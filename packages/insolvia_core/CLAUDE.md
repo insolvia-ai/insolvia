@@ -16,6 +16,15 @@ local-path install. Human docs: [`README.md`](README.md).
   admission — exist in one place so the DynamoDB and in-memory stores cannot
   drift, and so two services cannot disagree about what a stored record looks
   like. Never copy a shape into a service; import it.
+- **The court registry lives here, not beside the API's other series.**
+  `courts.py` loads `regulatory/courts/us-bankruptcy/` (ADR 0014's release
+  layout; the record shape is ADR 0024's) because the CASE DOMAIN validates
+  `case.court`/`case.division` against it, and the case domain has two
+  writers — the API's routes and the admin service's seeder. A registry the
+  seeder could not reach would leave the fixtures unvalidated. The data ships
+  in the wheel via `pyproject.toml`'s `package-data`; a file that list misses
+  loads in this package's tests and raises in every service. Append-only:
+  a correction is a new release directory, never an edit.
 - **Layering, enforced by `tests/unit/test_architecture.py`:** the domain modules in
   the package root import nothing but each other and the stdlib (PyJWT is the
   one deliberate exception — the signature check *is* the domain rule, see

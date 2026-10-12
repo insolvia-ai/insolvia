@@ -20,16 +20,21 @@ import pytest
 from insolvia_api.adapters.memory.packet_store import MemoryPacketStore
 from insolvia_api.core import dollar_amounts
 from insolvia_api.core.creditor_matrix import MATRIX_FILE_NAME
+from insolvia_api.core.form_fill import Text
 from insolvia_api.core.form_overlay import OutputOptions
-from insolvia_api.core.form_templates import form_revisions_as_of
+from insolvia_api.core.form_projections import CaseFile
+from insolvia_api.core.form_templates import form_revisions_as_of, latest_form
 from insolvia_api.core.jobs import KINDS, JobError, new_job
 from insolvia_api.core.packet_assembly import (
+    ALL_FORM_SERIES,
+    CHAPTER_13_FORM_SERIES,
     PACKET_ASSEMBLY_KIND,
     PACKET_FORM_SERIES,
     AssembledPacket,
     CaseData,
     PacketAssemblyDeps,
     assemble,
+    chapter_form_series,
     completeness_problems,
     packet_form_series,
     packet_zip,
@@ -41,6 +46,8 @@ from insolvia_core.adapters.memory.case_entity_store import MemoryCaseEntityStor
 from insolvia_core.adapters.memory.case_store import MemoryCaseStore
 from insolvia_core.adapters.memory.debtor_store import MemoryDebtorStore
 from insolvia_core.adapters.memory.document_blobs import MemoryDocumentBlobStore
+from insolvia_core.adapters.memory.tax_id_cipher import LocalTaxIdCipher
+from insolvia_core.adapters.memory.tax_id_store import MemoryTaxIdStore
 from insolvia_core.assets import ASSET
 from insolvia_core.case_entities import CaseEntity
 from insolvia_core.cases import assign_case
@@ -65,10 +72,15 @@ from insolvia_core.petitions import (
     RELATED_CASE,
     SOLE_PROPRIETORSHIP,
 )
+from insolvia_core.plans import PLAN
 from insolvia_core.sofa import SOFA_ENTRY
+from insolvia_core.tax_ids import TaxIdInput, store_tax_id
 from pypdf import PdfReader
 
-from tests.unit.test_form_projections import REFERENCE_CASE, reference_case_file
+from tests.unit.test_form_projections import (
+    reference_case_file,
+    reference_case_file_chapter_13,
+)
 
 CASE_ID = "11111111-2222-4333-8444-000000000001"
 TODAY = date(2026, 9, 3)
@@ -88,12 +100,12 @@ def _entity(kind, body, entity_id, position):
     )
 
 
-def reference_case_data() -> CaseData:
+def reference_case_data(case_file: CaseFile | None = None) -> CaseData:
     """The reference CaseFile, wrapped back into stored-entity shape. Bare
     bodies get synthetic ids; id-paired collections keep the ids the file's
     cross-references use."""
-    case_file = reference_case_file()
-    case = replace(REFERENCE_CASE, id=CASE_ID)
+    case_file = case_file if case_file is not None else reference_case_file()
+    case = replace(case_file.case, id=CASE_ID)
     position = iter(range(10_000))
 
     def wrap_bodies(kind, bodies, prefix):
@@ -110,6 +122,10 @@ def reference_case_data() -> CaseData:
     return CaseData(
         case=case,
         debtors=tuple(replace(d, case_id=CASE_ID) for d in case_file.debtors),
+        # The disclosed state, like the file: `assemble()` called directly on
+        # this prints B121's numbers; `build_deps` below seals the same
+        # digits so the WORKER path reaches them through the logged read.
+        tax_ids=case_file.tax_ids,
         petitions=wrap_bodies(PETITION, (case_file.petition,), "petition"),
         prior_cases=wrap_bodies(PRIOR_CASE, case_file.prior_cases, "prior"),
         related_cases=wrap_bodies(RELATED_CASE, case_file.related_cases, "related"),
@@ -147,7 +163,13 @@ def reference_case_data() -> CaseData:
         expenses=wrap_bodies(EXPENSE, case_file.expenses, "expense"),
         dependents=wrap_bodies(DEPENDENT, case_file.dependents, "dependent"),
         sofa_entries=wrap_bodies(SOFA_ENTRY, case_file.sofa_entries, "sofa"),
+        plans=wrap_bodies(PLAN, case_file.plans, "plan"),
     )
+
+
+def reference_chapter_13_case_data() -> CaseData:
+    """The same family under Chapter 13, with its plan (issue #367)."""
+    return reference_case_data(reference_case_file_chapter_13())
 
 
 # ── The completeness gate ───────────────────────────────────────
@@ -157,11 +179,140 @@ def test_the_reference_case_passes_the_gate():
     assert completeness_problems(reference_case_data()) == ()
 
 
-def test_a_chapter_13_case_is_refused():
-    data = reference_case_data()
-    data = replace(data, case=replace(data.case, chapter=13))
+def test_the_chapter_13_reference_case_passes_the_gate():
+    assert completeness_problems(reference_chapter_13_case_data()) == ()
+
+
+def test_the_chapter_13_reference_case_assembles_with_its_plan():
+    """Issue #367's done-when, on the reference case: the Chapter 13 set,
+    B122C in place of B122A, no B108, and the plan closing the set."""
+    outcome = assemble(reference_chapter_13_case_data(), as_of=TODAY)
+    assert isinstance(outcome, AssembledPacket)
+    forms = [name.split("-", 1)[1] for name, _ in outcome.parts[:-1]]
+    assert forms[-3:] == ["b122c1.pdf", "b122c2.pdf", "b113.pdf"]
+    assert "b108.pdf" not in forms
+    assert not {"b122a1.pdf", "b122a2.pdf"} & set(forms)
+    assert outcome.projections["form/b113"]["line_2_5_total"] == Text("30,000.00")
+    assert outcome.form_revisions["form/b113"] == "2017-12-01"
+
+
+def test_a_chapter_13_case_without_a_plan_is_refused():
+    data = replace(reference_chapter_13_case_data(), plans=())
     problems = completeness_problems(data)
-    assert any(p.source == "case" and p.field == "chapter" for p in problems)
+    assert [p.source for p in problems] == ["plans"]
+    assert "Official Form 113" in problems[0].message
+
+
+def test_a_second_plan_record_is_refused_by_id():
+    data = reference_chapter_13_case_data()
+    extra = replace(data.plans[0], id="plan-extra")
+    problems = completeness_problems(replace(data, plans=(*data.plans, extra)))
+    assert [(p.source, p.item_id) for p in problems] == [("plans", "plan-extra")]
+
+
+def test_a_chapter_13_lease_without_an_answer_is_refused():
+    # B113 Part 6 assumes the listed leases and rejects every other one, so
+    # an unanswered lease would be rejected by silence.
+    data = reference_chapter_13_case_data()
+    leases = tuple(
+        replace(e, body=replace(e.body, intention=None)) if e.id == "cl-storage" else e
+        for e in data.contract_leases
+    )
+    problems = completeness_problems(replace(data, contract_leases=leases))
+    assert [(p.source, p.item_id, p.field) for p in problems] == [
+        ("contract_leases", "cl-storage", "intention")
+    ]
+
+
+def test_a_chapter_13_secured_claim_needs_no_statement_of_intention():
+    # B108 is Chapter 7's (Rule 1007(b)(2)); on Chapter 13 the plan treats
+    # the claim instead.
+    data = reference_chapter_13_case_data()
+    claims = tuple(
+        replace(e, body=replace(e.body, intention=None)) for e in data.claims
+    )
+    assert completeness_problems(replace(data, claims=claims)) == ()
+
+
+def test_an_infeasible_plan_is_refused_by_the_plan_form():
+    data = reference_chapter_13_case_data()
+    starved = replace(
+        data.plans[0], body=replace(data.plans[0].body, monthly_payment="50.00")
+    )
+    outcome = assemble(replace(data, plans=(starved,)), as_of=TODAY)
+    assert not isinstance(outcome, AssembledPacket)
+    assert {p.source for p in outcome} == {"form/b113"}
+    assert any("not feasible" in p.message for p in outcome)
+
+
+@pytest.mark.parametrize(
+    ("court", "refused"),
+    [
+        # FLSB's local form is verified in the registry (@2026-09-26+2).
+        ("flsb", True),
+        # FLMB's answer is unverified: the national form is the default.
+        ("flmb", False),
+        # A case written before the registry names no court.
+        (None, False),
+    ],
+)
+def test_a_district_with_a_local_plan_form_is_refused(court, refused):
+    data = reference_chapter_13_case_data()
+    data = replace(data, case=replace(data.case, court=court))
+    problems = completeness_problems(data)
+    local = [p for p in problems if p.source == "case" and p.field == "court"]
+    assert bool(local) is refused
+    if refused:
+        assert "Rule 3015.1" in local[0].message
+        assert "Official Form 113" in local[0].message
+
+
+def test_a_chapter_7_case_is_not_asked_for_a_plan():
+    data = reference_case_data()
+    assert "form/b113" not in packet_form_series(data)
+    assert completeness_problems(data) == ()
+
+
+def test_a_chapter_11_case_is_refused_too():
+    data = reference_case_data()
+    data = replace(data, case=replace(data.case, chapter=11))
+    problems = completeness_problems(data)
+    assert any(
+        p.source == "case" and p.field == "chapter" and "Chapter 11" in p.message
+        for p in problems
+    )
+
+
+def test_a_chapter_13_case_files_the_b122c_pair_in_place_of_b122a():
+    # The set the forms hub lists for a Chapter 13 case (issues #365, #367):
+    # the Chapter 7 set with the Chapter 13 means-test pair — C-2 only above
+    # the median, exactly as A-2 only files above it on Chapter 7 — without
+    # B108, and with the plan last.
+    data = reference_case_data()
+    thirteen = replace(data, case=replace(data.case, chapter=13))
+    series = packet_form_series(thirteen)
+    assert series[-3:] == ("form/b122c1", "form/b122c2", "form/b113")
+    assert not {"form/b122a1", "form/b122a2", "form/b108"} & set(series)
+    assert series[:-3] == tuple(
+        s for s in packet_form_series(data)[:-2] if s != "form/b108"
+    )
+    shrunk = replace(
+        thirteen,
+        pay_period_records=tuple(
+            replace(entity, body=replace(entity.body, gross="4500.00"))
+            for entity in data.pay_period_records
+        ),
+    )
+    below = packet_form_series(shrunk)
+    assert "form/b122c1" in below
+    assert "form/b122c2" not in below
+
+
+def test_the_pin_map_covers_both_chapters_form_sets():
+    assert set(ALL_FORM_SERIES) == set(form_revisions_as_of(TODAY))
+    assert set(CHAPTER_13_FORM_SERIES) | set(PACKET_FORM_SERIES) == set(ALL_FORM_SERIES)
+    assert chapter_form_series(13) == CHAPTER_13_FORM_SERIES
+    assert chapter_form_series(7) == PACKET_FORM_SERIES
 
 
 def test_a_filed_case_never_reassembles():
@@ -386,7 +537,13 @@ def test_the_zip_carries_fixed_timestamps():
 # the Chapter 7 packet), which changed the plain set's own form list and
 # order, so the golden moved with it. A change to that hash means the plain,
 # unwatermarked render moved — which issue 13.11 promises never happens.
-PLAIN_PACKET_SHA256 = "a65c29236ad1f91123aa5ecad60e8113ccfa3f8a876ce2cd7ae430facf6fdb45"
+# Re-pinned once by issue 13.12 / #382: the reference case gained its two
+# tax identifiers, so B121 (part 02) prints lines 2-3 and B101 (part 01) its
+# line 3 boxes — the same deliberate move as a goldens regeneration.
+# Re-pinned by issue #367: B2030 (part 16) draws each overlay value in its
+# own saved graphics state (black fill, reset text state) — the same values
+# in the same places, different content-stream bytes.
+PLAIN_PACKET_SHA256 = "f52503cefe9589055842dbf1c195031055d61e86a48f8d2101f19d18cb71d5b7"
 
 
 def test_output_options_default_to_the_plain_filing_set():
@@ -496,6 +653,223 @@ def test_an_unfiled_form_named_in_the_subset_is_a_problem():
     assert any(p.source == "form/b106j2" for p in outcome)
 
 
+# ── Amendments (issue #370) ──────────────────────────────────────
+
+
+def _filed_reference_case_data() -> CaseData:
+    data = reference_case_data()
+    return replace(data, case=replace(data.case, status="filed"))
+
+
+def _with_amended(data: CaseData, field: str, entity_id: str) -> CaseData:
+    """A copy of `data` with exactly ONE entity of `field` flagged
+    amended — the test's stand-in for a PUT with `amended: true` against a
+    filed case."""
+    updated = tuple(
+        replace(entity, amended=True) if entity.id == entity_id else entity
+        for entity in getattr(data, field)
+    )
+    return replace(data, **{field: updated})
+
+
+def _part_bytes(outcome: AssembledPacket, suffix: str) -> bytes:
+    ((_, content),) = (
+        (name, content) for name, content in outcome.parts if name.endswith(suffix)
+    )
+    return content
+
+
+def _pdf_field_value(content: bytes, series_id: str, field_id: str):
+    """The AcroForm value of one logical field, resolved through its
+    release's own `pdf_names` — field VALUES (unlike stamped text) are not
+    reliably present in `extract_text()` without generated appearances, so
+    every check here reads `get_fields()` instead."""
+    pdf_name = latest_form(series_id).field(field_id).pdf_names[0]
+    fields = PdfReader(io.BytesIO(content)).get_fields() or {}
+    return fields.get(pdf_name)
+
+
+def test_amended_only_refuses_an_unfiled_case():
+    # `amended` cannot even be SET before filing (core/case_entities.py's
+    # own rule, enforced at the route layer) — this is the packet-assembly
+    # side of the same rule, in case a test or a stale job body sets it
+    # anyway.
+    data = _with_amended(reference_case_data(), "claims", "claim-mortgage")
+    outcome = assemble(data, as_of=TODAY, options=OutputOptions(amended_only=True))
+    assert not isinstance(outcome, AssembledPacket)
+    assert any(
+        p.source == "case" and "has not been filed" in p.message for p in outcome
+    )
+
+
+def test_amended_only_with_nothing_marked_amended_is_a_problem():
+    outcome = assemble(
+        _filed_reference_case_data(),
+        as_of=TODAY,
+        options=OutputOptions(amended_only=True),
+    )
+    assert not isinstance(outcome, AssembledPacket)
+    assert any("No schedule items are marked amended" in p.message for p in outcome)
+
+
+def test_a_filed_case_still_refuses_an_ordinary_reassembly():
+    # amendedOnly is the ONE exception — a plain re-assembly of a filed case
+    # (no options.amended_only) is unaffected.
+    outcome = assemble(_filed_reference_case_data(), as_of=TODAY)
+    assert not isinstance(outcome, AssembledPacket)
+    assert any(
+        p.source == "case" and "never re-assembled" in p.message for p in outcome
+    )
+
+
+def test_amended_only_renders_exactly_the_amended_schedule_plus_sum_and_dec():
+    data = _with_amended(_filed_reference_case_data(), "claims", "claim-mortgage")
+    outcome = assemble(data, as_of=TODAY, options=OutputOptions(amended_only=True))
+    assert isinstance(outcome, AssembledPacket)
+    names = [name for name, _ in outcome.parts]
+    assert names[0] == "00-amendment-cover.pdf"
+    assert any(name.endswith("-b106d.pdf") for name in names)
+    assert any(name.endswith("-b106sum.pdf") for name in names)
+    assert any(name.endswith("-b106dec.pdf") for name in names)
+    # Nothing else in the schedule set carries an amended item.
+    assert not any(name.endswith("-b106ab.pdf") for name in names)
+    assert not any(name.endswith("-b106ef.pdf") for name in names)
+    assert not any(name.endswith("-b106c.pdf") for name in names)
+    assert names[-1] == MATRIX_FILE_NAME
+
+
+def test_amended_only_prints_only_the_amended_item_on_its_schedule():
+    # Two secured claims exist (claim-mortgage, claim-auto); only the first
+    # is flagged amended, so only ITS creditor's name should print on 106D.
+    data = _with_amended(_filed_reference_case_data(), "claims", "claim-mortgage")
+    outcome = assemble(data, as_of=TODAY, options=OutputOptions(amended_only=True))
+    assert isinstance(outcome, AssembledPacket)
+    content = _part_bytes(outcome, "-b106d.pdf")
+    values = " ".join(
+        str(v) for v in (PdfReader(io.BytesIO(content)).get_fields() or {}).values()
+    )
+    assert "Gulf Coast Home Loans" in values
+    assert "Drive Away Financial" not in values
+
+
+def test_amended_only_ticks_the_amended_caption_on_the_amended_schedule():
+    data = _with_amended(_filed_reference_case_data(), "claims", "claim-mortgage")
+    outcome = assemble(data, as_of=TODAY, options=OutputOptions(amended_only=True))
+    assert isinstance(outcome, AssembledPacket)
+    field = _pdf_field_value(
+        _part_bytes(outcome, "-b106d.pdf"), "form/b106d", "caption.amended_filing"
+    )
+    assert field is not None
+    assert field.get("/V") not in (None, "/Off")
+
+
+def test_a_plain_assembly_never_ticks_the_amended_caption():
+    # The plain filing set (no amendedOnly) must leave the caption exactly
+    # as blank as it has always been — the projections themselves still
+    # never fill case-wide `is_amended` (form_projections/__init__.py).
+    outcome = assemble(reference_case_data(), as_of=TODAY)
+    assert isinstance(outcome, AssembledPacket)
+    content = _part_bytes(outcome, "-b106ab.pdf")
+    field = _pdf_field_value(content, "form/b106ab", "caption.amended_filing")
+    assert field is None or field.get("/V") in (None, "/Off")
+
+
+def test_amended_only_cover_sheet_lists_the_amended_forms():
+    data = _with_amended(_filed_reference_case_data(), "claims", "claim-mortgage")
+    outcome = assemble(data, as_of=TODAY, options=OutputOptions(amended_only=True))
+    assert isinstance(outcome, AssembledPacket)
+    text = (
+        PdfReader(io.BytesIO(_part_bytes(outcome, "amendment-cover.pdf")))
+        .pages[0]
+        .extract_text()
+    )
+    assert "not an official" in text.lower()
+    # Every form rendered after it, Summary and Declaration included.
+    assert text.index("106Sum") < text.index("106D ") < text.index("106Dec")
+
+
+def test_amending_schedule_ef_prints_only_the_amended_unsecured_claim():
+    # Issue #370's done-when: a filed case amends Schedule E/F and produces
+    # an amended-only set — the cover sheet, 106Sum, 106E/F and 106Dec.
+    data = _with_amended(_filed_reference_case_data(), "claims", "claim-hospital")
+    outcome = assemble(data, as_of=TODAY, options=OutputOptions(amended_only=True))
+    assert isinstance(outcome, AssembledPacket)
+    forms = [name.split("-", 1)[1] for name, _ in outcome.parts[:-1]]
+    assert forms == ["amendment-cover.pdf", "b106sum.pdf", "b106ef.pdf", "b106dec.pdf"]
+    ef = _part_bytes(outcome, "-b106ef.pdf")
+    values = " ".join(
+        str(v) for v in (PdfReader(io.BytesIO(ef)).get_fields() or {}).values()
+    )
+    assert "Bayside General Hospital" in values
+    assert "Meridian Bank Card Services" not in values
+    caption = _pdf_field_value(ef, "form/b106ef", "caption.amended_filing")
+    assert caption is not None
+    assert caption.get("/V") not in (None, "/Off")
+
+
+def test_an_amendment_never_opens_a_tax_id_envelope():
+    # B121 is not amendable, so an amendment never prints it and never
+    # performs its audited full-value read.
+    data = _with_amended(_filed_reference_case_data(), "claims", "claim-mortgage")
+    deps = build_deps(data)
+    job = new_job(
+        PACKET_ASSEMBLY_KIND,
+        case_id=CASE_ID,
+        created_by="subject-1",
+        options={"amendedOnly": True},
+    )
+    result = run_packet_assembly(job, deps, today=TODAY)
+    assert result["outcome"] == "assembled"
+    assert not any(e.action == "taxid.read" for e in deps.access_log.events)
+
+
+def test_amended_only_does_not_repin_the_case():
+    # The CASE's own form_revisions/constants_set_id describe the ORIGINAL
+    # filing; an amendment years later must not rewrite that history — only
+    # the PACKET's own record does (outcome.form_revisions).
+    data = _with_amended(_filed_reference_case_data(), "claims", "claim-mortgage")
+    deps = build_deps(data)
+    job = new_job(
+        PACKET_ASSEMBLY_KIND,
+        case_id=CASE_ID,
+        created_by="subject-1",
+        options={"amendedOnly": True},
+    )
+    result = run_packet_assembly(job, deps, today=TODAY)
+    assert result["outcome"] == "assembled"
+    stored_case = deps.case_store.cases[CASE_ID]
+    assert stored_case.status == "filed"
+    assert stored_case.updated_at == data.case.updated_at
+
+
+def test_a_chapter_13_amendment_prints_the_schedules_not_the_plan():
+    """amendedOnly stays coherent on Chapter 13 (issue #367): the changed
+    schedule, B106Sum/B106Dec and the cover — never B113, whose post-filing
+    change is a § 1323/§ 1329 modification, not a Rule 1009 amendment."""
+    data = reference_chapter_13_case_data()
+    data = replace(data, case=replace(data.case, status="filed"))
+    data = _with_amended(data, "claims", "claim-mortgage")
+    outcome = assemble(data, as_of=TODAY, options=OutputOptions(amended_only=True))
+    assert isinstance(outcome, AssembledPacket)
+    names = [name for name, _ in outcome.parts]
+    assert names[0] == "00-amendment-cover.pdf"
+    assert [n.split("-", 1)[1] for n in names[1:-1]] == [
+        "b106sum.pdf",
+        "b106d.pdf",
+        "b106dec.pdf",
+    ]
+
+
+def test_amended_only_combined_with_forms_is_refused_at_parse_time():
+    from insolvia_api.core.form_overlay import parse_output_options
+    from insolvia_core.errors import FieldValidationError
+
+    with pytest.raises(FieldValidationError):
+        parse_output_options(
+            {"amendedOnly": True, "forms": ["b106d"]}, allow_forms=True
+        )
+
+
 # ── The worker, end to end on the memory adapters ───────────────
 
 
@@ -530,9 +904,27 @@ def build_deps(data: CaseData):
         "expenses",
         "dependents",
         "sofa_entries",
+        "plans",
     ):
         for entity in getattr(data, field_name):
             entity_store.create(entity)
+    # The reference tax ids, sealed the way the debtor route seals them —
+    # under the case's firm and each debtor's ref — so the worker's logged
+    # read (not the fixture's `tax_ids`) is what puts the number on B121.
+    tax_id_store = MemoryTaxIdStore()
+    tax_id_cipher = LocalTaxIdCipher()
+    for debtor in data.debtors:
+        digits = data.tax_ids.get(debtor.filing_role)
+        if debtor.tax_id is None or digits is None:
+            continue
+        store_tax_id(
+            TaxIdInput(kind=debtor.tax_id.kind, value=digits),
+            existing=debtor.tax_id,
+            firm_id=data.case.firm_id,
+            case_id=data.case.id,
+            cipher=tax_id_cipher,
+            store=tax_id_store,
+        )
     return PacketAssemblyDeps(
         case_store=case_store,
         debtor_store=debtor_store,
@@ -540,6 +932,8 @@ def build_deps(data: CaseData):
         packet_store=MemoryPacketStore(case_store),
         blobs=MemoryDocumentBlobStore(),
         access_log=MemoryAccessLog(),
+        tax_id_store=tax_id_store,
+        tax_id_cipher=tax_id_cipher,
     )
 
 
@@ -582,6 +976,61 @@ def test_the_worker_stores_the_packet_and_pins_the_case_together():
     )
 
 
+@pytest.mark.parametrize(
+    ("case_data", "file_name"),
+    [
+        (reference_case_data, "chapter7-packet.zip"),
+        (reference_chapter_13_case_data, "chapter13-packet.zip"),
+    ],
+)
+def test_the_worker_names_the_packet_by_the_cases_chapter(case_data, file_name):
+    data = case_data()
+    deps = build_deps(data)
+
+    result = run_packet_assembly(accept_job(data.case.id), deps, today=TODAY)
+
+    assert result["outcome"] == "assembled"
+    assert result["packet"]["fileName"] == file_name
+    stored = deps.packet_store.get(data.case.id, result["packet"]["id"])
+    assert stored is not None
+    assert stored.file_name == file_name
+
+
+def test_the_worker_performs_the_logged_read_for_b121_only():
+    """B121's number reaches the packet through the audited full-value read
+    (issue 13.12 / #382): one `taxid.read` row per debtor, naming the
+    preparer, the debtor and the form — and the printed B121 carries the
+    disclosed digits, never the fixture's."""
+    deps = build_deps(reference_case_data())
+    run_packet_assembly(accept_job(), deps, today=TODAY)
+
+    reads = [e for e in deps.access_log.events if e.action == "taxid.read"]
+    assert [(e.principal, e.filing_role, e.purpose) for e in reads] == [
+        ("subject-1", "debtor_1", "b121"),
+        ("subject-1", "debtor_2", "b121"),
+    ]
+    stored = deps.packet_store.list_for_case(CASE_ID)[0]
+    content = deps.blobs.contents[stored.storage_ref]
+    b121 = zipfile.ZipFile(io.BytesIO(content)).read("02-b121.pdf")
+    fields = PdfReader(io.BytesIO(b121)).get_fields()
+    assert fields is not None
+    assert fields["Debtor1a.SSNum"].value == "987-65-4321"
+    assert fields["Debtor2a ITINNum"].value == "87-65-4322"
+
+
+def test_a_subset_without_b121_never_opens_an_envelope():
+    deps = build_deps(reference_case_data())
+    job = new_job(
+        PACKET_ASSEMBLY_KIND,
+        case_id=CASE_ID,
+        created_by="subject-1",
+        options={"forms": ["b101"]},
+    )
+    result = run_packet_assembly(job, deps, today=TODAY)
+    assert result["outcome"] == "assembled"
+    assert not any(e.action == "taxid.read" for e in deps.access_log.events)
+
+
 def test_reassembly_repins_and_keeps_the_old_packet():
     data = reference_case_data()
     deps = build_deps(data)
@@ -621,7 +1070,9 @@ def test_a_vanished_case_fails_deterministically():
 
 def test_a_case_that_changed_mid_assembly_fails_the_job():
     class RefusingPacketStore:
-        def create(self, packet, *, pinned_case, expected_updated_at):
+        def create(
+            self, packet, *, pinned_case, expected_updated_at, allow_filed=False
+        ):
             return False
 
         def get(self, case_id, packet_id):

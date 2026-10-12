@@ -1,6 +1,11 @@
-import { COUNSELING_EXEMPTIONS, COUNSELING_STATUSES, VENUE_BASES } from '@insolvia-ai/api-client';
+import {
+  COUNSELING_EXEMPTIONS,
+  COUNSELING_STATUSES,
+  TAX_ID_KINDS,
+  VENUE_BASES,
+} from '@insolvia-ai/api-client';
 import type { Address, DebtorBody, OtherName, PersonName } from '@insolvia-ai/api-client';
-import { Button, DateInput, Field, Input, Select } from '@insolvia-ai/design-system';
+import { Button, DateInput, Field, Input, PasswordInput, Select } from '@insolvia-ai/design-system';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { Heading } from '@/components/heading';
@@ -34,6 +39,12 @@ const EXEMPTION_OPTIONS = [
   { value: 'incapacity', label: 'Incapacity' },
   { value: 'disability', label: 'Disability' },
   { value: 'active_duty', label: 'Active military duty' },
+] as const;
+
+// B101 line 3 / B121 lines 2-3 (issue 13.12 / #382).
+const TAX_ID_OPTIONS = [
+  { value: 'ssn', label: 'Social Security number' },
+  { value: 'itin', label: 'Individual Taxpayer Identification Number (ITIN)' },
 ] as const;
 
 /**
@@ -193,6 +204,76 @@ export function DebtorFields({ body, onChange, errors }: DebtorFieldsProps) {
         >
           Add another name
         </Button>
+      </Section>
+
+      <Section title="Social Security or taxpayer number">
+        {/* The number is MASKED as it is typed (the design system's
+            PasswordInput — a secure field with a Show/Hide toggle, so a nine-
+            digit number typed once can still be checked) and never shown
+            again: after a save the API returns the kind and the last four,
+            which is all this screen ever holds. A save that does not touch
+            the number echoes that view back and the server keeps what it
+            stored; typing a new number replaces it; "Remove" clears it. The
+            package's password field asks the browser's password manager for
+            a saved credential (it offers no way to decline), which is a
+            harmless prompt here and cheaper than a hand-rolled masked input
+            that would miss the package's focus ring and a11y work. */}
+        <Text
+          style={[styles.help, { color: theme.colors.muted, fontFamily: theme.typography.body }]}
+        >
+          Stored encrypted. Only the last four digits are shown after saving; the full number prints
+          on the Statement About Your Social Security Numbers (B121).
+        </Text>
+        <Field.Root invalid={Boolean(errors['tax_id.kind'])}>
+          <Field.Label>Kind of number</Field.Label>
+          <Select
+            options={TAX_ID_OPTIONS}
+            value={body.tax_id?.kind ?? null}
+            onValueChange={(next) => {
+              const kind = narrow(TAX_ID_KINDS, next);
+              onChange({
+                ...body,
+                tax_id: kind === undefined ? undefined : { ...body.tax_id, kind },
+              });
+            }}
+            placeholder="Choose a kind"
+          />
+          {errors['tax_id.kind'] ? <Field.Error match>{errors['tax_id.kind']}</Field.Error> : null}
+        </Field.Root>
+        <Field.Root invalid={Boolean(errors['tax_id.value'] ?? errors.tax_id)}>
+          <Field.Label>Number</Field.Label>
+          <PasswordInput
+            value={body.tax_id?.value ?? ''}
+            onValueChange={(value) =>
+              onChange({
+                ...body,
+                // A kind is needed before a number can be sent; default to
+                // an SSN, the common case, and let the picker correct it.
+                tax_id: { kind: body.tax_id?.kind ?? 'ssn', ...body.tax_id, value },
+              })
+            }
+            placeholder={body.tax_id?.last_four ? `On file, ending ${body.tax_id.last_four}` : ''}
+            showLabel="Show number"
+            hideLabel="Hide number"
+          />
+          <Field.Description>
+            {body.tax_id?.last_four
+              ? `A number ending in ${body.tax_id.last_four} is on file. Type a new one to replace it.`
+              : 'Nine digits, with or without dashes.'}
+          </Field.Description>
+          {(errors['tax_id.value'] ?? errors.tax_id) ? (
+            <Field.Error match>{errors['tax_id.value'] ?? errors.tax_id}</Field.Error>
+          ) : null}
+        </Field.Root>
+        {body.tax_id?.last_four ? (
+          <Button
+            size="lg"
+            intent="secondary"
+            onPress={() => onChange({ ...body, tax_id: undefined })}
+          >
+            Remove the stored number
+          </Button>
+        ) : null}
       </Section>
 
       <Section title="Where the debtor lives">

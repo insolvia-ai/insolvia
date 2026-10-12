@@ -13,7 +13,10 @@ from typing import Protocol
 
 from insolvia_core.cases import Case
 
+from insolvia_api.core.calendar_feed import CalendarToken
+from insolvia_api.core.events import Event, EventScope
 from insolvia_api.core.extraction import ExtractionModelResult, ExtractionRequest
+from insolvia_api.core.filing_approval import FilingApproval
 from insolvia_api.core.jobs import Job
 from insolvia_api.core.mail import OutboundEmail
 from insolvia_api.core.packets import Packet
@@ -84,7 +87,12 @@ class PacketStore(Protocol):
     """
 
     def create(
-        self, packet: Packet, *, pinned_case: Case, expected_updated_at: str
+        self,
+        packet: Packet,
+        *,
+        pinned_case: Case,
+        expected_updated_at: str,
+        allow_filed: bool = False,
     ) -> bool:
         """Store the packet record AND the pinned case, atomically — both or
         neither, exactly as CaseStore.create pairs the case with its
@@ -94,10 +102,21 @@ class PacketStore(Protocol):
 
         The case write is conditional on the stored `updatedAt` still being
         `expected_updated_at` (the value the worker READ before assembling)
-        and on the status not being `filed`. False means the condition failed
-        — the case was edited, filed, or deleted mid-assembly — and the
-        caller must treat the packet as describing a case that no longer
-        exists; nothing was written.
+        and, unless `allow_filed`, on the status not being `filed`. False
+        means the condition failed — the case was edited, filed, or deleted
+        mid-assembly — and the caller must treat the packet as describing a
+        case that no longer exists; nothing was written.
+
+        `allow_filed` (issue #370) is the ONE exception to "a filed case
+        never re-resolves": an amendedOnly packet. Its caller
+        (`packet_assembly.run_packet_assembly`) passes the case UNCHANGED as
+        `pinned_case` in that mode — never `pin_case`'s output — so the case
+        write is a no-op overwrite of what is already stored (same
+        `form_revisions`, same `constants_set_id`, same `updated_at`), never
+        a rewrite of the ORIGINAL filing's pins. The packet's OWN
+        `form_revisions`/`constants_set_id` still record what THIS amendment
+        run resolved — that is what makes each packet self-describing
+        regardless of what the case's pins say.
 
         The packet put itself refuses to overwrite an existing (case, id),
         the id-minting rule every sibling create states.
@@ -111,6 +130,60 @@ class PacketStore(Protocol):
         reversed — the SK is a random uuid, so neither implementation gets
         the ordering for free). All of them: a caller cannot page."""
         ...
+
+
+class EventStore(Protocol):
+    """Persists calendar events (issue 14.6 / #358) — case-scoped ones as
+    child items of their case's partition, firm-scoped ones under the
+    firm's own partition in the same table, and both under one calendar
+    index (core/events.event_item).
+
+    Takes NO accessor and enforces nothing, the rule every sibling store
+    states: a case event is reached only through its case, which the route
+    resolves through `CaseStore` first; a firm event through the caller's
+    resolved firm; and the calendar query is firm-keyed and then filtered by
+    the route against the cases the caller may see. One authorisation path.
+    """
+
+    def create(self, event: Event) -> None:
+        """Store a new event. Ids are server-minted uuid4s; an existing
+        (scope, id) means the minting is broken — MUST raise."""
+        ...
+
+    def get(self, scope: EventScope, event_id: str) -> Event | None: ...
+
+    def put(self, event: Event) -> bool:
+        """Write `event` back over a row that still exists. False means it
+        is gone — an edit racing a delete must not resurrect it."""
+        ...
+
+    def delete(self, scope: EventScope, event_id: str) -> bool: ...
+
+    def list_for_scope(self, scope: EventScope) -> tuple[Event, ...]:
+        """Every event of one case (or the firm's own, case-less events), in
+        start order. All of them: the deadline engine reconciles against
+        this list, and a truncated one would duplicate a deadline."""
+        ...
+
+    def list_for_firm(
+        self, firm_id: str, *, starting_from: str, until: str
+    ) -> tuple[Event, ...]:
+        """Every event of the firm whose `sort_instant` lies in
+        [starting_from, until], case-scoped and firm-scoped alike, in start
+        order — the calendar's one read. The caller widens `starting_from`
+        by MAX_EVENT_SPAN_DAYS and filters on the end itself."""
+        ...
+
+
+class CalendarTokenStore(Protocol):
+    """Persists the per-user feed secret (core/calendar_feed.py): one row
+    per (firm, subject), replaced on rotation, removed on revocation."""
+
+    def put(self, token: CalendarToken) -> None: ...
+
+    def get(self, firm_id: str, subject: str) -> CalendarToken | None: ...
+
+    def delete(self, firm_id: str, subject: str) -> bool: ...
 
 
 class ReviewModel(Protocol):
@@ -167,6 +240,73 @@ class JobQueue(Protocol):
     """
 
     def enqueue(self, job: Job) -> None: ...
+
+
+class FilingApprovalStore(Protocol):
+    """Persists the attorney's per-filing approvals (core/filing_approval.py;
+    ADR 0024, guardrail 1) — child items of the case partition, beside ONE
+    pointer item naming the case's current approval.
+
+    Every write is conditional; the conditions ARE the guardrail: one live
+    approval per case, used once, never after expiry or a change."""
+
+    def current(self, case_id: str) -> FilingApproval | None:
+        """The approval the pointer names, strongly consistent, or None."""
+        ...
+
+    def get(self, case_id: str, approval_id: str) -> FilingApproval | None:
+        """One approval by id, strongly consistent — the consume reads this."""
+        ...
+
+    def create(
+        self,
+        approval: FilingApproval,
+        *,
+        replacing: FilingApproval | None,
+        voided_at: str,
+    ) -> None:
+        """Store `approval` and point the case at it, atomically.
+
+        `replacing` is the current approval the caller read (None: there was
+        none). The write is conditional on the pointer still naming it, and,
+        when it is `pending`, voids it (`superseded`, `voided_at`) in the
+        same transaction — conditional on it still being pending. A race
+        lost raises ConflictError and writes nothing."""
+        ...
+
+    def consume(
+        self,
+        case_id: str,
+        approval_id: str,
+        *,
+        digest: str,
+        now: int,
+        consumed_at: str,
+    ) -> bool:
+        """`pending` → `consumed`, conditional on status `pending`, the stored
+        digest equalling `digest`, and `expiresAt > now`. True when this call
+        made the write; False for every other outcome (the single-use
+        property: of two callers, exactly one gets True)."""
+        ...
+
+    def void(
+        self, case_id: str, approval_id: str, *, reason: str, voided_at: str
+    ) -> bool:
+        """`pending` → `voided` with `reason`, conditional on `pending`. True
+        when this call made the write."""
+        ...
+
+
+class FilingQueue(Protocol):
+    """Hands an approved filing to the filing worker (ADR 0024, its own SQS
+    queue — infra/modules/filing_queue).
+
+    One method, and its argument is the APPROVAL, not a message: the body
+    is `core/filing_approval.filing_job_message`'s, so no caller can put
+    anything else on the queue, and the only caller is `approve_filing`
+    (tests/unit/test_filing_approval.py reads every call site)."""
+
+    def enqueue(self, approval: FilingApproval) -> None: ...
 
 
 class Mailer(Protocol):

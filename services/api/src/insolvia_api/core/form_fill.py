@@ -204,7 +204,7 @@ def _check_box_text(
             f"{where}: {fill.value!r} has a character Helvetica cannot draw"
         )
         return
-    width = helvetica_width(fill.value)
+    width = helvetica_width(fill.value, box.size or OVERLAY_FONT_SIZE)
     if width > box.w + 0.01:
         problems.append(
             f"{where}: {fill.value!r} is {width:.0f} points wide; the printed "
@@ -270,19 +270,24 @@ def _overlay_stream(draws: list[tuple[OverlayBox, FieldFill]]) -> bytes:
             )
         else:
             assert isinstance(fill, Text)  # validated: boxes take Text or Check
+            # The page's own stream may end with any fill colour or text
+            # state still set — Official Form 113's page 5 ends on a white
+            # fill, which drew every value invisibly (issue #367) — so each
+            # value draws in its own saved state: black fill, fill render
+            # mode, no character/word spacing, 100% scaling, no rise.
             lines.append(
                 b"% box:" + tag + b"\n"
-                b"BT "
+                b"q 0 g 0 Tr 0 Tc 0 Tw 100 Tz 0 Ts BT "
                 + _OVERLAY_FONT_KEY.encode("ascii")
                 + b" "
-                + _fmt(OVERLAY_FONT_SIZE)
+                + _fmt(box.size or OVERLAY_FONT_SIZE)
                 + b" Tf 1 0 0 1 "
                 + _fmt(box.x)
                 + b" "
                 + _fmt(box.y)
                 + b" Tm "
                 + _pdf_literal(fill.value)
-                + b" Tj ET\n"
+                + b" Tj ET Q\n"
             )
     return b"".join(lines)
 

@@ -20,7 +20,9 @@ name: Release
 #
 # WHAT AN APPROVAL PROMOTES: everything, at this run's commit — not just what
 # this push changed. Staging legs are path-filtered (deploying an unchanged
-# service is waste), but production promotion is whole-state: you might merge
+# service is waste) — against the last commit staging released green on every
+# leg, not the previous push, so a leg an earlier run lost is retried (see the
+# `changes` job) — but production promotion is whole-state: you might merge
 # five PRs and only approve the fifth run, and services touched by the first
 # four must not be left behind. The `record` job is what makes that resolvable
 # — see its comment.
@@ -32,21 +34,29 @@ name: Release
 # an error. The gate double-checks on approval that nothing newer is waiting.
 #
 # ORDER MATTERS in the service legs, and it is not alphabetical:
-#   1. mailer     — the API depends on it (module.mailer's caller allowlist is
-#                   the API's role; the API reads MAILER_API_URL from SSM).
-#   2. api        — the backend everything else talks to.
+#   1. api        — the backend everything else talks to.
+#   2. admin, mcp — after the API; nothing at runtime couples them to the
+#                   legs around them, they are placed here only because the
+#                   chain must be linear (see NO concurrency group below).
 #   3. marketing  — its SSR waitlist action POSTs to the API.
-#   4. app        — the client, last: it should never be the first thing that
+#   4. app        — the client: it should never be the first thing that
 #                   expects a new API.
+#   5. filing     — the filing worker (ADR 0024 PR 7), a queue consumer that
+#                   nothing waits on; at the end because new legs go there
+#                   (below), and because it reads the API's approvals, never
+#                   the reverse.
 #
-# SHARED INFRA is the very first leg, ahead of even the staging apply, because
-# both env roots resolve shared's resources (the wildcard cert, the container
-# repositories) with hard-failing `data` lookups. It used to deploy from its
-# own push trigger, concurrently with this run, and a merge touching shared
-# plus a consumer could lose that race and fail the release. It is ungated —
-# staging cannot even plan until it applies, so it cannot sit behind the prod
-# approval — and account-wide, so applying it once here is right for both
-# stages. shared-infra-deploy.yml's header has the long form.
+# NOT HERE ANY MORE: shared infra and the mailer. Both moved to the
+# insolvia-services repo on 2026-10-11 and release from ITS release.yml. Two
+# consequences for this pipeline:
+#   • infra/envs/shared (zone, wildcard cert, every service's container
+#     repository) is applied there. The env roots here still look those up by
+#     name, so a NEW service's ECR repository must be merged and released in
+#     insolvia-services before the insolvia PR that deploys it — or this
+#     staging apply fails its `data "aws_ecr_repository"` lookup.
+#   • The mailer is no longer a leg, and the API no longer waits on it: the
+#     API's MAILER_API_URL is a hostname this repo constructs, and the mailer
+#     allows the API's role by name. Neither deploy blocks the other.
 #
 # Infra is the FIRST job of each stage, because the service legs read Terraform
 # outputs and deploying against stale outputs is the race that ordering
@@ -64,9 +74,22 @@ name: Release
 # already holds the approval and must not ask again.
 #
 # NO concurrency group HERE. The called workflows each hold their environment's
-# group (`insolvia-terraform-staging` / `insolvia-terraform-prod`); `needs`
-# already serialises the legs, and a group on both caller and callee deadlocks
-# — the callee would queue behind its own parent.
+# group (`insolvia-terraform-staging` / `insolvia-terraform-prod`), and a group
+# on both caller and callee deadlocks — the callee would queue behind its own
+# parent.
+#
+# THE LEGS OF EACH STAGE ARE A STRICT CHAIN, one after another, never a
+# fan-out — and that is load-bearing, not tidiness. A GitHub concurrency group
+# holds ONE running and ONE pending entry; a newer pending entry CANCELS the
+# older pending one, whatever `cancel-in-progress` says. When admin, mcp and
+# marketing (or admin, mcp and app, when marketing skipped) all needed only
+# `api`, they queued on the group in the same second: one ran, one waited, and
+# the third evicted the waiter about a second after it started. That cancelled
+# `mcp / deploy` or `admin / deploy` in every multi-leg release for a while, and
+# `record` still went green. The group already made the legs run one at a time,
+# so the chain costs no wall-clock time; it just lets at most one leg of this
+# run wait on the group at once. Add a new leg to the END of the chain, never
+# beside an existing one.
 #
 # TESTING THIS BEFORE MERGING: `workflow_dispatch` runs the workflow file from
 # whatever branch you select, so dispatch this from the PR branch to exercise
@@ -113,48 +136,88 @@ jobs:
   # blocks. The repo's `changed-paths` action cannot be reused: it reads
   # `github.event.pull_request.base.sha` and hard-fails on any other event, by
   # design — it exists to keep required PR checks reporting, which is a
-  # different problem from "what did this push change".
+  # different problem from "what is staging missing".
   changes:
     runs-on: ubuntu-latest
+    # Job-level permissions REPLACE the workflow-level block, so this job gets
+    # only what it uses: the checkout, and reading commit statuses to find the
+    # diff base.
+    permissions:
+      contents: read
+      statuses: read
     outputs:
       admin: ${{ steps.f.outputs.admin }}
       api: ${{ steps.f.outputs.api }}
       app: ${{ steps.f.outputs.app }}
-      mailer: ${{ steps.f.outputs.mailer }}
       marketing: ${{ steps.f.outputs.marketing }}
       mcp: ${{ steps.f.outputs.mcp }}
-      shared: ${{ steps.f.outputs.shared }}
+      filing: ${{ steps.f.outputs.filing }}
     steps:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
-      - id: f
+      # THE DIFF BASE IS WHERE STAGING WAS LAST WHOLE, not the previous tip of
+      # `main`. Diffing against `github.event.before` asked "what did this
+      # push change", so a leg an earlier run lost (evicted from the
+      # concurrency group, or failed) was never retried: the next push did not
+      # touch that service's paths, and staging drifted behind `main` with
+      # nothing red. The base is now the newest first-parent ancestor carrying
+      # a successful `insolvia/staging-release` status — `record` stamps it
+      # only when every leg the run needed deployed — so the diff covers
+      # everything since staging last served one commit on every leg. None in
+      # the last 200 commits: every leg deploys. The status API failing:
+      # `github.event.before`, the old behaviour, with a warning.
+      # .github/scripts/release-diff-base.sh owns the rules and logs which base
+      # it chose and why; release-diff-base.test.sh is their unit test.
+      - id: base
         env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
           # On a push this is the previous tip of `main`. It is all-zeroes for a
           # branch's first push, and absent entirely on workflow_dispatch.
           BEFORE: ${{ github.event.before }}
           ALL: ${{ inputs.all }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          # From the PARENT: HEAD is never its own base (a re-run of a green
+          # commit would diff against itself). A root commit has no parent, so
+          # the list is empty and the script answers `all`.
+          candidates="$(git rev-list --first-parent --max-count=200 "$SHA^" 2>/dev/null || true)"
+          base="$(printf '%s\n' "$candidates" | .github/scripts/release-diff-base.sh)"
+          echo "base=$base" >> "$GITHUB_OUTPUT"
+
+      - id: f
+        env:
+          BASE: ${{ steps.base.outputs.base }}
+          SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
 
-          # Deploy everything when we cannot know what changed (manual dispatch,
-          # or a first push with no previous tip). Failing OPEN is right here:
-          # deploying a service that did not change is wasteful, while skipping
-          # one that did leaves staging silently behind `main`, which is the one
-          # property staging exists to have.
-          if [ "$ALL" = "true" ] || [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+          # Every leg, admin included — it was once missing from this list, so
+          # an `all=true` dispatch deployed everything except admin.
+          all_legs() {
+            for s in admin api app filing marketing mcp; do echo "$s=true" >> "$GITHUB_OUTPUT"; done
+          }
+
+          # Deploy everything when we cannot know what staging is missing.
+          # Failing OPEN is right here: deploying a service that did not change
+          # is wasteful, while skipping one that did leaves staging silently
+          # behind `main`, which is the one property staging exists to have.
+          if [ -z "$BASE" ] || [ "$BASE" = "all" ]; then
             echo "No usable diff base — deploying every service."
-            for s in api app mailer marketing mcp shared; do echo "$s=true" >> "$GITHUB_OUTPUT"; done
+            all_legs
             exit 0
           fi
 
-          files="$(git diff --name-only "$BEFORE" "${{ github.sha }}")"
+          files="$(git diff --name-only "$BASE" "$SHA")"
           if [ -z "$files" ]; then
-            echo "::warning::Empty diff against $BEFORE — deploying every service rather than nothing."
-            for s in api app mailer marketing mcp shared; do echo "$s=true" >> "$GITHUB_OUTPUT"; done
+            echo "::warning::Empty diff against $BASE — deploying every service rather than nothing."
+            all_legs
             exit 0
           fi
+          echo "Changed since $BASE:"
           printf '%s\n' "$files" | sed 's/^/  /'
 
           # These sets are copied verbatim from the `on.push.paths:` filters the
@@ -179,41 +242,32 @@ jobs:
           # integration job, so a change to it must re-run that job.
           emit api       '^(services/api/|packages/insolvia_core/|seeds/|services/admin/src/insolvia_admin/entrypoints/seed\.py|infra/envs/staging/|infra/modules/(api_service|job_pipeline)/|\.github/(workflows/(api-staging|release)\.yml|actions/seed-staging/))'
           emit admin     '^(apps/insolvia_admin/|services/admin/|packages/insolvia_core/|infra/envs/staging/|infra/modules/(admin_service|web_hosting)/|\.github/workflows/(admin-staging|release)\.yml)'
-          emit mailer    '^(services/mailer/|infra/envs/staging/|infra/modules/(mailer|api_service)/|\.github/workflows/(mailer-staging|release)\.yml)'
           emit marketing '^(apps/insolvia_marketing/|infra/envs/staging/|infra/modules/marketing_site/|\.github/workflows/(marketing-staging|release)\.yml)'
           # packages/insolvia_core is baked into the mcp image too (ADR 0016's
           # "a core change redeploys three services" consequence).
           emit mcp       '^(services/mcp/|packages/insolvia_core/|infra/envs/staging/|infra/modules/mcp_service/|\.github/workflows/(mcp-staging|release)\.yml)'
+          # The filing worker's image carries packages/insolvia_core AND the
+          # API's source (the approval digest and the filing set it must
+          # compute exactly as the API does — services/filing/README.md), so
+          # a change to either redeploys it; and the API's unit tier, whose
+          # reference case its tests file.
+          emit filing    '^(services/filing/|services/api/src/|packages/insolvia_core/|infra/envs/staging/|infra/modules/(filing_worker|filing_queue|filing_credentials)/|\.github/workflows/(filing-staging|release)\.yml)'
           # apps/ and packages/ are named app-by-app rather than as whole
           # directories: marketing has its own line above, and the Python
           # packages/insolvia_core belongs to the api leg — a broad ^apps/ or
           # ^packages/ here would rebuild and redeploy the app for changes it
           # never consumes.
           emit app       '^(apps/insolvia_app/|packages/insolvia_api_client/|package(-lock)?\.json|infra/envs/staging/|infra/modules/|e2e/|seeds/|services/admin/src/insolvia_admin/entrypoints/seed\.py|\.github/(workflows/(app-staging|release)\.yml|actions/seed-staging/))'
-          # The set shared-infra-deploy.yml carried as `on.push.paths` before
-          # this workflow took its trigger over.
-          emit shared    '^(infra/envs/shared/|infra/modules/|\.github/workflows/(shared-infra-deploy|release)\.yml)'
 
   # ── STAGING ──────────────────────────────────────────────────────────────
 
-  # Account-wide resources first — both env roots resolve them with
-  # hard-failing `data` lookups (see the header). Ungated: staging cannot even
-  # plan until this applies.
-  shared:
-    needs: changes
-    if: ${{ needs.changes.outputs.shared == 'true' }}
-    uses: ./.github/workflows/shared-infra-deploy.yml
-    # A called workflow receives no secrets at all without this — not even
-    # repository-level ones. AWS_ROLE_ARN would resolve to an empty string and
-    # the OIDC step would fail with an unhelpful error.
-    secrets: inherit
-
-  # Env infra next, always — every service job below reads its outputs.
-  # `!cancelled() && !failure()` for the same reason as the legs below: a push
-  # that skips `shared` must not skip the rest of the release behind it.
+  # Env infra first, always — every service job below reads its outputs.
+  # (Shared infra is applied by insolvia-services' own release; see the
+  # header.) A called workflow receives no secrets at all without
+  # `secrets: inherit` — not even repository-level ones — so AWS_ROLE_ARN
+  # would resolve to an empty string and the OIDC step would fail unhelpfully.
   infra:
-    needs: [changes, shared]
-    if: ${{ !cancelled() && !failure() }}
+    needs: changes
     uses: ./.github/workflows/infra-staging.yml
     with:
       mode: apply
@@ -221,46 +275,63 @@ jobs:
 
   # Every `if:` below deliberately avoids `success()`. A job whose dependency
   # was SKIPPED is itself skipped under the default `if: success()`, which would
-  # mean a docs-only change to the mailer path silently cancelling the whole
+  # mean a docs-only change to one service's path silently cancelling the whole
   # chain behind it. `!cancelled() && !failure()` runs after a skipped upstream
   # but still stops dead on a failed one.
-  mailer:
-    needs: [changes, infra]
-    if: ${{ !cancelled() && !failure() && needs.changes.outputs.mailer == 'true' }}
-    uses: ./.github/workflows/mailer-staging.yml
-    secrets: inherit
-
+  #
+  # `needs.infra.result == 'success'` on top, because `infra` is never
+  # path-filtered — it runs on every release, so anything but `success` means
+  # the apply did not complete — and `!failure()` waves a CANCELLED infra
+  # through. A newer run's jobs can evict this run's waiting `infra` from the
+  # concurrency group (header), and a leg deploying against outputs that were
+  # never applied is exactly the stale-outputs race infra-first exists to
+  # prevent. (The status-check function has to stay in the expression: an
+  # `if:` with none gets an implicit `success()`, which a path-skipped leg
+  # upstream would turn false.)
   api:
-    needs: [changes, infra, mailer]
-    if: ${{ !cancelled() && !failure() && needs.changes.outputs.api == 'true' }}
+    needs: [changes, infra]
+    if: ${{ !cancelled() && !failure() && needs.infra.result == 'success' && needs.changes.outputs.api == 'true' }}
     uses: ./.github/workflows/api-staging.yml
     secrets: inherit
 
   admin:
     needs: [changes, infra, api]
-    if: ${{ !cancelled() && !failure() && needs.changes.outputs.admin == 'true' }}
+    if: ${{ !cancelled() && !failure() && needs.infra.result == 'success' && needs.changes.outputs.admin == 'true' }}
     uses: ./.github/workflows/admin-staging.yml
     secrets: inherit
 
   # After the API for ordering only (shared tables mean a core change lands on
   # both, and the API is the primary surface) — nothing at runtime couples the
-  # two deploys.
+  # two deploys. After `admin` only to keep the chain linear: a fan-out here is
+  # what cancelled this leg (header, "THE LEGS OF EACH STAGE ARE A STRICT
+  # CHAIN").
   mcp:
-    needs: [changes, infra, api]
-    if: ${{ !cancelled() && !failure() && needs.changes.outputs.mcp == 'true' }}
+    needs: [changes, infra, api, admin]
+    if: ${{ !cancelled() && !failure() && needs.infra.result == 'success' && needs.changes.outputs.mcp == 'true' }}
     uses: ./.github/workflows/mcp-staging.yml
     secrets: inherit
 
+  # `mcp` for the chain, not for any runtime reason; `api` stays listed because
+  # it is the real dependency.
   marketing:
-    needs: [changes, infra, api]
-    if: ${{ !cancelled() && !failure() && needs.changes.outputs.marketing == 'true' }}
+    needs: [changes, infra, api, mcp]
+    if: ${{ !cancelled() && !failure() && needs.infra.result == 'success' && needs.changes.outputs.marketing == 'true' }}
     uses: ./.github/workflows/marketing-staging.yml
     secrets: inherit
 
   app:
     needs: [changes, infra, marketing]
-    if: ${{ !cancelled() && !failure() && needs.changes.outputs.app == 'true' }}
+    if: ${{ !cancelled() && !failure() && needs.infra.result == 'success' && needs.changes.outputs.app == 'true' }}
     uses: ./.github/workflows/app-staging.yml
+    secrets: inherit
+
+  # The filing worker (ADR 0024 PR 7) — at the END of the chain, per the
+  # header's rule; `api` listed because its approvals are what the worker
+  # consumes.
+  filing:
+    needs: [changes, infra, api, app]
+    if: ${{ !cancelled() && !failure() && needs.infra.result == 'success' && needs.changes.outputs.filing == 'true' }}
+    uses: ./.github/workflows/filing-staging.yml
     secrets: inherit
 
   # ── RECORD: durable evidence that staging validated this commit ──────────
@@ -290,7 +361,7 @@ jobs:
   # that deploys staging, so no deploy can move a `staging` marker tag between
   # the read and the copy.
   record:
-    needs: [changes, infra, mailer, api, admin, mcp, marketing, app]
+    needs: [changes, infra, api, admin, mcp, marketing, app, filing]
     if: ${{ !cancelled() && !failure() }}
     runs-on: ubuntu-latest
     concurrency:
@@ -301,6 +372,21 @@ jobs:
       contents: read
       statuses: write
     steps:
+      # `!cancelled()` above is about the RUN, and `!failure()` ignores a
+      # cancelled job — so a leg evicted from the concurrency group (header)
+      # used to be waved through as though it had deployed, and this job then
+      # stamped the commit staging-green and tagged the OLD image as its
+      # `sha-<commit>`. A cancelled need is a deploy that did not happen:
+      # refuse to record it. Skipped is fine — that is the path filter.
+      - name: Refuse to record a release with a cancelled leg
+        if: ${{ contains(needs.*.result, 'cancelled') }}
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          echo "::error::A staging leg was cancelled, so staging did not fully deploy this commit. Re-run the cancelled jobs; do not promote this run."
+          echo "$RESULTS" | jq -r 'to_entries[] | "  \(.key): \(.value.result)"'
+          exit 1
+
       - uses: actions/checkout@v5
 
       - uses: aws-actions/configure-aws-credentials@v6
@@ -329,9 +415,9 @@ jobs:
             echo "api=$(basename "$(tf api_ecr_repository_url)")"
             echo "admin=$(basename "$(tf admin_ecr_repository_url)")"
             echo "jobs=$(basename "$(tf jobs_ecr_repository_url)")"
-            echo "mailer=$(basename "$(tf mailer_ecr_repository_url)")"
             echo "marketing=$(basename "$(tf marketing_ecr_repository_url)")"
             echo "mcp=$(basename "$(tf mcp_ecr_repository_url)")"
+            echo "filing=$(basename "$(tf filing_ecr_repository_url)")"
           } >> "$GITHUB_OUTPUT"
 
       - name: Ensure every service has a sha-tagged image for this commit
@@ -341,9 +427,9 @@ jobs:
             ${{ steps.tf.outputs.api }}
             ${{ steps.tf.outputs.admin }}
             ${{ steps.tf.outputs.jobs }}
-            ${{ steps.tf.outputs.mailer }}
             ${{ steps.tf.outputs.marketing }}
             ${{ steps.tf.outputs.mcp }}
+            ${{ steps.tf.outputs.filing }}
         run: |
           set -euo pipefail
           for repo in $REPOS; do
@@ -382,9 +468,14 @@ jobs:
   # reviewer should only ever be offered the newest validated commit. `waiting`
   # is precisely "parked at an environment gate", so this cannot touch runs
   # still deploying staging (in_progress) or already approved ones.
+  #
+  # `result == 'success'`, here and on `promote`, rather than `!failure()`:
+  # `record` holds the staging group and can itself be evicted (header), and
+  # `!failure()` treats a cancelled `record` as fine — which would offer the
+  # reviewer a commit that was never stamped staging-green.
   supersede:
     needs: record
-    if: ${{ !cancelled() && !failure() }}
+    if: ${{ !cancelled() && needs.record.result == 'success' }}
     runs-on: ubuntu-latest
     # Job-level permissions REPLACE the workflow-level block: `actions: write`
     # (to cancel runs) stays confined to this job, which runs no third-party
@@ -420,7 +511,7 @@ jobs:
   # waiting — this closes the window where it was approved first.)
   promote:
     needs: record
-    if: ${{ !cancelled() && !failure() }}
+    if: ${{ !cancelled() && needs.record.result == 'success' }}
     runs-on: ubuntu-latest
     environment: insolvia-production
     permissions:
@@ -442,7 +533,7 @@ jobs:
           {
             echo "### :rocket: Promotion approved"
             echo
-            echo "Shipping \`${GITHUB_SHA:0:7}\` to production: infra, then mailer → api → marketing → app."
+            echo "Shipping \`${GITHUB_SHA:0:7}\` to production: infra, then api → admin → mcp → marketing → app → filing."
           } >> "$GITHUB_STEP_SUMMARY"
 
   # ── PRODUCTION ───────────────────────────────────────────────────────────
@@ -451,7 +542,7 @@ jobs:
   # exactly what it must not use. That default was here for a long time on the
   # reasoning that "nothing upstream of these can be skipped-but-fine", and the
   # reasoning was wrong: the staging legs are `changes`-gated, so `admin`,
-  # `mailer` and the rest routinely skip-but-fine. `record` and `promote`
+  # `mcp` and the rest routinely skip-but-fine. `record` and `promote`
   # tolerate that with their own `!cancelled() && !failure()`, but the implicit
   # `success()` on a job does NOT stop at its direct `needs` — a skip upstream
   # propagates through the chain and skips it, even though `promote` itself
@@ -480,18 +571,9 @@ jobs:
       gated: true
     secrets: inherit
 
-  prod-mailer:
+  prod-api:
     needs: prod-infra
     if: ${{ !cancelled() && needs['prod-infra'].result == 'success' }}
-    uses: ./.github/workflows/mailer-prod.yml
-    with:
-      sha: ${{ github.sha }}
-      gated: true
-    secrets: inherit
-
-  prod-api:
-    needs: [prod-infra, prod-mailer]
-    if: ${{ !cancelled() && needs['prod-infra'].result == 'success' && needs['prod-mailer'].result == 'success' }}
     uses: ./.github/workflows/api-prod.yml
     with:
       sha: ${{ github.sha }}
@@ -507,9 +589,13 @@ jobs:
       gated: true
     secrets: inherit
 
+  # The same strict chain as staging (header): every prod deploy job holds
+  # `insolvia-terraform-prod`, so admin, mcp and marketing fanning out after
+  # prod-api would evict one of them from the group. It never bit only because
+  # the prod stage had never run with more than one of them.
   prod-mcp:
-    needs: [prod-infra, prod-api]
-    if: ${{ !cancelled() && needs['prod-infra'].result == 'success' && needs['prod-api'].result == 'success' }}
+    needs: [prod-infra, prod-api, prod-admin]
+    if: ${{ !cancelled() && needs['prod-infra'].result == 'success' && needs['prod-api'].result == 'success' && needs['prod-admin'].result == 'success' }}
     uses: ./.github/workflows/mcp-prod.yml
     with:
       sha: ${{ github.sha }}
@@ -517,8 +603,8 @@ jobs:
     secrets: inherit
 
   prod-marketing:
-    needs: [prod-infra, prod-api]
-    if: ${{ !cancelled() && needs['prod-infra'].result == 'success' && needs['prod-api'].result == 'success' }}
+    needs: [prod-infra, prod-api, prod-mcp]
+    if: ${{ !cancelled() && needs['prod-infra'].result == 'success' && needs['prod-api'].result == 'success' && needs['prod-mcp'].result == 'success' }}
     uses: ./.github/workflows/marketing-prod.yml
     with:
       sha: ${{ github.sha }}
@@ -529,6 +615,18 @@ jobs:
     needs: [prod-infra, prod-marketing]
     if: ${{ !cancelled() && needs['prod-infra'].result == 'success' && needs['prod-marketing'].result == 'success' }}
     uses: ./.github/workflows/app-prod.yml
+    with:
+      sha: ${{ github.sha }}
+      gated: true
+    secrets: inherit
+
+  # The filing worker, last — the staging chain's order. Production files
+  # nothing yet: its kill switch is created off and its fence allows no court
+  # host until ADR 0024 PR 10.
+  prod-filing:
+    needs: [prod-infra, prod-app]
+    if: ${{ !cancelled() && needs['prod-infra'].result == 'success' && needs['prod-app'].result == 'success' }}
+    uses: ./.github/workflows/filing-prod.yml
     with:
       sha: ${{ github.sha }}
       gated: true

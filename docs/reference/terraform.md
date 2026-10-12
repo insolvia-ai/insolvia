@@ -3,7 +3,14 @@
 ## Two levels of state
 
 Insolvia infra is split into a **shared** layer and per-**environment** layers,
-each with its own isolated S3 state — never Terraform workspaces.
+each with its own isolated S3 state — never Terraform workspaces. **The two
+layers live in two repositories.** This repo holds the environment roots
+(`staging`, `prod`, `dev`) and the modules they call. The shared layer —
+`shared`, `ci-trust`, `account-access` — and the mailer's modules live in
+[`insolvia-ai/insolvia-services`](https://github.com/insolvia-ai/insolvia-services),
+whose own [`docs/reference/terraform.md`](https://github.com/insolvia-ai/insolvia-services/blob/main/docs/reference/terraform.md) owns
+them ([ADR 0025](../adr/0025-shared-infra-and-mailer-move-to-insolvia-services.md)).
+This document describes them only where an environment here depends on them.
 
 ```
 infra/
@@ -12,25 +19,28 @@ infra/
 │   ├── api_service/          # reusable: Docker Lambda + alias + HTTP API + custom domain
 │   │                         #   + waitlist DynamoDB + SSM config namespace + alarms
 │   ├── auth/                 # reusable: Cognito user pool + hosted domain
-│   │                         #   + one web (SPA) PKCE app client
+│   │                         #   + public PKCE app clients: the web SPA's,
+│   │                         #   the client portal's (ADR 0023), one per MCP harness
 │   ├── case_store/           # GLBA-scope case data: customer-managed KMS key +
 │   │                         #   single-table DynamoDB + the API role's grant
 │   ├── audit_trail/          # CloudTrail data events on the case store, into
 │   │                         #   insolvia-<env>-audit under its own key
+│   ├── filing_credentials/   # the CM/ECF credential vault (ADR 0024): a dedicated
+│   │                         #   KMS key only the filing worker's role may decrypt,
+│   │                         #   its table, that role, the API's seal-only grant
+│   ├── filing_queue/         # the filing worker's own queue (ADR 0024 PR 6): SQS
+│   │                         #   + DLQ, the API's send-only and the worker's
+│   │                         #   consume-only grants
+│   ├── filing_worker/        # the filing worker (ADR 0024 PR 7): image Lambda +
+│   │                         #   event source mapping + alarms (absent in dev),
+│   │                         #   the kill switch, and every grant the worker
+│   │                         #   role holds on case data, pinned whole
 │   ├── job_pipeline/         # async jobs (ADR 0018): SQS queue + DLQ + the
 │   │                         #   image-packaged worker Lambda + alarms; the
 │   │                         #   worker half is optional (absent in dev)
-│   ├── mailer/               # transactional email: Lambda + S3 + DynamoDB + SES
 │   └── marketing_site/       # SSR marketing site: Lambda + alias + HTTP API + S3 +
 │                             # CloudFront (www + apex)
-└── envs/
-    ├── account-access/       # the account's HUMAN IAM principals — users,
-    │                         #   groups, their attached policies. CI cannot
-    │                         #   apply it (see below)
-    ├── shared/               # account-wide, env-independent
-    │                         #   • Route53 hosted zone  insolvia.ai
-    │                         #   • ACM wildcard cert    *.insolvia.ai + apex SAN (us-east-1)
-    │                         #   • IAM role             insolvia-shared-deploy-role (OIDC)
+└── envs/                     # (shared, ci-trust, account-access: insolvia-services)
     ├── staging/              # web_hosting -> staging-app.insolvia.ai
     │                         # api_service -> staging-api.insolvia.ai
     │                         # auth        -> insolvia-staging-users
@@ -45,9 +55,9 @@ infra/
 
 | Env | State key (`s3://insolvia-shared-terraform-state-us-east-1/…`) | Owns |
 |---|---|---|
-| ci-trust | `insolvia/ci-trust/terraform.tfstate` | GitHub OIDC provider + `insolvia-shared-deploy-role` deploy role + its policy — **human-applied only**, never by CI (see below) |
-| account-access | `insolvia/account-access/terraform.tfstate` | The human IAM users, the groups they belong to, and the policies attached to them — **human-applied only**, and CI *cannot* apply it at all (see below) |
-| shared | `insolvia/shared/terraform.tfstate` | zone, wildcard cert, SES identity + mail DNS, **the container repositories** (`insolvia-shared-api`, `insolvia-shared-marketing`, `insolvia-shared-mailer`, `insolvia-shared-jobs` — one per image, shared by every env), and **the seed-fixture bucket** (`insolvia-shared-dev-fixtures-us-east-1`, `modules/dev_fixtures` — the bytes behind `seeds/fixtures/`, read by every dev stack and by staging's seed step; CI applies it and never writes it) |
+| ci-trust *(insolvia-services)* | `insolvia/ci-trust/terraform.tfstate` | GitHub OIDC provider + `insolvia-shared-deploy-role` deploy role + its policy, and the staging seed role — **human-applied only**, never by CI. The deploy role trusts both repositories; the seed role trusts this one only |
+| account-access *(insolvia-services)* | `insolvia/account-access/terraform.tfstate` | The human IAM users, their groups and attached policies — **human-applied only**, and CI *cannot* apply it at all |
+| shared *(insolvia-services)* | `insolvia/shared/terraform.tfstate` | zone, wildcard cert, SES identity + mail DNS, **the container repositories** (`insolvia-shared-api`, `insolvia-shared-marketing`, `insolvia-shared-jobs`, … — one per image, including every service of this repo's, shared by every env), and **the seed-fixture bucket** (`insolvia-shared-dev-fixtures-us-east-1` — the bytes behind `seeds/fixtures/`, read by every dev stack and by staging's seed step; CI applies it and never writes it) |
 | staging | `insolvia/staging/terraform.tfstate` | staging S3 + CloudFront + DNS record; staging API stack (Lambda, HTTP API, `insolvia-staging-waitlist`, alarms); staging auth (`insolvia-staging-users`) |
 | prod | `insolvia/prod/terraform.tfstate` | prod S3 + CloudFront + DNS record; prod API stack (Lambda, HTTP API, `insolvia-prod-waitlist`, alarms); prod auth (`insolvia-prod-users`); the marketing stack (see below) |
 | dev | `insolvia/dev/<account-id>/<machine-id>/terraform.tfstate` — one per developer machine | that machine's `insolvia-dev-<short-id>-waitlist` and `insolvia-dev-<short-id>-cases` tables and `insolvia-dev-<short-id>-users` pool; the audit trail only with `-var=enable_audit_trail=true` |
@@ -72,59 +82,13 @@ data "aws_acm_certificate" "wildcard" {
 
 ## Human account access
 
-`infra/envs/account-access/` — the account's **human** IAM principals: the
-users, the groups they belong to, and the policies attached to them. Machines are elsewhere by construction: the
-pipeline's identity is `ci-trust`, and every service role is created by the env
-root that owns the service.
-
-**CI cannot apply this root, and that is the control rather than an oversight.**
-The deploy role holds no `iam:*User*` or `iam:*Group*` action anywhere in its
-policy — `ServiceRoleManagement` is fenced to `role/insolvia-*` and nothing
-else — so a CI apply fails on the first call. A pipeline that could create an
-IAM user with `AdministratorAccess` could mint itself an admin, which is exactly
-what `DenySelfPrivilegeEscalation` exists to prevent; keeping human principals
-in a root CI cannot reach makes that property structural instead of a
-permission someone forgot to add.
-
-**It is separate from `ci-trust`, which is also human-applied,** for blast
-radius and cadence. `ci-trust` holds the trust anchor every deploy
-authenticates through — a botched plan there takes the pipeline offline. This
-root changes when a person joins, leaves or moves group. Two states means a bad
-edit to the user map can never propose a change to the deploy role.
-
-Apply with `scripts/apply-account-access.sh` (credential dance → plan → confirm).
-
-**What it deliberately does not model**, all for the same reason — the
-credential would be written to `s3://insolvia-shared-terraform-state-us-east-1` in plaintext:
-
-| Not modelled | Why | Where it lives instead |
-|---|---|---|
-| `aws_iam_virtual_mfa_device` | Exposes `base_32_string_seed` — the TOTP shared secret — as an attribute | Console enrolment: [`iam-mfa-rotation.md`](../runbooks/iam-mfa-rotation.md) |
-| `aws_iam_user_login_profile` | Generated password lands in state without a PGP key, and with one you have only moved the problem to key custody | Set by the person at first sign-in |
-| `aws_iam_access_key` | Writes the secret access key to state | Created out of band; rotate by create → cut over → delete |
-
-A self-service *"manage your own MFA"* policy is also absent, and the module
-header says so explicitly so it is not re-added from a search result: every
-user here is in `insolvia-shared-admin-group`, so `AdministratorAccess` already allows every MFA
-action (verified with `aws iam simulate-principal-policy`). It starts doing
-work the day a non-admin user exists. MFA **enforcement**
-(`aws:MultiFactorAuthPresent`) is a real open gap rather than a settled
-decision — left out because a badly scoped version locks the account's only
-human out, so it wants its own plan.
-
-Two behaviours worth knowing before editing the user map:
-
-- **Group membership is exclusive.** `aws_iam_user_group_membership` manages
-  the full set, so a group added in the console is removed on the next apply.
-- **Policy attachment is not.** There is no exclusive variant for users, so a
-  policy attached by hand survives; catching that drift means reading
-  `aws iam list-attached-user-policies`, not trusting the plan.
-
-Offboarding is deliberately two applies: `aws_iam_user` carries
-`prevent_destroy`, so removing someone means deleting that line and applying,
-then removing them from the map and applying again. The account has one human
-user and no other console path in — an accidental destroy locks everyone out
-short of root recovery, and a real departure can afford a second plan.
+The account's **human** IAM principals live in insolvia-services'
+[`infra/envs/account-access/`](https://github.com/insolvia-ai/insolvia-services/blob/main/infra/envs/account-access/main.tf), applied by
+a human with that repo's `scripts/apply-account-access.sh`. Its
+[`docs/reference/terraform.md`](https://github.com/insolvia-ai/insolvia-services/blob/main/docs/reference/terraform.md) owns why CI
+cannot apply it, what it deliberately does not model, and the MFA procedure
+([`iam-mfa-rotation.md`](https://github.com/insolvia-ai/insolvia-services/blob/main/docs/runbooks/iam-mfa-rotation.md)). Nothing in this
+repo depends on it.
 
 ## Backend API (`infra/modules/api_service/`)
 
@@ -132,7 +96,8 @@ One instance per environment (issue #63): `staging-api.insolvia.ai` and
 `api.insolvia.ai`. Each owns, per env:
 
 - **ECR** — *not* owned per env. One repository per service, `insolvia-shared-api`,
-  shared by staging and prod and created in `envs/shared`: prod deliberately
+  shared by staging and prod and created in insolvia-services'
+  `infra/envs/shared`: prod deliberately
   deploys the exact image digest staging validated, which requires one place
   both envs can name it. Environment
   isolation lives in separate Lambdas, roles, tables, SSM namespaces and
@@ -177,7 +142,7 @@ deadlocks**: Terraform owns the repo the image must already be in. Once per
 env:
 
 ```
-terraform -chdir=infra/envs/shared apply          # creates insolvia-shared-api
+# in insolvia-services: release its infra/envs/shared (creates insolvia-shared-api)
 docker build --target lambda -f services/api/Dockerfile -t <repo-url>:<env> . && docker push <repo-url>:<env>
 terraform apply
 ```
@@ -204,7 +169,8 @@ lives in the case table — this module owns no store.
   `sha-<commit>` tag like every other repo. No alias, no version dance:
   a queue consumer has no router to protect (the module header owns the
   argument).
-- **Grant seams, both by role NAME** (the mailer/case_store pattern, so no
+- **Grant seams, both by role NAME** (the case_store pattern — and the
+  mailer's, in insolvia-services — so no
   module references another's resources): this module attaches
   `sqs:SendMessage` onto the API role it is passed, and `modules/case_store`
   attaches the worker's case-table + key grant onto the worker role it is
@@ -316,8 +282,22 @@ grants, deliberately disjoint:
 
 | Principal | Table | Key |
 |---|---|---|
-| API Lambda role | Item-level reads and writes, **no `Scan`**, no control plane | `Decrypt`/`GenerateDataKey`, fenced to `kms:ViaService = dynamodb` |
+| API Lambda role | Item-level reads and writes, **no `Scan`**, no control plane | `Decrypt`/`GenerateDataKey`, fenced to `kms:ViaService = dynamodb`; plus `GenerateDataKey`/`Decrypt` **directly**, fenced to `kms:EncryptionContext:purpose = debtor-tax-id` — the tax-id envelope (13.12), and the only direct use of the key |
+| Pipeline worker role | Item-level reads, no delete | The same DynamoDB-fenced pair; `Decrypt` alone under the tax-id context (it prints B121, it never enters an identifier) |
+| MCP service role | Item-level reads, candidate writes | The DynamoDB-fenced pair only — no tax-id context at all, so "no tool returns a full tax identifier" is an IAM fact |
+| Staging seed role (`ci-trust`) | Firm and case rows in staging | The DynamoDB- and S3-fenced pairs; `GenerateDataKey` alone under the tax-id context, to seal a fixture debtor's synthetic number — never `Decrypt` |
 | CI deploy role | Control plane only — create, update, tag, PITR | Manage the key; **explicitly denied** `Decrypt`, `GenerateDataKey*` and `ReEncrypt*` except where SSM or CloudTrail is the calling service |
+
+The tax-id statements are the one place a role touches the key without a
+`kms:ViaService` fence, and the encryption context is what replaces it: a
+call that does not carry `purpose = debtor-tax-id` is denied, and a call that
+does can only be the envelope `insolvia_core.tax_ids` designed
+(`infra/modules/case_store`, `TaxIdKeyUse`). The key's alias is derived by
+the ciphers from the case table's name — `alias/insolvia-<env>-cases` is the
+same `local.name` — so no environment carries a second configuration value
+for it, and `infra/envs/dev` needs nothing: the developer's own IAM user
+reaches the key through the key policy's root delegation, exactly as it
+reaches the table.
 
 The API role's key grant is easy to mistake for redundancy, because DynamoDB
 creates its own grant when the table is built. It is not: that grant covers
@@ -342,7 +322,7 @@ API role and omitting root, is what would make "no human read path" a property
 of the key itself; it is rejected because a key policy naming no principal able
 to change it is unrecoverable. The property is delivered instead by no human
 principal holding DynamoDB data-plane or KMS decrypt permissions, and by the
-deploy role's explicit deny in `infra/envs/ci-trust`. That is a weaker
+deploy role's explicit deny in insolvia-services' `infra/envs/ci-trust`. That is a weaker
 guarantee honestly stated, rather than a stronger one that risks locking the
 account out of its own data.
 
@@ -397,7 +377,8 @@ and a GSI can be added online later without a migration.
 
 **Wiring.** The module takes `api_role_name` — a name, not an ARN — looks the
 role up with a data source, and attaches the table grant from its own side.
-That is the mailer's pattern, and it is what avoids a cycle, since
+That is the mailer's pattern too (insolvia-services' `modules/mailer`, which
+finds `insolvia-<env>-api-role` by name), and it is what avoids a cycle, since
 `api_service` must not know this module exists. For the same reason the table
 name reaches the API through an **env-level** `aws_ssm_parameter` rather than
 through `api_service`'s own parameter map, landing as `CASE_TABLE_NAME` via the
@@ -435,10 +416,48 @@ lifecycle rule or a bucket deletion remains open to it. Real immutability is S3
 Object Lock, which is deliberately not here yet.
 
 **Scope and cost.** Data events bill per event, so the selector names the case
-table specifically rather than "all DynamoDB tables"; the case document bucket
-joins `data_resource_arns` when 8.6 lands. Management events are excluded —
-they would double the volume to say what the Terraform diff already says.
-Retention is 90 days on staging and a year on prod.
+table (and the filing-credential vault's table) specifically rather than "all
+DynamoDB tables". Management events are off by default — they would double the
+volume to say what the Terraform diff already says — **except** that KMS
+`Decrypt`/`GenerateDataKey` ARE management events, and a selector can only
+exclude KMS, never select it alone. So every root holding the vault sets
+`include_management_events = true`: it is the only way to retain each seal and
+open of the vault key (with its encryption context) past Event History's 90
+days. Retention is 90 days on staging and a year on prod.
+
+## Filing-credential vault (`infra/modules/filing_credentials/`)
+
+ADR 0024's guardrail 3: an attorney's PACER password and TOTP seed, sealed
+under a **dedicated key** in a **dedicated table**
+(`insolvia-<env>-filing-credentials`, alias of the same name). The module's
+header owns the reasoning; the facts a reader needs here:
+
+- **The key policy, not IAM, keeps Decrypt to the filing worker's role**
+  (`insolvia-<env>-filing-role`): an explicit `Deny kms:Decrypt` to every
+  principal whose `aws:PrincipalArn` is not that role — the API's role, the
+  deploy role, every admin — plus a deny of `ReEncrypt*`/`CreateGrant` to
+  everyone and of any `Decrypt` outside the vault's encryption-context
+  purpose. The API's role is allowed `kms:GenerateDataKey` alone: it seals
+  and can never open. `terraform test` in the module pins the whole document.
+- **The worker's role is created here**, ahead of `services/filing` (ADR 0024
+  PR 7), because KMS refuses a key policy naming a principal that does not
+  exist. It holds GetItem on the vault, Decrypt on its key, and PutItem on the
+  case access log; PR 7 adds its queue and case grants.
+- **The table is encrypted at rest under the case key**, not the vault key:
+  DynamoDB decrypts a CMK table AS THE CALLER, so a vault-key table would need
+  a Decrypt carve-out for the API in the very policy whose point is that only
+  the worker decrypts.
+- **ci-trust's `DenyFilingCredentialDecryption`** (alias-matched, like
+  `DenyCaseDataDecryption`) keeps the pipeline unable to open a credential even
+  if it rewrote the key policy. It is hardening; the deploy needs no new grant.
+- **The signed authorization (guardrail 2) lives in the same table**, in the
+  attorney's partition (`SK = AUTHORIZATION` for the one in force,
+  `AUTHORIZATION#<id>` for each signature's history), and uses only the verbs
+  both roles already hold — the API's Put/Get/Delete, the worker's GetItem —
+  so it changed nothing in this module.
+- **Dev** passes `worker_assumable_by = [the developer]` so the open can be
+  proved by assuming the real role (`services/api/scripts/dev-filing-vault-proof.sh`);
+  a precondition refuses that list in any environment not named `dev-*`.
 
 **Locally** it is off by default: a per-developer trail bills to record a
 developer reading their own synthetic cases. It can still be stood up on a
@@ -450,6 +469,60 @@ terraform -chdir=infra/envs/dev apply -var=enable_audit_trail=true ...
 
 — so a change to this module is exercised before staging meets it, rather
 than after. Turn it back off and re-apply to remove it.
+
+## Filing queue (`infra/modules/filing_queue/`)
+
+ADR 0024's guardrail 1 says approval is the only producer of a filing job;
+this is where the job goes — `insolvia-<env>-filing` and its `-dlq`, the
+filing worker's own queue (ADR 0018's pattern, not the case-job pipeline's
+queue). The module's header owns the reasoning; the facts:
+
+- **Two grants, both by role NAME and both pinned whole by `terraform test`**:
+  the API's role may `sqs:SendMessage` and nothing else
+  (`insolvia-<env>-filing-enqueue`); the filing worker's role
+  (`insolvia-<env>-filing-role`, from `modules/filing_credentials`) may
+  receive, delete, change visibility and read attributes, and never send
+  (`insolvia-<env>-filing-consume`). In code the one sender is
+  `adapters/aws/filing_queue.py` and its one caller the approval
+  (`tests/unit/test_filing_approval.py` reads the source tree to keep it so).
+- **The message is ids only** — approval, filing and case id — so SSE-SQS is
+  enough, for `job_pipeline`'s reason.
+- **Retention is two approval lifetimes (2 h)** and the visibility timeout
+  15 minutes: an approval expires after an hour, so an older job can never be
+  consumed. DLQ 14 days, `maxReceiveCount = 3`.
+- **The consumer is `services/filing`** — the event source mapping is
+  `modules/filing_worker`'s (below), batch size 1.
+- The URL reaches the API as `/insolvia/<env>/api/filing-queue-url` →
+  `FILING_QUEUE_URL`; dev publishes the same parameter and
+  `scripts/dev-aws-setup.sh` writes the output into `services/api/.env`.
+
+## Filing worker (`infra/modules/filing_worker/`)
+
+`services/filing` as `insolvia-<env>-filing-worker`, an image Lambda from the
+shared `insolvia-shared-filing` repository, consuming the filing queue at batch
+size 1 and at most two concurrent invocations. The module header owns the
+reasoning; the facts:
+
+- **Every grant the worker role holds on case data is here, pinned whole by
+  `terraform test`** (`insolvia-<env>-filing-worker-access` on
+  `insolvia-<env>-filing-role`): `GetItem`/`Query` and `PutItem`/`UpdateItem`
+  on the case table (no index, no delete, no batch, no transaction); the case
+  key through DynamoDB and S3 only; `s3:GetObject` on `cases/*/packets/*` and
+  `s3:PutObject` on `cases/*/filings/*`; `ssm:GetParameter` on the kill
+  switch. The vault's grants stay `filing_credentials`', the queue's
+  `filing_queue`'s.
+- **The kill switch** is `/insolvia/<env>/filing/submissions-enabled`, created
+  `"false"` in every environment; Terraform ignores its value after that, so a
+  human flips it without a deploy and no apply reverts the flip.
+- **The Lambda's timeout (600 s) is the worker's claim lease** and sits under
+  the queue's 900-second visibility timeout.
+- **Three alarms** on the API's topic: DLQ depth, worker errors, and any
+  `outcome_unknown` (a log metric filter) — the one state nobody may retry.
+- **Dev**: the grants and the kill switch, no Lambda (`ecr_repository_url =
+  null`); the local poller assumes the role.
+- **First apply in a fresh environment** needs the image bootstrap:
+  `scripts/bootstrap-ecr-images.sh <env> filing` after `shared` has created the
+  repository.
 
 ## Per-machine development environment (`infra/envs/dev/`)
 
@@ -490,13 +563,28 @@ What it owns is deliberately only what local dev consumes today:
   API enqueues onto `insolvia-dev-<short-id>-jobs` (`JOB_QUEUE_URL` in
   `services/api/.env`) and the worker poller consumes it — the pipeline's
   local story, ADR 0018.
+- **Filing-credential vault** via the same `modules/filing_credentials` as
+  staging/prod — the real key policy and the real filing worker's role, which
+  in dev alone also trusts the developer, so the seal-only/open-only split is
+  provable on a laptop (`services/api/scripts/dev-filing-vault-proof.sh`).
+- **Filing queue** via the same `modules/filing_queue` (no API role — the
+  developer sends, playing the API): the local API's approval enqueues onto
+  `insolvia-dev-<short-id>-filing` (`FILING_QUEUE_URL` in
+  `services/api/.env`); the approval's guarantees are proved against it by
+  `services/api/scripts/dev-filing-approval-proof.sh`.
+- **Filing worker** via the same `modules/filing_worker`, without its Lambda:
+  the grants attach to this machine's filing worker role, which
+  `services/filing`'s local poller assumes (`FILING_WORKER_ROLE_ARN` in
+  `services/filing/.env`); `services/filing/scripts/dev-filing-proof.sh`
+  files the reference case end to end against the fake CM/ECF that way.
 
 No ECR/Lambda/API Gateway (local dev runs the API via compose, not Lambda),
-and no IAM — the developer's own credentials are the principal. The stack is
+and no IAM beyond the filing worker's role above — the developer's own
+credentials are the principal. The stack is
 **seeded, not empty**: `scripts/dev-aws-seed.sh` converges it on
 `seeds/dev.json` — the dev account's firm and the fixture case it names, whose
 sample documents are copied server-side out of the shared fixture bucket
-(`envs/shared`) into this machine's own case-documents bucket. The same loader
+(insolvia-services' `infra/envs/shared`) into this machine's own case-documents bucket. The same loader
 seeds staging on every deploy ([ADR 0021](../adr/0021-test-tiers-and-seed-fixtures.md)).
 
 **CI never touches this env.** It is applied, reset, and destroyed only by
@@ -538,7 +626,8 @@ viewer ── CloudFront (www.insolvia.ai + insolvia.ai) ─┬─ /assets/*  �
   `<ecr>:{var.marketing_image_tag}` (this env's moving marker tag) and then
   ignores `image_uri`; CI rolls images forward with
   `aws lambda update-function-code`. **First apply** needs the image to exist:
-  apply `infra/envs/shared` (which creates the repository), push the image,
+  release insolvia-services' `infra/envs/shared` (which creates the
+  repository), push the image,
   then a full apply.
 
 Names: `insolvia-shared-marketing` (ECR — shared across envs),
@@ -568,49 +657,53 @@ against `envs/dev`. The upgrade procedure lives in
 
 ```
 ci-trust  →  shared  →  staging  →  prod
+└──── insolvia-services ────┘   └── this repo ──┘
 ```
 `ci-trust` must exist first: it holds the OIDC provider + deploy role that CI
-*assumes* to apply everything else. It is **human-applied only** — no CI
-workflow touches it — because the deploy role can't grant itself permissions
-(`DenySelfPrivilegeEscalation`). Then `shared` (zone + cert + SES). CI applies
-`staging` on merge to `main`; `prod` behind the release's `insolvia-production`
-approval (or an out-of-band `infra-prod.yml` dispatch). The ordering
-is not ceremonial, for two independent reasons: every env looks the cert up
-with `statuses = ["ISSUED"]`, **and** every env looks its container
-repositories up with `data "aws_ecr_repository"`. Both hard-fail until
-`shared` has applied, so in a fresh account nothing downstream can even plan
-before then — and `shared` itself can't be CI-applied until the `ci-trust`
-role exists.
+*assumes* to apply everything else, and it is **human-applied only** because
+the deploy role can't grant itself permissions (`DenySelfPrivilegeEscalation`).
+Then `shared` (zone + cert + SES + container repositories), applied by
+insolvia-services' own `release.yml`. Both are that repo's — its
+[`docs/reference/terraform.md`](https://github.com/insolvia-ai/insolvia-services/blob/main/docs/reference/terraform.md) owns their
+order and bootstrap. Here, CI applies `staging` on merge to `main`, and `prod`
+behind the release's `insolvia-production` approval (or an out-of-band
+`infra-prod.yml` dispatch).
 
-CI orders `shared` against everything downstream: `shared-infra-deploy.yml`
-has no push trigger of its own — release.yml calls it (path-filtered) as the
-first leg of its staging stage, ahead of the staging apply, so a merge that
-adds a shared resource plus its consumer can never have the consumer's `data`
-lookup race the apply that creates it. (It used to run concurrently from its
-own trigger, and a staging run that lost the race failed on the lookup.) The
-first `shared` apply must be preceded by a manual
-`terraform import aws_route53_zone.main Z01038711J6IZ68FD6ZDW` (#13) — that
-import is done in this account.
+The ordering is not ceremonial, for two independent reasons: every env looks
+the cert up with `statuses = ["ISSUED"]`, **and** every env looks its container
+repositories up with `data "aws_ecr_repository"`. Both hard-fail until `shared`
+has applied. While both lived here, `release.yml` ran the shared apply as the
+first leg of its staging stage so a consumer's lookup could never race the
+apply that created it. **Across two repositories nothing orders them
+automatically**, so the rule is a sequence of merges: a new service's
+repository is a PR to insolvia-services, released there, *before* the PR here
+that deploys it. The `insolvia-new-package` skill owns the steps.
 
-Changing the deploy role's permissions is a `ci-trust` apply, and it must be
-run by a human admin (`scripts/apply-ci-trust.sh`) — CI cannot, by the
-self-deny above. This is why adding an IAM permission the pipeline needs is
-never a "just merge it" change.
+Changing the deploy role's permissions is a `ci-trust` apply — a PR to
+insolvia-services, then a human runs its `scripts/apply-ci-trust.sh`. This is
+why adding an IAM permission the pipeline needs is never a "just merge it"
+change; the `insolvia-deploy-role-permissions` skill owns the procedure.
 
-`account-access` is **outside this ordering entirely** — nothing depends on it
-and it depends on nothing, because IAM users are principals a human uses, not
-inputs any deploy reads. Apply it whenever the people change
-(`scripts/apply-account-access.sh`); it is never a step in standing up an
-environment.
+**The mailer's staging/prod resources moved state too.** They were
+`module.mailer` in this repo's `envs/{staging,prod}` and are now owned by
+insolvia-services' own `infra/envs/{staging,prod}`
+(`insolvia-services/<env>/terraform.tfstate`), moved by a human-run
+`scripts/migrate-mailer-state.sh` per its
+[`docs/runbooks/state-migration.md`](https://github.com/insolvia-ai/insolvia-services/blob/main/docs/runbooks/state-migration.md),
+executed 2026-10-11. During that window both `main.tf` here carried a
+`removed { from = module.mailer; lifecycle { destroy = false } }` safety net;
+it was deleted once both states were confirmed to hold no `module.mailer`. This repo still writes the
+API's `MAILER_API_URL` SSM parameter, as `https://${var.mailer_subdomain}`.
 
 ## Destruction safety
 
-Never `terraform destroy` `shared` casually — it holds the hosted zone and the
-deploy role every other layer depends on. Tear down `prod`/`staging` first.
+Tear down `prod`/`staging` here before anyone considers `shared` in
+insolvia-services — it holds the hosted zone, the certificate and the
+container repositories every environment here depends on.
 
 ## Conventions
 - Resources: `insolvia-<env>-<component>-<identifier>` — environment SECOND
-  (e.g. `insolvia-staging-api`, `insolvia-prod-mailer-feedback-dlq`). S3 buckets
+  (e.g. `insolvia-staging-api`, `insolvia-prod-jobs-dlq`). S3 buckets
   take a `-us-east-1` suffix for global uniqueness
   (`insolvia-prod-case-documents-us-east-1`). The `insolvia-aws-naming` skill
   owns the full per-resource-type table and the component-naming rule.

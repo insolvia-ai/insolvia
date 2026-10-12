@@ -59,7 +59,8 @@ if [[ "$CHECK_ONLY" -eq 1 ]]; then
   pool_id="$(jq -r '.outputs.auth_user_pool_id.value // empty' <<<"$state_json")"
   document_bucket="$(jq -r '.outputs.case_document_bucket.value // empty' <<<"$state_json")"
   job_queue_url="$(jq -r '.outputs.job_queue_url.value // empty' <<<"$state_json")"
-  [[ -n "$table" && -n "$case_table" && -n "$access_log_table" && -n "$firm_table" && -n "$document_bucket" && -n "$pool_id" && -n "$job_queue_url" ]] || die "Terraform state is missing required development outputs."
+  filing_queue_url="$(jq -r '.outputs.filing_queue_url.value // empty' <<<"$state_json")"
+  [[ -n "$table" && -n "$case_table" && -n "$access_log_table" && -n "$firm_table" && -n "$document_bucket" && -n "$pool_id" && -n "$job_queue_url" && -n "$filing_queue_url" ]] || die "Terraform state is missing required development outputs."
   aws_dev dynamodb describe-table --table-name "$table" >/dev/null ||
     die "Development DynamoDB table '$table' is unavailable."
   aws_dev dynamodb describe-table --table-name "$case_table" >/dev/null ||
@@ -74,12 +75,15 @@ if [[ "$CHECK_ONLY" -eq 1 ]]; then
     die "Development Cognito pool '$pool_id' is unavailable."
   aws_dev sqs get-queue-attributes --queue-url "$job_queue_url" --attribute-names QueueArn >/dev/null ||
     die "Development job queue '$job_queue_url' is unavailable."
+  aws_dev sqs get-queue-attributes --queue-url "$filing_queue_url" --attribute-names QueueArn >/dev/null ||
+    die "Development filing queue '$filing_queue_url' is unavailable."
   if [[ ! -f "$API_DIR/.env" ]] || ! grep -q "^WAITLIST_TABLE_NAME=$table\$" "$API_DIR/.env" ||
     ! grep -q "^CASE_TABLE_NAME=$case_table\$" "$API_DIR/.env" ||
     ! grep -q "^CASE_ACCESS_LOG_TABLE_NAME=$access_log_table\$" "$API_DIR/.env" ||
     ! grep -q "^FIRM_TABLE_NAME=$firm_table\$" "$API_DIR/.env" ||
     ! grep -q "^CASE_DOCUMENT_BUCKET=$document_bucket\$" "$API_DIR/.env" ||
     ! grep -q "^JOB_QUEUE_URL=$job_queue_url\$" "$API_DIR/.env" ||
+    ! grep -q "^FILING_QUEUE_URL=$filing_queue_url\$" "$API_DIR/.env" ||
     ! grep -q "^AUTH_USER_POOL_ID=$pool_id\$" "$API_DIR/.env"; then
     die "services/api/.env is missing or stale. Run setup without --check."
   fi
@@ -88,6 +92,12 @@ if [[ "$CHECK_ONLY" -eq 1 ]]; then
     ! grep -q "^FIRM_TABLE_NAME=$firm_table\$" "$REPO_ROOT/services/mcp/.env" ||
     ! grep -q "^AUTH_CLIENT_IDS=" "$REPO_ROOT/services/mcp/.env"; then
     die "services/mcp/.env is missing or stale. Run setup without --check."
+  fi
+  if [[ ! -f "$REPO_ROOT/services/filing/.env" ]] ||
+    ! grep -q "^CASE_TABLE_NAME=$case_table\$" "$REPO_ROOT/services/filing/.env" ||
+    ! grep -q "^FILING_QUEUE_URL=$filing_queue_url\$" "$REPO_ROOT/services/filing/.env" ||
+    ! grep -q "^FILING_WORKER_ROLE_ARN=" "$REPO_ROOT/services/filing/.env"; then
+    die "services/filing/.env is missing or stale. Run setup without --check."
   fi
   ok "Per-machine AWS resources and services/api/.env are ready."
   exit 0
@@ -106,12 +116,15 @@ firm_table="$(jq -r '.firm_table_name.value' <<<"$outputs")"
 document_bucket="$(jq -r '.case_document_bucket.value' <<<"$outputs")"
 pool_id="$(jq -r '.auth_user_pool_id.value' <<<"$outputs")"
 web_client_id="$(jq -r '.auth_web_client_id.value' <<<"$outputs")"
+portal_client_id="$(jq -r '.auth_portal_client_id.value' <<<"$outputs")"
 auth_domain="$(jq -r '.auth_domain.value' <<<"$outputs")"
 issuer_url="$(jq -r '.auth_issuer_url.value' <<<"$outputs")"
 admin_audit_table="$(jq -r '.admin_audit_table_name.value' <<<"$outputs")"
 google_admin_client_id="$(jq -r '.google_admin_client_id.value' <<<"$outputs")"
 job_queue_url="$(jq -r '.job_queue_url.value' <<<"$outputs")"
+filing_queue_url="$(jq -r '.filing_queue_url.value' <<<"$outputs")"
 mcp_auth_client_ids="$(jq -r '.mcp_auth_client_ids.value' <<<"$outputs")"
+filing_worker_role_arn="$(jq -r '.filing_worker_role_arn.value' <<<"$outputs")"
 
 # ── Wire services/api at the real table ─────────────────────────
 # Mechanism (chosen after reading services/api/docker-compose.yml): docker
@@ -147,11 +160,18 @@ upsert_env "$api_env" CASE_DOCUMENT_BUCKET "$document_bucket"
 # onto this machine's real queue, and `python -m
 # insolvia_api.entrypoints.worker_poller` (same .env) runs them.
 upsert_env "$api_env" JOB_QUEUE_URL "$job_queue_url"
+# The filing queue (ADR 0024 PR 6): an attorney's approval puts its one
+# filing job here; services/filing's local poller consumes it.
+upsert_env "$api_env" FILING_QUEUE_URL "$filing_queue_url"
 upsert_env "$api_env" INSOLVIA_ENV "local"
 upsert_env "$api_env" AWS_PROFILE "$AWS_PROFILE_VALUE"
 upsert_env "$api_env" AWS_DEFAULT_REGION "$AWS_REGION_VALUE"
 upsert_env "$api_env" AUTH_ISSUER_URL "$issuer_url"
 upsert_env "$api_env" AUTH_CLIENT_ID "$web_client_id"
+# The client portal's app client (ADR 0023): the one id every /v1/portal/
+# route verifies, disjoint from AUTH_CLIENT_ID. Also what
+# dev-test-integration.sh signs the seeded client in against.
+upsert_env "$api_env" AUTH_PORTAL_CLIENT_ID "$portal_client_id"
 # The pool the API CALLS, as against the issuer it verifies against. Both end
 # in the same id and neither is derived from the other — see services/api's
 # core/config.py for why parsing one out of the other is refused.
@@ -189,6 +209,27 @@ upsert_env "$mcp_env" INSOLVIA_ENV "local"
 upsert_env "$mcp_env" AWS_PROFILE "$AWS_PROFILE_VALUE"
 upsert_env "$mcp_env" AWS_DEFAULT_REGION "$AWS_REGION_VALUE"
 
+# ── Wire services/filing at the same resources (ADR 0024 PR 7) ──
+# The filing worker reads the case table (the approval, the record its digest
+# is computed over, the packet), writes its filing record and the receipt,
+# opens the vault and consumes the filing queue. Locally it runs as the
+# filing worker's ROLE, not as the developer: FILING_WORKER_ROLE_ARN is what
+# the poller assumes (infra/envs/dev trusts this machine's principal to), so
+# a laptop run is held to the role's real grants and the vault key's policy.
+# FILING_SUBMISSIONS_ENABLED is the local stand-in for the kill switch — on,
+# because the only court a laptop can reach is the fake (core/fence.py);
+# FAKE_CMECF_URL is set by services/filing/scripts/dev-up.sh at run time.
+filing_env="$REPO_ROOT/services/filing/.env"
+upsert_env "$filing_env" CASE_TABLE_NAME "$case_table"
+upsert_env "$filing_env" CASE_ACCESS_LOG_TABLE_NAME "$access_log_table"
+upsert_env "$filing_env" CASE_DOCUMENT_BUCKET "$document_bucket"
+upsert_env "$filing_env" FILING_QUEUE_URL "$filing_queue_url"
+upsert_env "$filing_env" FILING_WORKER_ROLE_ARN "$filing_worker_role_arn"
+upsert_env "$filing_env" FILING_SUBMISSIONS_ENABLED "true"
+upsert_env "$filing_env" INSOLVIA_ENV "local"
+upsert_env "$filing_env" AWS_PROFILE "$AWS_PROFILE_VALUE"
+upsert_env "$filing_env" AWS_DEFAULT_REGION "$AWS_REGION_VALUE"
+
 # ── Wire the Expo app at the same pool ──────────────────────────
 # The app reads these two at BUILD time, not runtime: Expo inlines only
 # `EXPO_PUBLIC_*`-prefixed variables into the bundle, and it loads them from
@@ -207,8 +248,12 @@ app_env="$APP_DIR/.env"
 upsert_env "$app_env" EXPO_PUBLIC_INSOLVIA_ENV "local"
 upsert_env "$app_env" EXPO_PUBLIC_COGNITO_DOMAIN "$auth_domain"
 upsert_env "$app_env" EXPO_PUBLIC_COGNITO_CLIENT_ID "$web_client_id"
+# The portal's own client (ADR 0023), read by the app's /portal route group
+# (src/config/environment.ts, resolvePortalAuthConfig). Without it /portal
+# says "sign-in is not configured" and the staff app is unaffected.
+upsert_env "$app_env" EXPO_PUBLIC_COGNITO_PORTAL_CLIENT_ID "$portal_client_id"
 
-ok "AWS development resources are ready; services/api/.env, services/admin/.env, services/mcp/.env and apps/insolvia_app/.env were updated."
+ok "AWS development resources are ready; services/api/.env, services/admin/.env, services/mcp/.env, services/filing/.env and apps/insolvia_app/.env were updated."
 
 # If setup is reapplied while the API container is already running, replace it
 # so it picks up the new table name and the freshly exported credentials —
@@ -226,6 +271,7 @@ fi
 printf '\nCognito (for upcoming local auth work — nothing consumes these yet):\n'
 printf '  User pool id:      %s\n' "$pool_id"
 printf '  Web client id:     %s\n' "$web_client_id"
+printf '  Portal client id:  %s\n' "$portal_client_id"
 printf '  Hosted domain:     %s\n' "$auth_domain"
 printf '  Issuer:            %s\n' "$issuer_url"
 printf '\nStart the API against your per-machine table with:\n  ./services/api/scripts/dev-up.sh\n'

@@ -24,8 +24,15 @@ from typing import Any
 import pytest
 from botocore.exceptions import ClientError
 from insolvia_core.adapters.aws import firm_store as aws_firm_store
+from insolvia_core.adapters.aws.dynamo import to_attributes
 from insolvia_core.adapters.aws.firm_store import DynamoDbFirmStore
 from insolvia_core.adapters.memory.firm_store import MemoryFirmStore
+from insolvia_core.firm_clients import (
+    create_firm_client,
+    firm_client_item,
+    parse_firm_client,
+    set_firm_client_status,
+)
 from insolvia_core.firms import (
     ADD_EDIT,
     CASES,
@@ -36,6 +43,12 @@ from insolvia_core.firms import (
 from insolvia_core.library_creditors import (
     create_library_creditor,
     parse_library_creditor,
+)
+from insolvia_core.questionnaire import (
+    SECTION_IDS,
+    build_config,
+    parse_questionnaire_update,
+    questionnaire_item,
 )
 
 FIRM_ID = "00000000-0000-4000-8000-00000000f18a"
@@ -215,6 +228,12 @@ class FakeDynamoDb:
 
     def delete_item(self, **kwargs: Any) -> Any:
         return self._record("delete_item", kwargs)
+
+    def update_item(self, **kwargs: Any) -> Any:
+        return self._record("update_item", kwargs)
+
+    def transact_write_items(self, **kwargs: Any) -> Any:
+        return self._record("transact_write_items", kwargs)
 
 
 def dynamo_store(monkeypatch, fake: FakeDynamoDb) -> DynamoDbFirmStore:
@@ -642,3 +661,292 @@ def test_the_library_query_excludes_the_firms_other_rows(monkeypatch):
     _, kwargs = fake.calls[0]
     assert kwargs["KeyConditionExpression"] == "PK = :firm AND begins_with(SK, :prefix)"
     assert kwargs["ExpressionAttributeValues"][":prefix"] == {"S": "LIBCREDITOR#"}
+
+
+# ── Firm clients (ADR 0022 / #353) ───────────────────────────────────
+
+
+def firm_client(firm_id: str = FIRM_ID, surname: str = "Example"):
+    draft = parse_firm_client(
+        {
+            "name": {"given": "Jordan", "surname": surname},
+            "residence_address": {"line1": "1 Example St", "county": "Sangamon"},
+            "other_names_used": [{"id": "alias-1", "surname": "Sample"}],
+            "date_of_birth": "1980-02-29",
+        }
+    )
+    return create_firm_client(draft, firm_id=firm_id, created_by=ALICE)
+
+
+def test_creating_the_same_client_twice_is_refused():
+    store = MemoryFirmStore()
+    client = firm_client()
+    store.create_client(client)
+    with pytest.raises(RuntimeError):
+        store.create_client(client)
+
+
+def test_a_client_is_read_within_its_firm():
+    store = MemoryFirmStore()
+    client = firm_client()
+    store.create_client(client)
+    assert store.get_client(FIRM_ID, client.id) == client
+    assert store.get_client(OTHER_FIRM_ID, client.id) is None
+
+
+def test_the_directory_is_one_firm_in_directory_order():
+    store = MemoryFirmStore()
+    store.create_client(firm_client(surname="Zeta"))
+    store.create_client(firm_client(surname="adams"))
+    store.create_client(firm_client(firm_id=OTHER_FIRM_ID, surname="Other"))
+    archived = set_firm_client_status(firm_client(surname="Middle"), "archived")
+    store.create_client(archived)
+
+    listed = store.list_clients(FIRM_ID)
+    # Archived clients are listed too: the directory is the whole directory.
+    assert [c.name.surname for c in listed] == ["adams", "Middle", "Zeta"]
+
+
+def test_updating_a_client_that_is_not_there_is_none():
+    assert MemoryFirmStore().update_client(firm_client()) is None
+
+
+def test_updating_across_firms_does_not_move_a_client():
+    store = MemoryFirmStore()
+    client = firm_client()
+    store.create_client(client)
+    assert store.update_client(replace(client, firm_id=OTHER_FIRM_ID)) is None
+    assert store.get_client(OTHER_FIRM_ID, client.id) is None
+
+
+def test_a_client_round_trips_through_the_wire_format(monkeypatch):
+    original = replace(
+        firm_client(),
+        tax_id_ref="00000000-0000-4000-8000-0000000000ef",
+        tax_id_last_four="4320",
+    )
+    fake = FakeDynamoDb()
+    store = dynamo_store(monkeypatch, fake)
+    store.create_client(original)
+
+    _, kwargs = fake.calls[0]
+    assert kwargs["ConditionExpression"] == "attribute_not_exists(SK)"
+    item = kwargs["Item"]
+    assert item["SK"] == {"S": f"FIRMCLIENT#{original.id}"}
+    assert item["body"]["M"]["residence_address"]["M"]["county"] == {"S": "Sangamon"}
+
+    fake.responses["get_item"] = {"Item": item}
+    assert store.get_client(FIRM_ID, original.id) == original
+
+
+def test_a_client_update_is_scoped_to_the_firm(monkeypatch):
+    fake = FakeDynamoDb()
+    dynamo_store(monkeypatch, fake).update_client(firm_client())
+    name, kwargs = fake.calls[0]
+    assert name == "update_item"
+    assert kwargs["ConditionExpression"] == (
+        "attribute_exists(SK) AND firmId = :firm AND attribute_not_exists(#merged)"
+    )
+    assert kwargs["ExpressionAttributeNames"]["#merged"] == "mergedInto"
+    assert kwargs["ExpressionAttributeValues"][":firm"] == {"S": FIRM_ID}
+
+
+def test_a_client_update_never_writes_the_merge_attributes(monkeypatch):
+    """A whole-record save built from a read taken before a merge claimed the
+    row must not erase the claim — so the update names every attribute the
+    record owns and none of the merge's, even when the read carried them."""
+    fake = FakeDynamoDb()
+    stale = replace(firm_client(), merging_into="client-a", merging_from="client-b")
+    dynamo_store(monkeypatch, fake).update_client(stale)
+    _, kwargs = fake.calls[0]
+    written = {
+        name
+        for placeholder, name in kwargs["ExpressionAttributeNames"].items()
+        if placeholder.startswith("#a")
+    }
+    assert {"status", "body", "updatedAt", "firmId"} <= written
+    assert written.isdisjoint({"mergedInto", "mergingInto", "mergingFrom", "PK", "SK"})
+
+
+def test_a_client_update_without_a_tax_id_removes_it(monkeypatch):
+    fake = FakeDynamoDb()
+    dynamo_store(monkeypatch, fake).update_client(firm_client())
+    _, kwargs = fake.calls[0]
+    assert kwargs["UpdateExpression"].endswith("REMOVE #taxId")
+
+
+def test_a_merge_claim_is_one_transaction_over_both_rows(monkeypatch):
+    fake = FakeDynamoDb()
+    claimed = dynamo_store(monkeypatch, fake).claim_client_merge(
+        FIRM_ID, merged_id="client-b", survivor_id="client-a"
+    )
+    [(name, kwargs)] = fake.calls
+    merged, survivor = (item["Update"] for item in kwargs["TransactItems"])
+    assert claimed is True
+    assert name == "transact_write_items"
+    assert merged["Key"]["SK"] == {"S": "FIRMCLIENT#client-b"}
+    assert merged["UpdateExpression"] == "SET #into = :survivor"
+    assert "attribute_not_exists(#from)" in merged["ConditionExpression"]
+    assert survivor["Key"]["SK"] == {"S": "FIRMCLIENT#client-a"}
+    assert survivor["UpdateExpression"] == "SET #from = :merged"
+    assert "attribute_not_exists(#into)" in survivor["ConditionExpression"]
+    for update in (merged, survivor):
+        assert "#status = :active" in update["ConditionExpression"]
+        assert "attribute_not_exists(#mergedInto)" in update["ConditionExpression"]
+        assert update["ExpressionAttributeValues"][":firm"] == {"S": FIRM_ID}
+
+
+def test_a_refused_merge_claim_is_false(monkeypatch):
+    fake = FakeDynamoDb()
+    fake.raises = ClientError(
+        {"Error": {"Code": "TransactionCanceledException"}}, "TransactWriteItems"
+    )
+    store = dynamo_store(monkeypatch, fake)
+    claimed = store.claim_client_merge(
+        FIRM_ID, merged_id="client-b", survivor_id="client-a"
+    )
+    assert claimed is False
+
+
+def test_finishing_a_merge_archives_and_releases_in_one_transaction(monkeypatch):
+    fake = FakeDynamoDb()
+    dynamo_store(monkeypatch, fake).finish_client_merge(
+        FIRM_ID, merged_id="client-b", survivor_id="client-a", merged_at="2026-09-30"
+    )
+    name, kwargs = fake.calls[0]
+    merged, survivor = (item["Update"] for item in kwargs["TransactItems"])
+    assert name == "transact_write_items"
+    assert merged["UpdateExpression"] == (
+        "SET #status = :archived, #mergedInto = :survivor, updatedAt = :now"
+        " REMOVE #into"
+    )
+    assert merged["ConditionExpression"] == "#into = :survivor"
+    assert survivor["UpdateExpression"] == "REMOVE #from"
+    assert survivor["ConditionExpression"] == "#from = :merged"
+
+
+def test_a_refused_client_update_is_none(monkeypatch):
+    fake = FakeDynamoDb()
+    store = dynamo_store(monkeypatch, fake)
+    fake.raises = conditional_check_failed()
+    assert store.update_client(firm_client()) is None
+
+
+def test_a_refused_client_create_raises(monkeypatch):
+    fake = FakeDynamoDb()
+    store = dynamo_store(monkeypatch, fake)
+    fake.raises = conditional_check_failed()
+    with pytest.raises(RuntimeError):
+        store.create_client(firm_client())
+
+
+def test_the_directory_query_reads_only_client_rows_and_every_page(monkeypatch):
+    """Under `FIRMCLIENT#`, never `CLIENT#` — the portal binding's prefix in
+    this same partition (`firm_clients` owns why)."""
+    first, second = firm_client(surname="Zeta"), firm_client(surname="Adams")
+    pages = iter(
+        [
+            {
+                "Items": [to_attributes(firm_client_item(first))],
+                "LastEvaluatedKey": {"PK": {"S": "x"}},
+            },
+            {"Items": [to_attributes(firm_client_item(second))]},
+        ]
+    )
+
+    class Paging(FakeDynamoDb):
+        def query(self, **kwargs: Any) -> Any:
+            self.calls.append(("query", kwargs))
+            return next(pages)
+
+    fake = Paging()
+    listed = dynamo_store(monkeypatch, fake).list_clients(FIRM_ID)
+
+    assert [c.name.surname for c in listed] == ["Adams", "Zeta"]
+    assert len(fake.calls) == 2
+    _, kwargs = fake.calls[0]
+    assert kwargs["KeyConditionExpression"] == "PK = :firm AND begins_with(SK, :prefix)"
+    assert kwargs["ExpressionAttributeValues"][":prefix"] == {"S": "FIRMCLIENT#"}
+    assert fake.calls[1][1]["ExclusiveStartKey"] == {"PK": {"S": "x"}}
+
+
+# ── The client questionnaire's config (ADR 0023 PR 3 / #362) ───────
+
+
+def questionnaire(firm_id: str = FIRM_ID, *, other: bool = False):
+    body = {
+        "sections": [{"id": s, "enabled": other or s != "other"} for s in SECTION_IDS]
+    }
+    return build_config(
+        parse_questionnaire_update(body), firm_id=firm_id, updated_by=ALICE
+    )
+
+
+def test_a_firm_with_no_questionnaire_config_reads_none():
+    assert MemoryFirmStore().get_questionnaire(FIRM_ID) is None
+
+
+def test_a_questionnaire_config_is_read_within_its_firm():
+    store = MemoryFirmStore()
+    saved = questionnaire()
+
+    store.put_questionnaire(saved)
+
+    assert store.get_questionnaire(FIRM_ID) == saved
+    assert store.get_questionnaire(OTHER_FIRM_ID) is None
+
+
+def test_a_questionnaire_save_replaces_the_stored_one():
+    store = MemoryFirmStore()
+    store.put_questionnaire(questionnaire())
+
+    store.put_questionnaire(questionnaire(other=True))
+
+    config = store.get_questionnaire(FIRM_ID)
+    assert config is not None
+    assert config.sections["other"].enabled is True
+
+
+def test_resetting_the_questionnaire_twice_reports_the_truth():
+    store = MemoryFirmStore()
+    store.put_questionnaire(questionnaire())
+
+    assert store.delete_questionnaire(FIRM_ID) is True
+    assert store.delete_questionnaire(FIRM_ID) is False
+    assert store.get_questionnaire(FIRM_ID) is None
+
+
+def test_the_questionnaire_is_written_under_its_own_key(monkeypatch):
+    fake = FakeDynamoDb()
+    store = dynamo_store(monkeypatch, fake)
+
+    store.put_questionnaire(questionnaire())
+
+    name, kwargs = fake.calls[0]
+    assert name == "put_item"
+    assert kwargs["Item"]["PK"] == {"S": f"FIRM#{FIRM_ID}"}
+    assert kwargs["Item"]["SK"] == {"S": "QUESTIONNAIRE"}
+    assert kwargs["Item"]["sections"]["M"]["other"] == {
+        "M": {"enabled": {"BOOL": False}}
+    }
+
+
+def test_the_questionnaire_round_trips_through_the_wire_format(monkeypatch):
+    config = questionnaire()
+    fake = FakeDynamoDb(
+        {"get_item": {"Item": to_attributes(questionnaire_item(config))}}
+    )
+    store = dynamo_store(monkeypatch, fake)
+
+    assert store.get_questionnaire(FIRM_ID) == config
+    assert fake.calls[0][1]["ConsistentRead"] is True
+    assert fake.calls[0][1]["Key"]["SK"] == {"S": "QUESTIONNAIRE"}
+
+
+def test_resetting_a_firm_already_on_the_defaults_is_false(monkeypatch):
+    fake = FakeDynamoDb()
+    fake.raises = conditional_check_failed()
+    store = dynamo_store(monkeypatch, fake)
+
+    assert store.delete_questionnaire(FIRM_ID) is False
+    assert fake.calls[0][1]["ConditionExpression"] == "attribute_exists(SK)"

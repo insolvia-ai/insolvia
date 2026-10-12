@@ -25,10 +25,13 @@ import { describe, expect, test } from 'vitest';
 
 import {
   ApiException,
+  ApiReauthenticationRequiredException,
   ApiUnauthorizedException,
   ApiValidationException,
   BUSINESS_TYPES,
   CASE_COLLECTIONS,
+  CASE_STATUSES,
+  CASE_TRANSITIONS,
   EXEMPTION_SETS,
   CLAIM_CLASSES,
   CONTRACT_LEASE_INTENTIONS,
@@ -41,10 +44,19 @@ import {
   INCOME_LINE_CATEGORIES,
   INTENTIONS,
   MARITAL_FILING_STATUSES,
+  MEANS_TEST_FORMS,
+  MEANS_TEST_OUTCOMES,
   OTHER_INCOME_CATEGORIES,
+  PLAN_CLASSES,
+  PLAN_PAYMENT_SOURCES,
   PRESUMPTION_EXEMPTIONS,
+  PROSPECT_STAGES,
+  QUESTIONNAIRE_SECTION_IDS,
+  PROVENANCE_SOURCES,
   SECURED_PAYMENT_BUCKETS,
+  SECURED_TREATMENTS,
   SMALL_BUSINESS_STATUSES,
+  UNSECURED_TREATMENTS,
   SOFA_ENTRY_TYPES,
   DOCUMENT_CONTENT_TYPES,
   DOCUMENT_KINDS,
@@ -53,15 +65,18 @@ import {
   MAX_DOCUMENT_BYTE_SIZE,
   isDocumentContentType,
   isDocumentKind,
+  isFiledStatus,
   isUploadIncomplete,
   libraryProvenance,
   permits,
+  revisedProvenance,
   staffTypedProvenance,
   submittedAtUtc,
 } from '@insolvia-ai/api-client';
 import type {
   Debtor,
   FetchLike,
+  FirmClient,
   LibraryCreditor,
   PutDebtorRequest,
   WaitlistSubmission,
@@ -79,6 +94,9 @@ const BASE_URL = 'https://staging-api.insolvia.ai';
 const SUBJECT = 'a11c0000-0000-4000-8000-00000000a11c';
 const USERNAME = '11111111-2222-3333-4444-555555555555';
 const CLIENT_ID = 'exampleappclientid000000';
+// A firm client's id (ADR 0022) — not to be confused with the Cognito app
+// client id above.
+const CLIENT_ID_1 = 'c1100000-0000-4000-8000-0000000c11a0';
 
 /** What the stub captured about a request, flattened for assertions. */
 interface SeenRequest {
@@ -695,13 +713,16 @@ describe('me', () => {
 
 describe('createCase', () => {
   // Pinned against the shape this package's contract requires of
-  // `POST /v1/cases`: request `{"chapter", "district"}`, 201 response is a
-  // full Case.
+  // `POST /v1/cases`: request `{"chapter", "court", "division"}` (issue
+  // #360 — a registry reference, never a typed district), 201 response is a
+  // full Case whose `district` is the name the registry prints.
   const CASE = {
     id: 'a3f1e9d0-4b2c-4d1e-9a7f-6c8e0d1f2a3b',
     createdBy: '3c9a1f7e-0d52-4a18-b6c3-9e14f7a20b55',
     chapter: 7,
-    district: 'D. Del.',
+    district: 'Middle District of Florida',
+    court: 'flmb',
+    division: 'tampa',
     status: 'intake',
     createdAt: '2026-07-23T09:15:00.123Z',
     updatedAt: '2026-07-23T09:15:00.123Z',
@@ -714,24 +735,58 @@ describe('createCase', () => {
       accessToken: () => ACCESS_TOKEN,
     });
 
-    const created = await client.createCase({ chapter: 7, district: 'D. Del.' });
+    const created = await client.createCase({
+      chapter: 7,
+      court: 'flmb',
+      division: 'tampa',
+      clientIds: [CLIENT_ID_1],
+    });
 
     const seen = stub.lastRequest();
     expect(seen.method).toBe('POST');
     expect(seen.url).toBe('https://staging-api.insolvia.ai/v1/cases');
     expect(seen.headers.get('authorization')).toBe(`Bearer ${ACCESS_TOKEN}`);
     expect(seen.headers.get('content-type')).toMatch(/^application\/json/);
-    expect(JSON.parse(seen.body)).toEqual({ chapter: 7, district: 'D. Del.' });
+    expect(JSON.parse(seen.body)).toEqual({
+      chapter: 7,
+      court: 'flmb',
+      division: 'tampa',
+      client_ids: [CLIENT_ID_1],
+    });
 
     expect(created).toEqual({
       id: 'a3f1e9d0-4b2c-4d1e-9a7f-6c8e0d1f2a3b',
       createdBy: '3c9a1f7e-0d52-4a18-b6c3-9e14f7a20b55',
       chapter: 7,
-      district: 'D. Del.',
+      district: 'Middle District of Florida',
+      court: 'flmb',
+      division: 'tampa',
       status: 'intake',
       createdAt: '2026-07-23T09:15:00.123Z',
       updatedAt: '2026-07-23T09:15:00.123Z',
     });
+  });
+
+  test('a case written before the court registry has NO court key — absent, not null', async () => {
+    // The legacy row: typed district, no reference. `'court' in case` is what
+    // a screen writes to decide whether to ask for one.
+    const { court: _court, division: _division, ...legacy } = CASE;
+    const stub = stubFetch(() => jsonResponse({ ...legacy, district: 'NDCA' }, 201));
+    const client = new InsolviaApiClient('https://staging-api.insolvia.ai', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const created = await client.createCase({
+      chapter: 7,
+      court: 'flmb',
+      division: 'tampa',
+      clientIds: [CLIENT_ID_1],
+    });
+
+    expect(created.district).toBe('NDCA');
+    expect('court' in created).toBe(false);
+    expect('division' in created).toBe(false);
   });
 
   test('maps a 400 {"error","fields"} body to ApiValidationException', async () => {
@@ -747,7 +802,14 @@ describe('createCase', () => {
     });
 
     const error = asApiValidationException(
-      await rejection(client.createCase({ chapter: 7, district: 'D. Del.' })),
+      await rejection(
+        client.createCase({
+          chapter: 7,
+          court: 'flmb',
+          division: 'tampa',
+          clientIds: [CLIENT_ID_1],
+        }),
+      ),
     );
 
     expect(error.statusCode).toBe(400);
@@ -767,7 +829,14 @@ describe('createCase', () => {
     });
 
     const error = asApiException(
-      await rejection(client.createCase({ chapter: 7, district: 'D. Del.' })),
+      await rejection(
+        client.createCase({
+          chapter: 7,
+          court: 'flmb',
+          division: 'tampa',
+          clientIds: [CLIENT_ID_1],
+        }),
+      ),
     );
 
     expect(error.statusCode).toBe(400);
@@ -784,7 +853,14 @@ describe('createCase', () => {
     });
 
     const error = asApiUnauthorizedException(
-      await rejection(client.createCase({ chapter: 7, district: 'D. Del.' })),
+      await rejection(
+        client.createCase({
+          chapter: 7,
+          court: 'flmb',
+          division: 'tampa',
+          clientIds: [CLIENT_ID_1],
+        }),
+      ),
     );
 
     expect(error.statusCode).toBe(401);
@@ -796,7 +872,14 @@ describe('createCase', () => {
     const client = new InsolviaApiClient('http://localhost:8080', { fetch: stub.fetch });
 
     const error = asApiUnauthorizedException(
-      await rejection(client.createCase({ chapter: 7, district: 'D. Del.' })),
+      await rejection(
+        client.createCase({
+          chapter: 7,
+          court: 'flmb',
+          division: 'tampa',
+          clientIds: [CLIENT_ID_1],
+        }),
+      ),
     );
 
     expect(stub.callCount()).toBe(0);
@@ -1022,6 +1105,7 @@ describe('updateCase', () => {
     const body = JSON.parse(seen.body) as Record<string, unknown>;
     expect(body).toEqual({ status: 'ready_to_file' });
     expect('chapter' in body).toBe(false);
+    expect('court' in body).toBe(false);
     expect('district' in body).toBe(false);
 
     expect(updated).toEqual(UPDATED_CASE);
@@ -1034,10 +1118,14 @@ describe('updateCase', () => {
       accessToken: () => ACCESS_TOKEN,
     });
 
-    await client.updateCase(CASE_ID, { chapter: 13, district: 'D. Del.' });
+    await client.updateCase(CASE_ID, {
+      chapter: 13,
+      court: { court: 'flmb', division: 'orlando' },
+    });
 
+    // The court pair is two wire keys, sent together and never apart.
     const body = JSON.parse(stub.lastRequest().body) as Record<string, unknown>;
-    expect(body).toEqual({ chapter: 13, district: 'D. Del.' });
+    expect(body).toEqual({ chapter: 13, court: 'flmb', division: 'orlando' });
     expect('status' in body).toBe(false);
   });
 
@@ -1051,11 +1139,38 @@ describe('updateCase', () => {
     await client.updateCase(CASE_ID, {
       status: 'ready_to_file',
       chapter: undefined,
-      district: undefined,
+      court: undefined,
     });
 
     const body = JSON.parse(stub.lastRequest().body) as Record<string, unknown>;
     expect(body).toEqual({ status: 'ready_to_file' });
+  });
+
+  test('sends the deadline anchors as filed_at / meeting_341_at, null meaning clear', async () => {
+    // Issue 14.6 / #358: the two dates the deadline engine counts from. An
+    // explicit null is the ONE null this PATCH sends on purpose — it clears
+    // the date and, server-side, the deadlines generated from it.
+    const stub = stubFetch(() =>
+      jsonResponse({ ...UPDATED_CASE, filedAt: '2026-03-02', meeting341At: '2026-04-07' }, 200),
+    );
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const updated = await client.updateCase(CASE_ID, {
+      filedAt: '2026-03-02',
+      meeting341At: null,
+    });
+
+    expect(JSON.parse(stub.lastRequest().body)).toEqual({
+      filed_at: '2026-03-02',
+      meeting_341_at: null,
+    });
+    expect(updated.filedAt).toBe('2026-03-02');
+    expect(updated.meeting341At).toBe('2026-04-07');
+    // And absent stays absent on a case that has neither.
+    expect('filedAt' in UPDATED_CASE).toBe(false);
   });
 
   test('sends the 106C election as exemption_set, and maps it back as exemptionSet', async () => {
@@ -1332,6 +1447,7 @@ describe('the packet endpoints', () => {
       printDate: false,
       signaturePages: 'all',
       signElectronically: false,
+      amendedOnly: false,
     },
   };
 
@@ -1377,6 +1493,7 @@ describe('the packet endpoints', () => {
             printDate: false,
             signaturePages: 'all',
             signElectronically: false,
+            amendedOnly: false,
             forms: ['b101', 'b106ab'],
           },
         },
@@ -1403,8 +1520,47 @@ describe('the packet endpoints', () => {
       printDate: false,
       signaturePages: 'all',
       signElectronically: false,
+      amendedOnly: false,
       forms: ['b101', 'b106ab'],
     });
+  });
+
+  test('amendedOnly (issue #370) is sent and echoed like any other option', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse(
+        {
+          id: 'e7f6d5c4-3b2a-4190-8f7e-6d5c4b3a2918',
+          kind: 'packet_assembly',
+          status: 'queued',
+          createdBy: '3c9a1f7e-0d52-4a18-b6c3-9e14f7a20b55',
+          attempts: 0,
+          createdAt: '2026-09-02T09:15:00.123Z',
+          updatedAt: '2026-09-02T09:15:00.123Z',
+          options: {
+            draftWatermark: false,
+            printDate: false,
+            signaturePages: 'all',
+            signElectronically: false,
+            amendedOnly: true,
+          },
+        },
+        202,
+      ),
+    );
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const accepted = await client.acceptCaseJob(PACKET_CASE_ID, 'packet_assembly', {
+      outputOptions: { amendedOnly: true },
+    });
+
+    expect(JSON.parse(stub.lastRequest().body)).toEqual({
+      kind: 'packet_assembly',
+      options: { amendedOnly: true },
+    });
+    expect(accepted.options?.amendedOnly).toBe(true);
   });
 
   test('a job of a kind that does not take options never carries one', async () => {
@@ -1577,6 +1733,7 @@ describe('the forms hub endpoints', () => {
     title: 'Voluntary Petition for Individuals Filing for Bankruptcy',
     officialNumber: 'B 101',
     problems: [{ source: 'debtors', message: 'The case has no Debtor 1 record.' }],
+    openTaskCount: 0,
   };
 
   /** A clean row that carries a count metric. */
@@ -1587,6 +1744,7 @@ describe('the forms hub endpoints', () => {
     officialNumber: 'B 106A/B',
     metric: { kind: 'count', value: '3' },
     problems: [],
+    openTaskCount: 0,
   };
 
   /** A clean row that carries a dollar total. */
@@ -1597,6 +1755,7 @@ describe('the forms hub endpoints', () => {
     officialNumber: 'B 106I',
     metric: { kind: 'total', value: '2500.00' },
     problems: [],
+    openTaskCount: 2,
   };
 
   test('GETs /v1/cases/{caseId}/forms and maps every row verbatim', async () => {
@@ -1632,6 +1791,7 @@ describe('the forms hub endpoints', () => {
     printDate: false,
     signaturePages: 'all',
     signElectronically: false,
+    amendedOnly: false,
   };
 
   test('GETs /v1/cases/{caseId}/forms/{form}/preview with the form segment encoded', async () => {
@@ -1701,6 +1861,33 @@ describe('the forms hub endpoints', () => {
     expect(minted.options).toEqual(preview.options);
   });
 
+  test('amendedOnly (issue #370) is sent as a query param, unlike forms', async () => {
+    // Unlike "forms", amendedOnly is NOT restricted to FormPreviewOptions'
+    // Omit — the preview route accepts it (form_overlay.parse_output_options
+    // is not gated by allow_forms for this key).
+    const preview = {
+      url: 'https://bucket.s3.amazonaws.com/form-previews/x/y.pdf?signature=abc',
+      method: 'GET',
+      expiresAt: '2026-09-02T09:25:00.123Z',
+      problems: [],
+      options: { ...DEFAULT_OPTIONS, amendedOnly: true },
+    };
+    const stub = stubFetch(() => jsonResponse(preview, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const minted = await client.getCaseFormPreview(FORMS_CASE_ID, 'b106d', {
+      amendedOnly: true,
+    });
+
+    expect(stub.lastRequest().url).toBe(
+      `${BASE_URL}/v1/cases/${FORMS_CASE_ID}/forms/b106d/preview?amendedOnly=true`,
+    );
+    expect(minted.options.amendedOnly).toBe(true);
+  });
+
   test('no output options sends no query string at all', async () => {
     const preview = {
       url: 'https://x',
@@ -1740,6 +1927,8 @@ const PENDING_DOCUMENT = {
   byteSize: 24,
   uploadedAt: '2026-07-28T11:02:03.456Z',
   status: 'pending',
+  channel: 'staff',
+  requestId: null,
 };
 
 /** The same record after completion: `stored`, with the size S3 counted. */
@@ -1754,7 +1943,6 @@ const UPLOAD_BLOCK = {
   method: 'PUT',
   headers: {
     'Content-Type': 'application/pdf',
-    'x-amz-server-side-encryption': 'aws:kms',
     'x-amz-tagging': 'upload=unconfirmed',
   },
   expiresAt: '2026-07-28T11:17:03.456Z',
@@ -1870,7 +2058,6 @@ describe('createDocument', () => {
 
     expect(created.upload.headers).toEqual({
       'Content-Type': 'application/pdf',
-      'x-amz-server-side-encryption': 'aws:kms',
       'x-amz-tagging': 'upload=unconfirmed',
       'x-amz-checksum-algorithm': 'CRC32',
     });
@@ -2390,7 +2577,6 @@ describe('uploadDocument', () => {
     expect(put).toBeDefined();
     expect(headerMap(put?.headers ?? new Headers())).toEqual({
       'content-type': 'application/pdf',
-      'x-amz-server-side-encryption': 'aws:kms',
       'x-amz-tagging': 'upload=unconfirmed',
     });
     expect(put?.headers.has('authorization')).toBe(false);
@@ -2758,8 +2944,7 @@ describe('putDebtor', () => {
             'name.given': 'Must be 200 characters or fewer.',
             'other_names_used[0].id': 'Must be letters, digits, hyphen or underscore.',
             'provenance.residence_address.city': 'This field has a value but no provenance.',
-            tax_id:
-              'Tax identifiers are not accepted yet — they need field-level encryption, which is not built. Leave this out.',
+            tax_id: 'The stored tax id does not match — enter the full number to replace it.',
           },
         },
         400,
@@ -2880,6 +3065,364 @@ describe('putDebtor', () => {
     await client.putDebtor(DEBTOR_CASE_ID, 'debtor_1', saved);
     expect(JSON.parse(stub.lastRequest().body)).toEqual(sent);
   });
+
+  // The tax id (issue 13.12 / #382). 987-65-4321 is from the SSA's
+  // never-issued advertising block — the fixture value the API accepts on
+  // purpose. This repo is public.
+
+  test('sends a typed number as {kind, value}, verbatim', async () => {
+    const stub = stubFetch(() => jsonResponse(DEBTOR_WITH_TAX_ID, 201));
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await client.putDebtor(DEBTOR_CASE_ID, 'debtor_1', {
+      tax_id: { kind: 'ssn', value: '987-65-4321' },
+      provenance: { tax_id: { source: 'staff_typed' } },
+    });
+
+    expect(JSON.parse(stub.lastRequest().body)).toEqual({
+      tax_id: { kind: 'ssn', value: '987-65-4321' },
+      provenance: { tax_id: { source: 'staff_typed' } },
+    });
+  });
+
+  test('echoes the last four as {kind, last_four} to keep the stored number', async () => {
+    // A questionnaire only ever holds the view after a save; sending it back
+    // is what "this save did not touch the number" looks like on the wire.
+    const stub = stubFetch(() => jsonResponse(DEBTOR_WITH_TAX_ID, 200));
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await client.putDebtor(DEBTOR_CASE_ID, 'debtor_1', {
+      tax_id: { kind: 'ssn', last_four: '4321' },
+      provenance: { tax_id: { source: 'staff_typed' } },
+    });
+
+    expect((JSON.parse(stub.lastRequest().body) as { tax_id: unknown }).tax_id).toEqual({
+      kind: 'ssn',
+      last_four: '4321',
+    });
+  });
+
+  test('a typed number wins over the on-file echo, and a bare kind is omitted', async () => {
+    const stub = stubFetch(() => jsonResponse(DEBTOR_WITH_TAX_ID, 200));
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await client.putDebtor(DEBTOR_CASE_ID, 'debtor_1', {
+      tax_id: { kind: 'ssn', value: '987654322', last_four: '4321' },
+      provenance: { tax_id: { source: 'staff_typed' } },
+    });
+    expect((JSON.parse(stub.lastRequest().body) as { tax_id: unknown }).tax_id).toEqual({
+      kind: 'ssn',
+      value: '987654322',
+    });
+
+    await client.putDebtor(DEBTOR_CASE_ID, 'debtor_1', { tax_id: { kind: 'itin' } });
+    expect('tax_id' in (JSON.parse(stub.lastRequest().body) as object)).toBe(false);
+  });
+
+  test('a decoded record with a tax id hands its view straight back', async () => {
+    const stub = stubFetch(() => jsonResponse(DEBTOR_WITH_TAX_ID, 200));
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const saved = await client.putDebtor(DEBTOR_CASE_ID, 'debtor_1', REQUEST);
+    expect(saved.tax_id).toEqual({ kind: 'ssn', last_four: '4321' });
+
+    await client.putDebtor(DEBTOR_CASE_ID, 'debtor_1', {
+      ...saved,
+      provenance: staffTypedProvenance(saved),
+    });
+    const sent = JSON.parse(stub.lastRequest().body) as {
+      tax_id: unknown;
+      provenance: Record<string, unknown>;
+    };
+    expect(sent.tax_id).toEqual({ kind: 'ssn', last_four: '4321' });
+    expect(sent.provenance.tax_id).toEqual({ source: 'staff_typed' });
+  });
+});
+
+/** {@link DEBTOR} with the last-four view the API adds once a number is stored. */
+const DEBTOR_WITH_TAX_ID = {
+  ...DEBTOR,
+  provenance: { ...DEBTOR.provenance, tax_id: { source: 'staff_typed' } },
+  tax_id: { kind: 'ssn', last_four: '4321' },
+};
+
+// A debtor copied from a firm client (ADR 0022), exactly as `debtor_json`
+// writes one: `client_id` beside the identity, `differs_from_client` when the
+// caller may see the directory, `client` provenance with its `client_id`, and
+// the residence county the copy carries.
+const CLIENT_DEBTOR = {
+  id: 'd1c10000-4b2c-4d1e-9a7f-6c8e0d1f2a3b',
+  case_id: 'a3f1e9d0-4b2c-4d1e-9a7f-6c8e0d1f2a3b',
+  filing_role: 'debtor_2',
+  created_at: '2026-09-27T09:15:00.000000Z',
+  updated_at: '2026-09-27T09:15:00.000000Z',
+  client_id: CLIENT_ID_1,
+  differs_from_client: ['phone'],
+  provenance: {
+    'name.given': { source: 'client', client_id: CLIENT_ID_1 },
+    'residence_address.county': { source: 'client', client_id: CLIENT_ID_1 },
+    phone: { source: 'staff_typed' },
+  },
+  name: { given: 'Sam' },
+  residence_address: { state: 'FL', county: 'Hillsborough' },
+  phone: '555-0199',
+} as const;
+
+describe('debtors linked to firm clients (ADR 0022)', () => {
+  test('a copied debtor decodes its client link, its divergence and its client provenance', async () => {
+    const stub = stubFetch(() => jsonResponse({ debtors: [CLIENT_DEBTOR] }, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const [debtor] = await client.listDebtors(CLIENT_DEBTOR.case_id);
+
+    expect(debtor).toEqual(CLIENT_DEBTOR);
+  });
+
+  test('putDebtor keeps the county and never sends client_id — the server owns it', async () => {
+    const stub = stubFetch(() => jsonResponse(CLIENT_DEBTOR, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await client.putDebtor(CLIENT_DEBTOR.case_id, 'debtor_2', {
+      name: CLIENT_DEBTOR.name,
+      residence_address: CLIENT_DEBTOR.residence_address,
+      phone: CLIENT_DEBTOR.phone,
+      provenance: CLIENT_DEBTOR.provenance,
+    });
+
+    expect(JSON.parse(stub.lastRequest().body)).toEqual({
+      name: { given: 'Sam' },
+      residence_address: { state: 'FL', county: 'Hillsborough' },
+      phone: '555-0199',
+      provenance: CLIENT_DEBTOR.provenance,
+    });
+  });
+
+  test('linkDebtorClient PUTs {client_id} to the role and maps a 201 copy', async () => {
+    const stub = stubFetch(() => jsonResponse(CLIENT_DEBTOR, 201));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const linked = await client.linkDebtorClient(CLIENT_DEBTOR.case_id, 'debtor_2', CLIENT_ID_1);
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('PUT');
+    expect(seen.url).toBe(`${BASE_URL}/v1/cases/${CLIENT_DEBTOR.case_id}/debtors/debtor_2/client`);
+    expect(seen.headers.get('authorization')).toBe(`Bearer ${ACCESS_TOKEN}`);
+    expect(seen.headers.get('content-type')).toMatch(/^application\/json/);
+    expect(JSON.parse(seen.body)).toEqual({ client_id: CLIENT_ID_1 });
+    expect(linked.client_id).toBe(CLIENT_ID_1);
+  });
+
+  test('linkDebtorClient accepts a 200 re-link and surfaces a client_id refusal', async () => {
+    const ok = stubFetch(() => jsonResponse(CLIENT_DEBTOR, 200));
+    const okClient = new InsolviaApiClient(BASE_URL, {
+      fetch: ok.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+    expect(
+      (await okClient.linkDebtorClient(CLIENT_DEBTOR.case_id, 'debtor_2', CLIENT_ID_1)).id,
+    ).toBe(CLIENT_DEBTOR.id);
+
+    const refused = stubFetch(() =>
+      jsonResponse(
+        {
+          error: 'ValidationError',
+          fields: { client_id: 'That client is already another debtor on this case.' },
+        },
+        400,
+      ),
+    );
+    const refusedClient = new InsolviaApiClient(BASE_URL, {
+      fetch: refused.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+    const error = asApiValidationException(
+      await rejection(
+        refusedClient.linkDebtorClient(CLIENT_DEBTOR.case_id, 'debtor_2', CLIENT_ID_1),
+      ),
+    );
+    expect(Object.keys(error.fields)).toEqual(['client_id']);
+  });
+
+  test.each([
+    ['copyDebtorFromClient', 'copy-from-client'],
+    ['copyDebtorToClient', 'copy-to-client'],
+  ] as const)('%s POSTs no body to /%s and maps the debtor', async (method, act) => {
+    const recopied = { ...CLIENT_DEBTOR, differs_from_client: [] };
+    const stub = stubFetch(() => jsonResponse(recopied, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const debtor = await client[method](CLIENT_DEBTOR.case_id, 'debtor_2');
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('POST');
+    expect(seen.url).toBe(`${BASE_URL}/v1/cases/${CLIENT_DEBTOR.case_id}/debtors/debtor_2/${act}`);
+    expect(seen.headers.get('authorization')).toBe(`Bearer ${ACCESS_TOKEN}`);
+    expect(seen.body).toBe('');
+    expect(debtor.differs_from_client).toEqual([]);
+    expect(debtor.provenance['name.given']).toEqual({ source: 'client', client_id: CLIENT_ID_1 });
+  });
+
+  test('a re-copy refused on a filed case is a 409 ApiException', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse(
+        {
+          error: 'ConflictError',
+          message:
+            'This case is filed — re-copying would change a filed petition. Amend it instead.',
+        },
+        409,
+      ),
+    );
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+    const error = await rejection(client.copyDebtorFromClient(CLIENT_DEBTOR.case_id, 'debtor_1'));
+    expect(error).toBeInstanceOf(ApiException);
+    expect((error as ApiException).statusCode).toBe(409);
+  });
+});
+
+describe('revisedProvenance', () => {
+  const COPIED = { source: 'client', client_id: CLIENT_ID_1 } as const;
+  const LOADED = {
+    name: { given: 'Sam', surname: 'Example' },
+    other_names_used: [{ id: 'alias-1', surname: 'Sample' }],
+    phone: '555-0100',
+    tax_id: { kind: 'ssn', last_four: '4321' },
+    provenance: {
+      'name.given': COPIED,
+      'name.surname': COPIED,
+      'other_names_used[alias-1].surname': COPIED,
+      phone: COPIED,
+      tax_id: { source: 'staff_typed' },
+    },
+  } as const;
+
+  test('an untouched record keeps every entry it was loaded with', () => {
+    const { provenance: _provenance, ...body } = LOADED;
+    expect(revisedProvenance(body, LOADED)).toEqual(LOADED.provenance);
+  });
+
+  test('only the field the person changed becomes staff_typed', () => {
+    const body = { ...LOADED, provenance: undefined, name: { ...LOADED.name, given: 'Samuel' } };
+    expect(revisedProvenance(body, LOADED)).toEqual({
+      ...LOADED.provenance,
+      'name.given': { source: 'staff_typed' },
+    });
+  });
+
+  test('a field the person added is staff_typed, and a cleared one has no entry', () => {
+    const body = { name: LOADED.name, email: 'sam@example.test' };
+    expect(revisedProvenance(body, LOADED)).toEqual({
+      'name.given': COPIED,
+      'name.surname': COPIED,
+      email: { source: 'staff_typed' },
+    });
+  });
+
+  test('an alias is matched by its id, not its position', () => {
+    const body = {
+      other_names_used: [
+        { id: 'alias-2', surname: 'New' },
+        { id: 'alias-1', surname: 'Sample' },
+      ],
+    };
+    expect(revisedProvenance(body, LOADED)).toEqual({
+      'other_names_used[alias-2].surname': { source: 'staff_typed' },
+      'other_names_used[alias-1].surname': COPIED,
+    });
+  });
+
+  test('a tax ID echoed as loaded keeps its entry; a number typed into it does not', () => {
+    const echoed = revisedProvenance({ tax_id: { kind: 'ssn', last_four: '4321' } }, LOADED);
+    const retyped = revisedProvenance(
+      { tax_id: { kind: 'ssn', last_four: '4321', value: '987-65-4321' } },
+      LOADED,
+    );
+    expect(echoed.tax_id).toBe(LOADED.provenance.tax_id);
+    expect(retyped.tax_id).toEqual({ source: 'staff_typed' });
+  });
+
+  test('with nothing loaded it is staffTypedProvenance', () => {
+    const body = { name: { given: 'Sam' }, phone: '555-0100' };
+    expect(revisedProvenance(body, undefined)).toEqual(staffTypedProvenance(body));
+  });
+});
+
+describe('listFirmClientCases', () => {
+  const ENTRY = {
+    filing_role: 'debtor_2',
+    case: {
+      id: 'a3f1e9d0-4b2c-4d1e-9a7f-6c8e0d1f2a3b',
+      createdBy: '3c9a1f7e-0d52-4a18-b6c3-9e14f7a20b55',
+      chapter: 13,
+      district: 'Middle District of Florida',
+      court: 'flmb',
+      division: 'tampa',
+      status: 'intake',
+      createdAt: '2026-09-27T09:15:00.123456Z',
+      updatedAt: '2026-09-27T09:15:00.123456Z',
+    },
+  };
+
+  test('GETs /v1/firm/clients/{id}/cases and maps each role and case', async () => {
+    const stub = stubFetch(() => jsonResponse({ cases: [ENTRY] }, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const entries = await client.listFirmClientCases(CLIENT_ID_1);
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('GET');
+    expect(seen.url).toBe(`${BASE_URL}/v1/firm/clients/${CLIENT_ID_1}/cases`);
+    expect(seen.headers.get('authorization')).toBe(`Bearer ${ACCESS_TOKEN}`);
+    expect(entries).toEqual([ENTRY]);
+  });
+
+  test('a prospect with no case is an empty list', async () => {
+    const stub = stubFetch(() => jsonResponse({ cases: [] }, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+    expect(await client.listFirmClientCases(CLIENT_ID_1)).toEqual([]);
+  });
+
+  test('an entry without its case is refused rather than half-mapped', async () => {
+    const stub = stubFetch(() => jsonResponse({ cases: [{ filing_role: 'debtor_1' }] }, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+    await expect(client.listFirmClientCases(CLIENT_ID_1)).rejects.toThrow();
+  });
 });
 
 describe('listDebtors', () => {
@@ -2921,6 +3464,28 @@ describe('listDebtors', () => {
     });
 
     expect(await client.listDebtors(DEBTOR_CASE_ID)).toEqual([]);
+  });
+
+  test('maps the tax id as its last-four view, and refuses a view without one', async () => {
+    const stub = stubFetch(() => jsonResponse({ debtors: [DEBTOR_WITH_TAX_ID] }, 200));
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const [debtor] = await client.listDebtors(DEBTOR_CASE_ID);
+    expect(debtor?.tax_id).toEqual({ kind: 'ssn', last_four: '4321' });
+
+    // The API never sends a number; a decoder that tolerated a view missing
+    // its last four would hand the screen a kind with nothing to show.
+    const broken = stubFetch(() =>
+      jsonResponse({ debtors: [{ ...DEBTOR_WITH_TAX_ID, tax_id: { kind: 'ssn' } }] }, 200),
+    );
+    const brokenClient = new InsolviaApiClient('http://localhost:8080', {
+      fetch: broken.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+    await expect(brokenClient.listDebtors(DEBTOR_CASE_ID)).rejects.toThrow();
   });
 
   test('an empty record comes back with an empty provenance map and no body keys at all', async () => {
@@ -3108,6 +3673,20 @@ describe('staffTypedProvenance', () => {
     expect(paths({ aliases: [{ id: 'n1' }] })).toEqual([]);
   });
 
+  test('the tax id is ONE path, whichever shape it takes', () => {
+    // Mirrors parse_debtor's one exception: the kind and the digits are one
+    // identifier entered in one act, and the last-four echo is not a fact of
+    // its own. Walking the object would mint `tax_id.kind` and
+    // `tax_id.value`, which the API refuses as unattributed.
+    expect(paths({ tax_id: { kind: 'ssn', value: '987-65-4321' } })).toEqual(['tax_id']);
+    expect(paths({ tax_id: { kind: 'ssn', last_four: '4321' } })).toEqual(['tax_id']);
+  });
+
+  test('a kind with nothing typed is not populated — it is not sent either', () => {
+    expect(paths({ tax_id: { kind: 'ssn' } })).toEqual([]);
+    expect(paths({ tax_id: { kind: 'ssn', value: '' } })).toEqual([]);
+  });
+
   test('a key that is not a field name fails loudly, before any request', () => {
     // These would otherwise produce a REQUIRED path that the server's
     // provenance parser then refuses as a key: no payload could satisfy both,
@@ -3289,6 +3868,12 @@ describe('the firm block on /v1/me', () => {
     documents: 'add_edit',
     extraction_review: 'add_edit',
     creditor_library: 'hidden',
+    notes: 'hidden',
+    events: 'hidden',
+    tasks: 'add_edit',
+    clients: 'hidden',
+    client_portal: 'hidden',
+    electronic_filing: 'hidden',
     firm_administration: 'add_edit',
   };
 
@@ -3333,6 +3918,13 @@ describe('the firm block on /v1/me', () => {
       isAdmin: true,
       accessAllCases: false,
       permissions: PERMISSIONS,
+      // The firm defaults and the caller's signature block (issue #360):
+      // null until set — and null too when an older API omits them.
+      defaultCourt: null,
+      defaultDivision: null,
+      defaultChapter: null,
+      letterhead: null,
+      signatureBlock: null,
     });
   });
 
@@ -3610,7 +4202,13 @@ describe('the firm record', () => {
     expect(seen.method).toBe('GET');
     expect(seen.url).toBe(`${BASE_URL}/v1/firm`);
     expect(seen.headers.get('authorization')).toBe(`Bearer ${ACCESS_TOKEN}`);
-    expect(firm).toEqual(FIRM_RECORD);
+    expect(firm).toEqual({
+      ...FIRM_RECORD,
+      defaultCourt: null,
+      defaultDivision: null,
+      defaultChapter: null,
+      letterhead: null,
+    });
   });
 
   test('PATCHes /v1/firm with exactly a name and maps the echoed record', async () => {
@@ -3626,10 +4224,93 @@ describe('the firm record', () => {
     expect(seen.method).toBe('PATCH');
     expect(seen.url).toBe(`${BASE_URL}/v1/firm`);
     expect(seen.headers.get('content-type')).toBe('application/json');
-    // The whole writable surface. `status` here would be the client offering
-    // a self-suspension the server's parser refuses to produce.
+    // A rename alone sends the name alone. `status` here would be the client
+    // offering a self-suspension the server's parser refuses to produce.
     expect(JSON.parse(seen.body)).toEqual({ name: 'Example, LLP' });
     expect(firm.name).toBe('Example, LLP');
+  });
+
+  // The firm defaults and letterhead (issue #360) — the literal
+  // firm_defaults_json shape: explicit nulls until set, and `null` in a
+  // PATCH is the clear instruction, sent as such.
+  const LETTERHEAD = {
+    name: 'Example & Partners, P.A.',
+    address: { line1: '1 Main St', city: 'Tampa', state: 'FL', postal_code: '33602' },
+    phone: '813-555-0100',
+    email: 'office@example.test',
+  };
+  const WITH_DEFAULTS = {
+    ...FIRM_RECORD,
+    defaultCourt: 'flmb',
+    defaultDivision: 'tampa',
+    defaultChapter: 7,
+    letterhead: LETTERHEAD,
+  };
+
+  test('GET /v1/firm maps the defaults as explicit nulls until set', async () => {
+    const stub = stubFetch(() => jsonResponse(FIRM_RECORD, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const firm = await client.getFirm();
+
+    expect(firm.defaultCourt).toBeNull();
+    expect(firm.defaultDivision).toBeNull();
+    expect(firm.defaultChapter).toBeNull();
+    expect(firm.letterhead).toBeNull();
+  });
+
+  test('PATCH /v1/firm sends the defaults under their exact wire names and maps them back', async () => {
+    const stub = stubFetch(() => jsonResponse(WITH_DEFAULTS, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const firm = await client.updateFirm({
+      defaultCourt: 'flmb',
+      defaultDivision: 'tampa',
+      defaultChapter: 7,
+      letterhead: LETTERHEAD,
+    });
+
+    expect(JSON.parse(stub.lastRequest().body)).toEqual({
+      defaultCourt: 'flmb',
+      defaultDivision: 'tampa',
+      defaultChapter: 7,
+      letterhead: LETTERHEAD,
+    });
+    expect(firm.defaultCourt).toBe('flmb');
+    expect(firm.defaultDivision).toBe('tampa');
+    expect(firm.defaultChapter).toBe(7);
+    expect(firm.letterhead).toEqual(LETTERHEAD);
+  });
+
+  test('PATCH /v1/firm sends null to CLEAR a default, and omits an unsupplied one', async () => {
+    const stub = stubFetch(() => jsonResponse(FIRM_RECORD, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await client.updateFirm({ defaultCourt: null, defaultDivision: null });
+
+    const body = JSON.parse(stub.lastRequest().body) as Record<string, unknown>;
+    expect(body).toEqual({ defaultCourt: null, defaultDivision: null });
+    expect('defaultChapter' in body).toBe(false);
+    expect('name' in body).toBe(false);
+  });
+
+  test('a default chapter this version cannot rank is malformed, not guessed', async () => {
+    const stub = stubFetch(() => jsonResponse({ ...FIRM_RECORD, defaultChapter: 9 }, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await expect(client.getFirm()).rejects.toThrow(ApiException);
   });
 
   test('a status this version cannot rank is malformed, not guessed', async () => {
@@ -3657,6 +4338,177 @@ describe('the firm record', () => {
     await failure.catch((caught: unknown) => {
       expect((caught as ApiValidationException).fields.name).toBe('A name is required.');
     });
+  });
+});
+
+describe('signature blocks (issue #360)', () => {
+  // The literal `signature_block_json` shape: a `filing_professional`-keyed
+  // object, or null. It rides on the directory, the admin list, and the
+  // /v1/me firm block; PATCH /v1/me and PATCH /v1/firm/users/{subject}
+  // both write it, with null as the clear instruction.
+  const BLOCK = {
+    bar_number: '0123456',
+    bar_state: 'FL',
+    firm_name: 'Example & Partners',
+    address: { line1: '1 Main St', city: 'Tampa', state: 'FL', postal_code: '33602' },
+    phone: '813-555-0100',
+    email: 'alice@example.test',
+  };
+
+  test('the directory carries each colleague’s block, null when unset', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse(
+        {
+          people: [
+            {
+              subject: 'a-1',
+              firstName: 'Alice',
+              lastName: 'Attorney',
+              displayName: 'Alice Attorney',
+              role: 'attorney',
+              signatureBlock: BLOCK,
+            },
+            {
+              subject: 'b-2',
+              firstName: 'Bob',
+              lastName: 'Paralegal',
+              displayName: 'Bob Paralegal',
+              role: 'paralegal',
+              signatureBlock: null,
+            },
+          ],
+        },
+        200,
+      ),
+    );
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const people = await client.listFirmDirectory();
+
+    expect(people[0]?.signatureBlock).toEqual(BLOCK);
+    expect(people[1]?.signatureBlock).toBeNull();
+  });
+
+  test('PATCH /v1/me sends the block under its wire name, and null to clear it', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse(
+        {
+          subject: SUBJECT,
+          username: USERNAME,
+          clientId: CLIENT_ID,
+          scopes: [],
+          expiresAt: 1893456000,
+          firm: {
+            id: 'f1a2b3c4-0000-4000-8000-000000000001',
+            name: 'Example & Partners',
+            role: 'attorney',
+            firstName: 'Alice',
+            lastName: 'Attorney',
+            displayName: 'Alice Attorney',
+            isAdmin: false,
+            accessAllCases: false,
+            permissions: { cases: 'add_edit' },
+            defaultCourt: 'flmb',
+            defaultDivision: 'tampa',
+            defaultChapter: 7,
+            letterhead: null,
+            signatureBlock: BLOCK,
+          },
+        },
+        200,
+      ),
+    );
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const me = await client.updateMe({ signatureBlock: BLOCK });
+    expect(JSON.parse(stub.lastRequest().body)).toEqual({ signatureBlock: BLOCK });
+    expect(me.firm?.signatureBlock).toEqual(BLOCK);
+    // The firm defaults ride on the same block, for the create form.
+    expect(me.firm?.defaultCourt).toBe('flmb');
+    expect(me.firm?.defaultDivision).toBe('tampa');
+    expect(me.firm?.defaultChapter).toBe(7);
+    expect(me.firm?.letterhead).toBeNull();
+
+    await client.updateMe({ signatureBlock: null });
+    expect(JSON.parse(stub.lastRequest().body)).toEqual({ signatureBlock: null });
+  });
+});
+
+describe('listCourts', () => {
+  // Pinned against api/routes/courts.py's `courts_json`: the registry's
+  // current release, districts with their divisions, counties by FIPS, and
+  // the Case Upload status per court.
+  const REGISTRY = {
+    releaseId: 'courts/us-bankruptcy@2026-09-24',
+    effectiveDate: '2026-09-24',
+    districts: [
+      {
+        code: 'flmb',
+        courtId: 'FLMBK',
+        name: 'Middle District of Florida',
+        state: 'FL',
+        circuit: 11,
+        website: 'https://www.flmb.uscourts.gov/',
+        divisions: [
+          {
+            code: 'tampa',
+            name: 'Tampa Division',
+            officeCode: '8',
+            officeCodeVerified: true,
+            courthouse: {
+              name: 'Sam M. Gibbons United States Courthouse',
+              line1: '801 N. Florida Avenue',
+              line2: 'Suite 555',
+              city: 'Tampa',
+              state: 'FL',
+              postal_code: '33602',
+            },
+            counties: [{ name: 'Hillsborough', fips: '12057' }],
+          },
+          {
+            code: 'fort-myers',
+            name: 'Fort Myers Division',
+            officeCode: null,
+            officeCodeVerified: false,
+            courthouse: null,
+            counties: [{ name: 'Lee', fips: '12071' }],
+          },
+        ],
+        caseUpload: { status: 'unverified', verifiedAt: null },
+      },
+    ],
+  };
+
+  test('GETs /v1/courts with a bearer token and maps the registry exactly', async () => {
+    const stub = stubFetch(() => jsonResponse(REGISTRY, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const registry = await client.listCourts();
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('GET');
+    expect(seen.url).toBe(`${BASE_URL}/v1/courts`);
+    expect(seen.headers.get('authorization')).toBe(`Bearer ${ACCESS_TOKEN}`);
+    expect(registry).toEqual(REGISTRY);
+  });
+
+  test('a caller in no firm is refused with a 403', async () => {
+    const stub = stubFetch(() => jsonResponse({ error: 'Forbidden' }, 403));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await expect(client.listCourts()).rejects.toThrow(ApiException);
   });
 });
 
@@ -3703,6 +4555,7 @@ describe('listFirmDirectory', () => {
         lastName: 'Attorney',
         displayName: 'Alice Attorney',
         role: 'attorney',
+        signatureBlock: null,
       },
       {
         subject: 'b-2',
@@ -3710,6 +4563,7 @@ describe('listFirmDirectory', () => {
         lastName: 'Paralegal',
         displayName: 'Bob Paralegal',
         role: 'paralegal',
+        signatureBlock: null,
       },
     ]);
   });
@@ -3742,11 +4596,15 @@ describe('listFirmDirectory', () => {
     const people = await client.listFirmDirectory();
 
     expect(people).toHaveLength(1);
+    // `signatureBlock` is the one deliberate widening (issue #360): the
+    // petition screen's "use firm default" is case work, and a bar number is
+    // printed on every filing the attorney signs.
     expect(Object.keys(people[0]!).sort()).toEqual([
       'displayName',
       'firstName',
       'lastName',
       'role',
+      'signatureBlock',
       'subject',
     ]);
   });
@@ -3769,6 +4627,12 @@ describe('the firm user endpoints', () => {
       documents: 'add_edit',
       extraction_review: 'add_edit',
       creditor_library: 'add_edit',
+      notes: 'add_edit',
+      events: 'hidden',
+      tasks: 'hidden',
+      clients: 'add_edit',
+      client_portal: 'hidden',
+      electronic_filing: 'hidden',
       firm_administration: 'hidden',
     },
     status: 'active',
@@ -3786,7 +4650,7 @@ describe('the firm user endpoints', () => {
     const users = await client.listFirmUsers();
 
     expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/firm/users`);
-    expect(users).toEqual([USER]);
+    expect(users).toEqual([{ ...USER, signatureBlock: null }]);
   });
 
   test('POSTs only the fields that were supplied — no undefined keys', async () => {
@@ -4068,6 +4932,1006 @@ describe('the library creditor endpoints', () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// The caller's own CM/ECF credential (ADR 0024, guardrail 3). Fake values
+// only: FAKE-ECF-USER, a fake password, a seed that is obviously not one.
+// ---------------------------------------------------------------------------
+
+describe('the filing credential endpoints', () => {
+  const CREDENTIAL_ID = 'c0ffee00-0000-4000-8000-000000000001';
+  const CREDENTIAL_JSON = {
+    id: CREDENTIAL_ID,
+    login: 'FAKE-ECF-USER',
+    courts: ['txsb'],
+    status: 'active',
+    created_at: '2026-07-23T09:15:00.123Z',
+    updated_at: '2026-07-23T09:15:00.123Z',
+  };
+
+  test('GETs /v1/me/filing-credentials and maps the status views', async () => {
+    const stub = stubFetch(() => jsonResponse({ credentials: [CREDENTIAL_JSON] }, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const credentials = await client.listFilingCredentials();
+
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/me/filing-credentials`);
+    expect(stub.lastRequest().method).toBe('GET');
+    expect(credentials).toEqual([CREDENTIAL_JSON]);
+  });
+
+  test('POSTs the enrolment snake_case, omits absent courts, maps the 201', async () => {
+    const stub = stubFetch(() => jsonResponse(CREDENTIAL_JSON, 201));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const enrolled = await client.enrolFilingCredential({
+      login: 'FAKE-ECF-USER',
+      password: 'FAKE-ECF-PASSWORD',
+      totp_seed: 'FAKEFAKEFAKEFAKE',
+    });
+
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/me/filing-credentials`);
+    expect(stub.lastRequest().method).toBe('POST');
+    expect(JSON.parse(stub.lastRequest().body as string)).toEqual({
+      login: 'FAKE-ECF-USER',
+      password: 'FAKE-ECF-PASSWORD',
+      totp_seed: 'FAKEFAKEFAKEFAKE',
+    });
+    expect(enrolled).toEqual(CREDENTIAL_JSON);
+  });
+
+  test('sends courts when given', async () => {
+    const stub = stubFetch(() => jsonResponse(CREDENTIAL_JSON, 201));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await client.enrolFilingCredential({
+      login: 'FAKE-ECF-USER',
+      password: 'FAKE-ECF-PASSWORD',
+      totp_seed: 'FAKEFAKEFAKEFAKE',
+      courts: ['txsb'],
+    });
+
+    expect(JSON.parse(stub.lastRequest().body as string).courts).toEqual(['txsb']);
+  });
+
+  test('a 400 surfaces the per-field messages', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse(
+        { error: 'validation failed', fields: { totp_seed: 'Enter the authenticator key.' } },
+        400,
+      ),
+    );
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const error = await client
+      .enrolFilingCredential({ login: 'FAKE-ECF-USER', password: 'x', totp_seed: 'x' })
+      .catch((thrown: unknown) => thrown);
+
+    expect(error).toBeInstanceOf(ApiValidationException);
+    expect((error as ApiValidationException).fields.totp_seed).toBe('Enter the authenticator key.');
+  });
+
+  test('DELETEs /v1/me/filing-credentials/{id} and resolves on 204', async () => {
+    const stub = stubFetch(() => new Response(null, { status: 204 }));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await expect(client.revokeFilingCredential(CREDENTIAL_ID)).resolves.toBeUndefined();
+    expect(stub.lastRequest().method).toBe('DELETE');
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/me/filing-credentials/${CREDENTIAL_ID}`);
+  });
+
+  test('a status other than active is refused as malformed', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse({ credentials: [{ ...CREDENTIAL_JSON, status: 'revoked' }] }, 200),
+    );
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await expect(client.listFilingCredentials()).rejects.toThrow(/status/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The written filing authorization (ADR 0024, guardrail 2).
+// ---------------------------------------------------------------------------
+
+describe('the filing authorization endpoints', () => {
+  const TEXT = {
+    version: '2026-10-07-draft',
+    digest: 'c526ac3fdfc34b9b2a03a42818b0e94eebad131472387fc516f0282b15fe3ce5',
+    text: 'DRAFT, pending review.\n\nAuthorization to file under my CM/ECF login\n',
+  };
+  // authorization_json's exact shape, with the text beside it.
+  const SIGNED_JSON = {
+    text: TEXT,
+    current_version: TEXT.version,
+    current: true,
+    signature: {
+      id: 'a0700000-0000-4000-8000-000000000001',
+      text_version: TEXT.version,
+      text_digest: TEXT.digest,
+      signed_at: '2100-01-01T00:01:00.000000Z',
+    },
+  };
+  const UNSIGNED_JSON = {
+    text: TEXT,
+    current_version: TEXT.version,
+    current: false,
+    signature: null,
+  };
+
+  function client(stub: ReturnType<typeof stubFetch>) {
+    return new InsolviaApiClient(BASE_URL, { fetch: stub.fetch, accessToken: () => ACCESS_TOKEN });
+  }
+
+  test('GETs /v1/me/filing-authorization and maps the unsigned view', async () => {
+    const stub = stubFetch(() => jsonResponse(UNSIGNED_JSON, 200));
+
+    const status = await client(stub).getFilingAuthorization();
+
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/me/filing-authorization`);
+    expect(stub.lastRequest().method).toBe('GET');
+    expect(status).toEqual(UNSIGNED_JSON);
+  });
+
+  test('POSTs the version and digest it was shown, snake_case, and maps the 201', async () => {
+    const stub = stubFetch(() => jsonResponse(SIGNED_JSON, 201));
+
+    const signed = await client(stub).signFilingAuthorization(TEXT);
+
+    expect(stub.lastRequest().method).toBe('POST');
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/me/filing-authorization`);
+    expect(JSON.parse(stub.lastRequest().body as string)).toEqual({
+      text_version: TEXT.version,
+      text_digest: TEXT.digest,
+    });
+    expect(signed).toEqual(SIGNED_JSON);
+  });
+
+  test('a stale sign-in is an ApiReauthenticationRequiredException', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse(
+        { error: 'ReauthenticationRequired', message: 'sign in again to continue' },
+        403,
+      ),
+    );
+
+    const error = await client(stub)
+      .signFilingAuthorization(TEXT)
+      .catch((thrown: unknown) => thrown);
+
+    expect(error).toBeInstanceOf(ApiReauthenticationRequiredException);
+    expect(error).toBeInstanceOf(ApiException);
+    expect((error as ApiException).statusCode).toBe(403);
+  });
+
+  test('any other 403 stays a plain ApiException', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse({ error: 'ForbiddenError', message: 'feature not granted' }, 403),
+    );
+
+    const error = await client(stub)
+      .getFilingAuthorization()
+      .catch((thrown: unknown) => thrown);
+
+    expect(error).toBeInstanceOf(ApiException);
+    expect(error).not.toBeInstanceOf(ApiReauthenticationRequiredException);
+  });
+
+  test('DELETEs /v1/me/filing-authorization and resolves to how many were destroyed', async () => {
+    const stub = stubFetch(() => jsonResponse({ credentials_revoked: 2 }, 200));
+
+    await expect(client(stub).withdrawFilingAuthorization()).resolves.toBe(2);
+    expect(stub.lastRequest().method).toBe('DELETE');
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/me/filing-authorization`);
+  });
+
+  test('a signature without its digest is refused as malformed', async () => {
+    const { text_digest: _dropped, ...partial } = SIGNED_JSON.signature;
+    const stub = stubFetch(() => jsonResponse({ ...SIGNED_JSON, signature: partial }, 200));
+
+    await expect(client(stub).getFilingAuthorization()).rejects.toThrow(/text_digest/);
+  });
+});
+
+describe('the per-filing approval endpoints (ADR 0024, guardrail 1)', () => {
+  const CASE = 'c0000000-0000-4000-8000-000000000001';
+  const DIGEST = 'a'.repeat(64);
+  // _view's exact shape (services/api api/routes/filing_approval.py):
+  // camelCase, optional members absent, never null.
+  const BASIS_JSON = {
+    scheme: 'insolvia-filing-approval/1',
+    digest: DIGEST,
+    ready: true,
+    blockers: [],
+    court: { code: 'flmb', name: 'Middle District of Florida', divisionName: 'Tampa Division' },
+    registryRelease: 'courts/us-bankruptcy@2026-09-24',
+    packet: {
+      id: 'p0000000-0000-4000-8000-000000000001',
+      createdAt: '2099-01-15T12:00:00.000Z',
+      sha256: 'b'.repeat(64),
+      byteSize: 123456,
+    },
+    documents: [
+      {
+        position: 1,
+        key: 'form/b101',
+        title: 'B101 — Voluntary Petition',
+        fileName: '01-b101.pdf',
+        source: 'packet',
+        handling: 'file',
+        file: { byteSize: 4096, pageCount: 9, sha256: 'c'.repeat(64) },
+      },
+      {
+        position: 2,
+        key: 'creditor_matrix',
+        title: 'Creditor matrix',
+        fileName: 'creditor-matrix.txt',
+        source: 'packet',
+        handling: 'file',
+        file: { byteSize: 19, sha256: 'd'.repeat(64) },
+      },
+      {
+        position: 3,
+        key: 'signature_instrument',
+        title: 'Declaration for E-Filing',
+        fileName: 'signature-instrument.pdf',
+        source: 'outside',
+        handling: 'own_event',
+        note: 'Signed in wet ink.',
+      },
+    ],
+    checklist: [{ id: 'court', status: 'ready', title: 'Court and division', detail: 'Tampa.' }],
+    fee: {
+      handling: 'hand_back_at_payment',
+      verified: false,
+      detail: 'Handed back at the payment step.',
+      deadline: 'Paid at filing.',
+    },
+    signInMaxAgeSeconds: 300,
+    approvalTtlSeconds: 3600,
+  };
+  const APPROVAL_JSON = {
+    id: 'e0000000-0000-4000-8000-000000000001',
+    filingId: 'f0000000-0000-4000-8000-000000000001',
+    status: 'pending',
+    digest: DIGEST,
+    approvedBy: 'a0000000-0000-4000-8000-000000000001',
+    approvedAt: '2099-01-15T12:00:00.000Z',
+    expiresAt: '2099-01-15T13:00:00.000Z',
+    credentialId: 'd0000000-0000-4000-8000-000000000001',
+    court: 'flmb',
+    division: 'tampa',
+    packetId: 'p0000000-0000-4000-8000-000000000001',
+  };
+
+  function client(stub: ReturnType<typeof stubFetch>) {
+    return new InsolviaApiClient(BASE_URL, { fetch: stub.fetch, accessToken: () => ACCESS_TOKEN });
+  }
+
+  test('GETs the basis, and no approval when there is none', async () => {
+    const stub = stubFetch(() => jsonResponse({ basis: BASIS_JSON }, 200));
+
+    const view = await client(stub).getFilingApproval(CASE);
+
+    expect(stub.lastRequest().method).toBe('GET');
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/cases/${CASE}/filing-approval`);
+    expect(view).toEqual({ basis: BASIS_JSON });
+    expect(view.approval).toBeUndefined();
+  });
+
+  test('POSTs the digest it was shown and maps the 201', async () => {
+    const stub = stubFetch(() => jsonResponse({ basis: BASIS_JSON, approval: APPROVAL_JSON }, 201));
+
+    const view = await client(stub).approveFiling(CASE, { digest: DIGEST });
+
+    expect(stub.lastRequest().method).toBe('POST');
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/cases/${CASE}/filing-approval`);
+    expect(JSON.parse(stub.lastRequest().body as string)).toEqual({ digest: DIGEST });
+    expect(view.approval).toEqual(APPROVAL_JSON);
+  });
+
+  test('names the login only when asked, snake_case', async () => {
+    const stub = stubFetch(() => jsonResponse({ basis: BASIS_JSON, approval: APPROVAL_JSON }, 201));
+
+    await client(stub).approveFiling(CASE, { digest: DIGEST, credentialId: 'cred-1' });
+
+    expect(JSON.parse(stub.lastRequest().body as string)).toEqual({
+      digest: DIGEST,
+      credential_id: 'cred-1',
+    });
+  });
+
+  test('a stale sign-in is an ApiReauthenticationRequiredException', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse(
+        { error: 'ReauthenticationRequired', message: 'sign in again to continue' },
+        403,
+      ),
+    );
+
+    const error = await client(stub)
+      .approveFiling(CASE, { digest: DIGEST })
+      .catch((thrown: unknown) => thrown);
+
+    expect(error).toBeInstanceOf(ApiReauthenticationRequiredException);
+  });
+
+  test('a filing set with a blocker is a 409 ApiException carrying the body', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse(
+        { error: 'FilingSetNotReady', message: 'not ready: packet.', blockers: ['packet'] },
+        409,
+      ),
+    );
+
+    const error = await client(stub)
+      .approveFiling(CASE, { digest: DIGEST })
+      .catch((thrown: unknown) => thrown);
+
+    expect(error).toBeInstanceOf(ApiException);
+    expect((error as ApiException).statusCode).toBe(409);
+    expect((error as ApiException).body).toContain('FilingSetNotReady');
+  });
+
+  test('a voided approval decodes its reason', async () => {
+    const voided = {
+      ...APPROVAL_JSON,
+      status: 'voided',
+      voidedAt: '2099-01-15T12:05:00.000Z',
+      voidReason: 'changed',
+    };
+    const stub = stubFetch(() => jsonResponse({ basis: BASIS_JSON, approval: voided }, 200));
+
+    const view = await client(stub).getFilingApproval(CASE);
+
+    expect(view.approval?.status).toBe('voided');
+    expect(view.approval?.voidReason).toBe('changed');
+  });
+
+  test('DELETEs to cancel', async () => {
+    const cancelled = { ...APPROVAL_JSON, status: 'voided', voidReason: 'cancelled' };
+    const stub = stubFetch(() => jsonResponse({ basis: BASIS_JSON, approval: cancelled }, 200));
+
+    const view = await client(stub).cancelFilingApproval(CASE);
+
+    expect(stub.lastRequest().method).toBe('DELETE');
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/cases/${CASE}/filing-approval`);
+    expect(view.approval?.voidReason).toBe('cancelled');
+  });
+
+  test('an unknown status is refused as malformed', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse({ basis: BASIS_JSON, approval: { ...APPROVAL_JSON, status: 'filed' } }, 200),
+    );
+
+    await expect(client(stub).getFilingApproval(CASE)).rejects.toThrow(/status/);
+  });
+
+  // insolvia_core.filings.filing_json's exact shape (ADR 0024 PR 8).
+  const FILING_JSON = {
+    filingId: APPROVAL_JSON.filingId,
+    approvalId: APPROVAL_JSON.id,
+    attorneyId: APPROVAL_JSON.approvedBy,
+    state: 'outcome_unknown',
+    court: 'flmb',
+    claimedAt: '2099-01-15T12:00:01.000Z',
+    updatedAt: '2099-01-15T12:03:00.000Z',
+    history: [
+      { state: 'claimed', at: '2099-01-15T12:00:01.000Z' },
+      { state: 'at_final_submit', at: '2099-01-15T12:02:00.000Z' },
+      { state: 'outcome_unknown', at: '2099-01-15T12:03:00.000Z' },
+    ],
+    resolvable: true,
+    driver: 'fake-cmecf/1',
+    handBack: {
+      reason: 'capture_interrupted',
+      stage: 'submitted',
+      title: 'The court confirmed the filing, but the receipt could not be stored',
+      action: "Look the debtor up on the court's own case query.",
+      link: 'packet',
+    },
+    unknownReason: 'capture_interrupted',
+    confirmation: {
+      caseNumber: '6:99-bk-10000',
+      filedAt: '2099-01-15T12:02:30Z',
+      docketEntries: ['1 Voluntary Petition'],
+      receiptNumber: 'FAKE-1',
+      feeDue: '$338.00',
+    },
+    followUps: ['pay_fee'],
+  };
+  const FILING_PATH = `${BASE_URL}/v1/cases/${CASE}/filings/${APPROVAL_JSON.filingId}/resolution`;
+
+  test('the view decodes the filing record whole', async () => {
+    const consumed = { ...APPROVAL_JSON, status: 'consumed' };
+    const stub = stubFetch(() =>
+      jsonResponse({ basis: BASIS_JSON, approval: consumed, filing: FILING_JSON }, 200),
+    );
+
+    const view = await client(stub).getFilingApproval(CASE);
+
+    expect(view.filing).toEqual(FILING_JSON);
+  });
+
+  test('POSTs a filed resolution snake_case, always with the docket check', async () => {
+    const resolution = {
+      outcome: 'filed',
+      resolvedBy: APPROVAL_JSON.approvedBy,
+      resolvedAt: '2099-01-16T09:00:00.000Z',
+      docketCheckedAt: '2099-01-16T09:00:00.000Z',
+      caseNumber: '6:99-bk-10000',
+      filedAt: '2099-01-15',
+    };
+    const stub = stubFetch(() =>
+      jsonResponse(
+        {
+          basis: BASIS_JSON,
+          approval: APPROVAL_JSON,
+          filing: { ...FILING_JSON, resolvable: false, resolution },
+        },
+        200,
+      ),
+    );
+
+    const view = await client(stub).resolveFiling(CASE, APPROVAL_JSON.filingId, {
+      outcome: 'filed',
+      caseNumber: '6:99-bk-10000',
+      filedAt: '2099-01-15',
+    });
+
+    expect(stub.lastRequest().method).toBe('POST');
+    expect(stub.lastRequest().url).toBe(FILING_PATH);
+    expect(JSON.parse(stub.lastRequest().body as string)).toEqual({
+      outcome: 'filed',
+      docket_checked: true,
+      case_number: '6:99-bk-10000',
+      filed_at: '2099-01-15',
+    });
+    expect(view.filing?.resolution).toEqual(resolution);
+  });
+
+  test('a not-filed resolution sends no filing details', async () => {
+    const stub = stubFetch(() => jsonResponse({ basis: BASIS_JSON }, 200));
+
+    await client(stub).resolveFiling(CASE, APPROVAL_JSON.filingId, { outcome: 'not_filed' });
+
+    expect(JSON.parse(stub.lastRequest().body as string)).toEqual({
+      outcome: 'not_filed',
+      docket_checked: true,
+    });
+  });
+
+  test('names the uploaded notice only when given', async () => {
+    const stub = stubFetch(() => jsonResponse({ basis: BASIS_JSON }, 200));
+
+    await client(stub).resolveFiling(CASE, APPROVAL_JSON.filingId, {
+      outcome: 'filed',
+      caseNumber: '6:99-bk-10000',
+      filedAt: '2099-01-15',
+      confirmationDocumentId: 'doc-1',
+    });
+
+    expect(JSON.parse(stub.lastRequest().body as string)).toMatchObject({
+      confirmation_document_id: 'doc-1',
+    });
+  });
+
+  test('a refused resolution is a 409 carrying its reason', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse(
+        { error: 'ResolutionRefused', message: 'Record it as filed.', reason: 'court_confirmed' },
+        409,
+      ),
+    );
+
+    const error = await client(stub)
+      .resolveFiling(CASE, APPROVAL_JSON.filingId, { outcome: 'not_filed' })
+      .catch((thrown: unknown) => thrown);
+
+    expect(error).toBeInstanceOf(ApiException);
+    expect((error as ApiException).statusCode).toBe(409);
+    expect((error as ApiException).body).toContain('court_confirmed');
+  });
+
+  test('an unknown filing state is refused as malformed', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse({ basis: BASIS_JSON, filing: { ...FILING_JSON, state: 'lost' } }, 200),
+    );
+
+    await expect(client(stub).getFilingApproval(CASE)).rejects.toThrow(/state/);
+  });
+});
+
+describe('the firm client endpoints (ADR 0022)', () => {
+  const FIRM_CLIENT_ID = 'c11e0000-0000-4000-8000-000000000001';
+  const CREATOR = 'a11c0000-0000-4000-8000-00000000a11c';
+  // firm_client_json's exact shape — snake_case, absent fields omitted.
+  const FIRM_CLIENT_JSON = {
+    id: FIRM_CLIENT_ID,
+    status: 'active',
+    name: { given: 'Jordan', surname: 'Example' },
+    other_names_used: [{ id: 'alias-1', surname: 'Sample' }],
+    date_of_birth: '1980-02-29',
+    residence_address: { line1: '1 Example St', city: 'Springfield', county: 'Sangamon' },
+    email: 'jordan@example.test',
+    lead_source: 'Referral',
+    tax_id_last_four: '4320',
+    created_at: '2026-09-26T09:15:00.123456Z',
+    updated_at: '2026-09-26T09:15:00.123456Z',
+    created_by: CREATOR,
+  };
+  const FIRM_CLIENT: FirmClient = {
+    id: FIRM_CLIENT_ID,
+    status: 'active',
+    name: { given: 'Jordan', surname: 'Example' },
+    other_names_used: [{ id: 'alias-1', surname: 'Sample' }],
+    date_of_birth: '1980-02-29',
+    residence_address: { line1: '1 Example St', city: 'Springfield', county: 'Sangamon' },
+    email: 'jordan@example.test',
+    lead_source: 'Referral',
+    tax_id_last_four: '4320',
+    created_at: '2026-09-26T09:15:00.123456Z',
+    updated_at: '2026-09-26T09:15:00.123456Z',
+    created_by: CREATOR,
+  };
+
+  function clientWith(stub: ReturnType<typeof stubFetch>): InsolviaApiClient {
+    return new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+  }
+
+  test('GETs /v1/firm/clients and maps the whole directory', async () => {
+    const stub = stubFetch(() => jsonResponse({ clients: [FIRM_CLIENT_JSON] }, 200));
+
+    const clients = await clientWith(stub).listFirmClients();
+
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/firm/clients`);
+    expect(stub.lastRequest().method).toBe('GET');
+    expect(clients).toEqual([FIRM_CLIENT]);
+  });
+
+  test('POSTs a snake_case draft, county included, and maps the 201 back', async () => {
+    const stub = stubFetch(() => jsonResponse(FIRM_CLIENT_JSON, 201));
+
+    const created = await clientWith(stub).createFirmClient({
+      name: { given: 'Jordan', surname: 'Example' },
+      other_names_used: [{ id: 'alias-1', surname: 'Sample' }],
+      date_of_birth: '1980-02-29',
+      residence_address: { line1: '1 Example St', city: 'Springfield', county: 'Sangamon' },
+      email: 'jordan@example.test',
+      lead_source: 'Referral',
+    });
+
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/firm/clients`);
+    expect(stub.lastRequest().method).toBe('POST');
+    expect(JSON.parse(stub.lastRequest().body as string)).toEqual({
+      name: { given: 'Jordan', surname: 'Example' },
+      other_names_used: [{ id: 'alias-1', surname: 'Sample' }],
+      date_of_birth: '1980-02-29',
+      residence_address: { line1: '1 Example St', city: 'Springfield', county: 'Sangamon' },
+      email: 'jordan@example.test',
+      lead_source: 'Referral',
+    });
+    expect(created).toEqual(FIRM_CLIENT);
+  });
+
+  test('a name-only draft omits every other key — no undefined leaks', async () => {
+    const stub = stubFetch(() => jsonResponse(FIRM_CLIENT_JSON, 201));
+
+    await clientWith(stub).createFirmClient({ name: { surname: 'Example' } });
+
+    expect(JSON.parse(stub.lastRequest().body as string)).toEqual({
+      name: { surname: 'Example' },
+    });
+  });
+
+  test('GETs one client by id, encoded once', async () => {
+    const stub = stubFetch(() => jsonResponse(FIRM_CLIENT_JSON, 200));
+
+    const fetched = await clientWith(stub).getFirmClient('id/with slash');
+
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/firm/clients/id%2Fwith%20slash`);
+    expect(fetched).toEqual(FIRM_CLIENT);
+  });
+
+  test('PUTs a whole replacement to /v1/firm/clients/{id}', async () => {
+    const stub = stubFetch(() => jsonResponse(FIRM_CLIENT_JSON, 200));
+
+    const updated = await clientWith(stub).updateFirmClient(FIRM_CLIENT_ID, {
+      name: { surname: 'Example' },
+    });
+
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/firm/clients/${FIRM_CLIENT_ID}`);
+    expect(stub.lastRequest().method).toBe('PUT');
+    expect(JSON.parse(stub.lastRequest().body as string)).toEqual({
+      name: { surname: 'Example' },
+    });
+    expect(updated).toEqual(FIRM_CLIENT);
+  });
+
+  test('archives with a PUT to /status carrying only the status', async () => {
+    const stub = stubFetch(() => jsonResponse({ ...FIRM_CLIENT_JSON, status: 'archived' }, 200));
+
+    const archived = await clientWith(stub).setFirmClientStatus(FIRM_CLIENT_ID, 'archived');
+
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/firm/clients/${FIRM_CLIENT_ID}/status`);
+    expect(stub.lastRequest().method).toBe('PUT');
+    expect(JSON.parse(stub.lastRequest().body as string)).toEqual({ status: 'archived' });
+    expect(archived.status).toBe('archived');
+  });
+
+  test('a minimal record decodes with every optional field absent', async () => {
+    const minimal = {
+      id: FIRM_CLIENT_ID,
+      status: 'active',
+      name: { given: 'Mononym' },
+      created_at: '2026-09-26T09:15:00.123456Z',
+      updated_at: '2026-09-26T09:15:00.123456Z',
+      created_by: CREATOR,
+    };
+    const stub = stubFetch(() => jsonResponse(minimal, 200));
+
+    const fetched = await clientWith(stub).getFirmClient(FIRM_CLIENT_ID);
+
+    expect(fetched).toEqual(minimal);
+  });
+
+  test('an unknown status or a missing name is a contract break', async () => {
+    const badStatus = stubFetch(() => jsonResponse({ ...FIRM_CLIENT_JSON, status: 'merged' }, 200));
+    await expect(clientWith(badStatus).getFirmClient(FIRM_CLIENT_ID)).rejects.toThrow('status');
+
+    const { name: _dropped, ...nameless } = FIRM_CLIENT_JSON;
+    const noName = stubFetch(() => jsonResponse(nameless, 200));
+    await expect(clientWith(noName).getFirmClient(FIRM_CLIENT_ID)).rejects.toThrow('name');
+  });
+
+  test('a 400 on POST throws ApiValidationException with the server field messages', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse(
+        { error: 'ValidationError', fields: { name: 'A surname or a given name is required.' } },
+        400,
+      ),
+    );
+
+    const error = await clientWith(stub)
+      .createFirmClient({ name: {} })
+      .catch((thrown: unknown) => thrown);
+
+    expect(error).toBeInstanceOf(ApiValidationException);
+    expect((error as ApiValidationException).fields.name).toBe(
+      'A surname or a given name is required.',
+    );
+  });
+
+  const MERGED_ID = 'c11e0000-0000-4000-8000-000000000002';
+  const MERGED_JSON = {
+    ...FIRM_CLIENT_JSON,
+    id: MERGED_ID,
+    status: 'archived',
+    merged_into: FIRM_CLIENT_ID,
+  };
+
+  test('merges with a POST to the survivor carrying only merged_client_id', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse({ client: FIRM_CLIENT_JSON, merged: MERGED_JSON }, 200),
+    );
+
+    const result = await clientWith(stub).mergeFirmClient(FIRM_CLIENT_ID, MERGED_ID);
+
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/firm/clients/${FIRM_CLIENT_ID}/merge`);
+    expect(stub.lastRequest().method).toBe('POST');
+    expect(JSON.parse(stub.lastRequest().body as string)).toEqual({
+      merged_client_id: MERGED_ID,
+    });
+    expect(result.client).toEqual(FIRM_CLIENT);
+    expect(result.merged.status).toBe('archived');
+    expect(result.merged.merged_into).toBe(FIRM_CLIENT_ID);
+  });
+
+  test('a merged client read on its own carries merged_into', async () => {
+    const stub = stubFetch(() => jsonResponse(MERGED_JSON, 200));
+
+    const fetched = await clientWith(stub).getFirmClient(MERGED_ID);
+
+    expect(fetched.merged_into).toBe(FIRM_CLIENT_ID);
+  });
+
+  test('a merge answer missing either client is a contract break', async () => {
+    const stub = stubFetch(() => jsonResponse({ client: FIRM_CLIENT_JSON }, 200));
+    await expect(clientWith(stub).mergeFirmClient(FIRM_CLIENT_ID, MERGED_ID)).rejects.toThrow(
+      'merged',
+    );
+  });
+
+  test('a refused merge is a 409 ApiException with the server message', async () => {
+    const message =
+      "These two clients are both debtors on the same case. Link that case's " +
+      'debtor to the right client first, then merge.';
+    const stub = stubFetch(() => jsonResponse({ error: 'ConflictError', message }, 409));
+
+    const error = await rejection(clientWith(stub).mergeFirmClient(FIRM_CLIENT_ID, MERGED_ID));
+
+    expect(error).toBeInstanceOf(ApiException);
+    expect((error as ApiException).statusCode).toBe(409);
+    expect((error as ApiException).message).toContain(message);
+  });
+
+  test('an unknown merged client is a 400 keyed merged_client_id', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse(
+        { error: 'ValidationError', fields: { merged_client_id: 'No such client.' } },
+        400,
+      ),
+    );
+
+    const error = await rejection(clientWith(stub).mergeFirmClient(FIRM_CLIENT_ID, 'nope'));
+
+    expect(error).toBeInstanceOf(ApiValidationException);
+    expect((error as ApiValidationException).fields.merged_client_id).toBe('No such client.');
+  });
+});
+
+// The case lifecycle (issue 14.3 / #355), pinned against
+// services/api/src/insolvia_api/api/routes/{cases,case_lifecycle}.py and
+// packages/insolvia_core/src/insolvia_core/cases.py.
+describe('the case lifecycle (issue #355)', () => {
+  const CASE_ID = 'a3f1e9d0-4b2c-4d1e-9a7f-6c8e0d1f2a3b';
+  const COPY_ID = 'c0b10000-0000-4000-8000-0000000c0b10';
+  const FIRM_CLIENT_ID_LIFECYCLE = 'c1100000-0000-4000-8000-0000000c11b0';
+  const FILED_CASE = {
+    id: CASE_ID,
+    createdBy: SUBJECT,
+    chapter: 7,
+    district: 'Middle District of Florida',
+    court: 'flmb',
+    division: 'tampa',
+    status: 'filed',
+    createdAt: '2026-07-23T09:15:00.123456Z',
+    updatedAt: '2026-09-01T10:00:00.000000Z',
+    filedAt: '2026-09-01',
+    caseNumber: '8:26-bk-01234',
+    judge: 'Hon. Example Judge',
+    trustee: 'Example Trustee',
+    officeFileNumber: 'F-1001',
+    archivedAt: '2026-09-30T10:00:00.000000Z',
+    archivedBy: SUBJECT,
+  };
+
+  function lifecycleClient(stub: { fetch: FetchLike }): InsolviaApiClient {
+    return new InsolviaApiClient(BASE_URL, { fetch: stub.fetch, accessToken: () => ACCESS_TOKEN });
+  }
+
+  test('the statuses, the moves and "filed" mirror insolvia_core.cases', () => {
+    expect(CASE_STATUSES).toEqual([
+      'intake',
+      'ready_to_file',
+      'filed',
+      'discharged',
+      'dismissed',
+      'closed',
+    ]);
+    expect(PROSPECT_STAGES).toEqual([
+      'possible',
+      'consultation_scheduled',
+      'awaiting_signed_agreement',
+      'exhausted',
+    ]);
+    expect(CASE_TRANSITIONS.filed).toEqual(['discharged', 'dismissed', 'closed']);
+    expect(CASE_TRANSITIONS.closed).toEqual(['filed']);
+    expect(CASE_STATUSES.filter(isFiledStatus)).toEqual([
+      'filed',
+      'discharged',
+      'dismissed',
+      'closed',
+    ]);
+  });
+
+  test('a case maps its docket facts and archive stamp, each absent until set', async () => {
+    const stub = stubFetch(() => jsonResponse(FILED_CASE, 200));
+
+    const matter = await lifecycleClient(stub).getCase(CASE_ID);
+
+    expect(matter).toEqual(FILED_CASE);
+  });
+
+  test('a prospect is not a case status: the client decodes it as malformed', async () => {
+    await expect(
+      lifecycleClient(
+        stubFetch(() => jsonResponse({ ...FILED_CASE, status: 'prospect' }, 200)),
+      ).getCase(CASE_ID),
+    ).rejects.toThrow();
+    await expect(
+      lifecycleClient(
+        stubFetch(() => jsonResponse({ ...FILED_CASE, status: 'shredded' }, 200)),
+      ).getCase(CASE_ID),
+    ).rejects.toThrow();
+  });
+
+  test('a prospect CLIENT is staged with a PUT, and the stage maps back', async () => {
+    const staged = {
+      id: FIRM_CLIENT_ID_LIFECYCLE,
+      status: 'active',
+      name: { surname: 'Example' },
+      prospect_stage: 'consultation_scheduled',
+      created_at: '2026-09-30T10:00:00.000000Z',
+      updated_at: '2026-10-01T10:00:00.000000Z',
+      created_by: SUBJECT,
+    };
+    const stub = stubFetch(() => jsonResponse(staged, 200));
+
+    const client = await lifecycleClient(stub).setFirmClientProspectStage(
+      FIRM_CLIENT_ID_LIFECYCLE,
+      'consultation_scheduled',
+    );
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('PUT');
+    expect(seen.url).toBe(`${BASE_URL}/v1/firm/clients/${FIRM_CLIENT_ID_LIFECYCLE}/prospect-stage`);
+    expect(JSON.parse(seen.body)).toEqual({ prospect_stage: 'consultation_scheduled' });
+    expect(client.prospect_stage).toBe('consultation_scheduled');
+  });
+
+  test('null takes a prospect out of the funnel, sent as null', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse(
+        {
+          id: FIRM_CLIENT_ID_LIFECYCLE,
+          status: 'active',
+          name: { surname: 'Example' },
+          created_at: '2026-09-30T10:00:00.000000Z',
+          updated_at: '2026-10-01T10:00:00.000000Z',
+          created_by: SUBJECT,
+        },
+        200,
+      ),
+    );
+
+    const client = await lifecycleClient(stub).setFirmClientProspectStage(
+      FIRM_CLIENT_ID_LIFECYCLE,
+      null,
+    );
+
+    expect(JSON.parse(stub.lastRequest().body)).toEqual({ prospect_stage: null });
+    expect('prospect_stage' in client).toBe(false);
+  });
+
+  test('a retained client refuses a stage with a 409', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse({ error: 'ConflictError', message: 'This client has been retained.' }, 409),
+    );
+    const error = asApiException(
+      await rejection(
+        lifecycleClient(stub).setFirmClientProspectStage(FIRM_CLIENT_ID_LIFECYCLE, 'possible'),
+      ),
+    );
+    expect(error.statusCode).toBe(409);
+  });
+
+  test('updateCase sends the docket facts snake_case, with null to clear', async () => {
+    const stub = stubFetch(() => jsonResponse(FILED_CASE, 200));
+
+    await lifecycleClient(stub).updateCase(CASE_ID, {
+      status: 'filed',
+      filedAt: '2026-09-01',
+      caseNumber: '8:26-bk-01234',
+      judge: 'Hon. Example Judge',
+      trustee: null,
+      officeFileNumber: 'F-1001',
+      chapter: undefined,
+    });
+
+    expect(JSON.parse(stub.lastRequest().body)).toEqual({
+      status: 'filed',
+      filed_at: '2026-09-01',
+      case_number: '8:26-bk-01234',
+      judge: 'Hon. Example Judge',
+      trustee: null,
+      office_file_number: 'F-1001',
+    });
+  });
+
+  test('listCases asks for the archive with archived=true, and never sends false', async () => {
+    const stub = stubFetch(() => jsonResponse({ cases: [FILED_CASE] }, 200));
+    const client = lifecycleClient(stub);
+
+    await client.listCases({ archived: true, limit: 10 });
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/cases?limit=10&archived=true`);
+    await client.listCases({ archived: false });
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/cases`);
+  });
+
+  test('GETs the status history oldest first, stages only where present', async () => {
+    const history = [
+      {
+        changedAt: '2026-08-01T10:00:00.000000Z',
+        changedBy: SUBJECT,
+        fromStatus: 'intake',
+        toStatus: 'ready_to_file',
+      },
+      {
+        // The filing worker's move (ADR 0024 PR 8): no person, a filing id.
+        changedAt: '2026-09-01T10:00:00.000000Z',
+        changedBy: 'filing-worker',
+        fromStatus: 'ready_to_file',
+        toStatus: 'filed',
+        filingId: 'f0000000-0000-4000-8000-000000000001',
+      },
+    ];
+    const stub = stubFetch(() => jsonResponse({ history }, 200));
+
+    const changes = await lifecycleClient(stub).listCaseStatusHistory(CASE_ID);
+
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/cases/${CASE_ID}/status-history`);
+    expect(changes).toEqual(history);
+  });
+
+  test('PUTs {archived} to archive or restore, and maps the Case', async () => {
+    const stub = stubFetch(() => jsonResponse(FILED_CASE, 200));
+
+    const archived = await lifecycleClient(stub).setCaseArchived(CASE_ID, true);
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('PUT');
+    expect(seen.url).toBe(`${BASE_URL}/v1/cases/${CASE_ID}/archived`);
+    expect(JSON.parse(seen.body)).toEqual({ archived: true });
+    expect(archived.archivedBy).toBe(SUBJECT);
+  });
+
+  test('DELETEs a case for a 204, and a filed case is a 409', async () => {
+    const stub = stubFetch(() => new Response(null, { status: 204 }));
+    await expect(lifecycleClient(stub).deleteCase(CASE_ID)).resolves.toBeUndefined();
+    expect(stub.lastRequest().method).toBe('DELETE');
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/cases/${CASE_ID}`);
+
+    const refused = stubFetch(() =>
+      jsonResponse({ error: 'ConflictError', message: 'A filed case cannot be deleted.' }, 409),
+    );
+    const error = asApiException(await rejection(lifecycleClient(refused).deleteCase(CASE_ID)));
+    expect(error.statusCode).toBe(409);
+  });
+
+  test('POSTs a copy with no body and maps the new Case from the 201', async () => {
+    const copy = {
+      id: COPY_ID,
+      createdBy: SUBJECT,
+      chapter: 7,
+      district: 'Middle District of Florida',
+      court: 'flmb',
+      division: 'tampa',
+      status: 'intake',
+      createdAt: '2026-10-01T10:00:00.000000Z',
+      updatedAt: '2026-10-01T10:00:00.000000Z',
+    };
+    const stub = stubFetch(() => jsonResponse(copy, 201));
+
+    const opened = await lifecycleClient(stub).copyCase(CASE_ID);
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('POST');
+    expect(seen.url).toBe(`${BASE_URL}/v1/cases/${CASE_ID}/copy`);
+    expect(opened).toEqual(copy);
+  });
+});
+
 describe('case assignment', () => {
   const CASE_ID = 'a3f1e9d0-4b2c-4d1e-9a7f-6c8e0d1f2a3b';
   const SUBJECT_ID = 'b0b00000-0000-4000-8000-00000000b0b0';
@@ -4127,6 +5991,225 @@ describe('case assignment', () => {
   });
 });
 
+// Tasks (issue #356 / 14.4), pinned against
+// services/api/src/insolvia_api/api/routes/tasks.py and
+// packages/insolvia_core/src/insolvia_core/tasks.py.
+describe('tasks', () => {
+  const CASE_ID = 'a3f1e9d0-4b2c-4d1e-9a7f-6c8e0d1f2a3b';
+  const TASK_ID = '00000000-0000-4000-8000-0000000000ta';
+  const ASSIGNEE = 'b0b00000-0000-4000-8000-00000000b0b0';
+
+  /** The literal `task_json` shape for a fully-populated, not-done task. */
+  const TASK = {
+    id: TASK_ID,
+    caseId: CASE_ID,
+    subject: 'Get the vehicle payoff',
+    description: 'Call the lender listed on the credit report.',
+    dueDate: '2026-10-01',
+    assigneeSubject: ASSIGNEE,
+    formSeries: 'b106d',
+    done: false,
+    overdue: false,
+    createdAt: '2026-09-01T00:00:00.000000Z',
+    updatedAt: '2026-09-01T00:00:00.000000Z',
+    createdBy: 'a11c0000-0000-4000-8000-00000000a11c',
+  };
+
+  /** A bare task — every optional member absent, never null. */
+  const BARE_TASK = {
+    id: TASK_ID,
+    caseId: CASE_ID,
+    subject: 'Follow up',
+    done: false,
+    overdue: false,
+    createdAt: '2026-09-01T00:00:00.000000Z',
+    updatedAt: '2026-09-01T00:00:00.000000Z',
+    createdBy: 'a11c0000-0000-4000-8000-00000000a11c',
+  };
+
+  test('POSTs a task with only subject required, and maps the created record', async () => {
+    const stub = stubFetch(() => jsonResponse(BARE_TASK, 201));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const task = await client.createTask(CASE_ID, { subject: 'Follow up' });
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('POST');
+    expect(seen.url).toBe(`${BASE_URL}/v1/cases/${CASE_ID}/tasks`);
+    expect(seen.headers.get('content-type')).toBe('application/json');
+    expect(JSON.parse(seen.body)).toEqual({ subject: 'Follow up' });
+    expect(task).toEqual(BARE_TASK);
+    expect('description' in task).toBe(false);
+    expect('completedAt' in task).toBe(false);
+  });
+
+  test('POSTs every optional field when supplied', async () => {
+    const stub = stubFetch(() => jsonResponse(TASK, 201));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await client.createTask(CASE_ID, {
+      subject: 'Get the vehicle payoff',
+      description: 'Call the lender listed on the credit report.',
+      dueDate: '2026-10-01',
+      assigneeSubject: ASSIGNEE,
+      formSeries: 'b106d',
+    });
+
+    expect(JSON.parse(stub.lastRequest().body)).toEqual({
+      subject: 'Get the vehicle payoff',
+      description: 'Call the lender listed on the credit report.',
+      dueDate: '2026-10-01',
+      assigneeSubject: ASSIGNEE,
+      formSeries: 'b106d',
+    });
+  });
+
+  test('GETs every task of a case', async () => {
+    const stub = stubFetch(() => jsonResponse({ tasks: [TASK, BARE_TASK] }, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const tasks = await client.listTasks(CASE_ID);
+
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/cases/${CASE_ID}/tasks`);
+    expect(tasks).toEqual([TASK, BARE_TASK]);
+  });
+
+  test('GETs one task, with both path segments encoded', async () => {
+    const stub = stubFetch(() => jsonResponse(TASK, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const task = await client.getTask('case/with slash', 'task id');
+
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/cases/case%2Fwith%20slash/tasks/task%20id`);
+    expect(task).toEqual(TASK);
+  });
+
+  test('PATCHes only the fields the caller actually names', async () => {
+    const stub = stubFetch(() => jsonResponse(TASK, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await client.updateTask(CASE_ID, TASK_ID, { subject: 'Renamed' });
+
+    expect(stub.lastRequest().method).toBe('PATCH');
+    expect(JSON.parse(stub.lastRequest().body)).toEqual({ subject: 'Renamed' });
+  });
+
+  test('PATCH sends an explicit null to clear a nullable field, distinct from omitting it', async () => {
+    const stub = stubFetch(() => jsonResponse(BARE_TASK, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    // Only dueDate is named — description/assigneeSubject/formSeries are
+    // absent from the request object entirely and must not appear in the
+    // JSON body at all, the same "leave unchanged" contract the server reads.
+    await client.updateTask(CASE_ID, TASK_ID, { dueDate: null });
+
+    const body = JSON.parse(stub.lastRequest().body);
+    expect(body).toEqual({ dueDate: null });
+    expect('description' in body).toBe(false);
+    expect('assigneeSubject' in body).toBe(false);
+  });
+
+  test('PATCH completes a task with `done: true`', async () => {
+    const completed = {
+      ...TASK,
+      done: true,
+      overdue: false,
+      completedAt: '2026-09-05T00:00:00.000000Z',
+    };
+    const stub = stubFetch(() => jsonResponse(completed, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const task = await client.updateTask(CASE_ID, TASK_ID, { done: true });
+
+    expect(JSON.parse(stub.lastRequest().body)).toEqual({ done: true });
+    expect(task.done).toBe(true);
+    expect(task.completedAt).toBe('2026-09-05T00:00:00.000000Z');
+  });
+
+  test('DELETEs a task', async () => {
+    const stub = stubFetch(() => new Response(null, { status: 204 }));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await expect(client.deleteTask(CASE_ID, TASK_ID)).resolves.toBeUndefined();
+    expect(stub.lastRequest().method).toBe('DELETE');
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/cases/${CASE_ID}/tasks/${TASK_ID}`);
+  });
+
+  test('GETs /v1/me/tasks — assigned to the caller across reachable cases', async () => {
+    const stub = stubFetch(() => jsonResponse({ tasks: [TASK] }, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const tasks = await client.listMyTasks();
+
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/me/tasks`);
+    expect(tasks).toEqual([TASK]);
+  });
+
+  test('GETs /v1/me/tasks with no query for scope: "mine" — the server default', async () => {
+    const stub = stubFetch(() => jsonResponse({ tasks: [] }, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await client.listMyTasks({ scope: 'mine' });
+
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/me/tasks`);
+  });
+
+  test("GETs /v1/me/tasks?scope=firm — the dashboard's firm-wide toggle", async () => {
+    const stub = stubFetch(() => jsonResponse({ tasks: [TASK] }, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const tasks = await client.listMyTasks({ scope: 'firm' });
+
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/me/tasks?scope=firm`);
+    expect(tasks).toEqual([TASK]);
+  });
+
+  test('an overdue task decodes overdue: true verbatim', async () => {
+    const overdue = { ...TASK, dueDate: '2000-01-01', overdue: true };
+    const stub = stubFetch(() => jsonResponse(overdue, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const task = await client.getTask(CASE_ID, TASK_ID);
+    expect(task.overdue).toBe(true);
+  });
+});
+
 // The generic case-collection endpoints (issue #249) are pinned against
 // services/api/src/insolvia_api/api/routes/case_entities.py and
 // .../core/{case_entities,case_collections,creditors,claims,sofa,...}.py.
@@ -4146,6 +6229,7 @@ const CREDITOR_RECORD = {
     name: { source: 'staff_typed' },
     'address.line1': { source: 'staff_typed' },
   },
+  amended: false,
   name: 'Example Bank',
   address: { line1: '1 Example Way' },
 };
@@ -4215,6 +6299,7 @@ describe('addCaseEntity', () => {
         'payload.recipient.name': { source: 'staff_typed' },
         'payload.value': { source: 'staff_typed' },
       },
+      amended: false,
       entry_type: 'gift',
       payload: { recipient: { name: 'Example Recipient' }, value: '700.00' },
     };
@@ -4239,6 +6324,60 @@ describe('addCaseEntity', () => {
       value: '700.00',
     });
     expect(saved).toEqual(RECORD);
+  });
+
+  // ── The amended flag (issue #370) ────────────────────────────
+
+  test('amended is sent only when the caller sets it', async () => {
+    const stub = stubFetch(() => jsonResponse(CREDITOR_RECORD, 201));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await client.addCaseEntity(ENTITY_CASE_ID, 'creditors', REQUEST);
+
+    expect(JSON.parse(stub.lastRequest().body)).not.toHaveProperty('amended');
+  });
+
+  test('amended: true is sent verbatim, like any other boolean', async () => {
+    const stub = stubFetch(() => jsonResponse({ ...CREDITOR_RECORD, amended: true }, 201));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const saved = await client.addCaseEntity(ENTITY_CASE_ID, 'creditors', {
+      ...REQUEST,
+      amended: true,
+    });
+
+    expect(JSON.parse(stub.lastRequest().body).amended).toBe(true);
+    expect(saved.amended).toBe(true);
+  });
+
+  test('a 409 for setting amended before the case is filed becomes ApiException', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse(
+        {
+          error: 'ConflictError',
+          message:
+            "amended can only be set once the case is filed — this case's status is 'intake'.",
+        },
+        409,
+      ),
+    );
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const error = asApiException(
+      await rejection(
+        client.addCaseEntity(ENTITY_CASE_ID, 'creditors', { ...REQUEST, amended: true }),
+      ),
+    );
+    expect(error.statusCode).toBe(409);
   });
 
   test('a 400 with fields becomes ApiValidationException keyed by field path', async () => {
@@ -4403,6 +6542,144 @@ describe('getCaseEntity / putCaseEntity / deleteCaseEntity', () => {
   });
 });
 
+// Notes (issue 14.5 / #357). `note_json` never carries a `provenance` key —
+// unlike CREDITOR_RECORD above, so the contract below pins its absence, not
+// just its presence with a particular shape.
+const NOTE_RECORD = {
+  id: '3fbb3f0a-8e2e-4a3f-9f9e-9b6f6b2d5a1e',
+  case_id: ENTITY_CASE_ID,
+  created_at: '2026-09-01T10:00:00.123456Z',
+  updated_at: '2026-09-01T10:00:00.123456Z',
+  author_subject: '00000000-0000-4000-8000-00000000a11c',
+  author_name: 'Alice Attorney',
+  text: 'Called the client about the car loan.',
+  form_series: 'form/b106g',
+};
+
+describe('addNote', () => {
+  test('POSTs /v1/cases/{caseId}/notes and maps the 201', async () => {
+    const stub = stubFetch(() => jsonResponse(NOTE_RECORD, 201));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const saved = await client.addNote(ENTITY_CASE_ID, {
+      text: 'Called the client about the car loan.',
+      form_series: 'form/b106g',
+    });
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('POST');
+    expect(seen.url).toBe(`${BASE_URL}/v1/cases/${ENTITY_CASE_ID}/notes`);
+    expect(seen.headers.get('authorization')).toBe(`Bearer ${ACCESS_TOKEN}`);
+    expect(JSON.parse(seen.body)).toEqual({
+      text: 'Called the client about the car loan.',
+      form_series: 'form/b106g',
+    });
+    // There is no author field on the request at all — nothing to omit,
+    // nothing to spoof. The server stamps it.
+    expect(Object.keys(JSON.parse(seen.body))).not.toContain('author_subject');
+    expect(saved).toEqual(NOTE_RECORD);
+  });
+
+  test('a case-level note omits form_series from the request', async () => {
+    const stub = stubFetch(() => jsonResponse({ ...NOTE_RECORD, form_series: undefined }, 201));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await client.addNote(ENTITY_CASE_ID, { text: 'A case-level note.' });
+
+    expect(JSON.parse(stub.lastRequest().body)).toEqual({ text: 'A case-level note.' });
+  });
+});
+
+describe('listNotes', () => {
+  test('GETs the case and unwraps the notes envelope', async () => {
+    const stub = stubFetch(() => jsonResponse({ notes: [NOTE_RECORD] }, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const listed = await client.listNotes(ENTITY_CASE_ID);
+
+    expect(stub.lastRequest().method).toBe('GET');
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/cases/${ENTITY_CASE_ID}/notes`);
+    expect(listed).toEqual([NOTE_RECORD]);
+  });
+});
+
+describe('putNote / deleteNote', () => {
+  test('PUTs the whole note and maps the 200', async () => {
+    const edited = { ...NOTE_RECORD, text: 'Corrected note.' };
+    const stub = stubFetch(() => jsonResponse(edited, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const saved = await client.putNote(ENTITY_CASE_ID, NOTE_RECORD.id, {
+      text: 'Corrected note.',
+    });
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('PUT');
+    expect(seen.url).toBe(`${BASE_URL}/v1/cases/${ENTITY_CASE_ID}/notes/${NOTE_RECORD.id}`);
+    expect(saved).toEqual(edited);
+    // Authorship is unaffected — the server keeps the stored author.
+    expect(saved.author_subject).toBe(NOTE_RECORD.author_subject);
+  });
+
+  test('a PUT/DELETE refused by the ownership rule surfaces the 403', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse(
+        {
+          error: 'ForbiddenError',
+          message: 'only the author or a firm admin may change this note',
+        },
+        403,
+      ),
+    );
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const error = asApiException(
+      await rejection(client.putNote(ENTITY_CASE_ID, NOTE_RECORD.id, { text: 'x' })),
+    );
+    expect(error.statusCode).toBe(403);
+  });
+
+  test('DELETEs one note and resolves on the bodyless 204', async () => {
+    const stub = stubFetch(() => new Response(null, { status: 204 }));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await expect(client.deleteNote(ENTITY_CASE_ID, NOTE_RECORD.id)).resolves.toBeUndefined();
+    expect(stub.lastRequest().method).toBe('DELETE');
+    expect(stub.lastRequest().url).toBe(
+      `${BASE_URL}/v1/cases/${ENTITY_CASE_ID}/notes/${NOTE_RECORD.id}`,
+    );
+  });
+
+  test('no access token throws without calling fetch at all', async () => {
+    const stub = stubFetch(() => jsonResponse(NOTE_RECORD, 200));
+    const client = new InsolviaApiClient(BASE_URL, { fetch: stub.fetch });
+
+    const error = asApiUnauthorizedException(
+      await rejection(client.putNote(ENTITY_CASE_ID, NOTE_RECORD.id, { text: 'x' })),
+    );
+    expect(stub.callCount()).toBe(0);
+    expect(error.source).toBe('client');
+  });
+});
+
 describe('getCreditorMatrix', () => {
   // The literal 200 body routes/creditor_matrix.py answers when every
   // creditor is mailable — content is the exact CRLF text of the .txt file.
@@ -4538,6 +6815,7 @@ describe('the case-collection enums', () => {
       'community_household_members',
       'other_income_records',
       'means_test_inputs',
+      'plans',
     ]);
   });
 
@@ -5630,6 +7908,355 @@ describe('getCaseStandards', () => {
   });
 });
 
+describe('the Chapter 13 plan (issue #366)', () => {
+  // Copied from `plan_calculation_json` (core/chapter13_plan.py) for the
+  // calculator tests' case with a two-month plan — not inferred. Every money
+  // figure and rate is a string on the wire; an unanswerable one is null.
+  const CALCULATION = {
+    planPresent: true,
+    chapter: 13,
+    commitmentPeriod: { months: 60, source: 'line 20b is more than or equal to line 20c' },
+    funding: {
+      termMonths: 2,
+      termSource: 'plan.term_months',
+      basePayment: '600.00',
+      baseSource: 'plan.monthly_payment',
+      schedule: [
+        { month: 1, payment: '600.00' },
+        { month: 2, payment: '600.00' },
+      ],
+      lumpSums: [],
+      total: '1200.00',
+    },
+    trusteePercentage: '10.00',
+    classes: [
+      {
+        key: 'trustee',
+        label: "Trustee's fee",
+        allowed: '120.00',
+        principal: '120.00',
+        interest: '0.00',
+        payout: '120.00',
+        unpaid: '0.00',
+        firstMonth: 1,
+        lastMonth: 2,
+        rows: [
+          {
+            key: 'trustee',
+            label: "Trustee's fee",
+            claimId: null,
+            treatment: null,
+            allowed: '120.00',
+            monthlyPayment: null,
+            rate: '10.00',
+            principal: '120.00',
+            interest: '0.00',
+            payout: '120.00',
+            firstMonth: 1,
+            lastMonth: 2,
+            monthsPaid: 2,
+            unpaid: '0.00',
+            source: 'plan.trustee_percentage 10.00% of every receipt (28 U.S.C. § 586(e))',
+          },
+        ],
+      },
+      {
+        key: 'secured',
+        label: 'Secured claims and arrears',
+        allowed: '9000.00',
+        principal: '1080.00',
+        interest: '0.00',
+        payout: '1080.00',
+        unpaid: '7920.00',
+        firstMonth: 1,
+        lastMonth: 2,
+        rows: [
+          {
+            key: 'secured:claim-auto',
+            label: 'Example Auto Finance — secured value',
+            claimId: 'claim-auto',
+            treatment: 'cramdown',
+            allowed: '9000.00',
+            monthlyPayment: '4500.00',
+            rate: '0.00',
+            principal: '1080.00',
+            interest: '0.00',
+            payout: '1080.00',
+            firstMonth: 1,
+            lastMonth: 2,
+            monthsPaid: 2,
+            unpaid: '7920.00',
+            source:
+              'plan.secured_treatments[t-auto].cramdown_value (§ 506(a), § 1325(a)(5)(B)), 0.00% a year; amortised over 2 months',
+          },
+        ],
+      },
+      {
+        key: 'general_unsecured',
+        label: 'General unsecured claims',
+        allowed: '24000.00',
+        principal: '0.00',
+        interest: '0.00',
+        payout: '0.00',
+        unpaid: '24000.00',
+        firstMonth: null,
+        lastMonth: null,
+        rows: [
+          {
+            key: 'unsecured',
+            label: 'General unsecured claims, pro rata',
+            claimId: null,
+            treatment: 'pot',
+            allowed: '24000.00',
+            monthlyPayment: null,
+            rate: null,
+            principal: '0.00',
+            interest: '0.00',
+            payout: '0.00',
+            firstMonth: null,
+            lastMonth: null,
+            monthsPaid: 0,
+            unpaid: '24000.00',
+            source: 'whatever remains, up to the full unsecured pool (a pot plan)',
+          },
+        ],
+      },
+    ],
+    unsecured: {
+      pool: [
+        {
+          claimId: 'claim-card',
+          label: 'Example Card Bank',
+          amount: '20000.00',
+          source: 'claim claim-card: nonpriority unsecured amount',
+        },
+      ],
+      poolTotal: '24000.00',
+      target: '24000.00',
+      targetSource: 'whatever remains, up to the full unsecured pool (a pot plan)',
+      percentage: '0.00',
+    },
+    feasibility: {
+      feasible: false,
+      totalFunding: '1200.00',
+      totalDistributed: '1200.00',
+      surplus: '0.00',
+      shortfall: '13920.00',
+      reasons: ['Secured claims and arrears: $7,920.00 is still unpaid after month 2.'],
+      scheduleJExcess: { amount: '700.00', source: 'Schedule J line 23c' },
+      exceedsScheduleJ: false,
+    },
+    liquidation: {
+      assets: [
+        {
+          assetId: 'asset-savings',
+          description: 'asset-savings',
+          value: '10000.00',
+          liens: '0.00',
+          exempt: '2000.00',
+          unexempt: '8000.00',
+        },
+      ],
+      propertyTotal: '269000.00',
+      liensTotal: '209000.00',
+      exemptionsTotal: '52000.00',
+      unexemptTotal: '8000.00',
+      trusteeCommission: '1550.00',
+      trusteeCommissionRule:
+        '11 U.S.C. § 326(a): 25% of the first $5,000, 10% of the next $45,000, 5% of the next $950,000, 3% above $1,000,000',
+      otherCosts: '0.00',
+      otherCostsSource: 'none typed',
+      priorityTotal: '3000.00',
+      available: '3450.00',
+      pool: [
+        {
+          claimId: 'claim-auto',
+          label: 'Example Auto Finance',
+          amount: '3000.00',
+          source: 'claim claim-auto: unsecured portion of a secured claim (derived)',
+        },
+      ],
+      poolTotal: '24000.00',
+      percentage: '14.38',
+    },
+    bestInterests: {
+      planPercentage: '0.00',
+      liquidationPercentage: '14.38',
+      planUnsecuredValue: '0.00',
+      presentValueRate: null,
+      passes: false,
+      rule: "11 U.S.C. § 1325(a)(4): unsecured creditors receive at least what a Chapter 7 liquidation would pay them, compared nominally — type a present-value rate to discount the plan's future payments",
+    },
+    warnings: [
+      'The term (2 months) is shorter than the 60-month commitment period, which § 1325(b)(4)(B) allows only when unsecured claims are paid in full.',
+    ],
+    problems: [],
+  };
+
+  const NO_PLAN = {
+    ...CALCULATION,
+    planPresent: false,
+    funding: {
+      termMonths: 60,
+      termSource: 'the applicable commitment period, B122C-1 line 21',
+      basePayment: null,
+      baseSource: null,
+      schedule: [],
+      lumpSums: [],
+      total: '0.00',
+    },
+    trusteePercentage: null,
+    classes: [CALCULATION.classes[2]],
+    unsecured: { ...CALCULATION.unsecured, target: '24000.00' },
+    feasibility: {
+      ...CALCULATION.feasibility,
+      feasible: null,
+      reasons: [],
+      scheduleJExcess: null,
+      exceedsScheduleJ: null,
+    },
+    bestInterests: { ...CALCULATION.bestInterests, passes: null, planPercentage: null },
+    problems: ['There is no plan yet: choose a monthly payment.'],
+  };
+
+  test('the plan enums mirror core/plans.py and the calculator', () => {
+    expect(PLAN_PAYMENT_SOURCES).toEqual(['fixed', 'schedule_j_excess', 'disposable_income']);
+    expect(SECURED_TREATMENTS).toEqual(['cure_and_maintain', 'cramdown', 'surrender']);
+    expect(UNSECURED_TREATMENTS).toEqual(['pot', 'percentage', 'amount']);
+    expect(PLAN_CLASSES).toEqual([
+      'trustee',
+      'ongoing_payments',
+      'secured',
+      'attorney_fees',
+      'priority',
+      'general_unsecured',
+    ]);
+  });
+
+  test('GETs /v1/cases/{id}/plan-calculation and decodes every figure', async () => {
+    const stub = stubFetch(() => jsonResponse(CALCULATION, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const calculation = await client.getCasePlanCalculation(ENTITY_CASE_ID);
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('GET');
+    expect(seen.url).toBe(`${BASE_URL}/v1/cases/${ENTITY_CASE_ID}/plan-calculation`);
+    expect(seen.headers.get('authorization')).toBe(`Bearer ${ACCESS_TOKEN}`);
+    expect(seen.body).toBe('');
+    expect(calculation).toEqual(CALCULATION);
+  });
+
+  test('a case with no plan decodes its nulls and its problems', async () => {
+    const stub = stubFetch(() => jsonResponse(NO_PLAN, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const calculation = await client.getCasePlanCalculation(ENTITY_CASE_ID);
+
+    expect(calculation.planPresent).toBe(false);
+    expect(calculation.feasibility.feasible).toBeNull();
+    expect(calculation.feasibility.scheduleJExcess).toBeNull();
+    expect(calculation.bestInterests.passes).toBeNull();
+    expect(calculation.liquidation.percentage).toBe('14.38');
+  });
+
+  test('an unknown class key is a contract violation, not a cast', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse({ ...CALCULATION, classes: [{ ...CALCULATION.classes[0], key: 'bonus' }] }, 200),
+    );
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await expect(client.getCasePlanCalculation(ENTITY_CASE_ID)).rejects.toThrow();
+  });
+
+  test('POSTs scenarios with absent members omitted, and decodes them in order', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse(
+        {
+          scenarios: [
+            { label: '$600 a month', calculation: CALCULATION },
+            { label: null, calculation: NO_PLAN },
+          ],
+        },
+        200,
+      ),
+    );
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const scenarios = await client.calculatePlanScenarios(ENTITY_CASE_ID, [
+      {
+        label: '$600 a month',
+        plan: {
+          term_months: 2,
+          monthly_payment: '600',
+          unsecured_percentage: undefined,
+          secured_treatments: [{ id: 't-auto', claim_id: 'claim-auto', treatment: 'cramdown' }],
+        },
+      },
+      { plan: {} },
+    ]);
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('POST');
+    expect(seen.url).toBe(`${BASE_URL}/v1/cases/${ENTITY_CASE_ID}/plan-calculation`);
+    expect(seen.headers.get('content-type')).toBe('application/json');
+    expect(JSON.parse(seen.body)).toEqual({
+      scenarios: [
+        {
+          label: '$600 a month',
+          plan: {
+            term_months: 2,
+            monthly_payment: '600',
+            secured_treatments: [{ id: 't-auto', claim_id: 'claim-auto', treatment: 'cramdown' }],
+          },
+        },
+        { plan: {} },
+      ],
+    });
+    expect(scenarios.map((s) => s.label)).toEqual(['$600 a month', null]);
+    expect(scenarios[0]?.calculation).toEqual(CALCULATION);
+  });
+
+  test("a malformed scenario's 400 names its path", async () => {
+    const stub = stubFetch(() =>
+      jsonResponse(
+        {
+          error: 'ValidationError',
+          fields: {
+            'scenarios[0].plan.term_months':
+              'A plan runs 1 to 60 months — § 1322(d) caps it at five years.',
+          },
+        },
+        400,
+      ),
+    );
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const error = asApiValidationException(
+      await rejection(
+        client.calculatePlanScenarios(ENTITY_CASE_ID, [{ plan: { term_months: 84 } }]),
+      ),
+    );
+
+    expect(Object.keys(error.fields)).toEqual(['scenarios[0].plan.term_months']);
+  });
+});
+
 describe('getCaseMeansTest', () => {
   // Copied from `means_test_json` (core/means_test_trace.py) for the
   // projection tests' reference case, entries trimmed to one per line —
@@ -5637,6 +8264,7 @@ describe('getCaseMeansTest', () => {
   const REFERENCE_TRACE = {
     asOf: '2026-08-01',
     asOfSource: 'case.created_at',
+    chapter: 7,
     releaseIds: {
       'ust/census-median-family-income': 'ust/census-median-family-income@2026-04-01',
       'ust/irs-national-standards': 'ust/irs-national-standards@2026-07-15',
@@ -5764,25 +8392,74 @@ describe('getCaseMeansTest', () => {
     determinedBy: 'threshold_floor',
     lines: [
       {
+        form: '122A-2',
         line: '1',
         label: 'Total current monthly income',
         amount: '8700.00',
         source: 'Form 122A-1 line 11 — the § 101(10A) derivation (core/cmi.py)',
       },
       {
+        form: '122A-2',
         line: '6',
         label: 'Food, clothing, and other items',
         amount: '1857.00',
         source: 'IRS National Standards, household of 3 — ust/irs-national-standards@2026-07-15',
       },
       {
+        form: '122A-2',
         line: '39d',
         label: 'Total over 60 months',
         amount: '-23359.80',
         source: 'line 39c x 60',
       },
     ],
+    chapter13: null,
     problems: [],
+  };
+
+  // The same family filing under Chapter 13 (issue #365), copied from
+  // `means_test_json` for the projection tests' Chapter 13 reference case:
+  // B122C-1's Part 2-3 lines, B122C-2's line 45, and the verdict block.
+  const CHAPTER_13_TRACE = {
+    ...REFERENCE_TRACE,
+    chapter: 13,
+    outcome: 'above_median',
+    determinedBy: 'median',
+    lines: [
+      {
+        form: '122C-1',
+        line: '14',
+        label: 'Current monthly income',
+        amount: '8700.00',
+        source: 'line 12 minus line 13',
+      },
+      {
+        form: '122C-1',
+        line: '21',
+        label: 'Applicable commitment period (months)',
+        amount: '60.00',
+        source:
+          'line 20b is more than or equal to line 20c: the commitment period is 5 years — 11 U.S.C. § 1325(b)(4)(A)(ii)',
+      },
+      {
+        form: '122C-2',
+        line: '45',
+        label: 'Monthly disposable income under 11 U.S.C. § 1325(b)(2)',
+        amount: '-1079.33',
+        source: 'line 39 minus line 44',
+      },
+    ],
+    chapter13: {
+      commitmentPeriodMonths: 60,
+      commitmentSource:
+        'line 20b is more than or equal to line 20c: the commitment period is 5 years — 11 U.S.C. § 1325(b)(4)(A)(ii)',
+      commitmentMaritalAdjustment: '0.00',
+      commitmentMonthlyIncome: '8700.00',
+      commitmentAnnualizedIncome: '104400.00',
+      commitmentAnnualMedian: '97540.00',
+      disposableIncomeRequired: true,
+      monthlyDisposableIncome: '-1079.33',
+    },
   };
 
   // A bare case: the engine refused, the derivation and window still landed.
@@ -5948,6 +8625,70 @@ describe('getCaseMeansTest', () => {
     await expect(client.getCaseMeansTest(ENTITY_CASE_ID)).rejects.toThrow();
   });
 
+  test('a Chapter 13 trace decodes the commitment period and disposable income', async () => {
+    const stub = stubFetch(() => jsonResponse(CHAPTER_13_TRACE, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const trace = await client.getCaseMeansTest(ENTITY_CASE_ID);
+
+    expect(trace).toEqual(CHAPTER_13_TRACE);
+    expect(trace.chapter).toBe(13);
+    expect(trace.outcome).toBe('above_median');
+    expect(trace.chapter13?.commitmentPeriodMonths).toBe(60);
+    expect(trace.chapter13?.monthlyDisposableIncome).toBe('-1079.33');
+    expect(trace.lines.map((line) => line.form)).toEqual(['122C-1', '122C-1', '122C-2']);
+  });
+
+  test('a below-median Chapter 13 trace carries a null disposable income', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse(
+        {
+          ...CHAPTER_13_TRACE,
+          outcome: 'below_median',
+          lines: CHAPTER_13_TRACE.lines.filter((line) => line.form === '122C-1'),
+          chapter13: {
+            ...CHAPTER_13_TRACE.chapter13,
+            commitmentPeriodMonths: 36,
+            disposableIncomeRequired: false,
+            monthlyDisposableIncome: null,
+          },
+        },
+        200,
+      ),
+    );
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const trace = await client.getCaseMeansTest(ENTITY_CASE_ID);
+
+    expect(trace.chapter13?.commitmentPeriodMonths).toBe(36);
+    expect(trace.chapter13?.disposableIncomeRequired).toBe(false);
+    expect(trace.chapter13?.monthlyDisposableIncome).toBeNull();
+  });
+
+  test('rejects a line naming a form the client does not know', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse(
+        {
+          ...REFERENCE_TRACE,
+          lines: [{ ...REFERENCE_TRACE.lines[0], form: '122B' }],
+        },
+        200,
+      ),
+    );
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await expect(client.getCaseMeansTest(ENTITY_CASE_ID)).rejects.toThrow();
+  });
+
   test('an unknown or foreign case is a 404, not a trace', async () => {
     const stub = stubFetch(() => jsonResponse({ error: 'case not found' }, 404));
     const client = new InsolviaApiClient(BASE_URL, {
@@ -5990,5 +8731,890 @@ describe('the means-test input enums (issue #349)', () => {
       'disabled_veteran',
       'reservist_national_guard',
     ]);
+    // core/means_test.py's FORM_122A2 / FORM_122C1 / FORM_122C2 and the
+    // outcomes of both chapters' branches (issue #365).
+    expect(MEANS_TEST_FORMS).toEqual(['122A-2', '122C-1', '122C-2']);
+    expect(MEANS_TEST_OUTCOMES).toEqual([
+      'below_median',
+      'above_median',
+      'no_presumption',
+      'presumption_of_abuse',
+      'exempt',
+      'undetermined',
+    ]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Events, the calendar and the ICS feed (issue 14.6 / #358). Snake_case on the
+// wire, like every case-domain body — the shapes are copied from
+// services/api/src/insolvia_api/core/events.py's `event_json` and the two
+// route modules that serve them.
+// ---------------------------------------------------------------------------
+
+describe('the event, calendar and feed endpoints', () => {
+  const CASE_ID = 'a3f1e9d0-4b2c-4d1e-9a7f-6c8e0d1f2a3b';
+  const EVENT_ID = 'e0e00000-0000-4000-8000-00000000e0e0';
+  const HAND_MADE_JSON = {
+    id: EVENT_ID,
+    case_id: CASE_ID,
+    title: 'Hearing on the motion',
+    start: '2026-03-02',
+    end: '2026-03-02',
+    all_day: true,
+    location: 'Courtroom 4',
+    attendees: [SUBJECT],
+    generated: false,
+    dismissed: false,
+    created_by: SUBJECT,
+    created_at: '2026-02-01T09:15:00.123456Z',
+    updated_at: '2026-02-01T09:15:00.123456Z',
+  };
+  const GENERATED_JSON = {
+    id: 'd0d00000-0000-4000-8000-00000000d0d0',
+    case_id: CASE_ID,
+    title: 'Schedules, statements and other documents due',
+    description: 'Rule 1007(c)(1): ...',
+    start: '2026-03-16',
+    end: '2026-03-16',
+    all_day: true,
+    attendees: [],
+    generated: true,
+    rule_id: 'frbp-1007c1-schedules',
+    rule_citation: 'Fed. R. Bankr. P. 1007(c)(1)',
+    dismissed: true,
+    created_by: SUBJECT,
+    created_at: '2026-03-02T09:15:00.123456Z',
+    updated_at: '2026-03-03T09:15:00.123456Z',
+  };
+
+  function client(respond: () => Response) {
+    const stub = stubFetch(respond);
+    return {
+      stub,
+      client: new InsolviaApiClient(BASE_URL, {
+        fetch: stub.fetch,
+        accessToken: () => ACCESS_TOKEN,
+      }),
+    };
+  }
+
+  test('GETs /v1/cases/{id}/events and maps hand-made and generated events alike', async () => {
+    const { stub, client: api } = client(() =>
+      jsonResponse({ events: [HAND_MADE_JSON, GENERATED_JSON] }, 200),
+    );
+
+    const events = await api.listCaseEvents(CASE_ID);
+
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/cases/${CASE_ID}/events`);
+    expect(stub.lastRequest().method).toBe('GET');
+    expect(stub.lastRequest().headers.get('authorization')).toBe(`Bearer ${ACCESS_TOKEN}`);
+    expect(events).toHaveLength(2);
+    expect(events[0]).toMatchObject({ id: EVENT_ID, generated: false, location: 'Courtroom 4' });
+    expect(events[0]?.rule_id).toBeUndefined();
+    expect(events[1]).toMatchObject({
+      generated: true,
+      dismissed: true,
+      rule_id: 'frbp-1007c1-schedules',
+      rule_citation: 'Fed. R. Bankr. P. 1007(c)(1)',
+    });
+  });
+
+  test('POSTs a draft with only the supplied keys, snake_case, and maps the 201', async () => {
+    const { stub, client: api } = client(() => jsonResponse(HAND_MADE_JSON, 201));
+
+    const created = await api.addCaseEvent(CASE_ID, {
+      title: 'Hearing on the motion',
+      start: '2026-03-02',
+      location: 'Courtroom 4',
+      attendees: [SUBJECT],
+    });
+
+    expect(stub.lastRequest().method).toBe('POST');
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/cases/${CASE_ID}/events`);
+    expect(JSON.parse(stub.lastRequest().body)).toEqual({
+      title: 'Hearing on the motion',
+      start: '2026-03-02',
+      location: 'Courtroom 4',
+      attendees: [SUBJECT],
+    });
+    expect(created.id).toBe(EVENT_ID);
+  });
+
+  test('PUTs a whole replacement, PATCHes a dismissal, and DELETEs', async () => {
+    const put = client(() => jsonResponse(HAND_MADE_JSON, 200));
+    await put.client.updateCaseEvent(CASE_ID, EVENT_ID, {
+      title: 'Moved',
+      start: '2026-03-03T19:00:00Z',
+      all_day: false,
+    });
+    expect(put.stub.lastRequest().method).toBe('PUT');
+    expect(put.stub.lastRequest().url).toBe(`${BASE_URL}/v1/cases/${CASE_ID}/events/${EVENT_ID}`);
+    expect(JSON.parse(put.stub.lastRequest().body)).toEqual({
+      title: 'Moved',
+      start: '2026-03-03T19:00:00Z',
+      all_day: false,
+    });
+
+    const patch = client(() => jsonResponse({ ...GENERATED_JSON, dismissed: true }, 200));
+    const dismissed = await patch.client.dismissCaseEvent(CASE_ID, GENERATED_JSON.id, true);
+    expect(patch.stub.lastRequest().method).toBe('PATCH');
+    expect(JSON.parse(patch.stub.lastRequest().body)).toEqual({ dismissed: true });
+    expect(dismissed.dismissed).toBe(true);
+
+    const del = client(() => new Response(null, { status: 204 }));
+    await expect(del.client.removeCaseEvent(CASE_ID, EVENT_ID)).resolves.toBeUndefined();
+    expect(del.stub.lastRequest().method).toBe('DELETE');
+  });
+
+  test('a generated deadline refused on PUT surfaces as a plain 400 ApiException', async () => {
+    const { client: api } = client(() =>
+      jsonResponse(
+        { error: 'ValidationError', message: 'a generated deadline cannot be edited' },
+        400,
+      ),
+    );
+    const error = await api
+      .updateCaseEvent(CASE_ID, GENERATED_JSON.id, { title: 'x', start: '2026-01-01' })
+      .catch((thrown: unknown) => thrown);
+    expect(error).toBeInstanceOf(ApiException);
+    expect(error).not.toBeInstanceOf(ApiValidationException);
+    expect((error as ApiException).statusCode).toBe(400);
+  });
+
+  test('the firm-scoped routes hit /v1/firm/events with no firm id anywhere', async () => {
+    const firmEvent = { ...HAND_MADE_JSON, case_id: undefined, title: 'Office closed' };
+    delete (firmEvent as Record<string, unknown>).case_id;
+    const list = client(() => jsonResponse({ events: [firmEvent] }, 200));
+    const events = await list.client.listFirmEvents();
+    expect(list.stub.lastRequest().url).toBe(`${BASE_URL}/v1/firm/events`);
+    expect(events[0]?.case_id).toBeUndefined();
+
+    const add = client(() => jsonResponse(firmEvent, 201));
+    await add.client.addFirmEvent({ title: 'Office closed', start: '2026-07-03' });
+    expect(add.stub.lastRequest().url).toBe(`${BASE_URL}/v1/firm/events`);
+
+    const update = client(() => jsonResponse(firmEvent, 200));
+    await update.client.updateFirmEvent(EVENT_ID, { title: 'Office closed', start: '2026-07-03' });
+    expect(update.stub.lastRequest().url).toBe(`${BASE_URL}/v1/firm/events/${EVENT_ID}`);
+
+    const dismiss = client(() => jsonResponse(firmEvent, 200));
+    await dismiss.client.dismissFirmEvent(EVENT_ID, false);
+    expect(dismiss.stub.lastRequest().method).toBe('PATCH');
+
+    const remove = client(() => new Response(null, { status: 204 }));
+    await remove.client.removeFirmEvent(EVENT_ID);
+    expect(remove.stub.lastRequest().url).toBe(`${BASE_URL}/v1/firm/events/${EVENT_ID}`);
+  });
+
+  test('GETs /v1/calendar with the window and the optional narrowings', async () => {
+    const { stub, client: api } = client(() =>
+      jsonResponse({ from: '2026-03-01', to: '2026-03-31', events: [GENERATED_JSON] }, 200),
+    );
+
+    const window = await api.getCalendar({
+      from: '2026-03-01',
+      to: '2026-03-31',
+      attendee: 'me',
+      caseId: CASE_ID,
+    });
+
+    expect(stub.lastRequest().url).toBe(
+      `${BASE_URL}/v1/calendar?from=2026-03-01&to=2026-03-31&attendee=me&case_id=${CASE_ID}`,
+    );
+    expect(window.from).toBe('2026-03-01');
+    expect(window.events[0]?.rule_id).toBe('frbp-1007c1-schedules');
+
+    const bare = client(() =>
+      jsonResponse({ from: '2026-03-01', to: '2026-03-31', events: [] }, 200),
+    );
+    await bare.client.getCalendar({ from: '2026-03-01', to: '2026-03-31' });
+    expect(bare.stub.lastRequest().url).toBe(
+      `${BASE_URL}/v1/calendar?from=2026-03-01&to=2026-03-31`,
+    );
+  });
+
+  test('mints the feed token and builds the absolute feed URL; revokes with DELETE', async () => {
+    const token = `${SUBJECT}.not-a-real-secret`;
+    const { stub, client: api } = client(() =>
+      jsonResponse({ token, feedPath: `/v1/me/calendar.ics?token=${token}` }, 201),
+    );
+
+    const minted = await api.mintCalendarToken();
+
+    expect(stub.lastRequest().method).toBe('POST');
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/me/calendar-token`);
+    expect(minted.token).toBe(token);
+    expect(minted.feedUrl).toBe(`${BASE_URL}/v1/me/calendar.ics?token=${token}`);
+
+    const revoke = client(() => new Response(null, { status: 204 }));
+    await expect(revoke.client.revokeCalendarToken()).resolves.toBeUndefined();
+    expect(revoke.stub.lastRequest().method).toBe('DELETE');
+    expect(revoke.stub.lastRequest().url).toBe(`${BASE_URL}/v1/me/calendar-token`);
+  });
+
+  test('the `events` feature is part of the permission map, hidden when the server omits it', async () => {
+    const { client: api } = client(() =>
+      jsonResponse(
+        {
+          subject: SUBJECT,
+          username: USERNAME,
+          clientId: CLIENT_ID,
+          scopes: [],
+          expiresAt: null,
+          firm: {
+            id: 'f18a0000-0000-4000-8000-00000000f18a',
+            name: 'Example & Partners',
+            role: 'attorney',
+            firstName: 'A',
+            lastName: 'B',
+            displayName: 'A B',
+            isAdmin: false,
+            accessAllCases: false,
+            permissions: { cases: 'add_edit', events: 'view_only' },
+          },
+        },
+        200,
+      ),
+    );
+    const me = await api.me();
+    expect(me.firm?.permissions.events).toBe('view_only');
+    expect(me.firm?.permissions.creditor_library).toBe('hidden');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The client portal (ADR 0023). The FIRM side takes a staff token; the CLIENT
+// side (`getPortalMe`) takes a portal session's token — the server refuses
+// each on the other's routes, so these tests pin only the wire contract.
+// Bodies are copied from api/routes/portal*.py and core/clients.binding_json.
+// ---------------------------------------------------------------------------
+
+describe('the client portal endpoints', () => {
+  const CASE_ID = 'a3f1e9d0-4b2c-4d1e-9a7f-6c8e0d1f2a3b';
+  const CLIENT_SUBJECT = 'c1c10000-0000-4000-8000-0000000000a1';
+  const BINDING = {
+    subject: CLIENT_SUBJECT,
+    email: 'pat@example.test',
+    displayName: 'Pat Example',
+    roles: ['debtor_1', 'debtor_2'],
+    status: 'invited',
+    invitedBy: SUBJECT,
+    createdAt: '2026-09-26T10:00:00.000000Z',
+    updatedAt: '2026-09-26T10:00:00.000000Z',
+  };
+
+  function portalClient(respond: () => Response) {
+    const stub = stubFetch(respond);
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+    return { stub, client };
+  }
+
+  test('POSTs an invitation with the roles and maps the binding', async () => {
+    const { stub, client } = portalClient(() => jsonResponse(BINDING, 201));
+
+    const invited = await client.invitePortalClient(CASE_ID, {
+      email: 'pat@example.test',
+      displayName: 'Pat Example',
+      roles: ['debtor_1', 'debtor_2'],
+    });
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('POST');
+    expect(seen.url).toBe(`${BASE_URL}/v1/cases/${CASE_ID}/portal/invitation`);
+    expect(seen.headers.get('Authorization')).toBe(`Bearer ${ACCESS_TOKEN}`);
+    expect(JSON.parse(seen.body)).toEqual({
+      email: 'pat@example.test',
+      displayName: 'Pat Example',
+      roles: ['debtor_1', 'debtor_2'],
+    });
+    expect(invited).toEqual(BINDING);
+  });
+
+  test('omits roles when the caller leaves them to the server default', async () => {
+    const { stub, client } = portalClient(() =>
+      jsonResponse({ ...BINDING, roles: ['debtor_1'] }, 201),
+    );
+
+    await client.invitePortalClient(CASE_ID, { email: 'pat@example.test', displayName: 'Pat' });
+
+    expect(JSON.parse(stub.lastRequest().body)).toEqual({
+      email: 'pat@example.test',
+      displayName: 'Pat',
+    });
+  });
+
+  test('a role conflict is a 409 the caller can show', async () => {
+    const { client } = portalClient(() =>
+      jsonResponse({ error: 'ConflictError', message: 'another client answers for debtor_2' }, 409),
+    );
+
+    const error = await rejection(
+      client.invitePortalClient(CASE_ID, { email: 'sam@example.test', displayName: 'Sam' }),
+    );
+
+    expect((error as ApiException).statusCode).toBe(409);
+  });
+
+  test('lists the clients on a case', async () => {
+    const { stub, client } = portalClient(() => jsonResponse({ clients: [BINDING] }, 200));
+
+    const clients = await client.listPortalClients(CASE_ID);
+
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/cases/${CASE_ID}/portal/clients`);
+    expect(clients).toEqual([BINDING]);
+  });
+
+  test('refuses a binding with no roles rather than passing it on', async () => {
+    const { client } = portalClient(() =>
+      jsonResponse({ clients: [{ ...BINDING, roles: [] }] }, 200),
+    );
+
+    await expect(client.listPortalClients(CASE_ID)).rejects.toThrow();
+  });
+
+  test('resends with a POST and resolves on 204', async () => {
+    const { stub, client } = portalClient(() => new Response(null, { status: 204 }));
+
+    await expect(client.resendPortalInvitation(CASE_ID, CLIENT_SUBJECT)).resolves.toBeUndefined();
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('POST');
+    expect(seen.url).toBe(
+      `${BASE_URL}/v1/cases/${CASE_ID}/portal/clients/${CLIENT_SUBJECT}/resend`,
+    );
+  });
+
+  test('revokes with a DELETE and maps the revoked binding', async () => {
+    const { stub, client } = portalClient(() =>
+      jsonResponse({ ...BINDING, status: 'revoked' }, 200),
+    );
+
+    const revoked = await client.revokePortalClient('case/with slash', CLIENT_SUBJECT);
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('DELETE');
+    expect(seen.url).toBe(
+      `${BASE_URL}/v1/cases/case%2Fwith%20slash/portal/clients/${CLIENT_SUBJECT}`,
+    );
+    expect(revoked.status).toBe('revoked');
+  });
+
+  // Copied from api/routes/portal.py::portal_me_json and
+  // core/clients.public_status_json.
+  const PORTAL_ME = {
+    subject: CLIENT_SUBJECT,
+    displayName: 'Pat Example',
+    roles: ['debtor_1'],
+    firm: { name: 'Example & Partners' },
+    case: { chapter: 13, stage: 'ready_to_file' },
+  };
+
+  test('reads the portal identity and the case status, which names no case', async () => {
+    const { stub, client } = portalClient(() => jsonResponse(PORTAL_ME, 200));
+
+    const me = await client.getPortalMe();
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('GET');
+    expect(seen.url).toBe(`${BASE_URL}/v1/portal/me`);
+    expect(me).toEqual({
+      subject: CLIENT_SUBJECT,
+      displayName: 'Pat Example',
+      roles: ['debtor_1'],
+      firm: { name: 'Example & Partners' },
+      case: { chapter: 13, stage: 'ready_to_file' },
+    });
+  });
+
+  test.each([
+    ['no case block', { ...PORTAL_ME, case: undefined }],
+    ['an unknown chapter', { ...PORTAL_ME, case: { chapter: 9, stage: 'intake' } }],
+    ['an unknown stage', { ...PORTAL_ME, case: { chapter: 7, stage: 'shredded' } }],
+  ])('refuses a portal identity with %s', async (_label, body) => {
+    const { client } = portalClient(() => jsonResponse(body, 200));
+
+    await expect(client.getPortalMe()).rejects.toThrow();
+  });
+
+  test('a signed-in person with no live binding is a 403', async () => {
+    const { client } = portalClient(() =>
+      jsonResponse(
+        {
+          error: 'Forbidden',
+          message: 'you do not have access to a case through the client portal',
+        },
+        403,
+      ),
+    );
+
+    const error = await rejection(client.getPortalMe());
+
+    expect(error).toBeInstanceOf(ApiException);
+    expect(error).not.toBeInstanceOf(ApiUnauthorizedException);
+    expect((error as ApiException).statusCode).toBe(403);
+  });
+
+  test('a staff token on the portal is a 401', async () => {
+    const { client } = portalClient(() =>
+      jsonResponse({ error: 'Unauthorized', message: 'authentication required' }, 401),
+    );
+
+    const error = await rejection(client.getPortalMe());
+
+    expect(error).toBeInstanceOf(ApiUnauthorizedException);
+  });
+});
+
+describe('the client questionnaire (ADR 0023 PR 3)', () => {
+  function apiClient(respond: () => Response) {
+    const stub = stubFetch(respond);
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+    return { stub, client };
+  }
+
+  // Copied from core/questionnaire.py::questionnaire_json, for a firm that
+  // switched `property` off and wrote its own instructions for it.
+  const FIRM_QUESTIONNAIRE = {
+    isDefault: false,
+    updatedAt: '2026-10-02T12:00:00.000000Z',
+    updatedBy: SUBJECT,
+    sections: [
+      {
+        id: 'personal_information',
+        title: 'Personal information',
+        covers:
+          'The voluntary petition: names, addresses, contact details, household and prior filings.',
+        switchable: false,
+        enabled: true,
+        instructions: null,
+        defaultInstructions:
+          'Tell us who you are and where you live. Use your full legal name as it appears on your identification, and list any other names you have used in the last eight years.',
+      },
+      {
+        id: 'property',
+        title: 'Property',
+        covers:
+          'Schedule A/B and the exemptions on Schedule C: real estate, vehicles, accounts, household goods and other assets.',
+        switchable: true,
+        enabled: false,
+        instructions: 'We will go through your property with you at the office.',
+        defaultInstructions:
+          'List everything you own or have an interest in, wherever it is: your home, vehicles, bank accounts, retirement accounts, household goods and anything else of value. An estimate of what each is worth today is enough.',
+      },
+    ],
+  };
+
+  test('mirrors the server catalogue ids, in order', () => {
+    expect(QUESTIONNAIRE_SECTION_IDS).toEqual([
+      'personal_information',
+      'property',
+      'debts',
+      'income',
+      'expenses',
+      'other',
+    ]);
+  });
+
+  test('GETs the firm questionnaire and maps every section', async () => {
+    const { stub, client } = apiClient(() => jsonResponse(FIRM_QUESTIONNAIRE, 200));
+
+    const questionnaire = await client.getFirmQuestionnaire();
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('GET');
+    expect(seen.url).toBe(`${BASE_URL}/v1/firm/questionnaire`);
+    expect(questionnaire).toEqual(FIRM_QUESTIONNAIRE);
+  });
+
+  test('a firm on the defaults reads null provenance', async () => {
+    const { client } = apiClient(() =>
+      jsonResponse(
+        { ...FIRM_QUESTIONNAIRE, isDefault: true, updatedAt: null, updatedBy: null },
+        200,
+      ),
+    );
+
+    const questionnaire = await client.getFirmQuestionnaire();
+
+    expect(questionnaire.isDefault).toBe(true);
+    expect(questionnaire.updatedBy).toBeNull();
+  });
+
+  test('PUTs the whole config, sending null instructions as null', async () => {
+    const { stub, client } = apiClient(() => jsonResponse(FIRM_QUESTIONNAIRE, 200));
+
+    await client.saveFirmQuestionnaire({
+      sections: [
+        { id: 'personal_information', enabled: true, instructions: null },
+        { id: 'property', enabled: false, instructions: 'At the office.' },
+      ],
+    });
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('PUT');
+    expect(seen.url).toBe(`${BASE_URL}/v1/firm/questionnaire`);
+    expect(seen.headers.get('content-type')).toBe('application/json');
+    expect(JSON.parse(seen.body)).toEqual({
+      sections: [
+        { id: 'personal_information', enabled: true, instructions: null },
+        { id: 'property', enabled: false, instructions: 'At the office.' },
+      ],
+    });
+  });
+
+  test('a refused save carries the per-section messages', async () => {
+    const { client } = apiClient(() =>
+      jsonResponse(
+        {
+          error: 'validation failed: sections.personal_information.enabled',
+          fields: {
+            'sections.personal_information.enabled': 'Personal information is always on.',
+          },
+        },
+        400,
+      ),
+    );
+
+    const error = asApiValidationException(
+      await rejection(
+        client.saveFirmQuestionnaire({
+          sections: [{ id: 'personal_information', enabled: false, instructions: null }],
+        }),
+      ),
+    );
+
+    expect(error.fields).toEqual({
+      'sections.personal_information.enabled': 'Personal information is always on.',
+    });
+  });
+
+  test('DELETEs to reset to the defaults', async () => {
+    const { stub, client } = apiClient(() =>
+      jsonResponse(
+        { ...FIRM_QUESTIONNAIRE, isDefault: true, updatedAt: null, updatedBy: null },
+        200,
+      ),
+    );
+
+    const reset = await client.resetFirmQuestionnaire();
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('DELETE');
+    expect(seen.url).toBe(`${BASE_URL}/v1/firm/questionnaire`);
+    expect(reset.isDefault).toBe(true);
+  });
+
+  test.each([
+    ['an unknown section id', { ...FIRM_QUESTIONNAIRE.sections[0], id: 'hobbies' }],
+    ['a missing switch', { ...FIRM_QUESTIONNAIRE.sections[0], enabled: undefined }],
+  ])('refuses a firm questionnaire with %s', async (_label, section) => {
+    const { client } = apiClient(() =>
+      jsonResponse({ ...FIRM_QUESTIONNAIRE, sections: [section] }, 200),
+    );
+
+    await expect(client.getFirmQuestionnaire()).rejects.toThrow();
+  });
+
+  // Copied from core/questions.py::portal_sections_json (each section's
+  // questions trimmed to one, verbatim).
+  const PORTAL_QUESTIONNAIRE = {
+    sections: [
+      {
+        id: 'personal_information',
+        title: 'Personal information',
+        instructions:
+          'Tell us who you are and where you live. Use your full legal name as it appears on your identification, and list any other names you have used in the last eight years.',
+        questions: [
+          {
+            id: 'personal_information.legal_name',
+            text: 'What is your full legal name?',
+            repeats: false,
+            perDebtor: true,
+            inputs: [
+              { key: 'given', label: 'First name', type: 'text', required: true },
+              { key: 'middle', label: 'Middle name', type: 'text', required: false },
+              { key: 'surname', label: 'Last name', type: 'text', required: true },
+              {
+                key: 'suffix',
+                label: 'Suffix',
+                type: 'text',
+                required: false,
+                help: 'Jr., Sr., III',
+              },
+            ],
+            help: "As it appears on your driver's license or other identification.",
+          },
+        ],
+      },
+      {
+        id: 'debts',
+        title: 'Debts',
+        instructions: 'Bring your statements.',
+        questions: [
+          {
+            id: 'debts.creditor',
+            text: 'Who do you owe money to?',
+            repeats: true,
+            perDebtor: false,
+            inputs: [
+              {
+                key: 'name',
+                label: 'Name of the person or company',
+                type: 'text',
+                required: true,
+              },
+              { key: 'address', label: 'Their address', type: 'address', required: false },
+            ],
+            help: 'Add each person or company you owe, including debts you dispute. Use the name and address on their latest statement or letter.',
+          },
+        ],
+      },
+    ],
+  };
+
+  test('GETs the portal questionnaire: the enabled sections, as the client reads them', async () => {
+    const { stub, client } = apiClient(() => jsonResponse(PORTAL_QUESTIONNAIRE, 200));
+
+    const questionnaire = await client.getPortalQuestionnaire();
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('GET');
+    expect(seen.url).toBe(`${BASE_URL}/v1/portal/questionnaire`);
+    expect(questionnaire).toEqual(PORTAL_QUESTIONNAIRE);
+  });
+
+  test('a revoked client reading the questionnaire is a 403', async () => {
+    const { client } = apiClient(() =>
+      jsonResponse(
+        {
+          error: 'Forbidden',
+          message: 'you do not have access to a case through the client portal',
+        },
+        403,
+      ),
+    );
+
+    const error = asApiException(await rejection(client.getPortalQuestionnaire()));
+
+    expect(error).not.toBeInstanceOf(ApiUnauthorizedException);
+    expect(error.statusCode).toBe(403);
+  });
+
+  test('refuses a question with an input type the client cannot render', async () => {
+    const [first] = PORTAL_QUESTIONNAIRE.sections;
+    const broken = {
+      sections: [
+        {
+          ...first,
+          questions: [
+            {
+              ...first?.questions[0],
+              inputs: [{ key: 'x', label: 'X', type: 'slider', required: false }],
+            },
+          ],
+        },
+      ],
+    };
+    const { client } = apiClient(() => jsonResponse(broken, 200));
+
+    await expect(client.getPortalQuestionnaire()).rejects.toThrow();
+  });
+});
+
+describe('the client questionnaire answers (ADR 0023 PR 4)', () => {
+  function apiClient(respond: () => Response) {
+    const stub = stubFetch(respond);
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+    return { stub, client };
+  }
+
+  // Copied from core/questions.py::answer_json.
+  const ANSWER = {
+    id: '00000000-0000-4000-8000-0000000a45e1',
+    questionId: 'personal_information.legal_name',
+    sectionId: 'personal_information',
+    filingRole: 'debtor_1',
+    value: { given: 'Patricia', surname: 'Example' },
+    status: 'pending',
+    createdAt: '2099-01-01T00:00:00.000000Z',
+    updatedAt: '2099-01-01T00:00:00.000000Z',
+  };
+
+  test('GETs the client’s own answers', async () => {
+    const { stub, client } = apiClient(() => jsonResponse({ answers: [ANSWER] }, 200));
+
+    const answers = await client.listPortalAnswers();
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('GET');
+    expect(seen.url).toBe(`${BASE_URL}/v1/portal/answers`);
+    expect(answers).toEqual([ANSWER]);
+  });
+
+  test('POSTs an answer, leaving filingRole off when not given', async () => {
+    const { stub, client } = apiClient(() => jsonResponse(ANSWER, 201));
+
+    const created = await client.createPortalAnswer({
+      questionId: 'personal_information.legal_name',
+      value: { given: 'Patricia', surname: 'Example' },
+    });
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('POST');
+    expect(seen.url).toBe(`${BASE_URL}/v1/portal/answers`);
+    expect(seen.headers.get('content-type')).toBe('application/json');
+    expect(JSON.parse(seen.body)).toEqual({
+      questionId: 'personal_information.legal_name',
+      value: { given: 'Patricia', surname: 'Example' },
+    });
+    expect(created).toEqual(ANSWER);
+  });
+
+  test('POSTs the filing role when a two-role client names it', async () => {
+    const { stub, client } = apiClient(() =>
+      jsonResponse({ ...ANSWER, filingRole: 'debtor_2' }, 201),
+    );
+
+    await client.createPortalAnswer({
+      questionId: 'personal_information.legal_name',
+      filingRole: 'debtor_2',
+      value: { given: 'Sam', surname: 'Example' },
+    });
+
+    expect(JSON.parse(stub.lastRequest().body)).toEqual({
+      questionId: 'personal_information.legal_name',
+      filingRole: 'debtor_2',
+      value: { given: 'Sam', surname: 'Example' },
+    });
+  });
+
+  test('a refused answer names the box to fix', async () => {
+    const { client } = apiClient(() =>
+      jsonResponse(
+        {
+          error: 'validation failed: value.surname',
+          fields: { 'value.surname': 'This is required.' },
+        },
+        400,
+      ),
+    );
+
+    const error = asApiValidationException(
+      await rejection(
+        client.createPortalAnswer({
+          questionId: 'personal_information.legal_name',
+          value: { given: 'Patricia' },
+        }),
+      ),
+    );
+
+    expect(error.fields).toEqual({ 'value.surname': 'This is required.' });
+  });
+
+  test('PUTs a changed value to the answer', async () => {
+    const { stub, client } = apiClient(() =>
+      jsonResponse({ ...ANSWER, value: { given: 'Pat', surname: 'Example' } }, 200),
+    );
+
+    const updated = await client.updatePortalAnswer(ANSWER.id, {
+      given: 'Pat',
+      surname: 'Example',
+    });
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('PUT');
+    expect(seen.url).toBe(`${BASE_URL}/v1/portal/answers/${ANSWER.id}`);
+    expect(JSON.parse(seen.body)).toEqual({ value: { given: 'Pat', surname: 'Example' } });
+    expect(updated.value).toEqual({ given: 'Pat', surname: 'Example' });
+  });
+
+  test('a reviewed answer refuses a change with a 409', async () => {
+    const { client } = apiClient(() =>
+      jsonResponse(
+        {
+          error: 'Conflict',
+          message: 'this answer has already been reviewed (status: accepted)',
+        },
+        409,
+      ),
+    );
+
+    const error = asApiException(await rejection(client.updatePortalAnswer(ANSWER.id, {})));
+
+    expect(error.statusCode).toBe(409);
+  });
+
+  test('DELETEs to withdraw', async () => {
+    const { stub, client } = apiClient(() => jsonResponse({ ...ANSWER, status: 'withdrawn' }, 200));
+
+    const withdrawn = await client.withdrawPortalAnswer(ANSWER.id);
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('DELETE');
+    expect(seen.url).toBe(`${BASE_URL}/v1/portal/answers/${ANSWER.id}`);
+    expect(withdrawn.status).toBe('withdrawn');
+  });
+
+  test('the review queue maps a client answer’s question and display name', async () => {
+    const { client } = apiClient(() =>
+      jsonResponse(
+        {
+          candidates: [
+            {
+              id: ANSWER.id,
+              entityType: 'debtors',
+              status: 'pending',
+              payload: { name: { given: 'Patricia', surname: 'Example' } },
+              origin: { channel: 'client', clientId: 'exampleportalclient', subject: SUBJECT },
+              createdAt: ANSWER.createdAt,
+              updatedAt: ANSWER.updatedAt,
+              locator: {
+                kind: 'question',
+                section_id: 'personal_information',
+                question_id: 'personal_information.legal_name',
+                filing_role: 'debtor_1',
+              },
+              question: {
+                id: 'personal_information.legal_name',
+                sectionId: 'personal_information',
+                sectionTitle: 'Personal information',
+                text: 'What is your full legal name?',
+                filingRole: 'debtor_1',
+              },
+              client: { displayName: 'Pat Example' },
+            },
+          ],
+        },
+        200,
+      ),
+    );
+
+    const [candidate] = await client.listExtractionCandidates(
+      'a3f1e9d0-4b2c-4d1e-9a7f-6c8e0d1f2a3b',
+    );
+
+    expect(candidate?.question).toEqual({
+      id: 'personal_information.legal_name',
+      sectionId: 'personal_information',
+      sectionTitle: 'Personal information',
+      text: 'What is your full legal name?',
+      filingRole: 'debtor_1',
+    });
+    expect(candidate?.client).toEqual({ displayName: 'Pat Example' });
+    expect(candidate?.locatorPage).toBeUndefined();
+  });
+
+  test('client_answered is a provenance source', () => {
+    expect(PROVENANCE_SOURCES).toContain('client_answered');
   });
 });

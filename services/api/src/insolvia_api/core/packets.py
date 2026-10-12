@@ -44,10 +44,20 @@ from .form_overlay import (
     output_options_json,
 )
 
-# The download name a browser saves the packet under. One name for every
-# packet on purpose: the object key carries the identity (two server-minted
-# uuids), and the record's created_at answers "which assembly was this".
-PACKET_FILE_NAME: Final = "chapter7-packet.zip"
+
+def packet_file_name(chapter: int) -> str:
+    """The download name a browser saves the packet under: the case's
+    chapter, and nothing else — `chapter7-packet.zip`, `chapter13-packet.zip`.
+
+    One name per chapter on purpose, whatever the output options: the
+    object key carries the identity (two server-minted uuids), the record's
+    created_at answers "which assembly was this", and the recorded options
+    answer "was it a draft, a subset, an amendment". The chapter is a
+    validated integer on the case (and assembly refuses any chapter but 7
+    and 13 before a packet exists), so no human-typed value reaches the name.
+    """
+    return f"chapter{chapter}-packet.zip"
+
 
 # What a packet zip is, on the wire and in the download.
 PACKET_CONTENT_TYPE: Final = "application/zip"
@@ -58,6 +68,91 @@ PACKET_CONTENT_TYPE: Final = "application/zip"
 _UUID_RE: Final = re.compile(
     r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\Z"
 )
+
+
+@dataclass(frozen=True)
+class PacketPart:
+    """One file inside the packet zip, as `core/pdf_measure.py` measured it
+    at assembly (ADR 0024 build PR 3) — the facts the filing set's PDF
+    checks judge against the court's rules.
+
+    Counts and sizes only, never content: B121 is a part. The page facts are
+    None for a part that is not a PDF (the creditor matrix's `.txt`).
+    `unreadable` marks a PDF the measurement could not parse.
+
+    `sha256` is the digest of the file's own bytes (ADR 0024 build PR 6):
+    what the attorney's per-filing approval is bound to, per document, and
+    what anyone can check one extracted file against. A digest discloses
+    nothing about B121's content. None on a packet assembled before it was
+    recorded — an approval refuses such a packet and asks for a re-assembly
+    (core/filing_approval.py), rather than vouching for bytes it cannot
+    name."""
+
+    name: str
+    byte_size: int
+    page_count: int | None = None
+    non_letter_pages: int | None = None
+    pages_without_text: int | None = None
+    unreadable: bool = False
+    sha256: str | None = None
+
+
+def packet_part_item(part: PacketPart) -> dict[str, object]:
+    """The stored (and wire) shape of one part — optional keys absent, never
+    null, the matrix route's rule."""
+    body: dict[str, object] = {"name": part.name, "byteSize": part.byte_size}
+    if part.page_count is not None:
+        body["pageCount"] = part.page_count
+    if part.non_letter_pages is not None:
+        body["nonLetterPages"] = part.non_letter_pages
+    if part.pages_without_text is not None:
+        body["pagesWithoutText"] = part.pages_without_text
+    if part.unreadable:
+        body["unreadable"] = True
+    if part.sha256 is not None:
+        body["sha256"] = part.sha256
+    return body
+
+
+def _optional_count(raw: Mapping[str, object], key: str) -> int | None:
+    value = raw.get(key)
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, (int, str)):
+        raise ValueError(f"part {key} has a non-numeric type")
+    return int(value)
+
+
+def _parts_from_item(raw: object) -> tuple[PacketPart, ...]:
+    """Absent — every packet assembled before the measurement existed —
+    reads as no parts: the filing set reports those files as unmeasured and
+    asks for a re-assembly, rather than vouching for bytes nobody checked."""
+    if raw is None:
+        return ()
+    if not isinstance(raw, list):
+        raise ValueError("parts is not a list")
+    parts: list[PacketPart] = []
+    for entry in raw:
+        if not isinstance(entry, Mapping):
+            raise ValueError("a part is not a map")
+        byte_size = _optional_count(entry, "byteSize")
+        if byte_size is None:
+            raise ValueError("a part has no byteSize")
+        digest = entry.get("sha256")
+        if digest is not None and not isinstance(digest, str):
+            raise ValueError("a part's sha256 is not a string")
+        parts.append(
+            PacketPart(
+                name=str(entry["name"]),
+                byte_size=byte_size,
+                page_count=_optional_count(entry, "pageCount"),
+                non_letter_pages=_optional_count(entry, "nonLetterPages"),
+                pages_without_text=_optional_count(entry, "pagesWithoutText"),
+                unreadable=bool(entry.get("unreadable", False)),
+                sha256=digest,
+            )
+        )
+    return tuple(parts)
 
 
 @dataclass(frozen=True)
@@ -93,6 +188,23 @@ class Packet:
     created_by: str
     created_at: str
     options: OutputOptions = field(default_factory=lambda: DEFAULT_OUTPUT_OPTIONS)
+    # What each file inside the zip measured (ADR 0024 build PR 3), in zip
+    # order. Empty for a packet assembled before the measurement existed.
+    parts: tuple[PacketPart, ...] = ()
+
+
+def is_filing_set(options: OutputOptions) -> bool:
+    """Whether a packet rendered with these options is a set a court could
+    be handed: every form, every signature page, no draft watermark, not an
+    amendment. The printed date and `/s/` signatures are both things a filed
+    document may carry, so they do not disqualify it. The filing set is
+    judged against the newest packet this says yes to."""
+    return (
+        not options.draft_watermark
+        and options.forms is None
+        and options.signature_pages == "all"
+        and not options.amended_only
+    )
 
 
 def _timestamp() -> str:
@@ -118,6 +230,7 @@ def packet_object_key(case_id: str, packet_id: str) -> str:
 def new_packet(
     *,
     case_id: str,
+    chapter: int,
     job_id: str,
     byte_size: int,
     sha256: str,
@@ -126,6 +239,7 @@ def new_packet(
     creditor_count: int,
     created_by: str,
     options: OutputOptions = DEFAULT_OUTPUT_OPTIONS,
+    parts: tuple[PacketPart, ...] = (),
 ) -> Packet:
     """Stamp an assembled packet with server-generated identity and its
     storage location. Every argument is a fact the worker just established;
@@ -137,7 +251,7 @@ def new_packet(
         id=packet_id,
         case_id=case_id,
         job_id=job_id,
-        file_name=PACKET_FILE_NAME,
+        file_name=packet_file_name(chapter),
         content_type=PACKET_CONTENT_TYPE,
         byte_size=byte_size,
         sha256=sha256,
@@ -150,6 +264,7 @@ def new_packet(
         created_by=created_by,
         created_at=_timestamp(),
         options=options,
+        parts=parts,
     )
 
 
@@ -189,6 +304,7 @@ def packet_item(packet: Packet) -> dict[str, object]:
         "createdBy": packet.created_by,
         "createdAt": packet.created_at,
         "options": output_options_json(packet.options),
+        "parts": [packet_part_item(part) for part in packet.parts],
     }
 
 
@@ -219,6 +335,7 @@ def _options_from_item(raw: object) -> OutputOptions:
         signature_pages=signature_pages,
         sign_electronically=bool(raw.get("signElectronically", False)),
         forms=forms,
+        amended_only=bool(raw.get("amendedOnly", False)),
     )
 
 
@@ -252,6 +369,7 @@ def packet_from_item(item: Mapping[str, object]) -> Packet:
             created_by=str(item["createdBy"]),
             created_at=str(item["createdAt"]),
             options=_options_from_item(item.get("options")),
+            parts=_parts_from_item(item.get("parts")),
         )
     except (KeyError, ValueError) as error:
         raise ValidationError(f"stored packet item is malformed: {error}") from error

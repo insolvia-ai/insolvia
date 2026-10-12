@@ -1,4 +1,4 @@
-import { screen, userEvent, waitFor, within } from '@testing-library/react-native';
+import { screen, userEvent, waitFor } from '@testing-library/react-native';
 import { renderRouter } from 'expo-router/testing-library';
 
 import type { AuthConfig } from '@/config/environment';
@@ -25,40 +25,64 @@ const CASE = {
   // resolves it, and a case list that rendered this raw would show a UUID.
   createdBy: '00000000-0000-4000-8000-00000000a11c',
   chapter: 7,
-  district: 'NDCA',
+  // The printed name, derived on the server from the pair below (#360).
+  district: 'Middle District of Florida',
+  court: 'flmb',
+  division: 'tampa',
   status: 'intake',
   createdAt: '2026-08-04T10:00:00.000000Z',
   updatedAt: '2026-08-04T10:00:00.000000Z',
 };
 
+/** A `/v1/me` body whose firm grants `cases` at the given level. */
+function member(cases: string) {
+  return {
+    subject: CASE.createdBy,
+    username: null,
+    clientId: 'exampleappclientid000000',
+    scopes: [],
+    expiresAt: null,
+    firm: {
+      id: '00000000-0000-4000-8000-00000000f18a',
+      name: 'Example & Partners',
+      role: 'staff',
+      firstName: 'Alice',
+      lastName: 'Attorney',
+      displayName: 'Alice Attorney',
+      isAdmin: false,
+      accessAllCases: true,
+      permissions: { cases },
+      defaultCourt: null,
+      defaultDivision: null,
+      defaultChapter: null,
+      letterhead: null,
+      signatureBlock: null,
+    },
+  };
+}
+
 /**
- * `/cases` — the screen that closes issue 8.3's loop.
+ * `/cases` — the case list (issue 8.3), and the way to `/cases/new`.
  *
  * Rendered through the **real router**, so a route file that moved or stopped
  * compiling fails here. `/cases` is protected, so every test signs in first,
  * exactly as the home screen's suite does.
  *
- * What is asserted is mostly the wiring the server cannot check for us: that
- * the form sends what the API expects, that the server's per-field messages
- * reach the field they belong to, and that the list is announced rather than
- * silently swapped in.
+ * The form that opens a case moved to `/cases/new` (ADR 0022 / #354); its
+ * suite is `new.test.tsx`. What is asserted here is that the list is
+ * announced rather than silently swapped in, that each row is one well-named
+ * link, and that "New case" goes where the form now lives.
  */
 describe('the cases screen', () => {
   let browser: FakeBrowser;
   const realFetch = globalThis.fetch;
 
-  /**
-   * Signs in and renders `/cases`, returning the fetch mock typed the way the
-   * tests read it. `routeFetch` declares a single `url` parameter because that
-   * is all it dispatches on, but the calls carry an init object too — and the
-   * request body is exactly what one of these tests needs to assert.
-   */
   function signedIn(handlers: Readonly<Record<string, () => Response>>) {
     const route = routeFetch({ '/oauth2/token': tokenEndpointResponse, ...handlers });
     const fetchMock = jest.fn((url: string, _init?: RequestInit) => route(url));
     globalThis.fetch = fetchMock as unknown as typeof fetch;
-    renderRouter('src/app', { initialUrl: '/cases' });
-    return fetchMock;
+    const router = renderRouter('src/app', { initialUrl: '/cases' });
+    return { fetchMock, router };
   }
 
   beforeEach(() => {
@@ -73,103 +97,55 @@ describe('the cases screen', () => {
     jest.clearAllMocks();
   });
 
+  it('sends "New case" to the page that opens one for a client', async () => {
+    const { router } = signedIn({ '/v1/cases': () => jsonResponse(200, { cases: [] }) });
+    await screen.findByText(/No cases yet/);
+
+    await userEvent.setup().press(screen.getByRole('button', { name: 'New case' }));
+
+    await waitFor(() => {
+      expect(router.getPathname()).toBe('/cases/new');
+    });
+  });
+
+  it('offers no "New case" to a colleague who may only view cases', async () => {
+    signedIn({
+      '/v1/me': () => jsonResponse(200, member('view_only')),
+      '/v1/cases': () => jsonResponse(200, { cases: [] }),
+    });
+    await screen.findByText(/No cases yet/);
+    // Settled on the membership: the avatar's name only renders once /v1/me answered.
+    await screen.findByText('Alice Attorney');
+
+    expect(screen.queryByRole('button', { name: 'New case' })).toBeNull();
+  });
+
   it('lists the cases the API returns', async () => {
     signedIn({ '/v1/cases': () => jsonResponse(200, { cases: [CASE] }) });
 
-    expect(await screen.findByText(/Chapter 7 · NDCA/)).toBeTruthy();
+    expect(await screen.findByText(/Chapter 7 · Middle District of Florida/)).toBeTruthy();
+  });
+
+  it('switches to the archive, which asks the API for archived cases', async () => {
+    // Fragment order matters: the archive's query first, the bare list after.
+    const { fetchMock } = signedIn({
+      '/v1/cases?archived=true': () => jsonResponse(200, { cases: [] }),
+      '/v1/cases': () => jsonResponse(200, { cases: [CASE] }),
+    });
+    await screen.findByText(/Chapter 7 · Middle District of Florida/);
+
+    await userEvent.setup().press(screen.getByRole('button', { name: 'Archived' }));
+
+    expect(await screen.findByText(/No archived cases/)).toBeTruthy();
+    expect(
+      fetchMock.mock.calls.some(([url]) => String(url).includes('/v1/cases?archived=true')),
+    ).toBe(true);
   });
 
   it('says so plainly when there are none', async () => {
     signedIn({ '/v1/cases': () => jsonResponse(200, { cases: [] }) });
 
     expect(await screen.findByText(/No cases yet/)).toBeTruthy();
-  });
-
-  it('renders one named radio per chapter, with the label outside the circle', async () => {
-    // The regression this guards: RadioGroup.Item IS the 20dp circle (its own
-    // package tests render it self-closing), so a label nested inside it makes
-    // four circles overlap into an unreadable pile. Asserting the accessible
-    // NAME rather than the visible text is what catches it — a nested label
-    // would still render, just on top of its neighbours.
-    signedIn({ '/v1/cases': () => jsonResponse(200, { cases: [] }) });
-    await screen.findByText(/No cases yet/);
-
-    const radios = screen.getAllByRole('radio');
-    expect(radios).toHaveLength(4);
-
-    for (const label of ['Chapter 7', 'Chapter 13', 'Chapter 11', 'Chapter 12']) {
-      const radio = screen.getByRole('radio', { name: label });
-      // The discriminating assertion. Checking the accessible NAME alone would
-      // pass either way — react-native-web derives it from nested content just
-      // as happily as from aria-label. What only the correct structure
-      // satisfies is the label being OUTSIDE the circle.
-      expect(within(radio).queryByText(label)).toBeNull();
-      expect(screen.getByText(label)).toBeTruthy();
-    }
-  });
-
-  it('sends the chosen chapter and district to the API', async () => {
-    const fetchMock = signedIn({
-      '/v1/cases': () => jsonResponse(200, { cases: [] }),
-    });
-    await screen.findByText(/No cases yet/);
-
-    await userEvent.press(screen.getByRole('radio', { name: /Chapter 13/ }));
-    await userEvent.type(screen.getByLabelText('Filing district'), 'CACD');
-    await userEvent.press(screen.getByRole('button', { name: 'Open case' }));
-
-    await waitFor(() => {
-      // Filtered by URL as well as method: the OAuth token exchange is also a
-      // POST, and it is the one that happens first.
-      const post = fetchMock.mock.calls.find(
-        ([url, init]) => url.includes('/v1/cases') && init?.method === 'POST',
-      );
-      expect(post).toBeDefined();
-      expect(JSON.parse(String(post?.[1]?.body))).toEqual({ chapter: 13, district: 'CACD' });
-    });
-  });
-
-  it("puts the server's per-field message on the field it belongs to", async () => {
-    // The server is the source of truth for validation (ADR 0001). The screen
-    // renders what it said rather than restating the rule in a second place
-    // that can disagree with it.
-    let calls = 0;
-    signedIn({
-      '/v1/cases': () => {
-        calls += 1;
-        return calls === 1
-          ? jsonResponse(200, { cases: [] })
-          : jsonResponse(400, {
-              error: 'ValidationError',
-              fields: { district: "That doesn't look like a district identifier." },
-            });
-      },
-    });
-    await screen.findByText(/No cases yet/);
-
-    await userEvent.type(screen.getByLabelText('Filing district'), '!!');
-    await userEvent.press(screen.getByRole('button', { name: 'Open case' }));
-
-    expect(await screen.findByText(/doesn't look like a district identifier/)).toBeTruthy();
-  });
-
-  it('reloads the list after opening a case', async () => {
-    let listCalls = 0;
-    signedIn({
-      '/v1/cases': () => {
-        // POST answers 201; the two GETs bracket it.
-        listCalls += 1;
-        if (listCalls === 1) return jsonResponse(200, { cases: [] });
-        if (listCalls === 2) return jsonResponse(201, CASE);
-        return jsonResponse(200, { cases: [CASE] });
-      },
-    });
-    await screen.findByText(/No cases yet/);
-
-    await userEvent.type(screen.getByLabelText('Filing district'), 'NDCA');
-    await userEvent.press(screen.getByRole('button', { name: 'Open case' }));
-
-    expect(await screen.findByText(/Chapter 7 · NDCA/)).toBeTruthy();
   });
 
   it('reports a failed load without pretending the list is empty', async () => {
@@ -198,7 +174,7 @@ describe('the cases screen', () => {
     // leaf asserts `table`/`row`/`cell` through a web-only prop that the native
     // testing renderer does not surface as a role, and the claim here is about
     // links anyway.
-    await screen.findByText('Chapter 7 · NDCA');
+    await screen.findByText('Chapter 7 · Middle District of Florida');
 
     const links = screen.getAllByRole('link').filter((node) => {
       const href: unknown = node.props.href;
@@ -214,7 +190,7 @@ describe('the cases screen', () => {
     signedIn({ '/v1/cases': () => jsonResponse(200, { cases: [CASE] }) });
 
     const link = await screen.findByLabelText(
-      `Chapter 7 case in NDCA, opened 2026-08-04 by ${CASE.createdBy}`,
+      `Chapter 7 case in Middle District of Florida, opened 2026-08-04 by ${CASE.createdBy}`,
     );
     // WCAG 2.5.3: the visible text is where the accessible name starts.
     expect(link.props.href).toBe(`/cases/${CASE.id}`);

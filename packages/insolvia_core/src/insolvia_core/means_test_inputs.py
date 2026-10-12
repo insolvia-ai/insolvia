@@ -54,6 +54,22 @@ other record holds, each named for the question it answers:
   for line 33d) and its past-due cure total (line 34). The engine sums the
   bucketed rows where the older single-figure totals are absent, so the
   panel beside a claim and the typed total cannot both count.
+
+Issue #365 (B122C-1 / B122C-2) added the four answers the Chapter 13 forms
+ask that the Chapter 7 pair does not, on the SAME record — a case has one
+means-test input whatever its chapter, and the shared lines (the household,
+the deductions) are entered once:
+
+- **The commitment-period marital adjustment** (B122C-1 line 19a): a
+  contention, not a fact — the debtor "contends that calculating the
+  commitment period under § 1325(b)(4) allows" the line 13 adjustment to be
+  deducted again. Absent or false, line 19a is 0, as the form instructs.
+- **Support income for dependent children** (B122C-2 line 40) and
+  **qualified retirement deductions** (line 41; §§ 541(b)(7), 362(b)(19)),
+  the two § 1325(b)(2) subtractions that are not § 707(b)(2)(A) deductions.
+- **Special circumstances** (line 43), listed rows like the marital
+  adjustments — on B122C-2 they are a deduction in the arithmetic, where
+  B122A-2 line 43 is a narrative the engine leaves to the attorney.
 """
 
 from __future__ import annotations
@@ -108,6 +124,16 @@ INCOME_LINE_CATEGORIES: Final = (
 class MaritalAdjustmentItem:
     """One line-3 row: a part of the non-filing spouse's income not paid for
     the household, listed separately as the form requires."""
+
+    id: str
+    description: str | None = None
+    amount: str | None = None
+
+
+@dataclass(frozen=True)
+class SpecialCircumstanceItem:
+    """One B122C-2 line-43 row: a special circumstance that justifies an
+    additional expense (§ 707(b)(2)(B)), with its monthly amount."""
 
     id: str
     description: str | None = None
@@ -202,23 +228,38 @@ class MeansTestInputBody:
     # Line 34: the total amount past due on line-33 debts that are necessary
     # for support (primary residence, vehicle, other support property).
     priority_cure_total: str | None = None
-    # Line 36.
+    # Line 36. `ch13_eligible` is B122A-2's question only; on B122C-2 the
+    # plan payment is multiplied unconditionally — a Chapter 13 debtor is
+    # filing under Chapter 13.
     ch13_eligible: bool | None = None
     ch13_projected_plan_payment: str | None = None
+    # Issue #365: the Chapter 13 forms' own questions.
+    # B122C-1 line 19a — the contention that the line 13 marital adjustment
+    # also applies to the commitment period under § 1325(b)(4).
+    commitment_period_marital_adjustment: bool | None = None
+    # B122C-2 line 40.
+    child_support_for_dependents: str | None = None
+    # B122C-2 line 41.
+    qualified_retirement_deductions: str | None = None
+    # B122C-2 line 43.
+    special_circumstances: tuple[SpecialCircumstanceItem, ...] = ()
 
 
-def _parse_marital_adjustments(
-    value: object, errors: dict[str, str]
-) -> tuple[MaritalAdjustmentItem, ...]:
+def _parse_described_amounts(
+    value: object, field_name: str, errors: dict[str, str]
+) -> tuple[tuple[str, str | None, str | None], ...]:
+    """The shared shape of the two `{id, description, amount}` row lists
+    (line 3's marital adjustments, B122C-2 line 43's special circumstances):
+    client-chosen addressable ids, unique per list."""
     if value is None:
         return ()
     if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
-        errors["marital_adjustments"] = "Must be a list."
+        errors[field_name] = "Must be a list."
         return ()
-    items: list[MaritalAdjustmentItem] = []
+    items: list[tuple[str, str | None, str | None]] = []
     seen: set[str] = set()
     for index, raw in enumerate(value):
-        path = f"marital_adjustments[{index}]"
+        path = f"{field_name}[{index}]"
         if not isinstance(raw, Mapping):
             errors[path] = "Must be an object."
             continue
@@ -234,13 +275,35 @@ def _parse_marital_adjustments(
             continue
         seen.add(given_id)
         items.append(
-            MaritalAdjustmentItem(
-                id=given_id,
-                description=text(raw.get("description"), f"{path}.description", errors),
-                amount=money(raw.get("amount"), f"{path}.amount", errors),
+            (
+                given_id,
+                text(raw.get("description"), f"{path}.description", errors),
+                money(raw.get("amount"), f"{path}.amount", errors),
             )
         )
     return tuple(items)
+
+
+def _parse_marital_adjustments(
+    value: object, errors: dict[str, str]
+) -> tuple[MaritalAdjustmentItem, ...]:
+    return tuple(
+        MaritalAdjustmentItem(id=row_id, description=description, amount=amount)
+        for row_id, description, amount in _parse_described_amounts(
+            value, "marital_adjustments", errors
+        )
+    )
+
+
+def _parse_special_circumstances(
+    value: object, errors: dict[str, str]
+) -> tuple[SpecialCircumstanceItem, ...]:
+    return tuple(
+        SpecialCircumstanceItem(id=row_id, description=description, amount=amount)
+        for row_id, description, amount in _parse_described_amounts(
+            value, "special_circumstances", errors
+        )
+    )
 
 
 def _parse_other_secured(
@@ -434,6 +497,16 @@ def parse_means_test_input(payload: Mapping[str, object]) -> MeansTestInputBody:
         priority_cure_total=amount("priority_cure_total"),
         ch13_eligible=boolean(payload.get("ch13_eligible"), "ch13_eligible", errors),
         ch13_projected_plan_payment=amount("ch13_projected_plan_payment"),
+        commitment_period_marital_adjustment=boolean(
+            payload.get("commitment_period_marital_adjustment"),
+            "commitment_period_marital_adjustment",
+            errors,
+        ),
+        child_support_for_dependents=amount("child_support_for_dependents"),
+        qualified_retirement_deductions=amount("qualified_retirement_deductions"),
+        special_circumstances=_parse_special_circumstances(
+            payload.get("special_circumstances"), errors
+        ),
     )
     for field_name in (
         "median_household_size",

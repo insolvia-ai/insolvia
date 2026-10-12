@@ -22,8 +22,13 @@ Runnable apps in `apps/`, shared libraries in `packages/`, backend services in
 | [`apps/insolvia_admin/`](apps/insolvia_admin/) | Internal staff portal — firm provisioning, Vite SPA, Google Workspace sign-in. |
 | [`apps/insolvia_marketing/`](apps/insolvia_marketing/) | Marketing site for `www.insolvia.ai` — React Router v7, SSR. |
 | [`packages/`](packages/) | Shared libraries: the API client (TypeScript) and `insolvia_core`, the Python services' shared domain. |
-| [`services/`](services/) | Backend services (Python on Lambda): `api`, `admin`, `mailer`, `mcp` (the remote MCP server). |
-| [`infra/`](infra/) | AWS infrastructure (Terraform): `ci-trust`, `shared`, `staging`, `prod`. |
+| [`services/`](services/) | Backend services (Python on Lambda): `api`, `admin`, `mcp` (the remote MCP server), `filing` (the filing worker — ADR 0024). |
+| [`infra/`](infra/) | AWS infrastructure (Terraform): `staging`, `prod`, and per-machine `dev`. |
+
+The account-wide AWS layer (DNS, certificate, SES, container registries, the CI
+deploy role, IAM users) and the transactional **mailer** live in a sibling
+repository, [`insolvia-ai/insolvia-services`](https://github.com/insolvia-ai/insolvia-services)
+— see [ADR 0025](docs/adr/0025-shared-infra-and-mailer-move-to-insolvia-services.md).
 | [`docs/`](docs/) | [Business plan](docs/business/business-plan.html) + engineering runbooks. |
 
 ## Getting started
@@ -67,9 +72,9 @@ Terraform, like everything else.
 ## Deployment
 
 Deploys run through GitHub Actions (AWS via OIDC) — see
-[`docs/runbooks/aws-bootstrap.md`](docs/runbooks/aws-bootstrap.md) and
+insolvia-services' [`docs/runbooks/aws-bootstrap.md`](https://github.com/insolvia-ai/insolvia-services/blob/main/docs/runbooks/aws-bootstrap.md) and
 [`docs/reference/terraform.md`](docs/reference/terraform.md). Shared
-infra is applied and the `*.insolvia.ai` ACM cert is `ISSUED`, so pushes to
+infra (applied from insolvia-services) is up and the `*.insolvia.ai` ACM cert is `ISSUED`, so pushes to
 `main` deploy for real.
 
 - **staging** → `staging-app.insolvia.ai` (auto, on merge to `main`)

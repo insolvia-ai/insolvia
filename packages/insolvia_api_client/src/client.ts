@@ -1,29 +1,48 @@
-import { ApiException, ApiUnauthorizedException, ApiValidationException } from './exceptions.ts';
 import {
+  ApiException,
+  ApiReauthenticationRequiredException,
+  ApiUnauthorizedException,
+  ApiValidationException,
+} from './exceptions.ts';
+import {
+  CASE_STATUSES,
   DOCUMENT_STATUSES,
   COUNSELING_EXEMPTIONS,
   COUNSELING_STATUSES,
   FILING_ROLES,
   PROVENANCE_SOURCES,
+  TAX_ID_KINDS,
   VENUE_BASES,
   INCOME_COLUMNS,
   MARITAL_FILING_STATUSES,
+  MEANS_TEST_FORMS,
   MEANS_TEST_OUTCOMES,
+  PLAN_CLASSES,
   PRESUMPTION_EXEMPTIONS,
+  PROSPECT_STAGES,
+  PORTAL_INPUT_TYPES,
+  QUESTIONNAIRE_SECTION_IDS,
   SIGNATURE_PAGES_MODES,
   addFirmUserRequestToJson,
+  calendarEventDraftToJson,
+  calendarWindowQuery,
   caseEntityRequestToJson,
   createCaseRequestToJson,
   createDocumentRequestToJson,
+  createTaskRequestToJson,
+  firmClientDraftToJson,
   formPreviewQuery,
   libraryCreditorDraftToJson,
   listCasesQuery,
+  listMyTasksQuery,
+  noteRequestToJson,
   outputOptionsRequestToJson,
   putDebtorRequestToJson,
   updateCaseChangesToJson,
   updateFirmRequestToJson,
   updateFirmUserRequestToJson,
   updateMeRequestToJson,
+  updateTaskRequestToJson,
   waitlistSubmissionToJson,
 } from './models.ts';
 import type {
@@ -39,13 +58,45 @@ import type {
   CaseChapter,
   CaseCollection,
   CaseEntity,
+  ClientRole,
+  InvitePortalClientRequest,
+  PortalClient,
+  PortalClientStatus,
+  PortalMe,
+  FirmQuestionnaire,
+  FirmQuestionnaireSection,
+  PortalQuestionnaire,
+  PortalQuestionnaireSection,
+  PortalQuestion,
+  PortalAnswer,
+  PortalAnswerValue,
+  CreatePortalAnswerRequest,
+  CandidateQuestion,
+  QuestionnaireSectionId,
+  SaveFirmQuestionnaireRequest,
+  ProspectStage,
   CaseEntityRequest,
   CaseForm,
+  FilingChecklistItem,
+  FilingDocument,
+  FilingApproval,
+  FilingApprovalBasis,
+  FilingApprovalDocument,
+  FilingApprovalView,
+  FilingConfirmation,
+  FilingHandBack,
+  FilingRecord,
+  FilingResolution,
+  FilingResolutionRequest,
+  FilingSet,
+  FilingSetBasis,
+  FilingSetCheck,
   CaseLiens,
   CaseMeansTest,
   CaseProblem,
   CaseStandards,
   CaseStatus,
+  CaseStatusChange,
   CaseSummary,
   CaseTotals,
   ClaimLien,
@@ -62,8 +113,17 @@ import type {
   CmiLine,
   CmiTrace,
   HouseholdFigure,
+  MeansTestChapter13,
   MeansTestLine,
   MedianComparison,
+  LiquidationAsset,
+  PlanCalculation,
+  PlanClass,
+  PlanPayoutRow,
+  PlanPoolClaim,
+  PlanScenario,
+  PlanScenarioRequest,
+  SourcedAmount,
   PresumptionExemption,
   CreateCaseRequest,
   CreateDocumentRequest,
@@ -76,11 +136,19 @@ import type {
   DocumentDownload,
   DocumentStatus,
   DocumentUpload,
+  CourtDistrict,
+  CourtDivision,
+  CourtRegistry,
   ExtractionCandidate,
   FilingRole,
   Firm,
   FirmColleague,
   FirmFeature,
+  FirmClient,
+  FirmClientCase,
+  FirmClientDraft,
+  FirmClientMerge,
+  FirmClientStatus,
   FirmMembership,
   FirmRole,
   FirmStatus,
@@ -96,10 +164,22 @@ import type {
   JobStatus,
   LibraryCreditor,
   LibraryCreditorDraft,
+  FilingCredential,
+  FilingCredentialEnrolment,
+  FilingAuthorizationStatus,
+  FilingAuthorizationText,
+  CalendarEvent,
+  CalendarEventDraft,
+  CalendarFeedToken,
+  CalendarWindow,
+  CalendarWindowOptions,
   ListCasesOptions,
   ListCasesResult,
+  ListMyTasksOptions,
   LocalStandardsFigures,
   NationalStandardsFigures,
+  Note,
+  NoteRequest,
   NoticeParty,
   OtherName,
   OutputOptions,
@@ -107,6 +187,7 @@ import type {
   Packet,
   PacketDownload,
   PermissionLevel,
+  Letterhead,
   PersonName,
   Principal,
   ProvenanceEntry,
@@ -114,14 +195,38 @@ import type {
   PutDebtorRequest,
   ReviewCandidateRequest,
   ReviewedCandidate,
+  TaxIdView,
+  Task,
+  CreateTaskRequest,
+  SignatureBlock,
   UpdateCaseChanges,
   UpdateFirmRequest,
   UpdateFirmUserRequest,
   UpdateMeRequest,
+  UpdateTaskRequest,
   UploadDocumentOptions,
   Venue,
   WaitlistConfirmation,
   WaitlistSubmission,
+} from './models.ts';
+// Document request checklists (ADR 0023 PR 5) — their own import, so the
+// section reads as one unit.
+import { DOCUMENT_CHANNELS, DOCUMENT_REQUEST_STATUSES, newChecklistItemToJson } from './models.ts';
+import type {
+  ApplyChecklistResult,
+  CaseDocumentRequests,
+  ChecklistItem,
+  CreatePortalDocumentRequest,
+  CreatePortalDocumentResult,
+  DocumentRequest,
+  DocumentRequestProgress,
+  FirmDocumentChecklist,
+  NewChecklistItem,
+  PortalDocumentRequest,
+  PortalDocumentRequests,
+  PortalUpload,
+  SaveDocumentChecklistRequest,
+  UploadPortalDocumentOptions,
 } from './models.ts';
 
 /**
@@ -398,7 +503,7 @@ export class InsolviaApiClient {
   /**
    * `PATCH /v1/cases/{caseId}` — change a subset of a case's fields.
    *
-   * `changes` may hold any subset of `{chapter, district, status}`; omitted
+   * `changes` may hold any subset of {@link UpdateCaseChanges}; omitted
    * keys mean "leave unchanged" and are never sent — see
    * {@link updateCaseChangesToJson}. Returns the updated {@link Case} on 200.
    *
@@ -753,6 +858,7 @@ export class InsolviaApiClient {
       // signature, so a declared size that disagrees with the body is a 403
       // with nothing in it to explain why.
       byteSize: options.file.size,
+      ...(options.requestId === undefined ? {} : { requestId: options.requestId }),
     });
 
     // The raw transport, NOT #protectedHeaders. A presigned URL carries its own
@@ -776,6 +882,221 @@ export class InsolviaApiClient {
     }
 
     return this.completeDocument(caseId, created.document.id);
+  }
+
+  // ── Document request checklists (ADR 0023 PR 5 / #364) ────────────
+
+  /**
+   * `GET /v1/firm/document-checklist` — the documents the firm asks every
+   * client for, and the shipped default beside them. `firm_administration`
+   * at `view_only`.
+   */
+  async getFirmDocumentChecklist(): Promise<FirmDocumentChecklist> {
+    return this.#checklistCall('GET');
+  }
+
+  /**
+   * `PUT /v1/firm/document-checklist` — save the whole list. Throws
+   * {@link ApiValidationException} on a 400, keyed `items.<index>.<field>`.
+   * `firm_administration` at `add_edit`.
+   */
+  async saveFirmDocumentChecklist(
+    request: SaveDocumentChecklistRequest,
+  ): Promise<FirmDocumentChecklist> {
+    return this.#checklistCall('PUT', { items: request.items.map(newChecklistItemToJson) });
+  }
+
+  /** `DELETE /v1/firm/document-checklist` — back to the shipped default. Idempotent. */
+  async resetFirmDocumentChecklist(): Promise<FirmDocumentChecklist> {
+    return this.#checklistCall('DELETE');
+  }
+
+  async #checklistCall(
+    method: 'GET' | 'PUT' | 'DELETE',
+    body?: Record<string, unknown>,
+  ): Promise<FirmDocumentChecklist> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#baseUrl}/v1/firm/document-checklist`, {
+      method,
+      headers: body === undefined ? headers : { ...headers, 'Content-Type': 'application/json' },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    });
+    return firmDocumentChecklistFromJson(await decodeExpected(response, 200));
+  }
+
+  /** `/v1/cases/{caseId}/document-requests`. */
+  #documentRequestsUrl(caseId: string): string {
+    return `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/document-requests`;
+  }
+
+  /**
+   * `GET /v1/cases/{caseId}/document-requests` — every request of the case,
+   * in the order asked, with arrived-vs-outstanding progress. `documents` at
+   * `view_only`.
+   */
+  async listDocumentRequests(caseId: string): Promise<CaseDocumentRequests> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(this.#documentRequestsUrl(caseId), {
+      method: 'GET',
+      headers,
+    });
+    return caseDocumentRequestsFromJson(await decodeExpected(response, 200));
+  }
+
+  /** `POST /v1/cases/{caseId}/document-requests` — ask for one more document. 201. */
+  async addDocumentRequest(caseId: string, item: NewChecklistItem): Promise<DocumentRequest> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(this.#documentRequestsUrl(caseId), {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify(newChecklistItemToJson(item)),
+    });
+    return documentRequestFromJson(await decodeExpected(response, 201));
+  }
+
+  /**
+   * `POST /v1/cases/{caseId}/document-requests/from-checklist` — request
+   * every entry of the firm's checklist the case has not already asked for.
+   * Safe to repeat; `added` says how many this call created.
+   */
+  async applyDocumentChecklist(caseId: string): Promise<ApplyChecklistResult> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#documentRequestsUrl(caseId)}/from-checklist`, {
+      method: 'POST',
+      headers,
+    });
+    const decoded = await decodeExpected(response, 200);
+    return { ...caseDocumentRequestsFromJson(decoded), added: requireNumber(decoded, 'added') };
+  }
+
+  /**
+   * `PATCH /v1/cases/{caseId}/document-requests/{requestId}` — waive or
+   * reopen. `received` is not settable: a completed upload is what
+   * receives a request.
+   */
+  async setDocumentRequestStatus(
+    caseId: string,
+    requestId: string,
+    status: 'requested' | 'waived',
+  ): Promise<DocumentRequest> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(
+      `${this.#documentRequestsUrl(caseId)}/${encodeURIComponent(requestId)}`,
+      {
+        method: 'PATCH',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      },
+    );
+    return documentRequestFromJson(await decodeExpected(response, 200));
+  }
+
+  /** `DELETE /v1/cases/{caseId}/document-requests/{requestId}` — 204; its documents stay. */
+  async deleteDocumentRequest(caseId: string, requestId: string): Promise<void> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(
+      `${this.#documentRequestsUrl(caseId)}/${encodeURIComponent(requestId)}`,
+      { method: 'DELETE', headers },
+    );
+    await expectNoContent(response, 204);
+  }
+
+  /**
+   * `GET /v1/portal/document-requests` — the CLIENT side: what the firm
+   * asked this client for, each with their own uploads against it, and the
+   * progress. Called with a portal session's token.
+   */
+  async getPortalDocumentRequests(): Promise<PortalDocumentRequests> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#baseUrl}/v1/portal/document-requests`, {
+      method: 'GET',
+      headers,
+    });
+    const decoded = await decodeExpected(response, 200);
+    return {
+      requests: requireArrayOf(
+        decoded,
+        'requests',
+        'PortalDocumentRequest',
+        (item): PortalDocumentRequest => ({
+          id: requireString(item, 'id'),
+          title: requireString(item, 'title'),
+          kind: requireString(item, 'kind'),
+          description: requireNullableString(item, 'description'),
+          status: requireChoice(item, 'status', DOCUMENT_REQUEST_STATUSES),
+          uploads: requireArrayOf(item, 'uploads', 'PortalUpload', portalUploadFromJson),
+        }),
+      ),
+      progress: documentRequestProgressFromJson(childObject(decoded, 'progress')),
+    };
+  }
+
+  /**
+   * `POST /v1/portal/documents` — step one of a client's upload, against
+   * one request. Prefer {@link uploadPortalDocument}, which runs all three
+   * steps for the reason {@link uploadDocument} gives.
+   */
+  async createPortalDocument(
+    request: CreatePortalDocumentRequest,
+  ): Promise<CreatePortalDocumentResult> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#baseUrl}/v1/portal/documents`, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        requestId: request.requestId,
+        fileName: request.fileName,
+        contentType: request.contentType,
+        byteSize: request.byteSize,
+      }),
+    });
+    const decoded = await decodeExpected(response, 201);
+    return {
+      document: portalUploadFromJson(childObject(decoded, 'document')),
+      upload: uploadFromJson(childObject(decoded, 'upload')),
+    };
+  }
+
+  /**
+   * `POST /v1/portal/documents/{documentId}/complete` — confirm the PUT;
+   * this is what marks the request received. 409 when the bytes never
+   * arrived ({@link isUploadIncomplete}).
+   */
+  async completePortalDocument(documentId: string): Promise<PortalUpload> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(
+      `${this.#baseUrl}/v1/portal/documents/${encodeURIComponent(documentId)}/complete`,
+      { method: 'POST', headers },
+    );
+    const decoded = await decodeExpected(response, 200);
+    return portalUploadFromJson(childObject(decoded, 'document'));
+  }
+
+  /**
+   * A client's upload end to end — create, PUT, complete — exactly as
+   * {@link uploadDocument} runs the staff one, and leaving a pending record
+   * on a partial failure for the same reason.
+   */
+  async uploadPortalDocument(options: UploadPortalDocumentOptions): Promise<PortalUpload> {
+    const created = await this.createPortalDocument({
+      requestId: options.requestId,
+      fileName: options.fileName,
+      contentType: options.contentType,
+      byteSize: options.file.size,
+    });
+    const uploaded = await this.#fetch(created.upload.url, {
+      method: created.upload.method,
+      headers: { ...created.upload.headers },
+      body: options.file,
+    });
+    if (!uploaded.ok) {
+      throw new ApiException({
+        statusCode: uploaded.status,
+        body: await uploaded.text(),
+        message: `the presigned upload failed with status ${uploaded.status}`,
+      });
+    }
+    return this.completePortalDocument(created.document.id);
   }
 
   /**
@@ -844,6 +1165,85 @@ export class InsolviaApiClient {
     );
     const decoded = await decodeExpected(response, 200);
     return requireDebtorArray(decoded, 'debtors');
+  }
+
+  /**
+   * `PUT /v1/cases/{caseId}/debtors/{filingRole}/client` — link a firm client
+   * to one debtor of a case (ADR 0022). The only way a debtor's `client_id`
+   * changes after the case is opened: {@link putDebtor} keeps it.
+   *
+   * With no debtor in that role yet, the client is COPIED in (201) — how a
+   * joint case gains its Debtor 2, since a questionnaire save can no longer
+   * create one from nothing. With one already there, only the link moves
+   * (200); the case's copied fields stay, and where they now disagree with
+   * the client is {@link Debtor.differs_from_client}.
+   *
+   * Needs `intake` at `add_edit` and `clients` at `view_only`. Throws
+   * {@link ApiValidationException} keyed `client_id` for an unknown, foreign
+   * or archived client, or one already holding another role on this case.
+   */
+  async linkDebtorClient(
+    caseId: string,
+    filingRole: FilingRole,
+    clientId: string,
+  ): Promise<Debtor> {
+    const headers = await this.#protectedHeaders();
+    const url = `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/debtors/${encodeURIComponent(filingRole)}/client`;
+    const response = await this.#fetch(url, {
+      method: 'PUT',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ client_id: clientId }),
+    });
+    const decoded = await decodeExpectedOneOf(response, [200, 201]);
+    return debtorFromJson(decoded);
+  }
+
+  /**
+   * `POST /v1/cases/{caseId}/debtors/{filingRole}/copy-from-client` — ADR
+   * 0022's *re-copy from client*: the debtor's copied fields (name, other
+   * names, both addresses, phone, mobile, email) are overwritten with the
+   * linked client's, each with `client` provenance again, and the saved
+   * debtor comes back (its `differs_from_client` now `[]`). The case's own
+   * answers — venue, counselling, the signature date, the tax ID — are
+   * untouched. No body.
+   *
+   * Throws a plain {@link ApiException} with `statusCode` **409** when the
+   * case is filed (changing a filed petition is an amendment) or the debtor
+   * has no linked client, and {@link ApiValidationException} keyed
+   * `client_id` when that client is archived. Needs `intake` at `add_edit`
+   * and `clients` at `view_only`.
+   */
+  async copyDebtorFromClient(caseId: string, filingRole: FilingRole): Promise<Debtor> {
+    return this.#debtorClientAct(caseId, filingRole, 'copy-from-client');
+  }
+
+  /**
+   * `POST /v1/cases/{caseId}/debtors/{filingRole}/copy-to-client` — ADR
+   * 0022's *update client from this case*: the linked client's copied fields
+   * are overwritten with what this debtor now says (the client's own date of
+   * birth, lead source and so on are kept). Answers the DEBTOR, unchanged
+   * but for `differs_from_client`, now `[]`. No body.
+   *
+   * Allowed on a filed case — the petition does not change, the directory
+   * does. Throws a plain {@link ApiException} with `statusCode` **409** when
+   * the debtor has no linked client, and {@link ApiValidationException}
+   * keyed `name` when the case's name is empty (a client needs one). Needs
+   * `clients` at `add_edit`.
+   */
+  async copyDebtorToClient(caseId: string, filingRole: FilingRole): Promise<Debtor> {
+    return this.#debtorClientAct(caseId, filingRole, 'copy-to-client');
+  }
+
+  async #debtorClientAct(
+    caseId: string,
+    filingRole: FilingRole,
+    act: 'copy-from-client' | 'copy-to-client',
+  ): Promise<Debtor> {
+    const headers = await this.#protectedHeaders();
+    const url = `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/debtors/${encodeURIComponent(filingRole)}/${act}`;
+    const response = await this.#fetch(url, { method: 'POST', headers });
+    const decoded = await decodeExpected(response, 200);
+    return debtorFromJson(decoded);
   }
 
   /**
@@ -956,6 +1356,86 @@ export class InsolviaApiClient {
     const headers = await this.#protectedHeaders();
     const response = await this.#fetch(
       `${this.#collectionUrl(caseId, collection)}/${encodeURIComponent(entityId)}`,
+      { method: 'DELETE', headers },
+    );
+    await expectNoContent(response, 204);
+  }
+
+  /**
+   * `POST /v1/cases/{caseId}/notes` — add one note (issue 14.5 / #357), case-
+   * level or anchored to a form. The server stamps `authorSubject`/
+   * `authorName` from the caller's own token; {@link NoteRequest} carries
+   * neither, so there is nothing to send and nothing to spoof.
+   *
+   * A STATIC segment, not {@link addCaseEntity} — `note`s are not a
+   * {@link CaseCollection}; see the module comment above {@link NoteRequest}.
+   */
+  async addNote(caseId: string, note: NoteRequest): Promise<Note> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(
+      `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/notes`,
+      {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify(noteRequestToJson(note)),
+      },
+    );
+    const decoded = await decodeExpected(response, 201);
+    return noteFromJson(decoded);
+  }
+
+  /**
+   * `GET /v1/cases/{caseId}/notes` — every note on the case, NEWEST FIRST
+   * (the server's own order — the opposite of {@link listCaseEntities}, which
+   * lists a schedule oldest first; a note is a running log, so the one just
+   * left belongs at the top). The wire body is `{"notes": [...]}`; this
+   * returns the array.
+   */
+  async listNotes(caseId: string): Promise<readonly Note[]> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(
+      `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/notes`,
+      { method: 'GET', headers },
+    );
+    const decoded = await decodeExpected(response, 200);
+    return requireNoteArray(decoded, 'notes');
+  }
+
+  /**
+   * `PUT /v1/cases/{caseId}/notes/{noteId}` — replace a note's text and form
+   * anchor, WHOLE, exactly as {@link putCaseEntity} replaces a collection
+   * record. Authorship never changes here, including when a firm admin edits
+   * a colleague's note — the server keeps the ORIGINAL author.
+   *
+   * A 403 means the caller is neither the note's author nor a firm admin —
+   * see {@link ApiException.statusCode} — distinct from the 403 a missing
+   * `notes` permission would answer, and from a 404, which this endpoint
+   * still uses for a note the caller cannot even see (unknown id, or another
+   * firm's case).
+   */
+  async putNote(caseId: string, noteId: string, note: NoteRequest): Promise<Note> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(
+      `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/notes/${encodeURIComponent(noteId)}`,
+      {
+        method: 'PUT',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify(noteRequestToJson(note)),
+      },
+    );
+    const decoded = await decodeExpected(response, 200);
+    return noteFromJson(decoded);
+  }
+
+  /**
+   * `DELETE /v1/cases/{caseId}/notes/{noteId}` — remove a note. Same
+   * author-or-admin rule as {@link putNote}; 204 with no body, and a second
+   * delete of the same id answers 404.
+   */
+  async deleteNote(caseId: string, noteId: string): Promise<void> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(
+      `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/notes/${encodeURIComponent(noteId)}`,
       { method: 'DELETE', headers },
     );
     await expectNoContent(response, 204);
@@ -1100,6 +1580,56 @@ export class InsolviaApiClient {
   }
 
   /**
+   * `GET /v1/cases/{caseId}/plan-calculation` — the stored Chapter 13 plan's
+   * figures (issue 16.2 / #366): the waterfall by class and payee,
+   * feasibility, and the § 1325(a)(4) liquidation test, every figure naming
+   * the claim, plan field or rule it came from. The plan itself is the
+   * `plans` collection ({@link addCaseEntity} / {@link putCaseEntity}).
+   *
+   * Always resolves to 200 on a reachable case; read
+   * {@link PlanCalculation.problems} for what is still missing. A 404 means
+   * the case is unknown *or* not the caller's.
+   */
+  async getCasePlanCalculation(caseId: string): Promise<PlanCalculation> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(
+      `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/plan-calculation`,
+      { method: 'GET', headers },
+    );
+    const decoded = await decodeExpected(response, 200);
+    return planCalculationFromJson(decoded);
+  }
+
+  /**
+   * `POST /v1/cases/{caseId}/plan-calculation` — unsaved alternatives, each
+   * calculated against the same case, in the order sent (at most five).
+   * Writes nothing: adopting one is an ordinary confirmed write of its
+   * body to `plans`. A malformed scenario is a 400 whose field paths read
+   * `scenarios[<n>].plan.<field>`.
+   */
+  async calculatePlanScenarios(
+    caseId: string,
+    scenarios: readonly PlanScenarioRequest[],
+  ): Promise<readonly PlanScenario[]> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(
+      `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/plan-calculation`,
+      {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          scenarios: scenarios.map((scenario) => ({
+            ...(scenario.label === undefined ? {} : { label: scenario.label }),
+            plan: caseEntityRequestToJson(scenario.plan),
+          })),
+        }),
+      },
+    );
+    const decoded = await decodeExpected(response, 200);
+    return requireArrayOf(decoded, 'scenarios', 'PlanScenario', planScenarioFromJson);
+  }
+
+  /**
    * `GET /v1/cases/{caseId}/packets` — every assembled Chapter 7 packet of
    * this case, newest first (issue #96).
    *
@@ -1164,6 +1694,130 @@ export class InsolviaApiClient {
     );
     const decoded = await decodeExpected(response, 200);
     return requireArrayOf(decoded, 'forms', 'CaseForm', caseFormFromJson);
+  }
+
+  /**
+   * `GET /v1/cases/{caseId}/filing-set` — the filing set and hand-off
+   * checklist for the case's court (ADR 0024 build PR 3): the documents in
+   * the court's docket order and upload names, each checked against the
+   * court's size, text-layer and page-size rules, and a checklist saying
+   * what is ready, what is missing and why, and where in the app to fix it.
+   * Files nothing. Like {@link getCase}, a 404 means the case is unknown
+   * *or* not the caller's.
+   */
+  async getCaseFilingSet(caseId: string): Promise<FilingSet> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(
+      `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/filing-set`,
+      { method: 'GET', headers },
+    );
+    return filingSetFromJson(await decodeExpected(response, 200));
+  }
+
+  /**
+   * `GET /v1/cases/{caseId}/filing-approval` — what an approval of this
+   * case's filing would cover (ADR 0024, guardrail 1: the court, the
+   * documents in docket order with sizes and digests, the checklist, the fee
+   * handling, and the digest over it all) and the case's current approval.
+   * An approval whose filing set has changed since comes back `voided`
+   * (`changed`). Needs `electronic_filing` at `view_only`.
+   */
+  async getFilingApproval(caseId: string): Promise<FilingApprovalView> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(
+      `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/filing-approval`,
+      { method: 'GET', headers },
+    );
+    return filingApprovalViewFromJson(await decodeExpected(response, 200));
+  }
+
+  /**
+   * `POST /v1/cases/{caseId}/filing-approval` — approve exactly the filing
+   * set the caller was shown, named by its `digest`. Throws
+   * {@link ApiReauthenticationRequiredException} when the sign-in is not
+   * recent (sign in again with a forced prompt, then retry); a 409 means the
+   * filing set changed since it was shown, has a blocker (`FilingSetNotReady`,
+   * with `blockers`), or is already being filed; a 403 that the caller holds
+   * no login of their own for this court, or no current authorization.
+   * `credentialId` is needed only when the caller has two logins for the
+   * court. Needs `electronic_filing` at `add_edit`.
+   */
+  async approveFiling(
+    caseId: string,
+    approval: { readonly digest: string; readonly credentialId?: string },
+  ): Promise<FilingApprovalView> {
+    const headers = await this.#protectedHeaders();
+    const body: Record<string, string> = { digest: approval.digest };
+    if (approval.credentialId !== undefined) {
+      body.credential_id = approval.credentialId;
+    }
+    const response = await this.#fetch(
+      `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/filing-approval`,
+      {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      },
+    );
+    return filingApprovalViewFromJson(await decodeExpected(response, 201));
+  }
+
+  /**
+   * `DELETE /v1/cases/{caseId}/filing-approval` — cancel the pending
+   * approval before the filing worker uses it. A 409 means nothing is
+   * pending. Needs `electronic_filing` at `view_only`: stopping a filing only
+   * ever takes authority away.
+   */
+  async cancelFilingApproval(caseId: string): Promise<FilingApprovalView> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(
+      `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/filing-approval`,
+      { method: 'DELETE', headers },
+    );
+    return filingApprovalViewFromJson(await decodeExpected(response, 200));
+  }
+
+  /**
+   * `POST /v1/cases/{caseId}/filings/{filingId}/resolution` (ADR 0024 PR 8)
+   * — record what the court's docket shows for a handed-back or
+   * unknown-outcome filing. ALWAYS sends `docket_checked: true`: call it
+   * only once the attorney has confirmed they checked the court's own
+   * docket. `filed` files the case with the number and petition date given;
+   * `not_filed` frees it for a new approval. A 403 means the caller is not
+   * the filing's attorney; a 409 (`ResolutionRefused`, with `reason`) that
+   * it is already resolved (`not_resolvable`), the court confirmed it
+   * (`court_confirmed`), or the attempt may still be live
+   * (`attempt_may_be_live`); a 400 names the field. Returns the
+   * {@link FilingApprovalView}, as `getFilingApproval` does.
+   */
+  async resolveFiling(
+    caseId: string,
+    filingId: string,
+    resolution: FilingResolutionRequest,
+  ): Promise<FilingApprovalView> {
+    const headers = await this.#protectedHeaders();
+    const body: Record<string, string | boolean> = {
+      outcome: resolution.outcome,
+      docket_checked: true,
+    };
+    if (resolution.outcome === 'filed') {
+      body.case_number = resolution.caseNumber;
+      body.filed_at = resolution.filedAt;
+      if (resolution.confirmationDocumentId !== undefined) {
+        body.confirmation_document_id = resolution.confirmationDocumentId;
+      }
+    }
+    const response = await this.#fetch(
+      `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/filings/${encodeURIComponent(
+        filingId,
+      )}/resolution`,
+      {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      },
+    );
+    return filingApprovalViewFromJson(await decodeExpected(response, 200));
   }
 
   /**
@@ -1248,6 +1902,58 @@ export class InsolviaApiClient {
   }
 
   /**
+   * `GET /v1/firm/questionnaire` — which questionnaire sections the firm's
+   * clients see, and the instructions they read (ADR 0023 PR 3). Every
+   * section, switched off or not: staff always see all of them.
+   *
+   * `firm_administration` at `view_only`, like {@link getFirm}.
+   */
+  async getFirmQuestionnaire(): Promise<FirmQuestionnaire> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#baseUrl}/v1/firm/questionnaire`, {
+      method: 'GET',
+      headers,
+    });
+    return firmQuestionnaireFromJson(await decodeExpected(response, 200));
+  }
+
+  /**
+   * `PUT /v1/firm/questionnaire` — save the whole config, every section once.
+   * Answers with what was stored, normalised (blank instructions read back
+   * as `null`). `firm_administration` at `add_edit`. Throws
+   * {@link ApiValidationException} on a 400, keyed `sections.<id>.<field>`.
+   */
+  async saveFirmQuestionnaire(request: SaveFirmQuestionnaireRequest): Promise<FirmQuestionnaire> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#baseUrl}/v1/firm/questionnaire`, {
+      method: 'PUT',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sections: request.sections.map((section) => ({
+          id: section.id,
+          enabled: section.enabled,
+          instructions: section.instructions,
+        })),
+      }),
+    });
+    return firmQuestionnaireFromJson(await decodeExpected(response, 200));
+  }
+
+  /**
+   * `DELETE /v1/firm/questionnaire` — reset to the defaults: every section
+   * on, every instruction the catalogue's. Idempotent; answers with the
+   * default view. `firm_administration` at `add_edit`.
+   */
+  async resetFirmQuestionnaire(): Promise<FirmQuestionnaire> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#baseUrl}/v1/firm/questionnaire`, {
+      method: 'DELETE',
+      headers,
+    });
+    return firmQuestionnaireFromJson(await decodeExpected(response, 200));
+  }
+
+  /**
    * `GET /v1/firm/directory` — everyone in the caller's firm, as names.
    *
    * Available to anyone who can view cases, not only administrators, because
@@ -1276,7 +1982,29 @@ export class InsolviaApiClient {
       lastName: requireString(element, 'lastName'),
       displayName: requireString(element, 'displayName'),
       role: requireFirmRole(element, 'role'),
+      signatureBlock: nullableSignatureBlock(element, 'signatureBlock'),
     }));
+  }
+
+  /**
+   * `GET /v1/courts` — the court registry (issue #360): the districts and
+   * divisions a case may name, resolved as of today. Authenticated, every
+   * member of a firm, no feature gate; a caller in no firm is a 403 like
+   * everywhere else. Read-only — the registry is committed data the API
+   * ships (ADR 0014), and this is the list the create form's pickers read.
+   */
+  async listCourts(): Promise<CourtRegistry> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#baseUrl}/v1/courts`, {
+      method: 'GET',
+      headers,
+    });
+    const decoded = await decodeExpected(response, 200);
+    return {
+      releaseId: requireString(decoded, 'releaseId'),
+      effectiveDate: requireString(decoded, 'effectiveDate'),
+      districts: requireArrayOf(decoded, 'districts', 'CourtDistrict', courtDistrictFromJson),
+    };
   }
 
   /**
@@ -1368,6 +2096,222 @@ export class InsolviaApiClient {
     await expectNoContent(response, 204);
   }
 
+  /**
+   * `GET /v1/cases/{caseId}/portal/clients` — everyone ever invited to this
+   * case's client portal (ADR 0023), revoked included, oldest first.
+   *
+   * Needs `client_portal` at `view_only` — hidden by default for every role.
+   */
+  async listPortalClients(caseId: string): Promise<readonly PortalClient[]> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(
+      `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/portal/clients`,
+      { method: 'GET', headers },
+    );
+    const decoded = await decodeExpected(response, 200);
+    return requireArrayOf(decoded, 'clients', 'PortalClient', portalClientFromJson);
+  }
+
+  /**
+   * `POST /v1/cases/{caseId}/portal/invitation` — invite a debtor to this
+   * case's client portal. Cognito mails the temporary password; the API mails
+   * the context (which firm, where to sign in), and neither passes through
+   * here.
+   *
+   * Throws {@link ApiException} with status **409** when the roles are held
+   * by another client whose binding would be left with none, when the person
+   * already has live access to a case, or when the address has an Insolvia
+   * account that is not one of this firm's clients. Needs `client_portal` at
+   * `add_edit`.
+   */
+  async invitePortalClient(
+    caseId: string,
+    request: InvitePortalClientRequest,
+  ): Promise<PortalClient> {
+    const headers = await this.#protectedHeaders();
+    const body: Record<string, unknown> = {
+      email: request.email,
+      displayName: request.displayName,
+    };
+    if (request.roles !== undefined) body.roles = [...request.roles];
+    const response = await this.#fetch(
+      `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/portal/invitation`,
+      {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      },
+    );
+    const decoded = await decodeExpected(response, 201);
+    return portalClientFromJson(decoded);
+  }
+
+  /**
+   * `POST /v1/cases/{caseId}/portal/clients/{subject}/resend` — re-send an
+   * invitation that has not been used yet. A **409** means the client has
+   * already used the portal.
+   */
+  async resendPortalInvitation(caseId: string, subject: string): Promise<void> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#portalClientUrl(caseId, subject)}/resend`, {
+      method: 'POST',
+      headers,
+    });
+    await expectNoContent(response, 204);
+  }
+
+  /**
+   * `DELETE /v1/cases/{caseId}/portal/clients/{subject}` — withdraw a
+   * client's access. Answers the binding, now `revoked`.
+   */
+  async revokePortalClient(caseId: string, subject: string): Promise<PortalClient> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(this.#portalClientUrl(caseId, subject), {
+      method: 'DELETE',
+      headers,
+    });
+    const decoded = await decodeExpected(response, 200);
+    return portalClientFromJson(decoded);
+  }
+
+  /**
+   * `GET /v1/portal/me` — the CLIENT side (ADR 0023). Construct the client
+   * with the PORTAL session's token for this one: a staff token answers
+   * **401** here, and a portal token answers 401 on every staff method.
+   * A **403** means the signed-in person has no live access to a case.
+   */
+  async getPortalMe(): Promise<PortalMe> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#baseUrl}/v1/portal/me`, {
+      method: 'GET',
+      headers,
+    });
+    const decoded = await decodeExpected(response, 200);
+    const firm = optionalObject(decoded, 'firm');
+    if (firm === undefined) {
+      throw malformedField(decoded, 'firm', 'object');
+    }
+    const matter = optionalObject(decoded, 'case');
+    if (matter === undefined) {
+      throw malformedField(decoded, 'case', 'object');
+    }
+    return {
+      subject: requireString(decoded, 'subject'),
+      displayName: requireString(decoded, 'displayName'),
+      roles: requireClientRoles(decoded, 'roles'),
+      firm: { name: requireString(firm, 'name') },
+      case: {
+        chapter: requireCaseChapter(matter, 'chapter'),
+        stage: requireCaseStatus(matter, 'stage'),
+      },
+    };
+  }
+
+  /**
+   * `GET /v1/portal/questionnaire` — the CLIENT side (ADR 0023 PR 3): the
+   * sections this client's firm shows them, in order, each with the
+   * instructions in force. A section the firm switched off is absent. Called
+   * with a portal session's token, like {@link getPortalMe}.
+   */
+  async getPortalQuestionnaire(): Promise<PortalQuestionnaire> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#baseUrl}/v1/portal/questionnaire`, {
+      method: 'GET',
+      headers,
+    });
+    const decoded = await decodeExpected(response, 200);
+    return {
+      sections: requireArrayOf(
+        decoded,
+        'sections',
+        'PortalQuestionnaireSection',
+        (section): PortalQuestionnaireSection => ({
+          id: requireQuestionnaireSectionId(section, 'id'),
+          title: requireString(section, 'title'),
+          instructions: requireString(section, 'instructions'),
+          questions: requireArrayOf(section, 'questions', 'PortalQuestion', portalQuestionFromJson),
+        }),
+      ),
+    };
+  }
+
+  /**
+   * `GET /v1/portal/answers` — the CLIENT's own answers, every status: the
+   * questionnaire's resume state (ADR 0023 PR 4). Only this client's, and
+   * only in sections the firm still shows. Portal token, like
+   * {@link getPortalMe}.
+   */
+  async listPortalAnswers(): Promise<readonly PortalAnswer[]> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#baseUrl}/v1/portal/answers`, {
+      method: 'GET',
+      headers,
+    });
+    const decoded = await decodeExpected(response, 200);
+    return requireArrayOf(decoded, 'answers', 'PortalAnswer', portalAnswerFromJson);
+  }
+
+  /**
+   * `POST /v1/portal/answers` — answer one question. The answer is a
+   * candidate in the firm's review queue, never case data. Throws
+   * {@link ApiValidationException} on a 400, keyed `value.<input key>`,
+   * `questionId` (not in this client's questionnaire — including a section
+   * the firm switched off) or `filingRole`; a plain {@link ApiException}
+   * with 409 when a one-answer question already has a pending answer
+   * (change that one with {@link updatePortalAnswer}).
+   */
+  async createPortalAnswer(request: CreatePortalAnswerRequest): Promise<PortalAnswer> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#baseUrl}/v1/portal/answers`, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        questionId: request.questionId,
+        ...(request.filingRole === undefined ? {} : { filingRole: request.filingRole }),
+        value: request.value,
+      }),
+    });
+    return portalAnswerFromJson(await decodeExpected(response, 201));
+  }
+
+  /**
+   * `PUT /v1/portal/answers/{answerId}` — change a PENDING answer's value.
+   * 409 once the firm has reviewed it (a change is then a new answer); 404
+   * for anything that is not this client's own.
+   */
+  async updatePortalAnswer(answerId: string, value: PortalAnswerValue): Promise<PortalAnswer> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(this.#portalAnswerUrl(answerId), {
+      method: 'PUT',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ value }),
+    });
+    return portalAnswerFromJson(await decodeExpected(response, 200));
+  }
+
+  /**
+   * `DELETE /v1/portal/answers/{answerId}` — withdraw a PENDING answer. The
+   * row is kept, `withdrawn`; 409 once reviewed, 404 if not this client's.
+   */
+  async withdrawPortalAnswer(answerId: string): Promise<PortalAnswer> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(this.#portalAnswerUrl(answerId), {
+      method: 'DELETE',
+      headers,
+    });
+    return portalAnswerFromJson(await decodeExpected(response, 200));
+  }
+
+  /** `/v1/portal/answers/{answerId}`, with the id encoded once. */
+  #portalAnswerUrl(answerId: string): string {
+    return `${this.#baseUrl}/v1/portal/answers/${encodeURIComponent(answerId)}`;
+  }
+
+  /** `/v1/cases/{caseId}/portal/clients/{subject}`, each segment encoded once. */
+  #portalClientUrl(caseId: string, subject: string): string {
+    return `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/portal/clients/${encodeURIComponent(subject)}`;
+  }
+
   /** `/v1/firm/users/{subject}`, with the subject encoded exactly once. */
   #firmUserUrl(subject: string): string {
     return `${this.#baseUrl}/v1/firm/users/${encodeURIComponent(subject)}`;
@@ -1448,6 +2392,530 @@ export class InsolviaApiClient {
     await expectNoContent(response, 204);
   }
 
+  // -------------------------------------------------------------------------
+  // The caller's own CM/ECF credential (ADR 0024, guardrail 3).
+  // -------------------------------------------------------------------------
+
+  /**
+   * `GET /v1/me/filing-credentials` — the caller's OWN credentials in the
+   * vault, as status views: never a password, never a seed. Needs
+   * `electronic_filing` at `view_only` (hidden for every role by default).
+   */
+  async listFilingCredentials(): Promise<readonly FilingCredential[]> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#baseUrl}/v1/me/filing-credentials`, {
+      method: 'GET',
+      headers,
+    });
+    const decoded = await decodeExpected(response, 200);
+    return requireArrayOf(decoded, 'credentials', 'FilingCredential', filingCredentialFromJson);
+  }
+
+  /**
+   * `POST /v1/me/filing-credentials` — seal and store one credential for the
+   * caller. The server answers the status view; nothing sent is echoed.
+   * Throws {@link ApiValidationException} on a 400 (per field: `login`,
+   * `password`, `totp_seed`, `courts`) and a 409 when that login is already
+   * enrolled. Needs `electronic_filing` at `add_edit`.
+   */
+  async enrolFilingCredential(enrolment: FilingCredentialEnrolment): Promise<FilingCredential> {
+    const headers = await this.#protectedHeaders();
+    const body: Record<string, unknown> = {
+      login: enrolment.login,
+      password: enrolment.password,
+      totp_seed: enrolment.totp_seed,
+    };
+    if (enrolment.courts !== undefined) body.courts = enrolment.courts;
+    const response = await this.#fetch(`${this.#baseUrl}/v1/me/filing-credentials`, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const decoded = await decodeExpected(response, 201);
+    return filingCredentialFromJson(decoded);
+  }
+
+  /**
+   * `DELETE /v1/me/filing-credentials/{id}` — revoke: the server DESTROYS the
+   * sealed credential, and the filing worker can no longer open it. A 404
+   * means the caller has no such credential.
+   */
+  async revokeFilingCredential(id: string): Promise<void> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(
+      `${this.#baseUrl}/v1/me/filing-credentials/${encodeURIComponent(id)}`,
+      { method: 'DELETE', headers },
+    );
+    await expectNoContent(response, 204);
+  }
+
+  // -------------------------------------------------------------------------
+  // The caller's written filing authorization (ADR 0024, guardrail 2).
+  // -------------------------------------------------------------------------
+
+  /**
+   * `GET /v1/me/filing-authorization` — the text to read (version, digest,
+   * body) and the caller's signature over it. Needs `electronic_filing` at
+   * `view_only`.
+   */
+  async getFilingAuthorization(): Promise<FilingAuthorizationStatus> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#baseUrl}/v1/me/filing-authorization`, {
+      method: 'GET',
+      headers,
+    });
+    return filingAuthorizationFromJson(await decodeExpected(response, 200));
+  }
+
+  /**
+   * `POST /v1/me/filing-authorization` — sign the text the caller was shown,
+   * named by the `version` and `digest` it came with. Throws
+   * {@link ApiReauthenticationRequiredException} when the caller's sign-in is
+   * not recent (minutes, not the session's age): sign in again with a forced
+   * prompt, then retry. A 409 means the text changed, or it is already
+   * signed. Needs `electronic_filing` at `add_edit`.
+   */
+  async signFilingAuthorization(
+    text: Pick<FilingAuthorizationText, 'version' | 'digest'>,
+  ): Promise<FilingAuthorizationStatus> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#baseUrl}/v1/me/filing-authorization`, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text_version: text.version, text_digest: text.digest }),
+    });
+    return filingAuthorizationFromJson(await decodeExpected(response, 201));
+  }
+
+  /**
+   * `DELETE /v1/me/filing-authorization` — withdraw the signature, which
+   * DESTROYS every filing credential the caller holds. Resolves to how many
+   * were destroyed. A 404 means nothing was signed.
+   */
+  async withdrawFilingAuthorization(): Promise<number> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#baseUrl}/v1/me/filing-authorization`, {
+      method: 'DELETE',
+      headers,
+    });
+    return requireNumber(await decodeExpected(response, 200), 'credentials_revoked');
+  }
+
+  // -------------------------------------------------------------------------
+  // The firm's client directory (ADR 0022 / #353).
+  // -------------------------------------------------------------------------
+
+  /** `/v1/firm/clients/{id}`, with the id encoded exactly once. */
+  #firmClientUrl(id: string): string {
+    return `${this.#baseUrl}/v1/firm/clients/${encodeURIComponent(id)}`;
+  }
+
+  /**
+   * `GET /v1/firm/clients` — the firm's whole client directory, archived
+   * clients included, ordered by surname then given name.
+   *
+   * Needs `clients` at `view_only`. Not access-logged (the list, like
+   * `GET /v1/cases`); every single-record call below is.
+   */
+  async listFirmClients(): Promise<readonly FirmClient[]> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#baseUrl}/v1/firm/clients`, {
+      method: 'GET',
+      headers,
+    });
+    const decoded = await decodeExpected(response, 200);
+    return requireArrayOf(decoded, 'clients', 'FirmClient', firmClientFromJson);
+  }
+
+  /**
+   * `POST /v1/firm/clients` — add a person to the directory. The new client
+   * is `active`, and `created_by` is the caller.
+   *
+   * Needs `clients` at `add_edit`. Throws {@link ApiValidationException} on a
+   * 400 (per-field: `name`, `date_of_birth`, `residence_address.*`,
+   * `other_names_used[n].id`, …; `tax_id` if one was sent — it cannot be set
+   * here).
+   */
+  async createFirmClient(draft: FirmClientDraft): Promise<FirmClient> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#baseUrl}/v1/firm/clients`, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify(firmClientDraftToJson(draft)),
+    });
+    const decoded = await decodeExpected(response, 201);
+    return firmClientFromJson(decoded);
+  }
+
+  /**
+   * `GET /v1/firm/clients/{id}` — one client. A 404 means the id is not in
+   * the caller's firm or does not exist — deliberately indistinguishable.
+   */
+  async getFirmClient(id: string): Promise<FirmClient> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(this.#firmClientUrl(id), { method: 'GET', headers });
+    const decoded = await decodeExpected(response, 200);
+    return firmClientFromJson(decoded);
+  }
+
+  /**
+   * `PUT /v1/firm/clients/{id}` — replace a client's WHOLE editable record;
+   * see {@link FirmClientDraft}. The status, `created_by` and the tax ID are
+   * kept. Needs `clients` at `add_edit`.
+   */
+  async updateFirmClient(id: string, draft: FirmClientDraft): Promise<FirmClient> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(this.#firmClientUrl(id), {
+      method: 'PUT',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify(firmClientDraftToJson(draft)),
+    });
+    const decoded = await decodeExpected(response, 200);
+    return firmClientFromJson(decoded);
+  }
+
+  /**
+   * `PUT /v1/firm/clients/{id}/prospect-stage` — place a PROSPECT in the
+   * funnel, or take them out of it with `null` (issue #355). A 409 means the
+   * client has been retained (they have a case, or a retained date); a 404
+   * that they are not in the caller's firm. Needs `clients: add_edit`.
+   */
+  async setFirmClientProspectStage(id: string, stage: ProspectStage | null): Promise<FirmClient> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#firmClientUrl(id)}/prospect-stage`, {
+      method: 'PUT',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prospect_stage: stage }),
+    });
+    const decoded = await decodeExpected(response, 200);
+    return firmClientFromJson(decoded);
+  }
+
+  /**
+   * `PUT /v1/firm/clients/{id}/status` — archive a client (`'archived'`) or
+   * bring one back (`'active'`). A status write, never a delete: there is no
+   * way to delete a client through this API (ADR 0022). Needs `clients` at
+   * `add_edit`.
+   */
+  async setFirmClientStatus(id: string, status: FirmClientStatus): Promise<FirmClient> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#firmClientUrl(id)}/status`, {
+      method: 'PUT',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    });
+    const decoded = await decodeExpected(response, 200);
+    return firmClientFromJson(decoded);
+  }
+
+  /**
+   * `GET /v1/firm/clients/{id}/cases` — the client's cases THAT THE CALLER
+   * MAY SEE, newest first, each with the role the client holds (ADR 0022).
+   * A case the caller is not linked to is simply absent — the response never
+   * says how many were left out. A prospect's list is empty.
+   *
+   * Needs `clients` and `cases`, each at `view_only`. A 404 means the client
+   * is not in the caller's firm or does not exist.
+   */
+  async listFirmClientCases(id: string): Promise<readonly FirmClientCase[]> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#firmClientUrl(id)}/cases`, {
+      method: 'GET',
+      headers,
+    });
+    const decoded = await decodeExpected(response, 200);
+    return requireArrayOf(decoded, 'cases', 'FirmClientCase', firmClientCaseFromJson);
+  }
+
+  /**
+   * `POST /v1/firm/clients/{survivorId}/merge` — fold `mergedId` INTO
+   * `survivorId` (ADR 0022). The survivor keeps its id; every case of the
+   * merged client — including ones the caller is not linked to — now names
+   * the survivor, the debtors' copied details unchanged; the merged client is
+   * archived with `merged_into`.
+   *
+   * Needs `clients` at `add_edit`. A 404 means the survivor is not in the
+   * caller's firm. Throws {@link ApiValidationException} on a 400 keyed
+   * `merged_client_id` (unknown client, or the same id twice), and a plain
+   * {@link ApiException} with `statusCode` **409** when either client is
+   * merged or archived, another merge involving either is in progress, or
+   * both are debtors on one case — its `message` says which. Nothing is
+   * written on any of these.
+   */
+  async mergeFirmClient(survivorId: string, mergedId: string): Promise<FirmClientMerge> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#firmClientUrl(survivorId)}/merge`, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ merged_client_id: mergedId }),
+    });
+    const decoded = await decodeExpected(response, 200);
+    return {
+      client: firmClientFromJson(requireObject(decoded, 'client')),
+      merged: firmClientFromJson(requireObject(decoded, 'merged')),
+    };
+  }
+
+  // -------------------------------------------------------------------------
+  // Events, the calendar and the feed (issue 14.6 / #358).
+  // -------------------------------------------------------------------------
+
+  /** `/v1/cases/{caseId}/events[/{id}]` or `/v1/firm/events[/{id}]`, encoded once. */
+  #eventsUrl(caseId: string | null, eventId?: string): string {
+    const base =
+      caseId === null
+        ? `${this.#baseUrl}/v1/firm/events`
+        : `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/events`;
+    return eventId === undefined ? base : `${base}/${encodeURIComponent(eventId)}`;
+  }
+
+  async #listEvents(caseId: string | null): Promise<readonly CalendarEvent[]> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(this.#eventsUrl(caseId), { method: 'GET', headers });
+    const decoded = await decodeExpected(response, 200);
+    return requireArrayOf(decoded, 'events', 'CalendarEvent', calendarEventFromJson);
+  }
+
+  async #addEvent(caseId: string | null, draft: CalendarEventDraft): Promise<CalendarEvent> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(this.#eventsUrl(caseId), {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify(calendarEventDraftToJson(draft)),
+    });
+    return calendarEventFromJson(await decodeExpected(response, 201));
+  }
+
+  async #updateEvent(
+    caseId: string | null,
+    eventId: string,
+    draft: CalendarEventDraft,
+  ): Promise<CalendarEvent> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(this.#eventsUrl(caseId, eventId), {
+      method: 'PUT',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify(calendarEventDraftToJson(draft)),
+    });
+    return calendarEventFromJson(await decodeExpected(response, 200));
+  }
+
+  async #dismissEvent(
+    caseId: string | null,
+    eventId: string,
+    dismissed: boolean,
+  ): Promise<CalendarEvent> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(this.#eventsUrl(caseId, eventId), {
+      method: 'PATCH',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dismissed }),
+    });
+    return calendarEventFromJson(await decodeExpected(response, 200));
+  }
+
+  async #removeEvent(caseId: string | null, eventId: string): Promise<void> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(this.#eventsUrl(caseId, eventId), {
+      method: 'DELETE',
+      headers,
+    });
+    await expectNoContent(response, 204);
+  }
+
+  /**
+   * `GET /v1/cases/{caseId}/events` — a case's events, hand-made and
+   * generated, dismissed included, in start order. Gated by `events`
+   * (`view_only`); a 404 means the case is unknown or not the caller's.
+   */
+  async listCaseEvents(caseId: string): Promise<readonly CalendarEvent[]> {
+    return this.#listEvents(caseId);
+  }
+
+  /** `POST /v1/cases/{caseId}/events` — add a hand-made event to a case. */
+  async addCaseEvent(caseId: string, draft: CalendarEventDraft): Promise<CalendarEvent> {
+    return this.#addEvent(caseId, draft);
+  }
+
+  /**
+   * `PUT /v1/cases/{caseId}/events/{id}` — replace a hand-made event whole.
+   * A generated deadline answers 400: change the case's dates instead.
+   */
+  async updateCaseEvent(
+    caseId: string,
+    eventId: string,
+    draft: CalendarEventDraft,
+  ): Promise<CalendarEvent> {
+    return this.#updateEvent(caseId, eventId, draft);
+  }
+
+  /**
+   * `PATCH /v1/cases/{caseId}/events/{id}` with `{"dismissed"}` — the one
+   * edit a generated deadline admits ("filed with the petition"), and it
+   * survives regeneration. Works on a hand-made event too.
+   */
+  async dismissCaseEvent(
+    caseId: string,
+    eventId: string,
+    dismissed: boolean,
+  ): Promise<CalendarEvent> {
+    return this.#dismissEvent(caseId, eventId, dismissed);
+  }
+
+  /** `DELETE /v1/cases/{caseId}/events/{id}` — a hand-made event only; a generated one is 400. */
+  async removeCaseEvent(caseId: string, eventId: string): Promise<void> {
+    return this.#removeEvent(caseId, eventId);
+  }
+
+  /** `GET /v1/firm/events` — the firm's own, case-less events (office events). */
+  async listFirmEvents(): Promise<readonly CalendarEvent[]> {
+    return this.#listEvents(null);
+  }
+
+  /** `POST /v1/firm/events` */
+  async addFirmEvent(draft: CalendarEventDraft): Promise<CalendarEvent> {
+    return this.#addEvent(null, draft);
+  }
+
+  /** `PUT /v1/firm/events/{id}` */
+  async updateFirmEvent(eventId: string, draft: CalendarEventDraft): Promise<CalendarEvent> {
+    return this.#updateEvent(null, eventId, draft);
+  }
+
+  /** `PATCH /v1/firm/events/{id}` with `{"dismissed"}`. */
+  async dismissFirmEvent(eventId: string, dismissed: boolean): Promise<CalendarEvent> {
+    return this.#dismissEvent(null, eventId, dismissed);
+  }
+
+  /** `DELETE /v1/firm/events/{id}` */
+  async removeFirmEvent(eventId: string): Promise<void> {
+    return this.#removeEvent(null, eventId);
+  }
+
+  /**
+   * `GET /v1/calendar?from=&to=[&attendee=][&case_id=]` — every event the
+   * caller may see that overlaps the window: the firm's own events plus
+   * those on cases the caller can open. The server applies the case access
+   * rule; a `caseId` the caller cannot see answers empty, never 404.
+   */
+  async getCalendar(options: CalendarWindowOptions): Promise<CalendarWindow> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(
+      `${this.#baseUrl}/v1/calendar?${calendarWindowQuery(options).toString()}`,
+      { method: 'GET', headers },
+    );
+    const decoded = await decodeExpected(response, 200);
+    return {
+      from: requireString(decoded, 'from'),
+      to: requireString(decoded, 'to'),
+      events: requireArrayOf(decoded, 'events', 'CalendarEvent', calendarEventFromJson),
+    };
+  }
+
+  /**
+   * `POST /v1/me/calendar-token` — mint (or rotate) the caller's ICS feed
+   * token. The token is returned ONCE; `feedUrl` is the absolute address a
+   * calendar application subscribes to, and the only way to read it again
+   * is to mint a new one, which retires this one.
+   */
+  async mintCalendarToken(): Promise<CalendarFeedToken> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#baseUrl}/v1/me/calendar-token`, {
+      method: 'POST',
+      headers,
+    });
+    const decoded = await decodeExpected(response, 201);
+    const feedPath = requireString(decoded, 'feedPath');
+    return {
+      token: requireString(decoded, 'token'),
+      feedPath,
+      feedUrl: `${this.#baseUrl}${feedPath}`,
+    };
+  }
+
+  /** `DELETE /v1/me/calendar-token` — revoke the feed; 404 when there is none. */
+  async revokeCalendarToken(): Promise<void> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#baseUrl}/v1/me/calendar-token`, {
+      method: 'DELETE',
+      headers,
+    });
+    await expectNoContent(response, 204);
+  }
+
+  /**
+   * `GET /v1/cases/{caseId}/status-history` — every lifecycle move of the
+   * case, oldest first (issue #355). A 404 is {@link getCase}'s 404.
+   */
+  async listCaseStatusHistory(caseId: string): Promise<readonly CaseStatusChange[]> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(
+      `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/status-history`,
+      { method: 'GET', headers },
+    );
+    const decoded = await decodeExpected(response, 200);
+    return requireArrayOf(decoded, 'history', 'CaseStatusChange', (element) =>
+      definedMembers<CaseStatusChange>({
+        changedAt: requireString(element, 'changedAt'),
+        changedBy: requireString(element, 'changedBy'),
+        fromStatus: requireCaseStatus(element, 'fromStatus'),
+        toStatus: requireCaseStatus(element, 'toStatus'),
+        filingId: optionalString(element, 'filingId'),
+      }),
+    );
+  }
+
+  /**
+   * `PUT /v1/cases/{caseId}/archived` — archive the case (`true`) or restore
+   * it to the working list (`false`). Idempotent; returns the {@link Case}
+   * with {@link Case.archivedAt} set or absent. Any status may be archived.
+   */
+  async setCaseArchived(caseId: string, archived: boolean): Promise<Case> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(
+      `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/archived`,
+      {
+        method: 'PUT',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ archived }),
+      },
+    );
+    const decoded = await decodeExpected(response, 200);
+    return caseFromJson(decoded);
+  }
+
+  /**
+   * `DELETE /v1/cases/{caseId}` — soft-delete a case (issue #355): from then
+   * on every read answers 404, and nothing is removed. A FIRM ADMIN's act
+   * (403 otherwise), and refused with a 409 on a case that has been filed —
+   * archive that instead.
+   */
+  async deleteCase(caseId: string): Promise<void> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}`, {
+      method: 'DELETE',
+      headers,
+    });
+    await expectNoContent(response, 204);
+  }
+
+  /**
+   * `POST /v1/cases/{caseId}/copy` — open a NEW case from this one's data
+   * (issue #355): its debtors, schedules and petition answers, each value's
+   * provenance naming the source in `copied_from_case_id`. Returns the new
+   * {@link Case} (201), opened at `intake`. A 409 means a client the source
+   * names is archived or merged, or its Debtor 1 has no client.
+   */
+  async copyCase(caseId: string): Promise<Case> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(
+      `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/copy`,
+      { method: 'POST', headers },
+    );
+    const decoded = await decodeExpected(response, 201);
+    return caseFromJson(decoded);
+  }
+
   /** `/v1/cases/{caseId}/assignees/{subject}`, each segment encoded once. */
   #assigneeUrl(caseId: string, subject: string): string {
     return `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/assignees/${encodeURIComponent(subject)}`;
@@ -1515,6 +2983,113 @@ export class InsolviaApiClient {
       headers,
     });
     await expectNoContent(response, 204);
+  }
+
+  /** `/v1/cases/{caseId}/tasks`, with the id encoded exactly once. */
+  #tasksUrl(caseId: string): string {
+    return `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/tasks`;
+  }
+
+  /** `/v1/cases/{caseId}/tasks/{taskId}`. */
+  #taskUrl(caseId: string, taskId: string): string {
+    return `${this.#tasksUrl(caseId)}/${encodeURIComponent(taskId)}`;
+  }
+
+  /**
+   * `POST /v1/cases/{caseId}/tasks` — add one task to a case (issue #356 /
+   * 14.4). Only {@link CreateTaskRequest.subject} is required.
+   *
+   * Throws {@link ApiValidationException} on a 400 — a missing `subject`, or
+   * an `assigneeSubject` naming somebody outside the caller's firm (checked
+   * against the same roster {@link listFirmUsers} reads). A plain
+   * {@link ApiException} (404) when the case is unknown or not the caller's.
+   */
+  async createTask(caseId: string, request: CreateTaskRequest): Promise<Task> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(this.#tasksUrl(caseId), {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify(createTaskRequestToJson(request)),
+    });
+    const decoded = await decodeExpected(response, 201);
+    return taskFromJson(decoded);
+  }
+
+  /**
+   * `GET /v1/cases/{caseId}/tasks` — every task of one case, in the order
+   * they were added (a schedule's own order, not a worklist's — see
+   * {@link listMyTasks} for the one that sorts by due date).
+   */
+  async listTasks(caseId: string): Promise<readonly Task[]> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(this.#tasksUrl(caseId), { method: 'GET', headers });
+    const decoded = await decodeExpected(response, 200);
+    return requireArrayOf(decoded, 'tasks', 'Task', taskFromJson);
+  }
+
+  /** `GET /v1/cases/{caseId}/tasks/{taskId}` — one task. 404 if it, its case, or the case's firm is not the caller's. */
+  async getTask(caseId: string, taskId: string): Promise<Task> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(this.#taskUrl(caseId, taskId), {
+      method: 'GET',
+      headers,
+    });
+    const decoded = await decodeExpected(response, 200);
+    return taskFromJson(decoded);
+  }
+
+  /**
+   * `PATCH /v1/cases/{caseId}/tasks/{taskId}` — edit, reassign, complete or
+   * reopen a task; see {@link UpdateTaskRequest} for the three-state rule a
+   * `null` vs. an omitted key follows.
+   *
+   * Throws {@link ApiValidationException} on a 400 — an empty request body,
+   * or `assigneeSubject` naming somebody outside the caller's firm.
+   */
+  async updateTask(caseId: string, taskId: string, request: UpdateTaskRequest): Promise<Task> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(this.#taskUrl(caseId, taskId), {
+      method: 'PATCH',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify(updateTaskRequestToJson(request)),
+    });
+    const decoded = await decodeExpected(response, 200);
+    return taskFromJson(decoded);
+  }
+
+  /** `DELETE /v1/cases/{caseId}/tasks/{taskId}` — remove a task. Answers 204 with no body. */
+  async deleteTask(caseId: string, taskId: string): Promise<void> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(this.#taskUrl(caseId, taskId), {
+      method: 'DELETE',
+      headers,
+    });
+    await expectNoContent(response, 204);
+  }
+
+  /**
+   * `GET /v1/me/tasks` — every task across every case in the caller's firm
+   * they can reach, sorted soonest-due-first (undated tasks last).
+   *
+   * `options.scope` (default `'mine'`) narrows to tasks assigned to the
+   * caller; `'firm'` is the dashboard's firm-wide toggle — see
+   * {@link ListMyTasksOptions}.
+   *
+   * **Never leaks a task from a case outside the caller's reach, in either
+   * scope** — the server walks the same reachable-case listing `listCases`
+   * uses (`api/routes/tasks.py`'s module docstring owns the argument), so
+   * this is safe to call before the caller has opened any particular case.
+   */
+  async listMyTasks(options: ListMyTasksOptions = {}): Promise<readonly Task[]> {
+    const headers = await this.#protectedHeaders();
+    const query = listMyTasksQuery(options).toString();
+    const url = `${this.#baseUrl}/v1/me/tasks${query === '' ? '' : `?${query}`}`;
+    const response = await this.#fetch(url, {
+      method: 'GET',
+      headers,
+    });
+    const decoded = await decodeExpected(response, 200);
+    return requireArrayOf(decoded, 'tasks', 'Task', taskFromJson);
   }
 }
 
@@ -1677,6 +3252,19 @@ function errorFor(statusCode: number, body: string): ApiException {
       message: parsed.kind === 'object' ? envelopeMessage(parsed.value) : undefined,
     });
   }
+  if (
+    statusCode === 403 &&
+    parsed.kind === 'object' &&
+    parsed.value.error === 'ReauthenticationRequired'
+  ) {
+    // Status AND code: a 403 is otherwise a missing permission, and only this
+    // one has a remedy the app can start itself (a fresh sign-in).
+    return new ApiReauthenticationRequiredException({
+      statusCode,
+      body,
+      message: envelopeMessage(parsed.value),
+    });
+  }
   if (parsed.kind === 'object') {
     const fields = parsed.value.fields;
     if (typeof fields === 'object' && fields !== null && !Array.isArray(fields)) {
@@ -1833,13 +3421,39 @@ function requireCaseChapter(response: DecodedResponse, key: string): CaseChapter
   throw malformedField(response, key, 'one of 7 | 11 | 12 | 13');
 }
 
-/** A required field that must be one of the three valid case statuses. */
+/** A required field that must be one of {@link CASE_STATUSES}. */
 function requireCaseStatus(response: DecodedResponse, key: string): CaseStatus {
-  const value = response.json[key];
-  if (value === 'intake' || value === 'ready_to_file' || value === 'filed') {
-    return value;
-  }
-  throw malformedField(response, key, 'one of "intake" | "ready_to_file" | "filed"');
+  return requireChoice(response, key, CASE_STATUSES);
+}
+
+function requireQuestionnaireSectionId(
+  response: DecodedResponse,
+  key: string,
+): QuestionnaireSectionId {
+  return requireChoice(response, key, QUESTIONNAIRE_SECTION_IDS);
+}
+
+/** The staff view of the questionnaire config — every section. */
+function firmQuestionnaireFromJson(response: DecodedResponse): FirmQuestionnaire {
+  return {
+    isDefault: requireBoolean(response, 'isDefault'),
+    updatedAt: requireNullableString(response, 'updatedAt'),
+    updatedBy: requireNullableString(response, 'updatedBy'),
+    sections: requireArrayOf(
+      response,
+      'sections',
+      'FirmQuestionnaireSection',
+      (section): FirmQuestionnaireSection => ({
+        id: requireQuestionnaireSectionId(section, 'id'),
+        title: requireString(section, 'title'),
+        covers: requireString(section, 'covers'),
+        switchable: requireBoolean(section, 'switchable'),
+        enabled: requireBoolean(section, 'enabled'),
+        instructions: requireNullableString(section, 'instructions'),
+        defaultInstructions: requireString(section, 'defaultInstructions'),
+      }),
+    ),
+  };
 }
 
 function requireExemptionSet(response: DecodedResponse, key: string): ExemptionSet {
@@ -1873,17 +3487,58 @@ function caseFromJson(response: DecodedResponse): Case {
   const constantsSetId = optionalString(response, 'constantsSetId');
   // Likewise absent until the 106C election is made (issue #346).
   const exemptionSet = optionalExemptionSet(response, 'exemptionSet');
+  // The deadline anchors (issue 14.6 / #358): absent until recorded.
+  const filedAt = optionalString(response, 'filedAt');
+  const meeting341At = optionalString(response, 'meeting341At');
+  // The registry reference is absent — never null — on a case written before
+  // the court registry existed (issue #360); `district` is always there.
+  const court = optionalString(response, 'court');
+  const division = optionalString(response, 'division');
   return {
     id: requireString(response, 'id'),
     createdBy: requireString(response, 'createdBy'),
     chapter: requireCaseChapter(response, 'chapter'),
     district: requireString(response, 'district'),
+    ...(court === undefined ? {} : { court }),
+    ...(division === undefined ? {} : { division }),
     status: requireCaseStatus(response, 'status'),
     createdAt: requireString(response, 'createdAt'),
     updatedAt: requireString(response, 'updatedAt'),
     ...(formRevisions === undefined ? {} : { formRevisions }),
     ...(constantsSetId === undefined ? {} : { constantsSetId }),
     ...(exemptionSet === undefined ? {} : { exemptionSet }),
+    ...(filedAt === undefined ? {} : { filedAt }),
+    ...(meeting341At === undefined ? {} : { meeting341At }),
+    // The lifecycle (issue #355): each absent until set.
+    ...definedMembers<Partial<Case>>({
+      caseNumber: optionalString(response, 'caseNumber'),
+      judge: optionalString(response, 'judge'),
+      trustee: optionalString(response, 'trustee'),
+      officeFileNumber: optionalString(response, 'officeFileNumber'),
+      archivedAt: optionalString(response, 'archivedAt'),
+      archivedBy: optionalString(response, 'archivedBy'),
+    }),
+  };
+}
+
+function calendarEventFromJson(response: DecodedResponse): CalendarEvent {
+  return {
+    id: requireString(response, 'id'),
+    case_id: optionalString(response, 'case_id'),
+    title: requireString(response, 'title'),
+    description: optionalString(response, 'description'),
+    start: requireString(response, 'start'),
+    end: requireString(response, 'end'),
+    all_day: requireBoolean(response, 'all_day'),
+    location: optionalString(response, 'location'),
+    attendees: requireStringArray(response, 'attendees'),
+    generated: requireBoolean(response, 'generated'),
+    rule_id: optionalString(response, 'rule_id'),
+    rule_citation: optionalString(response, 'rule_citation'),
+    dismissed: requireBoolean(response, 'dismissed'),
+    created_by: requireString(response, 'created_by'),
+    created_at: requireString(response, 'created_at'),
+    updated_at: requireString(response, 'updated_at'),
   };
 }
 
@@ -1925,6 +3580,7 @@ function outputOptionsFromJson(response: DecodedResponse): OutputOptions {
     printDate: requireBoolean(response, 'printDate'),
     signaturePages: requireChoice(response, 'signaturePages', SIGNATURE_PAGES_MODES),
     signElectronically: requireBoolean(response, 'signElectronically'),
+    amendedOnly: requireBoolean(response, 'amendedOnly'),
     forms: optionalStringArray(response, 'forms'),
   });
 }
@@ -1986,8 +3642,8 @@ function requireCandidateStatus(response: DecodedResponse, key: string): Candida
 
 function candidateOriginFromJson(response: DecodedResponse): CandidateOrigin {
   const channel = requireString(response, 'channel');
-  if (channel !== 'extraction' && channel !== 'mcp') {
-    throw malformedField(response, 'channel', "'extraction' | 'mcp'");
+  if (channel !== 'extraction' && channel !== 'mcp' && channel !== 'client') {
+    throw malformedField(response, 'channel', "'extraction' | 'mcp' | 'client'");
   }
   return {
     channel,
@@ -2027,7 +3683,19 @@ function candidateFromJson(response: DecodedResponse): ExtractionCandidate {
   if (response.json.correctedPayload !== undefined) {
     correctedPayload = childObject(response, 'correctedPayload').json;
   }
+  // A client's portal answer (ADR 0023 PR 4) names its question and who
+  // the firm says gave it.
+  const question =
+    response.json.question === undefined
+      ? undefined
+      : candidateQuestionFromJson(childObject(response, 'question'));
+  const client =
+    response.json.client === undefined
+      ? undefined
+      : { displayName: requireString(childObject(response, 'client'), 'displayName') };
   return {
+    ...(question === undefined ? {} : { question }),
+    ...(client === undefined ? {} : { client }),
     id: requireString(response, 'id'),
     entityType: requireString(response, 'entityType'),
     status: requireCandidateStatus(response, 'status'),
@@ -2178,6 +3846,8 @@ function documentFromJson(response: DecodedResponse): Document {
     byteSize: requireNumber(response, 'byteSize'),
     uploadedAt: requireString(response, 'uploadedAt'),
     status: requireDocumentStatus(response, 'status'),
+    channel: requireChoice(response, 'channel', DOCUMENT_CHANNELS),
+    requestId: requireNullableString(response, 'requestId'),
   };
 }
 
@@ -2189,6 +3859,94 @@ function uploadFromJson(response: DecodedResponse): DocumentUpload {
     headers: requireStringRecord(response, 'headers'),
     expiresAt: requireString(response, 'expiresAt'),
   };
+}
+
+/** `documents.portal_document_json` — a client's own upload, no case id. */
+function portalUploadFromJson(response: DecodedResponse): PortalUpload {
+  return {
+    id: requireString(response, 'id'),
+    requestId: requireNullableString(response, 'requestId'),
+    fileName: requireString(response, 'fileName'),
+    contentType: requireString(response, 'contentType'),
+    byteSize: requireNumber(response, 'byteSize'),
+    uploadedAt: requireString(response, 'uploadedAt'),
+    status: requireDocumentStatus(response, 'status'),
+  };
+}
+
+function checklistItemFromJson(response: DecodedResponse): ChecklistItem {
+  return {
+    title: requireString(response, 'title'),
+    kind: requireString(response, 'kind'),
+    description: requireNullableString(response, 'description'),
+  };
+}
+
+/** `document_requests.checklist_json`. */
+function firmDocumentChecklistFromJson(response: DecodedResponse): FirmDocumentChecklist {
+  return {
+    isDefault: requireBoolean(response, 'isDefault'),
+    updatedAt: requireNullableString(response, 'updatedAt'),
+    updatedBy: requireNullableString(response, 'updatedBy'),
+    items: requireArrayOf(response, 'items', 'ChecklistItem', checklistItemFromJson),
+    defaultItems: requireArrayOf(response, 'defaultItems', 'ChecklistItem', checklistItemFromJson),
+  };
+}
+
+/** `document_requests.request_json`. */
+function documentRequestFromJson(response: DecodedResponse): DocumentRequest {
+  return {
+    id: requireString(response, 'id'),
+    caseId: requireString(response, 'caseId'),
+    title: requireString(response, 'title'),
+    kind: requireString(response, 'kind'),
+    description: requireNullableString(response, 'description'),
+    status: requireChoice(response, 'status', DOCUMENT_REQUEST_STATUSES),
+    documentIds: requireStringArray(response, 'documentIds'),
+    createdAt: requireString(response, 'createdAt'),
+    updatedAt: requireString(response, 'updatedAt'),
+    receivedAt: requireNullableString(response, 'receivedAt'),
+  };
+}
+
+function documentRequestProgressFromJson(response: DecodedResponse): DocumentRequestProgress {
+  return {
+    total: requireNumber(response, 'total'),
+    received: requireNumber(response, 'received'),
+    outstanding: requireNumber(response, 'outstanding'),
+    waived: requireNumber(response, 'waived'),
+  };
+}
+
+/** `document_requests.requests_json` — the requests and their progress. */
+function caseDocumentRequestsFromJson(response: DecodedResponse): CaseDocumentRequests {
+  return {
+    requests: requireArrayOf(response, 'requests', 'DocumentRequest', documentRequestFromJson),
+    progress: documentRequestProgressFromJson(childObject(response, 'progress')),
+  };
+}
+
+/**
+ * Decodes a {@link Task} — `task_json`'s exact shape. The optional string
+ * members are absent, never null, exactly when unset on the record; `done`
+ * and `overdue` are always present.
+ */
+function taskFromJson(response: DecodedResponse): Task {
+  return definedMembers<Task>({
+    id: requireString(response, 'id'),
+    caseId: requireString(response, 'caseId'),
+    subject: requireString(response, 'subject'),
+    description: optionalString(response, 'description'),
+    dueDate: optionalString(response, 'dueDate'),
+    assigneeSubject: optionalString(response, 'assigneeSubject'),
+    formSeries: optionalString(response, 'formSeries'),
+    done: requireBoolean(response, 'done'),
+    overdue: requireBoolean(response, 'overdue'),
+    completedAt: optionalString(response, 'completedAt'),
+    createdAt: requireString(response, 'createdAt'),
+    updatedAt: requireString(response, 'updatedAt'),
+    createdBy: requireString(response, 'createdBy'),
+  });
 }
 
 /** {@link requireCaseArray} for documents — per-element, checked, not cast. */
@@ -2257,6 +4015,271 @@ function caseFormFromJson(response: DecodedResponse): CaseForm {
     officialNumber: requireString(response, 'officialNumber'),
     metric: metric === undefined ? undefined : formMetricFromJson(metric),
     problems: requireArrayOf(response, 'problems', 'CaseProblem', caseProblemFromJson),
+    openTaskCount: requireNumber(response, 'openTaskCount'),
+  });
+}
+
+function requireOneOf<const T extends string>(
+  response: DecodedResponse,
+  key: string,
+  allowed: readonly T[],
+): T {
+  const value = requireString(response, key);
+  if (!(allowed as readonly string[]).includes(value)) {
+    throw malformedField(response, key, allowed.map((a) => `'${a}'`).join(' | '));
+  }
+  return value as T;
+}
+
+const FILING_SET_BASES: readonly FilingSetBasis[] = ['court', 'court_unverified', 'default'];
+
+function filingSetCheckFromJson(response: DecodedResponse): FilingSetCheck {
+  return {
+    check: requireOneOf(response, 'check', ['size', 'text_layer', 'page_size']),
+    outcome: requireOneOf(response, 'outcome', ['pass', 'fail', 'warn', 'unmeasured']),
+    message: requireString(response, 'message'),
+  };
+}
+
+function filingDocumentFromJson(response: DecodedResponse): FilingDocument {
+  return definedMembers<FilingDocument>({
+    key: requireString(response, 'key'),
+    title: requireString(response, 'title'),
+    fileName: requireString(response, 'fileName'),
+    source: requireOneOf(response, 'source', ['packet', 'outside']),
+    handling: requireOneOf(response, 'handling', ['file', 'own_event', 'restricted', 'not_filed']),
+    checks: requireArrayOf(response, 'checks', 'FilingSetCheck', filingSetCheckFromJson),
+    note: optionalString(response, 'note'),
+  });
+}
+
+function filingChecklistItemFromJson(response: DecodedResponse): FilingChecklistItem {
+  return definedMembers<FilingChecklistItem>({
+    id: requireString(response, 'id'),
+    status: requireOneOf(response, 'status', ['ready', 'missing', 'action', 'confirm']),
+    title: requireString(response, 'title'),
+    detail: requireString(response, 'detail'),
+    link: optionalString(response, 'link'),
+  });
+}
+
+/**
+ * Decodes a {@link FilingSet} — `filing_set_json` in
+ * services/api api/routes/filing_set.py: `court`, `court.divisionName` and
+ * `packet` absent, never null, when there is none.
+ */
+function filingSetFromJson(response: DecodedResponse): FilingSet {
+  const court = optionalObject(response, 'court');
+  const packet = optionalObject(response, 'packet');
+  return definedMembers<FilingSet>({
+    court:
+      court === undefined
+        ? undefined
+        : definedMembers<NonNullable<FilingSet['court']>>({
+            code: requireString(court, 'code'),
+            name: requireString(court, 'name'),
+            divisionName: optionalString(court, 'divisionName'),
+          }),
+    registryRelease: requireString(response, 'registryRelease'),
+    filingMethod: requireOneOf(response, 'filingMethod', ['hand_off']),
+    packet:
+      packet === undefined
+        ? undefined
+        : { id: requireString(packet, 'id'), createdAt: requireString(packet, 'createdAt') },
+    orderBasis: requireOneOf(response, 'orderBasis', FILING_SET_BASES),
+    namesBasis: requireOneOf(response, 'namesBasis', FILING_SET_BASES),
+    maxBytes: requireNumber(response, 'maxBytes'),
+    maxBytesBasis: requireOneOf(response, 'maxBytesBasis', FILING_SET_BASES),
+    documents: requireArrayOf(response, 'documents', 'FilingDocument', filingDocumentFromJson),
+    checklist: requireArrayOf(
+      response,
+      'checklist',
+      'FilingChecklistItem',
+      filingChecklistItemFromJson,
+    ),
+  });
+}
+
+function filingApprovalDocumentFromJson(response: DecodedResponse): FilingApprovalDocument {
+  const file = optionalObject(response, 'file');
+  return definedMembers<FilingApprovalDocument>({
+    position: requireNumber(response, 'position'),
+    key: requireString(response, 'key'),
+    title: requireString(response, 'title'),
+    fileName: requireString(response, 'fileName'),
+    source: requireOneOf(response, 'source', ['packet', 'outside']),
+    handling: requireOneOf(response, 'handling', ['file', 'own_event', 'restricted', 'not_filed']),
+    file:
+      file === undefined
+        ? undefined
+        : definedMembers<NonNullable<FilingApprovalDocument['file']>>({
+            byteSize: requireNumber(file, 'byteSize'),
+            pageCount: optionalNumber(file, 'pageCount'),
+            sha256: optionalString(file, 'sha256'),
+          }),
+    note: optionalString(response, 'note'),
+  });
+}
+
+function filingApprovalBasisFromJson(response: DecodedResponse): FilingApprovalBasis {
+  const court = optionalObject(response, 'court');
+  const packet = optionalObject(response, 'packet');
+  const fee = requireObject(response, 'fee');
+  return definedMembers<FilingApprovalBasis>({
+    scheme: requireString(response, 'scheme'),
+    digest: requireString(response, 'digest'),
+    ready: requireBoolean(response, 'ready'),
+    blockers: requireStringArray(response, 'blockers'),
+    court:
+      court === undefined
+        ? undefined
+        : definedMembers<NonNullable<FilingApprovalBasis['court']>>({
+            code: requireString(court, 'code'),
+            name: requireString(court, 'name'),
+            divisionName: optionalString(court, 'divisionName'),
+          }),
+    registryRelease: requireString(response, 'registryRelease'),
+    packet:
+      packet === undefined
+        ? undefined
+        : {
+            id: requireString(packet, 'id'),
+            createdAt: requireString(packet, 'createdAt'),
+            sha256: requireString(packet, 'sha256'),
+            byteSize: requireNumber(packet, 'byteSize'),
+          },
+    documents: requireArrayOf(
+      response,
+      'documents',
+      'FilingApprovalDocument',
+      filingApprovalDocumentFromJson,
+    ),
+    checklist: requireArrayOf(
+      response,
+      'checklist',
+      'FilingChecklistItem',
+      filingChecklistItemFromJson,
+    ),
+    fee: definedMembers<FilingApprovalBasis['fee']>({
+      handling: requireOneOf(fee, 'handling', ['hand_back_at_payment']),
+      verified: requireBoolean(fee, 'verified'),
+      detail: requireString(fee, 'detail'),
+      deadline: optionalString(fee, 'deadline'),
+    }),
+    signInMaxAgeSeconds: requireNumber(response, 'signInMaxAgeSeconds'),
+    approvalTtlSeconds: requireNumber(response, 'approvalTtlSeconds'),
+  });
+}
+
+function filingApprovalFromJson(response: DecodedResponse): FilingApproval {
+  const voidReason = optionalString(response, 'voidReason');
+  return definedMembers<FilingApproval>({
+    id: requireString(response, 'id'),
+    filingId: requireString(response, 'filingId'),
+    status: requireOneOf(response, 'status', ['pending', 'consumed', 'voided', 'expired']),
+    digest: requireString(response, 'digest'),
+    approvedBy: requireString(response, 'approvedBy'),
+    approvedAt: requireString(response, 'approvedAt'),
+    expiresAt: requireString(response, 'expiresAt'),
+    credentialId: requireString(response, 'credentialId'),
+    court: requireString(response, 'court'),
+    division: requireString(response, 'division'),
+    packetId: requireString(response, 'packetId'),
+    consumedAt: optionalString(response, 'consumedAt'),
+    voidedAt: optionalString(response, 'voidedAt'),
+    voidReason:
+      voidReason === undefined
+        ? undefined
+        : requireOneOf(response, 'voidReason', [
+            'changed',
+            'superseded',
+            'cancelled',
+            'enqueue_failed',
+          ]),
+  });
+}
+
+/**
+ * Decodes a {@link FilingApprovalView} — `_view` in services/api
+ * api/routes/filing_approval.py: `approval` absent, never null, when the
+ * case has none.
+ */
+function filingApprovalViewFromJson(response: DecodedResponse): FilingApprovalView {
+  const approval = optionalObject(response, 'approval');
+  const filing = optionalObject(response, 'filing');
+  return definedMembers<FilingApprovalView>({
+    basis: filingApprovalBasisFromJson(requireObject(response, 'basis')),
+    approval: approval === undefined ? undefined : filingApprovalFromJson(approval),
+    filing: filing === undefined ? undefined : filingRecordFromJson(filing),
+  });
+}
+
+const FILING_STATES = [
+  'claimed',
+  'signed_in',
+  'uploading',
+  'at_final_submit',
+  'submitted',
+  'filed',
+  'handed_back',
+  'outcome_unknown',
+] as const;
+
+/** Decodes a {@link FilingRecord} — `insolvia_core.filings.filing_json`. */
+function filingRecordFromJson(response: DecodedResponse): FilingRecord {
+  const handBack = optionalObject(response, 'handBack');
+  const confirmation = optionalObject(response, 'confirmation');
+  const resolution = optionalObject(response, 'resolution');
+  return definedMembers<FilingRecord>({
+    filingId: requireString(response, 'filingId'),
+    approvalId: requireString(response, 'approvalId'),
+    attorneyId: requireString(response, 'attorneyId'),
+    state: requireOneOf(response, 'state', FILING_STATES),
+    court: requireString(response, 'court'),
+    claimedAt: requireString(response, 'claimedAt'),
+    updatedAt: requireString(response, 'updatedAt'),
+    history: requireArrayOf(response, 'history', 'FilingStep', (step) => ({
+      state: requireOneOf(step, 'state', FILING_STATES),
+      at: requireString(step, 'at'),
+    })),
+    resolvable: requireBoolean(response, 'resolvable'),
+    driver: optionalString(response, 'driver'),
+    handBack:
+      handBack === undefined
+        ? undefined
+        : definedMembers<FilingHandBack>({
+            reason: requireString(handBack, 'reason'),
+            stage: requireString(handBack, 'stage'),
+            title: requireString(handBack, 'title'),
+            action: requireString(handBack, 'action'),
+            courtSaid: optionalString(handBack, 'courtSaid'),
+            link: requireString(handBack, 'link'),
+          }),
+    unknownReason: optionalString(response, 'unknownReason'),
+    confirmation:
+      confirmation === undefined
+        ? undefined
+        : definedMembers<FilingConfirmation>({
+            caseNumber: requireString(confirmation, 'caseNumber'),
+            filedAt: requireString(confirmation, 'filedAt'),
+            docketEntries: requireStringArray(confirmation, 'docketEntries'),
+            receiptNumber: optionalString(confirmation, 'receiptNumber'),
+            feeDue: optionalString(confirmation, 'feeDue'),
+          }),
+    receiptDocumentId: optionalString(response, 'receiptDocumentId'),
+    followUps: optionalStringArray(response, 'followUps'),
+    resolution:
+      resolution === undefined
+        ? undefined
+        : definedMembers<FilingResolution>({
+            outcome: requireOneOf(resolution, 'outcome', ['filed', 'not_filed']),
+            resolvedBy: requireString(resolution, 'resolvedBy'),
+            resolvedAt: requireString(resolution, 'resolvedAt'),
+            docketCheckedAt: requireString(resolution, 'docketCheckedAt'),
+            caseNumber: optionalString(resolution, 'caseNumber'),
+            filedAt: optionalString(resolution, 'filedAt'),
+            confirmationDocumentId: optionalString(resolution, 'confirmationDocumentId'),
+          }),
   });
 }
 
@@ -2354,6 +4377,15 @@ function optionalObject(response: DecodedResponse, key: string): DecodedResponse
   };
 }
 
+/** {@link optionalObject} for a member the server always sends. */
+function requireObject(response: DecodedResponse, key: string): DecodedResponse {
+  const nested = optionalObject(response, key);
+  if (nested === undefined) {
+    throw malformedField(response, key, 'object');
+  }
+  return nested;
+}
+
 /** A number field that may be absent. `NaN`/`Infinity` cannot appear in JSON. */
 function optionalNumber(response: DecodedResponse, key: string): number | undefined {
   const value = response.json[key];
@@ -2431,18 +4463,13 @@ function optionalPersonName(response: DecodedResponse, key: string): PersonName 
   });
 }
 
+/**
+ * A debtor's address, `county` included — B101 line 5's County box, which a
+ * debtor copied from a firm client carries (ADR 0022). Absent when the
+ * response has no such member, unlike {@link libraryAddress}'s `{}`.
+ */
 function optionalAddress(response: DecodedResponse, key: string): Address | undefined {
-  const nested = optionalObject(response, key);
-  if (nested === undefined) {
-    return undefined;
-  }
-  return definedMembers<Address>({
-    line1: optionalString(nested, 'line1'),
-    line2: optionalString(nested, 'line2'),
-    city: optionalString(nested, 'city'),
-    state: optionalString(nested, 'state'),
-    postal_code: optionalString(nested, 'postal_code'),
-  });
+  return optionalObject(response, key) === undefined ? undefined : libraryAddress(response, key);
 }
 
 function optionalVenue(response: DecodedResponse, key: string): Venue | undefined {
@@ -2537,6 +4564,9 @@ function requireProvenanceMap(response: DecodedResponse, key: string): Provenanc
       locator: optionalObject(entry, 'locator')?.json,
       extraction_id: optionalString(entry, 'extraction_id'),
       confidence: optionalNumber(entry, 'confidence'),
+      library_creditor_id: optionalString(entry, 'library_creditor_id'),
+      client_id: optionalString(entry, 'client_id'),
+      copied_from_case_id: optionalString(entry, 'copied_from_case_id'),
     });
   }
   return entries;
@@ -2550,6 +4580,8 @@ function debtorFromJson(response: DecodedResponse): Debtor {
     filing_role: requireChoice(response, 'filing_role', FILING_ROLES),
     created_at: requireString(response, 'created_at'),
     updated_at: requireString(response, 'updated_at'),
+    client_id: optionalString(response, 'client_id'),
+    differs_from_client: optionalStringArray(response, 'differs_from_client'),
     provenance: requireProvenanceMap(response, 'provenance'),
     name: optionalPersonName(response, 'name'),
     other_names_used: optionalOtherNames(response, 'other_names_used'),
@@ -2562,7 +4594,25 @@ function debtorFromJson(response: DecodedResponse): Debtor {
     venue: optionalVenue(response, 'venue'),
     credit_counseling: optionalCreditCounseling(response, 'credit_counseling'),
     signed_at: optionalString(response, 'signed_at'),
+    tax_id: optionalTaxId(response, 'tax_id'),
   });
+}
+
+/**
+ * The last-four view (issue 13.12 / #382). Both members are REQUIRED once
+ * the object is present — a `tax_id` without a `last_four` is not a view the
+ * API ever sends, and a decoder that tolerated it would hand the screen a
+ * kind with nothing to show.
+ */
+function optionalTaxId(response: DecodedResponse, key: string): TaxIdView | undefined {
+  const nested = optionalObject(response, key);
+  if (nested === undefined) {
+    return undefined;
+  }
+  return {
+    kind: requireChoice(nested, 'kind', TAX_ID_KINDS),
+    last_four: requireString(nested, 'last_four'),
+  };
 }
 
 /**
@@ -2607,13 +4657,14 @@ function requireDebtorArray(response: DecodedResponse, key: string): readonly De
 // to a checked read here.
 // ---------------------------------------------------------------------------
 
-/** The five members `entity_json` stamps; everything else is the body. */
+/** The six members `entity_json` stamps; everything else is the body. */
 const ENTITY_IDENTITY_KEYS: readonly string[] = [
   'id',
   'case_id',
   'created_at',
   'updated_at',
   'provenance',
+  'amended',
 ];
 
 /** Decodes a {@link CaseEntity} — `entity_json`'s exact shape. */
@@ -2631,6 +4682,7 @@ function caseEntityFromJson<C extends CaseCollection>(response: DecodedResponse)
     created_at: requireString(response, 'created_at'),
     updated_at: requireString(response, 'updated_at'),
     provenance: requireProvenanceMap(response, 'provenance'),
+    amended: requireBoolean(response, 'amended'),
   } as CaseEntity<C>;
 }
 
@@ -2652,6 +4704,42 @@ function requireCaseEntityArray<C extends CaseCollection>(
       body: response.body,
       json: item as JsonObject,
       path: `${key}[${index}]`,
+    });
+  });
+}
+
+/** Decodes a {@link Note} from a response body — `note_json`'s exact shape
+ * (`insolvia_core.notes`). No `provenance` member: a note carries none. */
+function noteFromJson(response: DecodedResponse): Note {
+  return definedMembers<Note>({
+    id: requireString(response, 'id'),
+    case_id: requireString(response, 'case_id'),
+    created_at: requireString(response, 'created_at'),
+    updated_at: requireString(response, 'updated_at'),
+    author_subject: requireString(response, 'author_subject'),
+    author_name: requireString(response, 'author_name'),
+    text: optionalString(response, 'text'),
+    form_series: optionalString(response, 'form_series'),
+  });
+}
+
+/** The `{"notes": [...]}` envelope's array, checked per element — the same
+ * shape as {@link requireDebtorArray}. */
+function requireNoteArray(response: DecodedResponse, key: string): readonly Note[] {
+  const value = response.json[key];
+  if (!Array.isArray(value)) {
+    throw malformedField(response, key, 'Note[]');
+  }
+  return value.map((item, index) => {
+    const label = `${key}[${index}]`;
+    if (typeof item !== 'object' || item === null || Array.isArray(item)) {
+      throw malformedField(response, label, 'object');
+    }
+    return noteFromJson({
+      statusCode: response.statusCode,
+      body: response.body,
+      json: item as JsonObject,
+      path: label,
     });
   });
 }
@@ -2996,10 +5084,24 @@ function medianComparisonFromJson(response: DecodedResponse): MedianComparison {
 
 function meansTestLineFromJson(response: DecodedResponse): MeansTestLine {
   return {
+    form: requireChoice(response, 'form', MEANS_TEST_FORMS),
     line: requireString(response, 'line'),
     label: requireString(response, 'label'),
     amount: requireString(response, 'amount'),
     source: requireString(response, 'source'),
+  };
+}
+
+function meansTestChapter13FromJson(response: DecodedResponse): MeansTestChapter13 {
+  return {
+    commitmentPeriodMonths: requireNumber(response, 'commitmentPeriodMonths'),
+    commitmentSource: requireString(response, 'commitmentSource'),
+    commitmentMaritalAdjustment: requireString(response, 'commitmentMaritalAdjustment'),
+    commitmentMonthlyIncome: requireString(response, 'commitmentMonthlyIncome'),
+    commitmentAnnualizedIncome: requireString(response, 'commitmentAnnualizedIncome'),
+    commitmentAnnualMedian: requireString(response, 'commitmentAnnualMedian'),
+    disposableIncomeRequired: requireBoolean(response, 'disposableIncomeRequired'),
+    monthlyDisposableIncome: requireNullableString(response, 'monthlyDisposableIncome'),
   };
 }
 
@@ -3040,9 +5142,11 @@ function caseMeansTestFromJson(response: DecodedResponse): CaseMeansTest {
   const exemptions = childObject(response, 'exemptions');
   const debt = childObject(response, 'debt');
   const comparison = nullableObject(response, 'comparison');
+  const chapter13 = nullableObject(response, 'chapter13');
   return {
     asOf: requireString(response, 'asOf'),
     asOfSource: requireString(response, 'asOfSource'),
+    chapter: requireNumber(response, 'chapter'),
     releaseIds: requireStringRecord(response, 'releaseIds'),
     jurisdiction: {
       state: requireNullableString(jurisdiction, 'state'),
@@ -3083,7 +5187,160 @@ function caseMeansTestFromJson(response: DecodedResponse): CaseMeansTest {
     outcome: requireChoice(response, 'outcome', MEANS_TEST_OUTCOMES),
     determinedBy: requireNullableString(response, 'determinedBy'),
     lines: requireArrayOf(response, 'lines', 'MeansTestLine', meansTestLineFromJson),
+    chapter13: chapter13 === null ? null : meansTestChapter13FromJson(chapter13),
     problems: requireStringArray(response, 'problems'),
+  };
+}
+
+// --- the Chapter 13 plan calculator (issue #366) -------------------------------
+// `plan_calculation_json` in services/api/src/insolvia_api/core/chapter13_plan.py
+// is the shape; money and rates are STRINGS, the `caseTotalsFromJson` reason.
+
+function planPayoutRowFromJson(response: DecodedResponse): PlanPayoutRow {
+  return {
+    key: requireString(response, 'key'),
+    label: requireString(response, 'label'),
+    claimId: requireNullableString(response, 'claimId'),
+    treatment: requireNullableString(response, 'treatment'),
+    allowed: requireString(response, 'allowed'),
+    monthlyPayment: requireNullableString(response, 'monthlyPayment'),
+    rate: requireNullableString(response, 'rate'),
+    principal: requireString(response, 'principal'),
+    interest: requireString(response, 'interest'),
+    payout: requireString(response, 'payout'),
+    firstMonth: requireNullableNumber(response, 'firstMonth'),
+    lastMonth: requireNullableNumber(response, 'lastMonth'),
+    monthsPaid: requireNumber(response, 'monthsPaid'),
+    unpaid: requireString(response, 'unpaid'),
+    source: requireString(response, 'source'),
+  };
+}
+
+function planClassFromJson(response: DecodedResponse): PlanClass {
+  return {
+    key: requireChoice(response, 'key', PLAN_CLASSES),
+    label: requireString(response, 'label'),
+    allowed: requireString(response, 'allowed'),
+    principal: requireString(response, 'principal'),
+    interest: requireString(response, 'interest'),
+    payout: requireString(response, 'payout'),
+    unpaid: requireString(response, 'unpaid'),
+    firstMonth: requireNullableNumber(response, 'firstMonth'),
+    lastMonth: requireNullableNumber(response, 'lastMonth'),
+    rows: requireArrayOf(response, 'rows', 'PlanPayoutRow', planPayoutRowFromJson),
+  };
+}
+
+function planPoolClaimFromJson(response: DecodedResponse): PlanPoolClaim {
+  return {
+    claimId: requireString(response, 'claimId'),
+    label: requireString(response, 'label'),
+    amount: requireString(response, 'amount'),
+    source: requireString(response, 'source'),
+  };
+}
+
+function sourcedAmountFromJson(response: DecodedResponse): SourcedAmount {
+  return {
+    amount: requireString(response, 'amount'),
+    source: requireString(response, 'source'),
+  };
+}
+
+function liquidationAssetFromJson(response: DecodedResponse): LiquidationAsset {
+  return {
+    assetId: requireString(response, 'assetId'),
+    description: requireNullableString(response, 'description'),
+    value: requireString(response, 'value'),
+    liens: requireString(response, 'liens'),
+    exempt: requireString(response, 'exempt'),
+    unexempt: requireString(response, 'unexempt'),
+  };
+}
+
+function planCalculationFromJson(response: DecodedResponse): PlanCalculation {
+  const commitment = childObject(response, 'commitmentPeriod');
+  const funding = childObject(response, 'funding');
+  const unsecured = childObject(response, 'unsecured');
+  const feasibility = childObject(response, 'feasibility');
+  const excess = nullableObject(feasibility, 'scheduleJExcess');
+  const liquidation = childObject(response, 'liquidation');
+  const best = childObject(response, 'bestInterests');
+  return {
+    planPresent: requireBoolean(response, 'planPresent'),
+    chapter: requireNumber(response, 'chapter'),
+    commitmentPeriod: {
+      months: requireNullableNumber(commitment, 'months'),
+      source: requireNullableString(commitment, 'source'),
+    },
+    funding: {
+      termMonths: requireNullableNumber(funding, 'termMonths'),
+      termSource: requireNullableString(funding, 'termSource'),
+      basePayment: requireNullableString(funding, 'basePayment'),
+      baseSource: requireNullableString(funding, 'baseSource'),
+      schedule: requireArrayOf(funding, 'schedule', 'PlanScheduledPayment', (row) => ({
+        month: requireNumber(row, 'month'),
+        payment: requireString(row, 'payment'),
+      })),
+      lumpSums: requireArrayOf(funding, 'lumpSums', 'PlanReceivedLumpSum', (row) => ({
+        month: requireNumber(row, 'month'),
+        amount: requireString(row, 'amount'),
+        description: requireNullableString(row, 'description'),
+      })),
+      total: requireString(funding, 'total'),
+    },
+    trusteePercentage: requireNullableString(response, 'trusteePercentage'),
+    classes: requireArrayOf(response, 'classes', 'PlanClass', planClassFromJson),
+    unsecured: {
+      pool: requireArrayOf(unsecured, 'pool', 'PlanPoolClaim', planPoolClaimFromJson),
+      poolTotal: requireString(unsecured, 'poolTotal'),
+      target: requireNullableString(unsecured, 'target'),
+      targetSource: requireNullableString(unsecured, 'targetSource'),
+      percentage: requireNullableString(unsecured, 'percentage'),
+    },
+    feasibility: {
+      feasible: requireNullableBoolean(feasibility, 'feasible'),
+      totalFunding: requireString(feasibility, 'totalFunding'),
+      totalDistributed: requireString(feasibility, 'totalDistributed'),
+      surplus: requireString(feasibility, 'surplus'),
+      shortfall: requireString(feasibility, 'shortfall'),
+      reasons: requireStringArray(feasibility, 'reasons'),
+      scheduleJExcess: excess === null ? null : sourcedAmountFromJson(excess),
+      exceedsScheduleJ: requireNullableBoolean(feasibility, 'exceedsScheduleJ'),
+    },
+    liquidation: {
+      assets: requireArrayOf(liquidation, 'assets', 'LiquidationAsset', liquidationAssetFromJson),
+      propertyTotal: requireString(liquidation, 'propertyTotal'),
+      liensTotal: requireString(liquidation, 'liensTotal'),
+      exemptionsTotal: requireString(liquidation, 'exemptionsTotal'),
+      unexemptTotal: requireString(liquidation, 'unexemptTotal'),
+      trusteeCommission: requireString(liquidation, 'trusteeCommission'),
+      trusteeCommissionRule: requireString(liquidation, 'trusteeCommissionRule'),
+      otherCosts: requireString(liquidation, 'otherCosts'),
+      otherCostsSource: requireString(liquidation, 'otherCostsSource'),
+      priorityTotal: requireString(liquidation, 'priorityTotal'),
+      available: requireString(liquidation, 'available'),
+      pool: requireArrayOf(liquidation, 'pool', 'PlanPoolClaim', planPoolClaimFromJson),
+      poolTotal: requireString(liquidation, 'poolTotal'),
+      percentage: requireNullableString(liquidation, 'percentage'),
+    },
+    bestInterests: {
+      planPercentage: requireNullableString(best, 'planPercentage'),
+      liquidationPercentage: requireNullableString(best, 'liquidationPercentage'),
+      planUnsecuredValue: requireString(best, 'planUnsecuredValue'),
+      presentValueRate: requireNullableString(best, 'presentValueRate'),
+      passes: requireNullableBoolean(best, 'passes'),
+      rule: requireString(best, 'rule'),
+    },
+    warnings: requireStringArray(response, 'warnings'),
+    problems: requireStringArray(response, 'problems'),
+  };
+}
+
+function planScenarioFromJson(response: DecodedResponse): PlanScenario {
+  return {
+    label: requireNullableString(response, 'label'),
+    calculation: planCalculationFromJson(childObject(response, 'calculation')),
   };
 }
 
@@ -3131,6 +5388,78 @@ function requireArrayOf<T>(
   });
 }
 
+const CLIENT_ROLES: readonly ClientRole[] = ['debtor_1', 'debtor_2'];
+const PORTAL_CLIENT_STATUSES: readonly PortalClientStatus[] = ['invited', 'active', 'revoked'];
+
+function requireClientRoles(response: DecodedResponse, key: string): readonly ClientRole[] {
+  const roles = requireStringArray(response, key);
+  if (roles.length === 0 || roles.some((role) => !CLIENT_ROLES.includes(role as ClientRole))) {
+    throw malformedField(response, key, 'ClientRole[] (non-empty)');
+  }
+  return roles as readonly ClientRole[];
+}
+
+function requireClientRole(response: DecodedResponse, key: string): ClientRole {
+  return requireChoice(response, key, CLIENT_ROLES);
+}
+
+function portalQuestionFromJson(response: DecodedResponse): PortalQuestion {
+  const help = optionalString(response, 'help');
+  return {
+    id: requireString(response, 'id'),
+    text: requireString(response, 'text'),
+    ...(help === undefined ? {} : { help }),
+    repeats: requireBoolean(response, 'repeats'),
+    perDebtor: requireBoolean(response, 'perDebtor'),
+    inputs: requireArrayOf(response, 'inputs', 'PortalQuestionInput', (input) => {
+      const inputHelp = optionalString(input, 'help');
+      return {
+        key: requireString(input, 'key'),
+        label: requireString(input, 'label'),
+        type: requireChoice(input, 'type', PORTAL_INPUT_TYPES),
+        required: requireBoolean(input, 'required'),
+        ...(inputHelp === undefined ? {} : { help: inputHelp }),
+      };
+    }),
+  };
+}
+
+function portalAnswerFromJson(response: DecodedResponse): PortalAnswer {
+  return {
+    id: requireString(response, 'id'),
+    questionId: requireString(response, 'questionId'),
+    sectionId: requireQuestionnaireSectionId(response, 'sectionId'),
+    filingRole: requireClientRole(response, 'filingRole'),
+    value: childObject(response, 'value').json,
+    status: requireCandidateStatus(response, 'status'),
+    createdAt: requireString(response, 'createdAt'),
+    updatedAt: requireString(response, 'updatedAt'),
+  };
+}
+
+function candidateQuestionFromJson(response: DecodedResponse): CandidateQuestion {
+  return {
+    id: requireString(response, 'id'),
+    sectionId: requireQuestionnaireSectionId(response, 'sectionId'),
+    sectionTitle: requireString(response, 'sectionTitle'),
+    text: requireString(response, 'text'),
+    filingRole: requireClientRole(response, 'filingRole'),
+  };
+}
+
+function portalClientFromJson(response: DecodedResponse): PortalClient {
+  return {
+    subject: requireString(response, 'subject'),
+    email: requireString(response, 'email'),
+    displayName: requireString(response, 'displayName'),
+    roles: requireClientRoles(response, 'roles'),
+    status: requireChoice(response, 'status', PORTAL_CLIENT_STATUSES),
+    invitedBy: requireString(response, 'invitedBy'),
+    createdAt: requireString(response, 'createdAt'),
+    updatedAt: requireString(response, 'updatedAt'),
+  };
+}
+
 const FIRM_ROLES: readonly FirmRole[] = ['attorney', 'paralegal', 'staff'];
 const PERMISSION_LEVELS: readonly PermissionLevel[] = ['hidden', 'view_only', 'add_edit'];
 const FIRM_USER_STATUSES = ['active', 'disabled'] as const;
@@ -3140,6 +5469,12 @@ const FIRM_FEATURES = [
   'documents',
   'extraction_review',
   'creditor_library',
+  'notes',
+  'events',
+  'tasks',
+  'clients',
+  'client_portal',
+  'electronic_filing',
   'firm_administration',
 ] as const;
 
@@ -3201,15 +5536,134 @@ function firmFromJson(response: DecodedResponse): Firm {
     status: status as FirmStatus,
     createdAt: requireString(response, 'createdAt'),
     updatedAt: requireString(response, 'updatedAt'),
+    ...firmDefaultsFromJson(response),
   };
 }
 
 /**
- * A snake_case address decoder, alongside `optionalAddress` above rather than
- * reusing it: `optionalAddress` deliberately omits `county` (no debtor
- * address surface needs it yet), and a library creditor's does — it is the
- * same `fields.Address` the debtor's residence address is, and the county is
- * there because it exists on that shared shape.
+ * The firm defaults every firm-shaped response carries (issue #360). The
+ * server sends explicit nulls; a key that is ABSENT also reads as null here,
+ * deliberately — these ride on the `/v1/me` firm block too, and a block from
+ * an API a step behind this client must not make sign-in fail over a
+ * default nobody has set. The dedicated contract tests pin the nulls.
+ */
+function firmDefaultsFromJson(response: DecodedResponse): {
+  defaultCourt: string | null;
+  defaultDivision: string | null;
+  defaultChapter: CaseChapter | null;
+  letterhead: Letterhead | null;
+} {
+  const chapter = response.json.defaultChapter;
+  if (
+    chapter !== undefined &&
+    chapter !== null &&
+    chapter !== 7 &&
+    chapter !== 11 &&
+    chapter !== 12 &&
+    chapter !== 13
+  ) {
+    throw malformedField(response, 'defaultChapter', 'one of 7 | 11 | 12 | 13 | null');
+  }
+  const letterhead = objectOrNone(response, 'letterhead');
+  return {
+    defaultCourt: requireNullableStringOrAbsent(response, 'defaultCourt'),
+    defaultDivision: requireNullableStringOrAbsent(response, 'defaultDivision'),
+    defaultChapter: (chapter as CaseChapter | null | undefined) ?? null,
+    letterhead:
+      letterhead === undefined
+        ? null
+        : definedMembers<Letterhead>({
+            name: optionalString(letterhead, 'name'),
+            address: libraryAddress(letterhead, 'address'),
+            phone: optionalString(letterhead, 'phone'),
+            email: optionalString(letterhead, 'email'),
+          }),
+  };
+}
+
+/**
+ * An object field the server sends as explicit `null` when unset, and which
+ * an older API may omit: `null` and absent both read as "none" here.
+ * `optionalObject` reads `null` as malformed (a missing OBJECT) and
+ * `nullableObject` reads absence as malformed — each the right strictness for
+ * its fields; the firm defaults, the signature block and a division's
+ * courthouse are the three whose contract is "object, null, or not yet sent".
+ */
+function objectOrNone(response: DecodedResponse, key: string): DecodedResponse | undefined {
+  return response.json[key] === null ? undefined : optionalObject(response, key);
+}
+
+/** A `signatureBlock` field: an object, `null`, or (tolerated) absent → `null`. */
+function nullableSignatureBlock(response: DecodedResponse, key: string): SignatureBlock | null {
+  const nested = objectOrNone(response, key);
+  if (nested === undefined) return null;
+  return definedMembers<SignatureBlock>({
+    bar_number: optionalString(nested, 'bar_number'),
+    bar_state: optionalString(nested, 'bar_state'),
+    firm_name: optionalString(nested, 'firm_name'),
+    address: libraryAddress(nested, 'address'),
+    phone: optionalString(nested, 'phone'),
+    email: optionalString(nested, 'email'),
+  });
+}
+
+function courtDistrictFromJson(response: DecodedResponse): CourtDistrict {
+  const caseUpload = optionalObject(response, 'caseUpload');
+  if (caseUpload === undefined) {
+    throw malformedField(response, 'caseUpload', 'object');
+  }
+  return {
+    code: requireString(response, 'code'),
+    courtId: requireNullableString(response, 'courtId'),
+    name: requireString(response, 'name'),
+    state: requireString(response, 'state'),
+    circuit: requireNumber(response, 'circuit'),
+    website: requireString(response, 'website'),
+    divisions: requireArrayOf(response, 'divisions', 'CourtDivision', courtDivisionFromJson),
+    caseUpload: {
+      status: requireString(caseUpload, 'status'),
+      verifiedAt: requireNullableString(caseUpload, 'verifiedAt'),
+    },
+  };
+}
+
+/** A string, `null`, or (tolerated) absent → `null`. See {@link firmDefaultsFromJson}. */
+function requireNullableStringOrAbsent(response: DecodedResponse, key: string): string | null {
+  const value = response.json[key];
+  if (value === undefined || value === null) return null;
+  return requireString(response, key);
+}
+
+function courtDivisionFromJson(response: DecodedResponse): CourtDivision {
+  const courthouse = objectOrNone(response, 'courthouse');
+  return {
+    code: requireString(response, 'code'),
+    name: requireString(response, 'name'),
+    officeCode: requireNullableString(response, 'officeCode'),
+    officeCodeVerified: requireBoolean(response, 'officeCodeVerified'),
+    courthouse:
+      courthouse === undefined
+        ? null
+        : {
+            name: requireString(courthouse, 'name'),
+            line1: requireString(courthouse, 'line1'),
+            line2: requireNullableString(courthouse, 'line2'),
+            city: requireString(courthouse, 'city'),
+            state: requireString(courthouse, 'state'),
+            postal_code: requireString(courthouse, 'postal_code'),
+          },
+    counties: requireArrayOf(response, 'counties', 'County', (county) => ({
+      name: requireString(county, 'name'),
+      fips: requireString(county, 'fips'),
+    })),
+  };
+}
+
+/**
+ * A snake_case address decoder, `county` included — it is the same
+ * `fields.Address` the debtor's residence address is, and the county is there
+ * because it exists on that shared shape. `{}` when absent;
+ * {@link optionalAddress} is the absent-means-undefined wrapper debtors use.
  */
 function libraryAddress(response: DecodedResponse, key: string): Address {
   const nested = optionalObject(response, key);
@@ -3235,6 +5689,40 @@ function libraryNoticePartyFromJson(response: DecodedResponse): NoticeParty {
   };
 }
 
+function filingCredentialFromJson(response: DecodedResponse): FilingCredential {
+  return {
+    id: requireString(response, 'id'),
+    login: requireString(response, 'login'),
+    courts: requireStringArray(response, 'courts'),
+    status: requireChoice(response, 'status', ['active'] as const),
+    created_at: requireString(response, 'created_at'),
+    updated_at: requireString(response, 'updated_at'),
+  };
+}
+
+function filingAuthorizationFromJson(response: DecodedResponse): FilingAuthorizationStatus {
+  const text = requireObject(response, 'text');
+  const signature = response.json.signature === null ? null : requireObject(response, 'signature');
+  return {
+    text: {
+      version: requireString(text, 'version'),
+      digest: requireString(text, 'digest'),
+      text: requireString(text, 'text'),
+    },
+    current_version: requireString(response, 'current_version'),
+    current: requireBoolean(response, 'current'),
+    signature:
+      signature === null
+        ? null
+        : {
+            id: requireString(signature, 'id'),
+            text_version: requireString(signature, 'text_version'),
+            text_digest: requireString(signature, 'text_digest'),
+            signed_at: requireString(signature, 'signed_at'),
+          },
+  };
+}
+
 function libraryCreditorFromJson(response: DecodedResponse): LibraryCreditor {
   const parties =
     response.json.additional_notice_parties === undefined
@@ -3257,6 +5745,57 @@ function libraryCreditorFromJson(response: DecodedResponse): LibraryCreditor {
   };
 }
 
+const FIRM_CLIENT_STATUSES: readonly FirmClientStatus[] = ['active', 'archived'];
+
+/** One entry of `GET /v1/firm/clients/{id}/cases`: the role, and the case in
+ * `GET /v1/cases/{id}`'s own shape. */
+function firmClientCaseFromJson(response: DecodedResponse): FirmClientCase {
+  const nested = optionalObject(response, 'case');
+  if (nested === undefined) {
+    throw malformedField(response, 'case', 'object');
+  }
+  return {
+    filing_role: requireChoice(response, 'filing_role', FILING_ROLES),
+    case: caseFromJson(nested),
+  };
+}
+
+/**
+ * `firm_client_json`'s exact shape. `name` is required (the server always
+ * sends it); the addresses use {@link libraryAddress}, `county` included.
+ */
+function firmClientFromJson(response: DecodedResponse): FirmClient {
+  const residence = optionalObject(response, 'residence_address');
+  const mailing = optionalObject(response, 'mailing_address');
+  const name = optionalPersonName(response, 'name');
+  if (name === undefined) {
+    throw malformedField(response, 'name', 'object');
+  }
+  return definedMembers<FirmClient>({
+    id: requireString(response, 'id'),
+    status: requireChoice(response, 'status', FIRM_CLIENT_STATUSES),
+    name,
+    other_names_used: optionalOtherNames(response, 'other_names_used'),
+    date_of_birth: optionalString(response, 'date_of_birth'),
+    residence_address:
+      residence === undefined ? undefined : libraryAddress(response, 'residence_address'),
+    mailing_address:
+      mailing === undefined ? undefined : libraryAddress(response, 'mailing_address'),
+    phone: optionalString(response, 'phone'),
+    mobile: optionalString(response, 'mobile'),
+    email: optionalString(response, 'email'),
+    lead_source: optionalString(response, 'lead_source'),
+    referred_by: optionalString(response, 'referred_by'),
+    first_retained_at: optionalString(response, 'first_retained_at'),
+    tax_id_last_four: optionalString(response, 'tax_id_last_four'),
+    merged_into: optionalString(response, 'merged_into'),
+    prospect_stage: optionalChoice(response, 'prospect_stage', PROSPECT_STAGES),
+    created_at: requireString(response, 'created_at'),
+    updated_at: requireString(response, 'updated_at'),
+    created_by: requireString(response, 'created_by'),
+  });
+}
+
 function firmUserFromJson(response: DecodedResponse): FirmUser {
   const status = response.json.status;
   if (typeof status !== 'string' || !(FIRM_USER_STATUSES as readonly string[]).includes(status)) {
@@ -3275,6 +5814,7 @@ function firmUserFromJson(response: DecodedResponse): FirmUser {
     status: status as FirmUserStatus,
     createdAt: requireString(response, 'createdAt'),
     updatedAt: requireString(response, 'updatedAt'),
+    signatureBlock: nullableSignatureBlock(response, 'signatureBlock'),
   };
 }
 
@@ -3300,6 +5840,8 @@ function optionalFirmMembership(response: DecodedResponse): FirmMembership | und
     isAdmin: requireBoolean(nested, 'isAdmin'),
     accessAllCases: requireBoolean(nested, 'accessAllCases'),
     permissions: requirePermissions(nested, 'permissions'),
+    ...firmDefaultsFromJson(nested),
+    signatureBlock: nullableSignatureBlock(nested, 'signatureBlock'),
   };
 }
 

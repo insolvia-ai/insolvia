@@ -272,6 +272,9 @@ export interface CaseOverrides {
   readonly status?: string;
   readonly chapter?: number;
   readonly district?: string;
+  /** The registry reference (#360); the default case is in M.D. Fla., Tampa. */
+  readonly court?: string;
+  readonly division?: string;
 }
 
 /**
@@ -288,6 +291,8 @@ export function caseBody(caseId: string, overrides: CaseOverrides = {}): Record<
     createdBy: '00000000-0000-4000-8000-000000000001',
     chapter: overrides.chapter ?? 7,
     district: overrides.district ?? 'NDCA',
+    court: overrides.court ?? 'flmb',
+    division: overrides.division ?? 'tampa',
     status: overrides.status ?? 'intake',
     createdAt: '2026-08-04T10:00:00.000000Z',
     updatedAt: '2026-08-04T10:00:00.000000Z',

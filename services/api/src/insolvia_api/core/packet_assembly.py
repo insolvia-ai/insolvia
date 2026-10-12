@@ -1,8 +1,9 @@
-"""Chapter 7 packet assembly — the completeness gate, the deterministic
-render, and the pipeline worker that runs both (issue #96).
+"""Packet assembly — the completeness gate, the deterministic render, and
+the pipeline worker that runs both (issue #96; Chapter 13, issue #367).
 
 The milestone's definition of done: intake data in, a complete, filed-ready
-Chapter 7 packet out. This module is the end of that pipe, and it is a
+Chapter 7 packet out — and, since #367, the Chapter 13 packet with its plan
+(`CHAPTER_13_FORM_SERIES`). This module is the end of that pipe, and it is a
 PIPELINE WORKER, not an endpoint (ADR 0015/0018): rendering up to nineteen
 official PDFs takes longer than a request should, so the API accepts a
 `packet_assembly` job (api/routes/jobs.py) and this worker runs it.
@@ -30,7 +31,9 @@ Three stages, in a fixed order:
    (core/ports.PacketStore.create) — a packet whose pins were lost, or pins
    whose packet was, would each make "what did this filing use" unanswerable.
    Re-assembly re-pins; a FILED case refuses to assemble at all, because a
-   filed case never re-resolves.
+   filed case never re-resolves — except as an AMENDMENT (issue #370,
+   `OutputOptions.amended_only`), which prints only the changed schedules
+   and writes no pins to the case.
 
 A gate refusal is a SUCCESSFUL job whose result says `blocked` — the
 creditor-matrix route's rule ("both are the same successful act") carried
@@ -48,14 +51,15 @@ import io
 import logging
 import zipfile
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, Final
 
+from insolvia_core import courts
 from insolvia_core.access_log import record_access
 from insolvia_core.assets import ASSET, AssetBody
 from insolvia_core.case_entities import CaseEntity
-from insolvia_core.cases import Case, pin_case
+from insolvia_core.cases import Case, is_filed, pin_case
 from insolvia_core.claims import CLAIM, ClaimBody
 from insolvia_core.codebtors import (
     CODEBTOR,
@@ -98,17 +102,22 @@ from insolvia_core.petitions import (
     RelatedCaseBody,
     SoleProprietorshipBody,
 )
+from insolvia_core.plans import PLAN, PlanBody
 from insolvia_core.sofa import SOFA_ENTRY, SofaEntryBody
+from insolvia_core.tax_ids import read_tax_id
 
 from insolvia_api.core import dollar_amounts
+from insolvia_api.core.amendment_cover_sheet import render_amendment_cover_sheet
 from insolvia_api.core.creditor_matrix import (
     MATRIX_FILE_NAME,
+    format_for_court,
     generate_creditor_matrix,
 )
 from insolvia_api.core.form_fill import FormFillError, fill_form
 from insolvia_api.core.form_overlay import (
     DEFAULT_OUTPUT_OPTIONS,
     OutputOptions,
+    apply_amendment_options,
     apply_output_stamps,
     apply_signature_options,
     parse_output_options,
@@ -120,9 +129,11 @@ from insolvia_api.core.form_projections import (
     project,
 )
 from insolvia_api.core.form_projections.b122a2 import files_b122a2
+from insolvia_api.core.form_projections.b122c2 import files_b122c2
 from insolvia_api.core.form_templates import FormRelease, resolve_form
 from insolvia_api.core.jobs import Job, JobError
 from insolvia_api.core.packets import PACKET_CONTENT_TYPE, new_packet, packet_json
+from insolvia_api.core.pdf_measure import measure_parts
 
 if TYPE_CHECKING:
     from datetime import date
@@ -133,6 +144,8 @@ if TYPE_CHECKING:
         CaseStore,
         DebtorStore,
         DocumentBlobStore,
+        TaxIdCipher,
+        TaxIdStore,
     )
 
     from insolvia_api.core.ports import PacketStore
@@ -171,6 +184,68 @@ PACKET_FORM_SERIES: Final = (
     "form/b122a1",
     "form/b122a2",
 )
+
+# The individual Chapter 13 set, in filing order (issues #365, #367). It
+# differs from the Chapter 7 set in three places:
+#
+# - the B122C pair replaces the B122A pair (§ 1325(b) instead of
+#   § 707(b)): B122C-1 always files, B122C-2 only above the median
+#   (B122C-1 line 17);
+# - there is no B108. Bankruptcy Rule 1007(b)(2) asks for the Statement of
+#   Intention from "an individual debtor in a chapter 7 case", and the form
+#   says so in its title; on Chapter 13 what happens to each secured claim
+#   and each lease is the PLAN's to say (B113 Parts 3 and 6);
+# - Official Form 113, the plan, closes the set. Rule 3015(b) lets it file
+#   with the petition or within 14 days after, so it follows every
+#   statement it rests on — the schedules it treats, the means test whose
+#   commitment period sets its term. A district that has opted out of the
+#   national form under Rule 3015.1 is refused at the gate rather than
+#   handed the wrong form (`_local_plan_form_problem`).
+CHAPTER_13_FORM_SERIES: Final = (
+    "form/b101",
+    "form/b121",
+    "form/b106sum",
+    "form/b106ab",
+    "form/b106c",
+    "form/b106d",
+    "form/b106ef",
+    "form/b106g",
+    "form/b106h",
+    "form/b106i",
+    "form/b106j",
+    "form/b106j2",
+    "form/b106dec",
+    "form/b107",
+    "form/b2010",
+    "form/b2030",
+    "form/b122c1",
+    "form/b122c2",
+    "form/b113",
+)
+
+# Every series a case may pin — the union of the chapter sets, in the
+# Chapter 7 set's order with the Chapter 13 additions appended. `form_revisions`
+# records the WHOLE registry's revisions at assembly, so a case whose
+# chapter changes before re-assembly does not find a hole.
+ALL_FORM_SERIES: Final = (
+    *PACKET_FORM_SERIES,
+    *(series for series in CHAPTER_13_FORM_SERIES if series not in PACKET_FORM_SERIES),
+)
+
+
+def chapter_form_series(chapter: int) -> tuple[str, ...]:
+    """The unconditional form set a chapter files, before the per-case
+    conditions `packet_form_series` applies."""
+    return CHAPTER_13_FORM_SERIES if chapter == 13 else PACKET_FORM_SERIES
+
+
+def part_file_name(position: int, form: str) -> str:
+    """A form's name inside the packet zip — its position in the case's own
+    filed set (`packet_form_series`, 1-based) and its short form key. The
+    filing set (core/filing_set.py) uses the same name as its documented
+    default upload name, so the zip and the checklist cannot disagree."""
+    return f"{position:02d}-{form}.pdf"
+
 
 # The one fixed zip timestamp (1980-01-01, DOS epoch): determinism demands a
 # constant, and an obviously-synthetic constant beats a plausible-looking one.
@@ -212,10 +287,16 @@ class CaseData:
     """Everything assembly reads, as the stores hand it over — entities with
     their ids, in the collections' own listing order (creation order). The
     gate needs the wrappers (a problem names the record to fix); the
-    projections get the bodies via `to_case_file`."""
+    projections get the bodies via `to_case_file`.
+
+    `tax_ids` (filing role -> the full nine digits) is EMPTY as read — the
+    stores never hand over a full tax identifier — and is filled only by
+    `disclose_tax_ids`, the logged full-value read, on the one path that is
+    about to print B121. `to_case_file` carries it across verbatim."""
 
     case: Case
     debtors: tuple[Debtor, ...] = ()
+    tax_ids: Mapping[str, str] = field(default_factory=dict)
     petitions: tuple[CaseEntity[PetitionBody], ...] = ()
     prior_cases: tuple[CaseEntity[PriorCaseBody], ...] = ()
     related_cases: tuple[CaseEntity[RelatedCaseBody], ...] = ()
@@ -239,6 +320,7 @@ class CaseData:
     expenses: tuple[CaseEntity[ExpenseBody], ...] = ()
     dependents: tuple[CaseEntity[DependentBody], ...] = ()
     sofa_entries: tuple[CaseEntity[SofaEntryBody], ...] = ()
+    plans: tuple[CaseEntity[PlanBody], ...] = ()
 
 
 def read_case_data(
@@ -272,7 +354,50 @@ def read_case_data(
         expenses=entity_store.list_for_case(case.id, EXPENSE),
         dependents=entity_store.list_for_case(case.id, DEPENDENT),
         sofa_entries=entity_store.list_for_case(case.id, SOFA_ENTRY),
+        plans=entity_store.list_for_case(case.id, PLAN),
     )
+
+
+def disclose_tax_ids(
+    data: CaseData,
+    *,
+    principal: str,
+    purpose: str,
+    tax_id_store: TaxIdStore,
+    tax_id_cipher: TaxIdCipher,
+    access_log: AccessLog,
+) -> CaseData:
+    """The logged full-value read, for every debtor of the case that carries
+    a tax id — ONE `taxid.read` row per debtor, naming `principal` and
+    `purpose` (insolvia_core.tax_ids.read_tax_id) — returning the data with
+    `tax_ids` filled so B121 can print.
+
+    Called by exactly three things, each about to print B121 or reproduce
+    a packet that did: `run_packet_assembly` (unless the requested subset
+    leaves B121 out), the single-form preview for `b121`, and the review
+    worker's byte-exact re-assembly (core/petition_review.py — which then
+    drops B121 from what the model sees). Never by a route that answers a
+    client with case data, and never by the forms-hub listing, which prints
+    nothing.
+    """
+    disclosed: dict[str, str] = {}
+    for debtor in data.debtors:
+        if debtor.tax_id is None:
+            continue
+        digits = read_tax_id(
+            debtor.tax_id,
+            firm_id=data.case.firm_id,
+            case_id=data.case.id,
+            filing_role=debtor.filing_role,
+            principal=principal,
+            purpose=purpose,
+            cipher=tax_id_cipher,
+            store=tax_id_store,
+            access_log=access_log,
+        )
+        if digits is not None:
+            disclosed[debtor.filing_role] = digits
+    return replace(data, tax_ids=disclosed)
 
 
 def to_case_file(data: CaseData) -> CaseFile:
@@ -285,6 +410,7 @@ def to_case_file(data: CaseData) -> CaseFile:
     return CaseFile(
         case=data.case,
         debtors=data.debtors,
+        tax_ids=data.tax_ids,
         petition=data.petitions[0].body if data.petitions else None,
         prior_cases=tuple(e.body for e in data.prior_cases),
         related_cases=tuple(e.body for e in data.related_cases),
@@ -308,6 +434,7 @@ def to_case_file(data: CaseData) -> CaseFile:
         expenses=tuple(e.body for e in data.expenses),
         dependents=tuple(e.body for e in data.dependents),
         sofa_entries=tuple(e.body for e in data.sofa_entries),
+        plans=tuple(e.body for e in data.plans),
     )
 
 
@@ -409,6 +536,31 @@ def _cardinality_problems(data: CaseData) -> list[PacketProblem]:
             )
         )
 
+    if data.case.chapter == 13:
+        # One plan per case, not key-enforced (insolvia_core/plans.py leaves
+        # the cardinality here, as means_test_input does): B113 prints ONE
+        # proposal, and a second record would be a second answer to it.
+        if not data.plans:
+            problems.append(
+                PacketProblem(
+                    source="plans",
+                    item_id=None,
+                    field="",
+                    message="The Chapter 13 plan has not been entered yet —"
+                    " Official Form 113 prints from it.",
+                )
+            )
+        for extra_plan in data.plans[1:]:
+            problems.append(
+                PacketProblem(
+                    source="plans",
+                    item_id=extra_plan.id,
+                    field="",
+                    message="A case has exactly one plan record — delete the"
+                    " duplicates before assembling.",
+                )
+            )
+
     for extra_input in data.means_test_inputs[1:]:
         problems.append(
             PacketProblem(
@@ -469,16 +621,43 @@ def _cardinality_problems(data: CaseData) -> list[PacketProblem]:
 
 
 def _statement_problems(data: CaseData) -> list[PacketProblem]:
-    """What B108 and B2030 need answered before they can print (issue #351).
+    """What B108 and B2030 need answered before they can print (issue #351)
+    — and, on a Chapter 13 case, what B113 Part 6 needs in B108's place
+    (issue #367).
 
     A B108 row without its intention box, or a B2030 without its amounts,
     is a signed statement with its one question blank — so each is a gate,
     named per record like every other problem. B121 and B2010 gate nothing:
-    the notice has no field, and the tax identifier B121 exists to print is
-    not storable yet (its projection says why), which is not a fix a
-    preparer can make from the intake screens.
+    the notice has no field, and B121's "you do not have a Social Security
+    number / an ITIN" boxes are not modelled, so a debtor without a stored
+    tax id cannot be told apart from one who has none to give — a blank
+    line 2 is that debtor's honest statement, not a defect this gate can
+    name (issue 13.12 / #382 stored the number; modelling the absence is
+    still open).
     """
     problems: list[PacketProblem] = []
+    if data.case.chapter == 13:
+        # No B108 on Chapter 13 (Rule 1007(b)(2) is Chapter 7's): each secured
+        # claim's fate is the plan's treatment instead, which the B113
+        # projection checks. A lease still needs its answer, for a harder
+        # reason — B113 Part 6.1 lists the ASSUMED contracts and leases and
+        # rejects every other one, so an unanswered lease would be rejected
+        # by silence.
+        for lease in data.contract_leases:
+            if lease.body.intention is None:
+                problems.append(
+                    PacketProblem(
+                        source="contract_leases",
+                        item_id=lease.id,
+                        field="intention",
+                        message="Say whether this contract or lease will be"
+                        " assumed or rejected — the Chapter 13 plan (B113"
+                        " Part 6) lists the assumed ones and rejects every"
+                        " other.",
+                    )
+                )
+        problems.extend(_attorney_disclosure_problems(data))
+        return problems
     for claim in data.claims:
         if claim.body.claim_class == "secured" and claim.body.intention is None:
             problems.append(
@@ -503,6 +682,14 @@ def _statement_problems(data: CaseData) -> list[PacketProblem]:
                     " prints one answer per listed lease.",
                 )
             )
+    problems.extend(_attorney_disclosure_problems(data))
+    return problems
+
+
+def _attorney_disclosure_problems(data: CaseData) -> list[PacketProblem]:
+    """B2030's answers — the attorney's Rule 2016(b) disclosure files on
+    either chapter."""
+    problems: list[PacketProblem] = []
     for professional in data.filing_professionals:
         if professional.body.role != "attorney":
             continue
@@ -526,30 +713,87 @@ def _statement_problems(data: CaseData) -> list[PacketProblem]:
     return problems
 
 
-def completeness_problems(data: CaseData) -> tuple[PacketProblem, ...]:
+def _local_plan_form_problem(case: Case) -> PacketProblem | None:
+    """A Chapter 13 case in a district that has opted out of Official Form
+    113 (Rule 3015.1) — refused, naming the district's form, rather than
+    handed a national plan the court's rules say not to file.
+
+    The court registry owns the fact (`CourtDistrict.chapter_13_plan`,
+    issue #367). Only a VERIFIED `local` answer refuses: an unverified one
+    ("we have not read the page") and a case written before the registry
+    (`case.court` None) both take the national form, which is what Rule
+    3015(c) makes the default. The district's own plan forms are data to
+    add, one district at a time; until one is modelled, its cases stop
+    here."""
+    if case.court is None:
+        return None
+    district = courts.district(case.court)
+    if district is None:
+        return None
+    fact = district.chapter_13_plan
+    if not fact.verified or fact.value is None or fact.value.form != "local":
+        return None
+    title = fact.value.title or "its own local plan form"
+    return PacketProblem(
+        source="case",
+        item_id=None,
+        field="court",
+        message=f"The {district.name} requires {title} in place of Official"
+        " Form 113 (Bankruptcy Rule 3015.1), and that form is not prepared"
+        " here yet — the Chapter 13 plan for this court has to be prepared"
+        " outside Insolvia.",
+    )
+
+
+def completeness_problems(
+    data: CaseData, *, options: OutputOptions = DEFAULT_OUTPUT_OPTIONS
+) -> tuple[PacketProblem, ...]:
     """Every structural reason the case cannot assemble, before a single
     projection runs. Deterministic order: case, debtors, cardinality,
     references, the statements' own answers — so the same case always
-    reports the same list."""
+    reports the same list.
+
+    `options` (issue #370) is read for exactly one thing: `amended_only`
+    lifts the filed-case refusal below. Every OTHER caller — `forms_hub.py`'s
+    listing among them — passes nothing and gets exactly today's behaviour:
+    a filed case still blocks every ordinary re-assembly.
+    """
     problems: list[PacketProblem] = []
-    if data.case.chapter != 7:
+    if data.case.chapter not in (7, 13):
         problems.append(
             PacketProblem(
                 source="case",
                 item_id=None,
                 field="chapter",
                 message=f"This is a Chapter {data.case.chapter} case — only"
-                " the Chapter 7 packet can be assembled today.",
+                " the individual Chapter 7 and Chapter 13 packets can be"
+                " assembled today.",
             )
         )
-    if data.case.status == "filed":
+    if data.case.chapter == 13:
+        local_plan = _local_plan_form_problem(data.case)
+        if local_plan is not None:
+            problems.append(local_plan)
+    if is_filed(data.case.status) and not options.amended_only:
         problems.append(
             PacketProblem(
                 source="case",
                 item_id=None,
                 field="status",
                 message="This case is filed. A filed case's packet is pinned"
-                " to the data that produced it and is never re-assembled.",
+                " to the data that produced it and is never re-assembled."
+                " To change a filed schedule, mark the changed items amended"
+                " and assemble with amendedOnly instead.",
+            )
+        )
+    if options.amended_only and not is_filed(data.case.status):
+        problems.append(
+            PacketProblem(
+                source="case",
+                item_id=None,
+                field="status",
+                message="amendedOnly renders an amendment to a FILED case —"
+                " this case has not been filed yet.",
             )
         )
     if not any(debtor.filing_role == "debtor_1" for debtor in data.debtors):
@@ -576,20 +820,27 @@ def packet_form_series(data: CaseData) -> tuple[str, ...]:
     nothing to say is filed at all", and an all-blank J-2 in front of a clerk
     is a question, not a filing. B122A-2 files only when the debtor is not
     determinately below the median (B122A-1 line 14; `files_b122a2` argues
-    the indeterminate case). B108 files only when it has a row — a secured
-    claim, or a lease flagged for it — because § 521(a)(2) asks for it only
-    then; B2030 only when an attorney signs, because it is the attorney's
-    own disclosure. Everything else is unconditional for an individual
-    Chapter 7.
+    the indeterminate case), and B122C-2 likewise on a Chapter 13 case
+    (B122C-1 line 17; `files_b122c2`). B108 files only when it has a row —
+    a secured claim, or a lease flagged for it — because § 521(a)(2) asks
+    for it only then (and never on Chapter 13, whose set has no B108);
+    B2030 only when an attorney signs, because it is the attorney's own
+    disclosure. Everything else — the Chapter 13 plan, B113, among it — is
+    unconditional for an individual filing of the case's chapter
+    (`chapter_form_series`).
     """
     has_separate = any(
         e.body.which_household == "debtor_2_separate" for e in data.households
     )
+    base = chapter_form_series(data.case.chapter)
+    case_file = to_case_file(data)
     skipped = set()
     if not has_separate:
         skipped.add("form/b106j2")
-    if not files_b122a2(to_case_file(data)):
+    if "form/b122a2" in base and not files_b122a2(case_file):
         skipped.add("form/b122a2")
+    if "form/b122c2" in base and not files_b122c2(case_file):
+        skipped.add("form/b122c2")
     has_statement_row = any(
         e.body.claim_class == "secured" for e in data.claims
     ) or any(e.body.list_on_statement_of_intention for e in data.contract_leases)
@@ -597,7 +848,180 @@ def packet_form_series(data: CaseData) -> tuple[str, ...]:
         skipped.add("form/b108")
     if not any(e.body.role == "attorney" for e in data.filing_professionals):
         skipped.add("form/b2030")
-    return tuple(series for series in PACKET_FORM_SERIES if series not in skipped)
+    return tuple(series for series in base if series not in skipped)
+
+
+# ── Amendments (issue #370) ──────────────────────────────────────────────────
+#
+# `amended` (core/case_entities.py's generic entity attribute) marks a
+# SCHEDULE ITEM as changed since the case was filed. `OutputOptions.amended_
+# only` renders a packet of exactly the schedules that carry one, each
+# printing only ITS amended items, plus B106Sum/B106Dec (always, whenever
+# that set is non-empty) and a generated cover sheet
+# (core/amendment_cover_sheet.py) — never B101, B121, B108, B2010, B2030,
+# B122A-1/2 or B122C-1/2, none of which prints a per-item list an "amended"
+# flag could narrow. Nor B113 on a Chapter 13 case: a plan changed after
+# filing is modified under § 1329 (before confirmation, § 1323), a motion of
+# its own, not a Rule 1009 amendment — `plans.py` accepts and ignores the
+# flag for the same reason. So a Chapter 13 amendment prints exactly what a
+# Chapter 7 one does: the changed schedules, B106Sum/B106Dec, the cover.
+#
+# Every schedule below is fed by exactly ONE amendable collection — the
+# thing that keeps `filtered_for_render` simple: narrowing that series'
+# own row list can never strand a CROSS-reference another series in the SAME
+# render needs, because each series gets its own per-series data view (see
+# `assemble`), and only that one series' own collection is ever narrowed in
+# it. A claim's creditor, an exemption's asset, a codebtor's claim — none of
+# those referenced collections is touched by another series' filter.
+AMENDABLE_SERIES: Final = (
+    "form/b106ab",
+    "form/b106c",
+    "form/b106d",
+    "form/b106ef",
+    "form/b106g",
+    "form/b106h",
+    "form/b106i",
+    "form/b106j",
+    "form/b106j2",
+    "form/b107",
+)
+
+# Re-rendered (their own "amended filing" caption ticked) whenever
+# `AMENDABLE_SERIES` produces a non-empty set — B106Sum copies every
+# schedule forward and B106Dec is the declaration about them, so an
+# amendment to any schedule makes both of these stale, filed or not.
+_ALWAYS_WITH_AMENDMENT: Final = ("form/b106sum", "form/b106dec")
+
+
+def _household_ids(data: CaseData, which: str) -> frozenset[str]:
+    return frozenset(e.id for e in data.households if e.body.which_household == which)
+
+
+def _series_has_amended_items(data: CaseData, series_id: str) -> bool:
+    """Whether ANY item feeding `series_id` is flagged amended — the test
+    `amended_series_ids` filters `AMENDABLE_SERIES` by. Unknown or
+    non-amendable series answer False rather than raising: a caller that
+    asks about, say, "form/b101" is asking a question with an honest "no",
+    not a programming error."""
+    if series_id == "form/b106ab":
+        return any(e.amended for e in data.assets)
+    if series_id == "form/b106c":
+        return any(e.amended for e in data.exemptions)
+    if series_id == "form/b106d":
+        return any(e.amended for e in data.claims if e.body.claim_class == "secured")
+    if series_id == "form/b106ef":
+        return any(
+            e.amended
+            for e in data.claims
+            if e.body.claim_class in ("priority_unsecured", "nonpriority_unsecured")
+        )
+    if series_id == "form/b106g":
+        return any(e.amended for e in data.contract_leases)
+    if series_id == "form/b106h":
+        return any(e.amended for e in data.codebtors)
+    if series_id == "form/b106i":
+        return any(e.amended for e in data.income_summaries)
+    if series_id in ("form/b106j", "form/b106j2"):
+        which = "main" if series_id == "form/b106j" else "debtor_2_separate"
+        household_ids = _household_ids(data, which)
+        return any(
+            e.amended for e in data.expenses if e.body.household_id in household_ids
+        )
+    if series_id == "form/b107":
+        return any(e.amended for e in data.sofa_entries)
+    return False
+
+
+def amended_series_ids(data: CaseData, series_ids: tuple[str, ...]) -> tuple[str, ...]:
+    """The subset of `series_ids` that both `AMENDABLE_SERIES` names and
+    carries at least one amended item — filing order preserved."""
+    return tuple(
+        series
+        for series in series_ids
+        if series in AMENDABLE_SERIES and _series_has_amended_items(data, series)
+    )
+
+
+def amendment_render_series(
+    data: CaseData, series_ids: tuple[str, ...]
+) -> tuple[str, ...]:
+    """Every series an amendedOnly render prints, in filing order: the
+    schedules carrying an amended item plus B106Sum/B106Dec — or nothing at
+    all when no schedule does, because a Summary and Declaration about an
+    unchanged set amend nothing. The ONE answer both packet assembly and the
+    forms hub's single-form preview read, so the two cannot disagree about
+    whether a form belongs to the amendment."""
+    amended = amended_series_ids(data, series_ids)
+    if not amended:
+        return ()
+    return tuple(
+        series
+        for series in series_ids
+        if series in amended or series in _ALWAYS_WITH_AMENDMENT
+    )
+
+
+def filtered_for_render(data: CaseData, series_id: str) -> CaseData:
+    """The render-only view of `data` for ONE series of an amendedOnly
+    packet: only THIS series' own printed-row collection narrows to its
+    amended items. Every other collection — including one this series
+    merely RESOLVES A REFERENCE into (a claim's creditor, an exemption's or
+    a secured claim's asset, a codebtor's claim or lease) — stays whole, so
+    a kept row's cross-reference always resolves regardless of whether the
+    referenced record is itself flagged amended. A series this module does
+    not narrow (B106Sum, B106Dec, and everything outside
+    `AMENDABLE_SERIES`) gets `data` back unchanged — it still summarises or
+    declares over the WHOLE case, exactly as it always has; only its
+    caption changes (`form_overlay.apply_amendment_options`).
+    """
+    if series_id == "form/b106ab":
+        return replace(data, assets=tuple(e for e in data.assets if e.amended))
+    if series_id == "form/b106c":
+        return replace(data, exemptions=tuple(e for e in data.exemptions if e.amended))
+    if series_id == "form/b106d":
+        return replace(
+            data,
+            claims=tuple(
+                e for e in data.claims if e.amended and e.body.claim_class == "secured"
+            ),
+        )
+    if series_id == "form/b106ef":
+        return replace(
+            data,
+            claims=tuple(
+                e
+                for e in data.claims
+                if e.amended
+                and e.body.claim_class
+                in ("priority_unsecured", "nonpriority_unsecured")
+            ),
+        )
+    if series_id == "form/b106g":
+        return replace(
+            data,
+            contract_leases=tuple(e for e in data.contract_leases if e.amended),
+        )
+    if series_id == "form/b106h":
+        return replace(data, codebtors=tuple(e for e in data.codebtors if e.amended))
+    # form/b106i is amendable but never narrowed: Schedule I is one income
+    # statement, not a list of items, so an amended income summary re-prints
+    # the whole schedule — it falls through to the whole-data return below.
+    if series_id in ("form/b106j", "form/b106j2"):
+        which = "main" if series_id == "form/b106j" else "debtor_2_separate"
+        household_ids = _household_ids(data, which)
+        return replace(
+            data,
+            expenses=tuple(
+                e
+                for e in data.expenses
+                if e.amended and e.body.household_id in household_ids
+            ),
+        )
+    if series_id == "form/b107":
+        return replace(
+            data, sofa_entries=tuple(e for e in data.sofa_entries if e.amended)
+        )
+    return data
 
 
 @dataclass(frozen=True)
@@ -647,10 +1071,19 @@ def assemble(
     selection changes what gets PRINTED, not what "complete" means, so a
     packet is exactly as provably complete when printing one form as when
     printing all of them.
-    """
-    problems = list(completeness_problems(data))
 
-    matrix = generate_creditor_matrix(data.creditors)
+    `options.amended_only` (issue #370) is the one exception to "runs over
+    the whole case regardless": each series still resolves and projects, but
+    against a PER-SERIES view of the data (`filtered_for_render`) that
+    narrows only that series' own printed row list to its amended items —
+    see that function's own docstring for why this is safe for
+    cross-references. It also lifts `completeness_problems`'s filed-case
+    refusal (passed straight through here) and adds one gate of its own:
+    nothing to amend is a problem, not a silent empty packet.
+    """
+    problems = list(completeness_problems(data, options=options))
+
+    matrix = generate_creditor_matrix(data.creditors, format_for_court(data.case.court))
     problems.extend(
         PacketProblem(
             source="creditors",
@@ -663,6 +1096,9 @@ def assemble(
 
     case_file = to_case_file(data)
     series_ids = packet_form_series(data)
+    amendment = (
+        amendment_render_series(data, series_ids) if options.amended_only else ()
+    )
     # Resolve every release first: the pins the case records are the packet's
     # identity, and resolution failures gate like any other problem.
     releases: dict[str, FormRelease] = {}
@@ -694,8 +1130,17 @@ def assemble(
 
     projected: dict[str, FieldValues] = {}
     for series_id, release in releases.items():
+        # Every OTHER series still projects the WHOLE case, unfiltered —
+        # `filtered_for_render` is a no-op for anything outside
+        # `AMENDABLE_SERIES` (B106Sum/B106Dec still summarise/declare over
+        # everything, exactly as they always have).
+        series_case_file = (
+            to_case_file(filtered_for_render(data, series_id))
+            if options.amended_only
+            else case_file
+        )
         try:
-            projected[series_id] = project(release, case_file)
+            projected[series_id] = project(release, series_case_file)
         except FormProjectionError as error:
             problems.extend(
                 PacketProblem(source=series_id, item_id=None, field="", message=message)
@@ -710,6 +1155,10 @@ def assemble(
     # key naming a form this case does not currently file (typo, or a stale
     # selection from before a household/median fact changed) is a problem
     # like any other, not a silent drop: the preparer picked it on purpose.
+    # `amendedOnly` narrows the same way, by a different rule — the two are
+    # refused together at the request-validation layer
+    # (`form_overlay.parse_output_options`), so only one of these branches
+    # ever applies.
     render_series_ids = series_ids
     if options.forms is not None:
         requested = {f"form/{key}" for key in options.forms}
@@ -726,9 +1175,34 @@ def assemble(
         if problems:
             return tuple(problems)
         render_series_ids = tuple(s for s in series_ids if s in requested)
+    elif options.amended_only:
+        if not amendment:
+            problems.append(
+                PacketProblem(
+                    source="case",
+                    item_id=None,
+                    field="",
+                    message="No schedule items are marked amended — mark at"
+                    " least one item amended before assembling an"
+                    " amendedOnly packet.",
+                )
+            )
+            return tuple(problems)
+        render_series_ids = amendment
 
     printed_at = printed_at if printed_at is not None else datetime.now(UTC)
     parts: list[tuple[str, bytes]] = []
+    if options.amended_only:
+        parts.append(
+            (
+                "00-amendment-cover.pdf",
+                render_amendment_cover_sheet(
+                    case_file,
+                    amended_releases=[releases[s] for s in amendment],
+                    generated_at=printed_at,
+                ),
+            )
+        )
     for position, series_id in enumerate(series_ids, start=1):
         if series_id not in render_series_ids:
             continue
@@ -739,6 +1213,11 @@ def assemble(
             case_file=case_file,
             options=options,
             today=as_of,
+        )
+        values = apply_amendment_options(
+            release,
+            values,
+            amended=options.amended_only and series_id in render_series_ids,
         )
         try:
             rendered = fill_form(release, values)
@@ -756,7 +1235,7 @@ def assemble(
             # mode (e.g. "only" on a form with no signature line) — it
             # simply contributes nothing to this print, not a problem.
             continue
-        parts.append((f"{position:02d}-{release.form}.pdf", stamped))
+        parts.append((part_file_name(position, release.form), stamped))
     if problems:
         return tuple(problems)
 
@@ -767,12 +1246,13 @@ def assemble(
     return AssembledPacket(
         parts=tuple(parts),
         constants_set_id=constants_release.release_id,
-        # The WHOLE set pins, including a J-2 this case does not file: the
-        # pin map records which revisions were in force for this assembly,
-        # and a household added before re-assembly must not find a hole.
+        # The WHOLE set pins, including a J-2 this case does not file and
+        # the other chapter's means-test pair: the pin map records which
+        # revisions were in force for this assembly, and a household added
+        # (or a chapter changed) before re-assembly must not find a hole.
         form_revisions={
             series_id: resolve_form(series_id, as_of).pin
-            for series_id in PACKET_FORM_SERIES
+            for series_id in ALL_FORM_SERIES
         },
         creditor_count=matrix.creditor_count,
         projections={series_id: projected[series_id] for series_id in series_ids},
@@ -807,6 +1287,20 @@ class PacketAssemblyDeps:
     packet_store: PacketStore
     blobs: DocumentBlobStore
     access_log: AccessLog
+    # B121's number (issue 13.12 / #382): the sealed items and the cipher
+    # that opens them, under the worker role's Decrypt-only grant.
+    tax_id_store: TaxIdStore
+    tax_id_cipher: TaxIdCipher
+
+
+def prints_b121(options: OutputOptions) -> bool:
+    """Whether this render will put B121 on paper — the only reason to
+    perform the full-value read. A subset that leaves it out projects B121
+    blank and never opens an envelope. An amendment never prints B121
+    (it is not an amendable schedule), so it never opens one either."""
+    if options.amended_only:
+        return False
+    return options.forms is None or "b121" in options.forms
 
 
 def run_packet_assembly(
@@ -859,6 +1353,17 @@ def run_packet_assembly(
         if job.options is not None
         else DEFAULT_OUTPUT_OPTIONS
     )
+    if prints_b121(options):
+        # The full tax identifier, for B121 alone — its own audit row per
+        # debtor, against the same preparer, beside the packet.assemble row.
+        data = disclose_tax_ids(
+            data,
+            principal=job.created_by,
+            purpose="b121",
+            tax_id_store=deps.tax_id_store,
+            tax_id_cipher=deps.tax_id_cipher,
+            access_log=deps.access_log,
+        )
     outcome = assemble(data, as_of=as_of, options=options, printed_at=printed_at)
 
     if not isinstance(outcome, AssembledPacket):
@@ -875,6 +1380,7 @@ def run_packet_assembly(
     content = packet_zip(outcome.parts)
     packet = new_packet(
         case_id=case.id,
+        chapter=case.chapter,
         job_id=job.id,
         byte_size=len(content),
         sha256=hashlib.sha256(content).hexdigest(),
@@ -883,6 +1389,9 @@ def run_packet_assembly(
         creditor_count=outcome.creditor_count,
         created_by=job.created_by,
         options=options,
+        # What each file measures, for the filing set's PDF checks (ADR
+        # 0024 build PR 3) — taken now because nothing reads the bytes back.
+        parts=measure_parts(outcome.parts),
     )
     # Bytes first, record second: an object with no record is invisible and
     # harmless (nothing lists the bucket); a record with no object would be a
@@ -892,13 +1401,28 @@ def run_packet_assembly(
         packet.storage_ref, content=content, content_type=PACKET_CONTENT_TYPE
     )
 
-    pinned = pin_case(
-        case,
-        form_revisions=outcome.form_revisions,
-        constants_set_id=outcome.constants_set_id,
+    # An amendedOnly run never re-pins the CASE (issue #370): the case's
+    # `form_revisions`/`constants_set_id` describe the ORIGINAL filing, and
+    # this amendment's own resolution — possibly years later, against
+    # today's current releases — belongs on the PACKET record alone
+    # (`outcome.form_revisions` above), never overwriting what the case says
+    # the filing used. `pinned_case=case` (unchanged) makes the transactional
+    # case write below a no-op overwrite, and `allow_filed=True` is the one
+    # thing that lets it proceed at all against a filed case.
+    pinned = (
+        case
+        if options.amended_only
+        else pin_case(
+            case,
+            form_revisions=outcome.form_revisions,
+            constants_set_id=outcome.constants_set_id,
+        )
     )
     stored = deps.packet_store.create(
-        packet, pinned_case=pinned, expected_updated_at=case.updated_at
+        packet,
+        pinned_case=pinned,
+        expected_updated_at=case.updated_at,
+        allow_filed=options.amended_only,
     )
     if not stored:
         # The case moved (edited, filed, deleted) between our read and this

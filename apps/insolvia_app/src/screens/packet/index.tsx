@@ -1,3 +1,4 @@
+import { isFiledStatus } from '@insolvia-ai/api-client';
 import type { Job, Packet } from '@insolvia-ai/api-client';
 import { Badge, Button } from '@insolvia-ai/design-system';
 import type { BadgeIntent } from '@insolvia-ai/design-system';
@@ -16,6 +17,9 @@ import {
 } from '@/components/output-options-panel';
 import { openDownload } from '@/screens/documents/browser';
 import { fontSizes, spacing, useTheme } from '@/theme';
+
+import { FilingApprovalPanel } from './filing-approval-panel';
+import { FilingSetPanel } from './filing-set-panel';
 
 /**
  * How often a running assembly is polled. Assembly takes seconds to a couple
@@ -199,6 +203,8 @@ function describeSource(source: string): string {
     expenses: 'Expenses',
     dependents: 'Dependents',
     codebtors: 'Codebtors',
+    contract_leases: 'Contracts and leases',
+    plans: 'Chapter 13 plan',
   };
   return labels[source] ?? source.replace(/_/g, ' ');
 }
@@ -216,6 +222,7 @@ function describePacketOptions(options: Packet['options']): string | null {
   if (options.signaturePages === 'omit') labels.push('Signature pages omitted');
   if (options.signElectronically) labels.push('/s/ signed');
   if (options.forms !== undefined) labels.push('Partial set');
+  if (options.amendedOnly) labels.push('Amendment');
   return labels.length > 0 ? labels.join(' · ') : null;
 }
 
@@ -227,8 +234,9 @@ function formatSize(bytes: number): string {
 }
 
 /**
- * `/cases/<id>/packet` — assemble and download the Chapter 7 filing packet
- * (issue #96).
+ * `/cases/<id>/packet` — assemble and download the case's filing packet
+ * (issue #96): the Chapter 7 set, or the Chapter 13 set with its plan
+ * (issue #367).
  *
  * The shape follows the pipeline it fronts (ADR 0018): "Assemble" accepts a
  * `packet_assembly` job and this screen POLLS the job's status — the client
@@ -273,6 +281,18 @@ export function FilingPacket({ caseId }: { readonly caseId: string }) {
   const [options, setOptions] = useState<OutputOptionsValue>(DEFAULT_OUTPUT_OPTIONS);
   const [formOptions, setFormOptions] = useState<readonly FormsSubsetOption[]>([]);
   const [selectedForms, setSelectedForms] = useState<readonly string[] | undefined>(undefined);
+  // Whether the case is filed (issue #370) — the one state in which an
+  // amendment can be assembled, and so the one state the panel offers it.
+  // Best-effort like the forms checklist: a failed read just leaves the
+  // toggle hidden, and the plain assemble path is unaffected.
+  const [caseFiled, setCaseFiled] = useState(false);
+  // The case's chapter (issue #367): a Chapter 13 case assembles its own set,
+  // with the plan. Chapter 7 until the case reads, which is what the screen
+  // said before a Chapter 13 packet could be assembled at all.
+  const [chapter, setChapter] = useState(7);
+  // Bumped on every successful assembly so the filing set re-reads the new
+  // packet's file checks (ADR 0024 PR 3).
+  const [filingSetKey, setFilingSetKey] = useState(0);
 
   const load = useCallback(async () => {
     try {
@@ -313,6 +333,24 @@ export function FilingPacket({ caseId }: { readonly caseId: string }) {
     void loadFormOptions();
   }, [loadFormOptions]);
 
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const result = await call((client) => client.getCase(caseId));
+        if (!cancelled && result.ok) {
+          setCaseFiled(isFiledStatus(result.value.status));
+          setChapter(result.value.chapter);
+        }
+      } catch {
+        // No amendment toggle this load.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [call, caseId]);
+
   const settle = useCallback(
     (job: Job) => {
       if (job.status === 'succeeded') {
@@ -324,6 +362,7 @@ export function FilingPacket({ caseId }: { readonly caseId: string }) {
         }
         setAssembly({ phase: 'idle' });
         setActivity('Packet assembled. It is ready to download below.');
+        setFilingSetKey((key) => key + 1);
         void load();
         return;
       }
@@ -380,9 +419,12 @@ export function FilingPacket({ caseId }: { readonly caseId: string }) {
     setActionError(null);
     setActivity('Assembling the filing packet…');
     try {
+      // An amendment picks its own forms (the API refuses a subset with
+      // it), and is only ever sent for a filed case.
+      const amending = caseFiled && options.amendedOnly;
       const outputOptions = {
-        ...outputOptionsRequestFrom(options),
-        ...(selectedForms === undefined ? {} : { forms: selectedForms }),
+        ...outputOptionsRequestFrom({ ...options, amendedOnly: amending }),
+        ...(selectedForms === undefined || amending ? {} : { forms: selectedForms }),
       };
       // Omitted entirely — not sent as `{}` — when nothing was asked for, so
       // the plain "Assemble packet" press still sends exactly `{kind}`, the
@@ -515,16 +557,16 @@ export function FilingPacket({ caseId }: { readonly caseId: string }) {
     <CaseColumn>
       <Heading level={1}>Filing packet</Heading>
       <Text style={[styles.body, muted]}>
-        Assembles the full individual Chapter 7 set — the petition, every schedule, the
-        declarations, the statement of financial affairs and the creditor matrix — into one download
-        of filed-ready PDFs. Assembly first checks the case is complete, and refuses with a list of
-        what to fix rather than producing a partial packet.
+        {`Assembles the full individual Chapter ${chapter} set — the petition, every schedule, the declarations, the statement of financial affairs${
+          chapter === 13 ? ', the Chapter 13 plan (Official Form 113)' : ''
+        } and the creditor matrix — into one download of filed-ready PDFs. Assembly first checks the case is complete, and refuses with a list of what to fix rather than producing a partial packet.`}
       </Text>
 
       <OutputOptionsPanel
         value={options}
         onChange={setOptions}
         disabled={assembly.phase === 'running'}
+        amendment={caseFiled}
         forms={
           formOptions.length > 0
             ? { options: formOptions, selected: selectedForms, onChange: setSelectedForms }
@@ -546,7 +588,7 @@ export function FilingPacket({ caseId }: { readonly caseId: string }) {
           size="lg"
           onPress={assemble}
           disabled={assembly.phase === 'running'}
-          aria-label="Assemble the Chapter 7 filing packet for this case"
+          aria-label={`Assemble the Chapter ${chapter} filing packet for this case`}
         >
           {assembly.phase === 'running' ? 'Assembling…' : 'Assemble packet'}
         </Button>
@@ -617,6 +659,10 @@ export function FilingPacket({ caseId }: { readonly caseId: string }) {
           {list.kind === 'loading' ? 'Loading…' : `${list.message} Reload the page to try again.`}
         </Text>
       )}
+
+      <FilingSetPanel caseId={caseId} reloadKey={filingSetKey} />
+
+      <FilingApprovalPanel caseId={caseId} reloadKey={filingSetKey} />
 
       <Heading level={2}>AI review</Heading>
       <Text style={[styles.body, muted]}>

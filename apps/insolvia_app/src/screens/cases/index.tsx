@@ -1,35 +1,19 @@
-import { ApiValidationException } from '@insolvia-ai/api-client';
-import type { Case, CaseChapter, FirmColleague } from '@insolvia-ai/api-client';
-import { Badge, Button, Field, Input, RadioGroup, Table } from '@insolvia-ai/design-system';
-import type { BadgeIntent } from '@insolvia-ai/design-system';
-import { Link } from 'expo-router';
+import { permits } from '@insolvia-ai/api-client';
+import type { Case, FirmColleague } from '@insolvia-ai/api-client';
+import { Badge, Button, Table, Toggle, ToggleGroup } from '@insolvia-ai/design-system';
+import { Link, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { useMembership } from '@/api/me';
 import { useApi } from '@/api/use-api';
 import { AppShell } from '@/components/app-shell';
+import { CASE_STATUS_INTENT, CASE_STATUS_LABEL } from '@/components/case-status';
 import { Heading } from '@/components/heading';
 import { fontSizes, spacing, useTheme } from '@/theme';
 
-const CHAPTERS: readonly { readonly value: CaseChapter; readonly label: string }[] = [
-  { value: 7, label: 'Chapter 7' },
-  { value: 13, label: 'Chapter 13' },
-  { value: 11, label: 'Chapter 11' },
-  { value: 12, label: 'Chapter 12' },
-];
-
-/** How a case's own status reads, rather than the wire's snake_case. */
-const STATUS_LABEL: Record<Case['status'], string> = {
-  intake: 'In intake',
-  ready_to_file: 'Ready to file',
-  filed: 'Filed',
-};
-
-const STATUS_INTENT: Record<Case['status'], BadgeIntent> = {
-  intake: 'neutral',
-  ready_to_file: 'success',
-  filed: 'primary',
-};
+/** Which list: the working list, or the archive (issue #355). */
+type CaseView = 'working' | 'archived';
 
 type ListState =
   | { readonly kind: 'loading' }
@@ -37,38 +21,36 @@ type ListState =
   | { readonly kind: 'error'; readonly message: string };
 
 /**
- * The case list, and the form that opens one — the screen that closes issue
- * 8.3's loop: sign in, `POST /v1/cases`, `GET /v1/cases`, a case on screen.
+ * `/cases` — the cases the caller may see, and the way to open another.
  *
- * Deliberately not the intake questionnaire. This creates the case *record* —
- * chapter and district — and nothing else; the multi-step questionnaire that
- * fills a case is 8.5, and building a thin version of it here would be
- * something 8.5 has to unpick.
+ * The form that opens a case used to live here (issue 8.3, then #411's
+ * minimal client picker). It moved to `/cases/new` when a case became
+ * something opened FOR A CLIENT (ADR 0022 / #354): a client's record and
+ * "Add client" start cases too, and a form reached from three places is a
+ * page, not a panel on one of them. "New case" is the way in from here.
  *
- * Everything visual is ours: {@link AppShell}, {@link Heading}, and the design
- * system's `Button`, `Field`, `Input` and `RadioGroup` leaves. Chapter stays a
- * radio group even though the package has shipped `Select` since 0.4.0: with
- * four options a radio group is the better control regardless — every option is
- * visible and reachable without opening anything.
+ * TWO VIEWS (issue #355): the working list, and the archive — the cases the
+ * firm has put away, which leave the default list and never the firm's
+ * records. The API holds the two apart (`listCases({ archived })`); a deleted
+ * case is in neither.
  */
 export function Cases() {
   const theme = useTheme();
+  const router = useRouter();
   const { call } = useApi();
+  const membership = useMembership();
 
+  const [view, setView] = useState<CaseView>('working');
   const [list, setList] = useState<ListState>({ kind: 'loading' });
   // Subject -> name, so `createdBy` renders as a colleague rather than a uuid.
   // Loaded once and separately from the cases: it fails independently, and a
   // directory this screen could not fetch should cost names, not the list.
   const [colleagues, setColleagues] = useState<readonly FirmColleague[]>([]);
-  const [chapter, setChapter] = useState<CaseChapter>(7);
-  const [district, setDistrict] = useState('');
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const [formError, setFormError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      const result = await call((client) => client.listCases({}));
+      setList({ kind: 'loading' });
+      const result = await call((client) => client.listCases({ archived: view === 'archived' }));
       if (result.ok) {
         setList({ kind: 'ready', cases: result.value.cases });
       }
@@ -77,7 +59,7 @@ export function Cases() {
     } catch {
       setList({ kind: 'error', message: 'Could not load your cases.' });
     }
-  }, [call]);
+  }, [call, view]);
 
   useEffect(() => {
     void load();
@@ -99,126 +81,42 @@ export function Cases() {
     void loadDirectory();
   }, [call]);
 
-  const submit = async () => {
-    setSubmitting(true);
-    setFieldErrors({});
-    setFormError(null);
-    try {
-      const result = await call((client) => client.createCase({ chapter, district }));
-      if (result.ok) {
-        setDistrict('');
-        await load();
-      }
-    } catch (cause) {
-      if (cause instanceof ApiValidationException) {
-        // The server is the source of truth for validation (ADR 0001), so its
-        // per-field messages are rendered as-is rather than restated here.
-        setFieldErrors(cause.fields);
-      } else {
-        setFormError('Could not open the case. Please try again.');
-      }
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
   const muted = { color: theme.colors.muted, fontFamily: theme.typography.body };
+  // A courtesy, never a control: hidden only when the membership is KNOWN not
+  // to permit it. `/cases/new` says so itself, and the API refuses regardless.
+  const mayOpen = membership == null || permits(membership.permissions.cases, 'add_edit');
 
   return (
     <AppShell>
       <Heading level={1}>Your cases</Heading>
 
-      {/* level={2}: the screen owns the one <h1>; a heading picked for size
-          rather than structure is what produces a `heading-order` failure. */}
-      <Heading level={2}>Open a case</Heading>
-
-      <View style={styles.form}>
-        {/*
-          RadioGroup.Item IS the 20dp circle — the package's own tests render it
-          self-closing. Putting the label inside it makes four 20dp circles each
-          try to contain a word, and they overlap into an unreadable pile. The
-          label is a SIBLING; the only thing that belongs inside the Item is the
-          Indicator dot.
-
-          Two consequences that have to be handled here rather than assumed:
-          `aria-label`, because a circle containing only a dot has no accessible
-          name; and `hitSlop`, because 20dp is far under the 44dp WCAG 2.5.5
-          target this app enforces — 12 on each side takes the tappable area to
-          44 without changing the visual.
-        */}
-        <RadioGroup.Root
-          aria-label="Chapter"
-          value={String(chapter)}
-          onValueChange={(next) => setChapter(Number(next) as CaseChapter)}
-          style={styles.chapters}
-        >
-          {CHAPTERS.map((option) => (
-            <View key={option.value} style={styles.chapterOption}>
-              <RadioGroup.Item value={String(option.value)} aria-label={option.label} hitSlop={12}>
-                <RadioGroup.Indicator />
-              </RadioGroup.Item>
-              <Text
-                style={[
-                  styles.chapterLabel,
-                  { color: theme.colors.ink, fontFamily: theme.typography.body },
-                ]}
-              >
-                {option.label}
-              </Text>
-            </View>
-          ))}
-        </RadioGroup.Root>
-        {fieldErrors.chapter ? (
-          <Text
-            aria-live="assertive"
-            style={[
-              styles.error,
-              { color: theme.colors.danger, fontFamily: theme.typography.body },
-            ]}
-          >
-            {fieldErrors.chapter}
-          </Text>
-        ) : null}
-
-        <Field.Root name="district" invalid={Boolean(fieldErrors.district)}>
-          <Field.Label>Filing district</Field.Label>
-          <Input
-            value={district}
-            onValueChange={setDistrict}
-            placeholder="e.g. NDCA"
-            autoCapitalize="characters"
-            autoCorrect={false}
-          />
-          <Field.Description>
-            The bankruptcy court district this case will be filed in.
-          </Field.Description>
-          {fieldErrors.district ? <Field.Error match>{fieldErrors.district}</Field.Error> : null}
-        </Field.Root>
-
+      {mayOpen ? (
         <View style={styles.actions}>
           {/* size="lg" (48dp): the package's md is 40dp, under the 44dp
               WCAG 2.5.5 target-size floor this app enforces. */}
-          <Button size="lg" onPress={submit} disabled={submitting}>
-            {submitting ? 'Opening…' : 'Open case'}
+          <Button size="lg" onPress={() => router.push('/cases/new')}>
+            New case
           </Button>
         </View>
+      ) : null}
 
-        {formError === null ? null : (
-          <Text
-            aria-live="assertive"
-            style={[
-              styles.error,
-              { color: theme.colors.danger, fontFamily: theme.typography.body },
-            ]}
-          >
-            {formError}
-          </Text>
-        )}
-      </View>
+      <ToggleGroup.Root
+        aria-label="Show cases"
+        value={[view]}
+        // Single-select, and never empty: pressing the pressed one again
+        // reports `[]`, which keeps the current choice.
+        onValueChange={(next) => {
+          const picked = next[0] as CaseView | undefined;
+          if (picked !== undefined) setView(picked);
+        }}
+        style={styles.toggles}
+      >
+        <Toggle value="working">Working</Toggle>
+        <Toggle value="archived">Archived</Toggle>
+      </ToggleGroup.Root>
 
-      <Heading level={2}>Existing cases</Heading>
       {list.kind === 'ready' ? (
-        <CaseList cases={list.cases} colleagues={colleagues} />
+        <CaseList cases={list.cases} colleagues={colleagues} archived={view === 'archived'} />
       ) : (
         <Text
           aria-live={list.kind === 'error' ? 'assertive' : 'polite'}
@@ -234,9 +132,11 @@ export function Cases() {
 function CaseList({
   cases,
   colleagues,
+  archived,
 }: {
   cases: readonly Case[];
   colleagues: readonly FirmColleague[];
+  archived: boolean;
 }) {
   const theme = useTheme();
   const muted = { color: theme.colors.muted, fontFamily: theme.typography.body };
@@ -247,7 +147,13 @@ function CaseList({
     colleagues.find((colleague) => colleague.subject === subject)?.displayName ?? subject;
 
   if (cases.length === 0) {
-    return <Text style={[styles.body, muted]}>No cases yet. Open one above to get started.</Text>;
+    return (
+      <Text style={[styles.body, muted]}>
+        {archived
+          ? 'No archived cases. A case archived from its overview appears here.'
+          : 'No cases yet. Choose “New case” to open one.'}
+      </Text>
+    );
   }
 
   return (
@@ -304,8 +210,8 @@ function CaseList({
             <Table.Cell width={90}>{String(item.chapter)}</Table.Cell>
             <Table.Cell width={90}>{item.district}</Table.Cell>
             <Table.Cell width={140}>
-              <Badge intent={STATUS_INTENT[item.status]} size="sm">
-                {STATUS_LABEL[item.status]}
+              <Badge intent={CASE_STATUS_INTENT[item.status]} size="sm">
+                {CASE_STATUS_LABEL[item.status]}
               </Badge>
             </Table.Cell>
             <Table.Cell width={150}>
@@ -323,6 +229,7 @@ function CaseList({
 }
 
 const styles = StyleSheet.create({
+  toggles: { alignSelf: 'flex-start', marginBottom: spacing.md },
   actions: {
     flexDirection: 'row',
     marginTop: spacing.xs,
@@ -340,28 +247,5 @@ const styles = StyleSheet.create({
   },
   caseMeta: {
     fontSize: fontSizes.caption,
-  },
-  chapterLabel: {
-    fontSize: fontSizes.label,
-  },
-  chapterOption: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: spacing.xs,
-  },
-  chapters: {
-    // Overrides the Root's own column default — four short options read better
-    // across than stacked, and wrap when the column is narrow.
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.md,
-  },
-  error: {
-    fontSize: fontSizes.label,
-  },
-  form: {
-    gap: spacing.md,
-    marginBottom: spacing.lg,
-    marginTop: spacing.sm,
   },
 });

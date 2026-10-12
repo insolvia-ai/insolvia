@@ -7,7 +7,8 @@ description: >-
   patterns, the global-uniqueness suffix S3 needs, the required tags, and which
   resources cannot be renamed without destroying data. Use before creating or
   renaming any AWS resource, writing a new Terraform module, adding a service,
-  or widening the deploy role's ARN patterns in infra/envs/ci-trust.
+  or widening the deploy role's ARN patterns in infra/envs/ci-trust (in the
+  insolvia-services repo). The convention is account-wide: it binds both repos.
 ---
 
 # Naming AWS resources
@@ -41,7 +42,9 @@ let AWS generate it.** A name you never look up is a name that can't drift.
 ## `shared` is an environment, not an exemption
 
 Account-wide resources — the container repositories, the deploy role, the state
-bucket — take `shared` in the env slot: `insolvia-shared-api`,
+bucket, all owned by
+[insolvia-services](https://github.com/insolvia-ai/insolvia-services) — take
+`shared` in the env slot: `insolvia-shared-api`,
 `insolvia-shared-deploy-role`. They already tag `Environment = "shared"`, so the
 name now says what the tag says.
 
@@ -132,7 +135,8 @@ almost certainly a tag.
 
 ## The names are load-bearing in IAM — check `ci-trust` before you rename
 
-`infra/envs/ci-trust/main.tf` fences the deploy role by ARN pattern, and those
+insolvia-services' [`infra/envs/ci-trust/main.tf`](https://github.com/insolvia-ai/insolvia-services/blob/main/infra/envs/ci-trust/main.tf)
+fences the deploy role by ARN pattern, and those
 patterns encode the naming convention. Because env is the **second** segment,
 a component-scoped fence needs a wildcard in the middle:
 
@@ -145,9 +149,10 @@ Two of those patterns are not merely scoping — they are controls:
 `DenyCaseDataDecryption` (alias-matched) and `DenyAuditLogErasure`
 (bucket-matched). **A rename that misses them does not fail the apply. It
 silently stops the deny matching**, and the pipeline quietly gains the access
-the deny existed to remove. `ci-trust` is human-applied
-(`scripts/apply-ci-trust.sh`), so a rename touching any fenced family is a
-two-apply change: `ci-trust` first, then the env.
+the deny existed to remove. `ci-trust` is human-applied (that repo's
+`scripts/apply-ci-trust.sh`), so a rename touching any fenced family is a
+two-repo, two-apply change: a PR to insolvia-services and its `ci-trust` apply
+first, then the env here.
 
 **That first apply must be a UNION of the old and new patterns, not a swap.**
 This is the one that is easy to get wrong, because the finished state looks

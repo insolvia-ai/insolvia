@@ -46,12 +46,13 @@ API — which is what makes the API's calls run under ITS role, not yours.
 
 ## Scratch discipline
 
-Cases cannot be deleted through the API, so a spec that opened one per run
-would fill a table nobody prunes. The suite keeps ONE scratch case per
-environment, found by district (`SCRATCH_DISTRICT`) and opened only when
-absent. Everything else it creates — debtors are replaced in place, documents
-are deleted — lives inside that case, and every deletion runs in teardown
-however the test ended.
+Cases are only ever SOFT-deleted through the API (#355) — the rows stay — so
+a spec that opened one per run would fill a table nobody prunes. The suite
+keeps ONE scratch case per environment, found by its court and division
+(`SCRATCH_COURT`) and opened only when absent. Everything else it creates —
+debtors are replaced in place, documents are deleted — lives inside that
+case, and every deletion runs in teardown however the test ended. The one
+exception, said where it happens: `test_case_lifecycle.py`'s copy.
 """
 
 from __future__ import annotations
@@ -74,9 +75,17 @@ HERE = Path(__file__).resolve().parent
 GATE = "INSOLVIA_INTEGRATION"
 TARGETS = ("dev", "staging")
 
-#: The district the suite's scratch case carries — a value no real case would,
-#: which is what lets a later run find it again rather than opening another.
-SCRATCH_DISTRICT = "INTEGRATION-SCRATCH"
+#: The court and division the suite's scratch case carries. `district` used to
+#: be free text and the marker was a string no real case would carry; a case
+#: now names a registry reference (issue #360), so the marker is a launch
+#: division no fixture case (`flmb`/`tampa`, seeds/fixtures/v1..v3) uses
+#: — which is what lets a later run find the scratch case rather than open
+#: another. The suite's own writes never change it. The browser suite keeps
+#: its own scratch case in a third court (`e2e/support/scratch-case.ts`), so
+#: neither suite ever writes to the other's case or to a fixture's.
+SCRATCH_COURT = {"court": "flnb", "division": "gainesville"}
+#: The name the registry prints for that court — what `district` reads back as.
+SCRATCH_DISTRICT = "Northern District of Florida"
 
 #: What `/health` reports per target. The local compose stack runs the API as
 #: `local`; there is no `dev` environment name on the API side.
@@ -279,6 +288,49 @@ def as_user(base_url: str, tokens: dict[str, str]):
     return _as
 
 
+def _sign_in_now(fixture: dict[str, Any], handle: str) -> dict[str, str]:
+    person = seeded_users(fixture).get(handle)
+    if person is None:
+        pytest.fail(f"no fixture person with handle '{handle}'")
+    try:
+        return sign_in(
+            pool_id=_required("INTEGRATION_AUTH_POOL_ID"),
+            client_id=_required("INTEGRATION_AUTH_CLIENT_ID"),
+            email=str(person["email"]),
+            password=_required("E2E_TEST_USER_PASSWORD"),
+        )
+    except SignInError as refusal:
+        pytest.fail(f"could not sign in as '{handle}': {refusal}")
+
+
+@pytest.fixture
+def fresh_sign_in(fixture: dict[str, Any]):
+    """`fresh_sign_in("admin")` — a NEW SRP sign-in, now, returning Cognito's
+    whole `AuthenticationResult` (access, ID and refresh tokens).
+
+    For the acts that need a recent `auth_time` (ADR 0024: signing the
+    filing authorization, approving a filing). The session-scoped `tokens`
+    above were minted when the run started and may be older than those
+    windows by the time a test reaches them; this is the suite's equivalent
+    of the app's `prompt=login` — a real password typed at the real pool,
+    which is the thing `auth_time` records."""
+
+    def _fresh(handle: str) -> dict[str, str]:
+        return _sign_in_now(fixture, handle)
+
+    return _fresh
+
+
+@pytest.fixture
+def fresh_as_user(base_url: str, fresh_sign_in):
+    """`fresh_as_user("admin")` — the API, signed in as that person just now."""
+
+    def _as(handle: str) -> Api:
+        return Api(base_url, fresh_sign_in(handle)["AccessToken"])
+
+    return _as
+
+
 @pytest.fixture(scope="session")
 def anonymous(base_url: str) -> Api:
     """The API with no token at all — for the routes that must refuse."""
@@ -294,12 +346,30 @@ def admin(as_user) -> Api:
 # ── the scratch case ────────────────────────────────────────────
 
 
-@pytest.fixture(scope="session")
-def scratch_case(admin: Api) -> dict[str, Any]:
-    """ONE case per environment for the suite to work in, opened on demand.
+#: The suite's one firm client (ADR 0022) — what the scratch case is opened
+#: for. Found by this exact name on later runs, for the scratch case's reason:
+#: clients have no delete route either. Nobody real is called this.
+SCRATCH_CLIENT_NAME = {"given": "Scratch", "surname": "Integration-Suite"}
 
-    Found by its district on later runs rather than re-opened: cases have no
-    delete route, and a fresh row per run is a table nobody prunes.
+
+@pytest.fixture(scope="session")
+def scratch_client(admin: Api) -> dict[str, Any]:
+    """ONE firm client per environment, added on demand."""
+    for client in admin.get("/v1/firm/clients").get("clients") or []:
+        active = client.get("status") == "active"
+        if active and client.get("name") == SCRATCH_CLIENT_NAME:
+            return dict(client)
+    return dict(admin.post("/v1/firm/clients", {"name": SCRATCH_CLIENT_NAME}))
+
+
+@pytest.fixture(scope="session")
+def scratch_case(admin: Api, scratch_client: dict[str, Any]) -> dict[str, Any]:
+    """ONE case per environment for the suite to work in, opened on demand —
+    for the scratch client, since a case is opened for a client (ADR 0022).
+
+    Found by its court and division on later runs rather than re-opened:
+    a case's delete is soft (its rows stay), and a fresh row per run is a
+    table nobody prunes.
     """
     cursor: str | None = None
     while True:
@@ -308,9 +378,17 @@ def scratch_case(admin: Api) -> dict[str, Any]:
             params["cursor"] = cursor
         page = admin.get("/v1/cases", **params)
         for case in page.get("cases") or []:
-            if case.get("district") == SCRATCH_DISTRICT:
+            if (
+                case.get("court") == SCRATCH_COURT["court"]
+                and case.get("division") == SCRATCH_COURT["division"]
+            ):
                 return dict(case)
         cursor = page.get("nextCursor")
         if not cursor:
             break
-    return dict(admin.post("/v1/cases", {"chapter": 7, "district": SCRATCH_DISTRICT}))
+    return dict(
+        admin.post(
+            "/v1/cases",
+            {"chapter": 7, **SCRATCH_COURT, "client_ids": [scratch_client["id"]]},
+        )
+    )

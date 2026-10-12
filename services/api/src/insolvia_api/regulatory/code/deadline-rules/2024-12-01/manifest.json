@@ -1,0 +1,11 @@
+{
+  "series_id": "code/deadline-rules",
+  "effective_date": "2024-12-01",
+  "sequence": 1,
+  "source": {
+    "url": "https://www.law.cornell.edu/rules/frbp",
+    "published": "2024-04-02",
+    "sha256": null
+  },
+  "notes": "The post-filing deadlines the calendar generates from a case's petition date and first § 341(a) meeting date (issue 14.6 / #358), as DATA: each rule names the Federal Rule of Bankruptcy Procedure or Bankruptcy Code section it implements, the anchor it counts from, the count, and which chapters it applies to. Effective 2024-12-01, when the restyled Federal Rules of Bankruptcy Procedure (adopted by the Supreme Court on April 2, 2024) took effect — every rule below was read in its restyled text. Rule 9006(a)(1)'s computation (exclude the trigger day, count every calendar day, roll a last day that is a Saturday, Sunday or legal holiday forward) applies to every period stated in days, in the rules and in any statute that does not state its own method; the § 341 meeting windows are calendar spans the court schedules inside, not periods a filer computes, and are carried as `calendar`. Every rule's current text was verified on Cornell LII on 2026-09-24 and its accessed date is on the rule; a rule that could not be cited was left out (core/deadlines.py's docstring lists them). Amendments to these rules take effect each December 1 — read the next cycle's changes and ingest a new release before that date."
+}

@@ -5,6 +5,7 @@ import time
 
 from flask import Flask, Response, g, jsonify, request
 from flask.typing import ResponseReturnValue
+from insolvia_core.auth import ReauthenticationRequiredError
 from insolvia_core.errors import (
     ApiError,
     ConflictError,
@@ -16,21 +17,41 @@ from insolvia_core.errors import (
 from werkzeug.exceptions import HTTPException
 
 from insolvia_api.api.dependencies import ApiDependencies
+from insolvia_api.api.routes.calendar import blueprint as calendar_blueprint
 from insolvia_api.api.routes.case_entities import blueprint as case_entities_blueprint
+from insolvia_api.api.routes.case_lifecycle import (
+    blueprint as case_lifecycle_blueprint,
+)
 from insolvia_api.api.routes.case_summary import blueprint as case_summary_blueprint
 from insolvia_api.api.routes.cases import blueprint as cases_blueprint
+from insolvia_api.api.routes.courts import blueprint as courts_blueprint
 from insolvia_api.api.routes.creditor_matrix import (
     blueprint as creditor_matrix_blueprint,
 )
 from insolvia_api.api.routes.debtors import blueprint as debtors_blueprint
+from insolvia_api.api.routes.document_requests import (
+    blueprint as document_requests_blueprint,
+)
 from insolvia_api.api.routes.documents import blueprint as documents_blueprint
+from insolvia_api.api.routes.events import blueprint as events_blueprint
 from insolvia_api.api.routes.exemption_analysis import (
     blueprint as exemption_analysis_blueprint,
 )
 from insolvia_api.api.routes.extraction_review import (
     blueprint as extraction_review_blueprint,
 )
+from insolvia_api.api.routes.filing_approval import (
+    blueprint as filing_approval_blueprint,
+)
+from insolvia_api.api.routes.filing_credentials import (
+    blueprint as filing_credentials_blueprint,
+)
+from insolvia_api.api.routes.filing_set import blueprint as filing_set_blueprint
 from insolvia_api.api.routes.firm import blueprint as firm_blueprint
+from insolvia_api.api.routes.firm_clients import blueprint as firm_clients_blueprint
+from insolvia_api.api.routes.firm_questionnaire import (
+    blueprint as firm_questionnaire_blueprint,
+)
 from insolvia_api.api.routes.forms_hub import blueprint as forms_hub_blueprint
 from insolvia_api.api.routes.health import blueprint as health_blueprint
 from insolvia_api.api.routes.jobs import blueprint as jobs_blueprint
@@ -40,8 +61,18 @@ from insolvia_api.api.routes.library_creditors import (
 from insolvia_api.api.routes.liens import blueprint as liens_blueprint
 from insolvia_api.api.routes.me import blueprint as me_blueprint
 from insolvia_api.api.routes.means_test import blueprint as means_test_blueprint
+from insolvia_api.api.routes.notes import blueprint as notes_blueprint
 from insolvia_api.api.routes.packets import blueprint as packets_blueprint
+from insolvia_api.api.routes.plan import blueprint as plan_blueprint
+from insolvia_api.api.routes.portal import blueprint as portal_blueprint
+from insolvia_api.api.routes.portal_documents import (
+    blueprint as portal_documents_blueprint,
+)
+from insolvia_api.api.routes.portal_invitations import (
+    blueprint as portal_invitations_blueprint,
+)
 from insolvia_api.api.routes.standards import blueprint as standards_blueprint
+from insolvia_api.api.routes.tasks import blueprint as tasks_blueprint
 from insolvia_api.api.routes.unsubscribe import blueprint as unsubscribe_blueprint
 from insolvia_api.api.routes.waitlist import blueprint as waitlist_blueprint
 from insolvia_api.core.cors import origin_allowed
@@ -60,6 +91,9 @@ def create_app(dependencies: ApiDependencies) -> Flask:
     app = Flask(__name__)
     app.extensions["insolvia_api_dependencies"] = dependencies
     app.register_blueprint(cases_blueprint)
+    # The lifecycle's acts that are not a field edit (#355): history,
+    # archive, soft delete, copy.
+    app.register_blueprint(case_lifecycle_blueprint)
     app.register_blueprint(case_summary_blueprint)
     app.register_blueprint(liens_blueprint)
     # /v1/cases/<id>/standards — a static segment, same argument as /summary.
@@ -69,14 +103,39 @@ def create_app(dependencies: ApiDependencies) -> Flask:
     app.register_blueprint(exemption_analysis_blueprint)
     # /v1/cases/<id>/means-test — the same static-segment argument again.
     app.register_blueprint(means_test_blueprint)
+    # /v1/cases/<id>/plan-calculation (issue 16.2 / #366) — the same
+    # static-segment argument; the plan record itself is the `plans`
+    # collection.
+    app.register_blueprint(plan_blueprint)
     app.register_blueprint(firm_blueprint)
+    # The attorney's own CM/ECF credential (ADR 0024, guardrail 3) —
+    # under /v1/me because the owner is always the token's subject.
+    app.register_blueprint(filing_credentials_blueprint)
+    # The court registry (issue #360): read-only, every member.
+    app.register_blueprint(courts_blueprint)
     # /v1/firm/creditors — a static segment under the same firm-scoped
     # namespace as firm_blueprint, registered as its own module for the same
     # reason case_entities is its own module rather than a growing firm.py.
     app.register_blueprint(library_creditors_blueprint)
+    # /v1/firm/clients (ADR 0022) — the client directory, the same shape.
+    app.register_blueprint(firm_clients_blueprint)
+    # /v1/firm/questionnaire (ADR 0023 PR 3) — which sections a firm's
+    # clients see; the client's own read is in portal_blueprint.
+    app.register_blueprint(firm_questionnaire_blueprint)
     app.register_blueprint(documents_blueprint)
+    # /v1/firm/document-checklist and /v1/cases/<id>/document-requests (ADR
+    # 0023 PR 5) — the client's side is portal_documents_blueprint.
+    app.register_blueprint(document_requests_blueprint)
     app.register_blueprint(debtors_blueprint)
     app.register_blueprint(creditor_matrix_blueprint)
+    # /v1/cases/<id>/notes — same static-segment argument (issue 14.5 / #357),
+    # and it is its OWN module rather than a case_entities.COLLECTIONS entry:
+    # core/notes.py says why (server-stamped authorship, per-record edit
+    # ownership, no provenance).
+    app.register_blueprint(notes_blueprint)
+    # /v1/cases/<id>/tasks[/<task_id>] and /v1/me/tasks (issue #356 / 14.4) —
+    # same static-segment argument as debtors and documents.
+    app.register_blueprint(tasks_blueprint)
     # AFTER debtors and documents in this list, though registration order does
     # not decide matching — Werkzeug ranks static URL segments above dynamic
     # ones, so /debtors and /documents always beat /<collection>.
@@ -89,8 +148,28 @@ def create_app(dependencies: ApiDependencies) -> Flask:
     # /v1/cases/<id>/forms[/<form>/preview] — same static-segment argument
     # (issue 13.2 / #343).
     app.register_blueprint(forms_hub_blueprint)
+    # /v1/cases/<id>/filing-set — the hand-off checklist (ADR 0024 PR 3).
+    app.register_blueprint(filing_set_blueprint)
+    # The per-filing approval (ADR 0024, guardrail 1) — the one producer of
+    # a filing job.
+    app.register_blueprint(filing_approval_blueprint)
     # /v1/cases/<id>/extraction/... — same static-segment argument (8.9).
     app.register_blueprint(extraction_review_blueprint)
+    # /v1/cases/<id>/events and /v1/firm/events (issue 14.6 / #358) — static
+    # segments under both namespaces, so /events beats /<collection>.
+    app.register_blueprint(events_blueprint)
+    # /v1/calendar and /v1/me/calendar.ics — the latter is the one route
+    # that authenticates by feed token; its module argues why.
+    app.register_blueprint(calendar_blueprint)
+    # The client portal (ADR 0023). /v1/portal/* is the CLIENT principal
+    # class's whole surface — every rule there carries @require_client and
+    # no rule elsewhere does (tests/unit/test_portal_routes.py walks the URL
+    # map to hold that). The invitation routes beside it are STAFF routes
+    # under /v1/cases/<id>/portal/..., static segments that beat
+    # /<collection> for the same Werkzeug-ranking reason as the rest.
+    app.register_blueprint(portal_blueprint)
+    app.register_blueprint(portal_documents_blueprint)
+    app.register_blueprint(portal_invitations_blueprint)
     app.register_blueprint(health_blueprint)
     app.register_blueprint(me_blueprint)
     app.register_blueprint(unsubscribe_blueprint)
@@ -163,6 +242,19 @@ def create_app(dependencies: ApiDependencies) -> Flask:
     def conflict_error(error: ConflictError) -> ResponseReturnValue:
         # Same specific-before-general placement as the two below.
         return jsonify({"error": "ConflictError", "message": str(error)}), 409
+
+    @app.errorhandler(ReauthenticationRequiredError)
+    def reauthentication_required(
+        error: ReauthenticationRequiredError,
+    ) -> ResponseReturnValue:
+        # A ForbiddenError, registered above it for the same most-specific
+        # reason. Its own `error` code because its remedy differs from every
+        # other 403's: not a permission to ask an admin for, but a fresh
+        # sign-in (`prompt=login`) the client can start itself (ADR 0024).
+        return (
+            jsonify({"error": "ReauthenticationRequired", "message": str(error)}),
+            403,
+        )
 
     @app.errorhandler(ForbiddenError)
     def forbidden_error(error: ForbiddenError) -> ResponseReturnValue:

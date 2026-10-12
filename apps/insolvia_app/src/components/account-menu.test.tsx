@@ -5,6 +5,7 @@ import type { AuthConfig } from '@/config/environment';
 import { writeRefreshToken } from '@/session';
 import {
   installFakeBrowser,
+  jsonResponse,
   principalResponse,
   routeFetch,
   TEST_AUTH_CONFIG,
@@ -35,14 +36,51 @@ describe('the account menu', () => {
   let browser: FakeBrowser;
   const realFetch = globalThis.fetch;
 
-  function signedIn(initialUrl = '/') {
+  function signedIn(initialUrl = '/', me: () => Response = () => principalResponse()) {
     globalThis.fetch = jest.fn(
       routeFetch({
         '/oauth2/token': () => tokenEndpointResponse(),
-        '/v1/me': () => principalResponse(),
+        '/v1/me': me,
       }),
     ) as unknown as typeof fetch;
     return renderRouter('src/app', { initialUrl });
+  }
+
+  /**
+   * A `/v1/me` body carrying a firm — needed only where a test wants a
+   * design-system `Button` to check theme colours on, since the dashboard
+   * behind `RequireFirm` (issue 14.7 / #359) renders nothing "Start a case"
+   * shaped for a caller in no firm any more.
+   */
+  function withFirmResponse() {
+    return jsonResponse(200, {
+      subject: '00000000-0000-4000-8000-000000000001',
+      username: '00000000-0000-4000-8000-000000000001',
+      clientId: TEST_AUTH_CONFIG.clientId,
+      scopes: ['openid', 'email', 'profile'],
+      expiresAt: null,
+      firm: {
+        id: '00000000-0000-4000-8000-00000000f18a',
+        name: 'Example & Partners',
+        role: 'attorney',
+        firstName: 'Alice',
+        lastName: 'Attorney',
+        displayName: 'Alice Attorney',
+        isAdmin: false,
+        accessAllCases: true,
+        permissions: {
+          cases: 'add_edit',
+          intake: 'view_only',
+          documents: 'view_only',
+          extraction_review: 'hidden',
+          creditor_library: 'hidden',
+          notes: 'hidden',
+          events: 'hidden',
+          tasks: 'hidden',
+          firm_administration: 'hidden',
+        },
+      },
+    });
   }
 
   beforeEach(() => {
@@ -213,16 +251,23 @@ describe('the account menu', () => {
       // BRAND value, not the tokens default: from tokens 0.5.0 the package's
       // base theme is deliberately unbranded, so a `ThemeProvider` that passed
       // nothing would render the package's monochrome primary here.
-      signedIn();
+      //
+      // "New case" (the dashboard's quick action) stands in for the home
+      // screen's old "Start a case" CTA here — both are the design system's
+      // `Button`, and this test only needs one to check a colour on. It needs
+      // a firm in the fixture: `/` now composes `RequireFirm` for the
+      // dashboard (issue 14.7 / #359), which renders nothing button-shaped
+      // for a caller in no firm.
+      signedIn('/', withFirmResponse);
       const user = userEvent.setup();
 
-      const cta = await screen.findByRole('button', { name: 'Start a case' });
+      const cta = await screen.findByRole('button', { name: 'New case' });
       expect(flattenedBackground(cta)).toBe(brandColors.light.primary);
 
       await openMenu(user);
       await user.press(screen.getByRole('menuitem', { name: 'Dark' }));
 
-      expect(flattenedBackground(screen.getByRole('button', { name: 'Start a case' }))).toBe(
+      expect(flattenedBackground(screen.getByRole('button', { name: 'New case' }))).toBe(
         brandColors.dark.primary,
       );
       // Choosing closes the menu, like every other item; reopening shows the

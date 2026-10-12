@@ -33,6 +33,7 @@ list is precisely what the client renders next to each blocked row.
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from flask import Blueprint, jsonify, request
@@ -47,6 +48,9 @@ from insolvia_core.ports import (
     CaseStore,
     DebtorStore,
     DocumentBlobStore,
+    TaskStore,
+    TaxIdCipher,
+    TaxIdStore,
 )
 
 from insolvia_api.api.auth import current_accessor, require_auth, requires
@@ -65,6 +69,7 @@ from insolvia_api.core.forms_hub import (
 )
 from insolvia_api.core.packet_assembly import (
     PacketProblem,
+    disclose_tax_ids,
     packet_form_series,
     problem_json,
     read_case_data,
@@ -82,37 +87,78 @@ DOWNLOAD_URL_TTL_SECONDS = 5 * 60
 PREVIEW_CONTENT_TYPE = "application/pdf"
 
 
-def _stores() -> tuple[
-    CaseStore, DebtorStore, CaseEntityStore, DocumentBlobStore, AccessLog
-]:
+@dataclass(frozen=True)
+class _Stores:
+    case_store: CaseStore
+    debtor_store: DebtorStore
+    entity_store: CaseEntityStore
+    blobs: DocumentBlobStore
+    task_store: TaskStore
+    access_log: AccessLog
+    tax_id_store: TaxIdStore
+    tax_id_cipher: TaxIdCipher
+
+
+def _stores() -> _Stores:
     deps = dependencies()
     if (
         deps.case_store is None
         or deps.debtor_store is None
         or deps.case_entity_store is None
         or deps.document_blobs is None
+        or deps.task_store is None
         or deps.access_log is None
+        or deps.tax_id_store is None
+        or deps.tax_id_cipher is None
     ):
         raise RuntimeError(
-            "case store, debtor store, entity store, blob store and access log"
-            " are not composed"
+            "case store, debtor store, entity store, blob store, task store,"
+            " access log, tax-id store and tax-id cipher are not composed"
         )
-    return (
-        deps.case_store,
-        deps.debtor_store,
-        deps.case_entity_store,
-        deps.document_blobs,
-        deps.access_log,
+    return _Stores(
+        case_store=deps.case_store,
+        debtor_store=deps.debtor_store,
+        entity_store=deps.case_entity_store,
+        blobs=deps.document_blobs,
+        task_store=deps.task_store,
+        access_log=deps.access_log,
+        tax_id_store=deps.tax_id_store,
+        tax_id_cipher=deps.tax_id_cipher,
     )
 
 
-def _form_summary_json(summary: FormSummary) -> dict[str, object]:
+def _open_task_counts(task_store: TaskStore, case_id: str) -> dict[str, int]:
+    """Open (not-done) tasks anchored to each form series, by the SAME short
+    form key `FormSummary.form` carries (issue #356 / 14.4's `formSeries`
+    field is deliberately spelled to match it — see core/tasks.py). A task
+    anchored to a series this case does not currently file, or to a key
+    nobody defined, simply never matches a row here — the same "storage
+    validates shape, not the set of real forms" rule `core/tasks.py`'s module
+    docstring states for that field.
+    """
+    counts: dict[str, int] = {}
+    for task in task_store.list_for_case(case_id):
+        if task.form_series is None or task.done:
+            continue
+        counts[task.form_series] = counts.get(task.form_series, 0) + 1
+    return counts
+
+
+def _form_summary_json(
+    summary: FormSummary, *, open_task_count: int
+) -> dict[str, object]:
     body: dict[str, object] = {
         "series": summary.series,
         "form": summary.form,
         "title": summary.title,
         "officialNumber": summary.official_number,
         "problems": [problem_json(p) for p in summary.problems],
+        # Present even at zero — a client asking "does this row have a task
+        # count" gets one answer rather than treating absence as its own
+        # falsy state, the same reasoning `metric` does NOT follow only
+        # because a metric genuinely has no meaning for some forms (B101, the
+        # declaration) where a task count always does.
+        "openTaskCount": open_task_count,
     }
     if summary.metric is not None:
         body["metric"] = form_metric_json(summary.metric)
@@ -131,11 +177,11 @@ def list_case_forms_route(case_id: str) -> ResponseReturnValue:
     for which forms, `completeness_problems` for what is wrong — grouped per
     form rather than flattened, never a second definition of either.
     """
-    case_store, debtor_store, entity_store, _, access_log = _stores()
+    stores = _stores()
     accessor = current_accessor()
 
-    case = case_store.get(case_id, accessor=accessor)
-    access_log.record(
+    case = stores.case_store.get(case_id, accessor=accessor)
+    stores.access_log.record(
         record_access(
             case_id=case_id,
             principal=accessor.subject,
@@ -146,9 +192,22 @@ def list_case_forms_route(case_id: str) -> ResponseReturnValue:
     if case is None:
         raise NotFoundError("case not found")
 
-    data = read_case_data(case, debtor_store=debtor_store, entity_store=entity_store)
+    data = read_case_data(
+        case, debtor_store=stores.debtor_store, entity_store=stores.entity_store
+    )
     summaries = forms_hub(data, as_of=datetime.now(UTC).date())
-    return jsonify({"forms": [_form_summary_json(s) for s in summaries]}), 200
+    task_counts = _open_task_counts(stores.task_store, case_id)
+    return (
+        jsonify(
+            {
+                "forms": [
+                    _form_summary_json(s, open_task_count=task_counts.get(s.form, 0))
+                    for s in summaries
+                ]
+            }
+        ),
+        200,
+    )
 
 
 @blueprint.get("/v1/cases/<case_id>/forms/<form>/preview")
@@ -166,11 +225,11 @@ def form_preview_route(case_id: str, form: str) -> ResponseReturnValue:
     seat, that form simply is not part of this case, the same reading
     `assemble` gives it when it silently drops the series from the set.
     """
-    case_store, debtor_store, entity_store, blobs, access_log = _stores()
+    stores = _stores()
     accessor = current_accessor()
 
-    case = case_store.get(case_id, accessor=accessor)
-    access_log.record(
+    case = stores.case_store.get(case_id, accessor=accessor)
+    stores.access_log.record(
         record_access(
             case_id=case_id,
             principal=accessor.subject,
@@ -181,10 +240,26 @@ def form_preview_route(case_id: str, form: str) -> ResponseReturnValue:
     if case is None:
         raise NotFoundError("case not found")
 
-    data = read_case_data(case, debtor_store=debtor_store, entity_store=entity_store)
+    data = read_case_data(
+        case, debtor_store=stores.debtor_store, entity_store=stores.entity_store
+    )
     series_id = f"form/{form}"
     if series_id not in packet_form_series(data):
         raise NotFoundError("form not found")
+
+    if form == "b121":
+        # The one preview that prints the full tax identifier: the logged
+        # full-value read, against the previewing caller, purpose `b121` —
+        # its own row beside the form_preview.render one above. Every other
+        # form projects from the record's last four or nothing.
+        data = disclose_tax_ids(
+            data,
+            principal=accessor.subject,
+            purpose="b121",
+            tax_id_store=stores.tax_id_store,
+            tax_id_cipher=stores.tax_id_cipher,
+            access_log=stores.access_log,
+        )
 
     # Output options (issue 13.11): the query-string spelling of the same
     # OutputOptions packet assembly's job body carries. `allow_forms=False`
@@ -216,7 +291,9 @@ def form_preview_route(case_id: str, form: str) -> ResponseReturnValue:
 
     content = outcome
     storage_ref = form_preview_object_key(case.id, new_preview_id())
-    blobs.put_bytes(storage_ref, content=content, content_type=PREVIEW_CONTENT_TYPE)
+    stores.blobs.put_bytes(
+        storage_ref, content=content, content_type=PREVIEW_CONTENT_TYPE
+    )
     logger.info(
         "form preview rendered",
         extra={"case_id": case.id, "series": series_id},
@@ -224,7 +301,7 @@ def form_preview_route(case_id: str, form: str) -> ResponseReturnValue:
     return (
         jsonify(
             {
-                "url": blobs.download_url(
+                "url": stores.blobs.download_url(
                     storage_ref, expires_in=DOWNLOAD_URL_TTL_SECONDS
                 ),
                 "method": "GET",

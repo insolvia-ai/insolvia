@@ -35,7 +35,7 @@ asked.
 
 ## Core entities
 
-Twenty-five case-scoped types. Two more — the tax-identifier access log and
+Twenty-six case-scoped types. Two more — the tax-identifier access log and
 the effective-dated statutory constant sets — are referenced here but live
 outside the case store; see below.
 
@@ -58,7 +58,8 @@ outside the case store; see below.
 | `employment` | many | 106I Pt.1 |
 | `pay_period_record` | many, references an `employment` | Means test |
 | `other_income_record` | many, references a `debtor` | Means test |
-| `means_test_input` | one | B122A-2 |
+| `means_test_input` | one | B122A-2 (Ch. 7) · B122C-1, B122C-2 (Ch. 13) |
+| `plan` | one, Ch. 13 | The plan calculator; Official Form 113 |
 | `income_summary` | one per debtor column | 106I Pt.2 |
 | `household` | 1–2 (106J-2 adds a second) | 106J Pt.1 |
 | `expense` | many, references a `household` | 106J Pt.2 |
@@ -78,7 +79,27 @@ unaddressable.
 case {
   id, firm_id, created_by
   chapter: 7 | 11 | 12 | 13
-  district, status: intake | ready_to_file | filed, filed_at
+  court, division              // a reference into the court registry (below)
+  district                     // the printed name, DERIVED from the reference
+  status: intake | ready_to_file | filed | discharged | dismissed | closed
+                                       // a case STARTS retained; the funnel before it is
+                                       // the client's (below)
+  filed_at, meeting_341_at            // form dates: the petition (the order for relief in a
+                                       // voluntary case) and the FIRST date set for the §341
+                                       // meeting — the anchors the deadline engine counts from
+                                       // (issue 14.6 / #358)
+  case_number, judge, trustee         // the docket's facts, typed from the notice of filing
+                                       // until 17.2 reads them from the court (#355);
+                                       // case_number and filed_at are WRITTEN by an
+                                       // electronic filing too (ADR 0024 PR 8, below)
+  caseNumberKey                       // STORED ONLY, derived: `flmb:6:26-bk-10000` — the
+                                       // court plus the number read into office, year,
+                                       // type and sequence (judge initials dropped), the
+                                       // key court notices are matched on (#369);
+                                       // insolvia_core.case_numbers
+  office_file_number                  // the firm's own number for the matter
+  archived_at, archived_by            // out of the working list, still the firm's record
+  deleted_at, deleted_by              // soft delete — see "The lifecycle" below
   exemption_set: state_and_federal_nonbankruptcy | federal   // 106C line 1
   is_amended, ch13_supplement_date                           // the header box on every form
   form_revisions: { <form>: <revision> }
@@ -105,6 +126,103 @@ petition {
 churned during intake and untouched afterwards, while `case` holds identity and
 lifecycle that everything else references.
 
+**The court is a reference, not a string** (issue #360). `court` is a
+district's CM/ECF code and `division` one of its divisions' codes, both
+validated on write against the `courts/us-bankruptcy` series in
+`insolvia_core.courts` — a release of the regulatory registry
+([ADR 0014](../adr/0014-the-repository-is-the-regulatory-release-registry.md))
+whose record shape [ADR 0024](../adr/0024-electronic-filing-path.md)
+specifies: identity, divisions with their CM/ECF office code and the FIPS
+counties they serve, the court's PDF and creditor-matrix rules, the signature
+instrument and B121 handling, the docket order and upload names for an
+opening (unknown in every launch court today, so the filing set uses the
+packet's own — `services/api` `core/filing_set.py`), Case Upload status, and
+a source with a date on every fact. `district` survives as the printed name the registry gives the
+court ("Middle District of Florida" — the B101 dropdown's own spelling),
+written from the reference on every write and never typed. A case written
+before the registry existed carries its typed `district` and no reference;
+it still reads and prints, and is asked for a court on its next edit.
+
+## The lifecycle
+
+The case's status is its lifecycle as data (issue 14.3 / #355), owned by
+`insolvia_core.cases` (`STATUSES`, `TRANSITIONS`, `apply_changes`):
+
+```
+            client (prospect, prospect_stage) ──► case opened = RETAINED
+                                                     │
+intake ◄──► ready_to_file ──► filed ──► discharged ──► closed
+                                │  ▲ └──► dismissed ───► closed
+                                │  └───── closed (reopened, § 350(b))
+                                └───────► closed
+```
+
+- **The funnel is the client's, and a case starts retained** — the
+  maintainer's decision of 2026-10-01, recorded in
+  [ADR 0022](../adr/0022-a-client-is-not-a-case.md): "a prospect is a
+  client with no case yet". A firm client is a prospect while
+  `first_retained_at` is unset, and `prospect_stage` (`possible`,
+  `consultation_scheduled`, `awaiting_signed_agreement`, `exhausted`) is
+  their funnel position, set through `PUT /v1/firm/clients/<id>/prospect-stage`
+  and never by the whole-record PUT. Opening a case for the client — or
+  copying one — is the **retained transition**: one conditional write
+  (`FirmStore.mark_client_retained`) stamps `first_retained_at` when unset
+  and REMOVES the stage, which is cleared rather than kept as history (the
+  case's own status history and `lead_source` are the records). A stage
+  write is conditioned on `first_retained_at` still being absent, so the two
+  cannot interleave into a retained client with a funnel position; a stage
+  for a retained client is a 409. "Not retained" is read from the client
+  record, never from the `by-client` index, which would answer for cases
+  the caller may not see. A non-filing spouse is never stamped.
+- **Moves are forward only**, with two exceptions: `intake` ↔
+  `ready_to_file`, and `closed` → `filed` (a reopened case). A filed
+  petition does not go back to preparation — changing it is an amendment.
+  A move off the map is a 409.
+- **"Filed" means on the docket**: `filed`, `discharged`, `dismissed` and
+  `closed` are all filed petitions (`cases.is_filed`), and every rule that
+  protects a filed petition — no re-copy from the client, no plain packet
+  re-assembly, `amended` only once filed — reads that, never the literal.
+  Reaching it needs `filed_at` and `case_number`; once there, neither may be
+  cleared.
+- **An electronic filing moves the case itself** (ADR 0024 PR 8): the filing
+  worker's `filed` writes the case's `status=filed`, the court's number and
+  the petition date (the date the court printed, never converted to UTC) in
+  ONE transaction with the filing record and a history row whose
+  `changedBy` is `filing-worker` and `filingId` the filing; the attorney's
+  resolution of a hand-back as filed does the same with their own subject.
+  Only the lifecycle attributes are written, so a concurrent edit is never
+  put back. A filing resolved as *not filed* frees the case for a new
+  approval; nothing else does (`insolvia_core.filings`, services/api
+  `core/filing_outcome.py`).
+- **Every move is recorded**: a `STATUS#<changedAt>` row in the case's
+  partition (who, when, from and to status and stage), written in the same
+  transaction as the case — and the case write is conditioned on the status
+  it was read at, so a stale whole-record save cannot put an old status back
+  (`GET /v1/cases/<id>/status-history`).
+- **Archive** is an attribute, not a status: an archived case keeps its
+  lifecycle, leaves the working list (`GET /v1/cases`) and lists under
+  `?archived=true`. Any status may be archived; archived cases stay editable.
+- **Delete is soft, and the retention posture is this:** a firm admin may
+  delete a case that never reached the court (a filed one is refused —
+  archive it). Deleting stamps `deleted_at`/`deleted_by` and nothing else:
+  `access.may_see_case` refuses a deleted case for everyone, so it and
+  everything reached through it — debtors, schedules, documents, tasks,
+  events, the portal — answer 404, while every row and every document's bytes
+  stay where they are, under the same case-key encryption. **Documents follow
+  the case** by construction, because a document is only ever reached through
+  its case. Nothing is purged; there is no restore in the product. A purge
+  job, if ever wanted, is its own decision about retention periods (the
+  regulatory register's, like the access log's), not a side effect of this
+  one.
+- **Copy case** (`POST /v1/cases/<id>/copy`) opens a new retained case from
+  an existing one's preparation data — the chapter, court and exemption
+  election, every debtor with its client link and tax-id pointer, and every
+  generic collection — keeping record ids, so cross-references survive.
+  Not copied: status, history, docket facts, pins, documents, candidates,
+  notes, tasks, events, portal bindings. Each copied value keeps its own
+  provenance entry and gains `copied_from_case_id` (below). The module
+  docstring of `insolvia_core.case_copy` owns the list.
+
 ## Identity, and why joint debtors are two records
 
 **A joint filing is two debtor records under one case, not one record with
@@ -114,13 +232,19 @@ own tax identification, own signature — and the forms follow. B101 prints a
 full second column for credit counseling *and for venue*; 106I's second column
 may belong to a spouse who is not filing at all.
 
+A debtor is one case's **copy** of a firm-scoped `client` — the person, who
+outlives the matter. [ADR 0022](../adr/0022-a-client-is-not-a-case.md) owns
+that split (the `client_id` on the debtor, the `client` provenance source, and
+what "differs from client" means); this section gains those fields when its
+build lands.
+
 ```
 debtor {
   id, case_id
   filing_role: debtor_1 | debtor_2 | non_filing_spouse
   name: { given, middle, surname, suffix }
   other_names_used: [ { id, given, middle, surname, business_name } ]  // 8-year lookback
-  tax_id: { kind: ssn | itin, value }                                  // encrypted; see below
+  tax_id: { kind: ssn | itin, last_four, ref }                         // the number is a sealed item; see below
   employer_ids: [ ein ]
   residence_address, mailing_address
   phone, mobile, email
@@ -130,8 +254,52 @@ debtor {
     exemption_reason: incapacity | disability | active_duty
   }
   signed_at
+  client_id                                                            // the firm client this debtor was copied from — server-owned
 }
 ```
+
+**Every Debtor 1 and Debtor 2 is a firm client, copied**
+([ADR 0022](../adr/0022-a-client-is-not-a-case.md)). `POST /v1/cases` takes
+`client_ids` — one, or two filing jointly — and writes the case, its
+creator's assignment and a debtor per client in one transaction; each copied
+field (name, other names, both addresses with the residence county, phone,
+mobile, email) carries `client` provenance. `client_id` is server-owned: the
+questionnaire's whole-record PUT keeps it, and
+`PUT /v1/cases/<id>/debtors/<role>/client` is the only thing that sets or
+moves it — copying the client in when the role is empty, moving only the
+link when it is not. A questionnaire save cannot create Debtor 1 or Debtor 2
+from nothing; a non-filing spouse, who need not be the firm's client, still
+can. One client holds at most one role per case. The copy is never synced:
+`differs_from_client` (the field paths where the case and the client now
+disagree) is computed on every read for a caller who may see the client
+directory, and nothing resolves it silently. The debtor item carries
+`GSI3PK CLIENT#<client_id>` / `GSI3SK <case createdAt>#<case id>`, which is
+the `by-client` index a client's case list reads. "One client, one role" is
+the link write's own condition (a transaction that checks the case's other
+roles), not a read before it.
+
+Divergence is resolved only by one of two explicit acts, each a whole-record
+write: `POST …/debtors/<role>/copy-from-client` re-copies the client's
+identity fields with `client` provenance (refused on a `filed` case — that is
+an amendment), and `POST …/debtors/<role>/copy-to-client` writes the case's
+values onto the client record, leaving the debtor as it was. **A copied field
+keeps `client` provenance until a person changes that field**: the
+questionnaire sends each save's map per field against the record it loaded
+(the api-client's `revisedProvenance`), and the PUT refuses a `client` entry
+that the stored record does not carry on that same, unchanged value — so
+`client` is only ever kept, never minted, by a save.
+
+**Merging two clients moves the link and nothing else.**
+`POST /v1/firm/clients/<survivor>/merge` (`insolvia_core.client_merge`)
+re-points every debtor naming the merged client — its `client_id` and its
+`by-client` entry, one conditional write per case — to the survivor, and
+archives the merged client with `merged_into`. The copied identity fields and
+their provenance are untouched: a debtor's `client` entries keep naming the
+client they were copied from, which is why a merged client is archived rather
+than deleted, and why `differs_from_client` may now show paths where the
+copy and the survivor disagree. Two clients who are both debtors on one case
+are refused (one client, one role per case); a merged client cannot be
+opened for a case, linked, edited, restored or merged again.
 
 **A case belongs to a FIRM.** `firm_id` is the tenant; `created_by` is the
 Cognito subject of whoever opened the matter and is an audit fact rather than a
@@ -177,6 +345,39 @@ the default representation and the full value behind an explicit read that
 writes an audit record. That audit log is not case data and does not live in
 the case store. Designing for last-four-only would have to be undone at the
 e-filing milestone.
+
+Built as issue 13.12 ([#382](https://github.com/insolvia-ai/insolvia/issues/382));
+`insolvia_core.tax_ids` owns the design and its docstring is the full
+argument. The shape it settled on:
+
+- **The debtor carries a reference, never the number**: `tax_id: {kind,
+  last_four, ref}`. The number is its own **sealed item**, `SK=TAXID#<ref>`,
+  envelope-encrypted under the environment's case KMS key — a fresh data key
+  per sealed value, the key returned KMS-wrapped and stored beside the
+  ciphertext — with an encryption context binding the **firm and the
+  reference** (`{purpose, firm_id, tax_id_ref}`), never the case.
+- **The ref, not the location, is the contract.** The item sits in the case's
+  partition today; ADR 0022 (a client is not a case) needs a client's later
+  matter to point at the *same* sealed identifier rather than copy it, so the
+  ref is an opaque generated id a later case can re-use, and the
+  firm-plus-ref context is what lets one ref serve two cases of one client
+  while refusing replay onto another firm or another identifier.
+- **Two reads.** The last four are on the plain record and travel with every
+  debtor read (screens, B101, the generic routes, the MCP record tools). The
+  full value is `tax_ids.read_tax_id`: it writes a `taxid.read` row — who,
+  which case, which debtor (`filing_role`), why (`purpose`: `b121`,
+  `petition_review` for the review's byte-exact re-assembly, or `case_upload`
+  when the filing worker builds the court's Case Upload file, `Debtor.txt`)
+  — and is called by nothing that answers a client. B121 is the only form
+  that prints it. `Debtor.txt` (ADR 0024 PR 9, `services/api`
+  `core/case_upload.py`) carries it too, and is therefore generated on demand
+  in the worker's memory at upload time and never stored.
+- **Provenance is one entry, at `tax_id`.** The kind and the digits are one
+  identifier entered in one act, and the last-four echo a client sends to
+  keep a stored number carries no fact of its own.
+- **A fixture's number comes from the SSA's never-issued advertising block**
+  (987-65-4320..4329) — the tax-id analogue of the `.test` addresses, and
+  the one exception the shape rules make. There is no reserved ITIN block.
 
 ## Creditors and claims
 
@@ -296,9 +497,12 @@ other_income_record {                    // dated non-wage receipts — CMI's ot
   payer, description
 }
 
-means_test_input {                       // B122A-2's entered figures, one per case
-  id, case_id
-  ...the actual-expense and adjustment answers only the debtor can supply
+means_test_input {                       // the means test's entered figures, one per case
+  id, case_id                            // WHATEVER its chapter: B122A-2 on Ch. 7,
+                                         // B122C-1/C-2 on Ch. 13 read the same record
+  ...the actual-expense and adjustment answers only the debtor can supply,
+  plus the four only the Chapter 13 forms ask (the commitment-period
+  contention, lines 40, 41 and 43's rows)
   (insolvia_core.means_test_inputs owns the field list, named by subject)...
 }                                        // entered and confirmed, like income_summary;
                                          // one-per-case is the packet gate's check
@@ -323,6 +527,41 @@ domestic support, union dues, other) so that a stub's itemization maps without
 a lossy translation. Line 11 is one value for the household rather than one per
 debtor column; it is carried on the debtor-1 summary and the forms engine
 renders it in its single box.
+
+## The Chapter 13 plan
+
+```
+plan {                                   // one per case, like means_test_input
+  id, case_id
+  term_months                            // absent = the means test's commitment period
+  payment_source: fixed | schedule_j_excess | disposable_income
+  monthly_payment, step_payments: [ { id, start_month, monthly_payment } ]
+  lump_sums: [ { id, month, amount, description } ]
+  trustee_percentage                     // ≤ 10 (28 U.S.C. § 586(e))
+  attorney_fees, attorney_fee_monthly
+  secured_treatments: [ { id, claim_id,
+      treatment: cure_and_maintain | cramdown | surrender,
+      arrearage, arrearage_interest_rate, maintenance_payment,
+      cramdown_value, interest_rate, monthly_payment } ]
+  priority_percentage, priority_interest_rate
+  unsecured_treatment: pot | percentage | amount
+  unsecured_percentage, unsecured_amount, unsecured_interest_rate
+  chapter_7_other_costs(+description), present_value_rate   // the § 1325(a)(4) side
+}
+```
+
+**The record is the proposal only** (issue
+[#366](https://github.com/insolvia-ai/insolvia/issues/366)); every figure it
+produces — the waterfall per class, feasibility, the liquidation floor — is
+derived, and lives in the API's calculator (`services/api`
+`core/chapter13_plan.py`, whose docstring owns the rules). Two choices keep it
+from restating another record: the term *overrides* the commitment period
+rather than copying it, and the two non-typed payment sources *name* Schedule
+J's line 23c or B122C-2's line 45 rather than storing the figure. Rates are
+percentages carried as strings (`insolvia_core.fields.percentage`), for
+money's reason. Alternatives compared on the plan screen are never stored:
+they are unsaved proposals POSTed to the calculator, and the one a preparer
+adopts is written through the ordinary confirmed save.
 
 ## Expenses and household
 
@@ -372,15 +611,44 @@ per-field, carried on every record as a map keyed by field path:
 ```
 provenance: {
   "<field_path>": {
-    source: staff_typed | ai_extracted | imported | library,
+    source: staff_typed | ai_extracted | imported | library | client | client_answered,
     confirmed_by, confirmed_at,
     document_id, locator,
     extraction_id,          // the extraction_candidate.id this value came from
     confidence,
-    library_creditor_id     // the library_creditor.id this value was copied from
+    library_creditor_id,    // the library_creditor.id this value was copied from
+    client_id,              // the firm client this value was copied from
+    copied_from_case_id     // the case a copied record came from (copy case, #355)
   }
 }
 ```
+
+`client` ([ADR 0022](../adr/0022-a-client-is-not-a-case.md)) is `library`'s
+twin for a person: a debtor's identity copied from the firm's client
+directory when the case was opened for that client, or when the client was
+linked to the role. A copy, never a live link — a filed petition must not
+change because the client record did — and, like `library`, outside the
+confirmation rule, because a person chose the client.
+
+`client_answered` ([ADR 0023](../adr/0023-client-portal-identity-and-isolation.md),
+issue #363) is the debtor's own say-so: a value they gave through the
+client portal's questionnaire, which a person at the firm accepted through
+the review queue. It is **not** `client`, though the ADR first called it
+that: `client` already meant "copied from the firm's directory, chosen by
+staff, no confirmation", and an answer is the opposite on both counts —
+so it gets its own name and sits **under the confirmation rule** below,
+with `ai_extracted` and `imported`. `extraction_id` names the candidate it
+was accepted from, and the candidate names the question. Like `client`, it
+is **keep-only** on a whole-record save: a save may echo the entry on a
+value nobody touched and is refused if it claims one
+(`provenance.require_server_sources_kept`).
+
+`copied_from_case_id` is not a source: a record copied into a new case
+(see "The lifecycle") keeps the entry it had — a value a person confirmed
+from a document is still that, and `document_id` still names the source
+case's document — and gains the case it was copied from. Laundering every
+copied origin into one new source would lose exactly the audit the entry
+exists for.
 
 `library` (issue 13.9 / #350) names a value copied from the firm's reusable
 creditor library (`insolvia_core.library_creditors`) onto a case record — a
@@ -405,7 +673,8 @@ every write path inherits them rather than each endpoint remembering:**
 
 `imported` is subject to the same confirmation requirement as `ai_extracted`.
 Machine-supplied is machine-supplied; the source system does not change who is
-signing the form.
+signing the form. So is `client_answered`: nothing a debtor types is case
+data until someone at the firm confirms it.
 
 Together those make "nothing extracted enters the case until a human confirms
 it" a property of the store rather than a promise about the UI. Unconfirmed
@@ -415,7 +684,7 @@ output therefore lives outside the case entirely:
 extraction_candidate {
   id, case_id, kind, payload,                  // payload mirrors its target entity
   document_id,                                 // optional — an MCP proposal has no source document
-  origin: { channel: mcp | extraction,         // which surface wrote this row, and as whom —
+  origin: { channel: mcp | extraction | client, // which surface wrote this row, and as whom —
             client_id, subject },              // from the verified token, never an argument
   confidence, locator,
   status: pending | accepted | corrected | rejected | withdrawn,
@@ -444,13 +713,75 @@ Corrections and rejections are retained after review — and so are
 withdrawals. They are the only measurement of extraction (and agent) quality
 we will ever get, and deleting them on accept throws that away.
 
+### Answers from the client portal
+
+The third writer ([ADR 0023](../adr/0023-client-portal-identity-and-isolation.md)
+PR 4, issue #363) is the debtor, answering the portal questionnaire. Its
+rows are the same `extraction_candidate`, in the same queue:
+
+- `origin = {channel: client, client_id: <the portal app client>, subject}`,
+  from the verified portal token.
+- `locator = {kind: question, section_id, question_id, filing_role}` — a
+  QUESTION, not a page. `section_id` is one of
+  `insolvia_core.questionnaire`'s section ids; `question_id` one of
+  `insolvia_core.questions`' (both are stable contracts: added to, never
+  renamed); `filing_role` is who the answer is for, bounded by the
+  binding's roles. The locator stays on the candidate; it is not copied
+  into provenance, whose `locator` means a place on a page.
+- `payload` is a fragment of the target's own body shape, built from the
+  question's inputs and validated by the target's own parse function. A
+  question names its target: `debtors` (the debtor's own fields — name,
+  other names, both addresses, phone, mobile, email) or one generic
+  collection (one new record per answer: an asset, a creditor, an
+  employment, an expense, a contract or lease).
+- **Edit-while-pending.** The client may change (`PUT`) or withdraw
+  (`DELETE`) their own `pending` row; once staff have acted, the row is
+  immutable and a change is a new candidate. That is also the
+  questionnaire's resume state — there is no second draft store. A
+  non-repeating question takes one pending answer per client and role at a
+  time; a client holds at most 200 pending answers.
+
+**Acceptance.** A record answer is accepted exactly as an extracted record
+is: a new record, its fields `client_answered` with the confirmation pair
+and `extraction_id`, `staff_typed` where the reviewer corrected them. An
+employment's `debtor_id` and an expense's `household_id` are filled from
+the case at acceptance (the answering debtor; the main household), on the
+staff side — the portal never reads case records, so it knows no record
+ids. A **debtor answer is merged into that debtor's record**, which exists
+from the case's opening (ADR 0022): the answered paths are minted
+`client_answered` (or `staff_typed` where corrected), every other field
+keeps its entry, and an appended other name is added by its id rather than
+replacing the list. A Debtor 2 not yet linked is a 409.
+
+**What the client reads.** Only their own rows (`origin.subject == self`),
+in sections the firm still shows, as `{questionId, sectionId, filingRole,
+value, status}` — never the corrected payload, the reviewer or the
+resulting record id. A section switched off stops taking answers and hides
+its answers from the client; staff keep reviewing them.
+
+**What the first catalogue leaves out**, on purpose: the tax id (a sealed
+item — a candidate payload is no place for the digits); anything that is a
+second record's meaning (a claim needs its creditor, so `debts.creditor`
+asks for the creditor alone, not the amount or class); and anything that
+is the attorney's judgement rather than the debtor's fact (venue, credit
+counselling status, exemptions, intentions, priority, the means test).
+The SOFA, Schedule I's monthly figures and the household and dependents
+are the next to add.
+
 ## Documents and locators
 
 ```
 document { id, case_id, kind, file_name, content_type, byte_size, page_count,
            uploaded_by, uploaded_at, storage_ref, sha256,
            status,                               // pending | stored
-           etag }                                // set once the bytes are seen
+           etag,                                 // set once the bytes are seen
+           channel,                              // staff | client (ADR 0023)
+           request_id }                          // the document_request it answers
+
+document_request { id, case_id, title, kind, description,
+                   status,                       // requested | received | waived
+                   document_ids,                 // completed uploads against it
+                   created_at, created_by, updated_at, received_at }
 
 locator  { document_id, page,                    // 1-based
            region: { x, y, width, height } }     // fractions of the page box,
@@ -489,6 +820,21 @@ carrying an `upload=unconfirmed` tag after a day, which is safe only because
 confirmation is the one thing that clears it. Pending rows are returned by the
 listing like any other — a document whose upload failed is something the user
 needs to see and retry, not something to hide.
+
+**A client's upload is a document awaiting staff, not case data**
+([ADR 0023](../adr/0023-client-portal-identity-and-isolation.md) decision 6).
+It is the same record through the same two steps, with `channel: client` and
+the `request_id` of the case's `document_request` it answers; its `kind` is
+the request's, never the client's word. Nothing in it is a value about the
+debtor's affairs, so confirm-before-entry is untouched: what the document
+*says* reaches the case only through extraction and review, exactly as a
+staff upload's does — and a client's upload is not even auto-extracted until
+ADR 0019's ZDR item closes; a firm user asks for it. A `document_request` is a
+copy of an entry on the firm's checklist (`insolvia_core.document_requests`),
+so a firm editing its list never rewrites what a client was already asked.
+Its `received` status is set only by a completed upload against it — never
+by hand — so the case's "arrived against outstanding" can always be traced to
+a document.
 
 ## Storage validation is not filing completeness
 
@@ -562,6 +908,35 @@ invariant above governs agent writes exactly as it governs extraction. The
 tool surface that enforces this is the MCP milestone's design issue
 ([#260](https://github.com/insolvia-ai/insolvia/issues/260)).
 
+## Amendments — a per-item flag, not a copy of the case
+
+A schedule changed after filing is filed again as an amendment (Fed. R.
+Bankr. P. 1009) naming only what changed. The model carries that as one
+generic attribute beside `provenance` on every case-scoped entity (issue
+#370):
+
+```
+amended: bool          // false unless set; always present on the wire
+```
+
+- **It is not body data.** It needs no provenance entry, is never projected
+  as a value, and a PUT that omits it keeps the stored flag — "replace the
+  record whole" is about the body.
+- **It is only meaningful once the case is `filed`.** The API route refuses
+  `true` on any other status (409), rather than storing a flag that has
+  nothing to amend. The core parser checks shape only; the route is the
+  layer that holds the case's status.
+- **It drives one render, `OutputOptions.amended_only`.** Only the schedules
+  with an amended item print, each showing only those items and its own
+  "amended filing" caption ticked, followed by B106Sum and B106Dec and a
+  generated cover sheet (not an official form). It is the one packet a filed
+  case may still assemble, it resolves today's form revisions, and it writes
+  no pins to the case: the case's `form_revisions` go on describing the
+  original filing, and each amendment packet records its own.
+
+The case header's `is_amended` is a different fact (the whole-case box on
+every caption) and is still unset by anything.
+
 ## What this demands of the store
 
 Handing these constraints, not a decision, to the encrypted-case-store work:
@@ -597,6 +972,9 @@ A case belongs to a firm, and the entities that express that are:
 ```
 firm {
   id, name, status: active | suspended, created_at, updated_at
+  default_court, default_division   // a registry reference, for new cases (#360)
+  default_chapter
+  letterhead: { name, address, phone, email }
 }
 
 firm_user {                        // keyed (firm_id, subject) — no id of its own
@@ -608,6 +986,7 @@ firm_user {                        // keyed (firm_id, subject) — no id of its 
   access_all_cases: bool                    // every case, without per-case linking
   permissions: { <feature>: add_edit | view_only | hidden }
   status: active | disabled, created_at, updated_at
+  signature_block: { bar_number, bar_state, firm_name, address, phone, email }   // #360
 }
 
 case_assignment {                  // an item in the CASE's partition
@@ -637,16 +1016,45 @@ quietly comes to mean "can see everything"; collapsing `is_admin` into
 `access_all_cases` would mean the only way to see every matter is also to be
 able to change everyone's permissions.
 
-The feature list is ours — `cases`, `intake`, `documents`,
-`extraction_review`, `creditor_library`, `firm_administration` — and the
+**The firm's defaults prefill; they never decide** (issue #360). A new case's
+create form preselects `default_court`/`default_division`/`default_chapter`,
+and the petition's signer block copies an attorney's `signature_block` (keyed
+exactly as `filing_professional` is, so the copy needs no mapping) with the
+`letterhead` filling the firm lines a block leaves blank — onto the form, not
+onto the record. The preparer saves, and the record carries `staff_typed`
+provenance like anything else they confirmed. A `signature_block` is the
+attorney's own fact and self-service on `PATCH /v1/me`; every colleague may
+read it from the directory, because the prefill is case work and a bar number
+is printed on every filing.
+
+The feature list is ours — `insolvia_core.firms.FEATURES` owns it — and the
 default for anything not in a user's map is `hidden`. That is what lets a
 feature be listed before it exists (`extraction_review` is) without arriving
-already granted to every row written before it was named.
+already granted to every row written before it was named. `clients`
+([ADR 0022](../adr/0022-a-client-is-not-a-case.md)) arrived that way on
+purpose: every existing row has it hidden until an admin grants it.
+
+**A client is not a debtor.** The firm's client directory
+(`insolvia_core.firm_clients`, `/v1/firm/clients`) is a firm-scoped person
+record in the firm table, beside the library creditors; a debtor is that
+person's identity as copied into one case (see "Identity" above for the
+copy, `client_id` and the `by-client` index). Opening a case therefore needs
+`clients` at `view_only` as well as `cases` at `add_edit`, and a client's own
+case list (`GET /v1/firm/clients/<id>/cases`) is filtered per case through
+`may_see_case` and shows no count of the rest.
 
 ## Not here, on purpose
 
-- **Means-test forms 122A/B/C.** Their own milestone. `pay_period_record`
-  exists so they are implementable; their calculations are not modelled.
+- **Plan arithmetic.** The waterfall, feasibility and the § 1325(a)(4)
+  liquidation test are the API's calculator (`core/chapter13_plan.py`),
+  computed from `plan` and the records above and never stored. Official
+  Form 113 prints the calculator's figures (issue #367); which districts
+  take a local plan form instead is the court registry's
+  `chapter_13_plan` fact, not a case attribute.
+- **Means-test arithmetic (122A, 122C).** The calculations — § 707(b) on
+  Chapter 7, § 1325(b) on Chapter 13 — are the API's engine
+  (`services/api` `core/means_test.py`), computed from the records above and
+  never stored. B122B (Chapter 11) is not built.
 - **The forms-engine field mapping.** Which entity attribute lands on which
   form line, per revision — including the completeness check and the constant
   sets above. That is the forms milestone's artifact.

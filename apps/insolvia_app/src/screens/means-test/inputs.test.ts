@@ -91,8 +91,10 @@ describe('secured payments', () => {
 
 describe('verdictOf', () => {
   const base = {
+    chapter: 7,
     cmi: { combinedMonthlyTotal: '8700.00' },
     comparison: { annualMedian: '97540.00', aboveMedian: true },
+    chapter13: null,
   } as unknown as CaseMeansTest;
 
   it('reads every figure from the trace and never computes one', () => {
@@ -101,8 +103,60 @@ describe('verdictOf', () => {
       cmi: '$8700.00',
       median: '$97540.00',
       position: 'Above the median',
+      determinationLabel: 'Presumption of abuse',
       presumption: 'Presumption of abuse arises',
       intent: 'danger',
+      chapter13: null,
+    });
+  });
+
+  it('reads the Chapter 13 verdict — commitment period and disposable income — verbatim', () => {
+    const verdict = verdictOf({
+      ...base,
+      chapter: 13,
+      outcome: 'above_median',
+      chapter13: {
+        commitmentPeriodMonths: 60,
+        commitmentSource: 'x',
+        commitmentMaritalAdjustment: '0.00',
+        commitmentMonthlyIncome: '8700.00',
+        commitmentAnnualizedIncome: '104400.00',
+        commitmentAnnualMedian: '97540.00',
+        disposableIncomeRequired: true,
+        monthlyDisposableIncome: '-1079.33',
+      },
+    } as CaseMeansTest);
+    expect(verdict.determinationLabel).toBe('Disposable income under § 1325(b)(3)');
+    expect(verdict.presumption).toMatch(/Form 122C-2 is required/u);
+    expect(verdict.intent).toBe('warning');
+    expect(verdict.chapter13).toEqual({
+      commitmentPeriod: '60 months',
+      disposableIncome: '$-1079.33',
+    });
+  });
+
+  it('says a below-median Chapter 13 debtor files no 122C-2 and keeps the period', () => {
+    const verdict = verdictOf({
+      ...base,
+      chapter: 13,
+      comparison: { annualMedian: '97540.00', aboveMedian: false },
+      outcome: 'below_median',
+      chapter13: {
+        commitmentPeriodMonths: 36,
+        commitmentSource: 'x',
+        commitmentMaritalAdjustment: '0.00',
+        commitmentMonthlyIncome: '5800.00',
+        commitmentAnnualizedIncome: '69600.00',
+        commitmentAnnualMedian: '97540.00',
+        disposableIncomeRequired: false,
+        monthlyDisposableIncome: null,
+      },
+    } as CaseMeansTest);
+    expect(verdict.presumption).toMatch(/Form 122C-2 is not filed/u);
+    expect(verdict.intent).toBe('success');
+    expect(verdict.chapter13).toEqual({
+      commitmentPeriod: '36 months',
+      disposableIncome: 'Not determined under § 1325(b)(3)',
     });
   });
 

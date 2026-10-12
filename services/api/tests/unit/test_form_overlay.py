@@ -12,10 +12,11 @@ from dataclasses import replace
 from datetime import UTC, date, datetime
 
 import pytest
-from insolvia_api.core.form_fill import Text
+from insolvia_api.core.form_fill import Check, Option, Text
 from insolvia_api.core.form_overlay import (
     DEFAULT_OUTPUT_OPTIONS,
     OutputOptions,
+    apply_amendment_options,
     apply_output_stamps,
     apply_signature_options,
     output_options_json,
@@ -33,8 +34,10 @@ from tests.unit.test_form_projections import reference_case_file
 B101 = latest_form("form/b101")
 B106DEC = latest_form("form/b106dec")
 B106AB = latest_form("form/b106ab")
+B106I = latest_form("form/b106i")  # the radio-caption spelling
 B2010 = latest_form("form/b2010")  # flat: no AcroForm, no fields at all
 B2030 = latest_form("form/b2030")  # flat: no AcroForm, fields claim overlay boxes
+B121 = latest_form("form/b121")  # no per-schedule "amended" caption at all
 
 
 def _page_count(pdf_bytes: bytes) -> int:
@@ -107,6 +110,35 @@ def test_forms_is_refused_when_the_caller_does_not_allow_it() -> None:
         parse_output_options({"forms": ["b101"]}, allow_forms=False)
 
 
+# ── Amendments (issue #370) ───────────────────────────────────────
+
+
+def test_amended_only_parses_as_a_boolean() -> None:
+    parsed = parse_output_options({"amendedOnly": True}, allow_forms=True)
+    assert parsed.amended_only is True
+
+
+def test_amended_only_is_not_gated_by_allow_forms() -> None:
+    # Unlike "forms", amendedOnly is not the preview route's "already named
+    # one form" concern — it is allowed wherever "forms" is refused.
+    parsed = parse_output_options({"amendedOnly": True}, allow_forms=False)
+    assert parsed.amended_only is True
+
+
+def test_amended_only_cannot_combine_with_a_forms_subset() -> None:
+    with pytest.raises(FieldValidationError) as failure:
+        parse_output_options(
+            {"amendedOnly": True, "forms": ["b106d"]}, allow_forms=True
+        )
+    assert "amendedOnly" in failure.value.fields
+
+
+def test_amended_only_must_be_a_boolean() -> None:
+    with pytest.raises(FieldValidationError) as failure:
+        parse_output_options({"amendedOnly": "yes"}, allow_forms=True)
+    assert "amendedOnly" in failure.value.fields
+
+
 def test_output_options_json_round_trips_through_parse() -> None:
     options = OutputOptions(
         draft_watermark=True,
@@ -125,6 +157,7 @@ def test_output_options_json_always_carries_every_key() -> None:
         "printDate": False,
         "signaturePages": "all",
         "signElectronically": False,
+        "amendedOnly": False,
     }
     assert "forms" not in body  # None means "every form", not an empty list
 
@@ -156,6 +189,47 @@ def test_parse_output_options_query_refuses_forms() -> None:
     # a client's copy-pasted packet-assembly query string being ignored.
     with pytest.raises(FieldValidationError):
         parse_output_options_query({"forms": "b101,b106ab"})
+
+
+def test_parse_output_options_query_reads_amended_only() -> None:
+    assert parse_output_options_query({"amendedOnly": "true"}) == OutputOptions(
+        amended_only=True
+    )
+
+
+# ── Amendments: the "amended filing" caption (issue #370) ─────────────────
+
+
+def test_apply_amendment_options_is_a_no_op_when_not_amended() -> None:
+    values = {"some.field": Text("x")}
+    result = apply_amendment_options(B106AB, values, amended=False)
+    assert result is values
+
+
+def test_apply_amendment_options_ticks_a_checkbox_caption() -> None:
+    result = apply_amendment_options(B106AB, {}, amended=True)
+    assert result["caption.amended_filing"] == Check()
+
+
+def test_apply_amendment_options_selects_the_amended_radio_branch() -> None:
+    # 106I's caption is a two-way radio (amended vs. a Ch.13 postpetition
+    # supplement) rather than a plain checkbox — the "amended" branch is
+    # picked by the spec's own annotation, not by position.
+    result = apply_amendment_options(B106I, {}, amended=True)
+    assert result["caption.amended_or_supplement"] == Option("amended")
+
+
+def test_apply_amendment_options_never_touches_other_fields() -> None:
+    values = {"some.field": Text("kept")}
+    result = apply_amendment_options(B106AB, values, amended=True)
+    assert result["some.field"] == Text("kept")
+    assert result is not values  # a copy, like apply_signature_options
+
+
+def test_apply_amendment_options_is_a_no_op_for_a_release_with_no_caption() -> None:
+    # B121 prints no per-schedule "amended" box at all.
+    result = apply_amendment_options(B121, {}, amended=True)
+    assert result == {}
 
 
 # ── Signature-page selection ──────────────────────────────────────

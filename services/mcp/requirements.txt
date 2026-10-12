@@ -17,6 +17,10 @@ mangum==0.22.0
 boto3==1.40.66
 # JWT verification for Cognito access tokens, via insolvia_core.auth.
 PyJWT[crypto]==2.13.0
+# Named directly because insolvia_core's tax-id envelope imports it by name
+# (issue 13.12 / #382) — this service never seals or opens one, but the
+# package it installs does, so the pin stays aligned with the API's.
+cryptography==50.0.1
 # The shared domain (ADR 0012/0016): firms, token verification, the case
 # domain, and their adapters. A local path resolved against the CURRENT
 # WORKING DIRECTORY — every installer must run from this directory (CI's

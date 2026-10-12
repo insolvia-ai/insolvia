@@ -26,7 +26,11 @@ from insolvia_core.adapters.memory.case_store import MemoryCaseStore
 from insolvia_core.adapters.memory.debtor_store import MemoryDebtorStore
 from insolvia_core.adapters.memory.firm_store import MemoryFirmStore
 from insolvia_core.adapters.memory.jwks_provider import StaticJwksProvider
+from insolvia_core.adapters.memory.tax_id_cipher import LocalTaxIdCipher
+from insolvia_core.adapters.memory.tax_id_store import MemoryTaxIdStore
 from insolvia_core.firms import Firm, FirmUser, default_permissions
+
+from tests.unit.opening import with_client
 
 ISSUER = "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_EXAMPLE00"
 CLIENT_ID = "exampleappclientid000000"
@@ -113,6 +117,8 @@ def client():
             firm_store=firms,
             access_log=MemoryAccessLog(),
             debtor_store=MemoryDebtorStore(),
+            tax_id_store=MemoryTaxIdStore(),
+            tax_id_cipher=LocalTaxIdCipher(),
             case_entity_store=MemoryCaseEntityStore(),
         )
     )
@@ -121,7 +127,13 @@ def client():
 
 def open_case(client, subject=ALICE):
     response = client.post(
-        "/v1/cases", json={"chapter": 7, "district": "NDFL"}, headers=auth(subject)
+        "/v1/cases",
+        json=with_client(
+            client,
+            auth(subject),
+            {"chapter": 7, "court": "flnb", "division": "tallahassee"},
+        ),
+        headers=auth(subject),
     )
     assert response.status_code == 201
     return response.get_json()["id"]
@@ -184,12 +196,14 @@ def test_a_mailable_creditor_list_produces_the_file(client):
     add_creditor(client, case_id)
     response = get_matrix(client, case_id)
     assert response.status_code == 200
+    # The case is in N.D. Fla. (`flnb`), whose verified instructions put a
+    # comma after the city — the registry's format reaching the file (#360).
     assert response.get_json() == {
         "fileName": "creditor-matrix.txt",
         "creditorCount": 1,
         "duplicatesOmitted": 0,
         "problems": [],
-        "content": "Example Bank\r\nPO Box 15168\r\nWilmington DE 19850\r\n",
+        "content": "Example Bank\r\nPO Box 15168\r\nWilmington, DE 19850\r\n",
     }
 
 

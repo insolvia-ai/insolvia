@@ -14,6 +14,14 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ADMIN_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+
+# The credentials file dev-up.sh keeps refreshed for the container: its loop
+# removes it when compose exits, but a dev-up that was SIGKILLed never got
+# that far.
+# shellcheck source=/dev/null
+source "$REPO_ROOT/scripts/dev-aws-common.sh"
+stop_container_aws_credentials admin
 
 if ! command -v docker >/dev/null 2>&1; then
   printf '\033[1;34m[dev-down]\033[0m docker not found — nothing to stop.\n'

@@ -1,4 +1,4 @@
-import { screen, userEvent } from '@testing-library/react-native';
+import { screen, userEvent, waitFor } from '@testing-library/react-native';
 import { renderRouter } from 'expo-router/testing-library';
 
 import type { AuthConfig } from '@/config/environment';
@@ -77,6 +77,45 @@ const FIRM_RECORD = {
   updatedAt: '2026-08-01T12:00:00.000Z',
 };
 
+const SECTION_TITLES = [
+  ['personal_information', 'Personal information'],
+  ['property', 'Property'],
+  ['debts', 'Debts'],
+  ['income', 'Income'],
+  ['expenses', 'Expenses'],
+  ['other', 'Other'],
+] as const;
+
+/** Shaped as core/questionnaire.py::questionnaire_json answers for a firm on the defaults. */
+const DEFAULT_QUESTIONNAIRE = {
+  isDefault: true,
+  updatedAt: null,
+  updatedBy: null,
+  sections: SECTION_TITLES.map(([id, title]) => ({
+    id,
+    title,
+    covers: `What ${title.toLowerCase()} covers.`,
+    switchable: id !== 'personal_information',
+    enabled: true,
+    instructions: null,
+    defaultInstructions: `Default instructions for ${title.toLowerCase()}.`,
+  })),
+};
+
+/** Shaped as core/document_requests.py::checklist_json answers for a firm on the default. */
+const CHECKLIST_ITEM = {
+  title: 'Bank statements',
+  kind: 'bank_statement',
+  description: 'Six months.',
+};
+const DEFAULT_CHECKLIST = {
+  isDefault: true,
+  updatedAt: null,
+  updatedBy: null,
+  items: [CHECKLIST_ITEM],
+  defaultItems: [CHECKLIST_ITEM],
+};
+
 /**
  * `/firm` — the firm's own people.
  *
@@ -104,6 +143,10 @@ describe('the firm screen', () => {
     // cannot see — hence the wrapper.
     const route = routeFetch({
       '/oauth2/token': tokenEndpointResponse,
+      // BEFORE the spread, so a test's own questionnaire handler replaces
+      // this value while keeping its place ahead of the bare /v1/firm key.
+      '/v1/firm/questionnaire': () => jsonResponse(200, DEFAULT_QUESTIONNAIRE),
+      '/v1/firm/document-checklist': () => jsonResponse(200, DEFAULT_CHECKLIST),
       ...handlers,
       '/v1/firm': () => jsonResponse(200, FIRM_RECORD),
     });
@@ -276,6 +319,74 @@ describe('the firm screen', () => {
     expect(JSON.parse(String(patch?.[1]?.body))).toEqual({ name: 'Example, LLP' });
   });
 
+  it('saves the case defaults and letterhead as their own PATCH, with both halves of the court', async () => {
+    // Issue #360. A separate button from the rename, so each PATCH sends
+    // exactly what its button names.
+    const fetchMock = signedIn(
+      {
+        '/v1/me': () => jsonResponse(200, membership()),
+        '/v1/firm/users': () => jsonResponse(200, { users: [] }),
+        '/v1/courts': () =>
+          jsonResponse(200, {
+            releaseId: 'courts/us-bankruptcy@2026-09-24',
+            effectiveDate: '2026-09-24',
+            districts: [
+              {
+                code: 'flmb',
+                courtId: 'FLMBK',
+                name: 'Middle District of Florida',
+                state: 'FL',
+                circuit: 11,
+                website: 'https://www.flmb.uscourts.gov/',
+                divisions: [
+                  {
+                    code: 'tampa',
+                    name: 'Tampa Division',
+                    officeCode: '8',
+                    officeCodeVerified: true,
+                    courthouse: null,
+                    counties: [{ name: 'Hillsborough', fips: '12057' }],
+                  },
+                ],
+                caseUpload: { status: 'unverified', verifiedAt: null },
+              },
+            ],
+          }),
+      },
+      () =>
+        jsonResponse(200, {
+          ...FIRM_RECORD,
+          defaultCourt: 'flmb',
+          defaultDivision: 'tampa',
+          defaultChapter: 13,
+          letterhead: { name: 'Example & Partners, P.A.', phone: '813-555-0100' },
+        }),
+    );
+    await screen.findByDisplayValue('Example & Partners');
+
+    const user = userEvent.setup();
+    await user.press(await screen.findByRole('combobox', { name: 'Default court' }));
+    await user.press(await screen.findByRole('option', { name: 'Middle District of Florida' }));
+    await user.press(screen.getByRole('combobox', { name: 'Default division' }));
+    await user.press(await screen.findByRole('option', { name: 'Tampa Division' }));
+    await user.press(screen.getByRole('combobox', { name: 'Default chapter' }));
+    await user.press(await screen.findByRole('option', { name: 'Chapter 13' }));
+    await user.type(screen.getByLabelText('Letterhead name'), 'Example & Partners, P.A.');
+    await user.type(screen.getByLabelText('Letterhead phone'), '813-555-0100');
+    await user.press(screen.getByRole('button', { name: 'Save case defaults' }));
+
+    expect(await screen.findByText('Your firm’s case defaults are saved.')).toBeTruthy();
+    const patch = fetchMock.mock.calls.find(
+      ([url, init]) => url.endsWith('/v1/firm') && init?.method === 'PATCH',
+    );
+    expect(JSON.parse(String(patch?.[1]?.body))).toEqual({
+      defaultCourt: 'flmb',
+      defaultDivision: 'tampa',
+      defaultChapter: 13,
+      letterhead: { name: 'Example & Partners, P.A.', phone: '813-555-0100' },
+    });
+  });
+
   it('shows the record read-only to a viewer, with no rename control', async () => {
     signedIn({
       '/v1/me': () =>
@@ -304,5 +415,144 @@ describe('the firm screen', () => {
       .getAllByRole('heading')
       .filter((node) => node.props['aria-level'] === 1);
     expect(levelOnes).toHaveLength(1);
+  });
+
+  describe('the client questionnaire (ADR 0023 PR 3)', () => {
+    it('lists every section, with a switch on each but personal information', async () => {
+      signedIn({
+        '/v1/me': () => jsonResponse(200, membership()),
+        '/v1/firm/users': () => jsonResponse(200, { users: [] }),
+      });
+
+      expect(await screen.findByRole('heading', { name: 'Client questionnaire' })).toBeTruthy();
+      for (const [, title] of SECTION_TITLES) {
+        expect(screen.getByRole('heading', { name: title })).toBeTruthy();
+      }
+      expect(screen.getByText('Always shown to clients')).toBeTruthy();
+      expect(screen.getAllByRole('switch')).toHaveLength(5);
+      expect(
+        screen.queryByRole('switch', { name: 'Show personal information to clients' }),
+      ).toBeNull();
+    });
+
+    it('saves a section switched off as the whole record', async () => {
+      const fetchMock = signedIn({
+        '/v1/me': () => jsonResponse(200, membership()),
+        '/v1/firm/users': () => jsonResponse(200, { users: [] }),
+      });
+      const user = userEvent.setup();
+      await user.press(await screen.findByRole('switch', { name: 'Show expenses to clients' }));
+
+      expect(screen.getByText('Hidden from clients — staff only')).toBeTruthy();
+      await user.press(screen.getByRole('button', { name: 'Save questionnaire' }));
+
+      const put = fetchMock.mock.calls.find(
+        ([url, init]) => url.endsWith('/v1/firm/questionnaire') && init?.method === 'PUT',
+      );
+      const body = JSON.parse(String(put?.[1]?.body)) as {
+        sections: { id: string; enabled: boolean; instructions: string | null }[];
+      };
+      expect(body.sections.map((section) => [section.id, section.enabled])).toEqual([
+        ['personal_information', true],
+        ['property', true],
+        ['debts', true],
+        ['income', true],
+        ['expenses', false],
+        ['other', true],
+      ]);
+      // The textarea held the default in force; the server stores that as
+      // "use the default", so sending it is not a customisation.
+      expect(body.sections[4]?.instructions).toBe('Default instructions for expenses.');
+    });
+
+    it('asks before resetting to the defaults, then resets', async () => {
+      const customised = {
+        ...DEFAULT_QUESTIONNAIRE,
+        isDefault: false,
+        updatedAt: '2026-10-01T09:00:00.000000Z',
+        updatedBy: ALICE,
+      };
+      const fetchMock = signedIn({
+        '/v1/me': () => jsonResponse(200, membership()),
+        '/v1/firm/users': () => jsonResponse(200, { users: [] }),
+        '/v1/firm/questionnaire': () => jsonResponse(200, customised),
+      });
+      const user = userEvent.setup();
+      await user.press(await screen.findByRole('button', { name: 'Reset to defaults' }));
+
+      expect(await screen.findByText('Reset the questionnaire?')).toBeTruthy();
+      await user.press(screen.getByRole('button', { name: 'Reset' }));
+
+      const reset = fetchMock.mock.calls.find(
+        ([url, init]) => url.endsWith('/v1/firm/questionnaire') && init?.method === 'DELETE',
+      );
+      expect(reset).toBeTruthy();
+    });
+
+    it('shows a viewer the questionnaire with nothing to change', async () => {
+      signedIn({
+        '/v1/me': () =>
+          jsonResponse(
+            200,
+            membership({
+              isAdmin: false,
+              permissions: { ...ALL_ADD_EDIT, firm_administration: 'view_only' },
+            }),
+          ),
+        '/v1/firm/users': () => jsonResponse(200, { users: [] }),
+      });
+
+      expect(await screen.findByText('Default instructions for debts.')).toBeTruthy();
+      expect(screen.queryByRole('button', { name: 'Save questionnaire' })).toBeNull();
+      expect(screen.queryByLabelText('Instructions for your client')).toBeNull();
+    });
+  });
+
+  describe('the document checklist (ADR 0023 PR 5)', () => {
+    it('lists the default checklist and saves the whole list with an added entry', async () => {
+      const fetchMock = signedIn({
+        '/v1/me': () => jsonResponse(200, membership()),
+        '/v1/firm/users': () => jsonResponse(200, { users: [] }),
+      });
+      const user = userEvent.setup();
+
+      expect(await screen.findByRole('heading', { name: 'Document checklist' })).toBeTruthy();
+      expect(await screen.findByText('Your firm uses the default checklist.')).toBeTruthy();
+      expect(screen.getByDisplayValue('Bank statements')).toBeTruthy();
+
+      await user.press(screen.getByRole('button', { name: 'Add a document' }));
+      const titles = screen.getAllByLabelText('Document');
+      await user.type(titles[titles.length - 1]!, 'Lease');
+      await user.press(screen.getByRole('button', { name: 'Save checklist' }));
+
+      await waitFor(() => {
+        const put = fetchMock.mock.calls.find(
+          ([url, init]) => url.endsWith('/v1/firm/document-checklist') && init?.method === 'PUT',
+        );
+        expect(JSON.parse(String(put?.[1]?.body))).toEqual({
+          items: [
+            { title: 'Bank statements', kind: 'bank_statement', description: 'Six months.' },
+            { title: 'Lease', kind: 'other' },
+          ],
+        });
+      });
+    });
+
+    it('shows a viewer the checklist with nothing to change', async () => {
+      signedIn({
+        '/v1/me': () =>
+          jsonResponse(
+            200,
+            membership({
+              isAdmin: false,
+              permissions: { ...ALL_ADD_EDIT, firm_administration: 'view_only' },
+            }),
+          ),
+        '/v1/firm/users': () => jsonResponse(200, { users: [] }),
+      });
+
+      expect(await screen.findByRole('heading', { name: 'Bank statements' })).toBeTruthy();
+      expect(screen.queryByRole('button', { name: 'Save checklist' })).toBeNull();
+    });
   });
 });

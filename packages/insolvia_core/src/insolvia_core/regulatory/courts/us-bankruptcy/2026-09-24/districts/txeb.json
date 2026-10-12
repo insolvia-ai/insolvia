@@ -1,0 +1,545 @@
+{
+  "code": "txeb",
+  "court_id": "TXEBK",
+  "name": "Eastern District of Texas",
+  "state": "TX",
+  "circuit": 5,
+  "website": "http://www.txeb.uscourts.gov/",
+  "divisions": [
+    {
+      "code": "tyler",
+      "name": "Tyler Division",
+      "office_code": {
+        "value": null,
+        "status": "unverified",
+        "source": null,
+        "verified_at": null,
+        "note": "The CM/ECF office code (the digit before the colon in the case number; Case Upload field 10) was not found on a page read for this court. It is a fact the training-database session (ADR 0024, PR 5) confirms per court."
+      },
+      "courthouse": {
+        "value": {
+          "name": "U.S. Bankruptcy Court, Eastern District of Texas",
+          "line1": "110 North College Ave",
+          "line2": "9th Floor",
+          "city": "Tyler",
+          "state": "TX",
+          "postal_code": "75702"
+        },
+        "status": "verified",
+        "source": "S34",
+        "verified_at": "2026-09-24",
+        "note": null
+      },
+      "counties": [
+        {
+          "name": "Anderson",
+          "fips": "48001"
+        },
+        {
+          "name": "Cherokee",
+          "fips": "48073"
+        },
+        {
+          "name": "Gregg",
+          "fips": "48183"
+        },
+        {
+          "name": "Henderson",
+          "fips": "48213"
+        },
+        {
+          "name": "Panola",
+          "fips": "48365"
+        },
+        {
+          "name": "Rains",
+          "fips": "48379"
+        },
+        {
+          "name": "Rusk",
+          "fips": "48401"
+        },
+        {
+          "name": "Smith",
+          "fips": "48423"
+        },
+        {
+          "name": "Van Zandt",
+          "fips": "48467"
+        },
+        {
+          "name": "Wood",
+          "fips": "48499"
+        }
+      ],
+      "counties_source": "S41"
+    },
+    {
+      "code": "beaumont",
+      "name": "Beaumont Division",
+      "office_code": {
+        "value": null,
+        "status": "unverified",
+        "source": null,
+        "verified_at": null,
+        "note": "The CM/ECF office code (the digit before the colon in the case number; Case Upload field 10) was not found on a page read for this court. It is a fact the training-database session (ADR 0024, PR 5) confirms per court."
+      },
+      "courthouse": {
+        "value": {
+          "name": "U.S. Bankruptcy Court, Beaumont Division",
+          "line1": "300 Willow Street",
+          "line2": "Suite 100",
+          "city": "Beaumont",
+          "state": "TX",
+          "postal_code": "77701"
+        },
+        "status": "verified",
+        "source": "S34",
+        "verified_at": "2026-09-24",
+        "note": null
+      },
+      "counties": [
+        {
+          "name": "Hardin",
+          "fips": "48199"
+        },
+        {
+          "name": "Jasper",
+          "fips": "48241"
+        },
+        {
+          "name": "Jefferson",
+          "fips": "48245"
+        },
+        {
+          "name": "Liberty",
+          "fips": "48291"
+        },
+        {
+          "name": "Newton",
+          "fips": "48351"
+        },
+        {
+          "name": "Orange",
+          "fips": "48361"
+        }
+      ],
+      "counties_source": "S41"
+    },
+    {
+      "code": "sherman",
+      "name": "Sherman Division",
+      "office_code": {
+        "value": null,
+        "status": "unverified",
+        "source": null,
+        "verified_at": null,
+        "note": "The CM/ECF office code (the digit before the colon in the case number; Case Upload field 10) was not found on a page read for this court. It is a fact the training-database session (ADR 0024, PR 5) confirms per court."
+      },
+      "courthouse": {
+        "value": {
+          "name": "U.S. Bankruptcy Court, Plano Division office",
+          "line1": "660 North Central Expressway",
+          "line2": "Suite 300B",
+          "city": "Plano",
+          "state": "TX",
+          "postal_code": "75074"
+        },
+        "status": "verified",
+        "source": "S34",
+        "verified_at": "2026-09-24",
+        "note": "The statute holds court for the Sherman Division 'at Sherman and Plano'; the PACER lookup lists the Plano office, which is the address recorded here."
+      },
+      "counties": [
+        {
+          "name": "Collin",
+          "fips": "48085"
+        },
+        {
+          "name": "Cooke",
+          "fips": "48097"
+        },
+        {
+          "name": "Delta",
+          "fips": "48119"
+        },
+        {
+          "name": "Denton",
+          "fips": "48121"
+        },
+        {
+          "name": "Fannin",
+          "fips": "48147"
+        },
+        {
+          "name": "Grayson",
+          "fips": "48181"
+        },
+        {
+          "name": "Hopkins",
+          "fips": "48223"
+        },
+        {
+          "name": "Lamar",
+          "fips": "48277"
+        }
+      ],
+      "counties_source": "S41"
+    },
+    {
+      "code": "marshall",
+      "name": "Marshall Division",
+      "office_code": {
+        "value": null,
+        "status": "unverified",
+        "source": null,
+        "verified_at": null,
+        "note": "The CM/ECF office code (the digit before the colon in the case number; Case Upload field 10) was not found on a page read for this court. It is a fact the training-database session (ADR 0024, PR 5) confirms per court."
+      },
+      "courthouse": {
+        "value": null,
+        "status": "unverified",
+        "source": "S34",
+        "verified_at": null,
+        "note": "The PACER lookup lists offices at Tyler, Plano and Beaumont only; no address for this division was read."
+      },
+      "counties": [
+        {
+          "name": "Camp",
+          "fips": "48063"
+        },
+        {
+          "name": "Cass",
+          "fips": "48067"
+        },
+        {
+          "name": "Harrison",
+          "fips": "48203"
+        },
+        {
+          "name": "Marion",
+          "fips": "48315"
+        },
+        {
+          "name": "Morris",
+          "fips": "48343"
+        },
+        {
+          "name": "Upshur",
+          "fips": "48459"
+        }
+      ],
+      "counties_source": "S41"
+    },
+    {
+      "code": "texarkana",
+      "name": "Texarkana Division",
+      "office_code": {
+        "value": null,
+        "status": "unverified",
+        "source": null,
+        "verified_at": null,
+        "note": "The CM/ECF office code (the digit before the colon in the case number; Case Upload field 10) was not found on a page read for this court. It is a fact the training-database session (ADR 0024, PR 5) confirms per court."
+      },
+      "courthouse": {
+        "value": null,
+        "status": "unverified",
+        "source": "S34",
+        "verified_at": null,
+        "note": "The PACER lookup lists offices at Tyler, Plano and Beaumont only; no address for this division was read."
+      },
+      "counties": [
+        {
+          "name": "Bowie",
+          "fips": "48037"
+        },
+        {
+          "name": "Franklin",
+          "fips": "48159"
+        },
+        {
+          "name": "Red River",
+          "fips": "48387"
+        },
+        {
+          "name": "Titus",
+          "fips": "48449"
+        }
+      ],
+      "counties_source": "S41"
+    },
+    {
+      "code": "lufkin",
+      "name": "Lufkin Division",
+      "office_code": {
+        "value": null,
+        "status": "unverified",
+        "source": null,
+        "verified_at": null,
+        "note": "The CM/ECF office code (the digit before the colon in the case number; Case Upload field 10) was not found on a page read for this court. It is a fact the training-database session (ADR 0024, PR 5) confirms per court."
+      },
+      "courthouse": {
+        "value": null,
+        "status": "unverified",
+        "source": "S34",
+        "verified_at": null,
+        "note": "The PACER lookup lists offices at Tyler, Plano and Beaumont only; no address for this division was read."
+      },
+      "counties": [
+        {
+          "name": "Angelina",
+          "fips": "48005"
+        },
+        {
+          "name": "Houston",
+          "fips": "48225"
+        },
+        {
+          "name": "Nacogdoches",
+          "fips": "48347"
+        },
+        {
+          "name": "Polk",
+          "fips": "48373"
+        },
+        {
+          "name": "Sabine",
+          "fips": "48403"
+        },
+        {
+          "name": "San Augustine",
+          "fips": "48405"
+        },
+        {
+          "name": "Shelby",
+          "fips": "48419"
+        },
+        {
+          "name": "Trinity",
+          "fips": "48455"
+        },
+        {
+          "name": "Tyler",
+          "fips": "48457"
+        }
+      ],
+      "counties_source": "S41"
+    }
+  ],
+  "cmecf": {
+    "live_url": {
+      "value": "https://ecf.txeb.uscourts.gov/cgi-bin/login.pl",
+      "status": "verified",
+      "source": "S45",
+      "verified_at": "2026-09-24",
+      "note": null
+    },
+    "training_url": {
+      "value": null,
+      "status": "unverified",
+      "source": null,
+      "verified_at": null,
+      "note": "No training database URL on a page read for this court."
+    },
+    "help_desk": {
+      "value": "(903) 590-3200 (Tyler); (972) 509-1240 (Plano); (409) 839-2617 (Beaumont)",
+      "status": "verified",
+      "source": "S34",
+      "verified_at": "2026-09-24",
+      "note": null
+    },
+    "release": {
+      "value": "1.9",
+      "status": "verified",
+      "source": "S34",
+      "verified_at": "2026-09-24",
+      "note": "software_version 'NextGen CM/ECF Release 1.9'."
+    }
+  },
+  "pdf": {
+    "max_bytes": {
+      "value": 10485760,
+      "status": "unverified",
+      "source": "S9",
+      "verified_at": null,
+      "note": "10 MB in the 2017 statewide ECF Procedures [S9]; ADR 0024 marks it 'verify'. The PACER lookup [S34] carries merge_doc_size '1' with no unit."
+    },
+    "text_searchable_required": {
+      "value": null,
+      "status": "unverified",
+      "source": null,
+      "verified_at": null,
+      "note": "Not stated on a page read for this court."
+    },
+    "flatten_required": {
+      "value": null,
+      "status": "unverified",
+      "source": null,
+      "verified_at": null,
+      "note": "Not stated on a page read for this court."
+    },
+    "pdf_a_required": {
+      "value": false,
+      "status": "unverified",
+      "source": "S16",
+      "verified_at": null,
+      "note": "No page of this court read mentions PDF/A; the figure is ADR 0024's 'no launch court requires PDF/A today' [S16], not confirmed on a court page."
+    }
+  },
+  "matrix": {
+    "max_line_chars": {
+      "value": 40,
+      "status": "verified",
+      "source": "S46",
+      "verified_at": "2026-09-24",
+      "note": "I.B.6: 'Each name and address must consist of at least two but not more than five lines, each forty characters or less in length.'"
+    },
+    "max_creditor_lines": {
+      "value": 5,
+      "status": "verified",
+      "source": "S46",
+      "verified_at": "2026-09-24",
+      "note": "I.B.6, as above."
+    },
+    "blank_lines_between": {
+      "value": 2,
+      "status": "verified",
+      "source": "S46",
+      "verified_at": "2026-09-24",
+      "note": "I.B.19: 'There must be two blank lines between one creditor's name and address and another's.'"
+    },
+    "pad_to_lines": {
+      "value": null,
+      "status": "verified",
+      "source": "S46",
+      "verified_at": "2026-09-24",
+      "note": "No fixed block size is stated."
+    },
+    "name_line_chars": {
+      "value": null,
+      "status": "verified",
+      "source": "S46",
+      "verified_at": "2026-09-24",
+      "note": "No separate name-line width."
+    },
+    "comma_after_city": {
+      "value": false,
+      "status": "verified",
+      "source": "S46",
+      "verified_at": "2026-09-24",
+      "note": "I.B.17: 'There should be no punctuation included, except the hyphen in the ZIP code'; II.B.7: 'no commas or periods in any part of the address. There should be 2 spaces between the state and zip code.'"
+    },
+    "case_number_header_when_separate": {
+      "value": true,
+      "status": "verified",
+      "source": "S46",
+      "verified_at": "2026-09-24",
+      "note": "III.A.2 (matrix filed separately): 'You must include the case number issued by the Court on the first line of the matrix followed by two (2) blank lines'; III.B (Case Upload): the matrix 'should not be filed separately per LBR 1007(a)1(A), because the case upload program satisfies that requirement.'"
+    },
+    "certification_required": {
+      "value": null,
+      "status": "unverified",
+      "source": "S46",
+      "verified_at": null,
+      "note": "No certification requirement is stated in the appendix."
+    }
+  },
+  "opening": {
+    "signature_instrument": {
+      "value": {
+        "kind": "declaration_for_electronic_filing",
+        "title": "Declaration for Electronic Filing (Exhibits B-1/B-2 of the statewide ECF Procedures)",
+        "wet_ink_required": true,
+        "retention": null,
+        "own_docket_event": null,
+        "form_url": null
+      },
+      "status": "unverified",
+      "source": "S9",
+      "verified_at": null,
+      "note": "ADR 0024 [S9]: Texas files a Declaration for Electronic Filing (Exhibits B-1/B-2/B-3) bearing the debtor's wet-ink signature, DocuSign refused; the 2017 statewide text was not re-read today, so the instrument is carried unverified. A court's own current procedures may differ (TXWB's 2025 document is its own). TXEB Appendix 5005 [S10] is the local counterpart (ADR 0024); not re-read today."
+    },
+    "ssn_statement": {
+      "value": null,
+      "status": "unverified",
+      "source": null,
+      "verified_at": null,
+      "note": "Not stated on a page read for this court."
+    },
+    "local_forms": [],
+    "fee_rule": {
+      "value": null,
+      "status": "unverified",
+      "source": null,
+      "verified_at": null,
+      "note": "Not stated on a page read for this court."
+    }
+  },
+  "case_upload": {
+    "status": "unverified",
+    "kind": null,
+    "verified_at": null,
+    "note": "LBR Appendix 1007-b-5 III.B [S46] assumes Case Upload delivers the matrix 'in proper format when the case is uploaded'; the court's required field set has not been verified in a training-database session."
+  },
+  "registration": {
+    "training_required": {
+      "value": null,
+      "status": "unverified",
+      "source": null,
+      "verified_at": null,
+      "note": "Not stated on a page read for this court."
+    },
+    "notes": "Registration is through PACER's attorney-filer registration, linked from the court's e-services page [S45]."
+  },
+  "sources": [
+    {
+      "id": "S9",
+      "title": "Texas Bankruptcy Courts, ECF Procedures (statewide, amended 2017-01-12; carried from ADR 0024, not re-read)",
+      "url": "https://www.txs.uscourts.gov/sites/txs/files/bk_adminproc.pdf.pdf",
+      "read": "2026-09-23"
+    },
+    {
+      "id": "S10",
+      "title": "TXEB, Appendix 5005 (redline to 2022-08-22; carried from ADR 0024, not re-read)",
+      "url": "https://www.txeb.uscourts.gov/sites/txeb/files/Appendix%205005%20-%20redline%2012-1-2016%20to%208-22-2022.pdf",
+      "read": "2026-09-23"
+    },
+    {
+      "id": "S16",
+      "title": "PACER FAQ, Is there a limit on the size of the PDF files which CM/ECF will accept (carried from ADR 0024; not re-read)",
+      "url": "https://pacer.uscourts.gov/help/faqs/there-limit-size-pdf-files-which-cmecf-will-accept",
+      "read": "2026-09-23"
+    },
+    {
+      "id": "S34",
+      "title": "PACER, Court CM/ECF Lookup data (last_updated Thu, 24 Sep 2026 06:10:04 -0400)",
+      "url": "https://pacer.uscourts.gov/file-case/court-cmecf-lookup/data.json",
+      "read": "2026-09-24"
+    },
+    {
+      "id": "S41",
+      "title": "28 U.S.C. § 124 — Texas (judicial districts and divisions)",
+      "url": "https://www.law.cornell.edu/uscode/text/28/124",
+      "read": "2026-09-24"
+    },
+    {
+      "id": "S42",
+      "title": "U.S. Census Bureau, 2020 national county file (FIPS codes)",
+      "url": "https://www2.census.gov/geo/docs/reference/codes2020/national_county2020.txt",
+      "read": "2026-09-24"
+    },
+    {
+      "id": "S45",
+      "title": "TXEB, Debtor and Creditor Attorneys (e-services)",
+      "url": "https://www.txeb.uscourts.gov/e-services-attorneys",
+      "read": "2026-09-24"
+    },
+    {
+      "id": "S46",
+      "title": "TXEB, LBR Appendix 1007-b-5, Guidelines for Submission of a Master Mailing List (revised 2011-05-16)",
+      "url": "https://www.txeb.uscourts.gov/sites/txeb/files/LBR%20Appendix%201007-b-5,%20Matrix%20Submission.pdf",
+      "read": "2026-09-24"
+    }
+  ],
+  "notes": "Divisions and counties are 28 U.S.C. § 124(c) [S41], which says 'seven divisions' and lists six (Tyler, Beaumont, Sherman, Marshall, Texarkana, Lufkin); the statute's 'Cook' is the Census 'Cooke' (48097), which is also the PACER lookup's spelling. The bankruptcy court's Plano office serves the Sherman Division. Matrix guideline I.B.10 also requires alphabetical order, which the generator applies everywhere. Office codes, the SSN-statement handling, the fee rule and the current PDF cap were not found on the pages read and are stored unverified."
+}

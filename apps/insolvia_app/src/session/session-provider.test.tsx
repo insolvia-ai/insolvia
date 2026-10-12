@@ -451,6 +451,17 @@ describe('the session', () => {
       expect(browser.sessionStorage.entries.size).toBe(1);
     });
 
+    it('asks for the password again when re-authenticating', async () => {
+      renderSession();
+      await screen.findByText('status:signed-out');
+
+      await act(async () => {
+        await session().signIn('/account', { reauthenticate: true });
+      });
+
+      expect(browser.navigations[0] ?? '').toContain('prompt=login');
+    });
+
     it('does not send the verifier itself to the authorize endpoint', async () => {
       renderSession();
       await screen.findByText('status:signed-out');

@@ -1,7 +1,26 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
+from insolvia_core.document_requests import (
+    DocumentChecklist,
+    checklist_from_item,
+    checklist_item,
+)
+from insolvia_core.fields import timestamp
+from insolvia_core.firm_clients import (
+    ACTIVE,
+    ARCHIVED,
+    FirmClient,
+    sorted_firm_clients,
+)
 from insolvia_core.firms import Firm, FirmUser
 from insolvia_core.library_creditors import LibraryCreditor
+from insolvia_core.questionnaire import (
+    QuestionnaireConfig,
+    questionnaire_from_item,
+    questionnaire_item,
+)
 
 
 class MemoryFirmStore:
@@ -22,6 +41,14 @@ class MemoryFirmStore:
         self.users: dict[tuple[str, str], FirmUser] = {}
         # Same keying discipline as `users` above, for the same reason.
         self.library_creditors: dict[tuple[str, str], LibraryCreditor] = {}
+        # And again for the client directory (ADR 0022).
+        self.clients: dict[tuple[str, str], FirmClient] = {}
+        # The questionnaire config, held as the STORED ITEM rather than the
+        # dataclass, so a suite running here round-trips the item shape the
+        # DynamoDB adapter writes. Keyed by firm: one item per partition.
+        self.questionnaires: dict[str, dict[str, object]] = {}
+        # The document checklist, held the same way for the same reason.
+        self.document_checklists: dict[str, dict[str, object]] = {}
 
     # ── Firms ───────────────────────────────────────────────────────
 
@@ -127,3 +154,156 @@ class MemoryFirmStore:
 
     def delete_library_creditor(self, firm_id: str, creditor_id: str) -> bool:
         return self.library_creditors.pop((firm_id, creditor_id), None) is not None
+
+    # ── Firm clients ────────────────────────────────────────────────
+
+    def create_client(self, client: FirmClient) -> None:
+        key = (client.firm_id, client.id)
+        if key in self.clients:
+            raise RuntimeError(f"client {client.id} already exists")
+        self.clients[key] = client
+
+    def get_client(self, firm_id: str, client_id: str) -> FirmClient | None:
+        return self.clients.get((firm_id, client_id))
+
+    def list_clients(self, firm_id: str) -> tuple[FirmClient, ...]:
+        # The shared ordering, so this store and DynamoDB cannot disagree.
+        return sorted_firm_clients(
+            client for client in self.clients.values() if client.firm_id == firm_id
+        )
+
+    def update_client(self, client: FirmClient) -> FirmClient | None:
+        key = (client.firm_id, client.id)
+        stored = self.clients.get(key)
+        if stored is None or stored.merged_into is not None:
+            return None
+        # The record's own fields only: the merge attributes stay as stored,
+        # as the DynamoDB adapter's UpdateItem leaves them.
+        written = replace(
+            client,
+            merged_into=stored.merged_into,
+            merging_into=stored.merging_into,
+            merging_from=stored.merging_from,
+            prospect_stage=stored.prospect_stage,
+        )
+        self.clients[key] = written
+        return written
+
+    # ── The prospect funnel ─────────────────────────────────────────
+
+    def set_client_prospect_stage(
+        self, firm_id: str, client_id: str, stage: str | None
+    ) -> FirmClient | None:
+        key = (firm_id, client_id)
+        stored = self.clients.get(key)
+        if stored is None or stored.merged_into is not None or not stored.prospect:
+            return None
+        written = replace(stored, prospect_stage=stage, updated_at=timestamp())
+        self.clients[key] = written
+        return written
+
+    def mark_client_retained(
+        self, firm_id: str, client_id: str, *, retained_on: str
+    ) -> FirmClient | None:
+        key = (firm_id, client_id)
+        stored = self.clients.get(key)
+        if stored is None or stored.merged_into is not None:
+            return None
+        written = replace(
+            stored,
+            first_retained_at=stored.first_retained_at or retained_on,
+            prospect_stage=None,
+            updated_at=timestamp(),
+        )
+        self.clients[key] = written
+        return written
+
+    # ── Merging two clients ─────────────────────────────────────────
+    #
+    # The DynamoDB adapter's conditions, checked and applied in one step —
+    # nothing runs between the lines here, which is what its transactions buy.
+
+    def claim_client_merge(
+        self, firm_id: str, *, merged_id: str, survivor_id: str
+    ) -> bool:
+        merged = self.clients.get((firm_id, merged_id))
+        survivor = self.clients.get((firm_id, survivor_id))
+        if merged is None or survivor is None or merged_id == survivor_id:
+            return False
+        if not _claimable(merged, survivor_id, survivor=False):
+            return False
+        if not _claimable(survivor, merged_id, survivor=True):
+            return False
+        self.clients[(firm_id, merged_id)] = replace(merged, merging_into=survivor_id)
+        self.clients[(firm_id, survivor_id)] = replace(survivor, merging_from=merged_id)
+        return True
+
+    def finish_client_merge(
+        self, firm_id: str, *, merged_id: str, survivor_id: str, merged_at: str
+    ) -> FirmClient | None:
+        merged = self.clients.get((firm_id, merged_id))
+        survivor = self.clients.get((firm_id, survivor_id))
+        if (
+            merged is None
+            or survivor is None
+            or merged.merging_into != survivor_id
+            or survivor.merging_from != merged_id
+        ):
+            return None
+        archived = replace(
+            merged,
+            status=ARCHIVED,
+            merged_into=survivor_id,
+            merging_into=None,
+            updated_at=merged_at,
+        )
+        self.clients[(firm_id, merged_id)] = archived
+        self.clients[(firm_id, survivor_id)] = replace(survivor, merging_from=None)
+        return archived
+
+    def release_client_merge(
+        self, firm_id: str, *, merged_id: str, survivor_id: str
+    ) -> None:
+        merged = self.clients.get((firm_id, merged_id))
+        survivor = self.clients.get((firm_id, survivor_id))
+        if merged is not None and merged.merging_into == survivor_id:
+            self.clients[(firm_id, merged_id)] = replace(merged, merging_into=None)
+        if survivor is not None and survivor.merging_from == merged_id:
+            self.clients[(firm_id, survivor_id)] = replace(survivor, merging_from=None)
+
+    # ── The client questionnaire's config ───────────────────────────
+
+    def get_questionnaire(self, firm_id: str) -> QuestionnaireConfig | None:
+        item = self.questionnaires.get(firm_id)
+        return None if item is None else questionnaire_from_item(item)
+
+    def put_questionnaire(self, config: QuestionnaireConfig) -> None:
+        self.questionnaires[config.firm_id] = questionnaire_item(config)
+
+    def delete_questionnaire(self, firm_id: str) -> bool:
+        return self.questionnaires.pop(firm_id, None) is not None
+
+    # ── The document request checklist ──────────────────────────────
+
+    def get_document_checklist(self, firm_id: str) -> DocumentChecklist | None:
+        item = self.document_checklists.get(firm_id)
+        return None if item is None else checklist_from_item(item)
+
+    def put_document_checklist(self, checklist: DocumentChecklist) -> None:
+        self.document_checklists[checklist.firm_id] = checklist_item(checklist)
+
+    def delete_document_checklist(self, firm_id: str) -> bool:
+        return self.document_checklists.pop(firm_id, None) is not None
+
+
+def _claimable(client: FirmClient, other_id: str, *, survivor: bool) -> bool:
+    """`claim_client_merge`'s condition on one row: active, never merged,
+    and not already in a merge except this same one."""
+    if client.status != ACTIVE or client.merged_into is not None:
+        return False
+    if survivor:
+        return client.merging_into is None and client.merging_from in (
+            None,
+            other_id,
+        )
+    return client.merging_from is None and client.merging_into in (None, other_id)

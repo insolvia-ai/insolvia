@@ -16,21 +16,99 @@ from __future__ import annotations
 import base64
 import binascii
 import json
-import re
 import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
+from dataclasses import field as dataclass_field
 from datetime import UTC, datetime
 
-from insolvia_core.errors import FieldValidationError, ValidationError
+from insolvia_core import courts, fields
+from insolvia_core.case_numbers import case_number_key
+from insolvia_core.errors import ConflictError, FieldValidationError, ValidationError
 
 # The chapters an individual debtor can file under. 9 and 15 are municipal and
 # cross-border and will never appear in this product.
 CHAPTERS = (7, 11, 12, 13)
 
-# Lifecycle, deliberately small. "filed" is terminal for this issue — what
-# happens after filing is the forms milestone's problem.
-STATUSES = ("intake", "ready_to_file", "filed")
+# THE LIFECYCLE, AS DATA (issue 14.3 / #355). One field, one vocabulary, in
+# the order a matter moves through it:
+#
+#   intake, ready_to_file     RETAINED: the firm has the engagement and is
+#                             preparing the petition. A case STARTS here —
+#                             there is no prospect case. The funnel before
+#                             retention belongs to the CLIENT
+#                             (`firm_clients.PROSPECT_STAGES`; the
+#                             maintainer's decision of 2026-10-01, recorded
+#                             in ADR 0022): a prospect is a client with no
+#                             case yet, and opening their first case is the
+#                             retained transition.
+#   filed                     the petition is on the court's docket.
+#   discharged, dismissed     the two OUTCOMES of a filed case.
+#   closed                    the court closed the case (after either outcome,
+#                             or straight from `filed`).
+#
+# `filed` used to be terminal and every "is this a filed petition" check in
+# the codebase read `status == "filed"`. A discharged or closed case is still
+# a filed petition — re-copying a client into it, re-assembling its packet or
+# un-amending an item are as wrong there as on `filed` — so those checks read
+# `is_filed()` and never the literal.
+INTAKE = "intake"
+READY_TO_FILE = "ready_to_file"
+FILED = "filed"
+DISCHARGED = "discharged"
+DISMISSED = "dismissed"
+CLOSED = "closed"
+STATUSES = (INTAKE, READY_TO_FILE, FILED, DISCHARGED, DISMISSED, CLOSED)
+
+# Every status at or after filing — the petition is a court record.
+FILED_STATUSES = frozenset({FILED, DISCHARGED, DISMISSED, CLOSED})
+# The statuses in which the firm holds the engagement before filing.
+RETAINED_STATUSES = frozenset({INTAKE, READY_TO_FILE})
+
+# THE ALLOWED MOVES, and the conservative reading of an issue that names the
+# states but not the edges. Forward only, with exactly two ways back:
+#
+#   - intake <-> ready_to_file. Both are "retained, preparing"; the line
+#     between them is a preparer's judgement and gets revised.
+#   - closed -> filed. A court reopens a closed case (§ 350(b)); that is a
+#     real docket event, not an undo, and the history records it.
+#
+# Everything else backwards is refused. A filed case does not return to
+# preparation — changing a filed petition is an amendment (17.4), and the
+# store's `is_filed` checks would otherwise stop protecting it the moment
+# somebody moved the status back. A case opened by mistake is deleted, not
+# returned to a funnel it was never in. A status set to itself is not a move
+# and is accepted (so a client can resend the whole record).
+TRANSITIONS: Mapping[str, frozenset[str]] = {
+    INTAKE: frozenset({READY_TO_FILE, FILED}),
+    READY_TO_FILE: frozenset({INTAKE, FILED}),
+    FILED: frozenset({DISCHARGED, DISMISSED, CLOSED}),
+    DISCHARGED: frozenset({CLOSED}),
+    DISMISSED: frozenset({CLOSED}),
+    CLOSED: frozenset({FILED}),
+}
+
+# The post-filing facts the court's docket states (#355), each free text: the
+# case number in the court's own form ("8:26-bk-01234"), the judge's and the
+# trustee's names, and the firm's own file number. Free text because reading
+# them from the court is 17.2's, and until then a person types what the
+# notice of filing says — a format check here would refuse the one court that
+# writes its numbers differently. `office_file_number` is the firm's, not the
+# court's, and is settable at any stage.
+POST_FILING_TEXT_FIELDS = ("case_number", "judge", "trustee", "office_file_number")
+_POST_FILING_TEXT_LIMITS: Mapping[str, int] = {
+    "case_number": 40,
+    "judge": 120,
+    "trustee": 120,
+    "office_file_number": 40,
+}
+
+
+def is_filed(status: str) -> bool:
+    """Whether a case in `status` has a petition on the court's docket — the
+    question every "refused on a filed case" rule asks."""
+    return status in FILED_STATUSES
+
 
 # 106C line 1 — which § 522(b) set the debtor claims (issue #346). Named for
 # the MEANING the form prints, never the box index: `federal` is § 522(b)(2),
@@ -45,11 +123,25 @@ STATUSES = ("intake", "ready_to_file", "filed")
 # split.
 EXEMPTION_SETS = ("state_and_federal_nonbankruptcy", "federal")
 
-# A bankruptcy court district identifier. Kept loose on purpose: the
-# authoritative list belongs to the forms/e-filing work, which will have the
-# CM/ECF court codes, and inventing a half-list here would be a constraint the
-# next person has to unpick rather than a validation anyone wanted.
-_DISTRICT_RE = re.compile(r"^[A-Za-z0-9 .\-/]{2,64}$")
+# THE COURT IS A REFERENCE INTO THE REGISTRY (issue #360). `district` was
+# free text — kept loose on purpose while the authoritative court list
+# belonged to the e-filing work — and that work (ADR 0024) delivered the
+# list as the `courts/us-bankruptcy` series in `insolvia_core.courts`. A case
+# now names its court by the registry's CM/ECF code and its division by the
+# division's code, and a write naming a pair the registry does not know is
+# refused: every downstream consumer — the matrix's district variance, local
+# forms, venue on B101, the deadline rules — wants a court it can look up,
+# not a string it has to guess at.
+#
+# `district` SURVIVES AS THE PRINTED NAME. Twenty-odd readers — every form's
+# caption, the Chapter 13 multiplier lookup, B2030's split caption, the AI
+# review — consume the district as the name the B101 dropdown prints
+# ("Middle District of Florida"), and the registry's `name` is exactly that
+# spelling. So the reference is the source of truth and `district` is
+# written FROM it on every write, never typed by a client. On a row written
+# before the registry existed, `district` holds whatever free text was
+# typed and `court`/`division` are None: such a case still reads, still
+# prints, and is asked to pick a court the next time its record is edited.
 
 MAX_LIST_LIMIT = 100
 DEFAULT_LIST_LIMIT = 50
@@ -74,10 +166,18 @@ class Case:
     firm_id: str
     created_by: str
     chapter: int
+    # The printed district name — see the module comment above `MAX_LIST_LIMIT`
+    # for why this is a string beside the reference rather than the reference
+    # itself.
     district: str
     status: str
     created_at: str
     updated_at: str
+    # The registry reference (`insolvia_core.courts`): the court's CM/ECF
+    # code and the division's code. None on a row written before the registry
+    # existed — the one legal way for a stored case to lack them.
+    court: str | None = None
+    division: str | None = None
     # THE PINS (docs/reference/effective-dating.md, "Float, then pin").
     # None until packet assembly runs: a floating case resolves every
     # regulatory series as of today, and nothing is recorded. Packet assembly
@@ -97,6 +197,72 @@ class Case:
     # not one is stored, which the analysis and the B106C projection both
     # apply on read rather than writing a value nobody chose.
     exemption_set: str | None = None
+    # THE TWO POST-FILING DATES the deadline engine counts from (issue 14.6 /
+    # #358), as form dates — `YYYY-MM-DD`, no time, no zone — because each is
+    # a calendar fact the court's docket states, not an instant this server
+    # observed. `filed_at` is the petition date, which in a voluntary case IS
+    # the order for relief (§ 301(b)); `meeting_341_at` is the FIRST date the
+    # court set for the § 341(a) meeting, the anchor Rules 4004(a), 4007(c)
+    # and 1007(c) count from — a continued meeting does not move it. Both are
+    # None until somebody records them, and the smallest addition that lets
+    # a deadline exist at all; the rest of the post-filing record (#355)
+    # sits below. Once filed, `filed_at` may not be cleared (`apply_changes`).
+    filed_at: str | None = None
+    meeting_341_at: str | None = None
+    # The post-filing docket facts (POST_FILING_TEXT_FIELDS), None until
+    # somebody records them.
+    case_number: str | None = None
+    judge: str | None = None
+    trustee: str | None = None
+    office_file_number: str | None = None
+    # ARCHIVED: out of the firm's working list, still the firm's record. An
+    # attribute rather than a status because archiving is orthogonal to the
+    # lifecycle — a closed case and a dismissed one are both archived,
+    # and each must still say which it was. Who and when, together or not
+    # at all.
+    archived_at: str | None = None
+    archived_by: str | None = None
+    # SOFT-DELETED: the case and everything under it are unreachable through
+    # every read (`access.may_see_case` refuses it), and nothing is removed —
+    # the retention posture in docs/reference/case-data-model.md.
+    deleted_at: str | None = None
+    deleted_by: str | None = None
+
+    @property
+    def archived(self) -> bool:
+        return self.archived_at is not None
+
+    @property
+    def deleted(self) -> bool:
+        return self.deleted_at is not None
+
+
+@dataclass(frozen=True)
+class StatusChange:
+    """One move of a case through its lifecycle — who, when, from what to
+    what (#355: "status changes recorded with who and when").
+
+    An item in the CASE's partition, written in the same transaction as the
+    case record it describes (`CaseStore.update`), so the history cannot
+    disagree with the status: a change that landed has its row, and a row
+    exists only for a change that landed.
+    """
+
+    case_id: str
+    changed_at: str
+    changed_by: str
+    from_status: str
+    to_status: str
+    # The electronic filing that made this move (ADR 0024 PR 8) — the filing
+    # worker's `filed`, or the attorney's resolution of a hand-back. None on
+    # every move a person made through PATCH.
+    filing_id: str | None = None
+
+
+# Who `changed_by` names when the filing worker moved the case: it has no
+# person's subject, and inventing one would put a machine where the history
+# promises a who. The filing id beside it says which filing.
+FILING_WORKER_ACTOR = "filing-worker"
 
 
 @dataclass(frozen=True)
@@ -123,23 +289,74 @@ class CaseAssignment:
 
 
 @dataclass(frozen=True)
+class CourtReference:
+    """A validated `{court, division}` pair — the registry knows it, and
+    `district` is the name the registry prints for it."""
+
+    court: str
+    division: str
+    district: str
+
+
+@dataclass(frozen=True)
 class CaseDraft:
     """A validated creation request, before server-generated identity."""
 
     chapter: int
-    district: str
+    court: CourtReference
+    # The firm clients the case is opened for (ADR 0022), in filing-role
+    # order: the first is Debtor 1, the second — when present — Debtor 2.
+    # Ids only: whether each names a client of THIS firm is the route's
+    # question, answered against the firm store, not the parser's.
+    client_ids: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class ClientCase:
+    """One entry of a client's case list (`GET /v1/firm/clients/<id>/cases`):
+    a case the caller may see, and which debtor of it the client is."""
+
+    case: Case
+    filing_role: str
 
 
 @dataclass(frozen=True)
 class CaseChanges:
     """A validated PATCH body. None means "leave unchanged" — which is why
-    these are Optional rather than defaulted: a client that omits `district`
+    these are Optional rather than defaulted: a client that omits `court`
     must not silently blank it."""
 
     chapter: int | None = None
-    district: str | None = None
+    court: CourtReference | None = None
     status: str | None = None
     exemption_set: str | None = None
+    # The two dates are the one place "None means unchanged" is not enough:
+    # a filed date entered by mistake has to be removable, and a removed
+    # anchor has to take its generated deadlines with it. So a PATCH sends
+    # explicit JSON `null` to clear one, which the parser records as the
+    # matching `clear_*` flag — two facts, two fields, no sentinel object
+    # for mypy to squint at.
+    filed_at: str | None = None
+    meeting_341_at: str | None = None
+    clear_filed_at: bool = False
+    clear_meeting_341_at: bool = False
+    # The post-filing text fields (POST_FILING_TEXT_FIELDS) the body named:
+    # a value sets, None clears — `fields.text`'s rule that a blank box and
+    # an absent value are one state. Absent from the map means unchanged.
+    texts: Mapping[str, str | None] = dataclass_field(default_factory=dict)
+
+    @property
+    def touches_deadline_anchors(self) -> bool:
+        """Whether applying this changes anything the deadline engine reads —
+        a date, a cleared date, or the chapter (the rule table is keyed by
+        it). The case route regenerates on exactly this."""
+        return (
+            self.filed_at is not None
+            or self.meeting_341_at is not None
+            or self.clear_filed_at
+            or self.clear_meeting_341_at
+            or self.chapter is not None
+        )
 
 
 @dataclass(frozen=True)
@@ -184,15 +401,49 @@ def _parse_chapter(value: object, errors: dict[str, str]) -> int | None:
     return value
 
 
-def _parse_district(value: object, errors: dict[str, str]) -> str | None:
-    if not isinstance(value, str) or not value.strip():
-        errors["district"] = "A filing district is required."
+def _parse_court(
+    payload: Mapping[str, object], errors: dict[str, str]
+) -> CourtReference | None:
+    """The `court` + `division` pair, validated against the registry.
+
+    THE PAIR TRAVELS TOGETHER. A division only means something inside its
+    court, so a PATCH carrying one without the other is refused rather than
+    guessed at — and the message lands on the half that is missing, so the
+    client can put it next to the right control.
+
+    A free-text `district` in the body is refused by name (not ignored):
+    every client that sent one was writing the field this reference
+    replaces, and a silent 400 keyed to a control the screen no longer has
+    would be undiagnosable. The registry's message says what to send.
+    """
+    court = payload.get("court")
+    division = payload.get("division")
+    if not isinstance(court, str) or not court.strip():
+        errors["court"] = "Choose the bankruptcy court this case will be filed in."
         return None
-    district = value.strip()
-    if not _DISTRICT_RE.match(district):
-        errors["district"] = "That doesn't look like a district identifier."
+    if not isinstance(division, str) or not division.strip():
+        errors["division"] = "Choose the court's division."
         return None
-    return district
+    found = courts.division(court.strip(), division.strip())
+    if found is None:
+        if courts.district(court.strip()) is None:
+            errors["court"] = "That court is not in the registry."
+        else:
+            errors["division"] = "That division is not one of this court's."
+        return None
+    record, chosen = found
+    return CourtReference(court=record.code, division=chosen.code, district=record.name)
+
+
+def _refuse_typed_district(
+    payload: Mapping[str, object], errors: dict[str, str]
+) -> None:
+    if "district" in payload:
+        errors["district"] = (
+            "The district is no longer typed — send `court` and `division`"
+            " from the court registry (GET /v1/courts) and the district name"
+            " is derived."
+        )
 
 
 def _parse_status(value: object, errors: dict[str, str]) -> str | None:
@@ -200,6 +451,24 @@ def _parse_status(value: object, errors: dict[str, str]) -> str | None:
         errors["status"] = "Status must be one of " + ", ".join(STATUSES) + "."
         return None
     return value
+
+
+def _parse_post_filing_texts(
+    payload: Mapping[str, object], errors: dict[str, str]
+) -> dict[str, str | None]:
+    """The post-filing text fields the body NAMES — a value sets, null or a
+    blank string clears (`fields.text`'s rule), absent leaves it alone."""
+    texts: dict[str, str | None] = {}
+    for name in POST_FILING_TEXT_FIELDS:
+        if name not in payload:
+            continue
+        before = len(errors)
+        parsed = fields.text(
+            payload[name], name, errors, limit=_POST_FILING_TEXT_LIMITS[name]
+        )
+        if len(errors) == before:
+            texts[name] = parsed
+    return texts
 
 
 def _parse_exemption_set(value: object, errors: dict[str, str]) -> str | None:
@@ -211,27 +480,87 @@ def _parse_exemption_set(value: object, errors: dict[str, str]) -> str | None:
     return value
 
 
-def parse_case_creation(payload: Mapping[str, object]) -> CaseDraft:
+def _parse_form_date(value: object, field: str, errors: dict[str, str]) -> str | None:
+    """`YYYY-MM-DD`, parsed rather than pattern-matched — the same rule
+    `fields.form_date` applies to every schedule date, restated here because
+    this module predates that helper and imports nothing from it."""
+    if not isinstance(value, str) or not value.strip():
+        errors[field] = "Must be a date in YYYY-MM-DD form."
+        return None
+    stripped = value.strip()
+    try:
+        parsed = datetime.strptime(stripped, "%Y-%m-%d")
+    except ValueError:
+        errors[field] = "Must be a date in YYYY-MM-DD form."
+        return None
+    if parsed.strftime("%Y-%m-%d") != stripped:
+        errors[field] = "Must be a date in YYYY-MM-DD form."
+        return None
+    return stripped
+
+
+MAX_CASE_CLIENTS = 2
+
+
+def _parse_client_ids(value: object, errors: dict[str, str]) -> tuple[str, ...]:
+    """`client_ids`: one or two distinct client ids, Debtor 1 first (ADR 0022).
+
+    Two, not three: a non-filing spouse is not the firm's client and need not
+    be one, so opening a case never requires them — linking one afterwards is
+    the debtor link route's. The same client twice is refused here because it
+    is refused everywhere: one client, one role per case, or the `by-client`
+    index lists the case twice.
+    """
+    if not isinstance(value, list) or not value:
+        errors["client_ids"] = "Choose the client this case is for."
+        return ()
+    if len(value) > MAX_CASE_CLIENTS:
+        errors["client_ids"] = "A case is opened for one client, or two filing jointly."
+        return ()
+    if not all(isinstance(item, str) and item.strip() for item in value):
+        errors["client_ids"] = "Each client must be a client id."
+        return ()
+    ids = tuple(str(item).strip() for item in value)
+    if len(set(ids)) != len(ids):
+        errors["client_ids"] = "The same client cannot be both debtors on one case."
+        return ()
+    return ids
+
+
+def parse_case_creation(
+    payload: Mapping[str, object], *, require_clients: bool = True
+) -> CaseDraft:
     """Validate POST /v1/cases. Unknown keys are ignored.
 
     Status is deliberately NOT accepted here: every case starts at "intake",
     and letting a client create one already marked "filed" would be a lie the
-    server told on its behalf.
+    server told on its behalf. There is no prospect CASE — the funnel before
+    retention is the client's (`firm_clients.PROSPECT_STAGES`).
+
+    `client_ids` is REQUIRED (ADR 0022): a case is opened for a client, and a
+    debtor without one is a state the store no longer produces.
+    `require_clients=False` exists for the callers that build a case with no
+    request behind it — the seed loader until its fixtures name clients, and
+    tests that compose stores directly — never for a route.
     """
     errors: dict[str, str] = {}
     chapter = _parse_chapter(payload.get("chapter"), errors)
-    district = _parse_district(payload.get("district"), errors)
+    _refuse_typed_district(payload, errors)
+    court = _parse_court(payload, errors)
+    client_ids = (
+        _parse_client_ids(payload.get("client_ids"), errors) if require_clients else ()
+    )
     # The None checks are redundant with `errors` but they are what narrows
     # the types, and a redundant guard beats an assert that a future -O strips.
-    if errors or chapter is None or district is None:
+    if errors or chapter is None or court is None:
         raise FieldValidationError(errors)
-    return CaseDraft(chapter=chapter, district=district)
+    return CaseDraft(chapter=chapter, court=court, client_ids=client_ids)
 
 
 def parse_case_update(payload: Mapping[str, object]) -> CaseChanges:
     """Validate PATCH /v1/cases/<id>.
 
-    Only supplied keys are validated, so a caller changing the district alone
+    Only supplied keys are validated, so a caller changing the court alone
     is not forced to resend the chapter. An empty body is rejected rather than
     treated as a no-op — it is far more likely to be a client bug than an
     intent, and a silent 200 would hide it.
@@ -243,18 +572,48 @@ def parse_case_update(payload: Mapping[str, object]) -> CaseChanges:
         chapter = _parse_chapter(payload["chapter"], errors)
         if chapter is not None:
             changes["chapter"] = chapter
-    if "district" in payload:
-        district = _parse_district(payload["district"], errors)
-        if district is not None:
-            changes["district"] = district
+    _refuse_typed_district(payload, errors)
+    if "court" in payload or "division" in payload:
+        court = _parse_court(payload, errors)
+        if court is not None:
+            changes["court"] = court
     if "status" in payload:
         status = _parse_status(payload["status"], errors)
         if status is not None:
             changes["status"] = status
+    texts = _parse_post_filing_texts(payload, errors)
+    if texts:
+        changes["texts"] = texts
     if "exemption_set" in payload:
         exemption_set = _parse_exemption_set(payload["exemption_set"], errors)
         if exemption_set is not None:
             changes["exemption_set"] = exemption_set
+    # The two deadline anchors: a date sets, an explicit null clears. Absent
+    # means unchanged, like every other key here.
+    dates: dict[str, str] = {}
+    for field, clear_flag in (
+        ("filed_at", "clear_filed_at"),
+        ("meeting_341_at", "clear_meeting_341_at"),
+    ):
+        if field not in payload:
+            continue
+        if payload[field] is None:
+            changes[clear_flag] = True
+            continue
+        parsed_date = _parse_form_date(payload[field], field, errors)
+        if parsed_date is not None:
+            dates[field] = parsed_date
+            changes[field] = parsed_date
+    # Only checkable when both arrive together; against a stored date it is
+    # the route's read-modify-write that knows both, and a meeting before
+    # the petition there is a data-entry slip the deadline engine tolerates
+    # (it counts from whatever the case says) rather than a refused save.
+    if (
+        "filed_at" in dates
+        and "meeting_341_at" in dates
+        and dates["meeting_341_at"] < dates["filed_at"]
+    ):
+        errors["meeting_341_at"] = "The § 341 meeting cannot precede the petition."
 
     if errors:
         raise FieldValidationError(errors)
@@ -293,10 +652,12 @@ def create_case(
         firm_id=firm_id,
         created_by=created_by,
         chapter=draft.chapter,
-        district=draft.district,
-        status="intake",
+        district=draft.court.district,
+        status=INTAKE,
         created_at=now,
         updated_at=now,
+        court=draft.court.court,
+        division=draft.court.division,
     )
     return case, assign_case(case, subject=created_by, assigned_by=created_by)
 
@@ -315,18 +676,170 @@ def assign_case(case: Case, *, subject: str, assigned_by: str) -> CaseAssignment
 
 
 def apply_changes(case: Case, changes: CaseChanges) -> Case:
-    """A new Case with the supplied changes applied and updated_at refreshed."""
-    updates = {
-        field: value
-        for field, value in (
+    """A new Case with the supplied changes applied and updated_at refreshed —
+    or a refusal, when the changes would break the lifecycle's rules.
+
+    A court change writes all three of `court`, `division` and `district`
+    in one step — the printed name is derived from the reference and must
+    never be left describing the previous court.
+
+    THE LIFECYCLE IS CHECKED HERE, against the result, so no writer can
+    apply a change without it:
+
+    - a status move must be one of TRANSITIONS (409 otherwise — the request
+      is well-formed, the case is just not somewhere it can go from);
+    - reaching `filed` needs a filed date and a case number, in this request
+      or already stored — a filed case without them is a filing nobody can
+      find on the docket, and the deadline engine has nothing to count from
+      (400, keyed to the missing field);
+    - a filed case keeps both: clearing either would leave the deadlines
+      and the docket entry with no anchor (400);
+    """
+    updates: dict[str, object] = {
+        name: value
+        for name, value in (
             ("chapter", changes.chapter),
-            ("district", changes.district),
             ("status", changes.status),
             ("exemption_set", changes.exemption_set),
+            ("filed_at", changes.filed_at),
+            ("meeting_341_at", changes.meeting_341_at),
         )
         if value is not None
     }
+    if changes.clear_filed_at:
+        updates["filed_at"] = None
+    if changes.clear_meeting_341_at:
+        updates["meeting_341_at"] = None
+    if changes.court is not None:
+        updates["court"] = changes.court.court
+        updates["division"] = changes.court.division
+        updates["district"] = changes.court.district
+    updates.update(changes.texts)
+
+    status = changes.status if changes.status is not None else case.status
+    if status != case.status and status not in TRANSITIONS.get(
+        case.status, frozenset()
+    ):
+        raise ConflictError(
+            f"A case cannot move from {case.status!r} to {status!r}."
+            + (
+                " A filed petition is changed by amendment, not by moving it back."
+                if is_filed(case.status)
+                else ""
+            )
+        )
+    errors: dict[str, str] = {}
+    if is_filed(status):
+        # Checked on the way IN, and against a clear once there — not on
+        # every edit, so a case filed before these rules existed can still
+        # have its § 341 date recorded without first being made whole.
+        entering = not is_filed(case.status)
+        for name, label in (("filed_at", "filed date"), ("case_number", "case number")):
+            value = updates.get(name, getattr(case, name))
+            if value is None and (entering or name in updates):
+                errors[name] = f"A filed case needs its {label}."
+    if errors:
+        raise FieldValidationError(errors)
     return replace(case, updated_at=_timestamp(), **updates)  # type: ignore[arg-type]
+
+
+def status_change(
+    before: Case, after: Case, *, changed_by: str, filing_id: str | None = None
+) -> StatusChange | None:
+    """The history row for a write that moved `before` to `after`, or None
+    when the status did not move. Stamped with the
+    case's own `updated_at`, so the row and the record agree on when."""
+    if before.status == after.status:
+        return None
+    return StatusChange(
+        case_id=after.id,
+        changed_at=after.updated_at,
+        changed_by=changed_by,
+        from_status=before.status,
+        to_status=after.status,
+        filing_id=filing_id,
+    )
+
+
+def file_case(
+    case: Case,
+    *,
+    case_number: str,
+    filed_at: str,
+    changed_by: str,
+    filing_id: str,
+) -> tuple[Case, StatusChange]:
+    """The case moved to `filed` by an electronic filing (ADR 0024 PR 8):
+    the court's case number and the petition date, and the history row that
+    says which filing did it — the lifecycle's own rules, through
+    `apply_changes`, so this is the same move a person's PATCH would make
+    and is refused where theirs would be (a case already filed, a closed
+    one...: ConflictError).
+
+    The CALLER checks `is_filed` first and does not call this on a case
+    that is already filed — the filing's outcome is then recorded on the
+    filing alone and the docket facts a person entered are left as they
+    are."""
+    if is_filed(case.status):
+        raise ConflictError("This case is already filed.")
+    errors: dict[str, str] = {}
+    _parse_form_date(filed_at, "filed_at", errors)
+    if not case_number.strip():
+        errors["case_number"] = "A filed case needs its case number."
+    if errors:
+        raise FieldValidationError(errors)
+    after = apply_changes(
+        case,
+        CaseChanges(
+            status=FILED,
+            filed_at=filed_at,
+            texts={"case_number": case_number.strip()},
+        ),
+    )
+    change = status_change(case, after, changed_by=changed_by, filing_id=filing_id)
+    assert change is not None  # the status moved: not filed -> filed
+    return after, change
+
+
+def parse_archive(payload: Mapping[str, object]) -> bool:
+    """`PUT /v1/cases/<id>/archived`'s body: `{"archived": true|false}`."""
+    value = payload.get("archived")
+    if not isinstance(value, bool):
+        raise FieldValidationError({"archived": "Must be true or false."})
+    return value
+
+
+def set_archived(case: Case, *, archived: bool, by: str) -> Case:
+    """The case archived (stamped with who and when) or restored to the
+    working list. Archiving an archived case keeps its first stamp — the
+    question "since when" has one answer."""
+    if archived == case.archived:
+        return case
+    if archived:
+        now = _timestamp()
+        return replace(case, archived_at=now, archived_by=by, updated_at=now)
+    return replace(case, archived_at=None, archived_by=None, updated_at=_timestamp())
+
+
+def deletion_refusal(case: Case) -> str | None:
+    """Why this case may not be deleted, or None.
+
+    A FILED case is refused, whatever happened to it since: its petition is
+    a court record the firm must be able to produce, and archiving is how a
+    finished matter leaves the working list. What may be deleted is a matter
+    that never reached the court — an intake opened by mistake, a matter the
+    client walked away from before filing."""
+    if is_filed(case.status):
+        return (
+            "A filed case cannot be deleted — its petition is a court record."
+            " Archive it instead."
+        )
+    return None
+
+
+def mark_deleted(case: Case, *, by: str) -> Case:
+    now = _timestamp()
+    return replace(case, deleted_at=now, deleted_by=by, updated_at=now)
 
 
 def pin_case(
@@ -360,6 +873,14 @@ def firm_key(firm_id: str) -> str:
 
 def assignee_key(subject: str) -> str:
     return f"ASSIGNEE#{subject}"
+
+
+def client_key(client_id: str) -> str:
+    """GSI3PK on a debtor item that names a firm client — the `by-client`
+    index's partition (ADR 0022). `CLIENT#` is free in THIS table: the
+    portal binding's `CLIENT#<subject>` rows live in the firm table, and a
+    GSI key is a different namespace from a sort key in any case."""
+    return f"CLIENT#{client_id}"
 
 
 def listing_sort_key(created_at: str, case_id: str) -> str:
@@ -404,13 +925,63 @@ def case_item(case: Case) -> dict[str, object]:
         "createdAt": case.created_at,
         "updatedAt": case.updated_at,
     }
+    # The registry reference is stored only when present — a row written
+    # before the registry existed carries the typed district alone, and the
+    # absent-means-absent rule keeps it readable as exactly what it was.
+    if case.court is not None:
+        item["court"] = case.court
+    if case.division is not None:
+        item["division"] = case.division
     if case.form_revisions is not None:
         item["formRevisions"] = dict(case.form_revisions)
     if case.constants_set_id is not None:
         item["constantsSetId"] = case.constants_set_id
     if case.exemption_set is not None:
         item["exemptionSet"] = case.exemption_set
+    if case.filed_at is not None:
+        item["filedAt"] = case.filed_at
+    if case.meeting_341_at is not None:
+        item["meeting341At"] = case.meeting_341_at
+    # The lifecycle's additions (#355), absent-means-absent like the rest.
+    for name, value in _lifecycle_attributes(case).items():
+        if value is not None:
+            item[name] = value
+    # THE NOTICE MATCHER'S KEY (ADR 0024 PR 8, for #369): the case number
+    # read into its parts with the court in front (`case_numbers`), derived
+    # here from the two facts it is made of — so every writer, the filing
+    # worker, a hand-back and a person's PATCH alike, stores it, and it can
+    # never describe a number the record no longer carries. Absent when the
+    # number cannot be read whole. Stored only: it is never on the wire and
+    # `case_from_item` ignores it.
+    key = case_number_key(case.court, case.case_number)
+    if key is not None:
+        item[CASE_NUMBER_KEY_ATTRIBUTE] = key
     return item
+
+
+CASE_NUMBER_KEY_ATTRIBUTE = "caseNumberKey"
+
+
+def _lifecycle_attributes(case: Case) -> dict[str, str | None]:
+    """The #355 attributes under their stored (and wire) names — one table,
+    so `case_item`, `case_from_item` and `case_json` cannot spell one
+    differently."""
+    return {
+        stored: getattr(case, attribute)
+        for stored, attribute in _LIFECYCLE_FIELDS.items()
+    }
+
+
+_LIFECYCLE_FIELDS: Mapping[str, str] = {
+    "caseNumber": "case_number",
+    "judge": "judge",
+    "trustee": "trustee",
+    "officeFileNumber": "office_file_number",
+    "archivedAt": "archived_at",
+    "archivedBy": "archived_by",
+    "deletedAt": "deleted_at",
+    "deletedBy": "deleted_by",
+}
 
 
 def case_from_item(item: Mapping[str, object]) -> Case:
@@ -434,6 +1005,10 @@ def case_from_item(item: Mapping[str, object]) -> Case:
         )
         raw_constants = item.get("constantsSetId")
         raw_exemption_set = item.get("exemptionSet")
+        raw_filed_at = item.get("filedAt")
+        raw_meeting_341_at = item.get("meeting341At")
+        raw_court = item.get("court")
+        raw_division = item.get("division")
         chapter = item["chapter"]
         if not isinstance(chapter, (int, str)):
             raise ValueError(f"chapter is {chapter!r}")
@@ -446,11 +1021,24 @@ def case_from_item(item: Mapping[str, object]) -> Case:
             status=str(item["status"]),
             created_at=str(item["createdAt"]),
             updated_at=str(item["updatedAt"]),
+            # Tolerated-absent, deliberately: the legacy row IS a real state.
+            court=str(raw_court) if raw_court is not None else None,
+            division=str(raw_division) if raw_division is not None else None,
             form_revisions=form_revisions,
             constants_set_id=str(raw_constants) if raw_constants is not None else None,
             exemption_set=(
                 str(raw_exemption_set) if raw_exemption_set is not None else None
             ),
+            filed_at=str(raw_filed_at) if raw_filed_at is not None else None,
+            meeting_341_at=(
+                str(raw_meeting_341_at) if raw_meeting_341_at is not None else None
+            ),
+            # Every lifecycle attribute is an optional string.
+            **{
+                attribute: str(item[stored])
+                for stored, attribute in _LIFECYCLE_FIELDS.items()
+                if item.get(stored) is not None
+            },
         )
     except (KeyError, ValueError) as error:
         raise ValidationError(f"stored case item is malformed: {error}") from error
@@ -524,6 +1112,12 @@ def case_json(case: Case) -> dict[str, object]:
         "createdAt": case.created_at,
         "updatedAt": case.updated_at,
     }
+    # The registry reference, absent on a row written before it existed —
+    # which is how a client learns the case still needs a court chosen.
+    if case.court is not None:
+        body["court"] = case.court
+    if case.division is not None:
+        body["division"] = case.division
     # Present only once packet assembly has pinned the case — absent, not
     # null, before that (the failure/result rule in core/jobs.job_json). The
     # client renders which printed revisions the packet used; it never sends
@@ -536,6 +1130,72 @@ def case_json(case: Case) -> dict[str, object]:
     # `exemption_set` is the one writer (issue #346).
     if case.exemption_set is not None:
         body["exemptionSet"] = case.exemption_set
+    # The deadline anchors (issue 14.6 / #358): absent until recorded, and
+    # `PATCH /v1/cases/<id>` with `filed_at` / `meeting_341_at` (a date, or
+    # null to clear) is the one writer.
+    if case.filed_at is not None:
+        body["filedAt"] = case.filed_at
+    if case.meeting_341_at is not None:
+        body["meeting341At"] = case.meeting_341_at
+    # The lifecycle (#355): the docket facts and the
+    # archive stamp, each absent until set. The deletion stamp never
+    # reaches the wire — a deleted case is not served at all.
+    for name, value in _lifecycle_attributes(case).items():
+        if value is not None and name not in ("deletedAt", "deletedBy"):
+            body[name] = value
+    return body
+
+
+def status_sort_key(changed_at: str) -> str:
+    return f"STATUS#{changed_at}"
+
+
+def status_change_item(change: StatusChange) -> dict[str, object]:
+    """The stored shape of one lifecycle move.
+
+    PK  CASE#<case_id>          the case's own partition, so a begins_with
+    SK  STATUS#<changedAt>      query returns the history oldest first
+
+    No index keys: nothing lists status changes across cases."""
+    item: dict[str, object] = {
+        "PK": partition_key(change.case_id),
+        "SK": status_sort_key(change.changed_at),
+        "caseId": change.case_id,
+        "changedAt": change.changed_at,
+        "changedBy": change.changed_by,
+        "fromStatus": change.from_status,
+        "toStatus": change.to_status,
+    }
+    if change.filing_id is not None:
+        item["filingId"] = change.filing_id
+    return item
+
+
+def status_change_from_item(item: Mapping[str, object]) -> StatusChange:
+    try:
+        return StatusChange(
+            case_id=str(item["caseId"]),
+            changed_at=str(item["changedAt"]),
+            changed_by=str(item["changedBy"]),
+            from_status=str(item["fromStatus"]),
+            to_status=str(item["toStatus"]),
+            filing_id=(
+                str(item["filingId"]) if item.get("filingId") is not None else None
+            ),
+        )
+    except KeyError as error:
+        raise ValidationError(f"stored status change is malformed: {error}") from error
+
+
+def status_change_json(change: StatusChange) -> dict[str, object]:
+    body: dict[str, object] = {
+        "changedAt": change.changed_at,
+        "changedBy": change.changed_by,
+        "fromStatus": change.from_status,
+        "toStatus": change.to_status,
+    }
+    if change.filing_id is not None:
+        body["filingId"] = change.filing_id
     return body
 
 
@@ -565,6 +1225,23 @@ def parse_list_limit(raw: str | None) -> int:
 # correct answer, because their listing genuinely changed.
 INDEX_BY_FIRM = "by-firm"
 INDEX_BY_ASSIGNEE = "by-assignee"
+# A client's cases (ADR 0022), fed by debtor items that carry a `client_id`.
+# Never paginated through a cursor — a person has a handful of matters — so
+# it takes no part in the cursor tagging above.
+INDEX_BY_CLIENT = "by-client"
+
+
+def listing_cursor_tag(index: str, *, archived: bool) -> str:
+    """The tag a listing cursor carries: its index AND its view (#355). The
+    archive and the working list read the same index, so a cursor from one
+    would resume the other at a position in a different set — the same quiet
+    skip the index tag exists to refuse."""
+    return f"{index}:archived" if archived else index
+
+
+# A whole-record write raced a status move (`CaseStore.update`'s
+# `expected_status`). 409: the request was fine, the case moved underneath it.
+STATUS_MOVED = "This case's status changed since it was read — reload it and try again."
 
 
 def encode_cursor(key: Mapping[str, str], *, index: str) -> str:

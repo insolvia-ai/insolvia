@@ -12,8 +12,13 @@ repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:
+      # The creditor-matrix goldens are the exact bytes a court ingests —
+      # S.D. Tex.'s ends in padding blank lines — so neither fixer may touch
+      # them (their directory's .gitattributes does the same for git).
       - id: end-of-file-fixer
+        exclude: ^services/api/tests/unit/goldens/creditor_matrix/.*\.txt$
       - id: trailing-whitespace
+        exclude: ^services/api/tests/unit/goldens/creditor_matrix/.*\.txt$
       - id: check-yaml
       - id: check-merge-conflict
 

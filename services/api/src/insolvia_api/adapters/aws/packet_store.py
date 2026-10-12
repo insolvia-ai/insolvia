@@ -5,7 +5,7 @@ from typing import Any
 import boto3
 from botocore.exceptions import ClientError
 from insolvia_core.adapters.aws.dynamo import from_attributes, to_attributes
-from insolvia_core.cases import Case, case_item, partition_key
+from insolvia_core.cases import FILED_STATUSES, Case, case_item, partition_key
 
 from insolvia_api.core.packets import (
     Packet,
@@ -27,15 +27,40 @@ class DynamoDbPacketStore:
         self.client = boto3.client("dynamodb")
 
     def create(
-        self, packet: Packet, *, pinned_case: Case, expected_updated_at: str
+        self,
+        packet: Packet,
+        *,
+        pinned_case: Case,
+        expected_updated_at: str,
+        allow_filed: bool = False,
     ) -> bool:
         """ONE TRANSACTION, TWO ITEMS — the packet record and the pinned case
         (core/ports.PacketStore owns the argument). The case put carries the
         whole condition: the row must still exist, must not have moved since
-        the worker read it, and must not be `filed` — a filed case never
-        re-resolves (effective-dating.md), and the status check closes the
-        window where filing lands mid-assembly.
+        the worker read it, and — unless `allow_filed` (issue #370's
+        amendedOnly exception) — must not be `filed`, closing the window
+        where filing lands mid-assembly.
         """
+        condition = "attribute_exists(PK) AND updatedAt = :read_at"
+        values: dict[str, Any] = {":read_at": {"S": expected_updated_at}}
+        names: dict[str, str] = {}
+        if not allow_filed:
+            # Every status at or after filing (#355): a discharged or closed
+            # case is still a filed petition.
+            filed = sorted(FILED_STATUSES)
+            placeholders = [f":filed{i}" for i in range(len(filed))]
+            condition += f" AND NOT (#status IN ({', '.join(placeholders)}))"
+            names["#status"] = "status"
+            for placeholder, status in zip(placeholders, filed, strict=True):
+                values[placeholder] = {"S": status}
+        case_put: dict[str, Any] = {
+            "TableName": self.table_name,
+            "Item": to_attributes(case_item(pinned_case)),
+            "ConditionExpression": condition,
+            "ExpressionAttributeValues": values,
+        }
+        if names:
+            case_put["ExpressionAttributeNames"] = names
         try:
             self.client.transact_write_items(
                 TransactItems=[
@@ -48,22 +73,7 @@ class DynamoDbPacketStore:
                             "ConditionExpression": "attribute_not_exists(SK)",
                         }
                     },
-                    {
-                        "Put": {
-                            "TableName": self.table_name,
-                            "Item": to_attributes(case_item(pinned_case)),
-                            "ConditionExpression": (
-                                "attribute_exists(PK)"
-                                " AND updatedAt = :read_at"
-                                " AND #status <> :filed"
-                            ),
-                            "ExpressionAttributeNames": {"#status": "status"},
-                            "ExpressionAttributeValues": {
-                                ":read_at": {"S": expected_updated_at},
-                                ":filed": {"S": "filed"},
-                            },
-                        }
-                    },
+                    {"Put": case_put},
                 ]
             )
         except ClientError as error:

@@ -46,6 +46,8 @@ from insolvia_core.documents import (
 )
 from insolvia_core.firms import Firm, FirmUser, default_permissions
 
+from tests.unit.opening import with_client
+
 ISSUER = "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_EXAMPLE00"
 CLIENT_ID = "exampleappclientid000000"
 # Two firms. ALICE and DANA are colleagues; BOB administers the OTHER firm,
@@ -173,7 +175,11 @@ def client(access_log, documents, blobs, firms):
 
 def open_case(client, subject=ALICE):
     response = client.post(
-        "/v1/cases", json={"chapter": 7, "district": "NDCA"}, headers=auth(subject)
+        "/v1/cases",
+        json=with_client(
+            client, auth(subject), {"chapter": 7, "court": "flmb", "division": "tampa"}
+        ),
+        headers=auth(subject),
     )
     assert response.status_code == 201
     return response.get_json()["id"]
@@ -343,10 +349,14 @@ def test_the_upload_headers_are_the_ones_the_signature_demands(client):
     case_id = open_case(client)
     headers = upload(client, case_id).get_json()["upload"]["headers"]
     assert headers["Content-Type"] == "application/pdf"
-    # Without this the bucket policy's DenyEncryptionDowngrade refuses the PUT
-    # even with a valid signature.
-    assert headers["x-amz-server-side-encryption"] == "aws:kms"
-    # And without this the object is written UNTAGGED, which is worse than a
+    # NO encryption header. The route used to advertise
+    # `x-amz-server-side-encryption: aws:kms`, and every upload was refused:
+    # SSE-KMS with no key id means the AWS-managed key, which the bucket's
+    # DenyForeignEncryptionKey statement denies. A silent PUT lands on the
+    # bucket default, the case key. The adapter no longer signs it either
+    # (packages/insolvia_core, test_document_blobs.py pins that side).
+    assert "x-amz-server-side-encryption" not in headers
+    # Without this the object is written UNTAGGED, which is worse than a
     # refusal: the PUT succeeds, the bucket's expire-unconfirmed-uploads rule
     # has nothing to match, and an abandoned upload becomes bytes no lifecycle
     # rule and no code path in this service can ever reach.
@@ -365,11 +375,7 @@ def test_the_advertised_headers_are_exactly_the_signed_ones_the_client_can_set(
     something that quietly drifted."""
     case_id = open_case(client)
     headers = upload(client, case_id).get_json()["upload"]["headers"]
-    assert set(headers) == {
-        "Content-Type",
-        "x-amz-server-side-encryption",
-        "x-amz-tagging",
-    }
+    assert set(headers) == {"Content-Type", "x-amz-tagging"}
 
 
 def test_the_upload_is_tagged_unconfirmed_so_abandoned_bytes_are_reapable(

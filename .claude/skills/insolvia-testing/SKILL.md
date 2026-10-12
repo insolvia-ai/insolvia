@@ -4,7 +4,7 @@ description: >-
   How Insolvia tests — which shape applies where, where a new test file goes,
   and the per-stack conventions that are easy to get subtly wrong. Use this
   BEFORE writing or changing any test in this repo: a pytest test under
-  services/api or services/mailer, a Jest test in apps/insolvia_app, a Vitest
+  services/api (or admin, mcp, filing), a Jest test in apps/insolvia_app, a Vitest
   test in packages/insolvia_api_client, or a
   Playwright spec under e2e/. Reach for it the moment a task says "add a test",
   "write tests for", "improve coverage", "this needs test coverage", or when you
@@ -29,7 +29,7 @@ runs against which environment. This file owns *how* to write one.
 | **unit** | `services/*/tests/unit/`, `packages/insolvia_core/tests/unit/` | pytest | each unit's `scripts/dev-test.sh` (ruff → mypy → pytest, exactly as CI); a bare `pytest` is unit-only | nothing — memory adapters |
 | **unit** | `apps/insolvia_app` (colocated) | Jest (`jest-expo`) | `npm test --workspace apps/insolvia_app` | nothing — mocks |
 | **unit** | `packages/insolvia_api_client`, `apps/insolvia_admin` (colocated) | Vitest | `npm run test --workspace <pkg>` / `npm test` | nothing — stubbed `fetch` |
-| **unit**, all of the above at once | — | `scripts/dev-test-unit.sh` | every suite, or the ones a set of files touches; what the **pre-push hook** runs | nothing |
+| **unit**, all of the above at once | — | `scripts/dev-test-unit.sh` | every suite, or the ones a set of files touches; what the **pre-push hook** runs. Python areas run CI's ruff lint + format check first (not mypy) | nothing |
 | **integration** | `services/api/tests/integration/` | pytest, gated on `INSOLVIA_INTEGRATION=1` | `services/api/scripts/dev-test-integration.sh` (dev); `api-staging.yml` (staging) | the RUNNING API over HTTP, signed in by SRP as a seeded person |
 | **e2e `flows`** | `e2e/tests/flows/` | Playwright | `e2e/scripts/dev-test.sh` (dev); `app-staging.yml` (staging) | a real browser, signed in |
 | **e2e `smoke`** | `e2e/tests/smoke/` | Playwright | same wrappers; `app-prod.yml` (production) | HTTP + a browser, **no credentials** — the only thing that runs on prod |
@@ -91,7 +91,7 @@ found online.
 - **Never override `transformIgnorePatterns`.** A hand-copied list silently drops
   `standard-navigation` (pulled in by expo-router) and breaks every route test.
 
-## Python (`services/api`, `services/mailer`) — pytest
+## Python (`services/api` and the other services) — pytest
 
 - **Arrange–Act–Assert, one act per test.** The
   arrange–assert–act–assert–act pattern makes a failure ambiguous about which
@@ -140,7 +140,8 @@ found online.
 - **Who exists comes from `seeds/<target>.json`, by handle.** A spec that needs
   a person the fixture lacks adds them to the fixture (and the next seed
   creates them); it never invents an address or a subject.
-- **Scratch discipline.** Cases cannot be deleted through the API, so work
+- **Scratch discipline.** Cases are only soft-deleted through the API (the
+  rows stay), so work
   inside the one scratch case the conftest finds-or-opens; delete every
   document you create in teardown; leave a debtor as you found it. A spec that
   opens a case per run fills a table nobody prunes.
@@ -163,6 +164,9 @@ found online.
   `verified-commit`. A `smoke` test needs a reason a `curl` cannot satisfy.
 - **Never make either a required PR check** — that puts staging's availability
   on every PR's critical path. Post-deploy only.
+- **Write only to the scratch case** (`support/scratch-case.ts`), never to a
+  seeded fixture case — the loader will not repair it and the next integration
+  run cannot find it. Reading a fixture case is fine.
 - **Role-based selectors only**, matching the app's accessibility contract.
 - **Never let a credential reach a file, a default, a log line, or an uploaded
   artifact.** Traces record typed values verbatim and the repo is public.

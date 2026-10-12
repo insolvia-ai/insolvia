@@ -27,6 +27,19 @@ variable "data_resource_arns" {
   }
 }
 
+variable "include_management_events" {
+  description = <<-EOT
+    Also record MANAGEMENT events — which is where CloudTrail puts KMS
+    cryptographic calls (Decrypt, GenerateDataKey), so it is how the trail
+    records every seal and open of the filing-credential vault key
+    (ADR 0024, guardrail 3). main.tf's selector note says why a KMS-only
+    selector is not possible. Off by default so a root opts in knowingly:
+    one copy of management events per account is free, a second is billed.
+  EOT
+  type        = bool
+  default     = false
+}
+
 variable "retention_days" {
   description = <<-EOT
     Days log files are kept before expiry, current and non-current versions

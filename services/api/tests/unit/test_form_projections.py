@@ -45,6 +45,7 @@ from insolvia_api.core.form_projections.b122a1 import (
     means_test_as_of,
 )
 from insolvia_api.core.form_projections.b122a2 import files_b122a2
+from insolvia_api.core.form_projections.b122c2 import files_b122c2
 from insolvia_api.core.form_templates import get_form, latest_form
 from insolvia_core.assets import AssetBody
 from insolvia_core.cases import Case
@@ -65,8 +66,10 @@ from insolvia_core.income import (
 )
 from insolvia_core.means_test_inputs import (
     IncomeLineOverride,
+    MaritalAdjustmentItem,
     MeansTestInputBody,
     OtherSecuredPayment,
+    SpecialCircumstanceItem,
 )
 from insolvia_core.petitions import (
     FilingProfessionalBody,
@@ -76,6 +79,7 @@ from insolvia_core.petitions import (
     RelatedCaseBody,
     SoleProprietorshipBody,
 )
+from insolvia_core.plans import LumpSum, PlanBody, SecuredTreatment, StepPayment
 from insolvia_core.sofa import (
     BusinessConnection,
     CharitableContribution,
@@ -97,6 +101,7 @@ from insolvia_core.sofa import (
     SofaEntryBody,
     StorageUnit,
 )
+from insolvia_core.tax_ids import TaxIdRef
 
 from tests.unit.test_form_fill import read_form
 
@@ -148,7 +153,22 @@ def _debtor_1() -> Debtor:
         venue=Venue(basis="lived_longest_180_days"),
         credit_counseling=CreditCounseling(status="completed_with_certificate"),
         signed_at="2026-08-30",
+        # The record carries the kind, the last four and the sealed item's
+        # reference; the digits themselves are in `reference_case_file()`'s
+        # `tax_ids`, the disclosed state (issue 13.12 / #382).
+        tax_id=TaxIdRef(kind="ssn", last_four="4321", ref=TAX_ID_REF_1),
     )
+
+
+# The reference case's tax identifiers, from the SSA's advertising block
+# (987-65-4320..4329) — numbers the Administration has said it will never
+# issue, the tax-id analogue of RFC 2606's `.test` (insolvia_core.tax_ids
+# owns that decision). Debtor 2's is read as an ITIN so the golden prints
+# BOTH B121 lines and both B101 boxes; there is no reserved ITIN block, so
+# that value is merely structurally valid and describes nobody.
+TAX_ID_REF_1 = "taxid-0001"
+TAX_ID_REF_2 = "taxid-0002"
+REFERENCE_TAX_IDS = {"debtor_1": "987654321", "debtor_2": "987654322"}
 
 
 def _debtor_2() -> Debtor:
@@ -178,6 +198,7 @@ def _debtor_2() -> Debtor:
             status="not_required", exemption_reason="disability"
         ),
         signed_at="2026-08-30",
+        tax_id=TaxIdRef(kind="itin", last_four="4322", ref=TAX_ID_REF_2),
     )
 
 
@@ -1151,6 +1172,9 @@ def reference_case_file() -> CaseFile:
     return CaseFile(
         case=REFERENCE_CASE,
         debtors=(_debtor_1(), _debtor_2()),
+        # The DISCLOSED state — what packet assembly hands the projections
+        # after the logged full-value read. The goldens print B121 from it.
+        tax_ids=REFERENCE_TAX_IDS,
         petition=PetitionBody(
             fee_handling="installments",
             # The family owns its homestead (Schedule A/B row one), so B101
@@ -1301,7 +1325,69 @@ def reference_case_file() -> CaseFile:
     )
 
 
+def reference_case_file_chapter_13() -> CaseFile:
+    """The same family filing under Chapter 13 (issue #365): the identical
+    income history, household and deductions, plus the four answers the
+    Chapter 13 forms ask on their own — line 40's child support, line 41's
+    retirement withholding, one line-43 special circumstance, and no
+    contention that the (zero) marital adjustment shortens the commitment
+    period. B122C-1 and B122C-2's goldens print from this file.
+
+    Issue #367 adds what the Chapter 13 PACKET needs beyond the means test:
+    the plan (`REFERENCE_PLAN_BODY`, which B113's golden prints) and an
+    assume-or-reject answer on every lease — the plan's Part 6 assumes the
+    RAV4 lease the Chapter 7 file already assumes and rejects the rest."""
+    case_file = reference_case_file()
+    inputs = replace(
+        case_file.means_test_inputs[0],
+        child_support_for_dependents="300.00",
+        qualified_retirement_deductions="210.00",
+        special_circumstances=(
+            SpecialCircumstanceItem(
+                id="sc-1", description="Dialysis travel", amount="180.00"
+            ),
+        ),
+    )
+    return CaseFile(
+        **{
+            **case_file.__dict__,
+            "case": replace(REFERENCE_CASE, chapter=13),
+            "means_test_inputs": (inputs,),
+            "contract_leases": tuple(
+                (lease_id, replace(lease, intention=lease.intention or "reject"))
+                for lease_id, lease in case_file.contract_leases
+            ),
+            "plans": (REFERENCE_PLAN_BODY,),
+        }
+    )
+
+
+# The Chapter 13 reference plan (#366's route test types the same one): $500
+# a month over the commitment period, the mortgage kept current outside the
+# plan, the car crammed down at 7%, the rest to unsecured creditors.
+REFERENCE_PLAN_BODY = PlanBody(
+    payment_source="fixed",
+    monthly_payment="500.00",
+    trustee_percentage="10",
+    attorney_fees="3500.00",
+    secured_treatments=(
+        SecuredTreatment(
+            id="t-home", claim_id="claim-mortgage", treatment="cure_and_maintain"
+        ),
+        SecuredTreatment(
+            id="t-car", claim_id="claim-auto", treatment="cramdown", interest_rate="7"
+        ),
+    ),
+    unsecured_treatment="pot",
+)
+
+
 # --- the projected goldens ----------------------------------------------------
+
+# The Chapter 13 means-test pair and the plan print from the Chapter 13
+# reference case;
+# every other series from the Chapter 7 one.
+CHAPTER_13_SERIES = frozenset({"form/b113", "form/b122c1", "form/b122c2"})
 
 
 @pytest.mark.parametrize(
@@ -1321,16 +1407,24 @@ def reference_case_file() -> CaseFile:
         "form/b106sum",
         "form/b107",
         "form/b108",
+        "form/b113",
         "form/b121",
         "form/b122a1",
         "form/b122a2",
+        "form/b122c1",
+        "form/b122c2",
         "form/b2010",
         "form/b2030",
     ],
 )
 def test_reference_case_renders_to_its_golden(series: str) -> None:
     release = latest_form(series)
-    data = fill_form(release, project(release, reference_case_file()))
+    case_file = (
+        reference_case_file_chapter_13()
+        if series in CHAPTER_13_SERIES
+        else reference_case_file()
+    )
+    data = fill_form(release, project(release, case_file))
     observed = {
         "release": release.release_id,
         "sha256": hashlib.sha256(data).hexdigest(),
@@ -2074,10 +2168,11 @@ def test_b108_claimed_exempt_answers_no_without_a_schedule_c_claim() -> None:
 # --- B121 ---------------------------------------------------------------------
 
 
-def test_b121_prints_names_and_dates_and_leaves_the_numbers_blank() -> None:
-    """The full tax identifier is the one fact the store cannot hold yet
-    (parse_debtor refuses it), so lines 2-3 stay blank — and the "do not
-    have" boxes are never inferred from that blank."""
+def test_b121_prints_names_dates_and_the_disclosed_numbers() -> None:
+    """Lines 2-3 print from the DISCLOSED digits by kind: Debtor 1's SSN on
+    line 2 with dashes, Debtor 2's ITIN on line 3 as the ten characters
+    after the pre-printed 9 — each on row one, row two ("all numbers you
+    have used") blank. The "do not have" boxes are never inferred."""
     release = latest_form("form/b121")
     values = dict(project(release, reference_case_file()))
     assert values["line_1_debtor1_first_name"] == Text("Ada")
@@ -2087,13 +2182,37 @@ def test_b121_prints_names_and_dates_and_leaves_the_numbers_blank() -> None:
     assert "line_1_debtor2_middle_name" not in values
     assert values["debtor1_signature_date"] == Text("08/30/2026")
     assert values["debtor2_signature_date"] == Text("08/30/2026")
+    assert values["line_2_debtor1_ssn"] == {"Debtor1a.SSNum": Text("987-65-4321")}
+    assert values["line_3_debtor2_itin"] == {"Debtor2a ITINNum": Text("87-65-4322")}
     for field_id in (
-        "line_2_debtor1_ssn",
-        "line_2_debtor1_no_ssn",
         "line_3_debtor1_itin",
+        "line_2_debtor2_ssn",
+        "line_2_debtor1_no_ssn",
         "line_3_debtor1_no_itin",
+        "line_2_debtor2_no_ssn",
+        "line_3_debtor2_no_itin",
     ):
         assert field_id not in values
+
+
+def test_b121_without_the_logged_read_prints_the_numbers_blank() -> None:
+    """A CaseFile built without `tax_ids` — every caller that never asked
+    for the full value — prints lines 2-3 blank rather than wrong. The
+    record's last four is not enough for this form and is never used."""
+    release = latest_form("form/b121")
+    values = dict(project(release, replace(reference_case_file(), tax_ids={})))
+    assert "line_2_debtor1_ssn" not in values
+    assert "line_3_debtor2_itin" not in values
+    assert values["line_1_debtor1_first_name"] == Text("Ada")
+
+
+def test_b101_prints_the_last_four_in_the_box_for_the_kind() -> None:
+    """Line 3 needs no disclosure: the last four ride the debtor record."""
+    values = b101_values()
+    assert values["line_3_debtor1_ssn_last4"] == Text("4321")
+    assert values["line_3_debtor2_itin_last4"] == Text("4322")
+    assert "line_3_debtor1_itin_last4" not in values
+    assert "line_3_debtor2_ssn_last4" not in values
 
 
 # --- B2010 / B2030 ------------------------------------------------------------
@@ -2715,3 +2834,268 @@ def test_b122a1_prints_an_overridden_line_as_entered() -> None:
     assert isinstance(wages, dict)
     assert wages["Debto1.Quest2.0"] == Text("8,000.00")
     assert values["total_cmi"] == Text("9,300.00")  # 8,000 + Ben's 1,300
+
+
+# --- B122C-1 / B122C-2 (issue #365) -------------------------------------------
+
+
+def _below_median_chapter_13_file() -> CaseFile:
+    """The Chapter 13 reference case with Ada's paychecks shrunk: 4,500 +
+    Ben's 1,300 annualizes to 69,600, under the FL household-of-3 median
+    (97,540) — line 17a, and 3 years on line 21."""
+    case_file = reference_case_file_chapter_13()
+    shrunk = tuple(
+        replace(record, gross="4500.00") for record in case_file.pay_period_records
+    )
+    return CaseFile(**{**case_file.__dict__, "pay_period_records": shrunk})
+
+
+def test_b122c1_columns_are_the_cmi_derivation_under_its_own_widget_names() -> None:
+    values = project(latest_form("form/b122c1"), reference_case_file_chapter_13())
+    wages = values["wages"]
+    assert isinstance(wages, dict)
+    assert wages["undefined"] == Text("7,400.00")
+    assert wages["undefined_11"] == Text("0.00")
+    unemployment = values["unemployment"]
+    assert isinstance(unemployment, dict)
+    assert unemployment["undefined_19"] == Text("1,300.00")
+    ssa = values["ssa_contention"]
+    assert isinstance(ssa, dict)
+    assert ssa == {"undefined_21": Text("150.00")}
+    # Line 11's box also prints on lines 12 and 18 — one widget.
+    assert values["total_cmi"] == Text("8,700.00")
+    assert latest_form("form/b122c1").field("total_cmi").pdf_names == ("undefined_32",)
+
+
+def test_b122c1_above_the_median_requires_122c2_and_five_years() -> None:
+    values = project(latest_form("form/b122c1"), reference_case_file_chapter_13())
+    # Married and filing jointly: line 1 says married, line 13 says the
+    # spouse files with you (fill in 0).
+    assert values["marital_filing_status"] == Option("married")
+    assert values["marital_adjustment_status"] == Option("2")
+    assert values["marital_adjustment_total"] == Text("0.00")
+    assert values["current_monthly_income"] == Text("8,700.00")
+    assert values["annualized_cmi"] == Text("104,400.00")
+    assert values["median_state"] == Text("FL")
+    assert values["median_household_size"] == Text("3")
+    assert values["median_income"] == Text("97,540.00")
+    assert values["median_comparison"] == Option("17b")
+    assert values["caption.disposable_income_box"] == Option("2")
+    assert values["commitment_marital_adjustment"] == Text("0.00")
+    assert values["commitment_monthly_income"] == Text("8,700.00")
+    assert values["commitment_annualized"] == Text("104,400.00")
+    assert values["commitment_comparison"] == Option("no")
+    assert values["caption.commitment_period_box"] == Option("4")
+
+
+def test_b122c1_below_the_median_checks_17a_and_three_years() -> None:
+    values = project(latest_form("form/b122c1"), _below_median_chapter_13_file())
+    assert values["annualized_cmi"] == Text("69,600.00")
+    assert values["median_comparison"] == Option("17a")
+    assert values["caption.disposable_income_box"] == Option("1")
+    assert values["commitment_comparison"] == Option("yes")
+    assert values["caption.commitment_period_box"] == Option("3")
+
+
+def test_b122c1_leaves_lines_12_to_21_blank_until_the_household_exists() -> None:
+    case_file = reference_case_file_chapter_13()
+    without_inputs = CaseFile(**{**case_file.__dict__, "means_test_inputs": ()})
+    values = project(latest_form("form/b122c1"), without_inputs)
+    assert values["total_cmi"] == Text("8,700.00")
+    assert "current_monthly_income" not in values
+    assert "median_comparison" not in values
+    assert "caption.commitment_period_box" not in values
+
+
+def test_b122c1_prints_the_marital_adjustment_rows_and_the_contention() -> None:
+    contended = _with_inputs(
+        reference_case_file_chapter_13(),
+        marital_adjustments=(
+            MaritalAdjustmentItem(
+                id="ma-1", description="Spouse's own student loan", amount="300.00"
+            ),
+        ),
+        commitment_period_marital_adjustment=True,
+    )
+    values = project(latest_form("form/b122c1"), contended)
+    purpose = values["marital_adjustment_purpose"]
+    assert isinstance(purpose, dict)
+    assert purpose == {"13a": Text("Spouse's own student loan")}
+    assert values["marital_adjustment_total"] == Text("300.00")
+    assert values["current_monthly_income"] == Text("8,400.00")
+    assert values["commitment_marital_adjustment"] == Text("300.00")
+    assert values["commitment_monthly_income"] == Text("8,400.00")
+
+
+def test_b122c2_determination_follows_the_engine() -> None:
+    values = project(latest_form("form/b122c2"), reference_case_file_chapter_13())
+    # Lines 5-38 are B122A-2's figures under B122C-2's widgets; line 38's
+    # box is also line 42's (one widget), and line 45 is 8,700 less the
+    # 9,779.33 of adjustments.
+    assert values["household_size"] == Text("3")
+    assert values["total_deductions"] == Text("9,089.33")
+    assert latest_form("form/b122c2").field("total_deductions").pdf_names == (
+        "undefined_85",
+    )
+    assert values["current_monthly_income"] == Text("8,700.00")
+    assert values["child_support_income"] == Text("300.00")
+    assert values["qualified_retirement_deductions"] == Text("210.00")
+    description = values["special_circumstances_description"]
+    assert isinstance(description, dict)
+    assert description == {"43a": Text("Dialysis travel")}
+    assert values["special_circumstances_total"] == Text("180.00")
+    assert values["total_adjustments"] == Text("9,779.33")
+    assert values["monthly_disposable_income"] == Text("-1,079.33")
+    # Line 36 multiplies without B122A-2's eligibility question.
+    assert values["ch13_multiplier"] == Text("0.1")
+    assert values["ch13_plan_payment"] == Text("650.00")
+    assert values["ch13_admin_expense"] == Text("65.00")
+    # Line 11's export states are the line numbers each answer leads to.
+    assert values["vehicle_count"] == Option("12")
+    assert values["cure_claimed"] == Option("yes")
+    assert values["priority_claims_owed"] == Option("yes")
+    creditor = values["other_secured_creditor"]
+    assert isinstance(creditor, dict)
+    assert creditor == {"33d": Text("Suncoast Equipment Finance")}
+
+
+def test_b122c2_lands_13e_on_the_row_that_33c_shares() -> None:
+    # The official PDF wires line 33c's copy box to 13e's first creditor
+    # row; the total lands there so 33c prints it.
+    two_cars = _with_inputs(
+        reference_case_file_chapter_13(),
+        vehicle_count=2,
+        vehicle_2_loan_monthly="220.00",
+    )
+    values = project(latest_form("form/b122c2"), two_cars)
+    assert values["vehicle_2_loan_total"] == Text("220.00")
+    rows = values["vehicle_2_loan_rows"]
+    assert isinstance(rows, dict)
+    assert rows == {"undefined_25": Text("220.00")}
+    assert latest_form("form/b122c2").field("vehicle_2_loan_rows").pdf_names == (
+        "undefined_25",
+        "undefined_25-1",
+    )
+
+
+def test_b122c2_refuses_a_below_median_case() -> None:
+    assert not files_b122c2(_below_median_chapter_13_file())
+    with pytest.raises(FormProjectionError, match="at or below the applicable median"):
+        project(latest_form("form/b122c2"), _below_median_chapter_13_file())
+
+
+def test_the_means_test_forms_refuse_the_other_chapter() -> None:
+    with pytest.raises(FormProjectionError, match="Chapter 7 case"):
+        project(latest_form("form/b122c1"), reference_case_file())
+    with pytest.raises(FormProjectionError, match="Chapter 7 case"):
+        project(latest_form("form/b122c2"), reference_case_file())
+    assert not files_b122c2(reference_case_file())
+    with pytest.raises(FormProjectionError, match="Chapter 13 case"):
+        project(latest_form("form/b122a2"), reference_case_file_chapter_13())
+
+
+def test_b122c2_surfaces_the_engines_refusals_through_the_gate() -> None:
+    case_file = reference_case_file_chapter_13()
+    without_inputs = CaseFile(**{**case_file.__dict__, "means_test_inputs": ()})
+    assert files_b122c2(without_inputs)  # not yet determinable: stays in the set
+    with pytest.raises(FormProjectionError, match="household composition"):
+        project(latest_form("form/b122c2"), without_inputs)
+
+
+# --- B113, the Chapter 13 plan (issue #367) -----------------------------------
+
+
+def b113_values(**plan_changes: object) -> dict[str, object]:
+    case_file = reference_case_file_chapter_13()
+    plan = replace(REFERENCE_PLAN_BODY, **plan_changes)
+    return dict(project(latest_form("form/b113"), replace(case_file, plans=(plan,))))
+
+
+def test_b113_prints_the_calculators_figures() -> None:
+    values = b113_values()
+    assert values["line_2_1_amount"] == {"2.1.amount.1": Text("500.00")}
+    assert values["line_2_1_months"] == {"2.1.months.1": Text("60")}
+    assert values["line_2_5_total"] == Text("30,000.00")
+    # The car is crammed down, so Part 1 line 1.1 says so and § 3.2 lists it.
+    assert values["line_1_1_included"] == Check()
+    assert values["line_3_2_rate"] == {"3.2.rate.1": Text("7")}
+    assert values["line_5_1_remaining"] == Check()
+    # A pot plan disburses everything it takes in: the exhibit adds up to § 2.5.
+    assert values["exhibit.total"] == Text("30,000.00")
+
+
+def test_b113_prints_a_step_and_its_lump_sums() -> None:
+    values = b113_values(
+        step_payments=(StepPayment(id="s1", start_month=25, monthly_payment="650.00"),),
+        lump_sums=(
+            LumpSum(id="l1", month=13, amount="1200.00", description="Tax refund"),
+        ),
+    )
+    assert values["line_2_1_amount"] == {
+        "2.1.amount.1": Text("500.00"),
+        "2.1.amount.2": Text("650.00"),
+    }
+    assert values["line_2_1_months"] == {
+        "2.1.months.1": Text("24"),
+        "2.1.months.2": Text("36"),
+    }
+    assert values["line_2_4_additional"] == Check()
+    assert values["line_2_4_description"] == {
+        "2.4.description.1": Text("Tax refund: $1,200.00 in month 13")
+    }
+
+
+def test_b113_prints_a_promised_percentage() -> None:
+    values = b113_values(unsecured_treatment="percentage", unsecured_percentage="45")
+    assert values["line_5_1_percentage"] == Check()
+    assert values["line_5_1_percentage_value"] == Text("45")
+    assert "line_5_1_remaining" not in values
+
+
+def test_b113_lists_a_surrender_and_no_cramdown() -> None:
+    values = b113_values(
+        secured_treatments=(
+            SecuredTreatment(
+                id="t-home", claim_id="claim-mortgage", treatment="cure_and_maintain"
+            ),
+            SecuredTreatment(id="t-car", claim_id="claim-auto", treatment="surrender"),
+        )
+    )
+    assert values["line_3_5_surrender"] == Check()
+    assert values["line_3_5_creditor"] == {
+        "3.5.creditor.1": Text("Drive Away Financial LLC")
+    }
+    assert values["line_3_2_none"] == Check()
+    assert values["line_1_1_not_included"] == Check()
+
+
+@pytest.mark.parametrize(
+    ("changes", "problem"),
+    [
+        pytest.param(
+            {
+                "step_payments": (
+                    StepPayment(id="s1", start_month=13, monthly_payment="600.00"),
+                    StepPayment(id="s2", start_month=25, monthly_payment="700.00"),
+                )
+            },
+            "prints 2 payment lines",
+            id="three-payment-runs",
+        ),
+        pytest.param(
+            {"priority_percentage": "50"}, "§ 4.5", id="priority-paid-less-than-full"
+        ),
+        pytest.param({"monthly_payment": "50.00"}, "not feasible", id="infeasible"),
+        pytest.param({"trustee_percentage": None}, "Plan: ", id="calculator-problem"),
+    ],
+)
+def test_b113_refuses_a_plan_it_cannot_print_honestly(changes, problem) -> None:
+    with pytest.raises(FormProjectionError, match=problem):
+        b113_values(**changes)
+
+
+def test_b113_without_a_plan_prints_the_caption_alone() -> None:
+    case_file = replace(reference_case_file_chapter_13(), plans=())
+    values = project(latest_form("form/b113"), case_file)
+    assert values["caption.debtor1_name"] == Text("Ada Quinn Lovelace")
+    assert not any(key.startswith(("line_", "exhibit.")) for key in values)

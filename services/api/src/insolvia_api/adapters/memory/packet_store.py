@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from insolvia_core.adapters.memory.case_store import MemoryCaseStore
-from insolvia_core.cases import Case
+from insolvia_core.cases import Case, is_filed
 
 from insolvia_api.core.packets import Packet, list_order
 
@@ -21,7 +21,12 @@ class MemoryPacketStore:
         self.packets: dict[tuple[str, str], Packet] = {}
 
     def create(
-        self, packet: Packet, *, pinned_case: Case, expected_updated_at: str
+        self,
+        packet: Packet,
+        *,
+        pinned_case: Case,
+        expected_updated_at: str,
+        allow_filed: bool = False,
     ) -> bool:
         key = (packet.case_id, packet.id)
         if key in self.packets:
@@ -30,7 +35,7 @@ class MemoryPacketStore:
         if (
             stored_case is None
             or stored_case.updated_at != expected_updated_at
-            or stored_case.status == "filed"
+            or (is_filed(stored_case.status) and not allow_filed)
         ):
             return False
         # Both, together — nothing can fail between these lines, which is the

@@ -32,14 +32,21 @@ description: >-
 4. If it deploys, add `<name>-pr.yml` + `<name>-<env>.yml` workflows (follow the
    existing `<area>-pr.yml` / `<area>-<env>.yml` shape and the PR-gate design in
    [`docs/reference/architecture.md`](../../../docs/reference/architecture.md)) and an `infra/envs/*`
-   entry.
+   entry. **If it ships a container image, its ECR repository comes first, in
+   another repository:** add `insolvia-shared-<component>` to
+   [insolvia-services](https://github.com/insolvia-ai/insolvia-services)'
+   `infra/envs/shared` and let *that* repo's release apply it **before** the PR
+   here that deploys it — the env root's `data "aws_ecr_repository"` lookup
+   hard-fails until the repository exists, and nothing orders the two repos'
+   pipelines for you. If the deploy role needs a new grant for it, that is a
+   `ci-trust` PR there too (the `insolvia-deploy-role-permissions` skill).
 5. Document it in the map in the root [`README.md`](../../../README.md).
 
 ## Python service (the exception — not a workspace member)
 
 Lives under `services/<name>/`, is **not** an npm workspace member (no
-`package.json` in the root `workspaces` list). Use the mailer-style layered `src/`
-layout (`core/api/adapters/entrypoints`) with a per-service `pyproject.toml`
+`package.json` in the root `workspaces` list). Use the layered `src/`
+layout every service here shares (see `services/api` or `services/mcp`) (`core/api/adapters/entrypoints`) with a per-service `pyproject.toml`
 (pytest) plus the shared root `ruff.toml`, and its own `tests/test_architecture.py`
 enforcing the dependency direction. Steps 3–5 above still apply.
 

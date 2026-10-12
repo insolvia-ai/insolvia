@@ -64,9 +64,10 @@ if (
     access_log = DynamoDbAccessLog(config.case_access_log_table_name)
     firm_store = DynamoDbFirmStore(config.firm_table_name)
 else:
-    case_store = MemoryCaseStore()
-    case_entity_store = MemoryCaseEntityStore()
     debtor_store = MemoryDebtorStore()
+    # Shared with the case store: a case's debtors live in its partition.
+    case_store = MemoryCaseStore(debtor_store=debtor_store)
+    case_entity_store = MemoryCaseEntityStore()
     document_store = MemoryDocumentStore()
     candidate_store = MemoryCandidateStore()
     access_log = MemoryAccessLog()

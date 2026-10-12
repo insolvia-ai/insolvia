@@ -171,3 +171,24 @@ needing a capability the direct API cannot offer.
 > for extraction (the same document overflows the same ceiling every time)
 > and fails the job honestly instead of retrying — the review's transient
 > treatment stays as it was.
+
+---
+
+> **Amended 2026-09-23 (the tax id is stored, 13.12 /
+> [#382](https://github.com/insolvia-ai/insolvia/issues/382)).** "The
+> stores cannot hand a worker a full SSN/ITIN" stopped being true: the
+> debtor's tax identifier is now sealed in the case table
+> (`insolvia_core.tax_ids`), and the review worker **performs the logged
+> full-value read** — because the stored packet's B121 prints the number,
+> and the review's byte-exact re-assembly must reproduce those bytes to
+> prove it describes an assembled packet. Every such read is a
+> `taxid.read` access row with purpose `petition_review`, beside the
+> preparer's `petition.review` row. What keeps "no tax identifiers" true
+> for the model moved one layer up and stayed structural: **the B121
+> projection is dropped from the review document wholesale** — the
+> statement has nothing to review but the identifier — the debtor record
+> the document carries holds last-four only, and `scrub` remains as defence
+> in depth. The worker role's KMS grant is Decrypt alone, fenced to the
+> tax-id encryption context (`infra/modules/case_store`, `TaxIdKeyUse`);
+> it cannot seal one. Extraction is unchanged: it never performs the read,
+> and its output still passes `scrub` before storage.

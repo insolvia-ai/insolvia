@@ -1,10 +1,14 @@
 """B101 @ 2024-06-22 (revision 06/24) — the voluntary petition's mapping.
 
-What deliberately does NOT project, each blank until its owner lands: tax
-identifiers (line 3 — encrypted storage with audited reads is its own work),
-the amended-filing caption (no `case.is_amended` yet), wet-signature lines
+What deliberately does NOT project, each blank until its owner lands: the
+amended-filing caption (no `case.is_amended` yet), wet-signature lines
 (never machine-filled), the court's case number, and the pro se
 acknowledgment boxes (the filer's own act).
+
+Line 3 prints the tax identifier's LAST FOUR, which every debtor read
+carries on the record (`Debtor.tax_id.last_four`, issue 13.12 / #382) — no
+key and no audited read are involved, unlike B121, whose full number is
+the one thing the record does not hold.
 """
 
 from __future__ import annotations
@@ -108,6 +112,13 @@ def project_b101_0624(release: FormRelease, case_file: CaseFile) -> FieldValues:
                 f"line_2_{col}_{suffix_id}",
                 [getattr(alias, attr, None) for alias in aliases],
                 problems,
+            )
+
+        # Line 3 — the last four of the SSN or the ITIN, whichever the
+        # debtor has; the form prints one box per kind.
+        if debtor.tax_id is not None:
+            values[f"line_3_{col}_{debtor.tax_id.kind}_last4"] = Text(
+                debtor.tax_id.last_four
             )
 
         # Line 4 — EINs (two rows per debtor). The boxes are 9-character

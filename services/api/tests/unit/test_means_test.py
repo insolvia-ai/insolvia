@@ -1,22 +1,28 @@
-"""Known-answer checks for the § 707(b) engine (issue #101).
+"""Known-answer checks for the means-test engine (issues #101, #365).
 
 The register's bar for LOGIC rows: test cases with known answers, sanitized
 (this repo is public — every name and figure below is invented, but the
 ARITHMETIC is the form's own and can be redone on paper against the 04/25
-B122A-2). The full-trace scenario walks a Gainesville (Alachua County, FL)
-household of two through every line; the outcome scenarios pin all four
-ways the determination can settle — the median, the two § 707(b)(2)(A)(i)
-thresholds, and the 25%-of-unsecured ratio between them.
+B122A-2, the 10/19 B122C-1 and the 04/25 B122C-2). The full-trace scenario
+walks a Gainesville (Alachua County, FL) household of two through every
+line; the outcome scenarios pin all four ways the Chapter 7 determination
+can settle — the median, the two § 707(b)(2)(A)(i) thresholds, and the
+25%-of-unsecured ratio between them — and, for Chapter 13, both sides of
+the § 1325(b)(3) comparison and both commitment periods, including the
+case where the marital adjustment makes the two comparisons disagree.
 """
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import date
 from decimal import Decimal
 
 import pytest
 from insolvia_api.core.cmi import CmiResult, cmi_window, current_monthly_income
 from insolvia_api.core.means_test import (
+    FORM_122C1,
+    FORM_122C2,
     MeansTestCase,
     MeansTestError,
     MeansTestResult,
@@ -613,3 +619,314 @@ def test_a_typed_total_wins_over_the_bucketed_rows_rather_than_adding() -> None:
     assert "home_secured_monthly_total" in line(result, "9b")[1]
     assert line(result, "34")[0] == "10.00"
     assert line(result, "33d")[0] == "0.00"
+
+
+# ── issue #365: Chapter 13 — B122C-1 and B122C-2 ────────────────
+
+
+def ch13_case(**overrides: object) -> MeansTestCase:
+    """`case_for` on a Chapter 13 case — same Gainesville household."""
+    return replace(case_for(**overrides), chapter=13)  # type: ignore[arg-type]
+
+
+def c1_line(result: MeansTestResult, number: str) -> tuple[str, str]:
+    found = next(
+        entry
+        for entry in result.lines
+        if entry.line == number and entry.form == FORM_122C1
+    )
+    return found.amount, found.source
+
+
+def c2_line(result: MeansTestResult, number: str) -> tuple[str, str]:
+    found = next(
+        entry
+        for entry in result.lines
+        if entry.line == number and entry.form == FORM_122C2
+    )
+    return found.amount, found.source
+
+
+def test_chapter_7_lines_name_their_form() -> None:
+    result = run_means_test(full_case(), DATA)
+    assert {entry.form for entry in result.lines} == {"122A-2"}
+    assert result.chapter == 7
+    assert result.commitment is None
+    assert result.disposable_income is None
+
+
+def test_a_below_median_chapter_13_debtor_gets_a_three_year_period() -> None:
+    # 4,000 x 12 = 48,000 against FL's household-of-2 median (86,523): line
+    # 17a (no Form 122C-2) and, on the same figure, line 21's 3 years.
+    result = run_means_test(ch13_case(monthly_cmi="4000.00", inputs=household()), DATA)
+    assert result.chapter == 13
+    assert result.outcome == "below_median"
+    assert result.determined_by == "median"
+    assert result.comparison is not None
+    assert result.comparison.monthly_cmi == "4000.00"
+    assert not result.comparison.above_median
+    assert result.commitment is not None
+    assert result.commitment.months == 36
+    assert result.commitment.annualized_income == "48000.00"
+    assert result.commitment.annual_median == "86523.00"
+    assert "§ 1325(b)(4)(A)(i)" in result.commitment.source
+    assert result.disposable_income is None
+    # Form 122C-1's Part 2-3 lines are the whole trace; no 122C-2 line.
+    assert {entry.form for entry in result.lines} == {"122C-1"}
+    assert c1_line(result, "17")[0] == "0.00"
+    assert "not determined under § 1325(b)(3)" in c1_line(result, "17")[1]
+    assert c1_line(result, "21")[0] == "36.00"
+
+
+def ch13_inputs() -> MeansTestInputBody:
+    """The Chapter 7 full-trace inputs plus the four Chapter 13 answers."""
+    return parse_means_test_input(
+        {
+            "people_under_65": 2,
+            "people_65_or_older": 0,
+            "home_secured_monthly_total": "1750.00",
+            "vehicle_count": 1,
+            "vehicle_1_loan_monthly": "450.00",
+            "taxes": "1500.00",
+            "involuntary_deductions": "120.00",
+            "term_life_insurance": "40.00",
+            "healthcare_above_allowance": "100.00",
+            "optional_telecom": "60.00",
+            "health_insurance": "400.00",
+            "health_savings_account": "50.00",
+            "education_under_18": "200.00",
+            "additional_food_clothing": "50.00",
+            "charitable_contributions": "25.00",
+            "priority_cure_total": "3000.00",
+            # B122A-2's eligibility question, deliberately unanswered: the
+            # Chapter 13 form multiplies regardless.
+            "ch13_projected_plan_payment": "500.00",
+            "child_support_for_dependents": "250.00",
+            "qualified_retirement_deductions": "150.00",
+            "special_circumstances": [
+                {"id": "sc-1", "description": "Dialysis travel", "amount": "100.00"}
+            ],
+        }
+    )
+
+
+def test_the_chapter_13_calculation_line_by_line() -> None:
+    # 9,500 x 12 = 114,000 over the 86,523 median: Form 122C-2 is required
+    # (line 17b) and the commitment period is 5 years (line 21). Lines
+    # 5-38 are the Chapter 7 full trace's deductions with line 36 always
+    # multiplied; lines 39-45 are the § 1325(b)(2) subtractions.
+    result = run_means_test(
+        ch13_case(
+            monthly_cmi="9500.00",
+            inputs=ch13_inputs(),
+            priority_debt="6000.00",
+            children_under_18=1,
+        ),
+        DATA,
+    )
+    assert result.outcome == "above_median"
+    assert result.determined_by == "median"
+    assert result.commitment is not None
+    assert result.commitment.months == 60
+    assert result.commitment.monthly_income == "9500.00"
+    assert result.commitment.annualized_income == "114000.00"
+    assert "§ 1325(b)(4)(A)(ii)" in result.commitment.source
+    for number, amount in {
+        "11": "9500.00",
+        "12": "9500.00",
+        "13": "0.00",
+        "14": "9500.00",
+        "15a": "9500.00",
+        "15b": "114000.00",
+        "16c": "86523.00",
+        "17": "1.00",
+        "18": "9500.00",
+        "19a": "0.00",
+        "19b": "9500.00",
+        "20a": "9500.00",
+        "20b": "114000.00",
+        "20c": "86523.00",
+        "21": "60.00",
+    }.items():
+        assert c1_line(result, number)[0] == amount, f"122C-1 line {number}"
+    for number, amount in {
+        "5": "2.00",
+        "6": "1558.00",
+        "24": "4792.00",
+        "32": "725.00",
+        "33e": "2200.00",
+        "34": "50.00",
+        "35": "100.00",
+        "36": "50.00",  # 500 x 0.1 (Middle Florida), no eligibility question
+        "37": "2400.00",
+        "38": "7917.00",
+        "39": "9500.00",
+        "40": "250.00",
+        "41": "150.00",
+        "42": "7917.00",
+        "43": "100.00",
+        "44": "8417.00",  # 250 + 150 + 7917 + 100
+        "45": "1083.00",  # 9500 - 8417
+    }.items():
+        assert c2_line(result, number)[0] == amount, f"122C-2 line {number}"
+    assert result.disposable_income == "1083.00"
+    # No Chapter 7 line leaks into a Chapter 13 trace, and every line
+    # names its form.
+    assert {entry.form for entry in result.lines} == {"122C-1", "122C-2"}
+    assert not any(
+        entry.line in ("1", "3", "4", "39a", "40") and entry.form == "122A-2"
+        for entry in result.lines
+    )
+
+
+def test_every_chapter_13_figure_names_its_rule_input_or_dataset() -> None:
+    result = run_means_test(
+        ch13_case(monthly_cmi="9500.00", inputs=ch13_inputs(), children_under_18=1),
+        DATA,
+    )
+    assert all(entry.source for entry in result.lines)
+    assert "ust/census-median-family-income@2026-04-01" in c1_line(result, "16c")[1]
+    assert "§ 1325(b)(3)" in c1_line(result, "15b")[1]
+    assert "§ 1325(b)(4)" in c1_line(result, "20b")[1]
+    assert "ust/ch13-admin-multipliers@2026-07-15" in c2_line(result, "36")[1]
+    assert "§ 1325(b)(3)" in c2_line(result, "36")[1]
+    assert "§ 1325(b)(2)" in c2_line(result, "40")[1]
+    assert "541(b)(7)" in c2_line(result, "41")[1]
+    assert "Dialysis travel" in c2_line(result, "43")[1]
+    assert "§ 707(b)(2)(B)" in c2_line(result, "43")[1]
+    assert c2_line(result, "44")[1] == "lines 40 + 41 + 42 + 43"
+    assert c2_line(result, "45")[1] == "line 39 minus line 44"
+
+
+def spouse_only_cmi(monthly: str) -> CmiResult:
+    """A Column B-only derivation: the non-filing spouse's income."""
+    return current_monthly_income(
+        filing_date=AS_OF,
+        debtors=[
+            Debtor(
+                id="d-s",
+                case_id="case-0001",
+                filing_role="non_filing_spouse",
+                created_at="2026-08-01T12:00:00Z",
+                updated_at="2026-08-01T12:00:00Z",
+            )
+        ],
+        employments=[
+            (
+                "em-s",
+                EmploymentBody(
+                    debtor_id="d-s", status="employed", employer_name="Spouse Co"
+                ),
+            )
+        ],
+        pay_periods=[
+            PayPeriodRecordBody(
+                employment_id="em-s",
+                pay_date=f"2026-0{month}-25",
+                gross=monthly,
+                frequency="monthly",
+            )
+            for month in range(3, 9)
+        ],
+        other_income=[],
+    )
+
+
+def test_the_marital_adjustment_comes_off_before_the_median_on_122c1() -> None:
+    # 7,400 x 12 = 88,800 is over the household-of-2 median (86,523), but
+    # line 13's 300 brings line 14 to 7,100 and line 15b to 85,200: line
+    # 17a, no Form 122C-2. The commitment period reads the RAW line 11
+    # unless the adjustment is contended for it too — so 60 months here.
+    adjustments = [
+        {"id": "ma1", "description": "Spouse's own student loan", "amount": "300.00"}
+    ]
+    result = run_means_test(
+        ch13_case(
+            monthly_cmi="unused",
+            cmi=spouse_only_cmi("7400.00"),
+            inputs=household(under_65=2, marital_adjustments=adjustments),
+        ),
+        DATA,
+    )
+    assert result.outcome == "below_median"
+    assert result.comparison is not None
+    assert result.comparison.monthly_cmi == "7100.00"
+    assert result.comparison.annualized_cmi == "85200.00"
+    assert c1_line(result, "13")[0] == "300.00"
+    assert "Spouse's own student loan" in c1_line(result, "13")[1]
+    assert c1_line(result, "19a")[0] == "0.00"
+    assert "not contended" in c1_line(result, "19a")[1]
+    assert c1_line(result, "20b")[0] == "88800.00"
+    assert result.commitment is not None
+    assert result.commitment.months == 60
+    assert result.commitment.marital_adjustment == "0.00"
+
+
+def test_contending_the_adjustment_for_the_commitment_period_shortens_it() -> None:
+    adjustments = [
+        {"id": "ma1", "description": "Spouse's own student loan", "amount": "300.00"}
+    ]
+    result = run_means_test(
+        ch13_case(
+            monthly_cmi="unused",
+            cmi=spouse_only_cmi("7400.00"),
+            inputs=household(
+                under_65=2,
+                marital_adjustments=adjustments,
+                commitment_period_marital_adjustment=True,
+            ),
+        ),
+        DATA,
+    )
+    assert c1_line(result, "19a")[0] == "300.00"
+    assert "§ 1325(b)(4)" in c1_line(result, "19a")[1]
+    assert c1_line(result, "19b")[0] == "7100.00"
+    assert c1_line(result, "20b")[0] == "85200.00"
+    assert result.commitment is not None
+    assert result.commitment.months == 36
+    assert result.commitment.marital_adjustment == "300.00"
+
+
+def test_a_chapter_13_marital_adjustment_without_column_b_is_an_error() -> None:
+    inputs = household(
+        under_65=1,
+        marital_adjustments=[{"id": "ma1", "description": "x", "amount": "300.00"}],
+    )
+    with pytest.raises(MeansTestError, match=r"Form 122C-1 has no Column B"):
+        run_means_test(ch13_case(monthly_cmi="4000.00", inputs=inputs), DATA)
+
+
+def test_the_chapter_13_form_multiplies_line_36_without_the_eligibility_question() -> (
+    None
+):
+    # An absent plan payment is a zero, as a blank box; the district is
+    # still looked up, so an unknown one refuses.
+    inputs = household(under_65=1)
+    result = run_means_test(ch13_case(monthly_cmi="9000.00", inputs=inputs), DATA)
+    assert c2_line(result, "36")[0] == "0.00"
+    assert "multiplier 0.1" in c2_line(result, "36")[1]
+    with pytest.raises(MeansTestError, match="no district"):
+        run_means_test(
+            ch13_case(monthly_cmi="9000.00", inputs=inputs, district="Outer Nowhere"),
+            DATA,
+        )
+
+
+def test_the_presumption_exemptions_never_apply_to_chapter_13() -> None:
+    inputs = household(under_65=2, disabled_veteran=True)
+    result = run_means_test(ch13_case(monthly_cmi="4000.00", inputs=inputs), DATA)
+    assert result.outcome == "below_median"
+    assert result.commitment is not None
+
+
+def test_a_chapter_13_case_needs_the_household_before_either_comparison() -> None:
+    with pytest.raises(MeansTestError, match="line 16b"):
+        run_means_test(
+            ch13_case(monthly_cmi="4000.00", inputs=MeansTestInputBody()), DATA
+        )
+
+
+def test_a_chapter_with_no_means_test_form_refuses() -> None:
+    eleven = replace(case_for(monthly_cmi="4000.00", inputs=household()), chapter=11)
+    with pytest.raises(MeansTestError, match="Chapter 11 has no means-test form"):
+        run_means_test(eleven, DATA)

@@ -17,8 +17,8 @@ insolvia/
 │   └── insolvia_marketing/            React Router v7 + Vite, SSR
 ├── packages/
 │   └── insolvia_api_client/           @insolvia-ai/api-client
-├── services/                          api · admin · mailer · mcp (Python on Lambda)
-├── infra/                             Terraform — ci-trust / shared / staging / prod
+├── services/                          api · admin · mcp · filing (Python on Lambda)
+├── infra/                             Terraform — staging / prod / dev
 ├── tool/                              reconcile-cognito-branding.ts
 └── docs/                              business plan + runbooks
 ```
@@ -28,6 +28,11 @@ The design system is **not** in this tree. `@insolvia-ai/design-system` and
 [`insolvia-ai/design-system`](https://github.com/insolvia-ai/design-system) and
 install from GitHub Packages —
 [ADR 0010](../adr/0010-design-system-moves-to-its-own-repository.md).
+Nor is the account-wide AWS layer (zone, cert, SES, every container
+repository, the CI deploy role, the human IAM users) or the mailer: those are
+[`insolvia-ai/insolvia-services`](https://github.com/insolvia-ai/insolvia-services),
+which this repo depends on the way it depends on the design system — by name,
+never by path ([ADR 0025](../adr/0025-shared-infra-and-mailer-move-to-insolvia-services.md)).
 
 Everything is TypeScript. The app follows the layout Expo itself publishes —
 `src/app/` is routes-only, screen bodies live in `src/screens/` — see
@@ -143,7 +148,8 @@ redirect.
 ## CI/CD
 
 See `.github/workflows/`. Each area has a `*-pr.yml` (checks) and, where it
-deploys, a `*-<env>.yml`. Deploys are live: shared infra is applied, the
+deploys, a `*-<env>.yml`. Deploys are live: shared infra (applied from
+insolvia-services) is up, the
 `*.insolvia.ai` ACM cert is `ISSUED`, and merges to `main` deploy staging for
 real (prod ships when the release run's gate is approved).
 
@@ -153,19 +159,18 @@ real (prod ships when the release run's gate is approved).
 
 | Stage | Jobs | Gate |
 |---|---|---|
-| Staging | `shared-infra-deploy.yml` (if shared paths changed) → `infra-staging.yml` (`mode: apply`) → changed services, ordered by `needs`; the api leg ends in the **integration tier** and the app leg in the **e2e suite** (both projects), each after seeding staging | none — staging *is* `main` |
+| Staging | `infra-staging.yml` (`mode: apply`) → changed services, ordered by `needs`; the api leg ends in the **integration tier** and the app leg in the **e2e suite** (both projects), each after seeding staging | none — staging *is* `main` |
 | Evidence | `record` (sha image tags + commit status), `supersede` | none |
 | Production | `promote` → `infra-prod.yml` (`mode: apply`) → every service, same order; the app leg ends in the **smoke** project against production, a detector | `promote` carries the `insolvia-production` environment |
 
-Shared infra rides in the pipeline too, as the staging stage's very first leg:
-both env roots resolve shared's resources (the wildcard cert, the container
-repositories) with hard-failing `data` lookups, so `shared` must apply before
-either env can even plan — which is also why it sits *before* the gate,
-ungated, rather than behind the production approval. It is account-wide, so
-one apply per commit serves both stages. It used to deploy from its own push
-trigger, racing the staging jobs on any merge that touched both
-([`terraform.md`](terraform.md) § deploy order has the race); `needs` ordering
-replaced that.
+Shared infra and the mailer are **not** legs of this pipeline — they release
+from insolvia-services' own `release.yml`. Both env roots here still resolve
+shared's resources (the wildcard cert, the container repositories) with
+hard-failing `data` lookups, so `shared` must have applied before either env
+can even plan. Until 2026-10-11 that was a `needs` edge inside this pipeline;
+across two repositories it is a merge order instead — a new service's
+repository is released there before the PR here that deploys it
+([`terraform.md`](terraform.md) § Deployment order).
 
 Staging green parks the run at `promote`, which waits for the
 `insolvia-production` environment's **required reviewer** (a repo-settings
@@ -196,7 +201,20 @@ is the deliberate act that a separate infra dispatch used to be.
 The pipeline declares no concurrency group of its own; each called workflow's
 deploy job holds its environment's group (`insolvia-terraform-staging` /
 `insolvia-terraform-prod`), and `needs` orders the legs. A group on both
-caller and callee would deadlock the callee behind its own parent.
+caller and callee would deadlock the callee behind its own parent. The legs of
+each stage are a strict chain rather than a fan-out, because a group keeps only
+one pending entry and a newer one cancels it — `release.yml`'s header owns the
+detail.
+
+The staging legs are path-filtered against **the newest ancestor carrying a
+successful `insolvia/staging-release` status** — the last commit staging
+served on every leg — not against the previous tip of `main`. Diffing against
+the previous push meant a leg an earlier run lost (evicted from the group, or
+failed) was never retried, because the next push did not touch its paths, and
+staging drifted behind `main` with nothing red. With no such ancestor in the
+last 200 commits every leg deploys; if the status API itself fails, the
+previous push is the fallback. `.github/scripts/release-diff-base.sh` owns
+the rules and has a unit test beside it.
 
 Both environments can also be planned before they are applied: `infra-staging.yml`
 and `infra-prod.yml` each take `mode: plan`, which writes the plan to the job
@@ -216,7 +234,7 @@ and their failure withholds the `insolvia/staging-release` status; the e2e
 **smoke** project alone runs against production, last, with no credentials.
 Seed data converges on every staging deploy from `seeds/staging.json` plus the
 versioned fixtures in `seeds/fixtures/`, whose bytes live in the shared bucket
-`envs/shared` owns.
+insolvia-services' `infra/envs/shared` owns.
 
 ### Production promotes; it does not rebuild
 
@@ -226,7 +244,8 @@ and approve only the fifth run, and services touched by the first four must
 not be left behind. Three mechanisms make that promotion sound:
 
 - **It ships the artifact staging validated.** The container repositories are
-  shared across environments (`infra/envs/shared`), so the image staging tested
+  shared across environments (insolvia-services' `infra/envs/shared`), so the
+  image staging tested
   is already in the repository prod pulls from. A prod leg resolves the
   commit's `sha-<commit>` tag to an immutable digest and deploys *that* — there
   is no `docker build` in any prod workflow. The `record` job completes the
@@ -290,7 +309,7 @@ first.
 
 **Enforced today:** a PR is required (no direct pushes); linear history; no
 force-push; no branch deletion; squash or rebase merges only; review threads must
-be resolved, and pushes dismiss stale reviews. **Plus the nine required status
+be resolved, and pushes dismiss stale reviews. **Plus the seven required status
 checks below** — red CI cannot merge.
 
 **Not enforced today** (despite `.github/CODEOWNERS` existing):
@@ -302,7 +321,7 @@ last paragraph of this section.
 ### Required status checks
 
 Red CI blocks a merge to `main`. The `protect-main` ruleset requires these
-**nine** job `name:` values (matrix legs get a `(leg)` suffix):
+**seven** job `name:` values (matrix legs get a `(leg)` suffix):
 
 | Check name | Workflow |
 |---|---|
@@ -310,16 +329,16 @@ Red CI blocks a merge to `main`. The `protect-main` ruleset requires these
 | `Cognito branding` | `branding-pr.yml` |
 | `Marketing site` | `marketing-pr.yml` |
 | `API service` | `api-pr.yml` |
-| `Mailer service` | `mailer-pr.yml` |
 | `API client` | `api-client-pr.yml` |
-| `Terraform validate (shared)` | `shared-infra-plan.yml` |
 | `Terraform validate (staging)` | `shared-infra-plan.yml` |
 | `Terraform validate (prod)` | `shared-infra-plan.yml` |
 
-`Terraform validate (ci-trust)` and `(dev)` run alongside the three above but
-are deliberately **not** required — neither environment is ever applied by CI,
-so they exist for coverage rather than as gates. The reasoning is in
-`shared-infra-plan.yml`'s matrix comment.
+`Terraform validate (dev)` runs alongside the two above but is deliberately
+**not** required — dev is never applied by CI, so it exists for coverage rather
+than as a gate. The reasoning is in `shared-infra-plan.yml`'s matrix comment.
+`Mailer service` and `Terraform validate (shared)` left this list when the
+mailer and the shared root moved to insolvia-services, which gates them in its
+own ruleset.
 
 **Changing this list does not need a human clicking through settings.** Run
 `scripts/update-ruleset.sh` (`show` / `add` / `remove`); the
@@ -334,7 +353,7 @@ check nobody reports, and every PR then parks on *"Expected — waiting for stat
 to be reported"* forever. Rename a job only alongside the ruleset.
 
 **Two settings are deliberately off.** *Require branches to be up to date before
-merging* (`strict_required_status_checks_policy`) is `false`: with nine checks
+merging* (`strict_required_status_checks_policy`) is `false`: with seven checks
 it would force a rebase-and-rerun on every PR whenever anything lands first.
 `required_approving_review_count` is unset, and should stay that way — Insolvia
 is maintained by one person, and GitHub does not let you approve your own PR, so

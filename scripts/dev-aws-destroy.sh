@@ -62,6 +62,7 @@ remove_env "$api_env" AWS_PROFILE
 # confusing failure against a destroyed pool.
 remove_env "$api_env" AUTH_ISSUER_URL
 remove_env "$api_env" AUTH_CLIENT_ID
+remove_env "$api_env" AUTH_PORTAL_CLIENT_ID
 remove_env "$api_env" AUTH_USER_POOL_ID
 
 # Same for the app: a stale domain/client id would send sign-in to a pool that
@@ -70,5 +71,6 @@ remove_env "$api_env" AUTH_USER_POOL_ID
 app_env="$APP_DIR/.env"
 remove_env "$app_env" EXPO_PUBLIC_COGNITO_DOMAIN
 remove_env "$app_env" EXPO_PUBLIC_COGNITO_CLIENT_ID
+remove_env "$app_env" EXPO_PUBLIC_COGNITO_PORTAL_CLIENT_ID
 
 ok "This machine's Insolvia development resources were destroyed; services/api/.env and apps/insolvia_app/.env were unwound. The machine ID was retained for safe reuse."

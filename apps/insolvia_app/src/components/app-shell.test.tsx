@@ -1,4 +1,4 @@
-import { screen, userEvent, waitFor } from '@testing-library/react-native';
+import { screen, userEvent } from '@testing-library/react-native';
 import { renderRouter } from 'expo-router/testing-library';
 
 import type { AuthConfig } from '@/config/environment';
@@ -21,7 +21,7 @@ jest.mock('@/config/environment', () => ({
 
 const ALICE = '00000000-0000-4000-8000-00000000a11c';
 
-function me(firmAdministration: string | null) {
+function me(firmAdministration: string | null, clients = 'hidden') {
   return {
     subject: ALICE,
     username: null,
@@ -46,6 +46,7 @@ function me(firmAdministration: string | null) {
               documents: 'view_only',
               extraction_review: 'hidden',
               firm_administration: firmAdministration,
+              clients,
             },
           },
         }),
@@ -120,19 +121,37 @@ describe('the shell navigation', () => {
   });
 
   it('shows no entry to somebody in no firm at all', async () => {
-    const fetchMock = signedIn({ '/v1/me': () => jsonResponse(200, me(null)) });
+    signedIn({ '/v1/me': () => jsonResponse(200, me(null)) });
     // No membership means no membership-derived UI to wait on — the avatar
     // falls back to the email's initials, which render before the request even
-    // starts. So the settle is the request itself: `waitFor` retries across
-    // microtasks, so the state update that follows the response has flushed by
-    // the time the assertion below runs.
-    await waitFor(() => {
-      expect(fetchMock.mock.calls.filter(([url]) => String(url).includes('/v1/me'))).toHaveLength(
-        1,
-      );
-    });
+    // starts. So the settle is `/`'s own RequireFirm explanation, which can
+    // only appear once its independent `/v1/me` call — a second caller of the
+    // same endpoint alongside MeProvider's, since the dashboard (issue 14.7 /
+    // #359) needs a firm too — has resolved.
+    await screen.findByRole('heading', { name: 'You are not in a firm yet' });
     await screen.findByRole('button', { name: 'Account menu' });
 
     expect(screen.queryByRole('link', { name: 'Firm' })).toBeNull();
+  });
+
+  it('shows the Clients entry to somebody granted `clients`, and it navigates', async () => {
+    // ADR 0022 / #354. Every existing firm-user row reads `clients` as
+    // hidden until an admin grants it, so the entry is the grant made visible.
+    signedIn({
+      '/v1/firm/clients': () => jsonResponse(200, { clients: [] }),
+      '/v1/me': () => jsonResponse(200, me('hidden', 'view_only')),
+    });
+
+    await userEvent.setup().press(await screen.findByRole('link', { name: 'Clients' }));
+
+    expect(await screen.findByRole('heading', { name: 'Clients' })).toBeTruthy();
+  });
+
+  it('keeps the Clients entry from somebody whose firm has not granted it', async () => {
+    signedIn({ '/v1/me': () => jsonResponse(200, me('hidden')) });
+    await screen.findByText('Alice Attorney');
+
+    expect(screen.getByRole('link', { name: 'Cases' })).toBeTruthy();
+    expect(screen.queryByRole('link', { name: 'Clients' })).toBeNull();
   });
 });

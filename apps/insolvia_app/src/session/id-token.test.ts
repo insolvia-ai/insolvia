@@ -8,7 +8,14 @@ describe('reading display identity from the ID token', () => {
     expect(readIdTokenClaims(token)).toEqual({
       email: TEST_EMAIL,
       subject: '00000000-0000-4000-8000-000000000001',
+      authTime: null,
     });
+  });
+
+  it('reads auth_time as epoch seconds, and only when it is one', () => {
+    expect(readIdTokenClaims(fakeJwt({ auth_time: 4_102_444_800 })).authTime).toBe(4_102_444_800);
+    expect(readIdTokenClaims(fakeJwt({ auth_time: '4102444800' })).authTime).toBeNull();
+    expect(readIdTokenClaims(fakeJwt({ auth_time: 1.5 })).authTime).toBeNull();
   });
 
   it('ignores the signature entirely', () => {
@@ -32,17 +39,22 @@ describe('reading display identity from the ID token', () => {
     // Every failure collapses to the same shape: the caller's fallback is
     // identical in all of them, and a sign-in that succeeded must not be undone
     // by a cosmetic decode.
-    expect(readIdTokenClaims(token)).toEqual({ email: null, subject: null });
+    expect(readIdTokenClaims(token)).toEqual({ email: null, subject: null, authTime: null });
   });
 
   it('yields null for claims the token does not carry', () => {
-    expect(readIdTokenClaims(fakeJwt({ token_use: 'id' }))).toEqual({ email: null, subject: null });
+    expect(readIdTokenClaims(fakeJwt({ token_use: 'id' }))).toEqual({
+      email: null,
+      subject: null,
+      authTime: null,
+    });
   });
 
   it('does not mistake a JSON array payload for claims', () => {
     expect(readIdTokenClaims(fakeJwt([] as unknown as Record<string, unknown>))).toEqual({
       email: null,
       subject: null,
+      authTime: null,
     });
   });
 });

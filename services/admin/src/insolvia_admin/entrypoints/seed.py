@@ -100,10 +100,11 @@ bytes (the documents themselves), and the bytes have a home of their own:
 (what each case contains, in the API's own body shapes), `manifest.json`
 (every object's size and digest) and the small synthetic objects themselves —
 and `s3://insolvia-shared-dev-fixtures-<region>/<version>/` holds the copy the
-loader actually reads (`infra/modules/dev_fixtures`). A load is a server-side
-`copy_object` per document into the target's own case-documents bucket, so
-neither a laptop nor a CI runner ever handles the bytes, and the day a fixture
-is a realistic scan rather than a two-kilobyte PDF nothing here changes.
+loader actually reads (insolvia-services' `infra/modules/dev_fixtures`). A load
+is a server-side `copy_object` per document into the target's own
+case-documents bucket, so neither a laptop nor a CI runner ever handles the
+bytes, and the day a fixture is a realistic scan rather than a two-kilobyte PDF
+nothing here changes.
 
 Three commands, and the direction each moves data:
 
@@ -115,8 +116,10 @@ IDS ARE DERIVED, NOT PUBLISHED. A case's id is `uuid5` over the target table,
 the firm it lands in, the fixture version and the case's `handle`; a document's
 and a collection item's over the case id and their own position. So two
 environments seed different ids from one fixture, and a second run finds every
-row it wrote last time instead of writing it twice — which is what makes
-"seed on every staging deploy" a convergence rather than an accumulation.
+row it wrote last time instead of writing it twice (a debtor's id is derived
+too, over the case id and its filing role — see "references" below for
+why) — which is what makes "seed on every staging deploy" a convergence
+rather than an accumulation.
 Rows that exist are LEFT ALONE, even if the fixture has since changed: a
 seeded environment is somewhere people work, and a re-seed that rewrote a
 debtor under them would be the mystery regression this module exists to
@@ -126,6 +129,35 @@ prevent. A changed fixture is a new version.
 whole of hard rule "nothing real in a fixture": a dev stack holds nothing but
 what a developer typed, so a fixture captured from one is synthetic by
 construction. A reviewer of a `seeds/fixtures/` diff should still ask.
+
+## Clients (ADR 0023)
+
+A fixture case may name CLIENTS — debtors bound to it for the client portal,
+in the invitation route's own body shape (`email`, `displayName`, `roles`)
+plus a `handle` and, where the environment owns its accounts, a `password`.
+The account is converged exactly as a firm person's is (`_subject_for`); the
+binding is parsed by `parse_invitation`, planned by `plan_binding` and written
+by the same ClientBindingStore the API composes, so a fixture client is
+indistinguishable from one a firm invited — except that no invitation mail is
+sent: the password is set here, which is what lets the integration tier sign
+the client in over SRP against the portal's app client. A binding that
+exists is left alone, revoked or not, for the "rows that exist" reason above.
+A client's address may not also be a firm person's: a subject is staff or a
+client, never both.
+
+## Firm clients (ADR 0022), which are not those clients
+
+A fixture VERSION (v4 on) carries a top-level `clients` list: the firm's
+directory entries, `POST /v1/firm/clients` bodies plus a `handle`. A debtor
+names one with `"client_id": {"$ref": "clients/<handle>"}` — the same
+reference mechanism as a claim naming its creditor — and Debtor 1 and
+Debtor 2 MUST, because a case is opened for a client; a fixture that does
+not is refused before anything is written (so v1 to v3 no longer load: their
+rows are what `purge_pre_client` deletes). A client's id is derived from
+(firm table, firm, version, handle); the loader writes the clients a case
+names before the case, then the case, its assignment and its client debtors
+in `CaseStore.create`'s one transaction, exactly as `POST /v1/cases` does.
+`capture` writes the clients back out, given `--firm-table`.
 
 ## Adding an entity
 
@@ -150,20 +182,30 @@ from typing import Any, Final, Protocol
 
 from insolvia_core.adapters.aws.case_entity_store import DynamoDbCaseEntityStore
 from insolvia_core.adapters.aws.case_store import DynamoDbCaseStore
+from insolvia_core.adapters.aws.client_binding_store import DynamoDbClientBindingStore
 from insolvia_core.adapters.aws.debtor_store import DynamoDbDebtorStore
 from insolvia_core.adapters.aws.document_blobs import S3DocumentBlobStore
 from insolvia_core.adapters.aws.document_store import DynamoDbDocumentStore
 from insolvia_core.adapters.aws.firm_store import DynamoDbFirmStore
+from insolvia_core.adapters.aws.tax_id_cipher import KmsTaxIdCipher, case_key_alias
+from insolvia_core.adapters.aws.tax_id_store import DynamoDbTaxIdStore
 from insolvia_core.case_collections import COLLECTIONS
 from insolvia_core.case_entities import create_entity, entity_json, parse_entity
 from insolvia_core.cases import assign_case, create_case, parse_case_creation
-from insolvia_core.debtors import create_debtor, debtor_json, parse_debtor
+from insolvia_core.clients import create_binding, parse_invitation, plan_binding
+from insolvia_core.debtors import Debtor, create_debtor, debtor_json, parse_debtor
 from insolvia_core.documents import (
     STATUS_STORED,
     confirm_document,
     create_document,
     object_key,
     parse_document_upload,
+)
+from insolvia_core.errors import ConflictError
+from insolvia_core.firm_clients import (
+    create_firm_client,
+    firm_client_json,
+    parse_firm_client,
 )
 from insolvia_core.firms import (
     create_firm,
@@ -174,11 +216,15 @@ from insolvia_core.firms import (
 from insolvia_core.ports import (
     CaseEntityStore,
     CaseStore,
+    ClientBindingStore,
     DebtorStore,
     DocumentBlobStore,
     DocumentStore,
     FirmStore,
+    TaxIdCipher,
+    TaxIdStore,
 )
+from insolvia_core.tax_ids import store_tax_id
 
 # What infra/modules/* name a table, per environment: insolvia-<env>-<kind>,
 # environment SECOND (the insolvia-aws-naming skill). Dev carries the machine
@@ -193,7 +239,7 @@ _SEEDABLE_BUCKET: Final = (
 # Only a dev stack may be captured FROM: what a developer typed is synthetic
 # by construction, and nothing else is.
 _CAPTURABLE_TABLE: Final = r"^insolvia-dev-[0-9a-f]{12}-cases\Z"
-# The shared fixture bucket, infra/modules/dev_fixtures.
+# The shared fixture bucket, insolvia-services' infra/modules/dev_fixtures.
 _FIXTURE_BUCKET: Final = r"^insolvia-shared-dev-fixtures-[a-z0-9-]+\Z"
 
 # Derived ids hang off one namespace so a fixture row's id is a pure function
@@ -398,6 +444,18 @@ class Dependencies:
     document_blobs: Callable[[str], DocumentBlobStore] = S3DocumentBlobStore
     # (fixture bucket, target document bucket or None)
     fixture_objects: Callable[[str, str | None], FixtureObjects] = S3FixtureObjects
+    # The debtor's tax id (issue 13.12 / #382): a fixture debtor's number is
+    # sealed exactly as the API seals one — same store, same cipher, same
+    # encryption context — under the target's case key, whose alias is
+    # derived from the case table's name. Both factories take that name.
+    tax_id_store: Callable[[str], TaxIdStore] = DynamoDbTaxIdStore
+    tax_id_cipher: Callable[[str], TaxIdCipher] = lambda table: KmsTaxIdCipher(
+        case_key_alias(table)
+    )
+    # (firm table, case table): a binding spans both (insolvia_core.clients).
+    client_binding_store: Callable[[str, str], ClientBindingStore] = (
+        DynamoDbClientBindingStore
+    )
 
 
 def _require_seedable_table(table: str, *, kind: str) -> None:
@@ -549,11 +607,155 @@ class CaseStores:
     documents: DocumentStore
     blobs: DocumentBlobStore
     objects: FixtureObjects
+    tax_ids: TaxIdStore
+    tax_id_cipher: TaxIdCipher
 
 
 def derived_id(*parts: str) -> str:
     """A uuid that is a pure function of its parts — see the module docstring."""
     return str(uuid.uuid5(_SEED_NAMESPACE, "/".join(parts)))
+
+
+# ── references between a case's own records ────────────────────────
+#
+# A case is a graph, not a list: a claim names its creditor and its
+# collateral (`creditor_id`, `asset_id`), a plan names the claims it treats,
+# an income summary names its debtor column. Those are ids — and a fixture
+# publishes NO ids (every one is derived per target), so a fixture cannot
+# write one down. It writes a REFERENCE instead:
+#
+#     {"$handle": "car-loan", ...}         on the collection item referred TO
+#     {"$ref": "claims/car-loan"}          wherever an id of it is wanted
+#     {"$ref": "debtors/debtor_1"}         a debtor, by filing role
+#
+# and the loader swaps each `$ref` for the id that record has (or will have)
+# in THIS target before the route's own parser sees the body — so the parser
+# still validates exactly what the API would have been sent. `capture` writes
+# the same shapes back out, which is what makes a captured case with a plan
+# on it loadable anywhere.
+
+_REF: Final = "$ref"
+_HANDLE: Final = "$handle"
+_DEBTORS: Final = "debtors"
+# A firm client (ADR 0022) — `{"$ref": "clients/<handle>"}` names one of the
+# version's top-level `clients`, by its `handle`.
+_CLIENTS: Final = "clients"
+# The filing roles that are always a firm client; a non-filing spouse may be.
+_CLIENT_ROLES: Final = ("debtor_1", "debtor_2")
+
+
+def _debtor_id(case_id: str, role: str) -> str:
+    """The id a seeded debtor gets — derived like every other seeded row's,
+    so a reference to it can be resolved before it is written."""
+    return derived_id(case_id, "debtor", role)
+
+
+def _client_id(firm_table: str, firm_id: str, version: str, handle: str) -> str:
+    """A seeded firm client's id — derived over (target table, firm,
+    version, handle) exactly as a case's is (ADR 0022), so a second load
+    finds the client it wrote and a `$ref` resolves before it exists."""
+    return derived_id(firm_table, firm_id, version, _CLIENTS, handle)
+
+
+def _version_clients(handle: str, cases: Mapping[str, Any]) -> dict[str, Any]:
+    """The version's top-level `clients`, keyed by handle — refused on a
+    missing or duplicate handle."""
+    found: dict[str, Any] = {}
+    for entry in cases.get(_CLIENTS) or []:
+        client_handle = entry.get("handle") if isinstance(entry, dict) else None
+        if not isinstance(client_handle, str) or not client_handle:
+            raise RefusedError(f"case '{handle}': every fixture client needs a handle")
+        if client_handle in found:
+            raise RefusedError(
+                f"case '{handle}': two fixture clients have handle '{client_handle}'"
+            )
+        found[client_handle] = entry
+    return found
+
+
+def _collection_handles(
+    handle: str, collections: Mapping[str, Any]
+) -> dict[str, dict[str, int]]:
+    """{collection: {item $handle: position}} — refused on a duplicate."""
+    found: dict[str, dict[str, int]] = {}
+    for name, items in collections.items():
+        for index, body in enumerate(items or []):
+            item_handle = body.get(_HANDLE) if isinstance(body, dict) else None
+            if item_handle is None:
+                continue
+            seen = found.setdefault(str(name), {})
+            if str(item_handle) in seen:
+                raise RefusedError(
+                    f"case '{handle}': {name} has two items with $handle "
+                    f"'{item_handle}'"
+                )
+            seen[str(item_handle)] = index
+    return found
+
+
+def _resolved(
+    node: Any,
+    *,
+    handle: str,
+    case_id: str,
+    handles: Mapping[str, Mapping[str, int]],
+    debtor_ids: Mapping[str, str],
+    client_ids: Mapping[str, str],
+) -> Any:
+    """`node` with every `{"$ref": …}` replaced by the id it names in this
+    target, and every `$handle` dropped — a body the API's parser accepts."""
+    if isinstance(node, list):
+        return [
+            _resolved(
+                item,
+                handle=handle,
+                case_id=case_id,
+                handles=handles,
+                debtor_ids=debtor_ids,
+                client_ids=client_ids,
+            )
+            for item in node
+        ]
+    if not isinstance(node, dict):
+        return node
+    if _REF in node:
+        target = node[_REF]
+        if len(node) != 1 or not isinstance(target, str) or "/" not in target:
+            raise RefusedError(
+                f'case \'{handle}\': a reference is {{"$ref": "<collection>/'
+                f'<handle>"}} and nothing else, not {node!r}'
+            )
+        collection, _, name = target.partition("/")
+        if collection == _CLIENTS:
+            if name not in client_ids:
+                raise RefusedError(
+                    f"case '{handle}': $ref {target!r} names no fixture client"
+                )
+            return client_ids[name]
+        if collection == _DEBTORS:
+            if name not in debtor_ids:
+                raise RefusedError(
+                    f"case '{handle}': $ref {target!r} names no fixture debtor"
+                )
+            return debtor_ids[name]
+        position = (handles.get(collection) or {}).get(name)
+        if position is None:
+            raise RefusedError(
+                f"case '{handle}': $ref {target!r} names no item with that $handle"
+            )
+        return derived_id(case_id, collection, str(position))
+    return {
+        key: _resolved(
+            value,
+            handle=handle,
+            case_id=case_id,
+            handles=handles,
+            debtor_ids=debtor_ids,
+            client_ids=client_ids,
+        )
+        for key, value in node.items()
+        if key != _HANDLE
+    }
 
 
 def _fixture_version(
@@ -619,9 +821,12 @@ def _seed_one_case(
     manifest: Mapping[str, Any],
     version: str,
     *,
+    clients: Mapping[str, Any],
     case_table: str,
+    firm_table: str,
     firm_id: str,
     created_by: str,
+    firm_store: FirmStore,
     stores: CaseStores,
     check: bool,
 ) -> int:
@@ -639,53 +844,187 @@ def _seed_one_case(
     case_id = derived_id(case_table, firm_id, version, handle)
     missing = 0
 
-    # The case itself: parsed by the route's own parser, stamped by the same
-    # factory, and then given its derived id and a matching assignment.
-    if stores.cases.read_for_worker(case_id) is None:
+    debtors = spec.get("debtors") or {}
+    if not isinstance(debtors, dict):
+        raise RefusedError(f"case '{handle}': debtors must be an object keyed by role")
+    collections = spec.get("collections") or {}
+    if not isinstance(collections, dict):
+        raise RefusedError(f"case '{handle}': collections must be an object")
+
+    # What a `$ref` resolves to in THIS target (see "references" above): a
+    # debtor already here keeps the id it has — a v1/v2 debtor was minted
+    # before ids were derived — and one about to be written gets the
+    # derived id it will be written under.
+    debtor_ids = {
+        str(role): (
+            found.id
+            if (found := stores.debtors.get(case_id, filing_role=str(role))) is not None
+            else _debtor_id(case_id, str(role))
+        )
+        for role in debtors
+    }
+    handles = _collection_handles(handle, collections)
+    client_ids = {
+        client_handle: _client_id(firm_table, firm_id, version, client_handle)
+        for client_handle in clients
+    }
+
+    def resolve(body: Any) -> Any:
+        return _resolved(
+            body,
+            handle=handle,
+            case_id=case_id,
+            handles=handles,
+            debtor_ids=debtor_ids,
+            client_ids=client_ids,
+        )
+
+    # Every reference resolved ONCE before anything is written, so a
+    # fixture naming a record it does not contain is refused while the
+    # table is still untouched rather than half a case in.
+    resolved_debtors = resolve(debtors)
+    resolve(collections)
+
+    # WHICH CLIENT EACH DEBTOR IS (ADR 0022). Debtor 1 and Debtor 2 must name
+    # one — `client_id: {"$ref": "clients/<handle>"}` — because a case is
+    # opened for a client; a non-filing spouse may. A fixture version from
+    # before clients (v1 to v3) is therefore refused here, by design: its rows
+    # are the pre-client data ADR 0022's release deletes, not something to
+    # load again.
+    linked: dict[str, str] = {}
+    for role, body in resolved_debtors.items():
+        client_id = body.get("client_id") if isinstance(body, dict) else None
+        if client_id is None:
+            if role in _CLIENT_ROLES:
+                raise RefusedError(
+                    f"case '{handle}': {role} names no client — every Debtor 1 "
+                    'and Debtor 2 carries "client_id": {"$ref": "clients/<handle>"}'
+                )
+            continue
+        if not isinstance(client_id, str):
+            raise RefusedError(f"case '{handle}': {role}'s client_id is not a $ref")
+        linked[str(role)] = client_id
+    if len(set(linked.values())) != len(linked):
+        raise RefusedError(
+            f"case '{handle}': one client names two debtors — one client, one role"
+        )
+
+    # The clients themselves, before the case that names them: parsed by the
+    # route's own parser, converged like every other seeded row.
+    for name, client_id in sorted(client_ids.items()):
+        if client_id not in linked.values():
+            continue
+        body = {k: v for k, v in clients[name].items() if k != "handle"}
+        client_draft = parse_firm_client(body)
+        if firm_store.get_client(firm_id, client_id) is not None:
+            continue
+        missing += 1
+        if check:
+            print(f"    client '{name}': missing")
+            continue
+        minted_client = create_firm_client(
+            client_draft, firm_id=firm_id, created_by=created_by
+        )
+        firm_store.create_client(replace(minted_client, id=client_id))
+        print(f"    client '{name}': created")
+
+    # Each debtor's record, drafted — and its tax id sealed — only when it
+    # is about to be written. Sealed the way the API seals one (issue 13.12
+    # / #382): fresh ref, the firm bound in the context, the digits nowhere
+    # but the envelope. The fixture value is synthetic by the fixture's own
+    # rule, and the parser would refuse a real-looking one.
+    def debtor_record(role: str, case_created_at: str) -> Debtor:
+        debtor_draft = parse_debtor(resolved_debtors[role])
+        tax_id = store_tax_id(
+            debtor_draft.tax_id,
+            existing=None,
+            firm_id=firm_id,
+            case_id=case_id,
+            cipher=stores.tax_id_cipher,
+            store=stores.tax_ids,
+        )
+        client_id = linked.get(role)
+        minted_debtor = create_debtor(
+            debtor_draft,
+            case_id=case_id,
+            filing_role=role,
+            tax_id=tax_id,
+            client_id=client_id,
+            case_created_at=case_created_at if client_id is not None else None,
+        )
+        return replace(minted_debtor, id=debtor_ids[role])
+
+    # Every debtor body parsed before the first case-table write, so a
+    # malformed one fails with the API's field errors and nothing written.
+    for role in resolved_debtors:
+        parse_debtor(resolved_debtors[role])
+
+    # The case itself: parsed by the route's own parser — clients and all —
+    # stamped by the same factory, then given its derived id, a matching
+    # assignment AND its client debtors, in the one transaction
+    # `POST /v1/cases` uses.
+    written_with_case: set[str] = set()
+    stored_case = stores.cases.read_for_worker(case_id)
+    if stored_case is None:
         missing += 1
         if check:
             print(f"  case '{handle}': missing")
         else:
+            # `court` + `division` are a registry reference (issue #360), so
+            # a fixture naming a court the registry does not know fails here
+            # with the API's own field error rather than seeding a case the
+            # service would refuse to write.
             draft = parse_case_creation(
-                {"chapter": spec.get("chapter"), "district": spec.get("district")}
+                {
+                    "chapter": spec.get("chapter"),
+                    "court": spec.get("court"),
+                    "division": spec.get("division"),
+                    "client_ids": [linked[r] for r in _CLIENT_ROLES if r in linked],
+                }
             )
             minted, _ = create_case(draft, firm_id=firm_id, created_by=created_by)
             case = replace(minted, id=case_id)
+            opening = [
+                debtor_record(role, case.created_at)
+                for role in _CLIENT_ROLES
+                if role in linked
+                and stores.debtors.get(case_id, filing_role=role) is None
+            ]
             stores.cases.create(
-                case, assign_case(case, subject=created_by, assigned_by=created_by)
+                case,
+                assign_case(case, subject=created_by, assigned_by=created_by),
+                opening,
             )
+            written_with_case = {debtor.filing_role for debtor in opening}
+            stored_case = case
             print(f"  case '{handle}': created ({case_id})")
+            for role in sorted(written_with_case):
+                print(f"    debtor {role}: created")
     else:
         print(f"  case '{handle}': present")
 
-    # Debtors, keyed by filing role — the API's natural key for them.
-    debtors = spec.get("debtors") or {}
-    if not isinstance(debtors, dict):
-        raise RefusedError(f"case '{handle}': debtors must be an object keyed by role")
-    for role, body in debtors.items():
-        debtor_draft = parse_debtor(body)
+    # The rest of the debtors, keyed by filing role — the API's natural key.
+    for role in resolved_debtors:
+        if role in written_with_case:
+            continue
         if stores.debtors.get(case_id, filing_role=role) is not None:
             continue
         missing += 1
-        if check:
+        if check or stored_case is None:
             print(f"    debtor {role}: missing")
-        else:
-            stores.debtors.create(
-                create_debtor(debtor_draft, case_id=case_id, filing_role=role)
-            )
-            print(f"    debtor {role}: created")
+            continue
+        stores.debtors.create(debtor_record(role, stored_case.created_at))
+        print(f"    debtor {role}: created")
 
     # Collection items, in fixture order, each with an id derived from its
-    # position so a re-run finds it rather than adding a twin.
-    collections = spec.get("collections") or {}
-    if not isinstance(collections, dict):
-        raise RefusedError(f"case '{handle}': collections must be an object")
+    # position so a re-run finds it rather than adding a twin — and so a
+    # `$ref` to it resolves before it exists.
     for name, items in collections.items():
         kind = COLLECTIONS.get(str(name))
         if kind is None:
             raise RefusedError(f"case '{handle}': unknown collection '{name}'")
         for index, body in enumerate(items or []):
-            entity_draft = parse_entity(kind, body)
+            entity_draft = parse_entity(kind, resolve(body))
             entity_id = derived_id(case_id, str(name), str(index))
             if stores.entities.get(case_id, kind, entity_id) is not None:
                 continue
@@ -756,17 +1095,92 @@ def _seed_one_case(
     return missing
 
 
+def _seed_clients(
+    entries: list[Any],
+    *,
+    case_id: str,
+    firm_id: str,
+    invited_by: str,
+    firm_store: FirmStore,
+    accounts: Accounts,
+    bindings: ClientBindingStore,
+    check: bool,
+) -> int:
+    """Converge a fixture case's portal clients. Returns how many are missing.
+
+    See the module docstring's "Clients" — the one path that writes a binding
+    outside the invitation route, and it writes it through the same parser,
+    planner and store.
+    """
+    missing = 0
+    for entry in entries:
+        if not isinstance(entry, dict):
+            raise RefusedError("each client in a fixture case must be an object")
+        handle = str(entry.get("handle") or "")
+        draft = parse_invitation(
+            {
+                key: entry[key]
+                for key in ("email", "displayName", "roles")
+                if key in entry
+            }
+        )
+        try:
+            subject = _subject_for(entry, accounts, check=check)
+        except RefusedError:
+            if not check:
+                raise
+            print(f"    client '{handle}': no account")
+            missing += 1
+            continue
+        if firm_store.find_user(subject) is not None:
+            raise RefusedError(
+                f"client '{handle}' is also a firm user — a subject is staff or a "
+                "client, never both (ADR 0023)"
+            )
+        existing = bindings.get(firm_id, subject)
+        if existing is not None:
+            print(f"    client '{handle}': present ({existing.status})")
+            continue
+        missing += 1
+        if check:
+            print(f"    client '{handle}': missing")
+            continue
+        binding = create_binding(
+            draft,
+            firm_id=firm_id,
+            case_id=case_id,
+            subject=subject,
+            invited_by=invited_by,
+        )
+        try:
+            narrowed = plan_binding(
+                binding, previous=None, on_case=bindings.list_for_case(case_id)
+            )
+            bindings.bind(binding, narrowed=narrowed)
+        except ConflictError as conflict:
+            # The API's 409 is this loader's refusal: a fixture that gives two
+            # clients one debtor role is a fixture to fix, not to half-load.
+            raise RefusedError(f"client '{handle}': {conflict}") from None
+        print(f"    client '{handle}': bound ({', '.join(binding.roles)})")
+    return missing
+
+
 def _seed_cases(
     entries: list[Any],
     fixture: Mapping[str, Any],
     env_fixture: Path,
     *,
     case_table: str,
+    firm_table: str,
     firm_store: FirmStore,
     accounts: Accounts,
     stores: CaseStores,
+    bindings: Callable[[], ClientBindingStore],
     check: bool,
 ) -> int:
+    """`bindings` is a factory, called only for a case that names clients —
+    so a fixture without any never constructs a client for a store it does
+    not use."""
     missing = 0
     versions: dict[str, tuple[dict[str, Any], dict[str, Any]]] = {}
     for entry in entries:
@@ -794,12 +1208,34 @@ def _seed_cases(
             spec,
             manifest,
             version,
+            clients=_version_clients(wanted, cases),
             case_table=case_table,
+            firm_table=firm_table,
             firm_id=firm_id,
             created_by=subject,
+            firm_store=firm_store,
             stores=stores,
             check=check,
         )
+        clients = entry.get("clients") or []
+        if clients:
+            case_id = derived_id(case_table, firm_id, version, str(spec["handle"]))
+            if stores.cases.read_for_worker(case_id) is None:
+                # Only reachable under --check on an unseeded case: a binding
+                # must never point at a case that is not there.
+                print(f"  case '{wanted}': clients wait for the case")
+                missing += len(clients)
+                continue
+            missing += _seed_clients(
+                list(clients),
+                case_id=case_id,
+                firm_id=firm_id,
+                invited_by=subject,
+                firm_store=firm_store,
+                accounts=accounts,
+                bindings=bindings(),
+                check=check,
+            )
     return missing
 
 
@@ -865,10 +1301,59 @@ def publish(folder: Path, objects: FixtureObjects, *, check: bool) -> int:
 # ── capture: a DEV stack -> a git fixture version ───────────────────
 
 _SERVER_OWNED = ("id", "case_id", "filing_role", "created_at", "updated_at")
+# A captured firm client's server-owned members: identity, stamps, status
+# (a seeded client starts active) and the tax-id view, which has no writer.
+_CLIENT_SERVER_OWNED = (
+    "id",
+    "status",
+    "created_at",
+    "updated_at",
+    "created_by",
+    "tax_id_last_four",
+)
 
 
 def _strip(body: Mapping[str, object]) -> dict[str, object]:
-    return {k: v for k, v in body.items() if k not in _SERVER_OWNED}
+    """The request body a captured record came from, laid out for review:
+    the fields as the API prints them, then provenance, sorted — the order
+    a reviewer reads a fixture diff in. `amended` is dropped when false,
+    the default the parser supplies, so it only appears where it says
+    something."""
+    fields = {
+        k: v
+        for k, v in body.items()
+        if k not in _SERVER_OWNED
+        and k != "provenance"
+        and not (k == "amended" and v is False)
+    }
+    provenance = body.get("provenance")
+    if isinstance(provenance, Mapping):
+        fields["provenance"] = dict(sorted(provenance.items()))
+    return fields
+
+
+def _without_tax_id(body: dict[str, object]) -> dict[str, object]:
+    """A captured debtor minus its tax id and that field's provenance entry
+    — see `capture` for why the view cannot be written back."""
+    stripped = {k: v for k, v in body.items() if k != "tax_id"}
+    provenance = stripped.get("provenance")
+    if isinstance(provenance, Mapping):
+        stripped["provenance"] = {k: v for k, v in provenance.items() if k != "tax_id"}
+    return stripped
+
+
+def _with_refs(node: Any, refs: Mapping[str, str], referenced: set[str]) -> Any:
+    """`node` with every string that is one of this case's record ids
+    replaced by `{"$ref": …}` — the inverse of `_resolved`. `referenced`
+    collects what was pointed at, so only those items carry a `$handle`."""
+    if isinstance(node, str) and node in refs:
+        referenced.add(refs[node])
+        return {_REF: refs[node]}
+    if isinstance(node, list):
+        return [_with_refs(item, refs, referenced) for item in node]
+    if isinstance(node, dict):
+        return {k: _with_refs(v, refs, referenced) for k, v in node.items()}
+    return node
 
 
 def capture(
@@ -879,8 +1364,12 @@ def capture(
     case_table: str,
     stores: CaseStores,
     replace_existing: bool,
+    firm_store: FirmStore | None = None,
 ) -> None:
     """Write one dev-stack case into `folder` as (part of) a fixture version.
+
+    `firm_store` is where the debtors' firm clients are read from (ADR
+    0022); a case whose debtors name clients cannot be captured without it.
 
     Everything comes back out through the same core/ serialisers the API
     uses, minus the server-owned fields — the same shape `load` parses —
@@ -914,23 +1403,92 @@ def capture(
     if existing and not replace_existing:
         raise RefusedError(f"{version} already has a case '{handle}' (pass --replace)")
 
+    if case.court is None or case.division is None:
+        # A pre-registry row (issue #360): the loader's parser — the API's —
+        # needs the reference, and free text cannot be turned into one here.
+        raise RefusedError(
+            f"case {case_id} names no court and division; pick them on the "
+            "case before capturing it"
+        )
+    debtors = stores.debtors.list_for_case(case_id)
     spec: dict[str, Any] = {
         "handle": handle,
         "chapter": case.chapter,
-        "district": case.district,
+        # The registry reference, which is what `load` parses; `district` is
+        # the printed name the parser derives from it.
+        "court": case.court,
+        "division": case.division,
+        # `tax_id` is DROPPED from a captured debtor, and its provenance
+        # entry with it: the API's own representation is the last-four view,
+        # which the loader cannot re-seal (the full digits are behind the
+        # audited read, which a fixture must never trigger). A captured
+        # fixture that needs one gets it typed in by hand, from the SSA's
+        # never-issued advertising block (insolvia_core.tax_ids).
         "debtors": {
-            debtor.filing_role: _strip(debtor_json(debtor))
-            for debtor in stores.debtors.list_for_case(case_id)
+            debtor.filing_role: _without_tax_id(_strip(debtor_json(debtor)))
+            for debtor in debtors
         },
         "collections": {},
         "documents": [],
     }
+    # Every id this case's records carry, and the reference that names the
+    # same record in a fixture ("references" above). A captured body that
+    # holds one of these ids gets the `$ref`; the item it points at gets a
+    # `$handle`. An id the case does not own is left as typed.
+    refs: dict[str, str] = {
+        debtor.id: f"{_DEBTORS}/{debtor.filing_role}" for debtor in debtors
+    }
+    # The firm clients the debtors were copied from (ADR 0022) become the
+    # version's top-level `clients`, each debtor's `client_id` — and every
+    # `client` provenance entry's — a `$ref` to one. Handles are the case's
+    # handle and the role, so two captured cases never collide.
+    captured_clients: list[dict[str, Any]] = []
+    for debtor in debtors:
+        if debtor.client_id is None:
+            continue
+        if firm_store is None:
+            raise RefusedError(
+                f"case {case_id}'s {debtor.filing_role} names a client; "
+                "--firm-table is needed to capture it"
+            )
+        client = firm_store.get_client(case.firm_id, debtor.client_id)
+        if client is None:
+            raise RefusedError(
+                f"case {case_id}'s {debtor.filing_role} names client "
+                f"{debtor.client_id}, which the firm table does not hold"
+            )
+        client_handle = f"{handle}-{debtor.filing_role.replace('_', '-')}"
+        refs[client.id] = f"{_CLIENTS}/{client_handle}"
+        body = {
+            k: v
+            for k, v in firm_client_json(client).items()
+            if k not in _CLIENT_SERVER_OWNED
+        }
+        captured_clients.append({"handle": client_handle, **body})
+    captured: dict[str, list[tuple[str, dict[str, object]]]] = {}
     for name, kind in COLLECTIONS.items():
-        items = [
-            _strip(entity_json(e)) for e in stores.entities.list_for_case(case_id, kind)
+        entities = stores.entities.list_for_case(case_id, kind)
+        if not entities:
+            continue
+        captured[name] = []
+        for index, entity in enumerate(entities, start=1):
+            item_handle = f"{name}-{index}"
+            refs[entity.id] = f"{name}/{item_handle}"
+            captured[name].append((item_handle, _strip(entity_json(entity))))
+    referenced: set[str] = set()
+    spec["debtors"] = {
+        role: _with_refs(body, refs, referenced)
+        for role, body in spec["debtors"].items()
+    }
+    bodies = {
+        name: [(h, _with_refs(body, refs, referenced)) for h, body in items]
+        for name, items in captured.items()
+    }
+    for name, items in bodies.items():
+        spec["collections"][name] = [
+            {_HANDLE: h, **body} if f"{name}/{h}" in referenced else body
+            for h, body in items
         ]
-        if items:
-            spec["collections"][name] = items
 
     (folder / "objects").mkdir(parents=True, exist_ok=True)
     for document in stores.documents.list_for_case(case_id):
@@ -957,6 +1515,12 @@ def capture(
 
     kept = [c for c in cases.get("cases") or [] if c.get("handle") != handle]
     cases["cases"] = [*kept, spec]
+    if captured_clients:
+        replaced = {entry["handle"] for entry in captured_clients}
+        cases[_CLIENTS] = [
+            *(c for c in cases.get(_CLIENTS) or [] if c.get("handle") not in replaced),
+            *captured_clients,
+        ]
     cases["version"] = version
     manifest["version"] = version
     cases_path.write_text(json.dumps(cases, indent=2) + "\n")
@@ -1015,6 +1579,9 @@ def _build_parser() -> argparse.ArgumentParser:
         "--handle", required=True, help="the fixture handle to write it as"
     )
     cap.add_argument("--case-table", required=True)
+    cap.add_argument(
+        "--firm-table", help="where the debtors' firm clients are read from"
+    )
     cap.add_argument("--document-bucket", required=True)
     cap.add_argument("--replace", action="store_true")
     return parser
@@ -1040,6 +1607,8 @@ def _case_stores(
         documents=deps.document_store(args.case_table),
         blobs=deps.document_blobs(bucket or ""),
         objects=deps.fixture_objects(fixture_bucket or "", bucket),
+        tax_ids=deps.tax_id_store(args.case_table),
+        tax_id_cipher=deps.tax_id_cipher(args.case_table),
     )
 
 
@@ -1076,9 +1645,13 @@ def _load(args: argparse.Namespace, deps: Dependencies) -> int:
             fixture,
             args.fixture,
             case_table=args.case_table,
+            firm_table=args.firm_table,
             firm_store=firm_store,
             accounts=accounts,
             stores=stores,
+            bindings=lambda: deps.client_binding_store(
+                args.firm_table, args.case_table
+            ),
             check=args.check,
         )
     if args.check and missing:
@@ -1099,6 +1672,15 @@ def main(argv: list[str] | None = None, *, deps: Dependencies | None = None) -> 
             return _NOT_SEEDED if args.check and missing else _OK
         if args.command == "capture":
             stores = _case_stores(args, dependencies, fixture_bucket=None)
+            capture_firms: FirmStore | None = None
+            if args.firm_table is not None:
+                # Only a dev stack may be captured from — the firm table too.
+                if not re.match(r"^insolvia-dev-[0-9a-f]{12}-firms\Z", args.firm_table):
+                    raise RefusedError(
+                        f"'{args.firm_table}' is not a dev firm table — only a "
+                        "dev stack may be captured from"
+                    )
+                capture_firms = dependencies.firm_store(args.firm_table)
             capture(
                 args.version,
                 case_id=args.case,
@@ -1106,6 +1688,7 @@ def main(argv: list[str] | None = None, *, deps: Dependencies | None = None) -> 
                 case_table=args.case_table,
                 stores=stores,
                 replace_existing=args.replace,
+                firm_store=capture_firms,
             )
             return _OK
     except RefusedError as refusal:

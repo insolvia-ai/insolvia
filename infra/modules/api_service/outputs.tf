@@ -46,10 +46,11 @@ output "alarms_topic_arn" {
   value       = aws_sns_topic.alarms.arn
 }
 
-# The API Lambda's execution role is the mailer's one registered caller
-# (module.mailer's caller_role_name / caller_role_arn inputs): the mailer's
-# SigV4 allowlist grants execute-api:Invoke, and the insolvia_api service
-# registry entry's allowed_role_arns, to this role and no other.
+# The API Lambda's execution role is the mailer's one registered caller. The
+# mailer lives in insolvia-services and finds this role BY NAME
+# (insolvia-<env>-api-role), so renaming it breaks mail across repos: the
+# mailer's SigV4 allowlist grants execute-api:Invoke, and the insolvia_api
+# service registry entry's allowed_role_arns, to this role and no other.
 output "lambda_role_name" {
   description = "API Lambda execution role name."
   value       = aws_iam_role.api.name

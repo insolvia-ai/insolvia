@@ -37,7 +37,7 @@ variable "acm_certificate_arn" {
 }
 
 variable "ecr_repository_url" {
-  description = "URL of the shared insolvia-admin repository (created in infra/envs/shared, looked up by the env root)."
+  description = "URL of the shared insolvia-admin repository (created in insolvia-services' infra/envs/shared, looked up by the env root)."
   type        = string
 }
 

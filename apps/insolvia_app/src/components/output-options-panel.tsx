@@ -18,6 +18,12 @@ export interface OutputOptionsValue {
   readonly printDate: boolean;
   readonly signaturePages: SignaturePagesMode;
   readonly signElectronically: boolean;
+  /**
+   * An amendment (issue #370): only the schedules with an item marked
+   * amended, plus the Summary and Declaration and a cover sheet. Only ever
+   * offered on a filed case — see {@link OutputOptionsPanel}'s `amendment`.
+   */
+  readonly amendedOnly: boolean;
 }
 
 /** The plain filing set — every option off, nothing this screen has not always produced. */
@@ -26,6 +32,7 @@ export const DEFAULT_OUTPUT_OPTIONS: OutputOptionsValue = {
   printDate: false,
   signaturePages: 'all',
   signElectronically: false,
+  amendedOnly: false,
 };
 
 /**
@@ -51,6 +58,9 @@ export function outputOptionsRequestFrom(value: OutputOptionsValue): OutputOptio
   }
   if (value.signElectronically !== DEFAULT_OUTPUT_OPTIONS.signElectronically) {
     request.signElectronically = value.signElectronically;
+  }
+  if (value.amendedOnly !== DEFAULT_OUTPUT_OPTIONS.amendedOnly) {
+    request.amendedOnly = value.amendedOnly;
   }
   return request;
 }
@@ -78,12 +88,19 @@ export interface FormsSubsetOption {
  * `forms` is the packet screen's own addition — a subset of the case's
  * filed forms to print — and is omitted entirely on the preview, which
  * already names one form in its own URL.
+ *
+ * `amendment` (issue #370) offers the "amended items only" toggle, and is
+ * the caller's to pass only for a FILED case — the one state the API
+ * accepts it in. While that toggle is on the forms subset is hidden: the
+ * API refuses the two together, because each would answer "which forms"
+ * differently.
  */
 export function OutputOptionsPanel({
   value,
   onChange,
   disabled = false,
   forms,
+  amendment = false,
 }: {
   readonly value: OutputOptionsValue;
   readonly onChange: (next: OutputOptionsValue) => void;
@@ -94,6 +111,7 @@ export function OutputOptionsPanel({
     readonly selected: readonly string[] | undefined;
     readonly onChange: (next: readonly string[] | undefined) => void;
   };
+  readonly amendment?: boolean;
 }) {
   const theme = useTheme();
   const ink = { color: theme.colors.ink, fontFamily: theme.typography.body };
@@ -102,6 +120,16 @@ export function OutputOptionsPanel({
   return (
     <View style={styles.panel}>
       <Heading level={3}>Output options</Heading>
+
+      {amendment ? (
+        <ToggleRow
+          checked={value.amendedOnly}
+          onCheckedChange={(checked) => onChange({ ...value, amendedOnly: checked })}
+          disabled={disabled}
+          label="Amended items only"
+          description="This case is filed. Prints only the schedules with an item marked amended, each showing just those items, plus the Summary, the Declaration and a cover sheet."
+        />
+      ) : null}
 
       <ToggleRow
         checked={value.draftWatermark}
@@ -149,7 +177,7 @@ export function OutputOptionsPanel({
         </RadioGroup.Root>
       </View>
 
-      {forms !== undefined ? (
+      {forms !== undefined && !(amendment && value.amendedOnly) ? (
         <FormsSubsetSelector
           options={forms.options}
           selected={forms.selected}

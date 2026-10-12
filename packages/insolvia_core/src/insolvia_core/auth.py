@@ -30,7 +30,12 @@ Every check below is load-bearing:
   same key and would otherwise sail through; it is not an authorization
   credential and is not what this API accepts.
 - **`client_id`** equals the configured app client.
-- **`exp`**, plus `nbf`/`iat` when present. PyJWT enforces these.
+- **`exp`**, plus `nbf`/`iat` when present. PyJWT enforces these, with
+  `CLOCK_SKEW_SECONDS` of leeway either way: an `iat` or `nbf` up to that far
+  ahead of this clock is accepted (Cognito's clock ahead of ours — otherwise
+  a token used the instant it is minted is refused at random), and an `exp`
+  at most that far behind it. One constant, shared with the `auth_time`
+  check below, so the two cannot drift apart.
 - **`sub`** is present and non-empty — it is the principal's identity, and a
   token without one authenticates nobody.
 
@@ -58,12 +63,23 @@ from typing import Any
 
 import jwt
 
+from insolvia_core.errors import ForbiddenError
+
 # Cognito signs with RS256 and only RS256. Listing it explicitly is what stops
 # an attacker downgrading to `none`, or to HS256 with the public key as the
 # shared secret.
 ALGORITHMS = ("RS256",)
 
 TOKEN_USE_ACCESS = "access"
+
+# Clock skew tolerated between the issuer's clock and this verifier's, in
+# seconds, wherever a token's time is compared with now: a Cognito access
+# token's own `iat`/`nbf`/`exp` (`_decode_verified_claims`), a Google ID
+# token's (`verify_google_id_token`), and the sign-in's `auth_time`
+# (`require_recent_authentication`). A minute absorbs NTP-synchronised drift
+# with room to spare and is small next to either issuer's one-hour token
+# lifetime, so it extends `exp` by at most this much and no further.
+CLOCK_SKEW_SECONDS = 60
 
 _BEARER_PREFIX = "bearer"
 
@@ -132,6 +148,13 @@ class Principal:
     client_id: str
     scopes: tuple[str, ...]
     expires_at: int | None
+    # `auth_time`: when the person last actually signed in (typed a password
+    # at the pool), in epoch seconds. NOT the token's age — Cognito keeps the
+    # original `auth_time` on every token a refresh mints, which is exactly
+    # why it can answer "did they just re-authenticate?" when `iat` cannot.
+    # None when the token carries no usable claim; `require_recent_
+    # authentication` treats that as stale, never as fresh.
+    authenticated_at: int | None = None
 
 
 def settings_or_raise(issuer_url: str | None, client_id: str | None) -> AuthSettings:
@@ -144,6 +167,33 @@ def settings_or_raise(issuer_url: str | None, client_id: str | None) -> AuthSett
     if not issuer_url or not client_id:
         raise AuthenticationError(AuthFailureReason.NOT_CONFIGURED)
     return AuthSettings(issuer_url=issuer_url.rstrip("/"), client_id=client_id)
+
+
+def portal_settings_or_raise(
+    issuer_url: str | None,
+    portal_client_id: str | None,
+    *,
+    staff_client_id: str | None,
+) -> AuthSettings:
+    """The client-portal verify profile (ADR 0023): the same pool's issuer,
+    the portal's OWN app client — and a refusal to verify anything when that
+    client is not disjoint from the staff one.
+
+    Everything else about the check is `verify_access_token` unchanged:
+    signature, issuer, `token_use == access`, and `client_id` compared for
+    EQUALITY against exactly one id. Cognito access tokens carry no `aud`, so
+    "this token was issued for the portal" is "this token names the portal's
+    client" — which is only an audience check if the two ids differ. A
+    deployment configured with the same id twice would let every staff token
+    through every portal route and back; that is a misconfiguration to fail
+    closed on, not a state to serve. Missing staff config does not excuse it:
+    disjointness cannot be shown against a value that is not there.
+    """
+    if not portal_client_id or not staff_client_id:
+        raise AuthenticationError(AuthFailureReason.NOT_CONFIGURED)
+    if portal_client_id == staff_client_id:
+        raise AuthenticationError(AuthFailureReason.NOT_CONFIGURED)
+    return settings_or_raise(issuer_url, portal_client_id)
 
 
 def bearer_token(header_value: str | None) -> str:
@@ -222,6 +272,9 @@ def _decode_verified_claims(
                 "verify_nbf": True,
                 "verify_signature": True,
             },
+            # Applies to iat and nbf (how far in the future) and exp (how far
+            # in the past) alike — see CLOCK_SKEW_SECONDS.
+            leeway=CLOCK_SKEW_SECONDS,
         )
     except jwt.ExpiredSignatureError as exc:
         raise AuthenticationError(AuthFailureReason.EXPIRED) from exc
@@ -303,6 +356,7 @@ def verify_access_token_for_clients(
         client_id=client_id,
         scopes=_scopes(claims.get("scope")),
         expires_at=expires_at if isinstance(expires_at, int) else None,
+        authenticated_at=_auth_time(claims),
     )
 
 
@@ -337,7 +391,16 @@ def principal_from_claims(
         client_id=client_id,
         scopes=_scopes(claims.get("scope")),
         expires_at=expires_at if isinstance(expires_at, int) else None,
+        authenticated_at=_auth_time(claims),
     )
+
+
+def _auth_time(claims: Mapping[str, Any]) -> int | None:
+    raw = claims.get("auth_time")
+    # `bool` is an `int` subclass; `"auth_time": true` is not a time.
+    if isinstance(raw, bool) or not isinstance(raw, int) or raw <= 0:
+        return None
+    return raw
 
 
 def _scopes(raw: Any) -> tuple[str, ...]:
@@ -345,6 +408,58 @@ def _scopes(raw: Any) -> tuple[str, ...]:
     if not isinstance(raw, str):
         return ()
     return tuple(raw.split())
+
+
+# ── Recent authentication (ADR 0024, guardrails 1 and 2) ────────────
+#
+# "Signs after re-authenticating" and "approves each filing, re-
+# authenticating at approval time" are the same check: the token's
+# `auth_time` — when the person last typed their password at the pool — is
+# no more than a few minutes old. NOT the token's `iat` and not the session's
+# age: Cognito copies the original `auth_time` into every token a refresh
+# mints, so an hour-old session with a just-refreshed token is still an
+# hour-old sign-in, and is refused. The app forces a fresh sign-in with
+# `prompt=login` on the authorize request (managed login only, which every
+# environment's pool uses — infra/modules/auth's `managed_login_version`).
+#
+# The window is the caller's to choose, per act. Guardrail 2's signature
+# uses `SIGNATURE_MAX_AGE_SECONDS`; PR 6's approval chooses its own.
+
+# Clock skew tolerated in the other direction is CLOCK_SKEW_SECONDS: an
+# `auth_time` that far in the future (the pool's clock ahead of the API's) is
+# still accepted, and one further ahead is refused, because a time from the
+# future is not a sign-in that happened.
+
+
+class ReauthenticationRequiredError(ForbiddenError):
+    """The caller is signed in, but not RECENTLY enough for this act.
+
+    A 403, not a 401, on purpose: the token is valid and the session is fine
+    for everything else; a 401 would send the app's refresh-and-retry loop
+    round, and a refresh cannot help — it keeps `auth_time`. The API answers
+    `{"error": "ReauthenticationRequired"}` so the client knows the remedy
+    is a fresh sign-in (`prompt=login`), not a missing permission.
+    """
+
+
+def require_recent_authentication(
+    authenticated_at: int | None, *, now: float, max_age_seconds: int
+) -> int:
+    """`authenticated_at` (a Principal's `auth_time`) if it is within
+    `max_age_seconds` of `now`, else ReauthenticationRequiredError.
+
+    Refuses a missing time (never assume fresh), one older than the window,
+    and one more than CLOCK_SKEW_SECONDS in the future. Pure: `now` is
+    an argument so the boundary is testable to the second.
+    """
+    if max_age_seconds <= 0:
+        raise ValueError("max_age_seconds must be positive")
+    if authenticated_at is None:
+        raise ReauthenticationRequiredError("sign in again to continue")
+    age = now - authenticated_at
+    if age > max_age_seconds or age < -CLOCK_SKEW_SECONDS:
+        raise ReauthenticationRequiredError("sign in again to continue")
+    return authenticated_at
 
 
 # ── Google Workspace ID tokens (issue #209) ─────────────────────────
@@ -374,7 +489,9 @@ def _scopes(raw: Any) -> tuple[str, ...]:
 #   - `email_verified` is true and `email` present: the audit trail records
 #     who provisioned what by address, and an unverified address is not an
 #     identity.
-#   - `exp`/`iat` via PyJWT, `sub` present — same rules as the profile above.
+#   - `exp`/`iat`/`nbf` via PyJWT with the same CLOCK_SKEW_SECONDS leeway,
+#     `sub` present — same rules as the profile above. Google's clock running
+#     a moment ahead of ours would otherwise refuse a staff sign-in at random.
 
 GOOGLE_ISSUERS = ("https://accounts.google.com", "accounts.google.com")
 
@@ -443,6 +560,9 @@ def verify_google_id_token(
                 "verify_nbf": True,
                 "verify_signature": True,
             },
+            # Same leeway as the Cognito profile, on iat/nbf (future) and exp
+            # (past) alike — see CLOCK_SKEW_SECONDS.
+            leeway=CLOCK_SKEW_SECONDS,
         )
     except jwt.ExpiredSignatureError as exc:
         raise AuthenticationError(AuthFailureReason.EXPIRED) from exc

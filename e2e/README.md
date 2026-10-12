@@ -26,8 +26,9 @@ The tiers: [ADR 0021](../docs/adr/0021-test-tiers-and-seed-fixtures.md).
 | `playwright.config.ts` | Runner config — the two projects, retries, timeouts, and the artifact policy that keeps a password out of a public repo's build artifacts. Offers no `flows` project when the target is production. |
 | `support/env.ts` | The one place the target and credentials enter the suite. `E2E_TARGET` picks the fixture and the expected labels; no URL has a default; the password has none and never will. |
 | `support/sign-in.ts` | The sign-in dance, for `flows` specs whose subject is something else. `auth-round-trip.spec.ts` deliberately does not use it — the steps it skips past are that spec's whole point. |
+| `support/scratch-case.ts` | The suite's one scratch case, for one scratch client, found or opened through the UI — the only case a `flows` spec may write to. Seeded fixture cases are read-only here. |
 | `tests/flows/auth-round-trip.spec.ts` | Sign in via the Cognito hosted UI → `/auth/callback` → the signed-in identity renders → sign out. |
-| `tests/flows/intake-persists.spec.ts` | Type into a case's intake, watch it save, reload, find it still there. The only test that proves the app's request body is one the API accepts and the store keeps. |
+| `tests/flows/intake-persists.spec.ts` | Type into the scratch case's intake, watch it save, reload, find it still there. The only test that proves the app's request body is one the API accepts and the store keeps. |
 | `tests/smoke/app.spec.ts` | The shell, the footer's environment label and build stamp, the SPA rewrite, the sign-in hand-off (client id, callback, PKCE, the managed-login form) — without a password. |
 | `tests/smoke/api.spec.ts` | `/health` names the environment; an anonymous protected call is a 401, not a 500; CORS admits the app's origin and refuses a stranger's. |
 | `tests/smoke/marketing.spec.ts` | The home page serves; the indexing policy is the right one for a non-production host. Skipped by name when no marketing URL is given. |

@@ -13,6 +13,16 @@ output "web_client_id" {
   value       = aws_cognito_user_pool_client.web.id
 }
 
+# The client portal's app client (ADR 0023) — DISJOINT from web_client_id,
+# and that disjointness is the audience check between the staff and client
+# principal classes. Envs publish it as /insolvia/<env>/api/auth-portal-client-id
+# (the deploy workflow derives AUTH_PORTAL_CLIENT_ID from it) and as the
+# `auth_portal_client_id` output the app build and the integration tier read.
+output "portal_client_id" {
+  description = "App client ID for the client portal (authorization-code + PKCE, memory-only sessions)."
+  value       = aws_cognito_user_pool_client.portal.id
+}
+
 # The one hostname consumers should ever use: the app builds its /oauth2
 # URLs from this, the E2E asserts the redirect landed on it, and both read it
 # from the env's Terraform output rather than hard-coding either form.

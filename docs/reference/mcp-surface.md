@@ -106,7 +106,7 @@ because they are the entry points a harness reasons about.
 | Tool | Does | Requires |
 |---|---|---|
 | `whoami` | The caller's firm, name, and per-feature permissions — or the fact that they have no firm | authenticated only (the `/v1/me` of this surface) |
-| `list_cases` | The cases the caller may see, newest first, paginated | `cases: view_only` |
+| `list_cases` | The cases the caller may see, newest first, paginated — the working list: archived and deleted cases are not in it (#355) | `cases: view_only` |
 | `get_case` | One case root + petition-status summary + per-entity-type record counts | `cases: view_only` |
 | `list_case_records` | One entity type's records within one case, paginated | per entity type — see the gate table |
 | `get_case_record` | One record by id | per entity type — same table |
@@ -171,14 +171,20 @@ withdraw_proposal
 The `entity_type` enum is the case-scoped entity list of the data model
 (`petition`, `debtor`, `creditor`, `claim`, `asset`, `exemption`, …). The
 server publishes only the types its store actually implements at any given
-time; the enum grows with the model, never a new tool.
+time; the enum grows with the model, never a new tool. It also carries
+`clients` — not a case-scoped entity but the case's view of the firm's client
+directory; see [Permission gates](#permission-gates).
 
 Three deliberate absences:
 
 - **No tool returns a full tax identifier.** Records serialize with last-four
   only, the default representation the data model mandates. The audited
-  full-value read exists for the e-filing path and is *not a tool* — there is
-  no argument an agent can pass to receive an SSN.
+  full-value read (`insolvia_core.tax_ids.read_tax_id`, issue 13.12) exists
+  for the forms that print the number and for the e-filing path and is *not
+  a tool* — there is no argument an agent can pass to receive an SSN, and
+  the MCP role holds no KMS grant under the tax-id encryption context, so
+  it could not open the envelope even if one were added
+  (`infra/modules/case_store`).
 - **No document bytes.** `document` records (metadata) are readable through
   the record tools; upload and download stay in the app, where the two-step
   presigned flow and its human live. A harness that needs to hand us a PMS
@@ -200,7 +206,30 @@ gate map, mirroring the API's routes:
 |---|---|
 | case root (via `list_cases`/`get_case`) | `cases` |
 | `document` | `documents` |
+| `clients` — the firm clients the case's debtors are linked to ([ADR 0022](../adr/0022-a-client-is-not-a-case.md)); read-only | `clients` |
 | everything else (petition, debtor, creditor, claim, asset, …) | `intake` |
+
+**`clients` is the first entity type not under `intake`**, and the one
+record type that does not live in the case's partition: a case's clients are
+the firm-table records (`insolvia_core.firm_clients`) its debtors name by
+`client_id`, served in `firm_client_json`'s shape — the tax id as
+`tax_id_last_four` only, never the ref and never the value. They are still
+reached only through a case the caller may see: a client this case does not
+link answers `not_found` whatever firm it is in, and **a firm-wide client
+list is not a tool in v1**. A single-record read (`get_case_record`) is
+access-logged as `client.read` under `CLIENT#<id>`, as the API's is; the
+listing is not, matching `GET /v1/firm/clients`. The prospect funnel
+(#355) is the client's, not the case's — a case's statuses start at
+`intake` — and a client reached through a case has been retained, so
+`prospect_stage` does not appear here in practice (`firm_client_json` serves
+it only for a client with no `first_retained_at`); setting it is an API
+route, not a tool. `clients` is **not
+proposable yet**: ADR 0022 has a client proposal land as a candidate like any
+other write, but accepting one means a review path that writes the firm
+table, which candidate review (8.9) does not have — the same position
+`debtors` proposals are in, which are accepted by the tool and refused at
+review. Until that path exists `propose_case_records` refuses `clients`
+rather than queueing candidates nobody can accept.
 
 **A tool the caller may not use is listed but refuses — list-visible,
 call-denied.** `tools/list` returns the same static eight tools for every

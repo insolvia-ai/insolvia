@@ -6,16 +6,43 @@ from flask import Blueprint, jsonify, request
 from flask.typing import ResponseReturnValue
 from insolvia_core.access import Accessor
 from insolvia_core.access_log import record_access
+from insolvia_core.cases import Case, is_filed
 from insolvia_core.debtors import (
+    Debtor,
+    DebtorDraft,
+    LinkOutcome,
     create_debtor,
     debtor_json,
+    link_client,
     parse_debtor,
     parse_filing_role,
     replace_debtor,
+    require_client_provenance_kept,
 )
-from insolvia_core.errors import NotFoundError, ValidationError
-from insolvia_core.firms import ADD_EDIT, INTAKE, VIEW_ONLY
-from insolvia_core.ports import AccessLog, CaseStore, DebtorStore
+from insolvia_core.errors import (
+    ConflictError,
+    FieldValidationError,
+    NotFoundError,
+    ValidationError,
+)
+from insolvia_core.firm_clients import (
+    FirmClient,
+    client_updated_from_debtor,
+    debtor_from_client,
+    differs_from_client,
+    recopy_from_client,
+    refusal_for_refused_link,
+)
+from insolvia_core.firms import ADD_EDIT, CLIENTS, INTAKE, VIEW_ONLY
+from insolvia_core.ports import (
+    AccessLog,
+    CaseStore,
+    DebtorStore,
+    FirmStore,
+    TaxIdCipher,
+    TaxIdStore,
+)
+from insolvia_core.tax_ids import TaxIdRef, store_tax_id
 
 from insolvia_api.api.auth import current_accessor, require_auth, requires
 from insolvia_api.api.dependencies import dependencies
@@ -30,12 +57,31 @@ blueprint = Blueprint("debtors", __name__)
 # that anything over it is a mistake or an attack.
 MAX_REQUEST_BYTES = 256 * 1024
 
+# The filing roles that are always a firm client (ADR 0022). A non-filing
+# spouse may be one and need not be — the firm does not represent them.
+CLIENT_ROLES = ("debtor_1", "debtor_2")
 
-def _stores() -> tuple[CaseStore, DebtorStore, AccessLog]:
+
+def _stores() -> tuple[CaseStore, DebtorStore, AccessLog, TaxIdStore, TaxIdCipher]:
     deps = dependencies()
-    if deps.case_store is None or deps.debtor_store is None or deps.access_log is None:
-        raise RuntimeError("case store, debtor store and access log are not composed")
-    return deps.case_store, deps.debtor_store, deps.access_log
+    if (
+        deps.case_store is None
+        or deps.debtor_store is None
+        or deps.access_log is None
+        or deps.tax_id_store is None
+        or deps.tax_id_cipher is None
+    ):
+        raise RuntimeError(
+            "case store, debtor store, access log, tax-id store and tax-id "
+            "cipher are not composed"
+        )
+    return (
+        deps.case_store,
+        deps.debtor_store,
+        deps.access_log,
+        deps.tax_id_store,
+        deps.tax_id_cipher,
+    )
 
 
 def _json_body() -> dict[str, object]:
@@ -47,7 +93,7 @@ def _json_body() -> dict[str, object]:
     return payload
 
 
-def _reachable_case_or_404(accessor: Accessor, case_id: str, action: str) -> None:
+def _reachable_case_or_404(accessor: Accessor, case_id: str, action: str) -> Case:
     """Resolve the case first, and record the attempt either way.
 
     EVERY debtor route goes through here, because this is the only
@@ -63,8 +109,12 @@ def _reachable_case_or_404(accessor: Accessor, case_id: str, action: str) -> Non
     `access_all_cases`, or linked to this matter). `CaseStore.get` applies the
     whole rule — core/access.may_see_case — so the change here is one argument
     and nothing else, which is exactly what it should have been.
+
+    Returns the case because the write path needs its `firm_id`: the tax
+    id's encryption context binds the FIRM (insolvia_core.tax_ids), and the
+    firm comes from the resolved case, never from the request.
     """
-    case_store, _, access_log = _stores()
+    case_store, _, access_log, _, _ = _stores()
     case = case_store.get(case_id, accessor=accessor)
     access_log.record(
         record_access(
@@ -78,6 +128,28 @@ def _reachable_case_or_404(accessor: Accessor, case_id: str, action: str) -> Non
         # Identical to a case that does not exist — core/errors.py explains why
         # distinguishing them turns this into an id oracle.
         raise NotFoundError("case not found")
+    return case
+
+
+def _resolve_tax_id(
+    draft: DebtorDraft, stored: Debtor | None, case: Case
+) -> TaxIdRef | None:
+    """What the saved debtor will carry — the draft's write sealed, kept, or
+    cleared against the stored reference (tax_ids.store_tax_id owns the
+    rules). Runs AFTER the case is resolved, because sealing needs the
+    firm, and after the stored record is read, because keeping needs the
+    reference. A refused echo is a 400 like any other malformed field; the
+    case.update row already recorded above stands, because the case WAS
+    reached."""
+    _, _, _, tax_id_store, cipher = _stores()
+    return store_tax_id(
+        draft.tax_id,
+        existing=stored.tax_id if stored is not None else None,
+        firm_id=case.firm_id,
+        case_id=case.id,
+        cipher=cipher,
+        store=tax_id_store,
+    )
 
 
 def _log_saved(case_id: str, debtor_id: str, role: str) -> None:
@@ -106,8 +178,15 @@ def put_debtor_route(case_id: str, filing_role: str) -> ResponseReturnValue:
     Idempotent: the same body twice leaves the same record, keeping the id and
     created_at of the first write because provenance paths elsewhere may
     already name that id.
+
+    The tax id (issue 13.12 / #382) rides the same PUT: the digits arrive in
+    the body, are sealed under the case key BEFORE the debtor row is written,
+    and only the last-four view and the sealed item's reference land on the
+    record — so the response, like every read, carries `tax_id: {kind,
+    last_four}` and nothing more. A client keeps a stored number across a
+    save by echoing that view; it clears it by leaving the member out.
     """
-    _, debtor_store, _ = _stores()
+    _, debtor_store, _, _, _ = _stores()
     accessor = current_accessor()
 
     # Body BEFORE ownership, which looks backwards and is deliberate. The body
@@ -119,21 +198,42 @@ def put_debtor_route(case_id: str, filing_role: str) -> ResponseReturnValue:
     # alternative would be recording changes that never happened.
     role = parse_filing_role(filing_role)
     draft = parse_debtor(_json_body())
-    _reachable_case_or_404(accessor, case_id, "case.update")
+    case = _reachable_case_or_404(accessor, case_id, "case.update")
 
     stored = debtor_store.get(case_id, filing_role=role)
+    # A `client` entry is kept from the stored record, never minted here —
+    # see the function. Checked against THIS read only: when nothing was
+    # stored, a draft with any `client` entry has already been refused, so
+    # the create-race re-read below has nothing left to check.
+    require_client_provenance_kept(draft, stored)
+    if stored is None and role in CLIENT_ROLES:
+        # ADR 0022: Debtor 1 and Debtor 2 are the firm's clients, so neither
+        # is minted from a questionnaire save. Debtor 1 exists from the moment
+        # the case is opened; Debtor 2 arrives by linking a client
+        # (`PUT …/debtors/debtor_2/client`). Only the non-filing spouse — who
+        # need not be a client — may still start from nothing here.
+        raise FieldValidationError(
+            {"client_id": "Link a client to this debtor before entering their details."}
+        )
     if stored is None:
         # A CONDITIONAL create, not a plain write. Two overlapping first saves
         # would otherwise both find nothing, both mint an id, and the second
         # would erase the one the first had already returned to a client —
         # where provenance paths elsewhere may already name it. Autosave plus a
         # double submit is all it takes.
-        fresh = create_debtor(draft, case_id=case_id, filing_role=role)
+        fresh = create_debtor(
+            draft,
+            case_id=case_id,
+            filing_role=role,
+            tax_id=_resolve_tax_id(draft, None, case),
+        )
         if debtor_store.create(fresh):
             _log_saved(case_id, fresh.id, role)
-            return jsonify(debtor_json(fresh)), 201
+            return jsonify(_debtor_view(accessor, case, fresh)), 201
         # Lost the race. `fresh`'s id has not left this process, so dropping it
-        # costs nothing; the winner's record is the one to build on.
+        # costs nothing; the winner's record is the one to build on — and so
+        # is the winner's tax-id reference, which is why the tax id is
+        # resolved again below against what the winner stored.
         stored = debtor_store.get(case_id, filing_role=role)
 
     if stored is None:
@@ -143,10 +243,10 @@ def put_debtor_route(case_id: str, filing_role: str) -> ResponseReturnValue:
         # an UnboundLocalError in it.
         raise RuntimeError("debtor vanished between a refused create and a read")
 
-    debtor = replace_debtor(stored, draft)
+    debtor = replace_debtor(stored, draft, tax_id=_resolve_tax_id(draft, stored, case))
     debtor_store.put(debtor)
     _log_saved(case_id, debtor.id, role)
-    return jsonify(debtor_json(debtor)), 200
+    return jsonify(_debtor_view(accessor, case, debtor)), 200
 
 
 @blueprint.get("/v1/cases/<case_id>/debtors")
@@ -159,9 +259,248 @@ def list_debtors_route(case_id: str) -> ResponseReturnValue:
     at all: this names one case, so "who saw this file" has an answer worth
     recording.
     """
-    _, debtor_store, _ = _stores()
+    _, debtor_store, _, _, _ = _stores()
     accessor = current_accessor()
 
-    _reachable_case_or_404(accessor, case_id, "case.read")
+    case = _reachable_case_or_404(accessor, case_id, "case.read")
     debtors = debtor_store.list_for_case(case_id)
-    return jsonify({"debtors": [debtor_json(debtor) for debtor in debtors]}), 200
+    return jsonify(
+        {"debtors": [_debtor_view(accessor, case, debtor) for debtor in debtors]}
+    ), 200
+
+
+@blueprint.put("/v1/cases/<case_id>/debtors/<filing_role>/client")
+@require_auth
+@requires(INTAKE, ADD_EDIT)
+@requires(CLIENTS, VIEW_ONLY)
+def link_client_route(case_id: str, filing_role: str) -> ResponseReturnValue:
+    """Link a firm client to one debtor of a case — `{"client_id": "…"}`.
+
+    THE ONLY WRITER OF A DEBTOR'S `client_id` after the case is opened
+    (ADR 0022: server-owned; the questionnaire's PUT keeps it). Two cases:
+
+    - **No debtor in that role yet** — the client is COPIED in, exactly as
+      `POST /v1/cases` copies Debtor 1: a new record, every field with
+      `client` provenance. 201. This is how a joint case gains its Debtor 2,
+      and how a non-filing spouse who is a client is added.
+    - **A debtor already there** — only the link moves. The copied fields are
+      the case's and stay as they are; where they now disagree with the
+      newly linked client is `differs_from_client`, and copying over is its
+      own explicit act. 200.
+
+    One client, one role per case: a client already linked to another role
+    of this case is refused, or the `by-client` index would list the case
+    twice. The client is resolved in the CASE's firm and must be active,
+    for `POST /v1/cases`'s reasons, and the read is access-logged the same
+    way.
+
+    The one-role check is the WRITE's condition, not a read before it
+    (`DebtorStore.link`): two links of one client to two roles of one case,
+    racing, cannot both land. So is the client's own state: the read below
+    gives the clear message, and the write's condition on the client row
+    refuses a link a merge's claim overtook (`insolvia_core.client_merge`)
+    with the same 400.
+    """
+    _, debtor_store, _, _, _ = _stores()
+    accessor = current_accessor()
+    role = parse_filing_role(filing_role)
+    client_id = _client_id_of(_json_body())
+    case = _reachable_case_or_404(accessor, case_id, "case.update")
+    client = _linkable_client(accessor, case, client_id)
+
+    stored = debtor_store.get(case_id, filing_role=role)
+    if stored is None:
+        fresh = debtor_from_client(client, case=case, filing_role=role)
+        outcome = debtor_store.link(fresh, create=True, firm_id=case.firm_id)
+        if outcome == "written":
+            _log_saved(case_id, fresh.id, role)
+            return jsonify(_debtor_view(accessor, case, fresh, client=client)), 201
+        _refuse_refused_link(outcome, case, client.id)
+        # Lost the create race: somebody filled the role first, so this
+        # becomes a move of the link on the record they wrote.
+        stored = debtor_store.get(case_id, filing_role=role)
+        if stored is None:
+            raise RuntimeError("debtor vanished between a refused create and a read")
+
+    linked = link_client(stored, client_id=client.id, case_created_at=case.created_at)
+    _refuse_refused_link(
+        debtor_store.link(linked, create=False, firm_id=case.firm_id),
+        case,
+        client.id,
+    )
+    _log_saved(case_id, linked.id, role)
+    return jsonify(_debtor_view(accessor, case, linked, client=client)), 200
+
+
+@blueprint.post("/v1/cases/<case_id>/debtors/<filing_role>/copy-from-client")
+@require_auth
+@requires(INTAKE, ADD_EDIT)
+@requires(CLIENTS, VIEW_ONLY)
+def copy_from_client_route(case_id: str, filing_role: str) -> ResponseReturnValue:
+    """ADR 0022's *re-copy from client*: overwrite this debtor's copied
+    fields (name, other names, both addresses, phone, mobile, email) with
+    the linked client's, each carrying `client` provenance again. No body.
+
+    An ordinary whole-record write — `firm_clients.recopy_from_client` builds
+    the record the questionnaire's PUT would, and the same store call saves
+    it. The case's own answers (venue, counselling, signature date, the tax
+    id) are untouched.
+
+    REFUSED ON A FILED CASE (409): a filed petition is a signed statement
+    about a date, and changing what it says about the debtor is an
+    amendment — 17.4's, not this. Refused with a 409 rather than a 400
+    because nothing about the request is wrong; the case's state is.
+
+    A debtor with no linked client is a 409 for the same reason. The
+    client is resolved in the CASE's firm and access-logged as a
+    `client.read`, as linking does; an archived client is refused, as
+    linking refuses one."""
+    _, debtor_store, _, _, _ = _stores()
+    accessor = current_accessor()
+    role = parse_filing_role(filing_role)
+    case = _reachable_case_or_404(accessor, case_id, "case.update")
+    if is_filed(case.status):
+        raise ConflictError(
+            "This case is filed — re-copying would change a filed petition. "
+            "Amend it instead."
+        )
+    stored = _linked_debtor_or_409(debtor_store, case_id, role)
+    assert stored.client_id is not None  # _linked_debtor_or_409's promise
+    client = _linkable_client(accessor, case, stored.client_id)
+
+    recopied = recopy_from_client(stored, client)
+    debtor_store.put(recopied)
+    _log_saved(case_id, recopied.id, role)
+    return jsonify(_debtor_view(accessor, case, recopied, client=client)), 200
+
+
+@blueprint.post("/v1/cases/<case_id>/debtors/<filing_role>/copy-to-client")
+@require_auth
+@requires(INTAKE, VIEW_ONLY)
+@requires(CLIENTS, ADD_EDIT)
+def copy_to_client_route(case_id: str, filing_role: str) -> ResponseReturnValue:
+    """ADR 0022's *update client from this case*: overwrite the linked
+    client's copied fields with what this debtor now says. No body; answers
+    the DEBTOR, whose `differs_from_client` is now `[]`.
+
+    The write is the client's whole-record save (`firm_clients.
+    client_updated_from_debtor` → `FirmStore.update_client`), logged as a
+    `client.update` like `PUT /v1/firm/clients/<id>`. The debtor is only
+    read, so `intake` at `view_only` is enough and `clients` at `add_edit`
+    is what is required — the same grant editing the client directly needs.
+
+    Allowed on a filed case: the petition does not change, the directory
+    does. A debtor with no linked client is a 409."""
+    _, debtor_store, _, _, _ = _stores()
+    accessor = current_accessor()
+    role = parse_filing_role(filing_role)
+    case = _reachable_case_or_404(accessor, case_id, "case.read")
+    stored = _linked_debtor_or_409(debtor_store, case_id, role)
+    assert stored.client_id is not None  # _linked_debtor_or_409's promise
+    firm_store = _firm_store()
+    client = firm_store.get_client(case.firm_id, stored.client_id)
+    if client is None:
+        _log_client(accessor, stored.client_id, "client.update", found=False)
+        raise ConflictError("This debtor's client is no longer in the firm.")
+
+    written = firm_store.update_client(client_updated_from_debtor(client, stored))
+    _log_client(accessor, client.id, "client.update", found=written is not None)
+    if written is None:
+        raise ConflictError("This debtor's client is no longer in the firm.")
+    # GLBA: that a client was updated, and from which case — no field.
+    logger.info("client updated from case", extra={"case_id": case_id})
+    return jsonify(_debtor_view(accessor, case, stored, client=written)), 200
+
+
+def _linked_debtor_or_409(debtor_store: DebtorStore, case_id: str, role: str) -> Debtor:
+    stored = debtor_store.get(case_id, filing_role=role)
+    if stored is None or stored.client_id is None:
+        raise ConflictError("This debtor is not linked to a client.")
+    return stored
+
+
+def _log_client(
+    accessor: Accessor, client_id: str, action: str, *, found: bool
+) -> None:
+    _, _, access_log, _, _ = _stores()
+    access_log.record(
+        record_access(
+            client_id=client_id,
+            principal=accessor.subject,
+            action=action,
+            outcome="allowed" if found else "denied",
+        )
+    )
+
+
+def _linkable_client(accessor: Accessor, case: Case, client_id: str) -> FirmClient:
+    """The client `client_id` names in the CASE's firm, read and
+    access-logged as a `client.read` — refused with the link route's field
+    errors when there is none or it is archived."""
+    client = _firm_store().get_client(case.firm_id, client_id)
+    _log_client(accessor, client_id, "client.read", found=client is not None)
+    if client is None:
+        raise FieldValidationError({"client_id": "No such client."})
+    refused = client.refusal_for_new_case()
+    if refused is not None:
+        raise FieldValidationError({"client_id": refused})
+    return client
+
+
+def _refuse_refused_link(outcome: LinkOutcome, case: Case, client_id: str) -> None:
+    """Raise the field error for a refused link; return for `written` and
+    `role_taken` (the caller handles a lost create race)."""
+    if outcome == "client_taken":
+        raise FieldValidationError(
+            {"client_id": "That client is already another debtor on this case."}
+        )
+    if outcome == "client_unavailable":
+        # The write's condition on the client row refused it: a merge (or an
+        # archive) landed after `_linkable_client`'s read. Re-read for the
+        # read check's own words — not access-logged again, the route already
+        # logged this client's read and nothing is returned from this one.
+        reread = _firm_store().get_client(case.firm_id, client_id)
+        raise FieldValidationError({"client_id": refusal_for_refused_link(reread)})
+
+
+def _client_id_of(payload: dict[str, object]) -> str:
+    client_id = payload.get("client_id")
+    if not isinstance(client_id, str) or not client_id.strip():
+        raise FieldValidationError({"client_id": "Choose a client."})
+    return client_id.strip()
+
+
+def _firm_store() -> FirmStore:
+    deps = dependencies()
+    if deps.firm_store is None:
+        raise RuntimeError("firm store is not composed")
+    return deps.firm_store
+
+
+def _debtor_view(
+    accessor: Accessor,
+    case: Case,
+    debtor: Debtor,
+    *,
+    client: FirmClient | None = None,
+) -> dict[str, object]:
+    """`debtor_json`, plus `differs_from_client` when the debtor names a
+    client AND the caller may see the firm's clients (ADR 0022).
+
+    Computed on every read rather than stored: the divergence is between two
+    records that change independently, and a stored flag would be stale the
+    moment either did. A caller without `clients` gets the debtor without
+    the member — which fields of a client record differ is a fact about that
+    record. NOT access-logged as a client read: nothing of the client's
+    leaves the server here except which of the case's own fields disagree,
+    and logging it would write a client row on every autosave.
+
+    A linked client that is no longer in the case's firm (nothing can move
+    one today) yields no member rather than a diff against nothing."""
+    if debtor.client_id is None or not accessor.may(CLIENTS, VIEW_ONLY):
+        return debtor_json(debtor)
+    if client is None or client.id != debtor.client_id:
+        client = _firm_store().get_client(case.firm_id, debtor.client_id)
+    if client is None:
+        return debtor_json(debtor)
+    return debtor_json(debtor, differs_from_client=differs_from_client(debtor, client))

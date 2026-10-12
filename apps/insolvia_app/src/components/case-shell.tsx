@@ -1,7 +1,6 @@
 import { permits } from '@insolvia-ai/api-client';
 import type { Case, Debtor, PersonName } from '@insolvia-ai/api-client';
 import { Badge } from '@insolvia-ai/design-system';
-import type { BadgeIntent } from '@insolvia-ai/design-system';
 import { usePathname, useRouter } from 'expo-router';
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
@@ -10,6 +9,8 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useMembership } from '@/api/me';
 import { useApi } from '@/api/use-api';
 import { AppShell } from '@/components/app-shell';
+import { CASE_STATUS_INTENT, CASE_STATUS_LABEL } from '@/components/case-status';
+import { recordRecentCase } from '@/components/recent-cases';
 import { StatusScreen } from '@/components/status-screen';
 import { contentMaxWidth, fontSizes, spacing, useTheme } from '@/theme';
 
@@ -76,6 +77,8 @@ interface Section {
   readonly feature?: 'extraction_review';
   /** Which count, if any, this section shows beside its name. */
   readonly count?: 'pendingReview';
+  /** Present when the section exists only for one chapter's cases. */
+  readonly chapter?: 13;
 }
 
 const SECTIONS: readonly Section[] = [
@@ -84,6 +87,8 @@ const SECTIONS: readonly Section[] = [
   { segment: 'petition', label: 'Petition' },
   { segment: 'income', label: 'Income' },
   { segment: 'means-test', label: 'Means test' },
+  // Issue 16.2 / #366: a plan is proposed only under Chapter 13.
+  { segment: 'plan', label: 'Plan', chapter: 13 },
   { segment: 'documents', label: 'Documents' },
   {
     segment: 'extraction-review',
@@ -97,18 +102,6 @@ const SECTIONS: readonly Section[] = [
   { segment: 'team', label: 'Team' },
 ];
 
-const STATUS_LABEL: Record<Case['status'], string> = {
-  intake: 'In intake',
-  ready_to_file: 'Ready to file',
-  filed: 'Filed',
-};
-
-const STATUS_INTENT: Record<Case['status'], BadgeIntent> = {
-  intake: 'neutral',
-  ready_to_file: 'success',
-  filed: 'primary',
-};
-
 /**
  * A debtor's name as one string, or null when intake has not supplied one.
  *
@@ -116,7 +109,7 @@ const STATUS_INTENT: Record<Case['status'], BadgeIntent> = {
  * so a debtor with only a surname still reads as a name rather than as
  * `undefined undefined Reyes`.
  */
-function personName(name: PersonName | undefined): string | null {
+export function personName(name: PersonName | undefined): string | null {
   if (name === undefined) return null;
   const joined = [name.given, name.middle, name.surname, name.suffix]
     .map((part) => part?.trim() ?? '')
@@ -216,6 +209,10 @@ export function CaseShell({ caseId, children }: { caseId: string; children: Reac
       if (!result.ok) return;
       setMatter(result.value);
       setError(null);
+      // The dashboard's "recently viewed" trail (issue 14.7 / #359) — recorded
+      // here, once per successful open, rather than in each of the six case
+      // screens beneath this shell, since every one of them mounts through it.
+      recordRecentCase(caseId);
     } catch {
       // A 404 here means unknown OR not the caller's — the API refuses to say
       // which (see `getCase`), and so does this. "Could not be opened" is the
@@ -258,7 +255,11 @@ export function CaseShell({ caseId, children }: { caseId: string; children: Reac
     return <StatusScreen title="Opening case" message="Loading this case…" />;
   }
 
-  const visible = SECTIONS.filter((section) => section.feature === undefined || mayReview);
+  const visible = SECTIONS.filter(
+    (section) =>
+      (section.feature === undefined || mayReview) &&
+      (section.chapter === undefined || section.chapter === matter.chapter),
+  );
 
   // Which section is showing, as its route segment — '' for the overview.
   // Derived from the pathname rather than `useSegments()`, whose return type is
@@ -331,8 +332,8 @@ export function CaseShell({ caseId, children }: { caseId: string; children: Reac
                 (`alignSelf: 'flex-start'`, so it hugs its content); a box of
                 its own height is what lets the row centre it. */}
             <View style={styles.status}>
-              <Badge intent={STATUS_INTENT[matter.status]} size="sm">
-                {STATUS_LABEL[matter.status]}
+              <Badge intent={CASE_STATUS_INTENT[matter.status]} size="sm">
+                {CASE_STATUS_LABEL[matter.status]}
               </Badge>
             </View>
           </View>

@@ -1,75 +1,66 @@
-import { Button } from '@insolvia-ai/design-system';
-import { useRouter } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import type { FirmMembership } from '@insolvia-ai/api-client';
+import { StyleSheet, View } from 'react-native';
 
 import { AppShell } from '@/components/app-shell';
 import { Heading } from '@/components/heading';
-import { fontSizes, spacing, useTheme } from '@/theme';
+import { spacing, workspaceMaxWidth } from '@/theme';
+
+import { EventsCard } from './events-card';
+import { QuickActions } from './quick-actions';
+import { RecentCasesCard } from './recent-cases-card';
+import { TasksCard } from './tasks-card';
 
 /**
- * The signed-in shell's home screen.
+ * The signed-in shell's home screen — the working surface (issue 14.7 /
+ * #359), replacing the two-button landing shell that proved the delivery
+ * pipeline while intake, the forms engine and e-filing were still arriving.
  *
- * Deliberately thin: this milestone proves the delivery pipeline, not the
- * product. Everything visual comes from our own components — the {@link AppShell}
- * frame (wordmark, landmarks, centered max-width column), {@link Button},
- * {@link Heading} — and every color, radius and spacing step comes from
- * `@insolvia-ai/tokens` via `@/theme`, so none is spelled out here.
+ * Reached only through `RequireSession` **and** `RequireFirm` (see
+ * `src/app/index.tsx`), the same pair `/calendar` and `/my-tasks` use: the
+ * dashboard is built entirely out of firm-owned things — cases, tasks,
+ * events — so a signed-in person with no firm yet has nothing here to show,
+ * and `RequireFirm` already renders that explanation in place.
  *
- * It USED to end with two more things, both removed as leftovers: the
- * `GET /v1/me` panel that proved the authenticated round trip (issue #77),
- * which is support detail rather than product and now lives collapsed on
- * `/account`; and a line reading "Serving local · localhost", which repeated
- * what the header's environment badge already says and now appears once, in
- * the footer's build stamp.
- *
- * It is reached only through `RequireSession` (see `src/app/index.tsx`), so
- * everything below can assume a signed-in user.
+ * **Four independent cards, four independent reads.** `GET /v1/cases`,
+ * `GET /v1/me/tasks` and `GET /v1/calendar` already existed and already apply
+ * ADR 0009's reachability rule each in its own right; a bundling
+ * `GET /v1/me/dashboard` would have to re-state that rule a fourth time for
+ * one screen's convenience, at the cost of a slower first paint whenever any
+ * one of the three is slow. Four small requests that can each show their own
+ * loading and empty state — the shape every other multi-panel screen in this
+ * app already uses (`case-overview`'s spine, notes, events and tasks panels
+ * are four reads too) — cost the browser nothing a spinner would not, and
+ * keep each card testable and independently cacheable. See the report for
+ * the one place this app DID add a route rather than composing existing
+ * ones: `GET /v1/me/tasks?scope=` (`api/routes/tasks.py`), for the firm-wide
+ * toggle no existing endpoint could answer.
  */
-export function Home() {
-  const theme = useTheme();
-  const router = useRouter();
-
-  const openCases = () => {
-    router.push('/cases');
-  };
-
+export function Home({ membership }: { membership: FirmMembership }) {
   return (
-    <AppShell>
-      <Heading level={1}>Your case workspace</Heading>
-      <Text style={[styles.body, { color: theme.colors.muted, fontFamily: theme.typography.body }]}>
-        This is the shell every Insolvia screen sits inside. Case intake, the forms engine, and
-        e-filing each arrive in their own ticket.
-      </Text>
+    <AppShell maxContentWidth={workspaceMaxWidth}>
+      <Heading level={1}>Home</Heading>
 
-      <View style={styles.actions}>
-        {/*
-          The design system's Button (its .native leaf — see metro.config.js).
-          `size="lg"` (48dp) because the package's md is 40dp, under the 44dp
-          WCAG 2.5.5 target-size floor this app enforces. The arrow is
-          a decorative glyph, not part of the name: it renders `aria-hidden` and
-          `aria-label` pins the accessible name to exactly the visible label,
-          so a screen reader never announces "Start a case right arrow".
-        */}
-        <Button size="lg" aria-label="Start a case" onPress={openCases}>
-          Start a case <Text aria-hidden>→</Text>
-        </Button>
-        <Button size="lg" intent="secondary" onPress={openCases}>
-          Your cases
-        </Button>
+      <QuickActions membership={membership} />
+
+      <View style={styles.grid}>
+        <View style={styles.column}>
+          <RecentCasesCard />
+          <TasksCard membership={membership} />
+        </View>
+        <View style={styles.column}>
+          <EventsCard membership={membership} />
+        </View>
       </View>
     </AppShell>
   );
 }
 
 const styles = StyleSheet.create({
-  actions: {
+  column: { flex: 1, gap: spacing.lg, minWidth: 320 },
+  grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: spacing.md,
-    marginTop: spacing.md,
-  },
-  body: {
-    fontSize: fontSizes.body,
-    lineHeight: fontSizes.body * 1.5,
+    gap: spacing.lg,
+    marginTop: spacing.lg,
   },
 });

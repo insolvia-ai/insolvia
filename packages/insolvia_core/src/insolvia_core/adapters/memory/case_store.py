@@ -1,16 +1,30 @@
 from __future__ import annotations
 
-from insolvia_core.access import Accessor, may_see_case
+from collections.abc import Sequence
+
+from insolvia_core.access import Accessor, ClientAccessor, may_see_case
+from insolvia_core.adapters.memory.debtor_store import MemoryDebtorStore
 from insolvia_core.cases import (
     INDEX_BY_ASSIGNEE,
     INDEX_BY_FIRM,
+    STATUS_MOVED,
     Case,
     CaseAssignment,
     CasePage,
+    ClientCase,
+    StatusChange,
+    case_item,
     decode_cursor,
     encode_cursor,
+    listing_cursor_tag,
     listing_sort_key,
 )
+from insolvia_core.clients import (
+    CasePublicStatus,
+    public_status_from_case_item,
+)
+from insolvia_core.debtors import Debtor
+from insolvia_core.errors import ClientUnavailableError, ConflictError
 
 
 class MemoryCaseStore:
@@ -26,21 +40,78 @@ class MemoryCaseStore:
     design can produce.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, debtor_store: MemoryDebtorStore | None = None) -> None:
         self.cases: dict[str, Case] = {}
         # Keyed as the table is — (case, subject) — so a lookup is the same
         # shape the BatchGetItem does, and a subject-keyed dict cannot make
         # cross-case linkage accidentally work.
         self.assignments: dict[tuple[str, str], CaseAssignment] = {}
+        # The lifecycle history (#355), per case, in write order.
+        self.history: dict[str, list[StatusChange]] = {}
+        # THE SAME TABLE, in DynamoDB: a case, its assignments and its debtors
+        # share a partition, which is what lets `create` write all three in
+        # one transaction and `list_for_client` read the `by-client` index the
+        # debtor items feed. Here that is one shared MemoryDebtorStore — pass
+        # the one the debtor routes are composed with, or the debtors this
+        # store writes are invisible to them. A composition with no debtor
+        # routes gets a private one.
+        self.debtor_store = (
+            debtor_store if debtor_store is not None else (MemoryDebtorStore())
+        )
 
-    def create(self, case: Case, assignment: CaseAssignment) -> None:
+    def create(
+        self,
+        case: Case,
+        assignment: CaseAssignment,
+        debtors: Sequence[Debtor] = (),
+    ) -> None:
         if case.id in self.cases:
             raise RuntimeError(f"case {case.id} already exists")
-        # Both, together — the transaction, as a dict. Nothing here can fail
-        # between the two lines, which is the property the DynamoDB adapter
-        # buys with TransactWriteItems.
+        # Refused BEFORE anything is written, which is what makes this a
+        # transaction: the DynamoDB adapter's attribute_not_exists(SK) on each
+        # debtor fails the whole TransactWriteItems, never part of it.
+        for debtor in debtors:
+            if debtor.case_id != case.id:
+                raise RuntimeError("a debtor written with a case must belong to it")
+            if self.debtor_store.get(case.id, filing_role=debtor.filing_role):
+                raise RuntimeError(f"debtor {debtor.filing_role} already exists")
+        # The ConditionCheck on each linked client's row, against the firm
+        # store the shared debtor store is composed with (none composed: no
+        # check, the DynamoDB adapter's `firm_table_name=None`).
+        for debtor in debtors:
+            if debtor.client_id is not None and not self.debtor_store.client_linkable(
+                case.firm_id, debtor.client_id
+            ):
+                raise ClientUnavailableError(debtor.client_id)
+        # All together — the transaction, as dicts. Nothing here can fail
+        # between the lines, which is the property the DynamoDB adapter buys
+        # with TransactWriteItems.
         self.cases[case.id] = case
         self.assignments[(assignment.case_id, assignment.subject)] = assignment
+        for debtor in debtors:
+            self.debtor_store.put(debtor)
+
+    def list_for_client(
+        self, client_id: str, *, accessor: Accessor
+    ) -> tuple[ClientCase, ...]:
+        # The index, as a filter over the debtors: sparse (no client_id, no
+        # entry), one entry per debtor, sorted by the same "<caseCreatedAt>#
+        # <caseId>" value GSI3SK holds, newest first.
+        entries = sorted(
+            (
+                debtor
+                for debtor in self.debtor_store.debtors.values()
+                if debtor.client_id == client_id and debtor.case_created_at is not None
+            ),
+            key=lambda d: listing_sort_key(d.case_created_at or "", d.case_id),
+            reverse=True,
+        )
+        found: list[ClientCase] = []
+        for debtor in entries:
+            case = self.get(debtor.case_id, accessor=accessor)
+            if case is not None:
+                found.append(ClientCase(case=case, filing_role=debtor.filing_role))
+        return tuple(found)
 
     def get(self, case_id: str, *, accessor: Accessor) -> Case | None:
         case = self.cases.get(case_id)
@@ -55,8 +126,21 @@ class MemoryCaseStore:
         # path — never a route.
         return self.cases.get(case_id)
 
+    def public_status(self, client: ClientAccessor) -> CasePublicStatus | None:
+        # Through the stored item shape, as the DynamoDB adapter reads it, so
+        # the firm check and the parse are the one function both share.
+        case = self.cases.get(client.case_id)
+        if case is None:
+            return None
+        return public_status_from_case_item(case_item(case), firm_id=client.firm_id)
+
     def list_for_accessor(
-        self, accessor: Accessor, *, limit: int, cursor: str | None
+        self,
+        accessor: Accessor,
+        *,
+        limit: int,
+        cursor: str | None,
+        archived: bool = False,
     ) -> CasePage:
         if accessor.sees_every_case:
             index = INDEX_BY_FIRM
@@ -71,6 +155,11 @@ class MemoryCaseStore:
                 if case.firm_id == accessor.firm_id
                 and (case.id, accessor.subject) in self.assignments
             ]
+        # The view (#355): a filter over the index, never a deleted case.
+        visible = [
+            case for case in visible if not case.deleted and case.archived == archived
+        ]
+        index = listing_cursor_tag(index, archived=archived)
 
         # Mirrors both GSIs: sorted by the same "<createdAt>#<id>" value,
         # newest first. They agree on the sort key by construction — that is
@@ -97,12 +186,28 @@ class MemoryCaseStore:
             )
         return CasePage(cases=tuple(page), next_cursor=next_cursor)
 
-    def update(self, case: Case) -> Case | None:
+    def update(
+        self,
+        case: Case,
+        *,
+        expected_status: str | None = None,
+        status_change: StatusChange | None = None,
+    ) -> Case | None:
         existing = self.cases.get(case.id)
         if existing is None or existing.firm_id != case.firm_id:
             return None
+        if expected_status is not None and existing.status != expected_status:
+            raise ConflictError(STATUS_MOVED)
+        # Both, together — the DynamoDB adapter's transaction, as dicts.
         self.cases[case.id] = case
+        if status_change is not None:
+            self.history.setdefault(case.id, []).append(status_change)
         return case
+
+    def status_history(self, case_id: str) -> tuple[StatusChange, ...]:
+        return tuple(
+            sorted(self.history.get(case_id, ()), key=lambda change: change.changed_at)
+        )
 
     def assign(self, assignment: CaseAssignment) -> None:
         # Unconditional: the port says idempotent, and the DynamoDB adapter's

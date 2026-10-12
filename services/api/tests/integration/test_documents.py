@@ -2,11 +2,14 @@
 
 THE ONE ROUND TRIP NOTHING ELSE EXERCISES END TO END. The unit tier proves
 the presign signs the right headers against a faked client; the bucket
-policy (infra/modules/case_documents) refuses a PUT that arrives without
-`x-amz-server-side-encryption: aws:kms`, the CORS rule decides what a
-browser may send, and the KMS grant decides whether the API's role may mint
-a data key at all. Every one of those has failed on its own before and
-every one looks identical from a unit test: "the upload did not finish".
+policy (infra/modules/case_documents) decides which encryption a PUT may
+ask for, the CORS rule decides what a browser may send, and the KMS grant
+decides whether the API's role may mint a data key at all. Every one of
+those has failed on its own before and every one looks identical from a
+unit test: "the upload did not finish". This test's first run against
+staging is what found that the presign had asked for SSE-KMS without a key
+— which S3 reads as the AWS-managed key, and the bucket refuses — so no
+upload had ever succeeded outside the in-memory adapter.
 
 Four calls, in the order the app makes them: authorise → PUT → complete →
 download. Then the record is deleted, in teardown, however the assertions
@@ -80,7 +83,7 @@ def test_an_upload_round_trips_through_the_bucket(
     # 2. Complete: HeadObject under the API's own role, tag cleared, row stored.
     completed = admin.post(
         f"/v1/cases/{case_id}/documents/{record['id']}/complete", expect=200
-    )
+    )["document"]
     assert completed["status"] == "stored"
     assert completed["byteSize"] == len(BODY), (
         "the stored size is what S3 counted, not what the client claimed — a "

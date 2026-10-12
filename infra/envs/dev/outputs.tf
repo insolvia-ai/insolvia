@@ -33,6 +33,21 @@ output "case_kms_key_alias" {
   value       = module.case_store.kms_key_alias
 }
 
+output "filing_credentials_table_name" {
+  description = "This machine's filing-credential vault table. Nothing needs it configured — the API derives it from CASE_TABLE_NAME — printed for the dev proof."
+  value       = module.filing_credentials.table_name
+}
+
+output "filing_credentials_key_alias" {
+  description = "Alias of this machine's vault key — only the filing worker's role may Decrypt under it."
+  value       = module.filing_credentials.kms_key_alias
+}
+
+output "filing_worker_role_arn" {
+  description = "This machine's filing worker role. Assumable by the developer in dev only, to prove the worker's open."
+  value       = module.filing_credentials.worker_role_arn
+}
+
 output "auth_user_pool_id" {
   description = "This machine's Cognito user pool ID."
   value       = module.auth.user_pool_id
@@ -41,6 +56,11 @@ output "auth_user_pool_id" {
 output "auth_web_client_id" {
   description = "This machine's web SPA app client ID (authorization-code + PKCE)."
   value       = module.auth.web_client_id
+}
+
+output "auth_portal_client_id" {
+  description = "This machine's client portal app client ID (authorization-code + PKCE, ADR 0023) — disjoint from auth_web_client_id."
+  value       = module.auth.portal_client_id
 }
 
 output "auth_domain" {
@@ -66,6 +86,11 @@ output "case_document_bucket" {
 output "job_queue_url" {
   description = "This machine's job queue (JOB_QUEUE_URL for the local API and the worker poller — ADR 0018)."
   value       = module.job_pipeline.queue_url
+}
+
+output "filing_queue_url" {
+  description = "This machine's filing queue (FILING_QUEUE_URL for the local API — ADR 0024 PR 6). No consumer until PR 7."
+  value       = module.filing_queue.queue_url
 }
 
 output "admin_audit_table_name" {

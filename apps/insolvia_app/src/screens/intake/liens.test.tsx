@@ -32,6 +32,7 @@ const SAVED_ASSET = {
   created_at: STAMP,
   updated_at: STAMP,
   provenance: { category: { source: 'staff_typed' }, description: { source: 'staff_typed' } },
+  amended: false,
   category: 'vehicle',
   description: '2016 sedan',
   value_entire: '9000.00',
@@ -49,6 +50,7 @@ const LINKED_CLAIM = {
     asset_id: { source: 'staff_typed' },
     lien_position: { source: 'staff_typed' },
   },
+  amended: false,
   claim_class: 'secured',
   amount: '12000.00',
   asset_id: ASSET_ID,
@@ -70,6 +72,7 @@ const UNLINKED_CLAIM = {
       confirmed_at: '2026-09-01T10:00:00Z',
     },
   },
+  amended: false,
   claim_class: 'secured',
   amount: '12000.00',
 };

@@ -34,7 +34,15 @@ from insolvia_core.errors import ValidationError
 from insolvia_core.expenses import HOUSEHOLD, HouseholdBody
 from pypdf import PdfReader
 
-from tests.unit.test_packet_assembly import CASE_ID, TODAY, _entity, reference_case_data
+from tests.unit.test_packet_assembly import (
+    CASE_ID,
+    TODAY,
+    _entity,
+    _filed_reference_case_data,
+    _with_amended,
+    reference_case_data,
+    reference_chapter_13_case_data,
+)
 
 # ── forms_hub: one row per required form ─────────────────────────
 
@@ -193,12 +201,36 @@ def test_group_problems_never_names_a_form_the_case_does_not_file():
 def test_every_completeness_source_with_a_form_mapping_is_reachable():
     # FORM_PROBLEM_SOURCES only matters for sources completeness_problems can
     # actually emit; this pins that every one of its keys names a real series
-    # in the packet's own set, so a typo here cannot silently orphan a source.
-    from insolvia_api.core.packet_assembly import PACKET_FORM_SERIES
+    # in one of the chapters' own sets, so a typo here cannot silently orphan
+    # a source.
+    from insolvia_api.core.packet_assembly import ALL_FORM_SERIES
 
     for series_list in FORM_PROBLEM_SOURCES.values():
         for series in series_list:
-            assert series in PACKET_FORM_SERIES
+            assert series in ALL_FORM_SERIES
+
+
+def test_a_chapter_13_hub_lists_the_b122c_pair_in_place_of_b122a():
+    # Issue #365: the means-test rows follow the chapter, and a source that
+    # feeds both pairs groups only under the pair this case files.
+    data = reference_case_data()
+    data = replace(data, case=replace(data.case, chapter=13))
+    series = {s.series for s in forms_hub(data, as_of=TODAY)}
+    assert {"form/b122c1", "form/b122c2"} <= series
+    assert not {"form/b122a1", "form/b122a2"} & series
+    grouped = group_problems(data)
+    assert "form/b122a2" not in grouped
+    assert "form/b122c2" in grouped
+
+
+def test_a_missing_plan_groups_under_the_plan_form_only():
+    # Issue #367: the plan's gate problem belongs to B113's row, and the
+    # plan form is the last row of a Chapter 13 hub.
+    data = replace(reference_chapter_13_case_data(), plans=())
+    hub = forms_hub(data, as_of=TODAY)
+    assert hub[-1].series == "form/b113"
+    assert [p.source for p in hub[-1].problems] == ["plans"]
+    assert all(not row.problems for row in hub[:-1])
 
 
 # ── resolve_case_form: float, then pin (effective-dating.md) ────
@@ -311,6 +343,49 @@ def test_sign_electronically_fills_the_debtor_signature_field():
     fields = PdfReader(io.BytesIO(outcome)).get_fields()
     assert fields is not None
     assert fields["Debtor1.signature"].value == "/s/ Ada Quinn Lovelace"
+
+
+# ── Amendment previews (issue #370) ──────────────────────────────
+
+
+def test_a_filed_case_previews_its_amended_schedule_with_only_the_amended_item():
+    data = _with_amended(_filed_reference_case_data(), "claims", "claim-hospital")
+    outcome = render_form_preview(
+        data, "form/b106ef", as_of=TODAY, options=OutputOptions(amended_only=True)
+    )
+    assert isinstance(outcome, bytes)
+    values = " ".join(
+        str(v) for v in (PdfReader(io.BytesIO(outcome)).get_fields() or {}).values()
+    )
+    assert "Bayside General Hospital" in values
+    assert "Meridian Bank Card Services" not in values
+
+
+@pytest.mark.parametrize(
+    ("series", "renders"),
+    [
+        ("form/b106ef", True),
+        ("form/b106sum", True),
+        ("form/b106dec", True),
+        ("form/b106d", False),
+        ("form/b101", False),
+    ],
+)
+def test_an_amendment_preview_renders_exactly_what_the_amendment_prints(
+    series, renders
+):
+    data = _with_amended(_filed_reference_case_data(), "claims", "claim-hospital")
+    outcome = render_form_preview(
+        data, series, as_of=TODAY, options=OutputOptions(amended_only=True)
+    )
+    assert isinstance(outcome, bytes) is renders
+
+
+def test_a_filed_case_still_refuses_a_plain_preview():
+    data = _with_amended(_filed_reference_case_data(), "claims", "claim-hospital")
+    outcome = render_form_preview(data, "form/b106ef", as_of=TODAY)
+    assert isinstance(outcome, tuple)
+    assert any("never re-assembled" in p.message for p in outcome)
 
 
 # ── form_preview_object_key ──────────────────────────────────────

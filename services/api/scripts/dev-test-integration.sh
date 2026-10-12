@@ -19,6 +19,9 @@
 #   INTEGRATION_API_URL         http://localhost:8080
 #   INTEGRATION_AUTH_POOL_ID    this machine's pool,   from services/api/.env
 #   INTEGRATION_AUTH_CLIENT_ID  this machine's client, from services/api/.env
+#   INTEGRATION_AUTH_PORTAL_CLIENT_ID  this machine's portal client (ADR 0023),
+#                               from services/api/.env — the seeded client
+#                               signs in against it
 #   E2E_TEST_USER_PASSWORD      the dev account's password (see below)
 #
 # NEVER STAGING FROM A LAPTOP, for the reason e2e/scripts/dev-test.sh gives:
@@ -58,8 +61,9 @@ log()  { printf '\033[1;34m[integration]\033[0m %s\n' "$*"; }
 read_env() { sed -n "s/^$1=//p" "$API_ENV" | tail -1; }
 POOL_ID="${INTEGRATION_AUTH_POOL_ID:-$(read_env AUTH_USER_POOL_ID)}"
 CLIENT_ID="${INTEGRATION_AUTH_CLIENT_ID:-$(read_env AUTH_CLIENT_ID)}"
-[[ -n "$POOL_ID" && -n "$CLIENT_ID" ]] ||
-  die "AUTH_USER_POOL_ID / AUTH_CLIENT_ID are not in $API_ENV — re-run ./scripts/dev-aws-setup.sh."
+PORTAL_CLIENT_ID="${INTEGRATION_AUTH_PORTAL_CLIENT_ID:-$(read_env AUTH_PORTAL_CLIENT_ID)}"
+[[ -n "$POOL_ID" && -n "$CLIENT_ID" && -n "$PORTAL_CLIENT_ID" ]] ||
+  die "AUTH_USER_POOL_ID / AUTH_CLIENT_ID / AUTH_PORTAL_CLIENT_ID are not in $API_ENV — re-run ./scripts/dev-aws-setup.sh."
 
 # ── Credentials: named, never echoed ────────────────────────────────────────
 if [[ -z "${E2E_TEST_USER_PASSWORD:-}" && -f "$DEV_ENV_FILE" ]]; then
@@ -82,6 +86,7 @@ export INTEGRATION_TARGET=dev
 export INTEGRATION_API_URL="$BASE_URL"
 export INTEGRATION_AUTH_POOL_ID="$POOL_ID"
 export INTEGRATION_AUTH_CLIENT_ID="$CLIENT_ID"
+export INTEGRATION_AUTH_PORTAL_CLIENT_ID="$PORTAL_CLIENT_ID"
 export E2E_TEST_USER_PASSWORD
 
 log "target   $BASE_URL (seeds/dev.json)"

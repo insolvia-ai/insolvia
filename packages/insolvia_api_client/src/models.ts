@@ -86,6 +86,12 @@ export type FirmFeature =
   | 'documents'
   | 'extraction_review'
   | 'creditor_library'
+  | 'notes'
+  | 'events'
+  | 'tasks'
+  | 'clients'
+  | 'client_portal'
+  | 'electronic_filing'
   | 'firm_administration';
 
 /**
@@ -150,6 +156,45 @@ export interface FirmMembership {
    * {@link permits} rather than comparing strings.
    */
   readonly permissions: Readonly<Record<FirmFeature, PermissionLevel>>;
+  /**
+   * The firm's defaults for a new case and its letterhead (issue #360), on
+   * the ONE route every member may read — the create form prefills from
+   * them, and a paralegal who cannot read `/v1/firm` still opens cases.
+   */
+  readonly defaultCourt: string | null;
+  readonly defaultDivision: string | null;
+  readonly defaultChapter: CaseChapter | null;
+  readonly letterhead: Letterhead | null;
+  /** The caller's own standing signature block, or `null` when none is set. */
+  readonly signatureBlock: SignatureBlock | null;
+}
+
+/**
+ * What the firm prints at the top of a letter and on the signer block's firm
+ * lines (issue #360). Snake_case inside, like every case-domain body: the
+ * address IS the case domain's {@link Address}, and the block is copied onto
+ * a {@link FilingProfessionalBody} by key.
+ */
+export interface Letterhead {
+  readonly name?: string | undefined;
+  readonly address?: Address | undefined;
+  readonly phone?: string | undefined;
+  readonly email?: string | undefined;
+}
+
+/**
+ * An attorney's standing signature block (issue #360) — exactly the
+ * {@link FilingProfessionalBody} keys that do not change from case to case,
+ * so the petition screen's "use firm default" spreads it onto the record
+ * without a mapping. The name is not here: it is the firm user's own.
+ */
+export interface SignatureBlock {
+  readonly bar_number?: string | undefined;
+  readonly bar_state?: string | undefined;
+  readonly firm_name?: string | undefined;
+  readonly address?: Address | undefined;
+  readonly phone?: string | undefined;
+  readonly email?: string | undefined;
 }
 
 /** Weakest to strongest. `permits` compares by position. */
@@ -187,6 +232,12 @@ export function permits(held: PermissionLevel, required: PermissionLevel): boole
 export interface UpdateMeRequest {
   readonly firstName?: string;
   readonly lastName?: string;
+  /**
+   * Your own signature block (issue #360) — a bar number is the attorney's
+   * own fact, so it is self-service like the name. `null` clears it;
+   * omitted leaves it alone.
+   */
+  readonly signatureBlock?: SignatureBlock | null;
 }
 
 /**
@@ -200,6 +251,8 @@ export function updateMeRequestToJson(request: UpdateMeRequest): Record<string, 
   const body: Record<string, unknown> = {};
   if (request.firstName !== undefined) body.firstName = request.firstName;
   if (request.lastName !== undefined) body.lastName = request.lastName;
+  // `null` IS sent: it is the clear instruction, distinct from "leave alone".
+  if (request.signatureBlock !== undefined) body.signatureBlock = request.signatureBlock;
   return body;
 }
 
@@ -228,10 +281,21 @@ export interface Firm {
   readonly createdAt: string;
   /** Last write to the record, verbatim. */
   readonly updatedAt: string;
+  /** The firm's defaults for a new case (issue #360): explicit `null` until set. */
+  readonly defaultCourt: string | null;
+  readonly defaultDivision: string | null;
+  readonly defaultChapter: CaseChapter | null;
+  /** The firm's letterhead, or `null` until set. */
+  readonly letterhead: Letterhead | null;
 }
 
 /**
- * The `PATCH /v1/firm` request body — the name, and nothing else.
+ * The `PATCH /v1/firm` request body — the name, the defaults and the
+ * letterhead (issue #360), each optional; an empty body is a 400.
+ *
+ * `defaultCourt` and `defaultDivision` are read as a PAIR by the server:
+ * send both codes to set, both `null` to clear. `null` on any default
+ * clears it; omitted leaves it alone.
  *
  * **`status` is absent on purpose and never joins.** Suspend/reactivate is
  * Insolvia's own operation, on the admin portal: a firm suspending itself
@@ -240,12 +304,68 @@ export interface Firm {
  * everywhere.
  */
 export interface UpdateFirmRequest {
-  readonly name: string;
+  readonly name?: string;
+  readonly defaultCourt?: string | null;
+  readonly defaultDivision?: string | null;
+  readonly defaultChapter?: CaseChapter | null;
+  readonly letterhead?: Letterhead | null;
 }
 
-/** The `PATCH /v1/firm` body. */
+/** The `PATCH /v1/firm` body, absent fields omitted; `null` is sent as the clear instruction. */
 export function updateFirmRequestToJson(request: UpdateFirmRequest): Record<string, unknown> {
-  return { name: request.name };
+  const body: Record<string, unknown> = {};
+  if (request.name !== undefined) body.name = request.name;
+  if (request.defaultCourt !== undefined) body.defaultCourt = request.defaultCourt;
+  if (request.defaultDivision !== undefined) body.defaultDivision = request.defaultDivision;
+  if (request.defaultChapter !== undefined) body.defaultChapter = request.defaultChapter;
+  if (request.letterhead !== undefined) body.letterhead = request.letterhead;
+  return body;
+}
+
+/**
+ * The court registry — `GET /v1/courts` (issue #360): the districts and
+ * divisions a case may name, from the `courts/us-bankruptcy` series the API
+ * ships (ADR 0014, ADR 0024). Read-only; every member of a firm may read it.
+ */
+export interface CourtRegistry {
+  /** The release served, e.g. `courts/us-bankruptcy@2026-09-24`. */
+  readonly releaseId: string;
+  readonly effectiveDate: string;
+  readonly districts: readonly CourtDistrict[];
+}
+
+export interface CourtDistrict {
+  /** The CM/ECF code — what {@link Case.court} stores. */
+  readonly code: string;
+  /** The PACER court id (`FLMBK`), or `null` where the lookup did not carry one. */
+  readonly courtId: string | null;
+  /** The printed name — what {@link Case.district} is derived as. */
+  readonly name: string;
+  readonly state: string;
+  readonly circuit: number;
+  readonly website: string;
+  readonly divisions: readonly CourtDivision[];
+  /** Whether the court's Case Upload facility has been proven for our packages. */
+  readonly caseUpload: { readonly status: string; readonly verifiedAt: string | null };
+}
+
+export interface CourtDivision {
+  /** What {@link Case.division} stores. */
+  readonly code: string;
+  readonly name: string;
+  /** The digit before the colon in the case number, or `null` where unverified. */
+  readonly officeCode: string | null;
+  readonly officeCodeVerified: boolean;
+  readonly courthouse: {
+    readonly name: string;
+    readonly line1: string;
+    readonly line2: string | null;
+    readonly city: string;
+    readonly state: string;
+    readonly postal_code: string;
+  } | null;
+  /** The counties whose debtors file here, by FIPS-5 code. */
+  readonly counties: readonly { readonly name: string; readonly fips: string }[];
 }
 
 /**
@@ -266,6 +386,12 @@ export interface FirmColleague {
   readonly displayName: string;
   /** Their job title. */
   readonly role: FirmRole;
+  /**
+   * Their standing signature block, or `null` (issue #360) — the one field
+   * beyond identity every colleague may see, because the petition screen's
+   * "use firm default" is case work and a bar number is on every filing.
+   */
+  readonly signatureBlock: SignatureBlock | null;
 }
 
 /**
@@ -301,6 +427,8 @@ export interface FirmUser {
   readonly createdAt: string;
   /** The server's UTC last-update timestamp, verbatim. */
   readonly updatedAt: string;
+  /** Their standing signature block, or `null` (issue #360). */
+  readonly signatureBlock: SignatureBlock | null;
 }
 
 /**
@@ -365,6 +493,8 @@ export interface UpdateFirmUserRequest {
   readonly accessAllCases?: boolean;
   readonly permissions?: Readonly<Record<FirmFeature, PermissionLevel>>;
   readonly status?: FirmUserStatus;
+  /** A colleague's signature block (issue #360); `null` clears it. */
+  readonly signatureBlock?: SignatureBlock | null;
 }
 
 /** The `PATCH /v1/firm/users/{subject}` body, absent fields omitted. */
@@ -379,7 +509,76 @@ export function updateFirmUserRequestToJson(
   if (request.accessAllCases !== undefined) body.accessAllCases = request.accessAllCases;
   if (request.permissions !== undefined) body.permissions = request.permissions;
   if (request.status !== undefined) body.status = request.status;
+  if (request.signatureBlock !== undefined) body.signatureBlock = request.signatureBlock;
   return body;
+}
+
+/**
+ * One of the caller's own CM/ECF credentials in the vault (ADR 0024,
+ * guardrail 3) — `GET /v1/me/filing-credentials`, gated by
+ * `electronic_filing`. THE STATUS VIEW, and all a client ever receives: no
+ * password, no TOTP seed, nothing sealed. Snake_case, as
+ * `insolvia_core.filing_credentials.credential_json` writes it.
+ */
+export interface FilingCredential {
+  readonly id: string;
+  /** The PACER username. */
+  readonly login: string;
+  /** Court codes (`txsb`, …) the attorney says they e-file in. */
+  readonly courts: readonly string[];
+  /** `active` is the only stored status: revoking DELETES the credential. */
+  readonly status: 'active';
+  readonly created_at: string;
+  readonly updated_at: string;
+}
+
+/**
+ * The filing authorization's text as it ships (ADR 0024, guardrail 2):
+ * render `text` exactly, and sign by posting back `version` and `digest` —
+ * the server refuses any other pair, so a stale screen cannot sign a text
+ * the attorney never saw.
+ */
+export interface FilingAuthorizationText {
+  /** e.g. `2026-10-07-draft`. */
+  readonly version: string;
+  /** SHA-256 of `text`'s UTF-8 bytes, lower-case hex. */
+  readonly digest: string;
+  readonly text: string;
+}
+
+/** The caller's signature, as `GET /v1/me/filing-authorization` shows it. */
+export interface FilingAuthorizationSignature {
+  readonly id: string;
+  readonly text_version: string;
+  readonly text_digest: string;
+  readonly signed_at: string;
+}
+
+/**
+ * `GET`/`POST /v1/me/filing-authorization` — the text, and the caller's
+ * signature over it. `current` is false with no signature, and false with a
+ * signature over an OLDER text version (`signature.text_version !==
+ * current_version`): a new version invalidates older signatures, and nothing
+ * can be enrolled or filed until it is signed. Snake_case, as
+ * `insolvia_core.filing_authorization.authorization_json` writes it.
+ */
+export interface FilingAuthorizationStatus {
+  readonly text: FilingAuthorizationText;
+  readonly current_version: string;
+  readonly current: boolean;
+  readonly signature: FilingAuthorizationSignature | null;
+}
+
+/**
+ * The `POST /v1/me/filing-credentials` body. The ONE place the password and
+ * TOTP seed cross a client, sealed on arrival and never echoed back.
+ */
+export interface FilingCredentialEnrolment {
+  readonly login: string;
+  readonly password: string;
+  /** The authenticator key PACER shows at MFA enrolment (base32). */
+  readonly totp_seed: string;
+  readonly courts?: readonly string[] | undefined;
 }
 
 /**
@@ -452,6 +651,383 @@ export function libraryCreditorDraftToJson(draft: LibraryCreditorDraft): Record<
   );
 }
 
+// ---------------------------------------------------------------------------
+// The firm's client directory (ADR 0022) — mirrors insolvia_core/firm_clients.py
+// (`firm_client_json`, `parse_firm_client`, `STATUSES`) and the API's
+// api/routes/firm_clients.py. NOT the portal's client binding below, which is
+// a different record (`insolvia_core/clients.py`): a `FirmClient` is the firm's
+// directory entry for a person, with or without a portal login.
+// ---------------------------------------------------------------------------
+
+/**
+ * `archived` leaves the person in the directory — archiving is a status
+ * write, never a delete (ADR 0022).
+ */
+export type FirmClientStatus = 'active' | 'archived';
+
+/**
+ * A person in the firm's client directory — `/v1/firm/clients`, gated by the
+ * `clients` feature. One client has many cases over time; a prospect is a
+ * client with no case yet.
+ *
+ * **Snake_case**, for {@link LibraryCreditor}'s reason: the identity fields
+ * are the case domain's own shapes ({@link PersonName}, {@link Address},
+ * {@link OtherName}), reused verbatim so a client copied onto a debtor needs
+ * no mapping. Absent optional fields are omitted by the server, never `null`.
+ */
+export interface FirmClient {
+  readonly id: string;
+  readonly status: FirmClientStatus;
+  /** Always present; at least one of `surname` / `given` is set. */
+  readonly name: PersonName;
+  readonly other_names_used?: readonly OtherName[] | undefined;
+  /** `YYYY-MM-DD`. */
+  readonly date_of_birth?: string | undefined;
+  readonly residence_address?: Address | undefined;
+  readonly mailing_address?: Address | undefined;
+  readonly phone?: string | undefined;
+  readonly mobile?: string | undefined;
+  readonly email?: string | undefined;
+  /** Free text in v1; a firm pick-list is a later issue. */
+  readonly lead_source?: string | undefined;
+  readonly referred_by?: string | undefined;
+  /** `YYYY-MM-DD`. */
+  readonly first_retained_at?: string | undefined;
+  /**
+   * The last four digits of the client's tax ID — the only tax-ID fact any
+   * response carries. It cannot be set through this API: the full value is
+   * sealed once and entered on a case.
+   */
+  readonly tax_id_last_four?: string | undefined;
+  /**
+   * Present only on a client that was MERGED into another (ADR 0022): the
+   * surviving client's id. Such a client is `archived` for good — it cannot
+   * be edited, restored, merged again or opened for a case; its cases now
+   * belong to the survivor.
+   */
+  readonly merged_into?: string | undefined;
+  /**
+   * Where a PROSPECT sits in the funnel (issue #355) — present only while
+   * {@link first_retained_at} is absent and a stage has been set through
+   * `setFirmClientProspectStage`. Server-owned: the whole-record PUT never
+   * sends it.
+   */
+  readonly prospect_stage?: ProspectStage | undefined;
+  readonly created_at: string;
+  readonly updated_at: string;
+  /** The subject of the firm user who created the record. */
+  readonly created_by: string;
+}
+
+/**
+ * `POST /v1/firm/clients/{id}/merge`'s answer: the survivor as it now stands
+ * and the merged client, archived with `merged_into`. Deliberately no count of
+ * the cases moved — it would include cases the caller may not see.
+ */
+export interface FirmClientMerge {
+  readonly client: FirmClient;
+  readonly merged: FirmClient;
+}
+
+/**
+ * The `POST` / `PUT /v1/firm/clients/{id}` body — a WHOLE record, never a
+ * partial PATCH ({@link LibraryCreditorDraft}'s reason): a field omitted from
+ * a PUT is cleared. `status`, `created_by` and the tax ID are the server's and
+ * are not part of the draft; archive with `setFirmClientStatus`.
+ */
+export interface FirmClientDraft {
+  /** `surname` or `given` is required. */
+  readonly name: PersonName;
+  /** Each row needs its own client-chosen `id`, as a debtor's does. */
+  readonly other_names_used?: readonly OtherName[] | undefined;
+  readonly date_of_birth?: string | undefined;
+  readonly residence_address?: Address | undefined;
+  readonly mailing_address?: Address | undefined;
+  readonly phone?: string | undefined;
+  readonly mobile?: string | undefined;
+  readonly email?: string | undefined;
+  readonly lead_source?: string | undefined;
+  readonly referred_by?: string | undefined;
+  readonly first_retained_at?: string | undefined;
+}
+
+/**
+ * One entry of `GET /v1/firm/clients/{id}/cases` (ADR 0022): a case the
+ * caller may see, and which debtor of it the client is.
+ */
+export interface FirmClientCase {
+  readonly filing_role: FilingRole;
+  readonly case: Case;
+}
+
+/**
+ * An address WITH its county — unlike {@link addressToJson}, which drops it
+ * for the entities whose write paths never send one. A client's residence
+ * county is B101 line 5's County box once it is copied onto a debtor, so it
+ * travels on a client and on a debtor alike.
+ */
+function clientAddressToJson(address: Address | undefined): Record<string, unknown> | undefined {
+  if (address === undefined) {
+    return undefined;
+  }
+  return definedMembersOrUndefined({
+    line1: address.line1,
+    line2: address.line2,
+    city: address.city,
+    state: address.state,
+    postal_code: address.postal_code,
+    county: address.county,
+  });
+}
+
+/** The `POST`/`PUT /v1/firm/clients[/{id}]` body, snake_case, absent
+ * optionals omitted entirely. */
+export function firmClientDraftToJson(draft: FirmClientDraft): Record<string, unknown> {
+  return assignDefined(
+    { name: personNameToJson(draft.name) ?? {} },
+    {
+      other_names_used: otherNamesToJson(draft.other_names_used),
+      date_of_birth: draft.date_of_birth,
+      residence_address: clientAddressToJson(draft.residence_address),
+      mailing_address: clientAddressToJson(draft.mailing_address),
+      phone: draft.phone,
+      mobile: draft.mobile,
+      email: draft.email,
+      lead_source: draft.lead_source,
+      referred_by: draft.referred_by,
+      first_retained_at: draft.first_retained_at,
+    },
+  );
+}
+
+// ---------------------------------------------------------------------------
+// The client portal (ADR 0023) — mirrors insolvia_core/clients.py
+// (`binding_json`, `CLIENT_ROLES`, `STATUSES`) and the API's
+// api/routes/portal_invitations.py (the FIRM side, staff tokens) and
+// api/routes/portal.py (the CLIENT side, portal tokens).
+// ---------------------------------------------------------------------------
+
+/**
+ * Which debtor a portal client answers for. Never `non_filing_spouse` — who
+ * has no login in v1.
+ */
+export type ClientRole = 'debtor_1' | 'debtor_2';
+
+/**
+ * `invited` until the client's first portal request, `active` after it,
+ * `revoked` once the firm withdraws access (kept, not deleted).
+ */
+export type PortalClientStatus = 'invited' | 'active' | 'revoked';
+
+/** A client bound to a case, as a FIRM USER sees them. */
+export interface PortalClient {
+  /** The client's Cognito subject — the key the resend and revoke calls take. */
+  readonly subject: string;
+  readonly email: string;
+  /** The name the firm gave at invitation — what the review queue shows. */
+  readonly displayName: string;
+  /** Canonical order: `debtor_1` before `debtor_2`. Never empty. */
+  readonly roles: readonly ClientRole[];
+  readonly status: PortalClientStatus;
+  /** The subject of the firm user who invited them. */
+  readonly invitedBy: string;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
+/**
+ * `POST /v1/cases/{caseId}/portal/invitation`. `roles` defaults to
+ * `['debtor_1']` server-side; `['debtor_1', 'debtor_2']` is the firm's
+ * explicit choice of one login for both spouses.
+ */
+export interface InvitePortalClientRequest {
+  readonly email: string;
+  readonly displayName: string;
+  readonly roles?: readonly ClientRole[];
+}
+
+/**
+ * `GET /v1/portal/me` — who the portal says the signed-in CLIENT is. Called
+ * with a portal session's token, never a staff one. Deliberately carries no
+ * case id: no portal URL names a case.
+ */
+export interface PortalMe {
+  readonly subject: string;
+  readonly displayName: string;
+  readonly roles: readonly ClientRole[];
+  readonly firm: { readonly name: string };
+  /** The bound case's public status — and nothing else of the case record. */
+  readonly case: PortalCaseStatus;
+}
+
+/**
+ * What a client may read of their case (ADR 0023 decision 4): its chapter
+ * and its stage. `stage` is the case's lifecycle status, read server-side
+ * through a projection that takes the client's binding.
+ */
+export interface PortalCaseStatus {
+  readonly chapter: CaseChapter;
+  readonly stage: CaseStatus;
+}
+
+/**
+ * The questionnaire's sections (ADR 0023 PR 3), in the order a client works
+ * through them. Stable ids: the questionnaire's questions (#363) hang off
+ * them. `personal_information` is always on; the other five a firm may
+ * switch off for its clients.
+ */
+export const QUESTIONNAIRE_SECTION_IDS = [
+  'personal_information',
+  'property',
+  'debts',
+  'income',
+  'expenses',
+  'other',
+] as const;
+export type QuestionnaireSectionId = (typeof QUESTIONNAIRE_SECTION_IDS)[number];
+
+/** One section as a FIRM USER configures it — `GET /v1/firm/questionnaire`. */
+export interface FirmQuestionnaireSection {
+  readonly id: QuestionnaireSectionId;
+  readonly title: string;
+  /** What the section maps to on the petition and schedules — for staff. */
+  readonly covers: string;
+  /** False for `personal_information`, which is always on. */
+  readonly switchable: boolean;
+  /** Whether the firm's clients see it. Staff always do. */
+  readonly enabled: boolean;
+  /** The firm's own instructions, or `null` when the default is in force. */
+  readonly instructions: string | null;
+  readonly defaultInstructions: string;
+}
+
+/**
+ * `GET`/`PUT`/`DELETE /v1/firm/questionnaire` — EVERY section, switched off
+ * or not. `isDefault` means the firm has stored nothing (never saved, or
+ * reset); `updatedAt`/`updatedBy` are `null` then.
+ */
+export interface FirmQuestionnaire {
+  readonly isDefault: boolean;
+  readonly updatedAt: string | null;
+  /** The subject of the firm user who last saved it. */
+  readonly updatedBy: string | null;
+  readonly sections: readonly FirmQuestionnaireSection[];
+}
+
+/**
+ * `PUT /v1/firm/questionnaire` — the WHOLE config: every section exactly
+ * once. Instructions blank, `null` or identical to the default are stored
+ * as "use the default".
+ */
+export interface SaveFirmQuestionnaireRequest {
+  readonly sections: readonly {
+    readonly id: QuestionnaireSectionId;
+    readonly enabled: boolean;
+    readonly instructions: string | null;
+  }[];
+}
+
+/** One section as the CLIENT reads it — title, the instructions in force,
+ * and (ADR 0023 PR 4) its questions in order. */
+export interface PortalQuestionnaireSection {
+  readonly id: QuestionnaireSectionId;
+  readonly title: string;
+  readonly instructions: string;
+  readonly questions: readonly PortalQuestion[];
+}
+
+/**
+ * What one answer box holds — `insolvia_core.questions.INPUT_TYPES`.
+ * `money` is a decimal string (`"1200.00"`), never a number; `whole_number`
+ * is a JSON integer; `date` is `YYYY-MM-DD`; `address` is a
+ * {@link PortalAnswerAddress}.
+ */
+export const PORTAL_INPUT_TYPES = [
+  'text',
+  'long_text',
+  'date',
+  'money',
+  'whole_number',
+  'address',
+] as const;
+
+/** See {@link PORTAL_INPUT_TYPES}. */
+export type PortalInputType = (typeof PORTAL_INPUT_TYPES)[number];
+
+/** An `address` input's value. Every member optional, as on every form. */
+export interface PortalAnswerAddress {
+  readonly line1?: string;
+  readonly line2?: string;
+  readonly city?: string;
+  readonly state?: string;
+  readonly postal_code?: string;
+  readonly county?: string;
+}
+
+/** One box of a question. `key` is the key in the answer's `value`. */
+export interface PortalQuestionInput {
+  readonly key: string;
+  readonly label: string;
+  readonly type: PortalInputType;
+  readonly required: boolean;
+  readonly help?: string;
+}
+
+/**
+ * One question as the portal renders it (`insolvia_core.questions`). Where
+ * the answer lands in the case is the server's business and is not sent.
+ * `repeats`: many answers (each vehicle), else one live answer at a time —
+ * a second while the first is pending is a 409; change the first instead.
+ * `perDebtor`: answered for a filing role.
+ */
+export interface PortalQuestion {
+  readonly id: string;
+  readonly text: string;
+  readonly help?: string;
+  readonly repeats: boolean;
+  readonly perDebtor: boolean;
+  readonly inputs: readonly PortalQuestionInput[];
+}
+
+/** An answer's value: input key → that input's value. */
+export type PortalAnswerValue = Readonly<Record<string, unknown>>;
+
+/**
+ * A client's own answer, as `/v1/portal/answers` returns it — the value
+ * they gave and where it stands. An answer is a candidate in the firm's
+ * review queue: `pending` until a person at the firm accepts (`accepted` /
+ * `corrected`) or rejects it, or the client withdraws it. Only `pending`
+ * may be changed or withdrawn.
+ */
+export interface PortalAnswer {
+  readonly id: string;
+  readonly questionId: string;
+  readonly sectionId: QuestionnaireSectionId;
+  readonly filingRole: ClientRole;
+  readonly value: PortalAnswerValue;
+  readonly status: CandidateStatus;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
+/**
+ * `POST /v1/portal/answers`. `filingRole` may be left out by a client who
+ * holds one role; a client holding both must say which.
+ */
+export interface CreatePortalAnswerRequest {
+  readonly questionId: string;
+  readonly filingRole?: ClientRole | undefined;
+  readonly value: PortalAnswerValue;
+}
+
+/**
+ * `GET /v1/portal/questionnaire` — the sections this client's firm shows
+ * them, enabled ones only. Nothing says what is switched off.
+ */
+export interface PortalQuestionnaire {
+  readonly sections: readonly PortalQuestionnaireSection[];
+}
+
 /** One person linked to a case, as `GET /v1/cases/{id}/assignees` returns them. */
 export interface CaseAssignee {
   /** The colleague's Cognito subject — resolve it through the directory. */
@@ -460,6 +1036,142 @@ export interface CaseAssignee {
   readonly assignedAt: string;
   /** The subject of whoever made it. */
   readonly assignedBy: string;
+}
+
+// ---------------------------------------------------------------------------
+// Tasks (issue #356 / 14.4) — the case checklist: `/v1/cases/{caseId}/tasks`
+// and `GET /v1/me/tasks`. The contract lives in
+// `services/api/src/insolvia_api/api/routes/tasks.py` and
+// `packages/insolvia_core/src/insolvia_core/tasks.py`.
+//
+// NO PROVENANCE — unlike the case-domain entities below, a task is
+// operational metadata, not case data printed on a form (`core/tasks.py`'s
+// module docstring owns the argument).
+
+/**
+ * One task of a case, as every task endpoint returns it.
+ *
+ * `overdue` is server-COMPUTED on every read, never stored — it is `true`
+ * only when {@link dueDate} is in the past AND {@link done} is `false`. Do
+ * not compute your own version from `dueDate`; the server's clock and
+ * "today" are the ones that count, and computing it independently invites
+ * the client and the server disagreeing right at a day boundary.
+ */
+export interface Task {
+  readonly id: string;
+  readonly caseId: string;
+  readonly subject: string;
+  readonly description?: string;
+  readonly dueDate?: string;
+  /** The assignee's Cognito subject — resolve it through the firm directory, same as {@link CaseAssignee.subject}. Absent means unassigned. */
+  readonly assigneeSubject?: string;
+  /** The short form key this task anchors to (`"b106d"`, not `"form/b106d"`) — the same spelling {@link CaseForm.form} carries. Absent means no anchor. */
+  readonly formSeries?: string;
+  readonly done: boolean;
+  readonly overdue: boolean;
+  /** Present only once {@link done} has been `true`; absent on a task never completed or since reopened. */
+  readonly completedAt?: string;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  /** The subject of whoever added it — an audit fact, like {@link Case.createdBy}. Grants nothing on its own. */
+  readonly createdBy: string;
+}
+
+/**
+ * The `POST /v1/cases/{caseId}/tasks` request body. Only {@link subject} is
+ * required — everything else is filled in later with
+ * {@link InsolviaApiClient.updateTask}. `done` is never accepted here: every
+ * task starts not-done.
+ */
+export interface CreateTaskRequest {
+  readonly subject: string;
+  readonly description?: string;
+  readonly dueDate?: string;
+  readonly assigneeSubject?: string;
+  readonly formSeries?: string;
+}
+
+/** The `POST /v1/cases/{caseId}/tasks` request body, absent fields omitted. */
+export function createTaskRequestToJson(request: CreateTaskRequest): Record<string, unknown> {
+  const body: Record<string, unknown> = { subject: request.subject };
+  if (request.description !== undefined) body.description = request.description;
+  if (request.dueDate !== undefined) body.dueDate = request.dueDate;
+  if (request.assigneeSubject !== undefined) body.assigneeSubject = request.assigneeSubject;
+  if (request.formSeries !== undefined) body.formSeries = request.formSeries;
+  return body;
+}
+
+/**
+ * The `PATCH /v1/cases/{caseId}/tasks/{taskId}` request body — edit, reassign,
+ * complete or reopen a task, all through this one shape.
+ *
+ * **THREE STATES, not two, for {@link description}, {@link dueDate},
+ * {@link assigneeSubject} and {@link formSeries}.** Leave the key OUT of the
+ * object entirely to leave that field unchanged; set it to `null` to CLEAR
+ * it (unassign a task, remove a due date); set it to a value to replace it.
+ * `updateTaskRequestToJson` reads which keys are actually present with the
+ * `in` operator, so build the object literally —
+ * `{ dueDate: null }`, never `{ dueDate: undefined }`, which is
+ * indistinguishable from omitting the key at the JSON layer and would be
+ * silently read as "leave unchanged" by the wire format, not "clear".
+ *
+ * `subject` cannot be cleared, only replaced — a task with no title is not a
+ * task. `done` follows the same two-state rule `subject` does: set it to
+ * complete or reopen the task, and {@link Task.completedAt} follows it
+ * server-side — never send `completedAt` yourself, there is nowhere to send it.
+ */
+export interface UpdateTaskRequest {
+  readonly subject?: string;
+  readonly description?: string | null;
+  readonly dueDate?: string | null;
+  readonly assigneeSubject?: string | null;
+  readonly formSeries?: string | null;
+  readonly done?: boolean;
+}
+
+/**
+ * The `PATCH /v1/cases/{caseId}/tasks/{taskId}` body — reads which keys
+ * `request` actually carries (present-with-`null` means "clear", absent
+ * means "leave unchanged") rather than checking `!== undefined`, which
+ * cannot tell those two apart. See {@link UpdateTaskRequest}.
+ */
+export function updateTaskRequestToJson(request: UpdateTaskRequest): Record<string, unknown> {
+  const body: Record<string, unknown> = {};
+  if (request.subject !== undefined) body.subject = request.subject;
+  if ('description' in request) body.description = request.description;
+  if ('dueDate' in request) body.dueDate = request.dueDate;
+  if ('assigneeSubject' in request) body.assigneeSubject = request.assigneeSubject;
+  if ('formSeries' in request) body.formSeries = request.formSeries;
+  if (request.done !== undefined) body.done = request.done;
+  return body;
+}
+
+/**
+ * `GET /v1/me/tasks` query options.
+ *
+ * `scope: 'mine'` (the server's default, and this package's when the whole
+ * options object is omitted) keeps only tasks assigned to the caller.
+ * `'firm'` drops that filter and returns every task on every case the
+ * caller can reach — the dashboard's firm-wide toggle (issue 14.7 / #359).
+ * Neither widens which CASES are read, only which of a reachable case's
+ * tasks come back — see `api/routes/tasks.py`'s docstring.
+ */
+export interface ListMyTasksOptions {
+  readonly scope?: 'mine' | 'firm' | undefined;
+}
+
+/**
+ * `GET /v1/me/tasks` query options rendered as `URLSearchParams`, omitting
+ * `scope` entirely when absent or `'mine'` — the server's own default —
+ * rather than sending it explicitly, the same omit-when-absent rule
+ * {@link listCasesQuery} follows.
+ */
+export function listMyTasksQuery(options: ListMyTasksOptions): URLSearchParams {
+  const params = new URLSearchParams();
+  if (options.scope !== undefined && options.scope !== 'mine') {
+    params.set('scope', options.scope);
+  }
+  return params;
 }
 
 /**
@@ -545,13 +1257,72 @@ export function submittedAtUtc(confirmation: WaitlistConfirmation): Date {
 export type CaseChapter = 7 | 11 | 12 | 13;
 
 /**
- * A case's position in the filing workflow.
+ * A case's position in its lifecycle (issue 14.3 / #355) — mirrors
+ * `insolvia_core.cases.STATUSES`, member for member and in lifecycle order:
+ * `intake` and `ready_to_file`, retained and being prepared; `filed`; its two
+ * outcomes `discharged` and `dismissed`; and `closed`. Exported as a VALUE
+ * because the app renders it as a picker. There is no prospect CASE: the
+ * funnel before retention is the client's ({@link FirmClient.prospect_stage}).
  *
- * A union of string literals rather than an `enum`, because `erasableSyntaxOnly`
- * is on (see the root `tsconfig.base.json`) — the same reason
- * {@link UnauthorizedSource} in `exceptions.ts` is one.
+ * Which moves the server accepts is {@link CASE_TRANSITIONS}; a move off it
+ * answers 409.
  */
-export type CaseStatus = 'intake' | 'ready_to_file' | 'filed';
+export const CASE_STATUSES = [
+  'intake',
+  'ready_to_file',
+  'filed',
+  'discharged',
+  'dismissed',
+  'closed',
+] as const;
+export type CaseStatus = (typeof CASE_STATUSES)[number];
+
+/**
+ * The statuses at or after filing — a petition on the court's docket. Mirrors
+ * `insolvia_core.cases.FILED_STATUSES`; "is this case filed" means membership
+ * here, never `status === 'filed'`, because a discharged or closed case is
+ * still a filed petition.
+ */
+export const FILED_CASE_STATUSES: readonly CaseStatus[] = [
+  'filed',
+  'discharged',
+  'dismissed',
+  'closed',
+];
+
+/** Whether a case in `status` has a petition on the court's docket. */
+export function isFiledStatus(status: CaseStatus): boolean {
+  return FILED_CASE_STATUSES.includes(status);
+}
+
+/**
+ * The moves the server accepts from each status — mirrors
+ * `insolvia_core.cases.TRANSITIONS`, so a screen offers only moves that will
+ * land. Forward along the funnel, with two ways back: between `intake` and
+ * `ready_to_file`, and `closed` back to `filed` (a reopened case).
+ */
+export const CASE_TRANSITIONS: Readonly<Record<CaseStatus, readonly CaseStatus[]>> = {
+  intake: ['ready_to_file', 'filed'],
+  ready_to_file: ['intake', 'filed'],
+  filed: ['discharged', 'dismissed', 'closed'],
+  discharged: ['closed'],
+  dismissed: ['closed'],
+  closed: ['filed'],
+};
+
+/**
+ * Where a prospect CLIENT sits in the funnel (issue #355) — mirrors
+ * `insolvia_core.firm_clients.PROSPECT_STAGES`. A client is a prospect while
+ * {@link FirmClient.first_retained_at} is absent; opening their first case
+ * retains them and clears the stage.
+ */
+export const PROSPECT_STAGES = [
+  'possible',
+  'consultation_scheduled',
+  'awaiting_signed_agreement',
+  'exhausted',
+] as const;
+export type ProspectStage = (typeof PROSPECT_STAGES)[number];
 
 /**
  * 106C line 1 — which § 522(b) set the debtor claims (issue #346). Mirrors
@@ -591,8 +1362,18 @@ export interface Case {
   readonly createdBy: string;
   /** The bankruptcy chapter. */
   readonly chapter: CaseChapter;
-  /** The filing district. */
+  /**
+   * The filing district's printed name (`"Middle District of Florida"`) —
+   * DERIVED by the server from {@link court} (issue #360), never sent. On a
+   * case written before the court registry existed it is whatever free text
+   * was typed, and {@link court} is absent: that is how a client learns the
+   * case still needs a court chosen.
+   */
   readonly district: string;
+  /** The court's CM/ECF code (`"flmb"`) — a reference into {@link CourtRegistry}. Absent on a pre-registry case. */
+  readonly court?: string;
+  /** The division's code within the court (`"tampa"`). Absent with {@link court}. */
+  readonly division?: string;
   /** Where the case sits in the filing workflow. */
   readonly status: CaseStatus;
   /** The server's UTC creation timestamp, kept verbatim as the wire string. */
@@ -619,21 +1400,76 @@ export interface Case {
    * {@link ExemptionAnalysis.election.effective} is what was actually used.
    */
   readonly exemptionSet?: ExemptionSet;
+  /**
+   * The petition date — the order for relief in a voluntary case — as a
+   * form date, `YYYY-MM-DD` (issue 14.6 / #358). **Absent until recorded**
+   * through {@link UpdateCaseChanges.filedAt}; setting it is what populates
+   * the case's generated deadlines.
+   */
+  readonly filedAt?: string;
+  /**
+   * The FIRST date the court set for the § 341(a) meeting of creditors, as a
+   * form date. Absent until recorded; the 60-day objection windows and the
+   * rest of the meeting-anchored deadlines count from it.
+   */
+  readonly meeting341At?: string;
+  /**
+   * The court's case number, as the notice of filing prints it
+   * (`8:26-bk-01234`). Absent until recorded; a case cannot reach `filed`
+   * without it.
+   */
+  readonly caseNumber?: string;
+  /** The assigned judge's name. Absent until recorded. */
+  readonly judge?: string;
+  /** The case trustee's name. Absent until recorded. */
+  readonly trustee?: string;
+  /** The firm's own file number for the matter. Absent until recorded. */
+  readonly officeFileNumber?: string;
+  /**
+   * When the case was archived — out of the working list
+   * (`listCases()`), into the archive (`listCases({ archived: true })`).
+   * Absent on a case in the working list.
+   */
+  readonly archivedAt?: string;
+  /** The firm user's subject who archived it; present with {@link archivedAt}. */
+  readonly archivedBy?: string;
 }
 
-/** The `POST /v1/cases` request body: `{"chapter", "district"}`, both required. */
+/**
+ * The `POST /v1/cases` request body: `{"chapter", "court", "division",
+ * "client_ids"}`, all required. `court` and `division` are codes from
+ * {@link CourtRegistry} (issue #360); the server refuses a pair it does not
+ * know with a 400 keyed `court` or `division`, and refuses a typed `district`
+ * by name.
+ */
 export interface CreateCaseRequest {
   /** The bankruptcy chapter. */
   readonly chapter: CaseChapter;
-  /** The filing district. */
-  readonly district: string;
+  /** The court's CM/ECF code, from {@link CourtDistrict.code}. */
+  readonly court: string;
+  /** The division's code, from {@link CourtDivision.code}. */
+  readonly division: string;
+  /**
+   * The {@link FirmClient} ids the case is opened for (ADR 0022): one, or two
+   * filing jointly — the first becomes Debtor 1, the second Debtor 2, each a
+   * copy of the client with `client` provenance. Sent as `client_ids`. The
+   * server refuses (400, keyed `client_ids`) none, three, the same client
+   * twice, or one that is unknown, another firm's, or archived; it answers
+   * 403 to a caller without `clients` at `view_only`.
+   */
+  readonly clientIds: readonly string[];
 }
 
-/** The `POST /v1/cases` request body, verbatim — both fields are required. */
+/**
+ * The `POST /v1/cases` request body — every field is required. Every case
+ * opens at `intake`: there is no status to send (issue #355).
+ */
 export function createCaseRequestToJson(request: CreateCaseRequest): Record<string, unknown> {
   return {
     chapter: request.chapter,
-    district: request.district,
+    court: request.court,
+    division: request.division,
+    client_ids: [...request.clientIds],
   };
 }
 
@@ -647,6 +1483,11 @@ export interface ListCasesOptions {
   readonly limit?: number | undefined;
   /** An opaque pagination cursor from a previous {@link ListCasesResult.nextCursor}. */
   readonly cursor?: string | undefined;
+  /**
+   * `true` lists the ARCHIVE instead of the working list (issue #355). A
+   * cursor from one view is refused (400) by the other.
+   */
+  readonly archived?: boolean | undefined;
 }
 
 /**
@@ -662,6 +1503,9 @@ export function listCasesQuery(options: ListCasesOptions): URLSearchParams {
   }
   if (options.cursor !== undefined) {
     params.set('cursor', options.cursor);
+  }
+  if (options.archived === true) {
+    params.set('archived', 'true');
   }
   return params;
 }
@@ -682,15 +1526,20 @@ export interface ListCasesResult {
 
 /**
  * The `PATCH /v1/cases/{caseId}` request body: any subset of `{"chapter",
- * "district", "status"}`. An omitted key means "leave unchanged" — the client
+ * "court" + "division", "status", "prospect_stage", "exemption_set", the two
+ * dates and the four docket facts}`. An omitted key means "leave unchanged" — the client
  * must not send keys the caller did not supply, so {@link updateCaseChangesToJson}
  * omits them rather than sending `null`.
  */
 export interface UpdateCaseChanges {
   /** A new chapter, or omit to leave it unchanged. */
   readonly chapter?: CaseChapter | undefined;
-  /** A new district, or omit to leave it unchanged. */
-  readonly district?: string | undefined;
+  /**
+   * A new court and division, or omit both to leave them unchanged. THE PAIR
+   * TRAVELS TOGETHER: the server refuses one without the other, so this is
+   * one field rather than two that could be sent apart.
+   */
+  readonly court?: { readonly court: string; readonly division: string } | undefined;
   /** A new status, or omit to leave it unchanged. */
   readonly status?: CaseStatus | undefined;
   /**
@@ -699,11 +1548,34 @@ export interface UpdateCaseChanges {
    * state has opted out of the federal list.
    */
   readonly exemptionSet?: ExemptionSet | undefined;
+  /**
+   * The petition date (`filed_at` on the wire), or `null` to CLEAR it — the
+   * one place this request sends a null on purpose, because a date entered
+   * by mistake has to be removable and removing it takes the generated
+   * deadlines with it. Omit to leave it unchanged.
+   */
+  readonly filedAt?: string | null | undefined;
+  /** The first § 341 date (`meeting_341_at`), `null` to clear, omit to keep. */
+  readonly meeting341At?: string | null | undefined;
+  /**
+   * The post-filing docket facts (issue #355), each `null` to clear and
+   * omitted to keep. Reaching `filed` needs {@link filedAt} and
+   * {@link caseNumber}, in this request or already stored (400 keyed to the
+   * missing one); once filed, neither may be cleared.
+   */
+  readonly caseNumber?: string | null | undefined;
+  /** The judge's name (`judge`), `null` to clear, omit to keep. */
+  readonly judge?: string | null | undefined;
+  /** The trustee's name (`trustee`), `null` to clear, omit to keep. */
+  readonly trustee?: string | null | undefined;
+  /** The firm's file number (`office_file_number`), `null` to clear, omit to keep. */
+  readonly officeFileNumber?: string | null | undefined;
 }
 
 /**
  * The `PATCH /v1/cases/{caseId}` request body, with absent optional fields
- * omitted from the JSON entirely — never sent as `null`.
+ * omitted from the JSON entirely — never sent as `null`, except the two
+ * deadline anchors, where an explicit `null` means "clear".
  */
 export function updateCaseChangesToJson(changes: UpdateCaseChanges): Record<string, unknown> {
   const json: Record<string, unknown> = {};
@@ -713,8 +1585,9 @@ export function updateCaseChangesToJson(changes: UpdateCaseChanges): Record<stri
   if (changes.chapter !== undefined) {
     json.chapter = changes.chapter;
   }
-  if (changes.district !== undefined) {
-    json.district = changes.district;
+  if (changes.court !== undefined) {
+    json.court = changes.court.court;
+    json.division = changes.court.division;
   }
   if (changes.status !== undefined) {
     json.status = changes.status;
@@ -722,7 +1595,155 @@ export function updateCaseChangesToJson(changes: UpdateCaseChanges): Record<stri
   if (changes.exemptionSet !== undefined) {
     json.exemption_set = changes.exemptionSet;
   }
+  if (changes.filedAt !== undefined) {
+    json.filed_at = changes.filedAt;
+  }
+  if (changes.meeting341At !== undefined) {
+    json.meeting_341_at = changes.meeting341At;
+  }
+  if (changes.caseNumber !== undefined) {
+    json.case_number = changes.caseNumber;
+  }
+  if (changes.judge !== undefined) {
+    json.judge = changes.judge;
+  }
+  if (changes.trustee !== undefined) {
+    json.trustee = changes.trustee;
+  }
+  if (changes.officeFileNumber !== undefined) {
+    json.office_file_number = changes.officeFileNumber;
+  }
   return json;
+}
+
+/**
+ * One move in a case's lifecycle, from `GET /v1/cases/{caseId}/status-history`
+ * (issue #355): who moved it, when, from what to what.
+ */
+export interface CaseStatusChange {
+  readonly changedAt: string;
+  /**
+   * A firm user's subject — resolve it with `listFirmDirectory` — or
+   * {@link FILING_WORKER_ACTOR} when the filing worker filed the case
+   * (ADR 0024 PR 8).
+   */
+  readonly changedBy: string;
+  readonly fromStatus: CaseStatus;
+  readonly toStatus: CaseStatus;
+  /** The electronic filing that made this move; absent on a person's edit. */
+  readonly filingId?: string;
+}
+
+/** `changedBy` when the filing worker moved the case (services/api `cases.FILING_WORKER_ACTOR`). */
+export const FILING_WORKER_ACTOR = 'filing-worker';
+
+// ---------------------------------------------------------------------------
+// Events, the calendar and the feed — mirrors
+// services/api/src/insolvia_api/core/events.py (`event_json`),
+// api/routes/events.py and api/routes/calendar.py (issue 14.6 / #358).
+// SNAKE_CASE on the wire, like every case-domain body.
+// ---------------------------------------------------------------------------
+
+/**
+ * One calendar event — a case's (`case_id` present) or the firm's own.
+ *
+ * `all_day` decides how `start`/`end` read: form dates (`YYYY-MM-DD`, `end`
+ * INCLUSIVE) when true, RFC 3339 UTC instants (`...Z`) when false.
+ *
+ * `generated` events were written by the deadline engine from the case's
+ * filed and § 341 dates and name their rule (`rule_id`, `rule_citation`).
+ * They cannot be edited or deleted — only DISMISSED, which is what
+ * {@link InsolviaApiClient.dismissCaseEvent} does — and a dismissal survives
+ * regeneration.
+ */
+export interface CalendarEvent {
+  readonly id: string;
+  readonly case_id?: string | undefined;
+  readonly title: string;
+  readonly description?: string | undefined;
+  readonly start: string;
+  readonly end: string;
+  readonly all_day: boolean;
+  readonly location?: string | undefined;
+  /** Firm-user subjects — resolve them through the directory. */
+  readonly attendees: readonly string[];
+  readonly generated: boolean;
+  readonly rule_id?: string | undefined;
+  readonly rule_citation?: string | undefined;
+  readonly dismissed: boolean;
+  readonly created_by: string;
+  readonly created_at: string;
+  readonly updated_at: string;
+}
+
+/**
+ * The `POST`/`PUT` body for a hand-made event — a WHOLE record, never a
+ * partial PATCH, for the same reason {@link LibraryCreditorDraft} is one.
+ *
+ * `start` alone is enough: a bare date makes an all-day event ending the
+ * same day; an instant makes a timed one ending an hour later. `all_day`
+ * only needs stating when `start`'s shape would guess wrong.
+ */
+export interface CalendarEventDraft {
+  readonly title: string;
+  readonly start: string;
+  readonly end?: string | undefined;
+  readonly all_day?: boolean | undefined;
+  readonly description?: string | undefined;
+  readonly location?: string | undefined;
+  readonly attendees?: readonly string[] | undefined;
+}
+
+export function calendarEventDraftToJson(draft: CalendarEventDraft): Record<string, unknown> {
+  return assignDefined(
+    { title: draft.title, start: draft.start },
+    {
+      end: draft.end,
+      all_day: draft.all_day,
+      description: draft.description,
+      location: draft.location,
+      attendees: draft.attendees === undefined ? undefined : [...draft.attendees],
+    },
+  );
+}
+
+/** `GET /v1/calendar`'s query: a window, and two optional narrowings. */
+export interface CalendarWindowOptions {
+  /** Inclusive, `YYYY-MM-DD`. */
+  readonly from: string;
+  /** Inclusive, `YYYY-MM-DD`. At most 400 days after `from`. */
+  readonly to: string;
+  /** A firm-user subject, or `'me'` for the caller. */
+  readonly attendee?: string | undefined;
+  /** One case. A case the caller cannot see answers empty, not 404. */
+  readonly caseId?: string | undefined;
+}
+
+export function calendarWindowQuery(options: CalendarWindowOptions): URLSearchParams {
+  const params = new URLSearchParams();
+  params.set('from', options.from);
+  params.set('to', options.to);
+  if (options.attendee !== undefined) params.set('attendee', options.attendee);
+  if (options.caseId !== undefined) params.set('case_id', options.caseId);
+  return params;
+}
+
+/** The `GET /v1/calendar` 200 body: the window echoed, and its events in start order. */
+export interface CalendarWindow {
+  readonly from: string;
+  readonly to: string;
+  readonly events: readonly CalendarEvent[];
+}
+
+/**
+ * `POST /v1/me/calendar-token`'s 201 body: the feed token, returned ONCE —
+ * only its hash is stored — and the path a calendar application subscribes
+ * to. {@link InsolviaApiClient.mintCalendarToken} adds the absolute `feedUrl`.
+ */
+export interface CalendarFeedToken {
+  readonly token: string;
+  readonly feedPath: string;
+  readonly feedUrl: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -798,6 +1819,15 @@ export interface OutputOptions {
   readonly signElectronically: boolean;
   /** The short form keys rendered, when a subset was requested. */
   readonly forms?: readonly string[];
+  /**
+   * Renders an AMENDMENT (issue #370): only the schedules carrying at
+   * least one item flagged `amended` (see {@link CaseEntity}), each
+   * printing only its amended items with its own "amended filing" caption
+   * ticked, B106Sum/B106Dec re-rendered alongside them, and a generated
+   * amendment cover sheet — never an official court form. It is also the
+   * one option that lets a FILED case's packet assembly run at all.
+   */
+  readonly amendedOnly: boolean;
 }
 
 /**
@@ -813,6 +1843,8 @@ export interface OutputOptionsRequest {
   readonly signElectronically?: boolean;
   /** Packet assembly only — {@link InsolviaApiClient.getCaseFormPreview} already names one form. */
   readonly forms?: readonly string[];
+  /** See {@link OutputOptions.amendedOnly}. Refused server-side when combined with `forms`. */
+  readonly amendedOnly?: boolean;
 }
 
 /**
@@ -841,6 +1873,9 @@ export function outputOptionsRequestToJson(options: OutputOptionsRequest): Recor
   if (options.forms !== undefined) {
     body.forms = [...options.forms];
   }
+  if (options.amendedOnly !== undefined) {
+    body.amendedOnly = options.amendedOnly;
+  }
   return body;
 }
 
@@ -862,6 +1897,9 @@ export function formPreviewQuery(options: FormPreviewOptions): URLSearchParams {
   }
   if (options.signElectronically !== undefined) {
     params.set('signElectronically', String(options.signElectronically));
+  }
+  if (options.amendedOnly !== undefined) {
+    params.set('amendedOnly', String(options.amendedOnly));
   }
   return params;
 }
@@ -889,7 +1927,7 @@ export interface Packet {
   readonly caseId: string;
   /** The pipeline job whose run produced it. */
   readonly jobId: string;
-  /** The download name — always `chapter7-packet.zip`. */
+  /** The download name — the case's chapter: `chapter7-packet.zip` or `chapter13-packet.zip`. */
   readonly fileName: string;
   /** Always `application/zip`. */
   readonly contentType: string;
@@ -976,7 +2014,294 @@ export interface CaseForm {
   readonly metric?: FormMetric;
   /** Empty when this form has nothing blocking it. */
   readonly problems: readonly CaseProblem[];
+  /**
+   * Not-done tasks (issue #356 / 14.4) anchored to this form via
+   * {@link Task.formSeries} — always present, `0` included, unlike
+   * {@link metric} which some forms genuinely have none of.
+   */
+  readonly openTaskCount: number;
 }
+
+/** Which of the three file checks a {@link FilingSetCheck} is. */
+export type FilingSetCheckName = 'size' | 'text_layer' | 'page_size';
+
+/**
+ * A check's result. `unmeasured` means nobody has measured the file — no
+ * filing-set packet yet, a packet from before measurement, or a document
+ * prepared outside Insolvia — never "it passed".
+ */
+export type FilingSetCheckOutcome = 'pass' | 'fail' | 'warn' | 'unmeasured';
+
+export interface FilingSetCheck {
+  readonly check: FilingSetCheckName;
+  readonly outcome: FilingSetCheckOutcome;
+  readonly message: string;
+}
+
+/**
+ * How a document reaches the docket: uploaded as listed (`file`), as an
+ * event of its own, under the court's restricted SSN-statement event
+ * (B121), or not at all (B121 in a court that takes the number on its
+ * opening screen instead).
+ */
+export type FilingDocumentHandling = 'file' | 'own_event' | 'restricted' | 'not_filed';
+
+/** One document of the filing set, in the court's docket order. */
+export interface FilingDocument {
+  /** `form/<x>`, `creditor_matrix`, `signature_instrument` or `matrix_certification`. */
+  readonly key: string;
+  readonly title: string;
+  /** The name to upload it under — the packet zip's own unless the court prescribes one. */
+  readonly fileName: string;
+  /** `packet`: in Insolvia's packet zip. `outside`: prepared outside Insolvia. */
+  readonly source: 'packet' | 'outside';
+  readonly handling: FilingDocumentHandling;
+  readonly checks: readonly FilingSetCheck[];
+  /** Absent when there is nothing to add. */
+  readonly note?: string;
+}
+
+/**
+ * A checklist line's state. `action` is a step the attorney takes outside
+ * Insolvia; `confirm` is a court fact the registry has not verified.
+ */
+export type ChecklistItemStatus = 'ready' | 'missing' | 'action' | 'confirm';
+
+export interface FilingChecklistItem {
+  readonly id: string;
+  readonly status: ChecklistItemStatus;
+  readonly title: string;
+  readonly detail: string;
+  /**
+   * An app segment under `/cases/{caseId}/` (`''` is the case overview) —
+   * absent when the step happens outside Insolvia.
+   */
+  readonly link?: string;
+}
+
+/** Where a per-court figure came from: the court (verified or not), or the common default. */
+export type FilingSetBasis = 'court' | 'court_unverified' | 'default';
+
+/**
+ * `GET /v1/cases/{caseId}/filing-set` (ADR 0024 build PR 3) — the documents
+ * the attorney files, in the court's docket order and names, each checked
+ * against the court's file rules, and the hand-off checklist built from the
+ * case record. Files nothing; carries no tax identifier.
+ */
+export interface FilingSet {
+  /** Absent when the case names no court from the registry. */
+  readonly court?: {
+    readonly code: string;
+    readonly name: string;
+    readonly divisionName?: string;
+  };
+  readonly registryRelease: string;
+  /** Always `hand_off` until a court's filing driver is verified. */
+  readonly filingMethod: 'hand_off';
+  /** The filing-set packet the checks judged; absent when none is assembled. */
+  readonly packet?: { readonly id: string; readonly createdAt: string };
+  readonly orderBasis: FilingSetBasis;
+  readonly namesBasis: FilingSetBasis;
+  readonly maxBytes: number;
+  readonly maxBytesBasis: FilingSetBasis;
+  readonly documents: readonly FilingDocument[];
+  readonly checklist: readonly FilingChecklistItem[];
+}
+
+/**
+ * One packet file as the assembly worker measured it — what an approval
+ * binds each document to (ADR 0024 build PR 6).
+ */
+export interface FilingApprovalFile {
+  readonly byteSize: number;
+  /** Absent for the creditor matrix (a text file). */
+  readonly pageCount?: number;
+  /** SHA-256 of the file's bytes, lower-case hex; absent on a packet assembled before PR 6. */
+  readonly sha256?: string;
+}
+
+/** One document of what an approval would cover, in docket order. */
+export interface FilingApprovalDocument {
+  /** 1-based docket position. */
+  readonly position: number;
+  readonly key: string;
+  readonly title: string;
+  readonly fileName: string;
+  readonly source: 'packet' | 'outside';
+  readonly handling: FilingDocumentHandling;
+  /** Absent for a document prepared outside Insolvia. */
+  readonly file?: FilingApprovalFile;
+  readonly note?: string;
+}
+
+/**
+ * WHAT THE ATTORNEY IS SHOWN, and approves: the court, the documents in
+ * docket order with their sizes and digests, the checklist, the fee
+ * handling, and `digest` over all of it plus the case record behind it
+ * (`services/api core/filing_approval.py` defines it). Approve by posting
+ * back exactly this `digest` — the server refuses any other.
+ */
+export interface FilingApprovalBasis {
+  /** `insolvia-filing-approval/1` — what the digest covers, by name. */
+  readonly scheme: string;
+  readonly digest: string;
+  /** False while any `blockers` remain. */
+  readonly ready: boolean;
+  /** Checklist ids still `missing`, plus `filed` and `file_digests`. */
+  readonly blockers: readonly string[];
+  readonly court?: { readonly code: string; readonly name: string; readonly divisionName?: string };
+  readonly registryRelease: string;
+  readonly packet?: {
+    readonly id: string;
+    readonly createdAt: string;
+    readonly sha256: string;
+    readonly byteSize: number;
+  };
+  readonly documents: readonly FilingApprovalDocument[];
+  readonly checklist: readonly FilingChecklistItem[];
+  /** Today always the hand-back: Insolvia enters no card details. */
+  readonly fee: {
+    readonly handling: 'hand_back_at_payment';
+    readonly verified: boolean;
+    readonly detail: string;
+    readonly deadline?: string;
+  };
+  /** How recent the sign-in must be to approve (seconds). */
+  readonly signInMaxAgeSeconds: number;
+  /** How long an approval waits for the filing worker before expiring (seconds). */
+  readonly approvalTtlSeconds: number;
+}
+
+/**
+ * `pending` until the filing worker uses it (`consumed`, once), or it is
+ * `voided`, or it lapses (`expired`).
+ */
+export type FilingApprovalStatus = 'pending' | 'consumed' | 'voided' | 'expired';
+
+/** Why an approval was voided. `changed`: the filing set is not what was approved. */
+export type FilingApprovalVoidReason = 'changed' | 'superseded' | 'cancelled' | 'enqueue_failed';
+
+/** A case's current approval. */
+export interface FilingApproval {
+  readonly id: string;
+  readonly filingId: string;
+  readonly status: FilingApprovalStatus;
+  readonly digest: string;
+  /** The approving attorney's subject — always the login's owner. */
+  readonly approvedBy: string;
+  readonly approvedAt: string;
+  readonly expiresAt: string;
+  readonly credentialId: string;
+  readonly court: string;
+  readonly division: string;
+  readonly packetId: string;
+  readonly consumedAt?: string;
+  readonly voidedAt?: string;
+  readonly voidReason?: FilingApprovalVoidReason;
+}
+
+/**
+ * `GET`/`POST`/`DELETE /v1/cases/{caseId}/filing-approval` (ADR 0024,
+ * guardrail 1): what would be approved, and the case's current approval
+ * (absent when there has never been one).
+ */
+export interface FilingApprovalView {
+  readonly basis: FilingApprovalBasis;
+  readonly approval?: FilingApproval;
+  /** The approval's filing, once the filing worker has claimed it (ADR 0024 PR 8). */
+  readonly filing?: FilingRecord;
+}
+
+/**
+ * The filing worker's states (`insolvia_core.filings`). `handed_back`,
+ * `outcome_unknown` and `filed` are terminal; the first two are what the
+ * attorney resolves.
+ */
+export type FilingState =
+  | 'claimed'
+  | 'signed_in'
+  | 'uploading'
+  | 'at_final_submit'
+  | 'submitted'
+  | 'filed'
+  | 'handed_back'
+  | 'outcome_unknown';
+
+/** Why the worker stopped and what the attorney does next, in words. */
+export interface FilingHandBack {
+  readonly reason: string;
+  /** The state it stopped in. */
+  readonly stage: string;
+  readonly title: string;
+  readonly action: string;
+  /** The court's own message, when there was one. */
+  readonly courtSaid?: string;
+  readonly link: string;
+}
+
+/** What the court's confirmation screen said. */
+export interface FilingConfirmation {
+  readonly caseNumber: string;
+  /** The court's own timestamp, as printed. */
+  readonly filedAt: string;
+  readonly docketEntries: readonly string[];
+  readonly receiptNumber?: string;
+  readonly feeDue?: string;
+}
+
+/** `filed`: the court has it. `not_filed`: it does not — the case is free to approve again. */
+export type FilingResolutionOutcome = 'filed' | 'not_filed';
+
+/** The attorney's recorded answer to a hand-back. */
+export interface FilingResolution {
+  readonly outcome: FilingResolutionOutcome;
+  readonly resolvedBy: string;
+  readonly resolvedAt: string;
+  /** When they confirmed they checked the court's docket. */
+  readonly docketCheckedAt: string;
+  readonly caseNumber?: string;
+  /** The petition date, `YYYY-MM-DD`. */
+  readonly filedAt?: string;
+  readonly confirmationDocumentId?: string;
+}
+
+/** One filing record, as `GET .../filing-approval` serves it. */
+export interface FilingRecord {
+  readonly filingId: string;
+  readonly approvalId: string;
+  /** The attorney whose login it used — the only one who may resolve it. */
+  readonly attorneyId: string;
+  readonly state: FilingState;
+  readonly court: string;
+  readonly claimedAt: string;
+  readonly updatedAt: string;
+  readonly history: readonly { readonly state: FilingState; readonly at: string }[];
+  /** Whether the attorney may still resolve it. */
+  readonly resolvable: boolean;
+  readonly driver?: string;
+  readonly handBack?: FilingHandBack;
+  readonly unknownReason?: string;
+  readonly confirmation?: FilingConfirmation;
+  /** The stored court-filing receipt, a case document. */
+  readonly receiptDocumentId?: string;
+  readonly followUps?: readonly string[];
+  readonly resolution?: FilingResolution;
+}
+
+/**
+ * `POST /v1/cases/{caseId}/filings/{filingId}/resolution`'s body. The
+ * attorney must have checked the court's docket; `filed` needs the number
+ * and petition date the docket shows.
+ */
+export type FilingResolutionRequest =
+  | {
+      readonly outcome: 'filed';
+      readonly caseNumber: string;
+      /** `YYYY-MM-DD`. */
+      readonly filedAt: string;
+      readonly confirmationDocumentId?: string;
+    }
+  | { readonly outcome: 'not_filed' };
 
 /**
  * `GET /v1/cases/{caseId}/forms/{form}/preview` — the creditor-matrix
@@ -1049,7 +2374,8 @@ export type CandidateStatus = 'pending' | 'accepted' | 'corrected' | 'rejected' 
 
 /** Which surface wrote a candidate, and as whom — never client-claimed. */
 export interface CandidateOrigin {
-  readonly channel: 'extraction' | 'mcp';
+  /** `client` is a debtor answering through the client portal (ADR 0023). */
+  readonly channel: 'extraction' | 'mcp' | 'client';
   /** The model that extracted it, or the harness's OAuth client id. */
   readonly clientId: string;
   /** The subject it is attributed to — resolve through the firm directory. */
@@ -1083,6 +2409,23 @@ export interface ExtractionCandidate {
   readonly correctedPayload?: Readonly<Record<string, unknown>>;
   /** The case record acceptance created. */
   readonly resultingRecordId?: string;
+  /**
+   * For a client's portal answer (origin channel `client`): the question it
+   * answers, in the words the client read, and the debtor it is for.
+   */
+  readonly question?: CandidateQuestion;
+  /** For a client's portal answer: who the FIRM says gave it — the name
+   * on the invitation, never anything the client's token says. */
+  readonly client?: { readonly displayName: string };
+}
+
+/** The question a client-answered candidate answers. */
+export interface CandidateQuestion {
+  readonly id: string;
+  readonly sectionId: QuestionnaireSectionId;
+  readonly sectionTitle: string;
+  readonly text: string;
+  readonly filingRole: ClientRole;
 }
 
 /** What a reviewer may do with one pending candidate. */
@@ -1249,11 +2592,23 @@ export interface Document {
   readonly uploadedAt: string;
   /** Whether the bytes are known to be in the bucket. */
   readonly status: DocumentStatus;
+  /**
+   * Who uploaded it, as a class: a firm user, or the client through the
+   * portal (ADR 0023). A client's upload is never auto-extracted.
+   */
+  readonly channel: DocumentChannel;
+  /** The case's {@link DocumentRequest} this upload answers, or `null`. */
+  readonly requestId: string | null;
 }
+
+/** {@link Document.channel}'s two values — `documents.CHANNELS` server-side. */
+export const DOCUMENT_CHANNELS = ['staff', 'client'] as const;
+export type DocumentChannel = (typeof DOCUMENT_CHANNELS)[number];
 
 /**
  * The `POST /v1/cases/{caseId}/documents` request body: `{"kind", "fileName",
- * "contentType", "byteSize"}`, all four required.
+ * "contentType", "byteSize"}`, all four required, and `requestId` when the
+ * upload answers one of the case's document requests.
  *
  * `contentType` and `byteSize` are validated here and then **bound into the
  * presigned signature**, so they are not merely declarations: an upload whose
@@ -1273,9 +2628,14 @@ export interface CreateDocumentRequest {
   readonly contentType: DocumentContentType;
   /** The exact size of the bytes to be uploaded, 1..{@link MAX_DOCUMENT_BYTE_SIZE}. */
   readonly byteSize: number;
+  /**
+   * The case's document request this upload answers. Completing the upload
+   * marks it received. A waived request is refused (400 on `requestId`).
+   */
+  readonly requestId?: string;
 }
 
-/** The `POST /v1/cases/{caseId}/documents` request body, verbatim — no field is optional. */
+/** The `POST /v1/cases/{caseId}/documents` request body; `requestId` omitted when absent. */
 export function createDocumentRequestToJson(
   request: CreateDocumentRequest,
 ): Record<string, unknown> {
@@ -1284,6 +2644,7 @@ export function createDocumentRequestToJson(
     fileName: request.fileName,
     contentType: request.contentType,
     byteSize: request.byteSize,
+    ...(request.requestId === undefined ? {} : { requestId: request.requestId }),
   };
 }
 
@@ -1292,9 +2653,10 @@ export function createDocumentRequestToJson(
  * to one object, for a few minutes.
  *
  * **{@link headers} is passed through untouched and is not a fixed shape.**
- * The server chooses which headers it signs (today: `Content-Type`, the
- * server-side-encryption header, and the tag that makes an unconfirmed upload
- * reapable), and S3 checks every one. Modelling it as an interface with named
+ * The server chooses which headers it signs (today: `Content-Type` and the
+ * tag that makes an unconfirmed upload reapable — deliberately no encryption
+ * header, the bucket's default supplies that), and S3 checks every one.
+ * Modelling it as an interface with named
  * keys would mean a header added server-side was silently dropped by every
  * deployed client, turning every upload into a 403 that looks like a bug here.
  * Send this map verbatim, add nothing, and in particular never add an
@@ -1381,6 +2743,149 @@ export interface UploadDocumentOptions {
    * different file.
    */
   readonly contentType: DocumentContentType;
+  /** The case's document request this upload answers, if any. */
+  readonly requestId?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Document request checklists (ADR 0023 PR 5 / #364). The contract lives in
+// `packages/insolvia_core/src/insolvia_core/document_requests.py` (the
+// shapes), `services/api/.../routes/document_requests.py` (staff) and
+// `.../routes/portal_documents.py` (the client).
+// ---------------------------------------------------------------------------
+
+/** A request's three statuses. `received` is never set by hand. */
+export const DOCUMENT_REQUEST_STATUSES = ['requested', 'received', 'waived'] as const;
+export type DocumentRequestStatus = (typeof DOCUMENT_REQUEST_STATUSES)[number];
+
+/** One document a firm asks for — a checklist entry. */
+export interface ChecklistItem {
+  readonly title: string;
+  /** The kind an upload against it is filed under. */
+  readonly kind: string;
+  readonly description: string | null;
+}
+
+/**
+ * `GET`/`PUT`/`DELETE /v1/firm/document-checklist`. `isDefault` means the
+ * firm has stored nothing and the shipped default is in force;
+ * `defaultItems` is that default, always present, so a screen can offer it.
+ */
+export interface FirmDocumentChecklist {
+  readonly isDefault: boolean;
+  readonly updatedAt: string | null;
+  readonly updatedBy: string | null;
+  readonly items: readonly ChecklistItem[];
+  readonly defaultItems: readonly ChecklistItem[];
+}
+
+/** One entry of a checklist save, or one ad-hoc request. */
+export interface NewChecklistItem {
+  readonly title: string;
+  readonly kind: DocumentKind;
+  /** Omitted from the body when absent. */
+  readonly description?: string;
+}
+
+/** `PUT /v1/firm/document-checklist` — the WHOLE list (at most 40). */
+export interface SaveDocumentChecklistRequest {
+  readonly items: readonly NewChecklistItem[];
+}
+
+/** The wire shape of one checklist entry or ad-hoc request. */
+export function newChecklistItemToJson(item: NewChecklistItem): Record<string, unknown> {
+  return {
+    title: item.title,
+    kind: item.kind,
+    ...(item.description === undefined ? {} : { description: item.description }),
+  };
+}
+
+/** One document asked of a case's client — the staff view. */
+export interface DocumentRequest {
+  readonly id: string;
+  readonly caseId: string;
+  readonly title: string;
+  readonly kind: string;
+  readonly description: string | null;
+  readonly status: DocumentRequestStatus;
+  /** The completed uploads against it, in the order they completed. */
+  readonly documentIds: readonly string[];
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  /** When the first upload against it completed; kept if it is reopened. */
+  readonly receivedAt: string | null;
+}
+
+/** Arrived against outstanding. `total` excludes waived requests. */
+export interface DocumentRequestProgress {
+  readonly total: number;
+  readonly received: number;
+  readonly outstanding: number;
+  readonly waived: number;
+}
+
+/** `GET /v1/cases/{caseId}/document-requests`. */
+export interface CaseDocumentRequests {
+  readonly requests: readonly DocumentRequest[];
+  readonly progress: DocumentRequestProgress;
+}
+
+/** `POST .../document-requests/from-checklist` — the list after, and how many it added. */
+export interface ApplyChecklistResult extends CaseDocumentRequests {
+  readonly added: number;
+}
+
+/** A CLIENT's own upload, as the portal shows it — no case id. */
+export interface PortalUpload {
+  readonly id: string;
+  readonly requestId: string | null;
+  readonly fileName: string;
+  readonly contentType: string;
+  readonly byteSize: number;
+  readonly uploadedAt: string;
+  readonly status: DocumentStatus;
+}
+
+/** One request as the CLIENT reads it, with their own uploads against it. */
+export interface PortalDocumentRequest {
+  readonly id: string;
+  readonly title: string;
+  readonly kind: string;
+  readonly description: string | null;
+  readonly status: DocumentRequestStatus;
+  readonly uploads: readonly PortalUpload[];
+}
+
+/** `GET /v1/portal/document-requests`. */
+export interface PortalDocumentRequests {
+  readonly requests: readonly PortalDocumentRequest[];
+  readonly progress: DocumentRequestProgress;
+}
+
+/**
+ * `POST /v1/portal/documents` — no `kind`: the server files the upload
+ * under its request's kind.
+ */
+export interface CreatePortalDocumentRequest {
+  readonly requestId: string;
+  readonly fileName: string;
+  readonly contentType: DocumentContentType;
+  readonly byteSize: number;
+}
+
+/** The `POST /v1/portal/documents` 201 response. */
+export interface CreatePortalDocumentResult {
+  readonly document: PortalUpload;
+  readonly upload: DocumentUpload;
+}
+
+/** Everything {@link InsolviaApiClient.uploadPortalDocument} needs. */
+export interface UploadPortalDocumentOptions {
+  readonly requestId: string;
+  readonly file: Blob;
+  readonly fileName: string;
+  readonly contentType: DocumentContentType;
 }
 
 // ---------------------------------------------------------------------------
@@ -1455,6 +2960,53 @@ export const COUNSELING_EXEMPTIONS = ['incapacity', 'disability', 'active_duty']
 export type CounselingExemption = (typeof COUNSELING_EXEMPTIONS)[number];
 
 /**
+ * The two kinds of tax identifier a debtor may have (issue 13.12 / #382),
+ * mirroring `insolvia_core.tax_ids.TAX_ID_KINDS`. The API decides which one a
+ * number can be by its shape — an ITIN begins with 9 and an SSN never does —
+ * and refuses a value that claims the wrong kind, so the picker here is the
+ * person's statement, not a hint.
+ */
+export const TAX_ID_KINDS = ['ssn', 'itin'] as const;
+
+/** Social Security number or ITIN. See {@link TAX_ID_KINDS}. */
+export type TaxIdKind = (typeof TAX_ID_KINDS)[number];
+
+/**
+ * The tax identifier as EVERY read returns it: the kind and the last four
+ * digits, nothing more. The full number is stored encrypted and has no wire
+ * shape at all — no endpoint returns it, and the MCP tools cannot either
+ * (docs/reference/mcp-surface.md). The one form that prints it, B121, reads
+ * it server-side through an audited read.
+ */
+export interface TaxIdView {
+  readonly kind: TaxIdKind;
+  /** Exactly four digits. */
+  readonly last_four: string;
+}
+
+/**
+ * The tax identifier as a write carries it — ONE of two shapes:
+ *
+ * - `{ kind, value }`: a number being entered, nine digits with or without
+ *   dashes. The API validates the shape (SSN vs ITIN rules) and seals it.
+ * - `{ kind, last_four }`: the {@link TaxIdView} a read returned, echoed
+ *   back to mean "keep what is stored". A PUT replaces the whole record
+ *   ({@link PutDebtorRequest}) and a client only ever holds the last four,
+ *   so this is how a save that did not touch the number carries it across.
+ *   The API refuses an echo that does not match what it holds.
+ *
+ * Both members present is refused; neither present is refused. Leaving
+ * `tax_id` off the request altogether clears the stored number. A client
+ * that holds both — a number on file and one being typed — sends the
+ * typed one; {@link putDebtorRequestToJson} applies that rule.
+ */
+export interface TaxIdEntry {
+  readonly kind: TaxIdKind;
+  readonly value?: string | undefined;
+  readonly last_four?: string | undefined;
+}
+
+/**
  * Who supplied a value.
  *
  * `imported` sits with `ai_extracted` rather than with `staff_typed`: machine-
@@ -1465,8 +3017,28 @@ export type CounselingExemption = (typeof COUNSELING_EXEMPTIONS)[number];
  * creditor library onto a case record — a human chose the entry, so it needs
  * no confirmation, the same as `staff_typed`. See {@link libraryProvenance}
  * and {@link ProvenanceEntry.library_creditor_id}.
+ *
+ * `client` (ADR 0022) is a debtor's identity COPIED from the firm's client
+ * directory when the case was opened for that client, or when the client was
+ * linked to the role — a human's choice, like `library`, so no confirmation.
+ * See {@link ProvenanceEntry.client_id}.
+ *
+ * `client_answered` (ADR 0023 PR 4) is a value the DEBTOR gave through the
+ * client portal, which a person at the firm accepted through the review
+ * queue — confirmed, like `ai_extracted`, and named apart from `client`
+ * because "the firm copied this" and "the debtor told us" are different
+ * facts on a petition. Only the review queue mints it; a save may echo it
+ * back on an untouched value ({@link revisedProvenance} does) and never
+ * claim it.
  */
-export const PROVENANCE_SOURCES = ['staff_typed', 'ai_extracted', 'imported', 'library'] as const;
+export const PROVENANCE_SOURCES = [
+  'staff_typed',
+  'ai_extracted',
+  'imported',
+  'library',
+  'client',
+  'client_answered',
+] as const;
 
 /** Who supplied a value. See {@link PROVENANCE_SOURCES}. */
 export type ProvenanceSource = (typeof PROVENANCE_SOURCES)[number];
@@ -1511,6 +3083,21 @@ export interface ProvenanceEntry {
    * readable rather than the case record unwritable.
    */
   readonly library_creditor_id?: string | undefined;
+  /**
+   * The {@link FirmClient.id} this value was copied from. Present only when
+   * {@link source} is `'client'`. Not validated against the directory — an
+   * archived or merged client leaves the provenance readable.
+   */
+  readonly client_id?: string | undefined;
+  /**
+   * The case this value was COPIED from (`POST /v1/cases/{id}/copy`, issue
+   * #355) — alongside, not instead of, the value's own {@link source}: a
+   * confirmed extraction copied forward is still that, and `document_id`
+   * still names the source case's document. A client must echo it back
+   * unchanged on a save that did not touch the value, which
+   * {@link provenanceToJson} does.
+   */
+  readonly copied_from_case_id?: string | undefined;
 }
 
 /**
@@ -1626,6 +3213,14 @@ export interface DebtorBody {
    * `@insolvia-ai/design-system` emits exactly this.
    */
   readonly signed_at?: string | undefined;
+  /**
+   * The SSN or ITIN (issue 13.12 / #382): a {@link TaxIdEntry} on the way
+   * in, a {@link TaxIdView} on the way out ({@link Debtor} narrows it). Its
+   * provenance is ONE entry at the path `tax_id` — the kind and the digits
+   * are one identifier entered in one act — which {@link staffTypedProvenance}
+   * handles as the one exception to its walk.
+   */
+  readonly tax_id?: TaxIdEntry | undefined;
 }
 
 /**
@@ -1640,11 +3235,11 @@ export interface DebtorBody {
  * afterwards. The questionnaire holds the whole record client-side anyway, so
  * autosave sends it.
  *
- * **There is no `tax_id`.** The API rejects one explicitly with a 400 rather
- * than ignoring it: the SSN/ITIN has to be stored encrypted with only the last
- * four ever served, and that encryption is not built. Refusing it is the
- * honest failure — silently dropping it would leave the client believing a tax
- * id had been stored.
+ * **`tax_id` follows the same rule with one wrinkle.** The record is whole,
+ * but the client never holds the whole number after a save — only its last
+ * four — so a save that did not touch it echoes the {@link TaxIdView} it was
+ * given and the API keeps the stored number ({@link TaxIdEntry}). Leaving it
+ * out clears it, exactly as for any other field.
  */
 export interface PutDebtorRequest extends DebtorBody {
   /**
@@ -1668,6 +3263,8 @@ export interface PutDebtorRequest extends DebtorBody {
 export interface Debtor extends DebtorBody {
   /** The server-generated debtor id, stable across saves. */
   readonly id: string;
+  /** The last-four view — never the number. See {@link TaxIdView}. */
+  readonly tax_id?: TaxIdView | undefined;
   /** The case this debtor belongs to. */
   readonly case_id: string;
   /** Which debtor of the case this is. */
@@ -1676,6 +3273,22 @@ export interface Debtor extends DebtorBody {
   readonly created_at: string;
   /** The server's UTC last-update timestamp, kept verbatim as the wire string. */
   readonly updated_at: string;
+  /**
+   * The {@link FirmClient} this debtor is (ADR 0022) — present on every
+   * Debtor 1 and Debtor 2 opened since cases are opened for clients, and on a
+   * non-filing spouse who is a client. **Server-owned**: {@link putDebtor}
+   * never sends it and the server keeps it; re-linking is
+   * `linkDebtorClient`.
+   */
+  readonly client_id?: string | undefined;
+  /**
+   * The copied field paths where this case's debtor and the linked client
+   * record now disagree (`name.given`, `residence_address.county`, …) —
+   * computed on read, never stored. `[]` means identical. Absent when the
+   * debtor names no client, or when the caller cannot see the firm's client
+   * directory.
+   */
+  readonly differs_from_client?: readonly string[] | undefined;
   /**
    * Where each populated field came from. **Always present**, unlike every
    * other optional member here — the API emits it unconditionally, as `{}` on
@@ -1707,17 +3320,42 @@ export function putDebtorRequestToJson(request: PutDebtorRequest): Record<string
       name: personNameToJson(request.name),
       other_names_used: otherNamesToJson(request.other_names_used),
       employer_ids: stringListToJson(request.employer_ids),
-      residence_address: addressToJson(request.residence_address),
-      mailing_address: addressToJson(request.mailing_address),
+      // WITH county: a debtor copied from a client carries B101 line 5's
+      // County box, and a save that dropped it would erase it on every
+      // autosave — and then report it as differing from the client.
+      residence_address: clientAddressToJson(request.residence_address),
+      mailing_address: clientAddressToJson(request.mailing_address),
       phone: request.phone,
       mobile: request.mobile,
       email: request.email,
       venue: venueToJson(request.venue),
       credit_counseling: creditCounselingToJson(request.credit_counseling),
       signed_at: request.signed_at,
+      tax_id: taxIdToJson(request.tax_id),
       provenance: provenanceToJson(request.provenance),
     },
   );
+}
+
+/**
+ * {@link TaxIdEntry} on the wire: the typed number wins over the on-file
+ * echo when a caller holds both (a questionnaire that loaded `last_four` and
+ * then had a new number typed into it), and an entry with neither — a kind
+ * chosen and nothing typed — is omitted rather than sent for the API to
+ * refuse. Exported for {@link staffTypedProvenance}'s one exception, which
+ * has to agree with this about when a tax id counts as populated.
+ */
+export function taxIdToJson(taxId: TaxIdEntry | undefined): Record<string, unknown> | undefined {
+  if (taxId === undefined) {
+    return undefined;
+  }
+  if (taxId.value !== undefined && taxId.value !== '') {
+    return { kind: taxId.kind, value: taxId.value };
+  }
+  if (taxId.last_four !== undefined && taxId.last_four !== '') {
+    return { kind: taxId.kind, last_four: taxId.last_four };
+  }
+  return undefined;
 }
 
 /**
@@ -1851,6 +3489,8 @@ function provenanceToJson(
         extraction_id: entry.extraction_id,
         confidence: entry.confidence,
         library_creditor_id: entry.library_creditor_id,
+        client_id: entry.client_id,
+        copied_from_case_id: entry.copied_from_case_id,
       },
     );
   }
@@ -1941,6 +3581,81 @@ export function libraryProvenance(
   return entries;
 }
 
+/**
+ * The `provenance` map for a whole-record save of `body` that EDITS a record
+ * the caller loaded as `previous`: every populated field whose value is still
+ * the one `previous` held keeps the entry `previous` carried for it; every
+ * field the person changed or added becomes `staff_typed`.
+ *
+ * {@link staffTypedProvenance} is right for a record a person typed from
+ * scratch, and wrong for one that arrived with provenance of its own — a
+ * debtor copied from the firm's client (ADR 0022) says `client` on every
+ * copied field, and re-stamping the whole record `staff_typed` on the first
+ * autosave would erase that for fields nobody touched. The data model's rule
+ * is that a field keeps its provenance until a human changes THAT field; this
+ * is the rule, per path. The API enforces the `client` half of it — a
+ * `client` entry on a changed value is refused — so a caller that sends
+ * {@link staffTypedProvenance}'s map loses the copy's attribution, and one
+ * that echoes `previous.provenance` whole is refused.
+ *
+ * "Still the value" compares the field's value at its path — list elements
+ * by their `id`, as the paths address them. The tax ID compares as its kind
+ * and last four; a number typed into it is always a change.
+ *
+ * ```ts
+ * await client.putDebtor(caseId, role, { ...body, provenance: revisedProvenance(body, loaded) });
+ * ```
+ */
+export function revisedProvenance(
+  body: DebtorBodyLike,
+  previous: DebtorBodyLike | undefined,
+): Record<string, ProvenanceEntry> {
+  const kept: Readonly<Record<string, unknown>> =
+    isPlainObject(previous) && isPlainObject(previous.provenance) ? previous.provenance : {};
+  const before = previous === undefined ? undefined : caseDataOf(previous, taxIdIdentity);
+  const after = caseDataOf(body, taxIdIdentity);
+  const entries: Record<string, ProvenanceEntry> = {};
+  for (const path of populatedPaths(after)) {
+    const entry = kept[path];
+    const unchanged =
+      before !== undefined &&
+      isPlainObject(entry) &&
+      JSON.stringify(valueAt(before, path)) === JSON.stringify(valueAt(after, path));
+    entries[path] = unchanged ? (entry as unknown as ProvenanceEntry) : { source: 'staff_typed' };
+  }
+  return entries;
+}
+
+/** The tax ID as {@link revisedProvenance} compares it: kind and last four,
+ * or — when digits are being sent — the digits, which no loaded record holds. */
+function taxIdIdentity(sent: Record<string, unknown>): string {
+  return typeof sent.value === 'string'
+    ? `typed:${sent.value}`
+    : `${String(sent.kind)}:${String(sent.last_four)}`;
+}
+
+const PATH_SEGMENT_RE = /^([a-z][a-z0-9_]*)(?:\[([A-Za-z0-9_-]+)\])?$/;
+
+/** The value a provenance path addresses in `record` — `value_at` in
+ * `core/provenance.py`, and the inverse of {@link populatedPaths}. */
+function valueAt(record: unknown, path: string): unknown {
+  let current: unknown = record;
+  for (const segment of path.split('.')) {
+    const match = PATH_SEGMENT_RE.exec(segment);
+    if (match === null || !isPlainObject(current)) {
+      return undefined;
+    }
+    current = current[match[1] as string];
+    const id = match[2];
+    if (id !== undefined) {
+      current = Array.isArray(current)
+        ? current.find((element) => isPlainObject(element) && element.id === id)
+        : undefined;
+    }
+  }
+  return current;
+}
+
 // Stamped by the server or already the record's address, so there is nothing
 // to record the origin of. The same six keys `debtor_body()` drops.
 const NOT_CASE_DATA: readonly string[] = [
@@ -1952,11 +3667,35 @@ const NOT_CASE_DATA: readonly string[] = [
   'provenance',
 ];
 
-function caseDataOf(body: DebtorBodyLike): unknown {
+function caseDataOf(
+  body: DebtorBodyLike,
+  taxIdAs: (sent: Record<string, unknown>) => unknown = () => 'present',
+): unknown {
   if (!isPlainObject(body)) {
     return body;
   }
-  return Object.fromEntries(Object.entries(body).filter(([key]) => !NOT_CASE_DATA.includes(key)));
+  const caseData = Object.fromEntries(
+    Object.entries(body).filter(([key]) => !NOT_CASE_DATA.includes(key)),
+  );
+  // THE ONE EXCEPTION TO THE WALK, mirrored from `parse_debtor` server-side:
+  // the tax id is ONE field for provenance — the path `tax_id`, never
+  // `tax_id.kind` and `tax_id.value` — because the kind and the digits are
+  // one identifier entered in one act, and the last-four echo a client sends
+  // to keep a stored number is not a fact of its own. Walking the object
+  // would mint two paths the API then refuses as unattributed. It counts as
+  // populated exactly when `taxIdToJson` would send it, so the map and the
+  // body cannot disagree.
+  if ('tax_id' in caseData) {
+    const sent = isPlainObject(caseData.tax_id)
+      ? taxIdToJson(caseData.tax_id as unknown as TaxIdEntry)
+      : undefined;
+    if (sent === undefined) {
+      delete caseData.tax_id;
+    } else {
+      caseData.tax_id = taxIdAs(sent);
+    }
+  }
+  return caseData;
 }
 
 /** A field path segment. Note the lower-case start: `SSN` and `legalName` are not names. */
@@ -2507,8 +4246,19 @@ export interface OtherIncomeRecordBody {
   readonly description?: string | undefined;
 }
 
-/** One B122A-2 line-3 row; `id` is client-chosen and required (provenance). */
+/** One B122A-2 line-3 (B122C-1 line-13) row; `id` is client-chosen and required (provenance). */
 export interface MaritalAdjustmentItem {
+  readonly id: string;
+  readonly description?: string | undefined;
+  readonly amount?: Money | undefined;
+}
+
+/**
+ * One B122C-2 line-43 row (issue #365): a special circumstance that justifies
+ * an additional expense (§ 707(b)(2)(B)), which on the Chapter 13 form is a
+ * deduction in the arithmetic. `id` is client-chosen and required.
+ */
+export interface SpecialCircumstanceItem {
   readonly id: string;
   readonly description?: string | undefined;
   readonly amount?: Money | undefined;
@@ -2603,6 +4353,12 @@ export interface IncomeLineOverride {
  * three household sizes (each absent = `people_under_65 +
  * people_65_or_older`), the three Form 122A-1Supp exemptions (any one
  * short-circuits the test), and the per-line income overrides.
+ *
+ * Issue #365 added the four answers the Chapter 13 forms ask on their own,
+ * on the SAME record: the contention that the marital adjustment also
+ * shortens the commitment period (B122C-1 line 19a), support income for
+ * dependent children (B122C-2 line 40), qualified retirement deductions
+ * (line 41) and the special-circumstance rows (line 43).
  */
 export interface MeansTestInputBody {
   readonly people_under_65?: number | undefined;
@@ -2644,6 +4400,105 @@ export interface MeansTestInputBody {
   readonly priority_cure_total?: Money | undefined;
   readonly ch13_eligible?: boolean | undefined;
   readonly ch13_projected_plan_payment?: Money | undefined;
+  readonly commitment_period_marital_adjustment?: boolean | undefined;
+  readonly child_support_for_dependents?: Money | undefined;
+  readonly qualified_retirement_deductions?: Money | undefined;
+  readonly special_circumstances?: readonly SpecialCircumstanceItem[] | undefined;
+}
+
+/**
+ * A rate or a share in percent, carried as a string (`"8.5"` is eight and a
+ * half per cent) for money's reason — `insolvia_core.fields.percentage`.
+ * At most three places; the server stores it canonically (`"8.50"`).
+ */
+export type Percentage = string;
+
+/**
+ * Where a Chapter 13 plan's base payment comes from (issue #366): a typed
+ * amount, Schedule J line 23c's net income, or the means test's B122C-2
+ * line 45 disposable income. Mirrors `insolvia_core.plans.PAYMENT_SOURCES`.
+ */
+export const PLAN_PAYMENT_SOURCES = ['fixed', 'schedule_j_excess', 'disposable_income'] as const;
+export type PlanPaymentSource = (typeof PLAN_PAYMENT_SOURCES)[number];
+
+/**
+ * A secured claim's treatment under the plan: cure the arrears and maintain
+ * the contract (§ 1322(b)(5)), cram down to the collateral's value at a rate
+ * (§ 1325(a)(5)(B)), or surrender (§ 1325(a)(5)(C)). Mirrors
+ * `insolvia_core.plans.SECURED_TREATMENTS`.
+ */
+export const SECURED_TREATMENTS = ['cure_and_maintain', 'cramdown', 'surrender'] as const;
+export type SecuredTreatmentKind = (typeof SECURED_TREATMENTS)[number];
+
+/**
+ * What general unsecured creditors receive: whatever is left (`pot`), a
+ * promised percentage, or a promised amount. Mirrors
+ * `insolvia_core.plans.UNSECURED_TREATMENTS`.
+ */
+export const UNSECURED_TREATMENTS = ['pot', 'percentage', 'amount'] as const;
+export type UnsecuredTreatment = (typeof UNSECURED_TREATMENTS)[number];
+
+/** From `start_month` on (1-based), the monthly payment is `monthly_payment`. */
+export interface PlanStepPayment {
+  readonly id: string;
+  readonly start_month?: number | undefined;
+  readonly monthly_payment?: Money | undefined;
+}
+
+/** A one-time payment into the plan in `month`. */
+export interface PlanLumpSum {
+  readonly id: string;
+  readonly month?: number | undefined;
+  readonly amount?: Money | undefined;
+  readonly description?: string | undefined;
+}
+
+/**
+ * How the plan treats one secured claim. `arrearage`,
+ * `arrearage_interest_rate` and `maintenance_payment` (a conduit payment,
+ * absent = paid directly) belong to a cure; `cramdown_value` (absent = the
+ * derived secured portion) and `interest_rate` to a cramdown;
+ * `monthly_payment` fixes the equal monthly payment for either (absent =
+ * amortised over the term). `id` is client-chosen and required.
+ */
+export interface PlanSecuredTreatment {
+  readonly id: string;
+  readonly claim_id?: string | undefined;
+  readonly treatment?: SecuredTreatmentKind | undefined;
+  readonly arrearage?: Money | undefined;
+  readonly arrearage_interest_rate?: Percentage | undefined;
+  readonly maintenance_payment?: Money | undefined;
+  readonly cramdown_value?: Money | undefined;
+  readonly interest_rate?: Percentage | undefined;
+  readonly monthly_payment?: Money | undefined;
+}
+
+/**
+ * The Chapter 13 plan's proposal (issue 16.2 / #366), one record per case —
+ * the preparer's confirmed choices only. Every figure the plan produces is
+ * {@link PlanCalculation}, computed by the API and never stored.
+ * `term_months` absent means the means test's commitment period; the
+ * trustee's percentage is at most 10 (28 U.S.C. § 586(e)).
+ */
+export interface PlanBody {
+  readonly term_months?: number | undefined;
+  readonly payment_source?: PlanPaymentSource | undefined;
+  readonly monthly_payment?: Money | undefined;
+  readonly step_payments?: readonly PlanStepPayment[] | undefined;
+  readonly lump_sums?: readonly PlanLumpSum[] | undefined;
+  readonly trustee_percentage?: Percentage | undefined;
+  readonly attorney_fees?: Money | undefined;
+  readonly attorney_fee_monthly?: Money | undefined;
+  readonly secured_treatments?: readonly PlanSecuredTreatment[] | undefined;
+  readonly priority_percentage?: Percentage | undefined;
+  readonly priority_interest_rate?: Percentage | undefined;
+  readonly unsecured_treatment?: UnsecuredTreatment | undefined;
+  readonly unsecured_percentage?: Percentage | undefined;
+  readonly unsecured_amount?: Money | undefined;
+  readonly unsecured_interest_rate?: Percentage | undefined;
+  readonly chapter_7_other_costs?: Money | undefined;
+  readonly chapter_7_other_costs_description?: string | undefined;
+  readonly present_value_rate?: Percentage | undefined;
 }
 
 /** 106J Part 1's frame: which schedule, and the change narrative. */
@@ -2935,6 +4790,7 @@ export interface CaseCollections {
   readonly community_household_members: CommunityHouseholdMemberBody;
   readonly other_income_records: OtherIncomeRecordBody;
   readonly means_test_inputs: MeansTestInputBody;
+  readonly plans: PlanBody;
 }
 
 /** A collection's URL segment: `creditors`, `claims`, … */
@@ -2963,6 +4819,7 @@ export const CASE_COLLECTIONS = [
   'community_household_members',
   'other_income_records',
   'means_test_inputs',
+  'plans',
 ] as const satisfies readonly CaseCollection[];
 
 /**
@@ -2970,9 +4827,16 @@ export const CASE_COLLECTIONS = [
  * plus its {@link ProvenanceMap}. Whole, not partial — the endpoints replace
  * the record, for the same invariant-1 reason {@link PutDebtorRequest}
  * states. Build the ordinary provenance with {@link staffTypedProvenance}.
+ *
+ * `amended` (issue #370) is a GENERIC entity attribute, not part of any one
+ * collection's own body — `core/case_entities.py`'s module explains why.
+ * Optional here and omitted when absent, per this package's own rule; the
+ * server refuses `true` with a 409 unless the case is `filed`, and a PUT
+ * that omits it keeps the stored flag rather than clearing it.
  */
 export type CaseEntityRequest<C extends CaseCollection> = CaseCollections[C] & {
   readonly provenance?: ProvenanceMap | undefined;
+  readonly amended?: boolean | undefined;
 };
 
 /**
@@ -2989,6 +4853,12 @@ export type CaseEntity<C extends CaseCollection> = CaseCollections[C] & {
   readonly updated_at: string;
   /** Always present — `{}` on a record with nothing in it. */
   readonly provenance: ProvenanceMap;
+  /**
+   * Whether this item has been amended since the case was filed (issue
+   * #370) — always present, like `provenance`, and `false` for every item
+   * on a case that has never been filed.
+   */
+  readonly amended: boolean;
 };
 
 /**
@@ -3017,6 +4887,74 @@ export function caseEntityRequestToJson(
     json.provenance = provenance;
   }
   return json;
+}
+
+// ---------------------------------------------------------------------------
+// Notes (issue 14.5 / #357) — free-text notes on a case, or anchored to one
+// of its forms. Not a {@link CaseCollection}: `debtors` and `documents`
+// aren't either, for the same kind of reason — `core/notes.py` (the server)
+// says a note needs its own endpoints because the author is server-stamped
+// (never sent by the client, so it is not on {@link NoteRequest}) and a note
+// is editable only by its author or a firm admin, neither of which the
+// generic collection routes can express.
+//
+// SNAKE_CASE, like {@link Debtor} and unlike everything else in this file —
+// see that section's comment for why: the wire is mirrored, not smoothed.
+// `note_json` (`insolvia_core.notes`) emits `case_id`, `created_at`,
+// `author_subject` — and, unlike every {@link CaseEntity}, no `provenance`
+// key at all: a note is not case data printed on a form, so it carries none.
+// ---------------------------------------------------------------------------
+
+/** The client-supplied half of a note: everything but its server identity
+ * and its server-stamped author. Used for both create and edit — there is no
+ * partial update, the same PUT-replaces-whole rule {@link PutDebtorRequest}
+ * follows. */
+export interface NoteRequest {
+  readonly text?: string | undefined;
+  /**
+   * A form series id, exactly as {@link CaseForm.series} names it (e.g.
+   * `"form/b106g"`) — the form this note is anchored to, or absent for a
+   * case-level note.
+   */
+  readonly form_series?: string | undefined;
+}
+
+/**
+ * A note as every note endpoint returns it: server identity, the author
+ * snapshot captured at write, and whatever of {@link NoteRequest} is
+ * populated. Absent members are absent, never null — the same rule
+ * {@link Debtor} follows.
+ */
+export interface Note extends NoteRequest {
+  /** The server-generated note id, stable across edits. */
+  readonly id: string;
+  readonly case_id: string;
+  readonly created_at: string;
+  readonly updated_at: string;
+  /**
+   * The Cognito subject of whoever wrote this note, captured when it was
+   * created and unaffected by later edits — including an admin's, per
+   * {@link putNote}. Never the editor's.
+   */
+  readonly author_subject: string;
+  /** The author's display name, captured at the same moment as `author_subject`. */
+  readonly author_name: string;
+}
+
+/**
+ * The request body for `POST`/`PUT .../notes[...]`, with absent members
+ * omitted from the JSON entirely — the note counterpart of
+ * {@link putDebtorRequestToJson}. There is no `provenance` member to prune
+ * separately: a note carries none.
+ */
+export function noteRequestToJson(request: NoteRequest): Record<string, unknown> {
+  return assignDefined(
+    {},
+    {
+      text: request.text,
+      form_series: request.form_series,
+    },
+  );
 }
 
 /**
@@ -3438,16 +5376,45 @@ export interface MedianComparison {
   readonly source: string;
 }
 
+/** The forms a trace line can print on. */
+export const MEANS_TEST_FORMS = ['122A-2', '122C-1', '122C-2'] as const;
+export type MeansTestForm = (typeof MEANS_TEST_FORMS)[number];
+
 /**
- * One line of the B122A-2 trace: the printed line number, its subject, the
- * computed amount, and where it came from — a dataset release, an entered
- * field, a derived input, or line arithmetic.
+ * One line of the calculation trace: the form it prints on (B122C-1's
+ * Part 2-3 lines and B122C-2's lines share numbers, issue #365), the
+ * printed line number, its subject, the computed amount, and where it came
+ * from — a dataset release, an entered field, a derived input, or line
+ * arithmetic.
  */
 export interface MeansTestLine {
+  readonly form: MeansTestForm;
   readonly line: string;
   readonly label: string;
   readonly amount: Money;
   readonly source: string;
+}
+
+/**
+ * The Chapter 13 verdict (issue #365): B122C-1's applicable commitment
+ * period under § 1325(b)(4) with the comparison that set it, whether
+ * § 1325(b)(3) requires Form 122C-2 (line 17b), and — when it does —
+ * B122C-2 line 45, the monthly disposable income the plan must commit.
+ * `null` on a Chapter 7 trace and while the engine has not run.
+ */
+export interface MeansTestChapter13 {
+  readonly commitmentPeriodMonths: number;
+  readonly commitmentSource: string;
+  /** B122C-1 line 19a — the adjustment deducted for the commitment period. */
+  readonly commitmentMaritalAdjustment: Money;
+  /** Line 19b. */
+  readonly commitmentMonthlyIncome: Money;
+  /** Line 20b. */
+  readonly commitmentAnnualizedIncome: Money;
+  /** Line 20c. */
+  readonly commitmentAnnualMedian: Money;
+  readonly disposableIncomeRequired: boolean;
+  readonly monthlyDisposableIncome: Money | null;
 }
 
 /** A household size the engine read, and where it came from — both `null`
@@ -3490,10 +5457,14 @@ export interface MeansTestExemptions {
 /**
  * How the test ended. `undetermined` means the engine refused and
  * {@link CaseMeansTest.problems} says why; `exempt` means a Form 122A-1Supp
- * exemption ended it before the median.
+ * exemption ended it before the median. On a Chapter 13 case the outcomes
+ * are `below_median` (line 17a: no Form 122C-2) and `above_median` (line
+ * 17b: disposable income is determined under § 1325(b)(3)) — there is no
+ * presumption of abuse to find.
  */
 export const MEANS_TEST_OUTCOMES = [
   'below_median',
+  'above_median',
   'no_presumption',
   'presumption_of_abuse',
   'exempt',
@@ -3511,13 +5482,18 @@ export type MeansTestOutcome = (typeof MEANS_TEST_OUTCOMES)[number];
  * while the case is too early to answer (no household entered yet, a
  * planned filing date the datasets do not cover); `comparison` is `null`
  * then, and for an exempt debtor whose household is not entered. `lines` is
- * empty below the median and for an exempt debtor — Form 122A-2 is not
- * filed in either case.
+ * empty below the median and for an exempt debtor on Chapter 7 — Form
+ * 122A-2 is not filed in either case. On a Chapter 13 case (issue #365)
+ * the same endpoint runs § 1325(b): `chapter13` carries the verdict, and
+ * `lines` holds B122C-1's Part 2-3 lines always, plus B122C-2's above the
+ * median.
  */
 export interface CaseMeansTest {
   readonly asOf: FormDate;
   /** `petition.expected_filing_date` or `case.created_at`. */
   readonly asOfSource: string;
+  /** The case's chapter — which calculation ran. */
+  readonly chapter: number;
   /** Series id → release id, for every dataset the run read. */
   readonly releaseIds: Readonly<Record<string, string>>;
   readonly jurisdiction: {
@@ -3540,6 +5516,7 @@ export interface CaseMeansTest {
   readonly outcome: MeansTestOutcome;
   readonly determinedBy: string | null;
   readonly lines: readonly MeansTestLine[];
+  readonly chapter13: MeansTestChapter13 | null;
   readonly problems: readonly string[];
 }
 
@@ -3576,4 +5553,197 @@ export interface CreditorMatrix {
   readonly problems: readonly CreditorMatrixProblem[];
   /** The file text. Absent, never null, while `problems` is non-empty. */
   readonly content?: string;
+}
+
+// ---------------------------------------------------------------------------
+// The Chapter 13 plan calculator (issue 16.2 / #366) —
+// `plan_calculation_json` in services/api core/chapter13_plan.py is the
+// shape. Money and rates are STRINGS throughout; a figure the case cannot
+// answer yet is `null`, with the reason in `problems`.
+
+/** The waterfall's classes, in distribution order. */
+export const PLAN_CLASSES = [
+  'trustee',
+  'ongoing_payments',
+  'secured',
+  'attorney_fees',
+  'priority',
+  'general_unsecured',
+] as const;
+export type PlanClassKey = (typeof PLAN_CLASSES)[number];
+
+/**
+ * One payee's line of the waterfall — a claim, the trustee, the attorney.
+ * `allowed` is what the plan owes it before interest; `principal` and
+ * `interest` what the term pays; months are 1-based and `null` when nothing
+ * was paid. `source` names the claim, the plan field or the rule behind it.
+ */
+export interface PlanPayoutRow {
+  readonly key: string;
+  readonly label: string;
+  readonly claimId: string | null;
+  readonly treatment: string | null;
+  readonly allowed: Money;
+  readonly monthlyPayment: Money | null;
+  readonly rate: Percentage | null;
+  readonly principal: Money;
+  readonly interest: Money;
+  readonly payout: Money;
+  readonly firstMonth: number | null;
+  readonly lastMonth: number | null;
+  readonly monthsPaid: number;
+  readonly unpaid: Money;
+  readonly source: string;
+}
+
+/** One class of the waterfall: its totals, its months, and its rows. */
+export interface PlanClass {
+  readonly key: PlanClassKey;
+  readonly label: string;
+  readonly allowed: Money;
+  readonly principal: Money;
+  readonly interest: Money;
+  readonly payout: Money;
+  readonly unpaid: Money;
+  readonly firstMonth: number | null;
+  readonly lastMonth: number | null;
+  readonly rows: readonly PlanPayoutRow[];
+}
+
+/** One claim's part of an unsecured pool, and why it is there. */
+export interface PlanPoolClaim {
+  readonly claimId: string;
+  readonly label: string;
+  readonly amount: Money;
+  readonly source: string;
+}
+
+/** A figure and where it came from. */
+export interface SourcedAmount {
+  readonly amount: Money;
+  readonly source: string;
+}
+
+/** One month's scheduled payment. */
+export interface PlanScheduledPayment {
+  readonly month: number;
+  readonly payment: Money;
+}
+
+/** One lump sum the plan receives. */
+export interface PlanReceivedLumpSum {
+  readonly month: number;
+  readonly amount: Money;
+  readonly description: string | null;
+}
+
+/** What goes into the plan, month by month. */
+export interface PlanFunding {
+  readonly termMonths: number | null;
+  readonly termSource: string | null;
+  readonly basePayment: Money | null;
+  readonly baseSource: string | null;
+  readonly schedule: readonly PlanScheduledPayment[];
+  readonly lumpSums: readonly PlanReceivedLumpSum[];
+  readonly total: Money;
+}
+
+/**
+ * Whether the payments over the term cover the waterfall. `feasible` is
+ * `null` while an input the waterfall needs is missing.
+ */
+export interface PlanFeasibility {
+  readonly feasible: boolean | null;
+  readonly totalFunding: Money;
+  readonly totalDistributed: Money;
+  readonly surplus: Money;
+  readonly shortfall: Money;
+  readonly reasons: readonly string[];
+  readonly scheduleJExcess: SourcedAmount | null;
+  readonly exceedsScheduleJ: boolean | null;
+}
+
+/** One asset's row of the liquidation analysis. */
+export interface LiquidationAsset {
+  readonly assetId: string;
+  readonly description: string | null;
+  readonly value: Money;
+  readonly liens: Money;
+  readonly exempt: Money;
+  readonly unexempt: Money;
+}
+
+/**
+ * The § 1325(a)(4) hypothetical Chapter 7: property less liens, exemptions,
+ * the § 326(a) commission, other costs and priority claims — `available`
+ * to general unsecured creditors, as `percentage` of the Chapter 7 pool.
+ */
+export interface PlanLiquidation {
+  readonly assets: readonly LiquidationAsset[];
+  readonly propertyTotal: Money;
+  readonly liensTotal: Money;
+  readonly exemptionsTotal: Money;
+  readonly unexemptTotal: Money;
+  readonly trusteeCommission: Money;
+  readonly trusteeCommissionRule: string;
+  readonly otherCosts: Money;
+  readonly otherCostsSource: string;
+  readonly priorityTotal: Money;
+  readonly available: Money;
+  readonly pool: readonly PlanPoolClaim[];
+  readonly poolTotal: Money;
+  readonly percentage: Money | null;
+}
+
+/** The best-interests comparison; `passes` is `null` while undetermined. */
+export interface PlanBestInterests {
+  readonly planPercentage: Money | null;
+  readonly liquidationPercentage: Money | null;
+  readonly planUnsecuredValue: Money;
+  readonly presentValueRate: Percentage | null;
+  readonly passes: boolean | null;
+  readonly rule: string;
+}
+
+/** The plan's general unsecured class: who is in it and what it is owed. */
+export interface PlanUnsecured {
+  readonly pool: readonly PlanPoolClaim[];
+  readonly poolTotal: Money;
+  readonly target: Money | null;
+  readonly targetSource: string | null;
+  readonly percentage: Money | null;
+}
+
+/** The commitment period the means test set, and why. */
+export interface PlanCommitmentPeriod {
+  readonly months: number | null;
+  readonly source: string | null;
+}
+
+/** `GET /v1/cases/{caseId}/plan-calculation`'s body. */
+export interface PlanCalculation {
+  readonly planPresent: boolean;
+  readonly chapter: number;
+  readonly commitmentPeriod: PlanCommitmentPeriod;
+  readonly funding: PlanFunding;
+  readonly trusteePercentage: Percentage | null;
+  readonly classes: readonly PlanClass[];
+  readonly unsecured: PlanUnsecured;
+  readonly feasibility: PlanFeasibility;
+  readonly liquidation: PlanLiquidation;
+  readonly bestInterests: PlanBestInterests;
+  readonly warnings: readonly string[];
+  readonly problems: readonly string[];
+}
+
+/** One unsaved alternative to calculate; `plan` is parsed like a stored one. */
+export interface PlanScenarioRequest {
+  readonly label?: string | undefined;
+  readonly plan: PlanBody;
+}
+
+/** One calculated alternative, in the order sent. */
+export interface PlanScenario {
+  readonly label: string | null;
+  readonly calculation: PlanCalculation;
 }

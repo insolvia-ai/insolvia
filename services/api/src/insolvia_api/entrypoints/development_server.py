@@ -4,38 +4,94 @@ from insolvia_core.adapters.aws.access_log import DynamoDbAccessLog
 from insolvia_core.adapters.aws.candidate_store import DynamoDbCandidateStore
 from insolvia_core.adapters.aws.case_entity_store import DynamoDbCaseEntityStore
 from insolvia_core.adapters.aws.case_store import DynamoDbCaseStore
+from insolvia_core.adapters.aws.client_binding_store import DynamoDbClientBindingStore
 from insolvia_core.adapters.aws.debtor_store import DynamoDbDebtorStore
 from insolvia_core.adapters.aws.document_blobs import S3DocumentBlobStore
+from insolvia_core.adapters.aws.document_request_store import (
+    DynamoDbDocumentRequestStore,
+)
 from insolvia_core.adapters.aws.document_store import DynamoDbDocumentStore
+from insolvia_core.adapters.aws.filing_credentials import (
+    DynamoDbFilingAuthorizationStore,
+    DynamoDbFilingCredentialStore,
+    KmsCredentialSealer,
+    filing_credentials_key_alias,
+    filing_credentials_table_name,
+)
+from insolvia_core.adapters.aws.filing_store import DynamoDbFilingStore
 from insolvia_core.adapters.aws.firm_store import DynamoDbFirmStore
 from insolvia_core.adapters.aws.jwks_provider import CognitoJwksProvider
+from insolvia_core.adapters.aws.task_store import DynamoDbTaskStore
+from insolvia_core.adapters.aws.tax_id_cipher import KmsTaxIdCipher, case_key_alias
+from insolvia_core.adapters.aws.tax_id_store import DynamoDbTaxIdStore
 from insolvia_core.adapters.aws.user_directory import CognitoUserDirectory
 from insolvia_core.adapters.memory.access_log import MemoryAccessLog
 from insolvia_core.adapters.memory.candidate_store import MemoryCandidateStore
 from insolvia_core.adapters.memory.case_entity_store import MemoryCaseEntityStore
 from insolvia_core.adapters.memory.case_store import MemoryCaseStore
+from insolvia_core.adapters.memory.client_binding_store import (
+    MemoryClientBindingStore,
+)
 from insolvia_core.adapters.memory.debtor_store import MemoryDebtorStore
 from insolvia_core.adapters.memory.document_blobs import MemoryDocumentBlobStore
+from insolvia_core.adapters.memory.document_request_store import (
+    MemoryDocumentRequestStore,
+)
 from insolvia_core.adapters.memory.document_store import MemoryDocumentStore
+from insolvia_core.adapters.memory.filing_credentials import (
+    LocalCredentialSealer,
+    MemoryFilingAuthorizationStore,
+    MemoryFilingCredentialStore,
+)
+from insolvia_core.adapters.memory.filing_store import MemoryFilingStore
 from insolvia_core.adapters.memory.firm_store import MemoryFirmStore
+from insolvia_core.adapters.memory.task_store import MemoryTaskStore
+from insolvia_core.adapters.memory.tax_id_cipher import LocalTaxIdCipher
+from insolvia_core.adapters.memory.tax_id_store import MemoryTaxIdStore
 from insolvia_core.adapters.memory.user_directory import MemoryUserDirectory
 from insolvia_core.ports import (
     AccessLog,
     CandidateStore,
     CaseEntityStore,
     CaseStore,
+    ClientBindingStore,
     DebtorStore,
     DocumentBlobStore,
+    DocumentRequestStore,
     DocumentStore,
+    FilingAuthorizationStore,
+    FilingCredentialSealer,
+    FilingCredentialStore,
+    FilingStore,
     FirmStore,
     JwksProvider,
+    TaskStore,
+    TaxIdCipher,
+    TaxIdStore,
     UserDirectory,
 )
 
+from insolvia_api.adapters.aws.event_store import (
+    DynamoDbCalendarTokenStore,
+    DynamoDbEventStore,
+)
+from insolvia_api.adapters.aws.filing_approval_store import (
+    DynamoDbFilingApprovalStore,
+)
+from insolvia_api.adapters.aws.filing_queue import SqsFilingQueue
 from insolvia_api.adapters.aws.job_queue import SqsJobQueue
 from insolvia_api.adapters.aws.job_store import DynamoDbJobStore
+from insolvia_api.adapters.aws.mailer_client import SigV4MailerClient
 from insolvia_api.adapters.aws.packet_store import DynamoDbPacketStore
 from insolvia_api.adapters.aws.waitlist_store import DynamoDbWaitlistStore
+from insolvia_api.adapters.memory.event_store import (
+    MemoryCalendarTokenStore,
+    MemoryEventStore,
+)
+from insolvia_api.adapters.memory.filing_approval_store import (
+    MemoryFilingApprovalStore,
+)
+from insolvia_api.adapters.memory.filing_queue import MemoryFilingQueue
 from insolvia_api.adapters.memory.job_queue import MemoryJobQueue
 from insolvia_api.adapters.memory.job_store import MemoryJobStore
 from insolvia_api.adapters.memory.mailer_client import InMemoryMailerClient
@@ -46,8 +102,13 @@ from insolvia_api.api.dependencies import ApiDependencies
 from insolvia_api.core.config import load_config
 from insolvia_api.core.logging import configure_logging
 from insolvia_api.core.ports import (
+    CalendarTokenStore,
+    EventStore,
+    FilingApprovalStore,
+    FilingQueue,
     JobQueue,
     JobStore,
+    Mailer,
     PacketStore,
     WaitlistStore,
 )
@@ -69,10 +130,22 @@ if config.waitlist_table_name:
 else:
     waitlist_store = MemoryWaitlistStore(echo=True)
 
-# The plain development server never sends real mail — mirroring the memory
-# waitlist store, this is local-only and never composed in a deployed
-# environment (adapters/aws/mailer_client.py's SigV4MailerClient is).
-mailer = InMemoryMailerClient()
+# The plain development server never sends real mail. Unset MAILER_API_URL
+# records sends in memory — mirroring the memory waitlist store. Set, it
+# posts to THAT mailer: pointed at the mailer's own local stack (it lives in
+# the insolvia-services repo — `./scripts/dev-up.sh` starts it from a sibling
+# checkout, or run its `services/mailer/scripts/dev-up.sh` there; then
+# MAILER_API_URL=http://127.0.0.1:8026 — or http://host.docker.internal:8026
+# from the API's compose container), every message lands in Mailpit at :8025 and nothing
+# leaves the machine, which is how the client-portal invitation's context
+# mail (ADR 0023) is checked locally. The local mailer ignores the SigV4
+# signature API Gateway would verify, so the client needs only whatever
+# credentials the developer's session already exports to sign with.
+mailer: Mailer
+if config.mailer_api_url:
+    mailer = SigV4MailerClient(config.mailer_api_url)
+else:
+    mailer = InMemoryMailerClient()
 
 # Auth against this machine's own Cognito pool when AUTH_ISSUER_URL and
 # AUTH_CLIENT_ID are set (infra/envs/dev publishes both; export them into
@@ -99,7 +172,9 @@ if (
     and config.case_access_log_table_name
     and config.firm_table_name
 ):
-    case_store = DynamoDbCaseStore(config.case_table_name)
+    case_store = DynamoDbCaseStore(
+        config.case_table_name, firm_table_name=config.firm_table_name
+    )
     access_log = DynamoDbAccessLog(config.case_access_log_table_name)
     firm_store = DynamoDbFirmStore(config.firm_table_name)
 else:
@@ -117,7 +192,9 @@ if (
     and config.case_access_log_table_name
     and config.case_document_bucket
 ):
-    case_store = DynamoDbCaseStore(config.case_table_name)
+    case_store = DynamoDbCaseStore(
+        config.case_table_name, firm_table_name=config.firm_table_name
+    )
     access_log = DynamoDbAccessLog(config.case_access_log_table_name)
     document_store = DynamoDbDocumentStore(config.case_table_name)
     document_blobs = S3DocumentBlobStore(config.case_document_bucket)
@@ -130,18 +207,67 @@ else:
     document_blobs = MemoryDocumentBlobStore()
 debtor_store: DebtorStore
 case_entity_store: CaseEntityStore
+tax_id_store: TaxIdStore
+tax_id_cipher: TaxIdCipher
+task_store: TaskStore
+document_request_store: DocumentRequestStore
+filing_credential_store: FilingCredentialStore
+filing_credential_sealer: FilingCredentialSealer
+filing_authorization_store: FilingAuthorizationStore
 if config.case_table_name and config.case_access_log_table_name:
-    case_store = DynamoDbCaseStore(config.case_table_name)
+    case_store = DynamoDbCaseStore(
+        config.case_table_name, firm_table_name=config.firm_table_name
+    )
     access_log = DynamoDbAccessLog(config.case_access_log_table_name)
-    debtor_store = DynamoDbDebtorStore(config.case_table_name)
+    # The firm table is the client row a link conditions on (the merge
+    # race, insolvia_core.client_merge) — the deployed composition's.
+    debtor_store = DynamoDbDebtorStore(
+        config.case_table_name, firm_table_name=config.firm_table_name
+    )
     # The same table again: the generic collections (issue #249) are child
     # items of their case's partition, so the dev table already holds them.
     case_entity_store = DynamoDbCaseEntityStore(config.case_table_name)
+    # And the sealed tax ids (issue 13.12 / #382), under THIS MACHINE's real
+    # case key — the developer's own IAM user reaches it through the key
+    # policy's root delegation (infra/envs/dev), so a laptop seals and opens
+    # exactly as staging does. The alias is derived from the table name.
+    tax_id_store = DynamoDbTaxIdStore(config.case_table_name)
+    tax_id_cipher = KmsTaxIdCipher(case_key_alias(config.case_table_name))
+    # Likewise: case tasks (issue #356 / 14.4) are child items too.
+    task_store = DynamoDbTaskStore(config.case_table_name)
+    # And a case's document requests (ADR 0023 PR 5 / #364).
+    document_request_store = DynamoDbDocumentRequestStore(config.case_table_name)
+    # The filing-credential vault (ADR 0024), on THIS MACHINE's real
+    # vault table and key (infra/envs/dev). The developer's principal
+    # seals through the key's root delegation and is refused Decrypt by
+    # its key policy, exactly as the deployed API's role is.
+    filing_credential_store = DynamoDbFilingCredentialStore(
+        filing_credentials_table_name(config.case_table_name)
+    )
+    filing_credential_sealer = KmsCredentialSealer(
+        filing_credentials_key_alias(config.case_table_name)
+    )
+    filing_authorization_store = DynamoDbFilingAuthorizationStore(
+        filing_credentials_table_name(config.case_table_name)
+    )
 else:
-    case_store = MemoryCaseStore()
+    # Composed with the firm store, whose client rows a link (and a case
+    # open, through the shared store) conditions on.
+    debtor_store = MemoryDebtorStore(firm_store=firm_store)
+    # ONE debtor store for both: opening a case writes its debtors through
+    # the case store (ADR 0022), and the debtor routes must see them — the
+    # shared-table property the DynamoDB pair has by construction.
+    case_store = MemoryCaseStore(debtor_store=debtor_store)
     access_log = MemoryAccessLog()
-    debtor_store = MemoryDebtorStore()
     case_entity_store = MemoryCaseEntityStore()
+    tax_id_store = MemoryTaxIdStore()
+    # The deterministic local key — never composed beside a real table.
+    tax_id_cipher = LocalTaxIdCipher()
+    task_store = MemoryTaskStore()
+    document_request_store = MemoryDocumentRequestStore()
+    filing_credential_store = MemoryFilingCredentialStore()
+    filing_credential_sealer = LocalCredentialSealer()
+    filing_authorization_store = MemoryFilingAuthorizationStore()
 
 # The pipeline pair (ADR 0018). The store rides the case-table condition
 # above — a job is a child item of the case partition, so whichever table the
@@ -163,6 +289,23 @@ if config.job_queue_url:
 else:
     job_queue = MemoryJobQueue()
 
+# The per-filing approval (ADR 0024 PR 6): the records ride the case-table
+# group like the job store; the queue follows the job queue's shape — with
+# FILING_QUEUE_URL set (dev-aws-setup.sh writes this machine's real filing
+# queue) an approval's job lands on real SQS and waits there, since nothing
+# consumes it until services/filing (PR 7); unset, the memory queue records
+# it and sends nothing.
+filing_approval_store: FilingApprovalStore
+if config.case_table_name and config.case_access_log_table_name:
+    filing_approval_store = DynamoDbFilingApprovalStore(config.case_table_name)
+else:
+    filing_approval_store = MemoryFilingApprovalStore()
+filing_queue: FilingQueue
+if config.filing_queue_url:
+    filing_queue = SqsFilingQueue(config.filing_queue_url)
+else:
+    filing_queue = MemoryFilingQueue()
+
 # Assembled packets (issue #96): the record rides the case table like the job
 # store; the API side only reads it. The memory fallback shares the memory
 # case store because its `create` is a transaction over both — and in that
@@ -175,6 +318,18 @@ else:
         raise RuntimeError("memory packet store needs the memory case store")
     packet_store = MemoryPacketStore(case_store)
 
+# The filing records (ADR 0024 PR 8): written by services/filing, read here,
+# and a hand-back's resolution written onto them — in one transaction with
+# the case when it files it, which is why the memory fallback shares the
+# memory case store, exactly as the packet store does.
+filing_store: FilingStore
+if config.case_table_name and config.case_access_log_table_name:
+    filing_store = DynamoDbFilingStore(config.case_table_name)
+else:
+    if not isinstance(case_store, MemoryCaseStore):  # pragma: no cover - guard
+        raise RuntimeError("memory filing store needs the memory case store")
+    filing_store = MemoryFilingStore(case_store)
+
 # The review queue (8.9): candidate rows ride the case table like the job
 # store — this machine's real dev table, or the in-memory group with the
 # rest of the memory stores.
@@ -183,6 +338,29 @@ if config.case_table_name and config.case_access_log_table_name:
     candidate_store = DynamoDbCandidateStore(config.case_table_name)
 else:
     candidate_store = MemoryCandidateStore()
+
+# Events, deadlines and the feed token (issue 14.6 / #358): the case table
+# again, so a developer's calendar rides this machine's real dev table and
+# the bare server keeps everything in memory.
+event_store: EventStore
+calendar_token_store: CalendarTokenStore
+if config.case_table_name and config.case_access_log_table_name:
+    event_store = DynamoDbEventStore(config.case_table_name)
+    calendar_token_store = DynamoDbCalendarTokenStore(config.case_table_name)
+else:
+    event_store = MemoryEventStore()
+    calendar_token_store = MemoryCalendarTokenStore()
+
+# The client portal's bindings (ADR 0023) span the firm table AND the case
+# table, so they ride this machine's real pair when BOTH are named and the
+# in-memory store otherwise — the same "the group moves together" rule.
+client_binding_store: ClientBindingStore
+if config.firm_table_name and config.case_table_name:
+    client_binding_store = DynamoDbClientBindingStore(
+        config.firm_table_name, config.case_table_name
+    )
+else:
+    client_binding_store = MemoryClientBindingStore()
 
 jwks_provider: JwksProvider | None = None
 if config.auth_issuer_url and config.auth_client_id:
@@ -213,10 +391,23 @@ app = create_app(
         document_store=document_store,
         document_blobs=document_blobs,
         debtor_store=debtor_store,
+        tax_id_store=tax_id_store,
+        tax_id_cipher=tax_id_cipher,
         case_entity_store=case_entity_store,
         job_store=job_store,
         job_queue=job_queue,
         packet_store=packet_store,
         candidate_store=candidate_store,
+        event_store=event_store,
+        calendar_token_store=calendar_token_store,
+        task_store=task_store,
+        document_request_store=document_request_store,
+        client_binding_store=client_binding_store,
+        filing_credential_store=filing_credential_store,
+        filing_credential_sealer=filing_credential_sealer,
+        filing_authorization_store=filing_authorization_store,
+        filing_approval_store=filing_approval_store,
+        filing_queue=filing_queue,
+        filing_store=filing_store,
     )
 )

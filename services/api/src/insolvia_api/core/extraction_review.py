@@ -7,6 +7,10 @@ that acceptance is built. It serves BOTH candidate streams — extraction's
 (8.7/8.8, origin channel `extraction`) and the MCP surface's agent proposals
 (origin channel `mcp`) — through one queue, one status vocabulary, one
 confirmation act, exactly as docs/reference/case-data-model.md specifies.
+Since ADR 0023 PR 4 it serves a THIRD: a debtor's portal answers (origin
+channel `client`), which confirm into `client_answered` — and, for the
+answers about a debtor's own fields, merge into that debtor's record
+rather than creating one (`build_accepted_debtor`).
 
 What acceptance IS: the reviewed payload (the human's corrected version when
 they changed anything) goes through the SAME `parse_entity` every staff-typed
@@ -59,9 +63,11 @@ from insolvia_core.candidates import (
 )
 from insolvia_core.case_collections import COLLECTIONS
 from insolvia_core.case_entities import EntityDraft, entity_body, parse_entity
+from insolvia_core.clients import CLIENT_ROLES
+from insolvia_core.debtors import Debtor, DebtorDraft, debtor_body, parse_debtor
 from insolvia_core.errors import FieldValidationError, ValidationError
-from insolvia_core.fields import timestamp
-from insolvia_core.provenance import populated_paths
+from insolvia_core.fields import prune_body, timestamp
+from insolvia_core.provenance import populated_paths, provenance_json
 
 if TYPE_CHECKING:
     from typing import Any
@@ -76,7 +82,21 @@ REVIEW_ACTIONS: Final = ("accept", "reject")
 # vocabulary, followed exactly: extraction output is `ai_extracted`, an
 # agent's PMS-sourced proposal is `imported`, and both are machine sources
 # subject to the same confirmation rule.
-SOURCE_FOR_CHANNEL: Final = {"extraction": "ai_extracted", "mcp": "imported"}
+#
+# A client's portal answer (ADR 0023 PR 4) confirms into `client_answered`:
+# the debtor's own say-so, under the same confirmation rule (provenance.py
+# says why it is not ADR 0022's `client`).
+SOURCE_FOR_CHANNEL: Final = {
+    "extraction": "ai_extracted",
+    "mcp": "imported",
+    "client": "client_answered",
+}
+
+# The link fields a CLIENT answer cannot fill (the portal never reads case
+# records, so it knows no record ids) and acceptance fills from the case:
+# an employment belongs to the debtor who answered, an expense to the main
+# household. Only when the reviewed payload leaves the field empty.
+CLIENT_LINKS: Final = {"employments": "debtor_id", "expenses": "household_id"}
 
 # Which reference field may carry candidate-id indirection, per entity type
 # (core/extraction.py writes these; nothing else does).
@@ -258,15 +278,157 @@ def build_accepted_draft(
             "extraction_id": candidate.id,
         }
         if unchanged:
-            if candidate.document_id is not None:
-                entry["document_id"] = candidate.document_id
-            if candidate.locator is not None:
-                entry["locator"] = dict(candidate.locator)
-            if candidate.confidence is not None:
-                entry["confidence"] = candidate.confidence
+            entry.update(_source_pointers(candidate))
         provenance[path] = entry
 
     return parse_entity(kind, {**payload, "provenance": provenance})
+
+
+def _source_pointers(candidate: Candidate) -> dict[str, object]:
+    """What an unchanged field's entry carries besides the confirmation:
+    the document, the page anchor and the model's confidence. A client
+    answer has none of them — its locator names a QUESTION, which the
+    candidate (`extraction_id`) already records, and a provenance locator
+    means a place on a page."""
+    pointers: dict[str, object] = {}
+    if candidate.document_id is not None:
+        pointers["document_id"] = candidate.document_id
+    if candidate.locator is not None and candidate.origin.channel != "client":
+        pointers["locator"] = dict(candidate.locator)
+    if candidate.confidence is not None:
+        pointers["confidence"] = candidate.confidence
+    return pointers
+
+
+def is_debtor_answer(candidate: Candidate) -> bool:
+    """A client's answer about a debtor's own fields — accepted by MERGING
+    into that debtor's record, not by creating a record (see
+    `build_accepted_debtor`)."""
+    return candidate.origin.channel == "client" and candidate.entity_type == "debtors"
+
+
+def answer_filing_role(candidate: Candidate) -> str:
+    """The filing role a client answer was given for — its question
+    locator's, written by the portal from the binding's roles."""
+    locator = candidate.locator or {}
+    role = locator.get("filing_role")
+    if not isinstance(role, str) or role not in CLIENT_ROLES:
+        raise ValidationError("this answer does not name which debtor it is for")
+    return role
+
+
+def merge_answer(
+    stored: Mapping[str, object], payload: Mapping[str, object]
+) -> dict[str, object]:
+    """The debtor body with a client answer's fields applied: each
+    top-level member the answer carries REPLACES the stored one, except a
+    list element (an other name), which is added — or replaces the element
+    with its id, so an accepted edit of an earlier answer does not
+    duplicate it."""
+    merged = dict(stored)
+    for key, value in payload.items():
+        current = merged.get(key)
+        # `debtor_body` renders a list member as a tuple (dataclasses.asdict).
+        if isinstance(value, list | tuple) and isinstance(current, list | tuple):
+            incoming = {
+                element.get("id") for element in value if isinstance(element, Mapping)
+            }
+            kept = [
+                element
+                for element in current
+                if not (isinstance(element, Mapping) and element.get("id") in incoming)
+            ]
+            merged[key] = [*kept, *value]
+        else:
+            merged[key] = value
+    return merged
+
+
+def build_accepted_debtor(
+    candidate: Candidate,
+    payload: Mapping[str, object],
+    *,
+    stored: Debtor,
+    confirmed_by: str,
+    confirmed_at: str,
+) -> DebtorDraft:
+    """The debtor acceptance writes: the stored record with the reviewed
+    answer merged in, validated through `parse_debtor` with provenance
+    ENFORCED — the same parse the questionnaire's PUT runs.
+
+    Every path the answer populates is minted fresh: `client_answered`
+    with the confirmation pair and the candidate id when the reviewer took
+    it as given, `staff_typed` (confirmed) where they corrected it. Every
+    other field keeps its stored entry untouched — the data model's rule
+    that a field keeps its provenance until a person changes THAT field.
+    A stored entry under a replaced member (`name.middle`, when the answer
+    left the middle name out) goes with the value it described.
+
+    The tax id is not a body member (debtors.debtor_body) and is never in
+    an answer: the stored reference and its entry ride through unchanged.
+    """
+    source = SOURCE_FOR_CHANNEL["client"]
+    stored_body = debtor_body(stored)
+    merged = merge_answer(stored_body, payload)
+    # The canonical forms, so "(555) 0100" vs a parser-trimmed value never
+    # reads as a correction.
+    answered_body = debtor_body(parse_debtor(payload, enforce_provenance=False))
+    try:
+        original = debtor_body(
+            parse_debtor(candidate.payload, enforce_provenance=False)
+        )
+    except FieldValidationError:
+        original = dict(candidate.payload)
+
+    answered_paths = set(populated_paths(prune_body(answered_body)))
+    replaced_roots = set(payload)
+    provenance: dict[str, dict[str, object]] = {}
+    for path, entry in provenance_json(stored.provenance).items():
+        root = _SEGMENT_RE.match(path)
+        root_name = root.group(1) if root else path
+        if root_name in replaced_roots and not _survives(path, stored_body, merged):
+            continue
+        provenance[path] = entry
+    for path in answered_paths:
+        unchanged = _value_at(answered_body, path) == _value_at(original, path)
+        provenance[path] = {
+            "source": source if unchanged else "staff_typed",
+            "confirmed_by": confirmed_by,
+            "confirmed_at": confirmed_at,
+            "extraction_id": candidate.id,
+        }
+    return parse_debtor({**merged, "provenance": provenance})
+
+
+def _survives(
+    path: str, before: Mapping[str, object], after: Mapping[str, object]
+) -> bool:
+    """Whether a stored entry's value is still in the merged record, exactly
+    — an other name the answer did not touch keeps its entry."""
+    value = _value_at(after, path)
+    return value is not None and value == _value_at(before, path)
+
+
+def fill_client_links(
+    candidate: Candidate,
+    payload: Mapping[str, object],
+    *,
+    debtor_id: str | None,
+    household_id: str | None,
+) -> Mapping[str, object]:
+    """A client record answer's link field, filled from the case
+    (`CLIENT_LINKS`) — only for the client channel and only when empty. A
+    reviewer's own value wins; nothing to link to leaves it empty, which is
+    the completeness gate's business as everywhere."""
+    if candidate.origin.channel != "client":
+        return payload
+    field = CLIENT_LINKS.get(candidate.entity_type)
+    if field is None or payload.get(field):
+        return payload
+    value = debtor_id if field == "debtor_id" else household_id
+    if value is None:
+        return payload
+    return {**payload, field: value}
 
 
 def accept(
@@ -309,13 +471,19 @@ def review_moment() -> str:
 
 
 __all__ = [
+    "CLIENT_LINKS",
     "LINK_FIELDS",
     "PENDING",
     "REVIEW_ACTIONS",
     "SOURCE_FOR_CHANNEL",
     "ReviewDecision",
     "accept",
+    "answer_filing_role",
+    "build_accepted_debtor",
     "build_accepted_draft",
+    "fill_client_links",
+    "is_debtor_answer",
+    "merge_answer",
     "parse_review",
     "parse_status_filter",
     "reject",

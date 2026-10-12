@@ -1,6 +1,7 @@
 # Shared ruff config for every Python service in the monorepo.
 # Mirrors the per-service CI `ruff check` / `ruff format --check` steps — the
-# same rules run locally (pre-commit + dev-test.sh) and in CI.
+# same rules run locally (scripts/dev-test-unit.sh at push time, each area's
+# dev-test.sh on demand) and in CI. There is no ruff pre-COMMIT hook.
 target-version = "py311"
 line-length = 88
 

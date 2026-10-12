@@ -15,11 +15,12 @@
 # An Image-package Lambda cannot be created without an existing image:
 # `aws_lambda_function` fails ("Source image ... does not exist") until one has
 # been pushed. The repository itself is not part of the deadlock — it
-# lives in infra/envs/shared and is applied before any environment (see the
-# deployment order in docs/reference/terraform.md) — so the cycle is
+# lives in insolvia-services' infra/envs/shared and is applied before any
+# environment (see the deployment order in docs/reference/terraform.md) — so
+# the cycle is
 # just "seed an image, then apply", once per environment:
 #
-#   1. apply infra/envs/shared (creates insolvia-shared-api)
+#   1. release insolvia-services' infra/envs/shared (creates insolvia-shared-api)
 #   2. build services/api
 #      (`docker build --platform linux/amd64 --provenance=false --target lambda`),
 #      tag it <repo-url>:<env> — this environment's moving marker tag, which is
@@ -50,7 +51,8 @@ locals {
 
 # ── Container repository ────────────────────────────────────────
 # This module does NOT own a repository. `insolvia-shared-api` is a single repo
-# shared by every environment, created in infra/envs/shared and passed in as
+# shared by every environment, created in insolvia-services' infra/envs/shared
+# and passed in as
 # `var.ecr_repository_url`.
 #
 # One repo per environment ("so a prod deploy can never pick up a staging
@@ -63,7 +65,8 @@ locals {
 # environment from SSM at deploy time (see the Lambda's lifecycle note), so
 # nothing environment-specific is baked into a layer.
 #
-# See infra/envs/shared/main.tf for the repository and its retention policy.
+# See insolvia-services' infra/envs/shared/main.tf for the repository and its
+# retention policy.
 
 # ── One-time state migration (transitional) ─────────────────────
 # The two resources above were DELETED from config, but they still live in the
@@ -80,7 +83,8 @@ locals {
 # from the shared repo.
 #
 # Declared in the MODULE, so one block drains both staging's and prod's state.
-# Mirrors the ci-trust extraction in infra/envs/shared/main.tf.
+# Mirrors the ci-trust extraction in infra/envs/shared/main.tf (which has
+# since moved to insolvia-services).
 #
 # These blocks are one-time. Delete them ONLY after BOTH staging and prod have
 # applied — removing them while prod's state still holds the repo puts the

@@ -61,6 +61,7 @@ ENTITIES = {
     "pay_period_record",
     "other_income_record",
     "means_test_input",
+    "plan",
     "income_summary",
     "household",
     "expense",
@@ -98,7 +99,10 @@ MAPPING_KEYS = {"entity", "derived", "unmapped", "constant"}
 # space, points, origin bottom-left; `y` is the baseline for text and the
 # bottom edge for a checkbox). `h` is required for a checkbox and forbidden
 # otherwise — text is drawn at a baseline, an X is drawn across a box.
-OVERLAY_BOX_KEYS = {"name", "page", "x", "y", "w", "h"}
+# `size` (optional, text boxes only) is the point size a value is drawn at
+# where the printed blank is too small for the engine's default — Official
+# Form 113's table cells are 7.6-point type.
+OVERLAY_BOX_KEYS = {"name", "page", "x", "y", "w", "h", "size"}
 
 errors: list[str] = []
 
@@ -223,11 +227,13 @@ def check_form(spec_path: Path) -> tuple[int, int, int]:
                 overlay_boxes[name] = fid
                 if not isinstance(box["page"], int) or not 1 <= box["page"] <= dump.get("pages", 0):
                     err(form, f"{fid}: overlay box {name!r} page {box['page']!r} is not a page of the PDF")
-                for key in ("x", "y", "w", "h"):
+                for key in ("x", "y", "w", "h", "size"):
                     if key in box and (isinstance(box[key], bool) or not isinstance(box[key], (int, float)) or box[key] < 0):
                         err(form, f"{fid}: overlay box {name!r} {key} must be a non-negative number")
                 if (ftype == "checkbox") != ("h" in box):
                     err(form, f"{fid}: overlay box {name!r} carries h only when the field is a checkbox")
+                if "size" in box and (ftype == "checkbox" or not box["size"]):
+                    err(form, f"{fid}: overlay box {name!r} size is a positive point size, and only on a text box")
             if "options" in field:
                 err(form, f"{fid}: options only belong on radio/checkbox widget fields")
             continue

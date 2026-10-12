@@ -18,6 +18,14 @@
 #   • the case store via modules/case_store — the same module staging and prod
 #     instantiate, so local development exercises the real encrypted path
 #     rather than an approximation of it;
+#   • the filing-credential vault via modules/filing_credentials (ADR 0024)
+#     — its key, its table and the filing worker's role, so the key policy
+#     that keeps Decrypt to the worker is exercised here, not first met on
+#     staging;
+#   • the filing queue via modules/filing_queue (ADR 0024 PR 6) — the queue
+#     an attorney's approval puts a filing job on, so the dev proof
+#     (services/api/scripts/dev-filing-approval-proof.sh) enqueues on a real
+#     per-machine queue;
 #   • a Cognito pool via modules/auth, prepping local auth work (outputs
 #     only — nothing consumes it yet);
 #   • OPTIONALLY the case-data audit trail (-var=enable_audit_trail=true),
@@ -147,6 +155,51 @@ module "firm_store" {
   deletion_protection    = false
   tags                   = local.common_tags
 }
+
+# ── Filing credentials (ADR 0024, guardrail 3) ──────────────────
+# The same module staging and prod instantiate — the real dedicated key, its
+# real key policy and the real filing worker's role — so the sealed
+# round-trip and the key policy's refusal are exercised against AWS on a
+# laptop, as ADR 0024 § Three environments requires, not against a stub.
+#
+# Two dev-only differences, both stated in the module:
+#   • api_role_name is null. There is no Lambda here; the developer's own
+#     principal runs the local API and seals through the key's root
+#     delegation. The key policy's deny refuses THAT principal Decrypt too —
+#     an admin — which is the dev proof that only the worker can open.
+#   • worker_assumable_by names the developer, so "the worker's role opens"
+#     is proved by assuming the real role (services/api/scripts/
+#     dev-filing-vault-proof.sh). The module refuses this outside dev-*.
+module "filing_credentials" {
+  source = "../../modules/filing_credentials"
+
+  project                     = "insolvia"
+  environment                 = local.environment
+  table_kms_key_arn           = module.case_store.kms_key_arn
+  access_log_table_arn        = module.case_store.access_log_table_arn
+  api_role_name               = null
+  worker_assumable_by         = [var.aws_principal_arn]
+  point_in_time_recovery      = false
+  deletion_protection         = false
+  key_deletion_window_in_days = 7
+  tags                        = local.common_tags
+}
+
+# ── The filing queue (ADR 0024 PR 6) ────────────────────────────
+# Where an approval puts a filing job — the real queue, per machine, as
+# job_pipeline's is. No API role here (the developer sends, playing the API
+# as for the vault); the consume grant lands on this machine's filing worker
+# role, which services/filing's local poller assumes.
+module "filing_queue" {
+  source = "../../modules/filing_queue"
+
+  project          = "insolvia"
+  environment      = local.environment
+  api_role_name    = null
+  worker_role_name = module.filing_credentials.worker_role_name
+  tags             = local.common_tags
+}
+
 # ── Case documents ──────────────────────────────────────────────
 # The same module staging and prod instantiate, encrypting under the same case
 # key, so local development exercises the real bucket policy — TLS-only,
@@ -172,6 +225,34 @@ module "case_documents" {
   # A developer's bucket must be destroyable without emptying it by hand.
   force_destroy = true
   tags          = local.common_tags
+}
+
+# ── The filing worker (ADR 0024 PR 7) ───────────────────────────
+# The same module staging and prod instantiate, with no Lambda
+# (ecr_repository_url = null): its grants on the case table, the documents
+# bucket and the kill switch attach to this machine's filing worker role all
+# the same, because services/filing's local poller ASSUMES that role
+# (FILING_WORKER_ROLE_ARN in services/filing/.env) — so a laptop run is held
+# to exactly what the deployed worker holds. The kill switch parameter exists
+# for parity; locally the worker reads FILING_SUBMISSIONS_ENABLED instead.
+module "filing_worker" {
+  source = "../../modules/filing_worker"
+
+  project                    = "insolvia"
+  environment                = local.environment
+  ecr_repository_url         = null
+  worker_role_name           = module.filing_credentials.worker_role_name
+  worker_role_arn            = module.filing_credentials.worker_role_arn
+  queue_arn                  = module.filing_queue.queue_arn
+  dlq_name                   = module.filing_queue.dlq_name
+  case_table_arn             = module.case_store.table_arn
+  case_table_name            = module.case_store.table_name
+  case_access_log_table_name = module.case_store.access_log_table_name
+  case_kms_key_arn           = module.case_store.kms_key_arn
+  case_document_bucket_arn   = module.case_documents.bucket_arn
+  case_document_bucket_name  = module.case_documents.bucket_name
+  alarms_topic_arn           = null
+  tags                       = local.common_tags
 }
 
 
@@ -256,6 +337,19 @@ resource "aws_ssm_parameter" "auth_client_id" {
   tags  = local.common_tags
 }
 
+# The client portal's app client (ADR 0023), the same namespace and the same
+# derivation as auth-client-id above: the deploy workflow turns it into
+# AUTH_PORTAL_CLIENT_ID, which is the ONE client id every /v1/portal/ route
+# verifies — disjoint from AUTH_CLIENT_ID, and the API refuses to verify
+# portal tokens at all if the two are ever equal. A public value, like the
+# web client id: it rides in every portal sign-in redirect.
+resource "aws_ssm_parameter" "auth_portal_client_id" {
+  name  = "/insolvia/${local.environment}/api/auth-portal-client-id"
+  type  = "String"
+  value = module.auth.portal_client_id
+  tags  = local.common_tags
+}
+
 # Same reasoning as the auth parameters above: nothing reads it here, but
 # keeping the namespace identical across every environment means "where does
 # CASE_TABLE_NAME come from" has one answer rather than two. The value a
@@ -287,6 +381,16 @@ resource "aws_ssm_parameter" "job_queue_url" {
   tags  = local.common_tags
 }
 
+# The filing queue's URL, same namespace-parity reasoning. A developer
+# consumes the filing_queue_url output, which dev-aws-setup.sh writes into
+# services/api/.env as FILING_QUEUE_URL.
+resource "aws_ssm_parameter" "filing_queue_url" {
+  name  = "/insolvia/${local.environment}/api/filing-queue-url"
+  type  = "String"
+  value = module.filing_queue.queue_url
+  tags  = local.common_tags
+}
+
 # ── Case-data audit trail (issue 8.2), opt-in ───────────────────
 # Off unless -var=enable_audit_trail=true. See the variable's own description
 # for why the default is off and why the module is still worth being able to
@@ -301,7 +405,8 @@ module "audit_trail" {
 
   project                     = "insolvia"
   environment                 = local.environment
-  data_resource_arns          = [module.case_store.table_arn]
+  data_resource_arns          = [module.case_store.table_arn, module.filing_credentials.table_arn]
+  include_management_events   = true
   retention_days              = 90
   key_deletion_window_in_days = 7
   tags                        = local.common_tags

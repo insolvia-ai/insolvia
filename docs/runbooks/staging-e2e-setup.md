@@ -71,6 +71,9 @@ echo.
 The seed role (`insolvia-staging-seed-role`) needs to create accounts in the
 staging pool, write the firm and case tables, copy fixture objects into
 staging's case-documents bucket, and read the shared fixture bucket. The
+seed role lives in insolvia-services'
+[`infra/envs/ci-trust`](https://github.com/insolvia-ai/insolvia-services/blob/main/infra/envs/ci-trust/main.tf), and so does every
+command in this step — run them from that checkout. The
 table and bucket grants are in `ci-trust` already (`StagingCaseTableRows`,
 `StagingCaseDocumentObjects`, `StagingCaseKeyThroughS3Only`,
 `DevFixtureObjectsRead`) and only need the apply. The pool's ARN is not
@@ -79,14 +82,14 @@ id — so it is passed in as a variable once staging exists.
 
 **CI cannot apply this root.** `DenySelfPrivilegeEscalation` means an apply run
 as the deploy role fails by design; see the `insolvia-deploy-role-permissions`
-skill. A human runs:
+skill. A human runs, from this repo:
 
 ```bash
 terraform -chdir=infra/envs/staging output -raw auth_user_pool_arn
 ```
 
-Put that value in `infra/envs/ci-trust/terraform.tfvars` as
-`staging_user_pool_arn`, then:
+Put that value in insolvia-services' `infra/envs/ci-trust/terraform.tfvars` as
+`staging_user_pool_arn`, then, from the insolvia-services checkout:
 
 ```bash
 ./scripts/apply-ci-trust.sh
@@ -99,7 +102,7 @@ the staging stage fails with it — that is this step, not a regression.
 
 Also set `AWS_SEED_ROLE_ARN` on the **`insolvia-staging` environment** if it is
 not already there — `terraform -chdir=infra/envs/ci-trust output -raw
-github_seed_role_arn`. Environment-scoped, not repository: the role's trust
+github_seed_role_arn`, run in insolvia-services. Environment-scoped, not repository: the role's trust
 policy only accepts tokens minted for that environment, so a repo-level secret
 would be a value no job could use.
 
@@ -129,8 +132,8 @@ silence.
 
 The fixture case's sample documents are committed under
 [`../../seeds/fixtures/v1/`](../../seeds/fixtures/v1/) and loaded from the
-account's shared fixture bucket (`infra/modules/dev_fixtures`, applied by CI as
-part of `envs/shared` — the first release after it merges creates the bucket).
+account's shared fixture bucket (insolvia-services' `infra/modules/dev_fixtures`,
+applied by that repo's CI as part of its `infra/envs/shared`).
 CI never writes that bucket; a developer publishes, once per version:
 
 ```bash
@@ -170,7 +173,7 @@ recognising on sight:
 |---|---|
 | Seed step: `AccessDenied` on `cognito-idp:AdminCreateUser` | Step 1 has not been done, or `staging_user_pool_arn` is empty in `ci-trust` — the grant is conditional on it, so the statement is simply absent. |
 | Seed step: `AccessDenied` on a `dynamodb:*` call against `insolvia-staging-cases`, on `s3:PutObject`, or on `s3:GetObject` from the fixture bucket | Step 1 has not been re-applied since the case grants were added to `ci-trust`. |
-| Seed step: `refusing: … the copy of objects/… did not land` or `NoSuchKey` | Step 3 has not been done for this fixture version, or `envs/shared` has not applied the bucket yet. |
+| Seed step: `refusing: … the copy of objects/… did not land` or `NoSuchKey` | Step 3 has not been done for this fixture version, or insolvia-services' `infra/envs/shared` has not applied the bucket yet. |
 | Integration: `could not sign in as 'admin': … NotAuthorized` | The password secret and the pool disagree — a rotation that only half landed — or the account is not CONFIRMED. If the seed step was green, suspect the former. |
 | Seed step: `refusing: fixture references ${E2E_TEST_USER_PASSWORD}` | The secret is unset, **or** the job lost its `environment: insolvia-staging` key — an environment-scoped secret resolves to an empty string in silence when the environment is missing or borrowed (`infra/CLAUDE.md`). |
 | Seed step: `InvalidPasswordException` | The stored password no longer meets the pool policy. Re-run step 2. |

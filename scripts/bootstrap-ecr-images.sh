@@ -16,8 +16,11 @@
 #     does not exist. Provide a valid source image.
 #
 # The same note lives at the top of infra/modules/{api_service,admin_service,
-# job_pipeline,mailer,marketing_site}/main.tf and in each workflow header. This
+# job_pipeline,marketing_site}/main.tf and in each workflow header. This
 # script is that manual step, done once, for whatever services you name.
+#
+# NOT THE MAILER. It moved to the insolvia-services repo on 2026-10-11, and its
+# bootstrap is that repo's (mailer-staging.yml's header).
 #
 # It is safe to run when the ECR *repositories* already exist (e.g. a failed
 # apply created them before it reached the Lambdas): it only pushes images.
@@ -26,10 +29,9 @@
 #
 # It does not apply Terraform and it does not create the ECR repositories. The
 # repositories are shared across environments and live in infra/envs/shared
-# (one per service, `shared` in the environment slot — insolvia-shared-api and
-# friends); if one is genuinely absent, apply that root first:
-#
-#   terraform -chdir=infra/envs/shared apply
+# IN THE insolvia-services REPO (one per service, `shared` in the environment
+# slot — insolvia-shared-api and friends); if one is genuinely absent, it is
+# missing from that root — add it there and let that repo's release apply it.
 #
 # The images it pushes are placeholders. The deploy workflow immediately builds
 # its own from the merged commit and rolls the Lambda onto it with
@@ -41,15 +43,16 @@
 #   scripts/bootstrap-ecr-images.sh <env> [service ...] [--dispatch] [--yes]
 #
 #   <env>        staging | prod   (matches infra/envs/<env> and the ECR suffix)
-#   service ...  any of: api admin jobs mailer marketing mcp   (default: all
-#                six; `jobs` is the pipeline worker image — ADR 0018, `mcp`
-#                the remote MCP server — ADR 0016)
+#   service ...  any of: api admin jobs marketing mcp filing
+#                (default: all six; `jobs` is the pipeline worker image —
+#                ADR 0018, `mcp` the remote MCP server — ADR 0016, `filing`
+#                the filing worker — ADR 0024)
 #   --dispatch   after pushing, re-run the matching deploy workflows
 #                (<service>-<env>.yml; jobs rides api-<env>.yml)
 #   --yes        skip the confirmation prompt
 #
 # Examples:
-#   scripts/bootstrap-ecr-images.sh staging mailer marketing --dispatch
+#   scripts/bootstrap-ecr-images.sh staging api marketing --dispatch
 #   scripts/bootstrap-ecr-images.sh staging            # all four, no dispatch
 #
 set -euo pipefail
@@ -65,6 +68,15 @@ REGISTRY="$ACCOUNT.dkr.ecr.$REGION.amazonaws.com"
 # resulting CreateFunction failure reads like a corrupt image, not an arch
 # mismatch — hence forcing the platform on every build below.
 PLATFORM=linux/amd64
+
+# Lambda takes a single image manifest, never an image index. Docker Desktop's
+# containerd image store (the default on new installs) pushes an OCI index with
+# a provenance attestation for every `docker build`, and CreateFunction answers
+# "The image manifest, config or layer media type ... is not supported" — the
+# classic store CI's runners use pushes a plain manifest, which is why the
+# deploy workflows never hit it. So every build below turns attestations off,
+# and the push step checks what ECR actually received.
+BUILD_FLAGS=(--platform "$PLATFORM" --provenance=false --sbom=false)
 
 log()  { printf '\033[1;34m[bootstrap]\033[0m %s\n' "$*"; }
 ok()   { printf '\033[1;32m[ ok ]\033[0m %s\n' "$*"; }
@@ -102,9 +114,9 @@ ecr_component() {
     api)       printf 'api' ;;
     admin)     printf 'admin-api' ;;
     jobs)      printf 'jobs' ;;
-    mailer)    printf 'mailer' ;;
     marketing) printf 'marketing' ;;
     mcp)       printf 'mcp' ;;
+    filing)    printf 'filing' ;;
     *)         die "no ECR component mapping for service '$1'" ;;
   esac
 }
@@ -125,7 +137,7 @@ for arg in "$@"; do
     -h|--help)  usage 0 ;;
     --dispatch) DISPATCH=true ;;
     --yes|-y)   ASSUME_YES=true ;;
-    api|admin|jobs|mailer|marketing|mcp) SERVICES+=("$arg") ;;
+    api|admin|jobs|marketing|mcp|filing) SERVICES+=("$arg") ;;
     staging|prod)
       [[ -z "$ENV" ]] || die "environment given twice ('$ENV' and '$arg')"
       ENV="$arg" ;;
@@ -134,7 +146,7 @@ for arg in "$@"; do
 done
 
 [[ -n "$ENV" ]] || { warn "no environment given"; usage 1; }
-[[ ${#SERVICES[@]} -gt 0 ]] || SERVICES=(api admin jobs mailer marketing mcp)
+[[ ${#SERVICES[@]} -gt 0 ]] || SERVICES=(api admin jobs marketing mcp filing)
 
 require_command aws
 require_command docker
@@ -195,7 +207,7 @@ build_api() {
   # other stage is the local development server). Context is the REPO ROOT:
   # the image installs the shared packages/insolvia_core by relative path
   # (see services/api/Dockerfile's header).
-  docker build --platform "$PLATFORM" --target lambda \
+  docker build "${BUILD_FLAGS[@]}" --target lambda \
     -f "$REPO_ROOT/services/api/Dockerfile" \
     -t "$1:$ENV" "$REPO_ROOT"
 }
@@ -203,7 +215,7 @@ build_api() {
 build_admin() {
   # Same repo-root-context rule as build_api — the image installs the shared
   # packages/insolvia_core by relative path.
-  docker build --platform "$PLATFORM" --target lambda \
+  docker build "${BUILD_FLAGS[@]}" --target lambda \
     -f "$REPO_ROOT/services/admin/Dockerfile" \
     -t "$1:$ENV" "$REPO_ROOT"
 }
@@ -212,21 +224,25 @@ build_jobs() {
   # The pipeline worker (ADR 0018): services/api's Dockerfile, `worker`
   # target — same source tree as the api image, its own image and repo so
   # worker-only dependencies never land in the request path's image.
-  docker build --platform "$PLATFORM" --target worker \
+  docker build "${BUILD_FLAGS[@]}" --target worker \
     -f "$REPO_ROOT/services/api/Dockerfile" \
     -t "$1:$ENV" "$REPO_ROOT"
-}
-
-build_mailer() {
-  docker build --platform "$PLATFORM" --target lambda \
-    -t "$1:$ENV" "$REPO_ROOT/services/mailer"
 }
 
 build_mcp() {
   # Same repo-root-context rule as build_api — the image installs the shared
   # packages/insolvia_core by relative path (ADR 0016).
-  docker build --platform "$PLATFORM" --target lambda \
+  docker build "${BUILD_FLAGS[@]}" --target lambda \
     -f "$REPO_ROOT/services/mcp/Dockerfile" \
+    -t "$1:$ENV" "$REPO_ROOT"
+}
+
+build_filing() {
+  # The filing worker (ADR 0024): repo-root context — the image installs
+  # packages/insolvia_core and copies services/api/src (its Dockerfile's
+  # header). The fake CM/ECF is never in it.
+  docker build "${BUILD_FLAGS[@]}" --target lambda \
+    -f "$REPO_ROOT/services/filing/Dockerfile" \
     -t "$1:$ENV" "$REPO_ROOT"
 }
 
@@ -241,12 +257,12 @@ build_marketing() {
   NODE_AUTH_TOKEN="$(gh auth token)" npm ci --prefix "$dir" ||
     die "npm ci failed. If it was a 403, run: gh auth refresh -s read:packages"
   npm run build --prefix "$dir"
-  docker build --platform "$PLATFORM" -t "$1:$ENV" "$dir"
+  docker build "${BUILD_FLAGS[@]}" -t "$1:$ENV" "$dir"
 }
 
 for svc in "${SERVICES[@]}"; do
   # One repository per SERVICE, shared by every environment
-  # (infra/envs/shared). The image is seeded under this environment's moving
+  # (insolvia-services' infra/envs/shared). The image is seeded under this environment's moving
   # marker tag, which is what the Lambda's Terraform seed points at
   # (var.image_tag) — not `:latest`, which under a shared repository would mean
   # "whatever any environment pushed last".
@@ -255,15 +271,21 @@ for svc in "${SERVICES[@]}"; do
   log "── $svc → $repo ─────────────────────────────"
 
   if ! ecr_repo_exists "$repo"; then
-    die "ECR repository '$repo' does not exist yet. Create it first with:
-      terraform -chdir=infra/envs/shared apply
-    (the repositories are shared across environments — see
-    infra/envs/shared/main.tf), then re-run this script."
+    die "ECR repository '$repo' does not exist yet. The repositories are shared
+    across environments and created by infra/envs/shared in the
+    insolvia-services repo — add it there, let that repo's release apply it,
+    then re-run this script."
   fi
 
   "build_$svc" "$image"
   docker push "$image:$ENV"
-  ok "pushed $image:$ENV"
+  media_type="$(aws ecr describe-images --repository-name "${image##*/}" \
+    --image-ids imageTag="$ENV" --query 'imageDetails[0].imageManifestMediaType' --output text)"
+  case "$media_type" in
+    *index* | *manifest.list*)
+      die "$image:$ENV was pushed as an image index ($media_type); Lambda refuses it. Check that this Docker honours --provenance=false." ;;
+  esac
+  ok "pushed $image:$ENV ($media_type)"
 done
 
 # ── optionally re-run the deploys ──────────────────────────────────

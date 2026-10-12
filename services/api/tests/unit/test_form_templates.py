@@ -53,8 +53,9 @@ def _release_params() -> list[object]:
 
 
 def test_the_registry_holds_the_expected_series() -> None:
-    """The full Chapter 7 individual filing set — one series per form in
-    forms/, which the drift test below keeps in lockstep."""
+    """The full Chapter 7 individual filing set plus the Chapter 13 means-
+    test pair (issue #365) — one series per form in forms/, which the drift
+    test below keeps in lockstep."""
     assert form_series_ids() == (
         "form/b101",
         "form/b106ab",
@@ -70,9 +71,12 @@ def test_the_registry_holds_the_expected_series() -> None:
         "form/b106sum",
         "form/b107",
         "form/b108",
+        "form/b113",
         "form/b121",
         "form/b122a1",
         "form/b122a2",
+        "form/b122c1",
+        "form/b122c2",
         "form/b2010",
         "form/b2030",
     )
@@ -221,9 +225,12 @@ def test_form_revisions_as_of_is_the_case_pin_map() -> None:
         "form/b106sum": "2015-12-01",
         "form/b107": "2025-04-01",
         "form/b108": "2015-12-01",
+        "form/b113": "2017-12-01",
         "form/b121": "2015-12-01",
         "form/b122a1": "2019-12-01",
         "form/b122a2": "2025-04-01",
+        "form/b122c1": "2019-10-01",
+        "form/b122c2": "2025-04-01",
         "form/b2010": "2020-12-01",
         "form/b2030": "2025-12-01",
     }

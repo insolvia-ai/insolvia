@@ -62,6 +62,11 @@ output "jobs_queue_url" {
   value       = module.job_pipeline.queue_url
 }
 
+output "filing_queue_url" {
+  description = "Staging filing queue URL (ADR 0024 PR 6) — also published to SSM as filing-queue-url for the API."
+  value       = module.filing_queue.queue_url
+}
+
 output "auth_user_pool_id" {
   description = "Staging Cognito user pool ID."
   value       = module.auth.user_pool_id
@@ -89,6 +94,11 @@ output "auth_web_client_id" {
   value       = module.auth.web_client_id
 }
 
+output "auth_portal_client_id" {
+  description = "Staging client portal app client ID (authorization-code + PKCE, ADR 0023) — disjoint from auth_web_client_id."
+  value       = module.auth.portal_client_id
+}
+
 output "auth_domain" {
   description = "Staging hosted auth domain (Cognito-provided)."
   value       = module.auth.domain
@@ -101,61 +111,6 @@ output "auth_issuer_url" {
 
 # ── Mailer (issues 6.2, 6.3) — read by the deploy workflow and, in PR4, by
 # the API deploy workflow to derive its MAILER_* env vars ────────────────────
-output "mailer_api_url" {
-  description = "Staging mailer API base URL (SigV4-authenticated)."
-  value       = module.mailer.api_url
-}
-
-output "mailer_ecr_repository_url" {
-  description = "ECR repository the mailer deploy workflow pushes staging images to."
-  value       = module.mailer.ecr_repository_url
-}
-
-output "mailer_lambda_function_names" {
-  description = "Staging mailer Lambda function names keyed by role (ingress/sender/feedback)."
-  value       = module.mailer.lambda_function_names
-}
-
-output "mailer_content_bucket" {
-  description = "Staging mailer content bucket (request manifests, future attachments)."
-  value       = module.mailer.content_bucket
-}
-
-output "mailer_messages_table" {
-  description = "Staging mailer messages DynamoDB table."
-  value       = module.mailer.messages_table
-}
-
-output "mailer_suppressions_table" {
-  description = "Staging mailer suppressions DynamoDB table."
-  value       = module.mailer.suppressions_table
-}
-
-output "mailer_service_registry_json" {
-  description = "Staging MAILER_SERVICE_REGISTRY_JSON value — the insolvia_api tenant config, for PR4's API service to reference."
-  value       = module.mailer.service_registry_json
-}
-
-output "mailer_api_status_queue_url" {
-  description = "Staging SQS queue insolvia_api's send-status events publish to."
-  value       = module.mailer.api_status_queue_url
-}
-
-output "mailer_api_status_queue_arn" {
-  description = "ARN of the above, for PR4's consumer IAM policy / event source mapping."
-  value       = module.mailer.api_status_queue_arn
-}
-
-output "mailer_configuration_set" {
-  description = "Staging SES configuration set the mailer sends through."
-  value       = module.mailer.configuration_set
-}
-
-output "mailer_alarms_topic_arn" {
-  description = "SNS topic for staging mailer alarms — subscribe by hand (Terraform manages no subscriptions)."
-  value       = module.mailer.alarms_topic_arn
-}
-
 # ── Marketing site (issue #45 revisited) — read by marketing-staging.yml ──
 output "marketing_distribution_id" {
   description = "Marketing CloudFront distribution ID (cache invalidation)."
@@ -285,6 +240,21 @@ output "case_document_bucket" {
 }
 
 output "dev_fixtures_bucket" {
-  description = "The account's shared seed-fixture bucket (infra/modules/dev_fixtures, owned by envs/shared), resolved by data lookup like every other shared resource."
+  description = "The account's shared seed-fixture bucket (module dev_fixtures, owned by envs/shared in the insolvia-services repo), resolved by data lookup like every other shared resource."
   value       = data.aws_s3_bucket.dev_fixtures.id
+}
+
+output "filing_ecr_repository_url" {
+  description = "ECR repository holding the filing worker image (services/filing, ADR 0024 PR 7)."
+  value       = module.filing_worker.ecr_repository_url
+}
+
+output "filing_worker_function_name" {
+  description = "The filing worker Lambda (deploy target of filing-<env>.yml)."
+  value       = module.filing_worker.function_name
+}
+
+output "filing_kill_switch_parameter" {
+  description = "The filing kill switch: \"true\" lets the worker submit. Created off; flipped by hand only."
+  value       = module.filing_worker.kill_switch_parameter
 }

@@ -9,8 +9,9 @@ re-deriving it:
 
 1. Every populated field carries a provenance entry. A record with a value and
    no entry for it is rejected — otherwise rule 2 is evaded by omitting the key.
-2. A field whose source is machine-supplied and whose ``confirmed_at`` is null
-   cannot exist on a case record. Not "should not": the write is rejected.
+2. A field whose source is machine-supplied — or a debtor's portal answer,
+   ``client_answered`` — and whose ``confirmed_at`` is null cannot exist on a
+   case record. Not "should not": the write is rejected.
 
 Together those make "nothing extracted enters the case until a human confirms
 it" a property of the store rather than a promise about the UI.
@@ -50,8 +51,38 @@ from insolvia_core.errors import FieldValidationError
 # `extraction_id` or `external_refs` fit a firm's own prior record, so this is
 # the source-specific member that names it, the same way `extraction_id` names
 # an `extraction_candidate` for `ai_extracted`.
-SOURCES: Final = ("staff_typed", "ai_extracted", "imported", "library")
+#
+# `client` is the fifth (ADR 0022): a debtor's identity COPIED from the firm's
+# client directory (`firm_clients.py`) when a case is opened for that client,
+# or when a client is linked to a filing role. The same shape as `library`
+# for the same reason — a copy of a firm-owned record, chosen by a person —
+# with `client_id` naming the record it came from. Never a live reference: a
+# filed petition must not change because the client record did, and
+# divergence is computed on read (`firm_clients.differs_from_client`).
+#
+# `client_answered` is the sixth (ADR 0023 PR 4 / #363): a value the DEBTOR
+# gave through the client portal's questionnaire, which a person at the firm
+# then accepted through the review queue. Not `client`, which ADR 0022 had
+# already given a different meaning — a copy of the firm's own directory
+# record, chosen by staff and outside the confirmation rule. An answer is
+# the opposite on both counts: the debtor's own say-so, and subject to the
+# confirmation rule exactly as `ai_extracted` is. Overloading one name with
+# both would lose the one distinction an audit of a petition needs ("did the
+# firm copy this, or did the debtor tell us?"). `extraction_id` names the
+# candidate it was accepted from; that candidate names the question.
+SOURCES: Final = (
+    "staff_typed",
+    "ai_extracted",
+    "imported",
+    "library",
+    "client",
+    "client_answered",
+)
 MACHINE_SOURCES: Final = frozenset({"ai_extracted", "imported"})
+# Every source invariant 2 covers: the machine-supplied ones, and a debtor's
+# answer — a value that reaches a case record only through a person's
+# confirmation (ADR 0023 § Writes).
+CONFIRMATION_REQUIRED: Final = MACHINE_SOURCES | {"client_answered"}
 
 # A dotted field path, with embedded list elements addressed by their id in
 # brackets: `name.surname`, `other_names_used[3f9c…].surname`.
@@ -72,7 +103,13 @@ _FIELD_NAME_RE: Final = re.compile(rf"^{_FIELD_NAME}$")
 
 # Stamped by the server, never supplied, so there is nothing to record the
 # origin of. Matched as whole paths — see require_provenance.
-_SERVER_OWNED: Final = frozenset({"id", "case_id", "created_at", "updated_at"})
+#
+# `client_id` is the debtor's link to the firm's client (ADR 0022): set when a
+# case is opened for a client or by the debtor's link route, KEPT by the
+# questionnaire's whole-record PUT, and never a fact a caller asserts.
+_SERVER_OWNED: Final = frozenset(
+    {"id", "case_id", "created_at", "updated_at", "client_id"}
+)
 _SEGMENT = rf"{_FIELD_NAME}(?:\[[A-Za-z0-9_-]+\])?"
 _FIELD_PATH_RE: Final = re.compile(rf"^{_SEGMENT}(?:\.{_SEGMENT})*$")
 
@@ -100,6 +137,19 @@ class ProvenanceEntry:
     # creditor_id) — so a library entry deleted after the copy leaves the
     # provenance readable rather than the case record unwritable.
     library_creditor_id: str | None = None
+    # The `firm_clients.py` row a `client`-sourced value was copied from —
+    # the same "shape and type only" rule as `library_creditor_id`: a client
+    # archived or merged after the copy leaves the provenance readable.
+    client_id: str | None = None
+    # The case this value was COPIED FROM (issue 14.3 / #355's copy case) —
+    # orthogonal to `source`, on purpose. A copied value keeps the entry it
+    # had: an extracted value a person confirmed is still that, confirmed by
+    # that person, read from that document (which `document_id` names in the
+    # SOURCE case); the copy adds where the record was taken from rather than
+    # laundering every origin into one new source. Same "shape and type
+    # only" rule as the ids above: a source case deleted afterwards leaves
+    # the provenance readable.
+    copied_from_case_id: str | None = None
 
 
 def _is_utc_timestamp(value: object) -> bool:
@@ -210,7 +260,9 @@ def _parse_entry(
     # Both halves are required: `confirmed_at` is the moment and `confirmed_by`
     # is the person, and a confirmation with no one attached to it cannot be
     # audited, which is the entire point of recording it.
-    if source in MACHINE_SOURCES and (confirmed_at is None or confirmed_by is None):
+    if source in CONFIRMATION_REQUIRED and (
+        confirmed_at is None or confirmed_by is None
+    ):
         errors[f"provenance.{path}"] = (
             f"A {source} value must be confirmed by a person before it can be stored."
         )
@@ -251,6 +303,18 @@ def _parse_entry(
         )
         return None
 
+    client_id = value.get("client_id")
+    if client_id is not None and not isinstance(client_id, str):
+        errors[f"provenance.{path}.client_id"] = "client_id must be a string."
+        return None
+
+    copied_from_case_id = value.get("copied_from_case_id")
+    if copied_from_case_id is not None and not isinstance(copied_from_case_id, str):
+        errors[f"provenance.{path}.copied_from_case_id"] = (
+            "copied_from_case_id must be a string."
+        )
+        return None
+
     return ProvenanceEntry(
         source=source,
         confirmed_by=confirmed_by,
@@ -260,6 +324,8 @@ def _parse_entry(
         extraction_id=extraction_id,
         confidence=confidence,
         library_creditor_id=library_creditor_id,
+        client_id=client_id,
+        copied_from_case_id=copied_from_case_id,
     )
 
 
@@ -376,6 +442,40 @@ def populated_paths(record: object, prefix: str = "") -> list[str]:
     return [prefix] if prefix else []
 
 
+_PATH_SEGMENT_RE: Final = re.compile(r"^([a-z][a-z0-9_]*)(?:\[([A-Za-z0-9_-]+)\])?$")
+
+
+def value_at(record: object, path: str) -> object:
+    """The value `path` addresses in `record` — the inverse of
+    `populated_paths`, so every path that walk emits resolves here to the
+    value it was emitted for. A list element is found by its `id`, never by
+    position. None when nothing is there.
+
+    Exists so a write can ask "is this field the value it was?" of two
+    records by path — `debtors.require_client_provenance_kept` — which is
+    how a copied field's `client` provenance is told apart from a claim of
+    one on a value somebody has since changed."""
+    current: object = record
+    for segment in path.split("."):
+        match = _PATH_SEGMENT_RE.match(segment)
+        if match is None or not isinstance(current, Mapping):
+            return None
+        name, element_id = match.groups()
+        current = current.get(name)
+        if element_id is not None:
+            if not isinstance(current, Sequence) or isinstance(current, (str, bytes)):
+                return None
+            current = next(
+                (
+                    element
+                    for element in current
+                    if isinstance(element, Mapping) and element.get("id") == element_id
+                ),
+                None,
+            )
+    return current
+
+
 def require_provenance(
     record: Mapping[str, object], entries: Mapping[str, ProvenanceEntry]
 ) -> None:
@@ -386,7 +486,7 @@ def require_provenance(
     omitting the key, which is the loophole that would make invariant 2
     decorative.
 
-    The four server-assigned fields in `_SERVER_OWNED` are exempt: they are
+    The server-assigned fields in `_SERVER_OWNED` are exempt: they are
     stamped here, not supplied by anyone, so "where did this come from" has one
     answer and it is not a fact about the case.
 
@@ -410,6 +510,57 @@ def require_provenance(
         )
 
 
+# Sources the SERVER mints and a whole-record save may only KEEP: `client`
+# (only the copy routes write it — debtors.require_client_provenance_kept)
+# and `client_answered` (only the review queue's acceptance of a portal
+# answer writes it, ADR 0023). A staff save that claimed either on a value
+# would be a person attributing their own typing to someone else.
+KEEP_ONLY_SOURCES: Final = frozenset({"client", "client_answered"})
+
+_KEEP_ONLY_MESSAGES: Final = {
+    "client": (
+        "Only a value copied from the client, and unchanged since, "
+        "can say it came from the client."
+    ),
+    "client_answered": (
+        "Only a value accepted from the client's own answer, and unchanged "
+        "since, can say the client answered it."
+    ),
+}
+
+
+def require_server_sources_kept(
+    body: Mapping[str, object],
+    entries: Mapping[str, ProvenanceEntry],
+    *,
+    stored_body: Mapping[str, object] | None,
+    stored_entries: Mapping[str, ProvenanceEntry] | None,
+) -> None:
+    """A save may KEEP a `KEEP_ONLY_SOURCES` entry, never mint one.
+
+    Legitimate in exactly one shape: the entry the stored record already
+    carries at that path, on the value that path already holds — an autosave
+    echoing back a field nobody touched (the api-client's
+    `revisedProvenance`). Anything else is refused, not silently downgraded:
+    a caller that believes it saved one thing must not find another stored.
+    Entries at paths `body` leaves empty describe nothing and are not
+    checked. `stored_body` None is a create, where nothing can be kept."""
+    populated = set(populated_paths(body))
+    errors: dict[str, str] = {}
+    for path, entry in entries.items():
+        if entry.source not in KEEP_ONLY_SOURCES or path not in populated:
+            continue
+        kept = stored_entries.get(path) if stored_entries is not None else None
+        if (
+            stored_body is None
+            or kept != entry
+            or value_at(stored_body, path) != value_at(body, path)
+        ):
+            errors[f"provenance.{path}"] = _KEEP_ONLY_MESSAGES[entry.source]
+    if errors:
+        raise FieldValidationError(errors)
+
+
 def provenance_json(
     entries: Mapping[str, ProvenanceEntry],
 ) -> dict[str, dict[str, object]]:
@@ -427,6 +578,8 @@ def provenance_json(
             ("extraction_id", entry.extraction_id),
             ("confidence", entry.confidence),
             ("library_creditor_id", entry.library_creditor_id),
+            ("client_id", entry.client_id),
+            ("copied_from_case_id", entry.copied_from_case_id),
         ):
             if value is not None:
                 member[key] = value

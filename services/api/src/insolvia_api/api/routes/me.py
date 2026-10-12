@@ -9,9 +9,11 @@ from insolvia_core.errors import NotFoundError, ValidationError
 from insolvia_core.firms import (
     FEATURES,
     apply_user_changes,
+    firm_defaults_json,
     full_name,
     parse_self_update,
     permission_for,
+    signature_block_json,
 )
 from insolvia_core.ports import FirmStore
 
@@ -84,6 +86,12 @@ def _me_body(accessor: Accessor | None) -> dict[str, object]:
             "permissions": {
                 feature: permission_for(accessor.user, feature) for feature in FEATURES
             },
+            # The firm's defaults and the caller's own signature block (issue
+            # #360). Here, on the ONE route every member may read, because
+            # the create form and the petition screen are case work and
+            # `/v1/firm` is administration.
+            **firm_defaults_json(accessor.firm),
+            "signatureBlock": signature_block_json(accessor.user),
         }
     return body
 

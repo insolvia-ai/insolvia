@@ -10,8 +10,8 @@ does belongs in that form's module.
 
 from __future__ import annotations
 
-from collections.abc import Iterable
-from dataclasses import dataclass
+from collections.abc import Iterable, Mapping
+from dataclasses import dataclass, field
 from decimal import Decimal
 
 from insolvia_core.assets import AssetBody
@@ -37,6 +37,7 @@ from insolvia_core.petitions import (
     RelatedCaseBody,
     SoleProprietorshipBody,
 )
+from insolvia_core.plans import PlanBody
 from insolvia_core.sofa import SofaEntryBody
 
 from ..form_fill import FieldFill, Option, Text, helvetica_width
@@ -70,10 +71,20 @@ class CaseFile:
     from codebtors, households from expenses, employments from pay-period
     records) carry `(id, body)` pairs so a reference resolves without a
     store; the rest are bare bodies.
+
+    `tax_ids` is the ONE thing here a store did not simply hand over: the
+    debtors' full tax identifiers, by filing role, produced by the logged
+    full-value read (insolvia_core.tax_ids.read_tax_id) that packet
+    assembly and the single-form preview perform when — and only when —
+    B121 is being rendered. Empty otherwise, and every debtor read still
+    carries its last four on the record for B101. Keeping the digits in
+    this map rather than on the Debtor is what keeps `Debtor` serialisable
+    everywhere else without a second thought.
     """
 
     case: Case
     debtors: tuple[Debtor, ...] = ()
+    tax_ids: Mapping[str, str] = field(default_factory=dict)
     petition: PetitionBody | None = None
     prior_cases: tuple[PriorCaseBody, ...] = ()
     related_cases: tuple[RelatedCaseBody, ...] = ()
@@ -100,6 +111,10 @@ class CaseFile:
     dependents: tuple[DependentBody, ...] = ()
     # B107.
     sofa_entries: tuple[SofaEntryBody, ...] = ()
+    # B113, the Chapter 13 plan (issue #367): the one `plans` record —
+    # packet assembly's gate refuses a second, so the projection reads the
+    # first. Chapter 7 cases carry none that anything reads.
+    plans: tuple[PlanBody, ...] = ()
 
     def debtor(self, *roles: str) -> Debtor | None:
         return next((d for d in self.debtors if d.filing_role in roles), None)
@@ -168,17 +183,30 @@ def wrap_lines(
 
 
 def wrap_width(
-    value: str, *, points: float, lines: int, where: str, problems: list[str]
+    value: str,
+    *,
+    points: float,
+    lines: int,
+    where: str,
+    problems: list[str],
+    size: float | None = None,
 ) -> list[str]:
     """`wrap_lines` for a flat release's overlay rows: the measure is the
-    row's width in POINTS under the font the engine draws with, so a line
-    that fits here is a line the engine will accept. Overflow is an error."""
+    row's width in POINTS under the font the engine draws with — at the
+    box's own `size` where it carries one (`OverlayBox.size`), the engine's
+    default otherwise — so a line that fits here is a line the engine will
+    accept. Overflow is an error."""
     words = value.split()
     rows_out: list[str] = []
     current = ""
     for word in words:
         candidate = f"{current} {word}".strip()
-        if helvetica_width(candidate) <= points or not current:
+        measured = (
+            helvetica_width(candidate)
+            if size is None
+            else helvetica_width(candidate, size)
+        )
+        if measured <= points or not current:
             current = candidate
         else:
             rows_out.append(current)

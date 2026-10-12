@@ -61,9 +61,10 @@
 #
 # The fixture also names CASES (seeds/fixtures/<version>/), whose sample
 # documents live in the shared fixture bucket — one bucket for the account,
-# infra/modules/dev_fixtures, applied by CI as part of envs/shared. The loader
-# copies them server-side into this machine's own case-documents bucket; the
-# developer's credentials are what read the shared bucket. If the copy is
+# insolvia-services' infra/modules/dev_fixtures, applied by that repo's CI as
+# part of its infra/envs/shared. The loader copies them server-side into this
+# machine's own case-documents bucket; the developer's credentials are what
+# read the shared bucket. If the copy is
 # refused, the bucket has not been applied yet or the fixture version has not
 # been published (scripts/dev-fixture.sh publish).
 #
@@ -159,8 +160,8 @@ DOCUMENT_BUCKET="$(jq -r '.case_document_bucket.value // empty' <<<"$outputs")"
 [[ "$DOCUMENT_BUCKET" == "$RESOURCE_PREFIX-case-documents-"* ]] ||
   die "Refusing: document bucket '$DOCUMENT_BUCKET' does not carry this machine's prefix."
 # The shared fixture bucket is account-level and named deterministically
-# (infra/modules/dev_fixtures); INSOLVIA_DEV_FIXTURES_BUCKET overrides it for
-# an account that names it differently.
+# (insolvia-services' infra/modules/dev_fixtures); INSOLVIA_DEV_FIXTURES_BUCKET
+# overrides it for an account that names it differently.
 FIXTURE_BUCKET="${INSOLVIA_DEV_FIXTURES_BUCKET:-insolvia-shared-dev-fixtures-$AWS_REGION_VALUE}"
 
 POOL_ID="$(jq -r '.auth_user_pool_id.value // empty' <<<"$outputs")"
@@ -177,6 +178,8 @@ pool_name="$(aws_dev cognito-idp describe-user-pool --user-pool-id "$POOL_ID" \
 # FROM THE FIXTURE, not from an env var or a default that has to be kept in
 # step with it: a fixture person WITHOUT a password is one whose account this
 # wrapper must provide (with one, the loader creates it — staging's model).
+# That includes a fixture case's portal CLIENTS (ADR 0023), which get the same
+# dev password — one secret for every throwaway seat on this machine.
 # The addresses are all `.test` ones — a reserved TLD (RFC 2606) that can
 # never be a real mailbox, which matters twice over: this repo is public, and
 # Cognito would otherwise be able to mail a stranger. Nothing is emailed
@@ -185,7 +188,7 @@ pool_name="$(aws_dev cognito-idp describe-user-pool --user-pool-id "$POOL_ID" \
 ACCOUNT_EMAILS=()
 while IFS= read -r email; do
   ACCOUNT_EMAILS+=("$email")
-done < <(jq -r '[.firms[].users[] | select(has("password") | not) | .email] | unique | .[]' "$FIXTURE")
+done < <(jq -r '[(.firms[].users[], (.cases // [])[].clients[]?) | select(has("password") | not) | .email] | reduce .[] as $e ([]; if index([$e]) then . else . + [$e] end) | .[]' "$FIXTURE")
 [[ ${#ACCOUNT_EMAILS[@]} -gt 0 ]] ||
   die "No passwordless person in $(basename "$FIXTURE") — nothing for this wrapper to ensure, which is not the dev fixture's shape."
 for email in "${ACCOUNT_EMAILS[@]}"; do
@@ -325,11 +328,26 @@ seed() {
     "$@"
 }
 
+# ADR 0022's release step, on this machine: delete the case partitions whose
+# debtors name no firm client — the rows seeded from fixtures v1..v3, or opened
+# before cases were opened for clients. Idempotent (a second run finds none),
+# and it can never delete a case that has a client; the entrypoint's docstring
+# owns the rule. Run before the load, so the v4 cases replace the v3 ones
+# rather than sitting beside them.
+purge_pre_client() {
+  PYTHONPATH="$REPO_ROOT/services/admin/src" "$VENV_PYTHON" -m insolvia_admin.entrypoints.purge_pre_client \
+    --case-table "$CASE_TABLE" \
+    --firm-table "$FIRM_TABLE" \
+    "$@"
+}
+
 if [[ "$CHECK_ONLY" -eq 1 ]]; then
   for email in "${ACCOUNT_EMAILS[@]}"; do
     user_is_confirmed "$email" ||
       die "No CONFIRMED user '$email' in $pool_name. Re-run without --check to create it."
   done
+  purge_pre_client --check ||
+    die "This machine still holds pre-client cases (ADR 0022). Re-run without --check."
   seed --check || die "seeds/dev.json is not fully loaded. Re-run without --check."
   ok "Sign-in ready and this machine matches seeds/dev.json."
   exit 0
@@ -339,6 +357,9 @@ for email in "${ACCOUNT_EMAILS[@]}"; do
   ensure_account "$email"
 done
 offer_to_save_password
+
+log "Deleting pre-client cases from $CASE_TABLE (ADR 0022) — finding none is the usual answer"
+purge_pre_client --apply
 
 log "Loading $(basename "$FIXTURE") into $FIRM_TABLE and $CASE_TABLE (documents from s3://$FIXTURE_BUCKET)"
 seed

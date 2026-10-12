@@ -14,6 +14,7 @@ import time
 import jwt
 import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
+from insolvia_api.adapters.memory.event_store import MemoryEventStore
 from insolvia_api.adapters.memory.mailer_client import InMemoryMailerClient
 from insolvia_api.adapters.memory.waitlist_store import MemoryWaitlistStore
 from insolvia_api.api.app_factory import create_app
@@ -25,7 +26,11 @@ from insolvia_core.adapters.memory.case_store import MemoryCaseStore
 from insolvia_core.adapters.memory.debtor_store import MemoryDebtorStore
 from insolvia_core.adapters.memory.firm_store import MemoryFirmStore
 from insolvia_core.adapters.memory.jwks_provider import StaticJwksProvider
+from insolvia_core.adapters.memory.tax_id_cipher import LocalTaxIdCipher
+from insolvia_core.adapters.memory.tax_id_store import MemoryTaxIdStore
 from insolvia_core.firms import Firm, FirmUser, default_permissions
+
+from tests.unit.opening import with_client
 
 ISSUER = "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_EXAMPLE00"
 CLIENT_ID = "exampleappclientid000000"
@@ -114,11 +119,15 @@ def client(access_log):
             mailer=InMemoryMailerClient(),
             jwks_provider=StaticJwksProvider({KID: _PUBLIC_KEY}),
             case_store=MemoryCaseStore(),
+            # Filing records a filed date, which regenerates deadlines.
+            event_store=MemoryEventStore(),
             firm_store=firms,
             access_log=access_log,
             # Composed so the not-shadowed test below can prove the static
             # debtor route still answers, not because these tests need it.
             debtor_store=MemoryDebtorStore(),
+            tax_id_store=MemoryTaxIdStore(),
+            tax_id_cipher=LocalTaxIdCipher(),
             case_entity_store=MemoryCaseEntityStore(),
         )
     )
@@ -127,10 +136,29 @@ def client(access_log):
 
 def open_case(client, subject=ALICE):
     response = client.post(
-        "/v1/cases", json={"chapter": 7, "district": "NDCA"}, headers=auth(subject)
+        "/v1/cases",
+        json=with_client(
+            client, auth(subject), {"chapter": 7, "court": "flmb", "division": "tampa"}
+        ),
+        headers=auth(subject),
     )
     assert response.status_code == 201
     return response.get_json()["id"]
+
+
+def file_case(client, case_id, subject=ALICE):
+    response = client.patch(
+        f"/v1/cases/{case_id}",
+        # Filing needs its docket facts (#355).
+        json={
+            "status": "filed",
+            "filed_at": "2026-09-01",
+            "case_number": "8:26-bk-01234",
+        },
+        headers=auth(subject),
+    )
+    assert response.status_code == 200
+    return response
 
 
 CREDITOR_BODY = {
@@ -290,6 +318,75 @@ def test_removing_a_record_answers_204_then_404(client):
     assert second.status_code == 404
     listing = client.get(f"/v1/cases/{case_id}/creditors", headers=auth(ALICE))
     assert listing.get_json() == {"creditors": []}
+
+
+# ── Amendments (issue #370) ──────────────────────────────────────
+
+
+def test_amended_defaults_false_and_is_always_present(client):
+    case_id = open_case(client)
+    record = add_creditor(client, case_id).get_json()
+    assert record["amended"] is False
+
+
+def test_amended_true_is_refused_before_the_case_is_filed(client):
+    case_id = open_case(client)
+    response = add_creditor(client, case_id, body={**CREDITOR_BODY, "amended": True})
+    assert response.status_code == 409
+
+
+def test_amended_true_is_accepted_once_the_case_is_filed(client):
+    case_id = open_case(client)
+    file_case(client, case_id)
+    response = add_creditor(client, case_id, body={**CREDITOR_BODY, "amended": True})
+    assert response.status_code == 201
+    assert response.get_json()["amended"] is True
+
+
+def test_editing_to_amended_true_is_refused_before_the_case_is_filed(client):
+    case_id = open_case(client)
+    entity_id = add_creditor(client, case_id).get_json()["id"]
+    response = client.put(
+        f"/v1/cases/{case_id}/creditors/{entity_id}",
+        json={"name": "Renamed Bank", "provenance": {"name": TYPED}, "amended": True},
+        headers=auth(ALICE),
+    )
+    assert response.status_code == 409
+
+
+def test_amended_false_is_always_allowed_even_unfiled(client):
+    case_id = open_case(client)
+    response = add_creditor(client, case_id, body={**CREDITOR_BODY, "amended": False})
+    assert response.status_code == 201
+    assert response.get_json()["amended"] is False
+
+
+@pytest.mark.parametrize(
+    ("sent", "expected"), [({}, True), ({"amended": False}, False)]
+)
+def test_a_put_that_omits_amended_keeps_the_stored_flag(client, sent, expected):
+    # A screen editing one field sends the body back without `amended`;
+    # silence must not un-amend a filed item, but an explicit false clears it.
+    case_id = open_case(client)
+    file_case(client, case_id)
+    entity_id = add_creditor(
+        client, case_id, body={**CREDITOR_BODY, "amended": True}
+    ).get_json()["id"]
+    response = client.put(
+        f"/v1/cases/{case_id}/creditors/{entity_id}",
+        json={"name": "Renamed Bank", "provenance": {"name": TYPED}, **sent},
+        headers=auth(ALICE),
+    )
+    assert response.status_code == 200
+    assert response.get_json()["amended"] is expected
+
+
+def test_amended_must_be_a_boolean(client):
+    case_id = open_case(client)
+    file_case(client, case_id)
+    response = add_creditor(client, case_id, body={**CREDITOR_BODY, "amended": "yes"})
+    assert response.status_code == 400
+    assert "amended" in response.get_json()["fields"]
 
 
 # ── Listing ─────────────────────────────────────────────────────

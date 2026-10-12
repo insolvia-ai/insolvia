@@ -1,0 +1,11 @@
+{
+  "series_id": "courts/us-bankruptcy",
+  "effective_date": "2026-09-26",
+  "sequence": 2,
+  "source": {
+    "url": "https://pacer.uscourts.gov/file-case/court-cmecf-lookup/data.json",
+    "published": null,
+    "sha256": null
+  },
+  "notes": "The court registry's third release (issue #367): every record of courts/us-bankruptcy@2026-09-26, unchanged, plus one new fact per district — `chapter_13_plan`, whether the court takes Official Form 113 or its own Rule 3015.1 local plan form. FLSB's is verified from the Clerk's Procedural Manual the first release already cites; the other nine are unverified with no value, because their forms pages could not be read on 2026-09-26, and an unverified answer leaves those cases on the national form. A new release rather than an edit because the registry is append-only (effective-dating.md); sequence 2 of 2026-09-26 because the matrix release (#368) took that date's first sequence the same day, and the fact must be in force the day it was compiled."
+}

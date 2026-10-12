@@ -37,6 +37,8 @@ from insolvia_core.adapters.memory.case_store import MemoryCaseStore
 from insolvia_core.adapters.memory.debtor_store import MemoryDebtorStore
 from insolvia_core.adapters.memory.firm_store import MemoryFirmStore
 from insolvia_core.adapters.memory.jwks_provider import StaticJwksProvider
+from insolvia_core.adapters.memory.tax_id_cipher import LocalTaxIdCipher
+from insolvia_core.adapters.memory.tax_id_store import MemoryTaxIdStore
 from insolvia_core.cases import (
     INDEX_BY_ASSIGNEE,
     INDEX_BY_FIRM,
@@ -58,6 +60,8 @@ from insolvia_core.firms import (
     default_permissions,
 )
 
+from tests.unit.opening import add_client, claim_merge_after_read, with_client
+
 ISSUER = "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_EXAMPLE00"
 CLIENT_ID = "exampleappclientid000000"
 KID = "test-key-1"
@@ -75,6 +79,10 @@ ERIN = "00000000-0000-4000-8000-00000000e21e"  # disabled
 CAROL = "00000000-0000-4000-8000-0000000ca201"
 # In no firm at all: signed up, never provisioned.
 FRANK = "00000000-0000-4000-8000-00000000f4a2"
+
+# A registry reference (issue #360): the court and division a request names.
+TAMPA = {"chapter": 7, "court": "flmb", "division": "tampa"}
+ORLANDO = {"court": "flmb", "division": "orlando"}
 
 _PRIVATE_KEY = rsa.generate_private_key(public_exponent=65537, key_size=2048)
 _PUBLIC_KEY = _PRIVATE_KEY.public_key()
@@ -140,8 +148,15 @@ def member(
 
 
 @pytest.fixture
-def store():
-    return MemoryCaseStore()
+def debtors(firms):
+    # Composed with the firm store, as the API is: a link and a case open
+    # are conditional on the client row (the merge race).
+    return MemoryDebtorStore(firm_store=firms)
+
+
+@pytest.fixture
+def store(debtors):
+    return MemoryCaseStore(debtor_store=debtors)
 
 
 @pytest.fixture
@@ -165,7 +180,7 @@ def firms():
 
 
 @pytest.fixture
-def client(store, access_log, firms):
+def client(store, access_log, firms, debtors):
     app = create_app(
         ApiDependencies(
             config=load_config(
@@ -183,17 +198,23 @@ def client(store, access_log, firms):
             firm_store=firms,
             # The exemption election's opt-out check (issue #346) reads
             # Debtor 1's state and the petition's filing date.
-            debtor_store=MemoryDebtorStore(),
+            debtor_store=debtors,
+            tax_id_store=MemoryTaxIdStore(),
+            tax_id_cipher=LocalTaxIdCipher(),
             case_entity_store=MemoryCaseEntityStore(),
         )
     )
     return app.test_client()
 
 
-def open_case(client, subject=ALICE, *, chapter=7, district="NDCA"):
+def open_case(client, subject=ALICE, *, chapter=7, court="flmb", division="tampa"):
     response = client.post(
         "/v1/cases",
-        json={"chapter": chapter, "district": district},
+        json=with_client(
+            client,
+            auth(subject),
+            {"chapter": chapter, "court": court, "division": division},
+        ),
         headers=auth(subject),
     )
     assert response.status_code == 201
@@ -234,9 +255,7 @@ def test_a_signed_in_user_with_no_firm_is_403_not_401(client, method, path):
     """THE NEW FAILURE STATE. Their token is fine and signing in again will not
     help, so 401 would send them round a loop. It is a fact about their own
     account, so it is not hidden behind a 404 either."""
-    response = getattr(client, method)(
-        path, json={"chapter": 7, "district": "NDCA"}, headers=auth(FRANK)
-    )
+    response = getattr(client, method)(path, json=TAMPA, headers=auth(FRANK))
     assert response.status_code == 403
     assert response.get_json()["error"] == "ForbiddenError"
 
@@ -269,12 +288,7 @@ def test_staff_cannot_open_a_matter_by_default(client):
     """A consequence of core/firms.default_permissions worth pinning at this
     level: staff get view_only on the case record, so POST /v1/cases is a 403
     for them until an admin grants add_edit. Reading is unaffected."""
-    assert (
-        client.post(
-            "/v1/cases", json={"chapter": 7, "district": "NDCA"}, headers=auth(GREG)
-        ).status_code
-        == 403
-    )
+    assert client.post("/v1/cases", json=TAMPA, headers=auth(GREG)).status_code == 403
     assert client.get("/v1/cases", headers=auth(GREG)).status_code == 200
 
 
@@ -286,13 +300,13 @@ def test_view_only_can_read_but_not_write(client, firms):
     )
     case_id = open_case(client, ALICE)["id"]
     assert client.get(f"/v1/cases/{case_id}", headers=auth(DANA)).status_code == 200
-    refused = client.patch(
-        f"/v1/cases/{case_id}", json={"district": "CACD"}, headers=auth(DANA)
-    )
+    refused = client.patch(f"/v1/cases/{case_id}", json=ORLANDO, headers=auth(DANA))
     assert refused.status_code == 403
     assert (
         client.post(
-            "/v1/cases", json={"chapter": 7, "district": "X"}, headers=auth(DANA)
+            "/v1/cases",
+            json={"chapter": 7, "court": "x", "division": "y"},
+            headers=auth(DANA),
         ).status_code
         == 403
     )
@@ -304,7 +318,10 @@ def test_view_only_can_read_but_not_write(client, firms):
 def test_create_returns_the_case(client):
     body = open_case(client)
     assert body["chapter"] == 7
-    assert body["district"] == "NDCA"
+    assert body["court"] == "flmb"
+    assert body["division"] == "tampa"
+    # The printed name is DERIVED from the reference, never typed.
+    assert body["district"] == "Middle District of Florida"
     assert body["status"] == "intake"
     assert body["id"]
     assert body["createdAt"] == body["updatedAt"]
@@ -322,7 +339,9 @@ def test_create_never_returns_the_firm(client):
 def test_create_ignores_a_firm_supplied_by_the_client(client, store):
     response = client.post(
         "/v1/cases",
-        json={"chapter": 7, "district": "NDCA", "firmId": FIRM_B, "createdBy": CAROL},
+        json=with_client(
+            client, auth(ALICE), {**TAMPA, "firmId": FIRM_B, "createdBy": CAROL}
+        ),
         headers=auth(ALICE),
     )
     assert response.status_code == 201
@@ -343,25 +362,36 @@ def test_creating_a_case_links_its_creator(client, store):
     ] == [case_id]
 
 
-def test_create_starts_at_intake_even_if_asked_otherwise(client):
+@pytest.mark.parametrize("asked", ["filed", "prospect"])
+def test_create_starts_at_intake_even_if_asked_otherwise(client, asked):
     response = client.post(
         "/v1/cases",
-        json={"chapter": 7, "district": "NDCA", "status": "filed"},
+        json=with_client(client, auth(ALICE), {**TAMPA, "status": asked}),
         headers=auth(ALICE),
     )
+    # Every case opens retained (#355): the funnel before it is the client's.
     assert response.get_json()["status"] == "intake"
 
 
 @pytest.mark.parametrize(
     ("payload", "field"),
     [
-        ({"district": "NDCA"}, "chapter"),
-        ({"chapter": 9, "district": "NDCA"}, "chapter"),
-        ({"chapter": "7", "district": "NDCA"}, "chapter"),
-        ({"chapter": True, "district": "NDCA"}, "chapter"),
-        ({"chapter": 7}, "district"),
-        ({"chapter": 7, "district": "   "}, "district"),
-        ({"chapter": 7, "district": "x" * 65}, "district"),
+        ({"court": "flmb", "division": "tampa"}, "chapter"),
+        ({"chapter": 9, "court": "flmb", "division": "tampa"}, "chapter"),
+        ({"chapter": "7", "court": "flmb", "division": "tampa"}, "chapter"),
+        ({"chapter": True, "court": "flmb", "division": "tampa"}, "chapter"),
+        ({"chapter": 7}, "court"),
+        ({"chapter": 7, "court": "   ", "division": "tampa"}, "court"),
+        # A court the registry does not know is refused by name (#360).
+        ({"chapter": 7, "court": "nyeb", "division": "brooklyn"}, "court"),
+        ({"chapter": 7, "court": "flmb"}, "division"),
+        # A division of a DIFFERENT court is not this court's.
+        ({"chapter": 7, "court": "flmb", "division": "miami"}, "division"),
+        # The free-text district is refused, not silently ignored.
+        (
+            {"chapter": 7, "court": "flmb", "division": "tampa", "district": "NDCA"},
+            "district",
+        ),
     ],
 )
 def test_create_rejects_bad_input(client, payload, field):
@@ -426,11 +456,9 @@ def test_another_firms_case_is_invisible_to_its_admin(client):
 
 def test_another_firms_case_cannot_be_updated(client, store):
     case_id = open_case(client, ALICE)["id"]
-    response = client.patch(
-        f"/v1/cases/{case_id}", json={"district": "CACD"}, headers=auth(CAROL)
-    )
+    response = client.patch(f"/v1/cases/{case_id}", json=ORLANDO, headers=auth(CAROL))
     assert response.status_code == 404
-    assert store.cases[case_id].district == "NDCA"
+    assert store.cases[case_id].division == "tampa"
 
 
 def test_a_foreign_case_is_indistinguishable_from_a_missing_one(client):
@@ -591,8 +619,8 @@ def test_both_listings_order_identically(store, firms):
 
 
 def test_list_returns_the_firms_cases_over_http(client):
-    first = open_case(client, ALICE, district="NDCA")
-    second = open_case(client, DANA, district="CACD")
+    first = open_case(client, ALICE)
+    second = open_case(client, DANA, division="orlando")
     ids = {
         case["id"]
         for case in client.get("/v1/cases", headers=auth(ALICE)).get_json()["cases"]
@@ -656,11 +684,12 @@ def test_list_rejects_a_forged_cursor(client):
 
 
 def test_update_changes_only_what_was_sent(client):
-    created = open_case(client, chapter=7, district="NDCA")
+    created = open_case(client, chapter=7)
     updated = client.patch(
-        f"/v1/cases/{created['id']}", json={"district": "CACD"}, headers=auth(ALICE)
+        f"/v1/cases/{created['id']}", json=ORLANDO, headers=auth(ALICE)
     ).get_json()
-    assert updated["district"] == "CACD"
+    assert updated["division"] == "orlando"
+    assert updated["district"] == "Middle District of Florida"
     assert updated["chapter"] == 7
     assert updated["status"] == "intake"
 
@@ -705,9 +734,7 @@ def test_update_rejects_an_unknown_status(client):
 
 
 def test_update_of_a_missing_case_is_404(client):
-    response = client.patch(
-        "/v1/cases/nope", json={"district": "CACD"}, headers=auth(ALICE)
-    )
+    response = client.patch("/v1/cases/nope", json=ORLANDO, headers=auth(ALICE))
     assert response.status_code == 404
 
 
@@ -723,7 +750,8 @@ def put_debtor_1_in(client, case_id, state):
         },
         headers=auth(ALICE),
     )
-    assert response.status_code == 201, response.get_json()
+    # 200: Debtor 1 exists from the moment the case is opened for its client.
+    assert response.status_code == 200, response.get_json()
 
 
 def test_a_case_starts_with_no_election(client):
@@ -798,8 +826,21 @@ def test_a_case_with_no_debtor_state_yet_accepts_either_election(client):
 
 def test_creating_a_case_is_recorded(client, access_log):
     case_id = open_case(client)["id"]
-    assert [(e.action, e.case_id, e.principal) for e in access_log.events] == [
+    case_rows = [e for e in access_log.events if e.case_id is not None]
+    assert [(e.action, e.case_id, e.principal) for e in case_rows] == [
         ("case.create", case_id, ALICE)
+    ]
+
+
+def test_the_client_copied_into_a_case_is_recorded_as_read(client, access_log):
+    """Copying a person's identity into a case is reading their record."""
+    client_id = add_client(client, auth(ALICE))
+    client.post(
+        "/v1/cases", json={**TAMPA, "client_ids": [client_id]}, headers=auth(ALICE)
+    )
+    reads = [e for e in access_log.events if e.action == "client.read"]
+    assert [(e.client_id, e.outcome, e.principal) for e in reads] == [
+        (client_id, "allowed", ALICE)
     ]
 
 
@@ -847,7 +888,7 @@ def test_an_in_firm_refusal_is_also_recorded_as_denied(client, access_log):
 
 def test_a_refused_update_is_recorded_as_denied(client, access_log):
     case_id = open_case(client, ALICE)["id"]
-    client.patch(f"/v1/cases/{case_id}", json={"district": "CACD"}, headers=auth(CAROL))
+    client.patch(f"/v1/cases/{case_id}", json=ORLANDO, headers=auth(CAROL))
     assert access_log.events[-1].outcome == "denied"
 
 
@@ -1000,3 +1041,168 @@ def test_case_assignment_denormalises_the_cases_timestamp():
     assert assignment.case_created_at == case.created_at
     # Its own stamp is a different fact and is recorded separately.
     assert assignment.assigned_at != case.created_at
+
+
+# ── Opening a case for a client (ADR 0022) ─────────────────────────────
+
+
+def debtors_of(client, case_id, subject=ALICE):
+    response = client.get(f"/v1/cases/{case_id}/debtors", headers=auth(subject))
+    assert response.status_code == 200
+    return response.get_json()["debtors"]
+
+
+def test_a_case_opened_for_a_client_starts_with_that_client_as_debtor_1(client):
+    client_id = add_client(
+        client,
+        auth(ALICE),
+        name={"given": "Jordan", "surname": "Example"},
+        phone="555-0100",
+        lead_source="Referral",
+    )
+    case = client.post(
+        "/v1/cases", json={**TAMPA, "client_ids": [client_id]}, headers=auth(ALICE)
+    ).get_json()
+
+    [debtor] = debtors_of(client, case["id"])
+    assert debtor["filing_role"] == "debtor_1"
+    assert debtor["client_id"] == client_id
+    assert debtor["name"] == {"given": "Jordan", "surname": "Example"}
+    assert debtor["phone"] == "555-0100"
+    # The firm's own fields stay the firm's.
+    assert "lead_source" not in debtor
+    copied = {"source": "client", "client_id": client_id}
+    assert debtor["provenance"] == {
+        "name.given": copied,
+        "name.surname": copied,
+        "phone": copied,
+    }
+    assert debtor["differs_from_client"] == []
+
+
+def test_two_clients_open_a_joint_case_in_filing_order(client):
+    first = add_client(client, auth(ALICE), name={"given": "Jordan"})
+    second = add_client(client, auth(ALICE), name={"given": "Sam"})
+    case = client.post(
+        "/v1/cases",
+        json={**TAMPA, "client_ids": [first, second]},
+        headers=auth(ALICE),
+    ).get_json()
+    listed = debtors_of(client, case["id"])
+    assert [(d["filing_role"], d["client_id"]) for d in listed] == [
+        ("debtor_1", first),
+        ("debtor_2", second),
+    ]
+
+
+@pytest.mark.parametrize(
+    "client_ids",
+    [None, [], ["a", "b", "c"]],
+    ids=["missing", "empty", "three"],
+)
+def test_a_case_needs_one_or_two_clients(client, client_ids):
+    body = {**TAMPA} if client_ids is None else {**TAMPA, "client_ids": client_ids}
+    response = client.post("/v1/cases", json=body, headers=auth(ALICE))
+    assert response.status_code == 400
+    assert "client_ids" in response.get_json()["fields"]
+
+
+def test_the_same_client_cannot_be_both_debtors(client, store):
+    client_id = add_client(client, auth(ALICE))
+    response = client.post(
+        "/v1/cases",
+        json={**TAMPA, "client_ids": [client_id, client_id]},
+        headers=auth(ALICE),
+    )
+    assert response.status_code == 400
+    assert "client_ids" in response.get_json()["fields"]
+    assert store.cases == {}
+
+
+def test_another_firms_client_is_indistinguishable_from_no_client(
+    client, store, access_log
+):
+    """The anti-oracle rule of `GET /v1/firm/clients/<id>`, as a field error:
+    Carol's client and a made-up id get the same answer, nothing is written,
+    and the refused read is on the log."""
+    carols = add_client(client, auth(CAROL))
+    foreign = client.post(
+        "/v1/cases", json={**TAMPA, "client_ids": [carols]}, headers=auth(ALICE)
+    )
+    unknown = client.post(
+        "/v1/cases",
+        json={**TAMPA, "client_ids": ["no-such-client"]},
+        headers=auth(ALICE),
+    )
+    assert foreign.status_code == unknown.status_code == 400
+    assert foreign.get_json() == unknown.get_json()
+    assert store.cases == {}
+    denied = [e for e in access_log.events if e.outcome == "denied"]
+    assert [(e.action, e.client_id) for e in denied] == [
+        ("client.read", carols),
+        ("client.read", "no-such-client"),
+    ]
+
+
+def test_an_archived_client_is_restored_before_a_case_is_opened_for_them(client):
+    client_id = add_client(client, auth(ALICE))
+    client.put(
+        f"/v1/firm/clients/{client_id}/status",
+        json={"status": "archived"},
+        headers=auth(ALICE),
+    )
+    response = client.post(
+        "/v1/cases", json={**TAMPA, "client_ids": [client_id]}, headers=auth(ALICE)
+    )
+    assert response.status_code == 400
+    assert "archived" in response.get_json()["fields"]["client_ids"]
+
+
+def test_a_case_opened_for_a_client_a_merge_claimed_after_the_read_is_refused(
+    client, firms, store, monkeypatch
+):
+    """`CaseStore.create`'s condition on the client row: the route read the
+    client active, a merge claimed it, then the case's transaction ran. The
+    same 400 the read check gives, and no case."""
+    client_id = add_client(client, auth(ALICE))
+    survivor = add_client(client, auth(ALICE), name={"given": "Jordan B."})
+    claim_merge_after_read(
+        monkeypatch, firms, firm_id=FIRM_A, merged_id=client_id, survivor_id=survivor
+    )
+
+    response = client.post(
+        "/v1/cases", json={**TAMPA, "client_ids": [client_id]}, headers=auth(ALICE)
+    )
+
+    assert response.status_code == 400
+    assert response.get_json()["fields"] == {
+        "client_ids": "That client is being merged into another client."
+    }
+    assert store.cases == {}
+
+
+def test_opening_a_case_needs_the_client_directory_too(client, firms):
+    """`cases: add_edit` alone is not enough: the copy would read a client
+    record the firm has not let this person see."""
+    client_id = add_client(client, auth(ALICE))
+    no_clients = "00000000-0000-4000-8000-0000000c0de0"
+    firms.add_user(
+        member(
+            no_clients,
+            permissions={**default_permissions("attorney"), "clients": HIDDEN},
+        )
+    )
+    response = client.post(
+        "/v1/cases",
+        json={**TAMPA, "client_ids": [client_id]},
+        headers=auth(no_clients),
+    )
+    assert response.status_code == 403
+
+
+def test_a_restricted_creator_is_still_linked_and_sees_their_debtor(client):
+    """BOB opens a matter for a client: the transaction that links him also
+    wrote the debtor he is about to fill in."""
+    case = open_case(client, BOB)
+    [debtor] = debtors_of(client, case["id"], BOB)
+    assert debtor["filing_role"] == "debtor_1"

@@ -117,6 +117,8 @@ function respond(stub: ApiStub, url: string, init?: RequestInit): Response {
               byteSize: 2048,
               uploadedAt: '2026-09-04T09:00:00.000000Z',
               status: 'stored',
+              channel: 'staff',
+              requestId: null,
             },
           ],
         }))
@@ -180,6 +182,46 @@ describe('the extraction review screen', () => {
     expect(await screen.findByText(/from synthetic-report\.pdf/)).toBeTruthy();
     expect(screen.getByText(/page 2/)).toBeTruthy();
     expect(screen.getByText('95% confident')).toBeTruthy();
+  });
+
+  it('shows a client’s portal answer as from the client, with its question', async () => {
+    // ADR 0023 PR 4: "From the client", the name from the binding, and the
+    // section and question answered.
+    signedIn({
+      queue: () =>
+        jsonResponse(200, {
+          candidates: [
+            candidate({
+              entityType: 'debtors',
+              payload: { name: { given: 'Patricia', surname: 'Example' } },
+              origin: { channel: 'client', clientId: 'exampleportalclient', subject: ALICE },
+              documentId: undefined,
+              confidence: undefined,
+              locator: {
+                kind: 'question',
+                section_id: 'personal_information',
+                question_id: 'personal_information.legal_name',
+                filing_role: 'debtor_1',
+              },
+              question: {
+                id: 'personal_information.legal_name',
+                sectionId: 'personal_information',
+                sectionTitle: 'Personal information',
+                text: 'What is your full legal name?',
+                filingRole: 'debtor_1',
+              },
+              client: { displayName: 'Pat Example' },
+            }),
+          ],
+        }),
+    });
+
+    expect(await screen.findByText('Debtor details')).toBeTruthy();
+    expect(
+      screen.getByText('From the client, Pat Example · Personal information · for Debtor 1'),
+    ).toBeTruthy();
+    expect(screen.getByText('Question: “What is your full legal name?”')).toBeTruthy();
+    expect(screen.getByText('Patricia')).toBeTruthy();
   });
 
   it('says so plainly when nothing is waiting', async () => {

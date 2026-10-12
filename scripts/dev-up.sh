@@ -11,9 +11,9 @@
 #   ./apps/insolvia_app/scripts/dev-up.sh
 #
 # This script starts and stops NOTHING itself. Every area owns a dev-up.sh
-# that knows how to run its own thing (the API's exports short-lived AWS
-# credentials before `compose up`; the app's pins port 3000 because Cognito
-# registers that exact origin) and a dev-down.sh that knows how to stop it
+# that knows how to run its own thing (the API's keeps its container's
+# short-lived AWS credentials refreshed while `compose up` runs; the app's
+# pins port 3000 because Cognito registers that exact origin) and a dev-down.sh that knows how to stop it
 # (compose containers outlive the process that started them; a stray npx
 # grandchild keeps holding 3000). Both halves of that knowledge belong next to
 # the thing they describe. This file is an orchestrator: preflight, launch,
@@ -33,6 +33,14 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # Bash 3.2 is what macOS ships, so no associative arrays anywhere below.
 SERVICES="api admin-api mailer app portal marketing"
+
+# The mailer lives in the insolvia-services repo (since 2026-10-11); it runs
+# from that checkout when this machine has one, and is left out otherwise —
+# the API then records mail in memory, exactly as it does whenever
+# MAILER_API_URL is unset. scripts/services-checkout.sh owns where it looks.
+. "$SCRIPT_DIR/services-checkout.sh"
+SERVICES_REPO="$(services_checkout "$REPO_ROOT")"
+[[ -n "$SERVICES_REPO" ]] || SERVICES="api admin-api app portal marketing"
 PIDS=""
 
 c_reset=$'\033[0m'
@@ -55,7 +63,7 @@ service_dir() {
   case "$1" in
   api) printf '%s/services/api' "$REPO_ROOT" ;;
   admin-api) printf '%s/services/admin' "$REPO_ROOT" ;;
-  mailer) printf '%s/services/mailer' "$REPO_ROOT" ;;
+  mailer) printf '%s/services/mailer' "$SERVICES_REPO" ;;
   app) printf '%s/apps/insolvia_app' "$REPO_ROOT" ;;
   portal) printf '%s/apps/insolvia_admin' "$REPO_ROOT" ;;
   marketing) printf '%s/apps/insolvia_marketing' "$REPO_ROOT" ;;
@@ -111,12 +119,14 @@ case "${1:-}" in
 Usage: ./scripts/dev-up.sh
 
 Brings up the whole system: api, admin api, mailer, app, admin portal,
-marketing. Ctrl-C stops all of it, containers included.
+marketing. Ctrl-C stops all of it, containers included. The mailer comes from
+a sibling insolvia-services checkout (or $INSOLVIA_SERVICES_DIR) and is
+skipped when there is none.
 
 To run one part, run that part's own script instead:
   ./services/api/scripts/dev-up.sh
   ./services/admin/scripts/dev-up.sh
-  ./services/mailer/scripts/dev-up.sh
+  ../insolvia-services/services/mailer/scripts/dev-up.sh   (separate repo)
   ./apps/insolvia_app/scripts/dev-up.sh
   ./apps/insolvia_admin/scripts/dev-up.sh
   ./apps/insolvia_marketing/scripts/dev-up.sh
@@ -232,6 +242,10 @@ preflight() {
     warn "apps/insolvia_admin/node_modules missing — run ./apps/insolvia_admin/scripts/dev-setup.sh."
     failures=$((failures + 1))
   }
+
+  # Not a failure: everything else runs without it (see SERVICES above).
+  [[ -n "$SERVICES_REPO" ]] ||
+    warn "no insolvia-services checkout found — skipping the mailer; the API will record mail in memory. Clone insolvia-ai/insolvia-services next to this repo (or set INSOLVIA_SERVICES_DIR) to run it."
 
   local name dir port half
   for name in $SERVICES; do

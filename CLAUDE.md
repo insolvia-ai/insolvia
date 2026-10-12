@@ -12,6 +12,15 @@ fails the build on an `eas.json`. Decision **D9** in
 [ADR 0004](docs/adr/0004-react-native-replaces-flutter.md) own this — read 0004
 before proposing NativeWind, Tailwind-in-the-app, or a UI library.
 
+**Two repositories.** This one is the product: the apps, the marketing site,
+and the app's own backend (`api`, `admin`, `mcp`, `filing`, `insolvia_core`)
+with its staging/prod/dev Terraform. The account-wide AWS layer — Route53 zone,
+wildcard cert, SES identity, every service's ECR repository, the CI deploy
+role, the human IAM users — and the **mailer** service live in
+[`insolvia-ai/insolvia-services`](https://github.com/insolvia-ai/insolvia-services)
+(a sibling checkout, `../insolvia-services`), which has its own `CLAUDE.md` ·
+[ADR 0025](docs/adr/0025-shared-infra-and-mailer-move-to-insolvia-services.md).
+
 **This file is a catalog.** It says where things live and what to open before
 touching them — read the linked file when your task needs it. Detail lives there,
 not here.
@@ -37,11 +46,11 @@ not here.
 ```
 apps/       insolvia_app (Expo / React Native, web) · insolvia_admin (staff portal, Vite SPA) · insolvia_marketing (React SSR)
 packages/   insolvia_api_client · insolvia_core (Python — shared by the services, not an npm member)
-services/   api · admin · mailer · mcp    (Python on Lambda)
+services/   api · admin · mcp · filing    (Python on Lambda; the mailer is in insolvia-services)
 forms/      official-form field specs (B101, B106*, B107) — data + checker, no build
 seeds/      who exists per environment (dev.json, staging.json) · fixtures/<version>/ — what a seeded case contains
 e2e/        Playwright against deployed environments: flows (signed in; dev, staging) · smoke (no credentials; also prod)
-infra/      Terraform: ci-trust · shared · staging · prod
+infra/      Terraform: staging · prod · dev (shared, ci-trust, account-access are in insolvia-services)
 brand/      colors.json · fonts.json · radii.json — Insolvia's palette, typefaces and corners, the ONE place each is written down
 tool/       brand-palette.ts · render-brand-theme.ts · reconcile-cognito-branding.ts
 docs/       plan.md · reference/ · runbooks/ · adr/ · business/
@@ -86,10 +95,11 @@ before you touch anything:
 | working in any app/package/service/infra | that directory's `CLAUDE.md` |
 | running or building anything | `insolvia-scripts` skill → [`scripts/README.md`](scripts/README.md) |
 | deploying / shipping / applying to staging or prod | `insolvia-deploy` skill — **deploys run in CI, never from your CLI** |
-| hitting AWS auth / credential errors | `insolvia-aws-auth` skill |
-| changing the CI deploy role's IAM | `insolvia-deploy-role-permissions` skill |
-| adding/removing a **human** IAM user or changing their groups | [`infra/envs/account-access/`](infra/envs/account-access/main.tf) — human-applied; CI holds no IAM user/group permissions at all |
-| rotating an IAM user's **MFA device** | [`docs/runbooks/iam-mfa-rotation.md`](docs/runbooks/iam-mfa-rotation.md) — a console procedure, deliberately **not** Terraform (the TOTP seed would land in state) |
+| hitting AWS auth / credential errors, or an AWS account other than `521762924626` | `insolvia-aws-auth` skill — never assume the `default` profile is Insolvia's |
+| **any GitHub write** (`gh pr create/merge`, `gh api` mutations, `git push`, auto-merge) or a GitHub 403 / "denied to <user>" | `insolvia-github-auth` skill — read the `GitHub:` line the SessionStart hook put in your context; **never `gh auth switch`** |
+| changing the CI deploy role's IAM | `insolvia-deploy-role-permissions` skill — the role lives in insolvia-services |
+| adding/removing a **human** IAM user or changing their groups | [insolvia-services' `infra/envs/account-access/`](https://github.com/insolvia-ai/insolvia-services/blob/main/infra/envs/account-access/main.tf) — human-applied; CI holds no IAM user/group permissions at all |
+| rotating an IAM user's **MFA device** | [insolvia-services' `docs/runbooks/iam-mfa-rotation.md`](https://github.com/insolvia-ai/insolvia-services/blob/main/docs/runbooks/iam-mfa-rotation.md) — a console procedure, deliberately **not** Terraform (the TOTP seed would land in state) |
 | adding a new package/app/service | `insolvia-new-package` skill |
 | **opening a PR / writing or editing its description** | `insolvia-pr-description` skill — the body is the durable record, not a review request; CI is the only gate |
 | **writing or changing any test**, or asked to "improve coverage" | `insolvia-testing` skill — the shape differs by area on purpose · [ADR 0008](docs/adr/0008-testing-shape-follows-the-code-it-tests.md); **which tier** (unit / integration / e2e flows / e2e smoke) and which environment runs it · [ADR 0021](docs/adr/0021-test-tiers-and-seed-fixtures.md) |
@@ -114,8 +124,8 @@ before you touch anything:
 | **touching the case schema** — case CRUD, intake fields, extraction output, anything storing case data | [`docs/reference/case-data-model.md`](docs/reference/case-data-model.md) — provenance and confirm-before-entry are invariants, not conventions |
 | **touching the official-form field specs** — form fields, revisions, the forms engine's input | [`forms/CLAUDE.md`](forms/CLAUDE.md) — the AcroForm dumps are ground truth; `forms/scripts/dev-test.sh` gates every edit |
 | touching Terraform state / naming / deploy order | [`docs/reference/terraform.md`](docs/reference/terraform.md) |
-| doing one-time AWS/GitHub bootstrap | [`docs/runbooks/aws-bootstrap.md`](docs/runbooks/aws-bootstrap.md) |
-| working on mail / SES | [`docs/reference/email.md`](docs/reference/email.md) · [`docs/runbooks/ses-production-access.md`](docs/runbooks/ses-production-access.md) |
+| doing one-time AWS/GitHub bootstrap | [insolvia-services' `docs/runbooks/aws-bootstrap.md`](https://github.com/insolvia-ai/insolvia-services/blob/main/docs/runbooks/aws-bootstrap.md) |
+| working on mail / SES — the mailer is in insolvia-services; this repo only calls it (`services/api`'s mailer client) | [`docs/reference/email.md`](https://github.com/insolvia-ai/insolvia-services/blob/main/docs/reference/email.md) · [`docs/runbooks/ses-production-access.md`](https://github.com/insolvia-ai/insolvia-services/blob/main/docs/runbooks/ses-production-access.md) — both in insolvia-services |
 | **adding, moving, or rewriting anything in `docs/`** | [`docs/CLAUDE.md`](docs/CLAUDE.md) — four kinds, one per directory; and what belongs in a skill instead |
 | looking for any other runbook | [`docs/README.md`](docs/README.md) |
 
@@ -198,7 +208,7 @@ invites the next agent to overrule it.
 | `eas-simulator` | **Do not use** | Paid cloud simulators for native builds we do not produce. `allowed-tools: Bash(eas *)` — it will try to run the CLI. |
 | `eas-update-insights` | **Do not use** | Reports on EAS Update, which we do not publish. Also `allowed-tools: Bash(eas *)`. |
 | `gluestack-ui-v5` | **Uninstalled** — do not reinstall | It described a component library this codebase deliberately does not have, and its first principle was *"gluestack components over React Native primitives"* — the exact inversion of our decision. It is gone from `skills-lock.json`, so dev-setup no longer installs it. [ADR 0004](docs/adr/0004-react-native-replaces-flutter.md) keeps the measurements that rejected the library, including two accessibility defects it caused. |
-| `expo-tailwind-setup` | **Do not use** | **There is no Tailwind in the app at all** (it stays on the web side: the design system's `.web` leaves and marketing). It also pins `react-native-css@0.0.0-nightly.5ce6396`, whose own npm metadata reads *"Outdated SDK 54 era nightly… cannot resolve on Expo SDK 55 or newer"* — we are on SDK 57. |
+| `expo-tailwind-setup` | **Uninstalled** — do not reinstall | Expo removed it upstream ([expo/skills#151](https://github.com/expo/skills/pull/151)), so it is gone from `skills-lock.json` too. The row stays because the reasons still hold: **there is no Tailwind in the app at all** (it stays on the web side: the design system's `.web` leaves and marketing). It also pinned `react-native-css@0.0.0-nightly.5ce6396`, whose own npm metadata reads *"Outdated SDK 54 era nightly… cannot resolve on Expo SDK 55 or newer"* — we are on SDK 57. |
 | everything else | **Case by case** | Not evaluated. Check the frontmatter first: **"EAS service (paid)" or an `allowed-tools: Bash(eas *)` line means it is out of scope**, whatever the task looks like. |
 
 **All six `eas-*` skills are out of scope for one reason:** we are on Expo's free

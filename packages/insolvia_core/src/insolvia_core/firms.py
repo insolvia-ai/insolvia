@@ -37,11 +37,15 @@ from __future__ import annotations
 import re
 import uuid
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
-from typing import Final
+from typing import Final, Generic, TypeVar
 
+from insolvia_core import courts
 from insolvia_core.errors import FieldValidationError, ValidationError
+from insolvia_core.fields import Address, parse_address, prune, text
+
+T = TypeVar("T")
 
 # A job title, and — this is the part that is easy to get wrong — NOT a level
 # of access. MyCase keeps them independent and so do we: role drives the
@@ -87,12 +91,64 @@ FIRM_ADMINISTRATION: Final = "firm_administration"
 # also handing them every case, or the reverse: full intake access with the
 # library left view_only while the firm settles on what belongs in it.
 CREDITOR_LIBRARY: Final = "creditor_library"
+# Free-text notes on a case, or on a form within it (issue 14.5 / #357) —
+# separate from INTAKE because a note is not case data (it never prints on a
+# form and carries no provenance, see core/notes.py) and a firm may want
+# staff to see the schedule intake without seeing what colleagues have
+# scribbled about it, or the reverse.
+NOTES: Final = "notes"
+# Events and deadlines (issue 14.6 / #358): case-scoped and firm-scoped
+# calendar entries, the deadlines generated from a case's filed and § 341
+# dates, and the per-user ICS feed. Its own feature rather than a facet of
+# CASES because a calendar is read by people who never touch a schedule —
+# and because the generated deadlines are the one thing here a firm may
+# want everybody to SEE and only the case team to change.
+EVENTS: Final = "events"
+# Case tasks (issue #356 / 14.4) — the checklist a paralegal, an attorney and
+# a client work from. Separate from INTAKE for the same kind of reason
+# CREDITOR_LIBRARY is: a staff member who chases documents and completes
+# tasks assigned to them should not need intake access to do it, and a firm
+# that wants intake locked down while task work continues should be able to
+# say so without a second axis.
+TASKS: Final = "tasks"
+# The client portal (ADR 0023): inviting a debtor to their own case, resending
+# and revoking that invitation, and — from #363 — reviewing what they send.
+# Its own feature rather than a facet of CASES because inviting a member of
+# the public into a GLBA-scope system is an act a firm may want only some of
+# its people to perform. HIDDEN BY DEFAULT for every role, ADR 0009's
+# list-before-build rule: an admin holds it (admins hold everything), and
+# anyone else holds it only once an admin grants it.
+CLIENT_PORTAL: Final = "client_portal"
+# The firm's client directory (ADR 0022 / #353): the person who outlives any
+# one matter — `insolvia_core.firm_clients`. Its own feature rather than a
+# facet of CASES or INTAKE for CREDITOR_LIBRARY's reason: a firm may want a
+# paralegal keeping the directory without every matter, or the reverse.
+# Reaching a client is same firm AND `clients >= view_only`; reaching a case
+# stays `access.may_see_case`, unchanged. Every row written before this
+# feature existed lacks it and so has it `hidden` (`permission_for`) — the
+# maintainer's choice: existing users reach clients only by an admin's grant.
+CLIENTS: Final = "clients"
+# Electronic filing (ADR 0024): today, enrolling and revoking one's own CM/ECF
+# credential in the vault (guardrail 3); with PRs 5-7, the authorization and
+# the per-filing approval. HIDDEN BY DEFAULT for every role, CLIENT_PORTAL's
+# reasoning and then some: it is the path that will submit a court filing
+# under an attorney's signature, it is unfinished until PRs 5-8 land, and so
+# nobody holds it by job title — an admin grants it, attorney by attorney.
+# Holding it lets a user manage THEIR OWN credential only; nothing here lets
+# anyone, admin included, enrol, read or revoke somebody else's.
+ELECTRONIC_FILING: Final = "electronic_filing"
 FEATURES: Final = (
     CASES,
     INTAKE,
     DOCUMENTS,
     EXTRACTION_REVIEW,
     CREDITOR_LIBRARY,
+    NOTES,
+    EVENTS,
+    TASKS,
+    CLIENTS,
+    CLIENT_PORTAL,
+    ELECTRONIC_FILING,
     FIRM_ADMINISTRATION,
 )
 
@@ -121,6 +177,68 @@ _SUBJECT_RE: Final = re.compile(
     r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\Z"
 )
 
+# The chapters a firm may default a new case to — the same set
+# `insolvia_core.cases.CHAPTERS` admits, restated here rather than imported
+# because `cases` already imports this module's neighbours and a cycle is
+# not worth one tuple.
+_DEFAULT_CHAPTERS: Final = (7, 11, 12, 13)
+
+
+@dataclass(frozen=True)
+class Letterhead:
+    """What the firm prints at the top of a letter and on the signer block's
+    firm lines (issue #360): the display name (which may differ from the
+    tenant's `name`), the office address, a phone and an email. Every field
+    is optional — a firm fills in what it has."""
+
+    name: str | None = None
+    address: Address = field(default_factory=Address)
+    phone: str | None = None
+    email: str | None = None
+
+
+@dataclass(frozen=True)
+class SignatureBlock:
+    """An attorney's standing signature block (issue #360) — the fields B101
+    Part 7 prints that do not change from case to case.
+
+    THE FIELD NAMES ARE `petitions.FilingProfessionalBody`'S, on purpose: the
+    petition screen's "use firm default" copies this block onto a case's
+    `filing_professional` record, and a block whose keys already are that
+    record's needs no mapping to copy. The name is not here — it is the firm
+    user's own first and last name — and the firm lines fall back to the
+    firm's letterhead when a block leaves them blank.
+    """
+
+    bar_number: str | None = None
+    bar_state: str | None = None
+    firm_name: str | None = None
+    address: Address = field(default_factory=Address)
+    phone: str | None = None
+    email: str | None = None
+
+
+@dataclass(frozen=True)
+class DefaultCourt:
+    """A firm's default court and division for new cases — a validated
+    registry reference, exactly as a case's own is."""
+
+    court: str
+    division: str
+
+
+@dataclass(frozen=True)
+class Assign(Generic[T]):
+    """A value a PATCH writes, INCLUDING `None` to clear it.
+
+    Every change class here reads a bare `None` as "leave unchanged", and
+    that rule cannot express "take the default away". Wrapping the value
+    keeps both meanings without inventing a sentinel: an absent field is
+    `None`, a present one is an `Assign`, and an `Assign(None)` clears.
+    """
+
+    value: T | None
+
 
 @dataclass(frozen=True)
 class Firm:
@@ -142,6 +260,13 @@ class Firm:
     updated_at: str
     created_by: str | None = None
     created_by_email: str | None = None
+    # FIRM DEFAULTS (issue #360): what a new case starts with, and what the
+    # firm prints. All optional — a firm that has set none of them is exactly
+    # the firm every row written before this existed describes, and nothing
+    # downstream requires them: they PREFILL, they never decide.
+    default_court: DefaultCourt | None = None
+    default_chapter: int | None = None
+    letterhead: Letterhead | None = None
 
 
 @dataclass(frozen=True)
@@ -186,6 +311,11 @@ class FirmUser:
     status: str
     created_at: str
     updated_at: str
+    # The attorney's standing signature block (issue #360). Optional on every
+    # row and meaningful only for an attorney — but not REFUSED for the other
+    # roles, because the role "drives defaults, decides nothing" and a
+    # paralegal admitted to the bar next month should not need a row rewrite.
+    signature_block: SignatureBlock | None = None
 
 
 @dataclass(frozen=True)
@@ -223,9 +353,15 @@ class FirmChanges:
     suspending itself is a lockout with no self-service recovery, because
     self-signup is off. Future firm-profile fields join this class; the status
     axis does not.
+
+    The three defaults and the letterhead are `Assign`-wrapped so a PATCH
+    can clear one (see `Assign`).
     """
 
     name: str | None = None
+    default_court: Assign[DefaultCourt] | None = None
+    default_chapter: Assign[int] | None = None
+    letterhead: Assign[Letterhead] | None = None
 
 
 @dataclass(frozen=True)
@@ -240,6 +376,7 @@ class FirmUserChanges:
     access_all_cases: bool | None = None
     permissions: Mapping[str, str] | None = None
     status: str | None = None
+    signature_block: Assign[SignatureBlock] | None = None
 
 
 def _timestamp() -> str:
@@ -280,6 +417,24 @@ def default_permissions(role: str) -> dict[str, str]:
             DOCUMENTS: ADD_EDIT,
             EXTRACTION_REVIEW: HIDDEN,
             CREDITOR_LIBRARY: VIEW_ONLY,
+            # Fail-closed default (issue 14.5 / #357): staff is not named as a
+            # default grantee, so this stays HIDDEN until an admin opts them
+            # in, the same way EXTRACTION_REVIEW arrived above.
+            NOTES: HIDDEN,
+            # Staff see the calendar — a deadline is exactly what they chase
+            # documents against — but the case team owns what is on it.
+            EVENTS: VIEW_ONLY,
+            # Staff chase paperwork and complete the tasks assigned to
+            # them — the same reasoning that gives them DOCUMENTS, not the
+            # narrower CASES/INTAKE treatment.
+            TASKS: ADD_EDIT,
+            # Staff read the directory — the person they are chasing
+            # documents from — and the case team keeps it (ADR 0022).
+            CLIENTS: VIEW_ONLY,
+            # Fail-closed default (ADR 0023), like NOTES above.
+            CLIENT_PORTAL: HIDDEN,
+            # Fail-closed default (ADR 0024) — see ELECTRONIC_FILING.
+            ELECTRONIC_FILING: HIDDEN,
             FIRM_ADMINISTRATION: HIDDEN,
         }
     return {
@@ -288,6 +443,20 @@ def default_permissions(role: str) -> dict[str, str]:
         DOCUMENTS: ADD_EDIT,
         EXTRACTION_REVIEW: ADD_EDIT,
         CREDITOR_LIBRARY: ADD_EDIT,
+        # ATTORNEY AND PARALEGAL, same as every feature in this branch (see
+        # the docstring above) — both do case work, and a note is part of it.
+        NOTES: ADD_EDIT,
+        EVENTS: ADD_EDIT,
+        TASKS: ADD_EDIT,
+        # Opening a matter starts from a client (ADR 0022), so the people
+        # who open matters keep the directory.
+        CLIENTS: ADD_EDIT,
+        # Hidden for every role until an admin grants it — ADR 0023 lists the
+        # feature before its screens exist, and an invitation admits a member
+        # of the public, so nobody holds it by job title.
+        CLIENT_PORTAL: HIDDEN,
+        # Hidden for every role (ADR 0024) — see ELECTRONIC_FILING.
+        ELECTRONIC_FILING: HIDDEN,
         # Never a default, for any role. Managing the firm's users is what
         # `is_admin` is, and a second route to it that arrives with a job title
         # would make "who can add users here" unanswerable without reading two
@@ -541,6 +710,97 @@ def parse_firm_creation(payload: Mapping[str, object]) -> FirmDraft:
     return FirmDraft(name=name)
 
 
+def _parse_letterhead(
+    value: object, errors: dict[str, str]
+) -> Assign[Letterhead] | None:
+    """`letterhead`: an object to set, `null` to clear. Field errors are
+    keyed by dotted path (`letterhead.address.line1`) like the case domain's,
+    because the address parser is the case domain's."""
+    if value is None:
+        return Assign(None)
+    if not isinstance(value, Mapping):
+        errors["letterhead"] = "Must be an object."
+        return None
+    before = len(errors)
+    parsed = Letterhead(
+        name=text(value.get("name"), "letterhead.name", errors, limit=MAX_FIRM_NAME),
+        address=parse_address(value.get("address"), "letterhead.address", errors),
+        phone=text(value.get("phone"), "letterhead.phone", errors, limit=32),
+        email=text(value.get("email"), "letterhead.email", errors, limit=MAX_EMAIL),
+    )
+    return None if len(errors) > before else Assign(parsed)
+
+
+def _parse_signature_block(
+    value: object, errors: dict[str, str]
+) -> Assign[SignatureBlock] | None:
+    """`signatureBlock`: an object to set, `null` to clear. The limits are
+    `petitions.parse_filing_professional`'s, because the block is copied onto
+    that record and must not be able to hold what it would refuse."""
+    if value is None:
+        return Assign(None)
+    if not isinstance(value, Mapping):
+        errors["signatureBlock"] = "Must be an object."
+        return None
+    before = len(errors)
+    prefix = "signatureBlock"
+    parsed = SignatureBlock(
+        bar_number=text(
+            value.get("bar_number"), f"{prefix}.bar_number", errors, limit=32
+        ),
+        bar_state=text(value.get("bar_state"), f"{prefix}.bar_state", errors, limit=2),
+        firm_name=text(value.get("firm_name"), f"{prefix}.firm_name", errors),
+        address=parse_address(value.get("address"), f"{prefix}.address", errors),
+        phone=text(value.get("phone"), f"{prefix}.phone", errors, limit=32),
+        email=text(value.get("email"), f"{prefix}.email", errors),
+    )
+    return None if len(errors) > before else Assign(parsed)
+
+
+def _parse_default_court(
+    payload: Mapping[str, object], errors: dict[str, str]
+) -> Assign[DefaultCourt] | None:
+    """`defaultCourt` + `defaultDivision`: both strings to set (validated
+    against the registry, as a case's own reference is), both `null` to
+    clear. One without the other is refused — a division only means
+    something inside its court."""
+    court = payload.get("defaultCourt")
+    division = payload.get("defaultDivision")
+    if court is None and division is None:
+        return Assign(None)
+    if not isinstance(court, str) or not court.strip():
+        errors["defaultCourt"] = "Choose a court from the registry, or clear both."
+        return None
+    if not isinstance(division, str) or not division.strip():
+        errors["defaultDivision"] = "Choose the court's division, or clear both."
+        return None
+    found = courts.division(court.strip(), division.strip())
+    if found is None:
+        if courts.district(court.strip()) is None:
+            errors["defaultCourt"] = "That court is not in the registry."
+        else:
+            errors["defaultDivision"] = "That division is not one of this court's."
+        return None
+    record, chosen = found
+    return Assign(DefaultCourt(court=record.code, division=chosen.code))
+
+
+def _parse_default_chapter(value: object, errors: dict[str, str]) -> Assign[int] | None:
+    if value is None:
+        return Assign(None)
+    if isinstance(value, bool) or not isinstance(value, int):
+        errors["defaultChapter"] = "Chapter must be a number."
+        return None
+    if value not in _DEFAULT_CHAPTERS:
+        errors["defaultChapter"] = (
+            "Chapter must be one of "
+            + ", ".join(str(c) for c in _DEFAULT_CHAPTERS)
+            + "."
+        )
+        return None
+    return Assign(value)
+
+
 def parse_firm_user_creation(payload: Mapping[str, object]) -> FirmUserDraft:
     """Validate POST /v1/firm/users. Unknown keys are ignored.
 
@@ -665,6 +925,10 @@ def parse_firm_user_update(payload: Mapping[str, object]) -> FirmUserChanges:
             errors["status"] = "Status must be one of " + ", ".join(USER_STATUSES) + "."
         else:
             changes["status"] = status
+    if "signatureBlock" in payload:
+        block = _parse_signature_block(payload["signatureBlock"], errors)
+        if block is not None:
+            changes["signature_block"] = block
 
     if errors:
         raise FieldValidationError(errors)
@@ -676,14 +940,16 @@ def parse_firm_user_update(payload: Mapping[str, object]) -> FirmUserChanges:
 def parse_self_update(payload: Mapping[str, object]) -> FirmUserChanges:
     """Validate PATCH /v1/me. Unknown keys are ignored.
 
-    Their own name is the ONE thing a member may change about themselves.
-    Everything else on the row is somebody else's statement about them — role,
-    permissions, the admin flag and status are an administrator's writes
-    (parse_firm_user_update), and email is a pool fact, for the reason that
-    parser records. So this is not parse_firm_user_update with a smaller
-    allowlist by accident: a payload carrying `role` here is ignored the same
-    way one carrying `email` is there, and what the caller can rely on is that
-    the only thing this parser ever produces is a rename.
+    Their own name and their own signature block (issue #360) are the two
+    things a member may change about themselves. Everything else on the row
+    is somebody else's statement about them — role, permissions, the admin
+    flag and status are an administrator's writes (parse_firm_user_update),
+    and email is a pool fact, for the reason that parser records. So this is
+    not parse_firm_user_update with a smaller allowlist by accident: a
+    payload carrying `role` here is ignored the same way one carrying `email`
+    is there. The signature block joins the name because it is the same kind
+    of fact — a bar number is the attorney's own, and an admin retyping it
+    for them is the same detour the name prompt was built to remove.
 
     EITHER HALF ALONE IS ACCEPTED. The account screen sends both; somebody
     fixing only their surname — the common case for a row whose halves were
@@ -691,7 +957,7 @@ def parse_self_update(payload: Mapping[str, object]) -> FirmUserChanges:
     the correction a rewrite of a value that was already right.
     """
     errors: dict[str, str] = {}
-    changes: dict[str, str] = {}
+    changes: dict[str, object] = {}
 
     if "firstName" in payload:
         first = _parse_name(
@@ -710,6 +976,10 @@ def parse_self_update(payload: Mapping[str, object]) -> FirmUserChanges:
         legacy = _parse_legacy_name(payload["displayName"], errors)
         if legacy is not None:
             changes["first_name"], changes["last_name"] = legacy
+    if "signatureBlock" in payload:
+        block = _parse_signature_block(payload["signatureBlock"], errors)
+        if block is not None:
+            changes["signature_block"] = block
 
     if errors:
         raise FieldValidationError(errors)
@@ -721,17 +991,38 @@ def parse_self_update(payload: Mapping[str, object]) -> FirmUserChanges:
 def parse_firm_update(payload: Mapping[str, object]) -> FirmChanges:
     """Validate PATCH /v1/firm. Unknown keys are ignored.
 
-    `name` is the one field today. `status` lands in the "no supported fields"
-    branch on purpose — see FirmChanges for why it never joins, and the admin
-    service's PATCH /v1/firms/<id> for where suspend/reactivate lives.
+    `name`, the three defaults and the letterhead (issue #360). `status`
+    lands in the "no supported fields" branch on purpose — see FirmChanges
+    for why it never joins, and the admin service's PATCH /v1/firms/<id> for
+    where suspend/reactivate lives.
+
+    `defaultCourt` and `defaultDivision` are read as a PAIR: sending either
+    key engages the pair, and the pair is validated against the court
+    registry exactly as a case's own reference is.
     """
     errors: dict[str, str] = {}
-    if "name" not in payload:
-        raise ValidationError("no supported fields to update")
-    name = _parse_name(payload["name"], errors, field="name", cap=MAX_FIRM_NAME)
-    if errors or name is None:
+    changes: dict[str, object] = {}
+    if "name" in payload:
+        name = _parse_name(payload["name"], errors, field="name", cap=MAX_FIRM_NAME)
+        if name is not None:
+            changes["name"] = name
+    if "defaultCourt" in payload or "defaultDivision" in payload:
+        default_court = _parse_default_court(payload, errors)
+        if default_court is not None:
+            changes["default_court"] = default_court
+    if "defaultChapter" in payload:
+        default_chapter = _parse_default_chapter(payload["defaultChapter"], errors)
+        if default_chapter is not None:
+            changes["default_chapter"] = default_chapter
+    if "letterhead" in payload:
+        letterhead = _parse_letterhead(payload["letterhead"], errors)
+        if letterhead is not None:
+            changes["letterhead"] = letterhead
+    if errors:
         raise FieldValidationError(errors)
-    return FirmChanges(name=name)
+    if not changes:
+        raise ValidationError("no supported fields to update")
+    return FirmChanges(**changes)  # type: ignore[arg-type]
 
 
 # ── Construction ────────────────────────────────────────────────────
@@ -790,6 +1081,12 @@ def apply_firm_changes(firm: Firm, changes: FirmChanges) -> Firm:
     updates: dict[str, object] = {}
     if changes.name is not None:
         updates["name"] = changes.name
+    if changes.default_court is not None:
+        updates["default_court"] = changes.default_court.value
+    if changes.default_chapter is not None:
+        updates["default_chapter"] = changes.default_chapter.value
+    if changes.letterhead is not None:
+        updates["letterhead"] = changes.letterhead.value
     return replace(firm, updated_at=_timestamp(), **updates)  # type: ignore[arg-type]
 
 
@@ -832,7 +1129,7 @@ def apply_user_changes(user: FirmUser, changes: FirmUserChanges) -> FirmUser:
     the thing that caused it. A caller that wants the new role's defaults sends
     them in the same PATCH.
     """
-    updates = {
+    updates: dict[str, object] = {
         field: value
         for field, value in (
             # Two entries, not one, and independently applied: a PATCH carrying
@@ -850,17 +1147,115 @@ def apply_user_changes(user: FirmUser, changes: FirmUserChanges) -> FirmUser:
         )
         if value is not None
     }
+    if changes.signature_block is not None:
+        updates["signature_block"] = changes.signature_block.value
     return replace(user, updated_at=_timestamp(), **updates)  # type: ignore[arg-type]
 
 
 # ── Keys and the stored item shapes ─────────────────────────────────
 
-# What an item value may be in this table, and it is a wider set than the case
-# table's `str | int`: a firm user carries two booleans and a map. The adapter's
-# converter handles exactly these four, and BOOL IS CHECKED BEFORE INT there,
-# because in Python `True` is an int and would otherwise be stored as the
-# number 1.
-FirmItemValue = str | bool | dict[str, str]
+# What an item value may be in this table. It USED to be `str | bool |
+# dict[str, str]` with the adapter carrying its own three-branch converter;
+# the firm defaults (issue #360) added an integer (`defaultChapter`) and two
+# nested maps (`letterhead`, `signatureBlock`), so the adapter now uses the
+# shared recursive converter every other store uses
+# (`adapters.aws.dynamo`), and the alias is the honest `object`.
+FirmItemValue = object
+
+
+def _address_item(address: Address) -> dict[str, object]:
+    return {
+        "line1": address.line1,
+        "line2": address.line2,
+        "city": address.city,
+        "state": address.state,
+        "postal_code": address.postal_code,
+        "county": address.county,
+        "raw": address.raw,
+    }
+
+
+def _address_from_item(raw: object) -> Address:
+    if not isinstance(raw, Mapping):
+        return Address()
+
+    def part(key: str) -> str | None:
+        value = raw.get(key)
+        return str(value) if value is not None else None
+
+    return Address(
+        line1=part("line1"),
+        line2=part("line2"),
+        city=part("city"),
+        state=part("state"),
+        postal_code=part("postal_code"),
+        county=part("county"),
+        raw=part("raw"),
+    )
+
+
+def letterhead_item(letterhead: Letterhead) -> dict[str, object]:
+    """The letterhead as stored AND as sent — pruned of absent members, the
+    same shape rule every case-domain body follows."""
+    pruned = prune(
+        {
+            "name": letterhead.name,
+            "address": _address_item(letterhead.address),
+            "phone": letterhead.phone,
+            "email": letterhead.email,
+        }
+    )
+    return pruned if isinstance(pruned, dict) else {}
+
+
+def _letterhead_from_item(raw: object) -> Letterhead | None:
+    if not isinstance(raw, Mapping):
+        return None
+
+    def part(key: str) -> str | None:
+        value = raw.get(key)
+        return str(value) if value is not None else None
+
+    return Letterhead(
+        name=part("name"),
+        address=_address_from_item(raw.get("address")),
+        phone=part("phone"),
+        email=part("email"),
+    )
+
+
+def signature_block_item(block: SignatureBlock) -> dict[str, object]:
+    """The signature block as stored AND as sent — pruned, and keyed exactly
+    as a `filing_professional` body is (see `SignatureBlock`)."""
+    pruned = prune(
+        {
+            "bar_number": block.bar_number,
+            "bar_state": block.bar_state,
+            "firm_name": block.firm_name,
+            "address": _address_item(block.address),
+            "phone": block.phone,
+            "email": block.email,
+        }
+    )
+    return pruned if isinstance(pruned, dict) else {}
+
+
+def _signature_block_from_item(raw: object) -> SignatureBlock | None:
+    if not isinstance(raw, Mapping):
+        return None
+
+    def part(key: str) -> str | None:
+        value = raw.get(key)
+        return str(value) if value is not None else None
+
+    return SignatureBlock(
+        bar_number=part("bar_number"),
+        bar_state=part("bar_state"),
+        firm_name=part("firm_name"),
+        address=_address_from_item(raw.get("address")),
+        phone=part("phone"),
+        email=part("email"),
+    )
 
 
 def partition_key(firm_id: str) -> str:
@@ -902,6 +1297,15 @@ def firm_item(firm: Firm) -> dict[str, FirmItemValue]:
         item["createdBy"] = firm.created_by
     if firm.created_by_email is not None:
         item["createdByEmail"] = firm.created_by_email
+    # The defaults are sparse the same way: a firm that set none looks
+    # exactly like every row written before they existed.
+    if firm.default_court is not None:
+        item["defaultCourt"] = firm.default_court.court
+        item["defaultDivision"] = firm.default_court.division
+    if firm.default_chapter is not None:
+        item["defaultChapter"] = firm.default_chapter
+    if firm.letterhead is not None:
+        item["letterhead"] = letterhead_item(firm.letterhead)
     return item
 
 
@@ -912,6 +1316,11 @@ def firm_from_item(item: Mapping[str, FirmItemValue]) -> Firm:
     try:
         created_by = item.get("createdBy")
         created_by_email = item.get("createdByEmail")
+        raw_court = item.get("defaultCourt")
+        raw_division = item.get("defaultDivision")
+        raw_chapter = item.get("defaultChapter")
+        if raw_chapter is not None and not isinstance(raw_chapter, (int, str)):
+            raise ValueError(f"defaultChapter is {raw_chapter!r}")
         return Firm(
             id=str(item["id"]),
             name=str(item["name"]),
@@ -924,8 +1333,18 @@ def firm_from_item(item: Mapping[str, FirmItemValue]) -> Firm:
             created_by_email=(
                 str(created_by_email) if created_by_email is not None else None
             ),
+            # The defaults are tolerated-absent for the same reason. A court
+            # stored without its division is read as no default at all —
+            # half a reference is not one.
+            default_court=(
+                DefaultCourt(court=str(raw_court), division=str(raw_division))
+                if raw_court is not None and raw_division is not None
+                else None
+            ),
+            default_chapter=int(raw_chapter) if raw_chapter is not None else None,
+            letterhead=_letterhead_from_item(item.get("letterhead")),
         )
-    except KeyError as error:
+    except (KeyError, ValueError) as error:
         raise ValidationError(f"stored firm item is malformed: {error}") from error
 
 
@@ -955,7 +1374,7 @@ def firm_user_item(user: FirmUser) -> dict[str, FirmItemValue]:
     row on its own; a migration script would be a third writer of this shape,
     which this package's rules forbid.
     """
-    return {
+    item: dict[str, FirmItemValue] = {
         "PK": partition_key(user.firm_id),
         "SK": user_sort_key(user.subject),
         "GSI1PK": subject_key(user.subject),
@@ -979,6 +1398,11 @@ def firm_user_item(user: FirmUser) -> dict[str, FirmItemValue]:
         "createdAt": user.created_at,
         "updatedAt": user.updated_at,
     }
+    # Sparse, like the firm's defaults: absent means "no block", and every
+    # row written before the field existed reads that way unchanged.
+    if user.signature_block is not None:
+        item["signatureBlock"] = signature_block_item(user.signature_block)
+    return item
 
 
 def firm_user_from_item(item: Mapping[str, FirmItemValue]) -> FirmUser:
@@ -1037,9 +1461,37 @@ def firm_user_from_item(item: Mapping[str, FirmItemValue]) -> FirmUser:
             status=str(item["status"]),
             created_at=str(item["createdAt"]),
             updated_at=str(item["updatedAt"]),
+            signature_block=_signature_block_from_item(item.get("signatureBlock")),
         )
     except KeyError as error:
         raise ValidationError(f"stored firm user item is malformed: {error}") from error
+
+
+def firm_defaults_json(firm: Firm) -> dict[str, object]:
+    """The firm's defaults and letterhead as every firm response carries them
+    (issue #360) — EXPLICIT NULLS, not absent keys, for the reason `firm_json`
+    gives about provenance: a client reading `defaultCourt: null` learns
+    "not set", where a missing key would read as an older API. The same
+    block rides on `/v1/me`'s firm block, so a case worker who may not read
+    `/v1/firm` still gets the defaults the create form prefills from."""
+    return {
+        "defaultCourt": firm.default_court.court if firm.default_court else None,
+        "defaultDivision": (
+            firm.default_court.division if firm.default_court else None
+        ),
+        "defaultChapter": firm.default_chapter,
+        "letterhead": (
+            letterhead_item(firm.letterhead) if firm.letterhead is not None else None
+        ),
+    }
+
+
+def signature_block_json(user: FirmUser) -> dict[str, object] | None:
+    return (
+        signature_block_item(user.signature_block)
+        if user.signature_block is not None
+        else None
+    )
 
 
 def firm_json(firm: Firm) -> dict[str, object]:
@@ -1055,6 +1507,7 @@ def firm_json(firm: Firm) -> dict[str, object]:
         "updatedAt": firm.updated_at,
         "createdBy": firm.created_by,
         "createdByEmail": firm.created_by_email,
+        **firm_defaults_json(firm),
     }
 
 
@@ -1074,6 +1527,7 @@ def firm_summary_json(firm: Firm) -> dict[str, object]:
         "status": firm.status,
         "createdAt": firm.created_at,
         "updatedAt": firm.updated_at,
+        **firm_defaults_json(firm),
     }
 
 
@@ -1095,6 +1549,13 @@ def firm_user_summary_json(user: FirmUser) -> dict[str, object]:
     turns a subject into a rendered name, and it costs nothing to compose. The
     two halves ride alongside it for a client that needs to edit them; a client
     that only renders a name reads the one field and does not change at all.
+
+    `signatureBlock` IS here (issue #360), and it is the one addition to the
+    three fields that passes the test above: the petition screen's "use firm
+    default" needs every attorney's bar number and block, and it is a case
+    worker's screen, not an administrator's. A bar number is printed on
+    every filing the attorney signs — it is the least private fact on the
+    row.
     """
     return {
         "subject": user.subject,
@@ -1102,6 +1563,7 @@ def firm_user_summary_json(user: FirmUser) -> dict[str, object]:
         "lastName": user.last_name,
         "displayName": full_name(user),
         "role": user.role,
+        "signatureBlock": signature_block_json(user),
     }
 
 
@@ -1134,4 +1596,5 @@ def firm_user_json(user: FirmUser) -> dict[str, object]:
         "status": user.status,
         "createdAt": user.created_at,
         "updatedAt": user.updated_at,
+        "signatureBlock": signature_block_json(user),
     }

@@ -56,9 +56,14 @@ machine) is the dev database:
 curl http://127.0.0.1:8080/health
 ```
 
-`dev-up.sh` exports short-lived credentials from your AWS profile into the
-container at `up` time and refuses to start until `dev-aws-setup.sh` has
-written `services/api/.env` (see `scripts/README.md` at the repo root).
+`dev-up.sh` refuses to start until `dev-aws-setup.sh` has written
+`services/api/.env`. It never puts AWS keys in the container's environment:
+it keeps short-lived credentials from your AWS profile refreshed in a file
+under `~/.cache/insolvia/aws-container/api`, which the container reads through
+a `credential_process` config, so a run longer than one credential lifetime
+(a long `dev-test-integration.sh`, say) keeps working. Why it is not a
+`~/.aws` mount: **Credentials in a container** in `scripts/README.md` at the
+repo root.
 
 The bare dev server still runs with zero AWS — with `WAITLIST_TABLE_NAME`
 unset it falls back to the in-memory store (each submission is logged so
@@ -93,6 +98,7 @@ deploy. `tests/__init__.py` is the map of the tiers.
 | `AUTH_ISSUER_URL` | Cognito OIDC issuer — `https://cognito-idp.<region>.amazonaws.com/<pool-id>`. Its `/.well-known/jwks.json` supplies the signing keys. Required by the Lambda entrypoint |
 | `AUTH_USER_POOL_ID` | The pool this environment **calls** (`AdminCreateUser`, when a firm admin adds a colleague) — as against `AUTH_ISSUER_URL`, which it **verifies against**. Both end in the same id and neither is derived from the other: parsing an id out of a URL would make that URL's format load-bearing in a way Cognito never promised. Required by the Lambda entrypoint |
 | `AUTH_CLIENT_ID` | The web app client id every access token must name (`client_id` claim). Required by the Lambda entrypoint |
+| `AUTH_PORTAL_CLIENT_ID` | The client portal's app client id ([ADR 0023](../../docs/adr/0023-client-portal-identity-and-isolation.md)) — the ONE id every `/v1/portal/` route verifies, disjoint from `AUTH_CLIENT_ID`. Published as `/insolvia/<env>/api/auth-portal-client-id`; locally written to `.env` by `dev-aws-setup.sh`. Unset → every portal route answers 401 and staff routes are untouched; equal to `AUTH_CLIENT_ID` → the Lambda refuses to boot |
 | `ANTHROPIC_API_KEY` | The Anthropic API key the **worker's** AI petition review calls Claude with (issue #97, [ADR 0019](../../docs/adr/0019-ai-review-calls-anthropic-from-the-worker.md)). Deployed environments read SSM SecureString `/insolvia/<env>/api/anthropic-api-key` (human-created — see the ADR's rollout note); locally, add your own key to `services/api/.env` by hand. Unset → `petition_review` jobs fail deterministically with `not_configured`; nothing else is affected |
 
 Both auth variables are published to SSM as `/insolvia/<env>/api/auth-issuer-url`

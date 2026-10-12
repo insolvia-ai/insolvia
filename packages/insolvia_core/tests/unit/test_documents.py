@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import pytest
 from insolvia_core.documents import (
+    CHANNEL_CLIENT,
+    CHANNEL_STAFF,
     CONTENT_TYPES,
     KINDS,
     MAX_BYTE_SIZE,
@@ -29,10 +31,12 @@ from insolvia_core.documents import (
     list_order,
     object_key,
     parse_document_upload,
+    portal_document_json,
 )
 from insolvia_core.errors import FieldValidationError, ValidationError
 
 CASE_ID = "00000000-0000-4000-8000-0000000000ca"
+REQUEST_ID = "00000000-0000-4000-8000-0000000000e1"
 DOCUMENT_ID = "00000000-0000-4000-8000-0000000000d0"
 ALICE = "00000000-0000-4000-8000-00000000a11c"
 
@@ -398,3 +402,58 @@ def test_an_expiry_is_a_z_suffixed_instant_in_the_future():
     # Both are the same fixed-width format, so a string compare is a time
     # compare — the same property the case table's sort keys rely on.
     assert later > now
+
+
+# ── The upload's channel and request (ADR 0023 PR 5 / #364) ─────
+
+
+def test_a_staff_upload_is_the_default_channel_against_no_request():
+    document = create_document(
+        parse_document_upload(payload()), case_id=CASE_ID, uploaded_by=ALICE
+    )
+    assert (document.channel, document.request_id) == (CHANNEL_STAFF, None)
+    assert "requestId" not in document_item(document)
+
+
+def test_a_client_upload_round_trips_its_channel_and_request():
+    document = create_document(
+        parse_document_upload(payload()),
+        case_id=CASE_ID,
+        uploaded_by=ALICE,
+        channel=CHANNEL_CLIENT,
+        request_id=REQUEST_ID,
+    )
+    item = document_item(document)
+    assert (item["channel"], item["requestId"]) == (CHANNEL_CLIENT, REQUEST_ID)
+    assert document_from_item(item) == document
+
+
+def test_a_row_from_before_the_portal_reads_as_a_staff_upload():
+    item = document_item(
+        create_document(
+            parse_document_upload(payload()), case_id=CASE_ID, uploaded_by=ALICE
+        )
+    )
+    del item["channel"]
+    assert document_from_item(item).channel == CHANNEL_STAFF
+
+
+def test_a_server_decided_kind_overrides_the_payloads():
+    # The portal passes the request's kind; whatever the client sent is moot.
+    draft = parse_document_upload(payload(kind="wedding_photos"), kind="tax_return")
+    assert draft.kind == "tax_return"
+
+
+def test_the_clients_view_of_an_upload_names_no_case():
+    document = create_document(
+        parse_document_upload(payload()),
+        case_id=CASE_ID,
+        uploaded_by=ALICE,
+        channel=CHANNEL_CLIENT,
+        request_id=REQUEST_ID,
+    )
+    body = portal_document_json(document)
+    assert "caseId" not in body
+    assert CASE_ID not in str(body)
+    assert body["requestId"] == REQUEST_ID
+    assert document_json(document)["channel"] == CHANNEL_CLIENT

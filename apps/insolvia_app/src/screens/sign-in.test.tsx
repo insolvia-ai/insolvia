@@ -166,9 +166,17 @@ describe('the route guard', () => {
 
     const router = renderRouter('src/app', { initialUrl: '/' });
 
-    expect(await screen.findByRole('heading', { name: 'Your case workspace' })).toBeTruthy();
+    // The app's chrome renders at once. What is behind it now waits on
+    // RequireFirm's own `/v1/me` — a second in-flight caller of the same
+    // never-resolving `accessToken()`, so this is still "Loading your firm",
+    // never "Checking your session": the SESSION never blocks, only the
+    // firm-scoped screen's own read does, exactly as it already does on
+    // /calendar, /account and /my-tasks.
+    expect(await screen.findByRole('heading', { name: 'Loading your firm' })).toBeTruthy();
     expect(screen.queryByRole('heading', { name: 'Checking your session' })).toBeNull();
-    // Only the token endpoint has been asked anything: the API waits on it.
+    // Only the token endpoint has been asked anything: every caller of
+    // `accessToken()` — MeProvider's and RequireFirm's alike — waits on it,
+    // so neither has issued a real HTTP request yet.
     const urls = fetchMock.mock.calls.map((call) => String(call[0]));
     expect(urls.every((url) => url.includes('/oauth2/token'))).toBe(true);
     expect(urls).toHaveLength(1);
@@ -217,7 +225,10 @@ describe('the route guard', () => {
 
     const router = renderRouter('src/app', { initialUrl: '/' });
 
-    expect(await screen.findByRole('heading', { name: 'Your case workspace' })).toBeTruthy();
+    // `principalResponse()` carries no firm, so the protected screen behind
+    // the guard is RequireFirm's own explanation rather than the dashboard —
+    // either way, proof the session guard let the visitor through to `/`.
+    expect(await screen.findByRole('heading', { name: 'You are not in a firm yet' })).toBeTruthy();
     expect(router.getPathname()).toBe('/');
   });
 });

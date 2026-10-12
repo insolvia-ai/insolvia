@@ -38,6 +38,7 @@ from .petitions import (
     RELATED_CASE,
     SOLE_PROPRIETORSHIP,
 )
+from .plans import PLAN
 from .sofa import SOFA_ENTRY
 
 # `EntityKind[Any]` rather than a union of the ten body types: callers of this
@@ -79,6 +80,9 @@ COLLECTIONS: Final[Mapping[str, EntityKind[Any]]] = {
         # B122A-2's entered figures (issue #101), one per case like the
         # petition — the gate owns the cardinality.
         MEANS_TEST_INPUT,
+        # The Chapter 13 plan's proposal (issue 16.2 / #366), one per case
+        # the same way; its figures are the API calculator's, never stored.
+        PLAN,
     )
 }
 
@@ -92,6 +96,18 @@ COLLECTIONS: Final[Mapping[str, EntityKind[Any]]] = {
 # but outside the case data proper — accepting one is what writes a real case
 # record. Registered here because this tuple is the one cross-service ledger
 # of who owns which SK prefix in that partition.
+#
+# NOTE (issue 14.5 / #357) is the same kind of exception as DEBTOR/DOCUMENT
+# above: it uses the CaseEntity/CaseEntityStore machinery (core/notes.py) but
+# is deliberately absent from COLLECTIONS, so it is not reachable through the
+# generic `/v1/cases/<id>/<collection>` dispatch — see core/notes.py for why
+# (server-stamped authorship, per-record edit ownership, no provenance).
+#
+# EVENT is the tenant API's calendar rows (services/api core/events.py,
+# issue 14.6 / #358): a case's hand-made events and its generated deadlines,
+# in the case's partition like every other child item but NOT a generic
+# collection — they carry no provenance map, and the generated ones are
+# rewritten by the deadline engine rather than edited by hand.
 RESERVED_SK_NAMESPACES: Final = (
     "META",
     "ASSIGNEE",
@@ -100,4 +116,13 @@ RESERVED_SK_NAMESPACES: Final = (
     "JOB",
     "PACKET",
     "CANDIDATE",
+    "NOTE",
+    "EVENT",
+    # Case tasks (issue #356 / 14.4) — metadata rows, own module, own store
+    # (core/tasks.py), the same reasons DOCUMENT is its own prefix rather
+    # than a COLLECTIONS entry.
+    "TASK",
+    # The case's lifecycle history (issue 14.3 / #355) — one row per status
+    # move, written with the case record (core/cases.status_change_item).
+    "STATUS",
 )

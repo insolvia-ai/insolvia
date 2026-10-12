@@ -24,7 +24,7 @@
 # An Image-package Lambda cannot be created without an existing image. Same
 # one-time dance as every service module here:
 #
-#   1. apply infra/envs/shared (creates insolvia-shared-mcp)
+#   1. insolvia-services' infra/envs/shared (creates insolvia-shared-mcp)
 #   2. scripts/bootstrap-ecr-images.sh <env> mcp   (seeds <repo-url>:<env>)
 #   3. terraform apply   (full)
 #

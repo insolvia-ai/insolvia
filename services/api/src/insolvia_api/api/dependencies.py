@@ -9,16 +9,29 @@ from insolvia_core.ports import (
     CandidateStore,
     CaseEntityStore,
     CaseStore,
+    ClientBindingStore,
     DebtorStore,
     DocumentBlobStore,
+    DocumentRequestStore,
     DocumentStore,
+    FilingAuthorizationStore,
+    FilingCredentialSealer,
+    FilingCredentialStore,
+    FilingStore,
     FirmStore,
     JwksProvider,
+    TaskStore,
+    TaxIdCipher,
+    TaxIdStore,
     UserDirectory,
 )
 
 from insolvia_api.core.config import AppConfig
 from insolvia_api.core.ports import (
+    CalendarTokenStore,
+    EventStore,
+    FilingApprovalStore,
+    FilingQueue,
     JobQueue,
     JobStore,
     Mailer,
@@ -69,6 +82,16 @@ class ApiDependencies:
     # lives in its case's partition (SK=DEBTOR#<role>), so there is no
     # second table, no new environment variable, and nothing to provision.
     debtor_store: DebtorStore | None = None
+    # The debtor's tax identifier (issue 13.12 / #382): the sealed items
+    # share the case table (same partition as the debtor — "nothing to
+    # provision" again), and the cipher wraps their data keys under the
+    # case KEY, whose alias is derived from that same table name
+    # (adapters/aws/tax_id_cipher.case_key_alias), so neither needs a
+    # configuration value of its own. Two ports rather than one because
+    # they are two pieces of infrastructure with two IAM grants: a row in
+    # DynamoDB, and GenerateDataKey/Decrypt on KMS.
+    tax_id_store: TaxIdStore | None = None
+    tax_id_cipher: TaxIdCipher | None = None
     # The generic case collections (issue #249) — same table, same partition,
     # same "nothing to provision" argument as the debtor store above.
     case_entity_store: CaseEntityStore | None = None
@@ -93,6 +116,52 @@ class ApiDependencies:
     # the extraction worker and the MCP service, read and resolved by the
     # extraction-review routes.
     candidate_store: CandidateStore | None = None
+    # Events and the calendar (issue 14.6 / #358): both rows live in the case
+    # table — the "nothing to provision" argument yet again — and the token
+    # store is separate from the event store only because it is a different
+    # secret with a different lifetime, not a different table.
+    event_store: EventStore | None = None
+    calendar_token_store: CalendarTokenStore | None = None
+    # Case tasks (issue #356 / 14.4): the same "nothing to provision"
+    # argument again — task rows are child items of the case partition.
+    task_store: TaskStore | None = None
+    # A case's document requests (ADR 0023 PR 5 / #364): child items of the
+    # case partition once more — nothing to provision.
+    document_request_store: DocumentRequestStore | None = None
+    # The client portal's bindings (ADR 0023): which case a portal subject
+    # may reach. Spans the firm table and the case table — both already
+    # configured — so, like the stores above, nothing new to provision.
+    # Optional for the same test-convenience reason; the portal and
+    # invitation routes raise rather than degrade when it is absent.
+    client_binding_store: ClientBindingStore | None = None
+    # The filing-credential vault (ADR 0024, guardrail 3): its own table
+    # and its own key, both named from the case table's name
+    # (adapters/aws/filing_credentials) so, once again, nothing new to
+    # configure. A SEALER AND NO OPENER, on purpose: the API enrols and
+    # can never open what it stored — there is deliberately no field
+    # here a route could reach an opener through, and the key policy
+    # refuses this service's role Decrypt besides. The opener belongs to
+    # services/filing (ADR 0024 PR 7).
+    filing_credential_store: FilingCredentialStore | None = None
+    filing_credential_sealer: FilingCredentialSealer | None = None
+    # The attorney's signed authorization (ADR 0024, guardrail 2): items in
+    # the SAME vault table, the attorney's own partition — "stored with the
+    # credential" — so again nothing new to configure.
+    filing_authorization_store: FilingAuthorizationStore | None = None
+    # The per-filing approval (ADR 0024, guardrail 1): the records are child
+    # items of the case partition — nothing new to provision — and the QUEUE
+    # is the filing worker's own (FILING_QUEUE_URL). None is a legitimate
+    # deployed state for the queue, as for job_queue: the image can roll out
+    # ahead of the infra, and approving then answers 503 rather than
+    # recording an approval no worker will ever see. The approval route is
+    # the ONLY reader of `filing_queue` (tests/unit/test_filing_approval.py).
+    filing_approval_store: FilingApprovalStore | None = None
+    filing_queue: FilingQueue | None = None
+    # The filing worker's records (ADR 0024 PR 8; insolvia_core.filings),
+    # child items of the case partition again. The API READS them for the
+    # approval screen and writes exactly one thing onto them: the attorney's
+    # resolution of a hand-back (core/filing_outcome.py) — never a state.
+    filing_store: FilingStore | None = None
     # None means "this deployment cannot verify tokens" (issue #79). It is a
     # fail-CLOSED default, not a permissive one: api/auth.py answers 401 on
     # every protected route when it is absent, and the Lambda entrypoint

@@ -11,7 +11,7 @@ description: >-
 # nothing about the thing prod actually ran.
 #
 # Since the ECR repositories are shared across environments
-# (infra/envs/shared/main.tf), the image staging tested is already sitting in
+# (insolvia-services' infra/envs/shared/main.tf), the image staging tested is already sitting in
 # the repository prod pulls from. Promotion is therefore a lookup, not a build:
 # resolve `sha-<commit>` to its immutable digest and deploy THAT.
 #

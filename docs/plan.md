@@ -5,20 +5,27 @@ in force, and the work ahead. Completed milestones are summarized in one table
 — their full histories live in git, the PRs, and the ADRs, not here. Desktop
 was dropped entirely (D9); this document no longer plans for it.
 
-Status: **foundation, intake, forms & petition engine, and the MCP server
-(12.1–12.3) all built; forms and MCP await their staging validations (#96,
-#97, 12.4–12.5); means test and AI extraction built 2026-09-04. A gap
-analysis against the incumbent consumer-bankruptcy product (2026-09-16)
-showed the engines are at parity and the layers around them are not: the
-Chapter 7 data-entry surface is unfinished, and there is no practice
-management, client portal, Chapter 13 or post-filing. Those are now five
-milestones (13.x–17.x, below). **13.x was built 2026-09-16→23** (eleven
-PRs, #373–#384); one item it surfaced stays open — the debtor's tax id has
-no encrypted storage, so B121 and B101's last-four print blank (#382, 13.12).
-Next is the design wave: the four spikes that open 14.x, 15.x and 17.x. Still
-open from before: the staging walkthroughs, the MCP harness round-trip
-(12.4–12.5), SES production access, the design partner, and the positioning
-rewrites (12.7/12.8)** · Last pruned 2026-09-23
+Status: **Chapter 13 (milestone 16) is built and proven on staging; the three
+decision ADRs are accepted and half-built; staging is green end to end, and
+`promote` has not yet been approved for this series.** 2026-09-26→29 merged
+#386–#418: ADRs 0022 (a client is not a case), 0023 (the client portal) and
+0024 (automated e-filing); B122C and the Chapter 13 means test (#401), the plan
+calculator (#403) and Form 113 with the Chapter 13 packet (#406); amendments
+(#402); ADR 0022 PRs 1–6 (#409, #411, #412, #416, #417, #418); ADR 0023 PRs 1–2
+(#405, #413); ADR 0024 PR 2 (#404); seed fixtures v3/v4 with a seeded Chapter 13
+case (#410, #412). Three pipeline defects were found and fixed on the way:
+every Release run had silently skipped the MCP or admin deploy (#407), a lost
+leg was never retried (#408), and an e2e spec was overwriting seeded fixture
+data (#415). **What is next, in order, is § Next below.** Still open from
+before: the MCP harness round-trip (12.4–12.5), SES production access, the
+design partner, and the positioning rewrites (12.7/12.8) · Last pruned
+2026-09-30
+
+**2026-10-11:** shared AWS infrastructure (zone, cert, SES, ECR, the CI deploy
+role, human IAM) and the mailer moved to
+[`insolvia-ai/insolvia-services`](https://github.com/insolvia-ai/insolvia-services)
+([ADR 0025](adr/0025-shared-infra-and-mailer-move-to-insolvia-services.md)); this
+repo keeps the product and its own backend.
 
 The 2026-09-01→04 build sprint's decisions live in ADRs 0013–0019: the MCP
 pivot, repo-as-release-registry, async pipelines (no SAM), the MCP's own
@@ -60,16 +67,16 @@ the linked owner has the detail:
 | Surface / concern | What exists | Owner of the detail |
 |---|---|---|
 | Domain + DNS + TLS | `insolvia.ai` on Route53, shared `*.insolvia.ai` ACM cert | [`terraform.md`](reference/terraform.md) |
-| Human email | Google Workspace inbound, SES outbound `no-reply@` | [`email.md`](reference/email.md) |
+| Human email | Google Workspace inbound, SES outbound `no-reply@` | insolvia-services' [`email.md`](https://github.com/insolvia-ai/insolvia-services/blob/main/docs/reference/email.md) |
 | Marketing site | React Router v7 SSR Lambda, `www.insolvia.ai` (+ noindexed staging), Lighthouse-gated in CI | [`apps/insolvia_marketing/CLAUDE.md`](../apps/insolvia_marketing/CLAUDE.md) |
 | Web app | Expo / React Native SPA, `app.insolvia.ai`, S3 + CloudFront | [ADR 0004](adr/0004-react-native-replaces-flutter.md) · [`apps/insolvia_app/CLAUDE.md`](../apps/insolvia_app/CLAUDE.md) |
 | Design system | **One cross-platform package** (`@insolvia-ai/design-system`) serving both surfaces — platform-split leaves, no third-party UI dependency. Lives in [`insolvia-ai/design-system`](https://github.com/insolvia-ai/design-system); consumed here by published version | [ADR 0006](adr/0006-owned-cross-platform-design-system.md) · [ADR 0010](adr/0010-design-system-moves-to-its-own-repository.md) |
 | Tokens | One `tokens.json` → generated `theme.css` (web) + `tokens.ts` (native), drift-gated in CI — in the design-system repo. What is generated *here* is Cognito's sign-in branding, from the installed `@insolvia-ai/tokens` | [`reference/package-publishing.md`](reference/package-publishing.md) |
 | API | Python/Flask on Lambda, `api.insolvia.ai` — health + waitlist; the client-stays-dumb trust boundary | [ADR 0001](adr/0001-client-stays-dumb-trust-boundary.md) · [`services/api/CLAUDE.md`](../services/api/CLAUDE.md) |
 | API client | Hand-written TypeScript, contract-pinned by tests, wired into the app | [`packages/insolvia_api_client/CLAUDE.md`](../packages/insolvia_api_client/CLAUDE.md) |
-| Mailer | SES-backed transactional service with unsubscribe path | [`services/mailer/CLAUDE.md`](../services/mailer/CLAUDE.md) |
+| Mailer | SES-backed transactional service with unsubscribe path — in insolvia-services since 2026-10-11 | [`services/mailer/CLAUDE.md`](https://github.com/insolvia-ai/insolvia-services/blob/main/services/mailer/CLAUDE.md) |
 | Auth | Cognito pools + hosted UI per env; the app signs in with authorization-code + PKCE, keeps access/ID tokens in memory and the refresh token in `localStorage`, and guards its routes | [ADR 0007](adr/0007-hosted-ui-pkce-refresh-token-in-local-storage.md) · `infra/modules/auth/main.tf` |
-| CI/CD | Per-area PR gates (9 required checks), staging on merge, prod by dispatch, promote-not-rebuild | [`architecture.md`](reference/architecture.md) |
+| CI/CD | Per-area PR gates (7 required checks), staging on merge, prod by dispatch, promote-not-rebuild | [`architecture.md`](reference/architecture.md) |
 
 The subdomain map (D2) as deployed — flat `staging-*` naming, because one ACM
 wildcard covers exactly one label:
@@ -97,7 +104,7 @@ died in — this plan no longer carries their bodies.
 | D4 | **One owned cross-platform design system**, platform-split leaves, over one token source | [ADR 0006](adr/0006-owned-cross-platform-design-system.md) |
 | D5 | **The API is required for MVP** — GLBA-scope data (SSNs, financials) keeps the trust boundary server-side | [ADR 0001](adr/0001-client-stays-dumb-trust-boundary.md) |
 | D6 | Backend is **Python + Flask + Mangum on Lambda** | house pattern, shipped |
-| D7 | Human email and product email are **separate providers** (Workspace in, SES out) | [`email.md`](reference/email.md) |
+| D7 | Human email and product email are **separate providers** (Workspace in, SES out) | insolvia-services' [`email.md`](https://github.com/insolvia-ai/insolvia-services/blob/main/docs/reference/email.md) |
 | D10 | **A case belongs to a FIRM, not to a user.** Firm, role, admin flag, per-case linking and per-feature permissions live in our own store rather than in Cognito claims — an access token carries a `sub` and nothing else authorization-bearing | [ADR 0009](adr/0009-a-case-belongs-to-a-firm.md) |
 | D9 | **React Native on Expo replaced Flutter**; Expo free tier only, CI-enforced; **desktop deleted**, mobile held open by `expo prebuild` | [ADR 0004](adr/0004-react-native-replaces-flutter.md) |
 | D11 | **No direct PMS integration — Insolvia is an MCP server.** The attorney's AI harness moves data between their practice-management system and us; agent writes land as candidates under confirm-before-entry | [ADR 0013](adr/0013-mcp-server-replaces-direct-pms-integration.md) |
@@ -143,8 +150,8 @@ are most of what a harness would push.
 ## Outstanding foundation item · SES production access
 
 Deliberately deferred until the site and bounce handling were live — **they now
-are**, so this is actionable: submit the request per
-[`ses-production-access.md`](runbooks/ses-production-access.md). Until granted, we
+are**, so this is actionable: submit the request per insolvia-services'
+[`ses-production-access.md`](https://github.com/insolvia-ai/insolvia-services/blob/main/docs/runbooks/ses-production-access.md). Until granted, we
 receive at `@insolvia.ai` but cannot reply from it. Set a date rather than
 leaving it open-ended.
 
@@ -168,11 +175,11 @@ above; the intake data model's old sync seam narrowed to an origin pointer
 | [`Product · Means test`](https://github.com/insolvia-ai/insolvia/milestone/7) — **built 2026-09-04** | P3 | 10.1–10.4 | §707(b) engine, CMI, UST/IRS/Census registry series with a weekly staleness tripwire (`regulatory-refresh.yml`), B122A-1/A-2 in the packet. `code/dollar-amounts` now written at pin time. |
 | [`Product · Firms & access control`](https://github.com/insolvia-ai/insolvia/milestone/8) | M2 / P1 | 11.1–11.7 | A case belongs to a **firm**, not to whoever opened it — firm users, roles, per-case linking, per-feature permissions ([ADR 0009](adr/0009-a-case-belongs-to-a-firm.md)). Two items stay open on purpose: provisioning a firm is still a hand-run script (risk 6), and the pool's case sensitivity is a decision rather than a task (risk 7). |
 | [`Product · AI extraction`](https://github.com/insolvia-ai/insolvia/milestone/9) — **built 2026-09-04** | M2 / P1 | 8.7–8.9 | Credit reports and pay stubs into candidate records via pipeline workers (ADR 0019 as amended: document bytes reach the API, so **ZDR gates real-firm documents**); one shared review queue with MCP; human-confirmed before case entry. |
-| [`Product · Schedules workbench`](https://github.com/insolvia-ai/insolvia/milestone/11) — **built 2026-09-23** | M3 / P2 | 13.1–13.12 | Finish the Chapter 7 data-entry surface over entities that already exist: the petition screen, a forms hub with single-form preview, category-driven assets, claims linked to collateral with derived deficiency, the Schedule C workbench over the exemptions registry, Schedules G/H, the income workbench, a means-test screen with a live verdict, a firm creditor library, the four missing filing forms (B108/B121/B2010/B2030 — two are flat PDFs, so the engine gained an overlay pass that draws on vendored pages without touching their bytes), output options. Open: 13.12, the tax id's encrypted storage and logged full-value read. |
-| [`Product · Practice management`](https://github.com/insolvia-ai/insolvia/milestone/12) | — | 14.1–14.8 | The layer around the case: a client distinct from the case (ADR first), the client list, a real lifecycle with post-filing fields, tasks, notes, events with generated deadlines, a dashboard, a court registry and firm defaults. |
-| [`Product · Client portal`](https://github.com/insolvia-ai/insolvia/milestone/13) | M2 / P1 | 15.1–15.4 | The debtor fills their own questionnaire and document requests; every answer is a candidate confirmed by staff through the existing review seam. Identity and isolation are an ADR before any code. |
-| [`Product · Chapter 13`](https://github.com/insolvia-ai/insolvia/milestone/14) | — | 16.1–16.3 | B122C-1/C-2 on the existing engine, the plan model and calculator (waterfall, feasibility, §1325(a)(4) liquidation test), the plan form and the Chapter 13 packet. |
-| [`Product · Filing and after`](https://github.com/insolvia-ai/insolvia/milestone/15) | — | 17.1–17.4 | Two spikes (CM/ECF filing, importing from other software) that end in decisions, court-notice intake, and amendments. Nothing here is scheduled until 13.x lands. |
+| [`Product · Schedules workbench`](https://github.com/insolvia-ai/insolvia/milestone/11) — **built 2026-09-23** | M3 / P2 | 13.1–13.12 | Finish the Chapter 7 data-entry surface over entities that already exist: the petition screen, a forms hub with single-form preview, category-driven assets, claims linked to collateral with derived deficiency, the Schedule C workbench over the exemptions registry, Schedules G/H, the income workbench, a means-test screen with a live verdict, a firm creditor library, the four missing filing forms (B108/B121/B2010/B2030 — two are flat PDFs, so the engine gained an overlay pass that draws on vendored pages without touching their bytes), output options, and the tax id's encrypted storage with its logged full-value read (13.12 — B121 and B101's last four print). |
+| [`Product · Practice management`](https://github.com/insolvia-ai/insolvia/milestone/12) — **14.2–14.8 built; 14.1 mostly** | — | 14.1–14.8 | The layer around the case. Merged: tasks, notes, events with sixteen cited deadline rules and Rule 9006(a) counting, the dashboard, the court registry with firm defaults, and — per [ADR 0022](adr/0022-a-client-is-not-a-case.md) — the firm client record, cases opened for clients, the client list and record screens, the debtor screen reading its client, and client records over MCP (0022 PRs 1–6). Merge clients (PR 7) and the lifecycle with post-filing fields (PR 8, 14.3) followed. |
+| [`Product · Client portal`](https://github.com/insolvia-ai/insolvia/milestone/13) — **15.1 built** | M2 / P1 | 15.1–15.4 | The debtor fills their own questionnaire and document requests; every answer is a candidate confirmed by staff through the existing review seam. [ADR 0023](adr/0023-client-portal-identity-and-isolation.md) accepted (a login per debtor by default, one for both on the firm's choice); PRs 1–2 merged (the `client` principal and invitations; `/portal` sign-in and landing); PRs 3–4 built (the firm-configurable questionnaire, #362; answers writing candidates, #363). Left: PR 5 (#364). |
+| [`Product · Chapter 13`](https://github.com/insolvia-ai/insolvia/milestone/14) — **built 2026-09-26** | — | 16.1–16.3 | B122C-1/C-2 on the existing engine, the plan model and calculator (waterfall, feasibility, §1325(a)(4) liquidation test), Official Form 113 and the Chapter 13 packet; proven on staging by fixture v3/v4's seeded Chapter 13 case. A district whose verified plan form is local (FLSB today) is refused by name until its form is modelled. |
+| [`Product · Filing and after`](https://github.com/insolvia-ai/insolvia/milestone/15) — **17.1 decided, 17.4 built** | — | 17.1–17.4 | [ADR 0024](adr/0024-electronic-filing-path.md) (accepted, reversed from its draft): Insolvia files automatically from its own infrastructure under the attorney's CM/ECF login, with per-filing attorney approval, a signed authorization and an isolated credential vault — the court-rules risk is recorded as knowingly accepted. Its PR 1 (court registry) and PR 2 (matrix by court) are merged. Amendments (17.4) merged as #402. The import spike's finding (#389) is **parked** by the maintainer — no importer is scheduled. Court-notice intake (#369) follows ADR 0024's filed-state capture. |
 
 ### Why extraction is its own milestone now (2026-08-11)
 
@@ -210,6 +217,119 @@ effective-date fields*, not one-time loads. Now planned: the shared
 effective-date model opens the forms milestone (9.1), the Dec-1 forms cycle has
 a runbook issue (9.8), and the UST refresh pipeline anchors the means-test
 milestone (10.1).
+
+---
+
+## Next — the build order (as of 2026-09-30)
+
+Every item below is one PR with its done-when in the linked ADR or issue; the
+ADRs' **Build breakdown** tables are the source of truth, this is only the
+order. Nothing here needs a new decision except where marked.
+
+1. **Promote** the latest green Release run to production (maintainer; the
+   prod stage has never run end to end, so watch it). Prod holds no data.
+2. ~~**ADR 0022 PR 8 — lifecycle as data, post-filing fields, archive,
+   delete, copy** (#355 / 14.3)~~ — built: the prospect funnel on the
+   CLIENT (the maintainer's call, 2026-10-01 — a case starts retained), the
+   case's lifecycle from intake to closed with a history row per move, the docket facts, `first_retained_at`
+   stamped by the retained transition, the archive view, admin soft delete
+   of an unfiled case, and copy case naming its source in provenance
+   ([`case-data-model.md`](reference/case-data-model.md) § The lifecycle).
+   ADR 0022's series is complete. No Terraform change: the history rows and
+   the archive view live in the case table and its existing indexes.
+3. **ADR 0023 is built (PRs 1–5).** Before the first *real* invite: SES
+   production access, the ZDR item (ADR 0019), and the custom auth domain.
+   ~~PR 4, the questionnaire writing candidates (#363)~~ — built: an
+   18-question first catalogue (`insolvia_core.questions`; personal
+   information in full bar the tax id, a few whole-record questions per
+   switchable section), `GET/POST/PUT/DELETE /v1/portal/answers` writing
+   pending candidates with a `question` locator (edit and withdraw while
+   pending), the review queue labelling a client row with its question and
+   the binding's display name, and acceptance minting a new provenance
+   source `client_answered` under the confirmation rule — not `client`,
+   which ADR 0022 had already taken for directory copies
+   ([`case-data-model.md`](reference/case-data-model.md) § Answers from the
+   client portal). The portal questionnaire is `/portal/questionnaire`, one
+   section at a time. No Terraform change. Next for the catalogue: the
+   SOFA, Schedule I's monthly figures, household and dependents.
+   ~~PR 5, document request checklists (#364)~~ — built: a shipped default
+   checklist and a firm's own (`insolvia_core.document_requests`; one item
+   per firm, absent is the default, reset deletes it) under
+   `/v1/firm/document-checklist`; a case's requests as copies of checklist
+   entries, seeded by the explicit staff act "Request the checklist" (not on
+   case open), with status requested / received / waived and the case
+   overview's arrived-vs-outstanding; `POST /v1/portal/documents` against a
+   request through the same presigned PUT and `complete`, which marks the
+   request received; a client's upload (`channel: client`) is never
+   auto-extracted ([`case-data-model.md`](reference/case-data-model.md)
+   § Documents and locators). No Terraform change: the rows sit in the case
+   and firm tables under the API's existing grants, and the portal is the
+   app's own origin, already in the bucket's CORS.
+   ~~PR 3, the firm-configurable questionnaire (#362)~~ — built: a six-section
+   catalogue with stable ids (`insolvia_core.questionnaire`; personal
+   information always on), one config item per firm in the firm table (absent
+   is the defaults; reset deletes it), `GET/PUT/DELETE /v1/firm/questionnaire`
+   under `firm_administration`, `GET /v1/portal/questionnaire` returning the
+   enabled sections only, the settings on the firm screen and a read-only
+   card on the portal landing screen. No Terraform change: the item sits in
+   the firm partition under the API's existing grant. #363 hangs its
+   questions off the section ids.
+4. **ADR 0024 PRs 4–11.** ~~PR 3, the filing set and checklist~~ — built:
+   `GET /v1/cases/<id>/filing-set` (`core/filing_set.py`) lists the packet's
+   documents in the court's docket order under its upload names, checks each
+   file for size (the court's cap, else the strictest any launch court
+   records), a text layer and US-letter pages against measurements the
+   assembly worker now stores on the packet record (counts only — B121 is a
+   part), marks B121 restricted or not filed per the registry, and builds a
+   checklist from the record (what is missing and where to fix it; the
+   court's signature instrument, local forms, fee and registration; every
+   unverified registry fact as "confirm"). The registry's `@2026-10-06`
+   release adds `opening.docket_order` and `opening.file_names` — unverified
+   with no value in all ten districts, so the packet's own order and names
+   apply. The packet screen shows both. No Terraform change. Next: the
+   credential vault, the written authorization, per-filing approval, the
+   filing worker with a local fake CM/ECF, filed-state capture, the Case
+   Upload file, per-court drivers verified on training databases, and the fee
+   decision (**decided 2026-10-09:** the attorney pays at a hand-back at the
+   court's payment step; no card data is stored).
+   No production filing until PRs 4–8 are live and one district's driver is
+   verified. PR 7 — the filing worker (`services/filing`) and the fake CM/ECF
+   — is built: the state machine with conditional writes, TOTP at the court's
+   ask, the environment host fence (no court host anywhere but the local fake)
+   and the kill switch (created off), stop-and-hand-back, and receipt capture
+   into the case; the reference case files end to end against the fake on a
+   laptop as the worker's role. Every real court hands back until PR 10. PR 8
+   — filed-state capture — is built: the worker's `filed` files the case
+   (status, the court's number, the petition date, a history row naming the
+   filing) in one transaction; the attorney resolves a hand-back or an
+   unknown outcome as filed (the same move) or not filed (the one thing that
+   frees the case for a new approval — refused over a captured court
+   confirmation or a possibly-live attempt); the case stores a normalized
+   `caseNumberKey` for #369's matcher. Proved on a laptop against real dev
+   AWS by `dev-filing-proof.sh`.
+5. **Court-notice intake** (#369), once filed-state capture exists.
+6. **Small follow-ups found on the way:** B113 § 3.1's
+   current-installment column prints blank; the intake client panel and the
+   client screens format names two ways; `verify_access_token` has no `iat`
+   leeway (a flaky first `/v1/me` against a local API); a seed drift report (`seed load --check` naming
+   fixture fields changed after seeding) — whether the loader may repair
+   them reverses ADR 0021's "existing rows are left alone", so it is the
+   maintainer's call. The portal integration tests write to the seeded
+   client's fixture case (bindings, answers, requests) and clean up, but
+   accepted and withdrawn answers stay in its review queue on every staging
+   run — seed a portal client bound to a scratch case of its own instead.
+
+**How this has been built, for whoever picks it up:** one agent per PR in its
+own git worktree, committing only; the orchestrator pushes, opens the PR per
+the `insolvia-pr-description` skill, and merges on green — **one at a time**,
+because the default branch's ruleset requires a branch at its head, then
+rebases the next. A decision the maintainer has made in chat is written into
+its ADR and the ADR merged; an undecided ADR stays open for them. Agents never
+type a password into a sign-in page that isn't on localhost, so signed-in
+screens are verified by the e2e `flows` tier on staging, not by an agent's
+browser. Prod data is disposable until launch (maintainer, 2026-09-26): schema
+changes reseed rather than migrate — but a destructive command against staging
+or prod is still confirmed with the maintainer first.
 
 ---
 

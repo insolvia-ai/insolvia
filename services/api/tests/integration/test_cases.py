@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from tests.integration.conftest import SCRATCH_DISTRICT, Api
+from tests.integration.conftest import SCRATCH_COURT, SCRATCH_DISTRICT, Api
 
 
 def test_the_scratch_case_is_listed_for_its_firm(
@@ -19,6 +19,9 @@ def test_the_scratch_case_is_listed_for_its_firm(
     ids = [case["id"] for case in listed["cases"]]
     assert scratch_case["id"] in ids
     assert scratch_case["chapter"] == 7
+    assert scratch_case["court"] == SCRATCH_COURT["court"]
+    assert scratch_case["division"] == SCRATCH_COURT["division"]
+    # The printed name is derived from the reference by the registry (#360).
     assert scratch_case["district"] == SCRATCH_DISTRICT
     assert scratch_case["status"] == "intake"
 

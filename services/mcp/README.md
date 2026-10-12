@@ -71,6 +71,13 @@ in-memory stores with auth failing closed (every call 401s).
    `~/.config/insolvia/dev.env`).
 4. List tools, call `whoami`, then `list_cases` → `propose_case_records` →
    `check_proposals` against your own dev data.
+5. Clients ([ADR 0022](../../docs/adr/0022-a-client-is-not-a-case.md)):
+   `whoami` reports `permissions.clients` — `hidden` until an admin grants
+   it. With the grant, `list_case_records` with `entityType: "clients"` on a
+   seeded case answers the client each debtor is linked to, and
+   `get_case_record` with one of those ids answers that record. Check both
+   show `tax_id_last_four` and nothing else of the tax id, and that without
+   the grant both refuse `permission_denied`.
 
 If a client cannot run the browser flow, mint a token directly against the
 dev pool's MCP app client (`aws cognito-idp initiate-auth` with
@@ -84,7 +91,10 @@ layer over in-memory ports is the pyramid's base, and
 `tests/test_protocol.py` pins the MCP wire — JSON-RPC shape, the 401
 challenge, the static eight-tool listing, structuredContent, the
 `{error: {code}}` envelope — the way the api-client contract test pins the
-REST surface.
+REST surface. `tests/unit/test_lambda_handler.py` pins the warm-container
+path: the real Mangum handler invoked twice in one process, because Mangum
+runs the ASGI lifespan around every invocation and the SDK's session manager
+refuses to be run twice.
 
 CI gate: the `MCP service` job in `.github/workflows/mcp-pr.yml` (ruff, mypy
 `--strict`, pytest, and the Lambda image build from the repo root).

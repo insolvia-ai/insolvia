@@ -5,8 +5,10 @@
 # With services/admin/.env present (written by scripts/dev-aws-setup.sh once
 # the dev admin infra exists — #213), the container talks to this machine's
 # real dev resources; without it, everything is in-memory and the service
-# still runs. AWS credentials are exported fresh into the shell and never
-# written to a file — same mechanism as the API's dev-up.sh.
+# still runs. AWS credentials reach the container the same way as the API's
+# dev-up.sh: a host-refreshed file under ~/.cache/insolvia/aws-container/
+# admin, read through a generated credential_process config, so they do not
+# expire under a long-running stack.
 #
 set -euo pipefail
 
@@ -18,10 +20,14 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 source "$REPO_ROOT/scripts/dev-aws-common.sh"
 
 if aws_dev sts get-caller-identity >/dev/null 2>&1; then
-  export_temporary_aws_credentials
+  start_container_aws_credentials admin
 else
   warn "No AWS session — starting with in-memory adapters only."
+  # No config, no credentials: the container's SDK finds nothing, as before.
+  rm -f "$(container_aws_dir admin)/config"
+  stop_container_aws_credentials admin
 fi
 
 cd "$ADMIN_DIR"
-docker compose up --build --force-recreate
+# exec keeps this PID, which is what the refresh loop watches.
+exec docker compose up --build --force-recreate

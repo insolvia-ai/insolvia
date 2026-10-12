@@ -10,17 +10,33 @@ composes stay in that service.
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from typing import Any, Protocol, TypeVar
 
-from insolvia_core.access import Accessor
+from insolvia_core.access import Accessor, ClientAccessor
 from insolvia_core.access_log import AccessEvent
 from insolvia_core.candidates import Candidate
 from insolvia_core.case_entities import CaseEntity, EntityKind
-from insolvia_core.cases import Case, CaseAssignment, CasePage
-from insolvia_core.debtors import Debtor
+from insolvia_core.cases import (
+    Case,
+    CaseAssignment,
+    CasePage,
+    ClientCase,
+    StatusChange,
+)
+from insolvia_core.clients import CasePublicStatus, ClientBinding
+from insolvia_core.debtors import Debtor, LinkOutcome, RepointOutcome
+from insolvia_core.document_requests import DocumentChecklist, DocumentRequest
 from insolvia_core.documents import Document, StoredBlob
+from insolvia_core.filing_authorization import FilingAuthorization
+from insolvia_core.filing_credentials import FilingCredential
+from insolvia_core.filings import FiledCase, Filing
+from insolvia_core.firm_clients import FirmClient
 from insolvia_core.firms import Firm, FirmUser
 from insolvia_core.library_creditors import LibraryCreditor
+from insolvia_core.questionnaire import QuestionnaireConfig
+from insolvia_core.tasks import Task
+from insolvia_core.tax_ids import Envelope, SealedTaxId
 
 BodyT = TypeVar("BodyT")
 
@@ -254,6 +270,150 @@ class FirmStore(Protocol):
         """
         ...
 
+    # ── Firm clients (ADR 0022 / #353) ─────────────────────────────
+    #
+    # No delete, on purpose: archiving is a status write through
+    # `update_client`, and a client with cases can never be deleted at all
+    # (ADR 0022). Deleting a client with none is issue #355's to add.
+
+    def create_client(self, client: FirmClient) -> None:
+        """Store a new client. MUST refuse to overwrite an existing
+        (firm_id, id) — `create_library_creditor`'s rule and reason."""
+        ...
+
+    def get_client(self, firm_id: str, client_id: str) -> FirmClient | None:
+        """One client, firm-scoped by key — a member of one firm cannot read
+        another firm's client by knowing its id."""
+        ...
+
+    def list_clients(self, firm_id: str) -> tuple[FirmClient, ...]:
+        """A firm's whole directory, archived clients included, in
+        `firm_clients.sorted_firm_clients` order. All of them: a caller cannot
+        page, and an implementation that can truncate must not."""
+        ...
+
+    def update_client(self, client: FirmClient) -> FirmClient | None:
+        """Write `client` back, but only over a row that still exists AND
+        still belongs to `client.firm_id` — `update_user`'s two-part condition,
+        for its reason — AND was never merged away: a merged client is a
+        terminal record, and an edit read before the merge must not
+        un-archive it. None when any of the three no longer holds.
+
+        Writes the record's own fields ONLY. The server-owned attributes
+        (`firm_clients.SERVER_OWNED_ATTRIBUTES` — the merge claim and the
+        prospect stage) are left exactly as stored: a whole-record save built
+        from a read taken before a merge claimed the row would otherwise
+        erase the claim."""
+        ...
+
+    # ── The prospect funnel (issue 14.3 / #355) ─────────────────────
+    #
+    # Two writes, both single conditional UpdateItems, so the stage and the
+    # retained transition cannot interleave into a retained client with a
+    # funnel position (`firm_clients` module docstring).
+
+    def set_client_prospect_stage(
+        self, firm_id: str, client_id: str, stage: str | None
+    ) -> FirmClient | None:
+        """Set (or, with None, remove) the client's funnel stage — ONLY IF the
+        row exists in `firm_id`, was never merged away, and is still a
+        prospect (`first_retained_at` unset). The updated client, or None
+        when any condition failed; nothing is written then."""
+        ...
+
+    def mark_client_retained(
+        self, firm_id: str, client_id: str, *, retained_on: str
+    ) -> FirmClient | None:
+        """THE RETAINED TRANSITION's write: set `first_retained_at` to
+        `retained_on` unless it already has a value (a hand-entered earlier
+        date is the firm's own record), and remove `prospect_stage` — in ONE
+        write, conditional on the row existing in `firm_id` and never having
+        been merged away. The updated client, or None."""
+        ...
+
+    # ── Merging two clients (ADR 0022's PR 7) ───────────────────────
+    #
+    # Three steps, driven by `client_merge.merge_clients`. The CLAIM is what
+    # makes "merges into and out of the same client at once" safe (the
+    # ADR's named risk): while B is being merged into A, A cannot be merged
+    # away and B cannot receive a merge, so no case can be re-pointed onto a
+    # client that is itself being emptied. Each step is ONE conditional write
+    # over BOTH rows.
+
+    def claim_client_merge(
+        self, firm_id: str, *, merged_id: str, survivor_id: str
+    ) -> bool:
+        """Mark `merged_id` as merging into `survivor_id` and `survivor_id`
+        as receiving from it — both, or neither — ONLY IF both rows are in
+        `firm_id`, both are `active` and not merged, `merged_id` is not
+        receiving a merge of its own, and `survivor_id` is not being merged
+        away. An existing claim for THIS SAME pair passes, so a merge that
+        stopped half-way (a timeout) can be run again to finish. False when
+        any condition fails; nothing is written then."""
+        ...
+
+    def finish_client_merge(
+        self, firm_id: str, *, merged_id: str, survivor_id: str, merged_at: str
+    ) -> FirmClient | None:
+        """Archive `merged_id` with `merged_into = survivor_id` and release
+        both halves of the claim, in one write conditional on the claim still
+        being this pair's. The archived client, or None when the claim was
+        not there (a concurrent run of the same merge already finished it)."""
+        ...
+
+    def release_client_merge(
+        self, firm_id: str, *, merged_id: str, survivor_id: str
+    ) -> None:
+        """Drop this pair's claim without archiving anything — the merge was
+        refused part-way. Cases already re-pointed stay with the survivor:
+        each of them names an active client either way. A claim that is not
+        this pair's is left alone."""
+        ...
+
+    # ── The client questionnaire's config (ADR 0023 PR 3 / #362) ───
+    #
+    # One item per firm (`questionnaire.SORT_KEY`), and ABSENT IS A STATE:
+    # it means the catalogue's defaults. Reset deletes the item rather than
+    # writing a copy of the defaults — `insolvia_core.questionnaire` says why.
+
+    def get_questionnaire(self, firm_id: str) -> QuestionnaireConfig | None:
+        """The firm's stored config, or None for the defaults. Firm-scoped by
+        key, and strongly consistent: the staff screen reads back what it
+        just saved, and a client's next read must see a section switched off."""
+        ...
+
+    def put_questionnaire(self, config: QuestionnaireConfig) -> None:
+        """Write the firm's whole config, replacing any stored one. Last
+        writer wins, like `update_firm`: a firm's settings screen has one
+        form and a firm has a handful of admins."""
+        ...
+
+    def delete_questionnaire(self, firm_id: str) -> bool:
+        """Reset to defaults. True if a stored config was removed, False if
+        the firm was on the defaults already — either way the firm is on the
+        defaults afterwards, so a route treats both as success."""
+        ...
+
+    # ── The document request checklist (ADR 0023 PR 5 / #364) ──────
+    #
+    # The questionnaire's shape exactly: one item per firm
+    # (`document_requests.CHECKLIST_SORT_KEY`), absent is the shipped
+    # default, reset deletes.
+
+    def get_document_checklist(self, firm_id: str) -> DocumentChecklist | None:
+        """The firm's stored checklist, or None for the default. Strongly
+        consistent, for `get_questionnaire`'s reason."""
+        ...
+
+    def put_document_checklist(self, checklist: DocumentChecklist) -> None:
+        """Write the firm's whole checklist, replacing any stored one. Last
+        writer wins."""
+        ...
+
+    def delete_document_checklist(self, firm_id: str) -> bool:
+        """Reset to the default. True if a stored checklist was removed."""
+        ...
+
 
 class CaseStore(Protocol):
     """Persists case records (issue 8.3). Implemented by adapters/aws
@@ -273,14 +433,51 @@ class CaseStore(Protocol):
     matters a colleague is working.
     """
 
-    def create(self, case: Case, assignment: CaseAssignment) -> None:
-        """Store a new case AND link its creator, atomically.
+    def create(
+        self,
+        case: Case,
+        assignment: CaseAssignment,
+        debtors: Sequence[Debtor] = (),
+    ) -> None:
+        """Store a new case, link its creator, and write the debtors copied
+        from its clients — atomically.
 
-        BOTH OR NEITHER, and it must be a transaction rather than two writes.
+        ALL OR NONE, and it must be a transaction rather than several writes.
         A case whose assignment write failed is invisible to the person who
         just created it — they cannot list it, cannot open it, and cannot tell
         it apart from the request having failed — while still occupying its id.
-        core/cases.create_case returns the pair for exactly this reason.
+        core/cases.create_case returns the pair for exactly this reason. The
+        debtors join it for the same reason (ADR 0022): a case opened for a
+        client that lost its debtor write is a matter nobody can find from
+        the client, because the debtor item IS the `by-client` index entry.
+
+        `debtors` is empty only for callers with no clients to copy (the seed
+        loader, until its fixtures name clients); `POST /v1/cases` always
+        passes one or two.
+
+        Each debtor's client is a CONDITION of the same transaction, as
+        `DebtorStore.link`'s is: its row in `case.firm_id` must still be
+        linkable when the write lands. MUST raise
+        `insolvia_core.errors.ClientUnavailableError`, naming the client,
+        when one is not — nothing written. (A composition with no firm
+        store, the seed loader's, states no such condition.)
+        """
+        ...
+
+    def list_for_client(
+        self, client_id: str, *, accessor: Accessor
+    ) -> tuple[ClientCase, ...]:
+        """The cases naming `client_id` on a debtor that this accessor may
+        see, newest first — the `by-client` index (ADR 0022), each entry
+        filtered through `may_see_case` exactly as `get` filters one.
+
+        The ones filtered out leave NO trace: no count, no placeholder. A
+        client's list that said "and 2 more you cannot open" would be the
+        enumeration ADR 0009's 404 exists to hide.
+
+        Unpaginated, deliberately: one person's matters are a handful, and a
+        cursor over a list that is then filtered per case would page by a
+        count the caller must not learn.
         """
         ...
 
@@ -295,7 +492,12 @@ class CaseStore(Protocol):
         ...
 
     def list_for_accessor(
-        self, accessor: Accessor, *, limit: int, cursor: str | None
+        self,
+        accessor: Accessor,
+        *,
+        limit: int,
+        cursor: str | None,
+        archived: bool = False,
     ) -> CasePage:
         """The cases this accessor may see, newest first.
 
@@ -305,21 +507,52 @@ class CaseStore(Protocol):
         they were minted against (core/cases.encode_cursor). An implementation
         MUST pass its index through to encode/decode so a permission change
         mid-pagination fails loudly instead of skipping rows.
+
+        TWO VIEWS of either index (#355): the working list (`archived=False`,
+        the default — every case not archived) and the archive
+        (`archived=True`). A deleted case is in neither. The view is part of
+        the cursor's tag, so a cursor from one view is refused by the other.
+        Both are a FILTER over the same index rather than an index of their
+        own, so an implementation keeps reading until the page is full or
+        the index is exhausted — a page is never short merely because the
+        rows it skipped were archived.
         """
         ...
 
-    def update(self, case: Case) -> Case | None:
+    def update(
+        self,
+        case: Case,
+        *,
+        expected_status: str | None = None,
+        status_change: StatusChange | None = None,
+    ) -> Case | None:
         """Write `case` back, but only if it still belongs to `case.firm_id`.
 
         Returns None if that no longer holds — closing the window between the
         route's read and this write, so a case cannot move firms underneath a
         caller mid-request.
 
+        `expected_status` (#355) is the status the caller READ. The write is a
+        whole record, so without it an edit read before a concurrent status
+        move would put the old status back — and the history would record a
+        move that no longer describes the case. When the stored status
+        differs, nothing is written and this raises `ConflictError`.
+
+        `status_change`, when given, is the history row for this write, and
+        is written in the SAME transaction: the history and the record can
+        never disagree.
+
         NO ASSIGNMENT CHECK HERE, deliberately: the route has already resolved
         the case through `get`, which applied the whole rule. Re-deriving
         linkage in the write would be a second copy of an authorization
         decision, and two copies eventually disagree.
         """
+        ...
+
+    def status_history(self, case_id: str) -> tuple[StatusChange, ...]:
+        """Every lifecycle move of one case, oldest first. Case-scoped and
+        takes no accessor — `assignees`' rule: the one caller resolved the
+        case through `get` first."""
         ...
 
     def assign(self, assignment: CaseAssignment) -> None:
@@ -357,6 +590,22 @@ class CaseStore(Protocol):
         caller always has an accessor, and `get` is the only read a request
         path may use — this method existing does not change that rule, it is
         the one deliberate exception for the process that has no caller.
+        """
+        ...
+
+    def public_status(self, client: ClientAccessor) -> CasePublicStatus | None:
+        """The bound case's chapter and stage — the CLIENT's read of a case,
+        and the only one (ADR 0023 decision 4).
+
+        Takes the `ClientAccessor`, never a case id: the case is the one the
+        verified binding names, so there is no id a route could pass in
+        wrongly. Returns the projection, never a `Case`: implementations read
+        only `clients.PUBLIC_STATUS_ATTRIBUTES` and build the result with
+        `clients.public_status_from_case_item`, which answers None unless the
+        row belongs to the binding's firm.
+
+        `get` cannot serve here — it takes an `Accessor`, which a client
+        never holds and mypy will not let one be passed as.
         """
         ...
 
@@ -544,6 +793,56 @@ class DebtorStore(Protocol):
         """Replace the record for `debtor`'s role outright."""
         ...
 
+    def link(self, debtor: Debtor, *, create: bool, firm_id: str) -> LinkOutcome:
+        """Write `debtor` — which names a `client_id` — ONLY IF no other
+        role of its case names the same client (ADR 0022: one client, one
+        role per case), with `create` only if its own role is still empty
+        (`create`'s rule), and ONLY IF the client's own row in `firm_id`
+        is still linkable: active, never merged, not being merged away
+        (`FirmClient.refusal_for_new_case`, as a condition).
+
+        One CONDITIONAL write, not a read and then a write: two links of
+        one client to two roles of one matter, racing, must not both land,
+        or the `by-client` index lists the case twice; and a link racing a
+        merge's claim on its client must not land after the merge's last
+        pass over that index, or the case names a merged client forever
+        (`insolvia_core.client_merge`). Answers `"written"`, `"role_taken"`
+        (the create lost its race), `"client_taken"` (another role holds
+        this client), or `"client_unavailable"` (the client row refused) —
+        nothing written for any but the first."""
+        ...
+
+    def roles_for_client(self, client_id: str) -> tuple[tuple[str, str], ...]:
+        """Every `(case_id, filing_role)` whose debtor names `client_id` —
+        the `by-client` index, UNFILTERED by any accessor.
+
+        For the merge only, which must move every one of the merged client's
+        cases, including those the person merging is not linked to — a case
+        left behind would name an archived client. What it returns must never
+        reach a caller, not even as a count (`CaseStore.list_for_client`
+        says why). On DynamoDB the index is eventually consistent, so an
+        entry can lag a write in either direction; `repoint_client` re-checks
+        each one against the item itself."""
+        ...
+
+    def repoint_client(
+        self,
+        case_id: str,
+        filing_role: str,
+        *,
+        from_client_id: str,
+        to_client_id: str,
+    ) -> RepointOutcome:
+        """Point one debtor from one client to another — `client_id` and the
+        `by-client` entry it feeds, and NOTHING of the copied identity: a
+        filed petition still says what it said (ADR 0022).
+
+        One conditional write: only if the role still names
+        `from_client_id` (else `"absent"`), and only if no other role of the
+        case already names `to_client_id` (else `"client_taken"` — one
+        client, one role per case, `link`'s rule)."""
+        ...
+
     def get(self, case_id: str, *, filing_role: str) -> Debtor | None: ...
 
     def list_for_case(self, case_id: str) -> tuple[Debtor, ...]:
@@ -604,6 +903,213 @@ class CaseEntityStore(Protocol):
         ...
 
 
+class TaxIdCipher(Protocol):
+    """Seals and opens one tax identifier under the case key
+    (insolvia_core.tax_ids owns the design — envelope encryption, a fresh
+    data key per sealed value, the encryption context binding the firm and
+    the reference).
+
+    THE KMS CALL IS THE ONLY THING THE TWO IMPLEMENTATIONS DIFFER IN.
+    adapters/aws wraps the data key with `kms:GenerateDataKey`/`kms:Decrypt`
+    under the environment's case key; adapters/memory wraps it under a fixed
+    local key. Everything else — the AES-GCM seal, the associated data, the
+    envelope shape — is one shared module both call, so a unit test against
+    the memory cipher exercises the real code path minus the network, and a
+    ciphertext sealed under a context cannot be opened under another in
+    either implementation.
+
+    Both methods take the SAME `context` the value was sealed with; an
+    implementation MUST refuse (raise) to open an envelope under a different
+    one rather than returning garbage or None — that refusal is the replay
+    protection.
+    """
+
+    def seal(self, plaintext: str, *, context: Mapping[str, str]) -> Envelope: ...
+
+    def open(self, envelope: Envelope, *, context: Mapping[str, str]) -> str: ...
+
+
+class TaxIdStore(Protocol):
+    """Persists the sealed tax-id items (insolvia_core.tax_ids).
+
+    `case_id` on both methods is WHERE THE ITEM LIVES TODAY — the case
+    partition — not what identifies it. The reference (`ref`) is the
+    identity; ADR 0022's backfill will re-parent these items under the
+    client they belong to, and only this port's callers will change.
+
+    Ownership is NOT a parameter, the rule every case-child store states:
+    the caller resolved the case through `CaseStore` first, and the
+    encryption context — not this store — is what refuses another firm's
+    read.
+    """
+
+    def put(self, case_id: str, sealed: SealedTaxId) -> None:
+        """Write the item whole, replacing any item under the same ref — a
+        re-entered number is a correction of the client's identifier and
+        must reach every matter that points at the ref."""
+        ...
+
+    def get(self, case_id: str, ref: str) -> SealedTaxId | None: ...
+
+
+class FilingCredentialSealer(Protocol):
+    """SEALS an attorney's CM/ECF credential under the vault key
+    (insolvia_core.filing_credentials; ADR 0024, guardrail 3). The API's
+    half — and the whole of what the API may do with that key.
+
+    A separate port from `FilingCredentialOpener`, not one cipher with two
+    methods, and that split is the point: the key policy refuses the API's
+    role Decrypt, and the API's composition root holds no object that could
+    even ask. A route that tried to open a credential would not type-check.
+    """
+
+    def seal(self, plaintext: str, *, context: Mapping[str, str]) -> Envelope: ...
+
+
+class FilingCredentialOpener(Protocol):
+    """OPENS a sealed credential — the filing worker's half (ADR 0024 PR 7).
+    Must refuse (raise) under any context but the one it was sealed with,
+    exactly as `TaxIdCipher.open` must."""
+
+    def open(self, envelope: Envelope, *, context: Mapping[str, str]) -> str: ...
+
+
+class FilingCredentialStore(Protocol):
+    """Persists the vault's items (insolvia_core.filing_credentials) in the
+    dedicated `insolvia-<env>-filing-credentials` table.
+
+    Every method is keyed by the attorney (`firm_id`, `attorney_id`): the
+    item's partition IS the attorney, so a credential id that belongs to
+    somebody else is simply not found — the ownership check and the lookup
+    are the same key.
+    """
+
+    def create(self, credential: FilingCredential) -> None:
+        """Write a NEW item; raise (RuntimeError) if the id is taken — ids are
+        server-minted uuid4s, so a collision means the minting is broken.
+        Never a replace: rotation is revoke-then-enrol (`enrol_credential`)."""
+        ...
+
+    def get(
+        self, firm_id: str, attorney_id: str, credential_id: str
+    ) -> FilingCredential | None:
+        """Strongly consistent: the worker's re-check before the final
+        submit must see a revoke that happened a second ago."""
+        ...
+
+    def list_for_attorney(
+        self, firm_id: str, attorney_id: str
+    ) -> tuple[FilingCredential, ...]: ...
+
+    def delete(self, firm_id: str, attorney_id: str, credential_id: str) -> bool:
+        """Destroy the item. True when one existed."""
+        ...
+
+
+class FilingAuthorizationStore(Protocol):
+    """Persists attorneys' signed authorizations (insolvia_core.
+    filing_authorization; ADR 0024, guardrail 2) in the vault's table,
+    in the attorney's own partition beside their credentials.
+
+    Two kinds of item (the module docstring): THE CURRENT ONE at a fixed key,
+    and one history record per signature.
+    """
+
+    def get_current(self, firm_id: str, attorney_id: str) -> FilingAuthorization | None:
+        """The `AUTHORIZATION` item, strongly consistent — the worker's
+        re-check before the final submit must see a withdrawal that happened
+        a second ago."""
+        ...
+
+    def put_current(
+        self,
+        authorization: FilingAuthorization,
+        *,
+        replacing: FilingAuthorization | None,
+    ) -> None:
+        """Make `authorization` the current one and write its history record.
+
+        `replacing` is what the caller read as current (None for "there was
+        none"); the write is conditional on that still being so, and a race
+        lost raises ConflictError. A replaced record's history item becomes
+        `superseded`."""
+        ...
+
+    def withdraw(
+        self, authorization: FilingAuthorization, *, withdrawn_at: str
+    ) -> bool:
+        """Delete the `AUTHORIZATION` item if it is still `authorization`,
+        and mark its history record `withdrawn`. True when it was."""
+        ...
+
+
+class ClientBindingStore(Protocol):
+    """Which case a client-portal subject may reach (ADR 0023).
+
+    TWO TABLES, ONE STORE: the authoritative row lives in the firm table
+    (resolved by the by-subject index, like a firm user), its mirror and the
+    per-role claims in the case partition. insolvia_core.clients owns the
+    shapes and why each exists. Every write that touches more than one of
+    them is ONE transaction — a binding without its mirror is a client the
+    firm cannot see on the case; a mirror without its binding is a client
+    who cannot sign in; a role claim without either is a role nobody can
+    ever be given again.
+
+    Nothing here is firm-scoped by an Accessor: the API's invitation routes
+    resolve the case through `CaseStore.get(accessor=...)` FIRST, and only a
+    case the caller may see reaches this store. `find` is the one
+    unscoped read — necessarily, since its job is to discover the firm, as
+    `FirmStore.find_user`'s is.
+    """
+
+    def bind(
+        self, binding: ClientBinding, *, narrowed: tuple[ClientBinding, ...]
+    ) -> None:
+        """Write a new (or re-bound) binding, its mirror and its role claims,
+        and rewrite each `narrowed` binding with its smaller role set — in one
+        transaction.
+
+        MUST refuse with `insolvia_core.errors.ConflictError`, writing
+        nothing, when the subject already holds a LIVE binding in this firm,
+        or when any role is held by a subject other than the new one and the
+        `narrowed` ones. That second refusal is what makes "at most one live
+        binding per role per case" hold under a race, not only after a read.
+        """
+        ...
+
+    def update(self, binding: ClientBinding) -> ClientBinding | None:
+        """Rewrite an existing binding and its mirror — a status change.
+        A revocation also releases the role claims this subject holds, in the
+        same transaction. None if the binding does not exist."""
+        ...
+
+    def get(self, firm_id: str, subject: str) -> ClientBinding | None:
+        """The authoritative row, by primary key, STRONGLY consistent. Portal
+        resolution re-reads through this after `find`, so a revocation takes
+        effect on the very next request rather than whenever the index
+        catches up."""
+        ...
+
+    def find(self, subject: str) -> ClientBinding | None:
+        """Which binding a portal token's subject holds, via the by-subject
+        index. Eventually consistent (a GSI). MUST raise rather than choose
+        when a subject resolves to more than one firm — the rule
+        `FirmStore.find_user` states, for the same reason."""
+        ...
+
+    def find_by_email(self, firm_id: str, email: str) -> ClientBinding | None:
+        """This firm's binding for `email`, if it has ever had one — how an
+        address Cognito already knows is resolved to OUR prior binding (a
+        refiled case) rather than guessed at. Firm-scoped: another firm's
+        client is not ours to re-bind."""
+        ...
+
+    def list_for_case(self, case_id: str) -> tuple[ClientBinding, ...]:
+        """Every binding on a case, revoked ones included, oldest first —
+        read from the mirrors, strongly consistent."""
+        ...
+
+
 class AccessLog(Protocol):
     """Append-only record of who read or changed which case.
 
@@ -656,4 +1162,131 @@ class CandidateStore(Protocol):
         caller lost a race and must not pretend otherwise — a withdrawal that
         overwrote an acceptance would silently un-review a record the human
         just confirmed, and two reviewers racing must get one winner."""
+        ...
+
+
+class TaskStore(Protocol):
+    """Persists case tasks (issue #356 / 14.4) — metadata rows, no
+    provenance, no bytes; see core/tasks.py's module docstring for why this
+    is its own port rather than a CaseEntityStore kind.
+
+    Ownership is NOT a parameter here, the same rule DocumentStore and
+    CaseEntityStore state: a task is reached only through its case, the
+    caller resolves the case through `CaseStore` first on every path, and a
+    second authorisation path here would eventually disagree with the first.
+    What every method DOES enforce is the case scope: `case_id` is half the
+    key, so a task id from another case does not resolve here.
+
+    NO CROSS-CASE QUERY METHOD. "Assigned to me" (`GET /v1/me/tasks`) walks
+    the caller's reachable cases through `CaseStore.list_for_accessor` and
+    calls `list_for_case` on each — see api/routes/tasks.py — rather than
+    this port growing a by-assignee index. A store-level cross-case read
+    would have to re-derive `may_see_case` itself or risk one firm's task
+    leaking into another's "assigned to me" list, and that rule already lives
+    in exactly one place.
+    """
+
+    def create(self, task: Task) -> None:
+        """Store a new record. Ids are server-minted uuid4s, so an existing
+        (case, id) means the minting is broken — implementations MUST raise
+        rather than silently replace, exactly as CaseEntityStore.create and
+        DocumentStore.create do."""
+        ...
+
+    def get(self, case_id: str, task_id: str) -> Task | None: ...
+
+    def update(self, task: Task) -> Task | None:
+        """Write `task` back, but only over a row that still exists. Returns
+        None if it does not — the route turns that into the same 404 a
+        foreign id gets, so an edit racing a delete does not silently
+        resurrect the record."""
+        ...
+
+    def list_for_case(self, case_id: str) -> tuple[Task, ...]:
+        """Every task of one case, in creation order (core/tasks.list_order —
+        the sort key is a random uuid, so neither implementation gets this
+        ordering for free). All of them: a caller cannot page, so an
+        implementation that can truncate must not."""
+        ...
+
+    def delete(self, case_id: str, task_id: str) -> bool:
+        """Remove the record. True if this call removed it, False if there
+        was nothing there — so two concurrent deletes cannot both report
+        success."""
+        ...
+
+
+class DocumentRequestStore(Protocol):
+    """Persists a case's document requests (ADR 0023 PR 5 / #364) — child
+    items of the case, beside its documents.
+
+    TaskStore's rules, for TaskStore's reasons: no accessor here (a staff
+    route resolves the case through `CaseStore.get` first, a portal route
+    takes the case id from the client's verified binding), and the case id
+    is half the key, so a request id from another case does not resolve.
+    """
+
+    def create(self, request: DocumentRequest) -> None:
+        """Store a new record; MUST raise on an existing (case, id)."""
+        ...
+
+    def get(self, case_id: str, request_id: str) -> DocumentRequest | None: ...
+
+    def update(self, request: DocumentRequest) -> DocumentRequest | None:
+        """Write `request` back over a row that still exists, or None.
+        Last writer wins: the one concurrent pair that matters — two uploads
+        completing against one request — re-reads before each write, and
+        `document_requests.satisfy` is idempotent."""
+        ...
+
+    def list_for_case(self, case_id: str) -> tuple[DocumentRequest, ...]:
+        """Every request of one case, in `document_requests.list_order`. All
+        of them — progress is computed from this list."""
+        ...
+
+    def delete(self, case_id: str, request_id: str) -> bool:
+        """Remove the record. True if this call removed it."""
+        ...
+
+
+class FilingStore(Protocol):
+    """The filing records (insolvia_core.filings, ADR 0024 PR 7/8). Written
+    by the filing worker and — for a hand-back's resolution only — by the
+    API. Every write is conditional."""
+
+    def get(self, case_id: str, filing_id: str) -> Filing | None:
+        """Strongly consistent."""
+        ...
+
+    def claim(self, filing: Filing) -> bool:
+        """Create the record, conditional on there being none. True when this
+        call created it — of two racing consumers, exactly one."""
+        ...
+
+    def transition(
+        self,
+        filing: Filing,
+        *,
+        expected_state: str,
+        filed_case: FiledCase | None = None,
+    ) -> bool:
+        """Write `filing` (its new state, its history, its outcome members),
+        conditional on the stored record still being in `expected_state` AND
+        still carrying `filing.attempt_id`. With `filed_case`, the case moves
+        to `filed` and its history row is written IN THE SAME TRANSACTION,
+        conditional on the case still existing in its firm with
+        `filed_case.expected_status`. True when this call made the write;
+        False when any condition failed — and then nothing was written."""
+        ...
+
+    def resolve(
+        self,
+        filing: Filing,
+        *,
+        expected_state: str,
+        filed_case: FiledCase | None = None,
+    ) -> bool:
+        """Write `filing` carrying its `resolution`, conditional as
+        `transition` is AND on the stored record having no resolution yet —
+        a hand-back is resolved once. `filed_case` as for `transition`."""
         ...

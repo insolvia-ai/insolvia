@@ -28,6 +28,7 @@ const SAVED_CREDITOR = {
   created_at: '2026-09-01T10:00:00.000000Z',
   updated_at: '2026-09-01T10:00:00.000000Z',
   provenance: { name: { source: 'staff_typed' } },
+  amended: false,
   name: 'Example Bank',
 };
 
@@ -422,6 +423,7 @@ describe('the intake collection sections', () => {
             created_at: '2026-09-01T10:00:00.000000Z',
             updated_at: '2026-09-01T10:00:00.000000Z',
             provenance: {},
+            amended: false,
             notice_parties: [],
           }),
       },
@@ -535,6 +537,7 @@ describe('the intake collection sections', () => {
             created_at: '2026-09-01T10:00:00.000000Z',
             updated_at: '2026-09-01T10:00:00.000000Z',
             provenance: { account_last4: { source: 'staff_typed' } },
+            amended: false,
             account_last4: '4471',
           }),
       },
@@ -582,6 +585,7 @@ describe('the intake collection sections', () => {
             created_at: '2026-09-01T10:00:00.000000Z',
             updated_at: '2026-09-01T10:00:00.000000Z',
             provenance: {},
+            amended: false,
             counterparty_name: 'StorSafe Tampa LLC',
             intention: 'reject',
             list_on_statement_of_intention: true,
@@ -623,6 +627,7 @@ describe('the intake collection sections', () => {
       created_at: '2026-09-01T10:00:00.000000Z',
       updated_at: '2026-09-01T10:00:00.000000Z',
       provenance: { counterparty_name: { source: 'staff_typed' } },
+      amended: false,
       counterparty_name: 'StorSafe Tampa LLC',
     };
     const fetchMock = signedIn([
@@ -655,6 +660,7 @@ describe('the intake collection sections', () => {
               name: { source: 'staff_typed' },
               contract_lease_ids: { source: 'staff_typed' },
             },
+            amended: false,
             name: 'Jane Doe',
             contract_lease_ids: [LEASE.id],
           }),
@@ -686,6 +692,7 @@ describe('the intake collection sections', () => {
       created_at: '2026-09-01T10:00:00.000000Z',
       updated_at: '2026-09-01T10:00:00.000000Z',
       provenance: { amount: { source: 'staff_typed' } },
+      amended: false,
       amount: '500.00',
     };
     const CODEBTOR = {
@@ -694,6 +701,7 @@ describe('the intake collection sections', () => {
       created_at: '2026-09-01T10:00:00.000000Z',
       updated_at: '2026-09-01T10:00:00.000000Z',
       provenance: { name: { source: 'staff_typed' }, claim_ids: { source: 'staff_typed' } },
+      amended: false,
       name: 'Jane Doe',
       claim_ids: [CLAIM.id],
     };
@@ -747,6 +755,7 @@ describe('the intake collection sections', () => {
               entry_type: { source: 'staff_typed' },
               'payload.value': { source: 'staff_typed' },
             },
+            amended: false,
             entry_type: 'gift',
             payload: { value: '700.00' },
           }),
@@ -770,5 +779,83 @@ describe('the intake collection sections', () => {
         },
       }),
     );
+  });
+
+  // ── Amendments (issue #370) ────────────────────────────────────
+
+  it('shows an Amended badge for a row already flagged amended', async () => {
+    signedIn([
+      noDebtors,
+      {
+        method: 'GET',
+        fragment: `/v1/cases/${CASE_ID}/creditors`,
+        respond: () => jsonResponse(200, { creditors: [{ ...SAVED_CREDITOR, amended: true }] }),
+      },
+    ]);
+
+    await openSection('Creditors');
+
+    expect(await screen.findByText('Amended')).toBeTruthy();
+  });
+
+  it('offers the amended control only once the case is filed, and sends it when checked', async () => {
+    const fetchMock = signedIn([
+      noDebtors,
+      {
+        method: 'GET',
+        fragment: `/v1/cases/${CASE_ID}/creditors`,
+        respond: () => jsonResponse(200, { creditors: [] }),
+      },
+      {
+        method: 'POST',
+        fragment: `/v1/cases/${CASE_ID}/creditors`,
+        respond: () => jsonResponse(201, { ...SAVED_CREDITOR, amended: true }),
+      },
+      // The "Add creditor" flow's own source picker (issue 13.9 / #350)
+      // loads codebtors too.
+      {
+        method: 'GET',
+        fragment: `/v1/cases/${CASE_ID}/codebtors`,
+        respond: () => jsonResponse(200, { codebtors: [] }),
+      },
+      // Last: a prefix of every other route above, per the dispatcher's own
+      // "come last" rule.
+      {
+        method: 'GET',
+        fragment: `/v1/cases/${CASE_ID}`,
+        respond: () => jsonResponse(200, caseBody(CASE_ID, { status: 'filed' })),
+      },
+    ]);
+
+    const user = await openSection('Creditors');
+    await user.press(await screen.findByRole('button', { name: 'Add creditor' }));
+    await user.type(await screen.findByLabelText('Creditor name'), 'Example Bank');
+    await user.press(await screen.findByRole('checkbox', { name: 'Mark this creditor amended' }));
+    await user.press(screen.getByRole('button', { name: 'Save creditor' }));
+
+    await waitFor(() =>
+      expect(lastBody(fetchMock, 'POST', '/creditors')).toEqual({
+        name: 'Example Bank',
+        amended: true,
+        provenance: { name: { source: 'staff_typed' } },
+      }),
+    );
+  });
+
+  it('never shows the amended control before the case is filed', async () => {
+    signedIn([
+      noDebtors,
+      {
+        method: 'GET',
+        fragment: `/v1/cases/${CASE_ID}/creditors`,
+        respond: () => jsonResponse(200, { creditors: [] }),
+      },
+    ]);
+
+    const user = await openSection('Creditors');
+    await user.press(await screen.findByRole('button', { name: 'Add creditor' }));
+    await screen.findByLabelText('Creditor name');
+
+    expect(screen.queryByRole('checkbox', { name: 'Mark this creditor amended' })).toBeNull();
   });
 });

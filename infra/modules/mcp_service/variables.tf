@@ -39,7 +39,7 @@ variable "acm_certificate_arn" {
 }
 
 variable "ecr_repository_url" {
-  description = "URL of the shared insolvia-shared-mcp repository (created in infra/envs/shared, looked up by the env root). Shared across environments so prod deploys the exact digest staging validated."
+  description = "URL of the shared insolvia-shared-mcp repository (created in insolvia-services' infra/envs/shared, looked up by the env root). Shared across environments so prod deploys the exact digest staging validated."
   type        = string
 }
 

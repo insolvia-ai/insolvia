@@ -61,7 +61,12 @@ STATUSES: Final = (PENDING, ACCEPTED, CORRECTED, REJECTED, WITHDRAWN)
 # Which channels can originate a candidate. Extraction's channel is named now
 # so the enum exists when 8.7 writes its first row, mirroring how the
 # extraction_review feature was listed before the feature shipped.
-ORIGIN_CHANNELS: Final = ("mcp", "extraction")
+#
+# `client` (ADR 0023) is a debtor answering the portal questionnaire: origin
+# `{channel: "client", client_id: <the portal app client>, subject}`, taken
+# from the verified portal token like every other origin. Listed now, written
+# from #363 — acceptance then mints provenance `source: client`.
+ORIGIN_CHANNELS: Final = ("mcp", "extraction", "client")
 
 # 1-25 proposals per call (mcp-surface.md § Limits). A bigger batch is a
 # mistake or an attack; a harness with more records makes more calls.

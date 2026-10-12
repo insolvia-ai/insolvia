@@ -129,6 +129,32 @@ describe('the account screen', () => {
     });
   });
 
+  it('saves the signature block as its own PATCH, sending only the filled fields', async () => {
+    // Issue #360: self-service, like the name, and a separate button so the
+    // name PATCH stays exactly the two halves.
+    const saved = membership();
+    const fetchMock = signedIn({ '/v1/me': () => jsonResponse(200, saved) }, () =>
+      jsonResponse(200, {
+        ...saved,
+        firm: { ...saved.firm, signatureBlock: { bar_number: '0123456', bar_state: 'FL' } },
+      }),
+    );
+    await screen.findByDisplayValue('Attorney');
+
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText('Bar number'), '0123456');
+    await user.type(screen.getByLabelText('Bar state'), 'FL');
+    await user.press(screen.getByRole('button', { name: 'Save signature block' }));
+
+    expect(await screen.findByText('Your signature block is saved.')).toBeTruthy();
+    const patch = fetchMock.mock.calls.find(
+      ([url, init]) => url.includes('/v1/me') && init?.method === 'PATCH',
+    );
+    expect(JSON.parse(String(patch?.[1]?.body))).toEqual({
+      signatureBlock: { bar_number: '0123456', bar_state: 'FL' },
+    });
+  });
+
   it('renders the server’s own message on a rejected name', async () => {
     // The server owns validation (ADR 0001) — the message is its literal
     // FieldValidationError body, shown as-is rather than restated.
@@ -148,7 +174,11 @@ describe('the account screen', () => {
   });
 
   it('is reachable from the shell’s account menu', async () => {
-    signedIn({ '/v1/me': () => jsonResponse(200, membership()) }, undefined, '/');
+    // `/cases` rather than `/`: the account menu sits in the shell every
+    // route shares, and `/cases` needs no firm-scoped reads of its own to
+    // settle (unlike the dashboard's several cards), so there is nothing left
+    // in flight to race the navigation this test performs.
+    signedIn({ '/v1/me': () => jsonResponse(200, membership()) }, undefined, '/cases');
 
     const user = userEvent.setup();
     await user.press(await screen.findByRole('button', { name: 'Account menu' }));

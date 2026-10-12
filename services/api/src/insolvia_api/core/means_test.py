@@ -1,12 +1,20 @@
-"""The § 707(b) means-test engine — rule-based, effective-dated, pure
-(issue #101).
+"""The means-test engine — rule-based, effective-dated, pure (issues #101,
+#365): § 707(b) for a Chapter 7 case, § 1325(b) for a Chapter 13 case, one
+engine selected by the case's chapter.
 
-The legally required Chapter 7 eligibility calculation: the median-income
-comparison (§ 707(b)(7); B122A-1 lines 12-14), and for above-median debtors
+The legally required calculations: for Chapter 7, the median-income
+comparison (§ 707(b)(7); B122A-1 lines 12-14) and, for above-median debtors,
 the full B122A-2 calculation (revision 04/25) ending in the presumption-of-
-abuse determination (§ 707(b)(2)). Wrong means dismissal or a trustee
-challenge, so the numbers stay deterministic — Claude never touches them
-(the register's LOGIC rule) — and every figure in the output traces to a
+abuse determination (§ 707(b)(2)); for Chapter 13, B122C-1's applicable
+commitment period (§ 1325(b)(4): 36 months below the median, 60 at or above
+it) and, for above-median debtors, B122C-2's monthly disposable income under
+§ 1325(b)(2) — the SAME National and Local Standards and actual-expense
+deductions as B122A-2 (lines 5-38 are identical on both forms, by the forms'
+own design), followed by the Chapter 13-only subtractions (support income
+for dependent children, qualified retirement deductions, special
+circumstances). Wrong means dismissal, a trustee challenge, or a plan that
+cannot be confirmed, so the numbers stay deterministic — Claude never touches
+them (the register's LOGIC rule) — and every figure in the output traces to a
 rule, an input, or a dated dataset:
 
 - **Datasets** come resolved as of the filing date through
@@ -15,18 +23,21 @@ rule, an input, or a dated dataset:
   discipline packet assembly applies to forms.
 - **Derivable figures** arrive as inputs the CALLER derives from case
   records: the CMI result (core/cmi.py), the priority and nonpriority debt
-  totals (the claims), the under-18 dependant count. The engine does not
-  read stores; purity is what makes the known-answer tests possible.
+  totals (the claims), the under-18 dependant count, the case's chapter. The
+  engine does not read stores; purity is what makes the known-answer tests
+  possible.
 - **Entered figures** come from the case's `means_test_input`
   (insolvia_core.means_test_inputs) — the actual-expense answers only the
   debtor can supply. An ABSENT entered figure is a zero, exactly as a blank
   box on the form claims nothing; an entered figure that breaks a statutory
   cap is an error naming the cap, never a silent clamp.
 
-Line numbering follows the 04/25 revision so the trace reads against the
-printed form; `MeansTestLine.source` says where each amount came from. All
-arithmetic is Decimal, quantized to cents per line the way the form's boxes
-are, half-up.
+Line numbering follows the printed revisions (B122A-2 04/25, B122C-1 10/19,
+B122C-2 04/25) so the trace reads against the form; `MeansTestLine.form`
+says which form a line belongs to (B122C-1's Part 2-3 lines and B122C-2's
+lines share numbers 12-21) and `MeansTestLine.source` where each amount came
+from. All arithmetic is Decimal, quantized to cents per line the way the
+form's boxes are, half-up.
 
 Issue #349 (the means-test screen) widened the ENTERED inputs without
 touching a rule — every new field defaults to what the engine did before:
@@ -36,6 +47,7 @@ touching a rule — every new field defaults to what the engine did before:
   one ends the test with outcome `exempt`, `determined_by` naming the
   flag, no B122A-2 lines, and the median comparison still reported when
   the household is known — the screen shows it, the form does not need it.
+  They are § 707(b) concepts and never consulted for a Chapter 13 case.
 - **Three household sizes.** The median comparison takes
   `median_household_size`, line 5's IRS family size takes
   `irs_family_size`, and the housing standard (lines 8 and 9a) takes
@@ -48,6 +60,29 @@ touching a rule — every new field defaults to what the engine did before:
   matching bucket, and line 33d takes the rows in no bucket or `other`.
   A typed total wins outright rather than adding, so the panel beside a
   claim and the typed figure can never both count.
+
+The Chapter 13 branch (issue #365) reads the same inputs plus the four the
+Chapter 13 forms ask on their own (`commitment_period_marital_adjustment`,
+`child_support_for_dependents`, `qualified_retirement_deductions`,
+`special_circumstances`), and differs from Chapter 7 in exactly these ways:
+
+- **B122C-1 subtracts the marital adjustment BEFORE the median comparison**
+  (lines 12-14; line 15b is line 14 x 12), where B122A-1 compares the raw
+  total and B122A-2 line 3 adjusts afterwards. The comparison's
+  `monthly_cmi` is therefore line 14 on a Chapter 13 trace.
+- **The commitment period is its own comparison** (Part 3, lines 18-21):
+  the raw line 11 total, less the marital adjustment only when the debtor
+  contends it applies under § 1325(b)(4), annualized against the same
+  median — strictly below it is 3 years, at or above it is 5. The two
+  comparisons can disagree when the adjustment is claimed on line 13 but
+  not on line 19a; both are reported.
+- **Line 36 always multiplies** the projected plan payment by the district
+  multiplier: a Chapter 13 debtor is filing under Chapter 13, so B122A-2's
+  eligibility question does not exist on B122C-2.
+- **No presumption.** Above the median, B122C-2 Part 2 subtracts lines
+  40-43 from line 39 (B122C-1 line 14) to reach line 45, the monthly
+  disposable income the plan must commit; outcome `above_median`, never
+  `no_presumption` / `presumption_of_abuse`.
 """
 
 from __future__ import annotations
@@ -63,6 +98,15 @@ from . import dollar_amounts, ust_data
 from .cmi import CmiResult
 
 _CENT: Final = Decimal("0.01")
+
+# The form a trace line belongs to.
+FORM_122A2: Final = "122A-2"
+FORM_122C1: Final = "122C-1"
+FORM_122C2: Final = "122C-2"
+
+# § 1325(b)(4)'s two applicable commitment periods, in months.
+COMMITMENT_PERIOD_BELOW_MEDIAN: Final = 36
+COMMITMENT_PERIOD_ABOVE_MEDIAN: Final = 60
 
 # The three Form 122A-1Supp exemptions, in the order the form asks them,
 # each with the rule that grants it.
@@ -103,8 +147,9 @@ def _entered_household(inputs: MeansTestInputBody) -> int | None:
 
 
 def median_household_size(inputs: MeansTestInputBody) -> tuple[int, str] | None:
-    """B122A-1 line 13's household size and where it came from: the entered
-    override, else the sum of the age bands; None until either exists."""
+    """B122A-1 line 13's (B122C-1 line 16b's) household size and where it
+    came from: the entered override, else the sum of the age bands; None
+    until either exists."""
     if inputs.median_household_size is not None:
         return (
             inputs.median_household_size,
@@ -117,7 +162,7 @@ def median_household_size(inputs: MeansTestInputBody) -> tuple[int, str] | None:
 
 
 def irs_family_size(inputs: MeansTestInputBody) -> tuple[int, str] | None:
-    """B122A-2 line 5's "number of people used in determining deductions"."""
+    """Line 5's "number of people used in determining deductions"."""
     if inputs.irs_family_size is not None:
         return inputs.irs_family_size, "entered (means_test_input.irs_family_size)"
     entered = _entered_household(inputs)
@@ -214,7 +259,9 @@ def resolve_means_test_data(as_of: date) -> MeansTestData:
 
 @dataclass(frozen=True)
 class MedianComparison:
-    """B122A-1 lines 12-14: annualized CMI against the applicable median."""
+    """B122A-1 lines 12-14 / B122C-1 lines 15-17: annualized CMI against the
+    applicable median. On a Chapter 13 trace `monthly_cmi` is B122C-1 line
+    14 (after the marital adjustment), on a Chapter 7 trace line 11."""
 
     state: str
     household_size: int
@@ -227,13 +274,30 @@ class MedianComparison:
 
 @dataclass(frozen=True)
 class MeansTestLine:
-    """One line of the B122A-2 trace: the printed line number, its subject,
-    the computed amount, and where the amount came from — a dataset release,
-    an entered field, a derived input, or line arithmetic."""
+    """One line of the trace: the form it prints on, the printed line
+    number, its subject, the computed amount, and where the amount came from
+    — a dataset release, an entered field, a derived input, or line
+    arithmetic."""
 
     line: str
     label: str
     amount: str
+    source: str
+    form: str
+
+
+@dataclass(frozen=True)
+class CommitmentPeriod:
+    """B122C-1 Part 3 (11 U.S.C. § 1325(b)(4)): the applicable commitment
+    period and the comparison that set it — line 19b (the raw total less
+    the marital adjustment when contended), annualized on line 20b against
+    the median on line 20c."""
+
+    months: int
+    marital_adjustment: str
+    monthly_income: str
+    annualized_income: str
+    annual_median: str
     source: str
 
 
@@ -245,7 +309,8 @@ class MeansTestCase:
     `priority_debt_total` is the claims' priority portions summed (line 35);
     `nonpriority_unsecured_total` is Schedule E/F's nonpriority total plus
     priority claims' nonpriority portions (line 41a); `children_under_18`
-    counts dependants under 18 for line 29's per-child cap.
+    counts dependants under 18 for line 29's per-child cap; `chapter`
+    selects the calculation (7 or 13 — the only chapters with a form).
     """
 
     state: str
@@ -256,20 +321,26 @@ class MeansTestCase:
     priority_debt_total: str
     nonpriority_unsecured_total: str
     children_under_18: int
+    chapter: int = 7
 
 
 @dataclass(frozen=True)
 class MeansTestResult:
     """The whole determination: which data it used, the median comparison,
-    the B122A-2 trace for an above-median debtor (empty below the median),
-    and the § 707(b)(2) outcome.
+    the calculation form's trace (B122A-2 lines for an above-median Chapter
+    7 debtor; B122C-1's Part 2-3 lines and, above the median, B122C-2's
+    lines for a Chapter 13 debtor — empty below the median on Chapter 7),
+    and the outcome.
 
     `outcome` is one of `below_median` / `no_presumption` /
-    `presumption_of_abuse` / `exempt`; `determined_by` names the rule that
+    `presumption_of_abuse` / `exempt` on Chapter 7 and `below_median` /
+    `above_median` on Chapter 13; `determined_by` names the rule that
     settled it (`median`, `threshold_floor`, `threshold_ceiling`,
     `unsecured_ratio`, or the exemption flag). `comparison` is None only
     for an exempt debtor whose household has not been entered — the one
-    outcome the median does not decide.
+    outcome the median does not decide. `commitment` is the § 1325(b)(4)
+    period (Chapter 13 only) and `disposable_income` B122C-2 line 45
+    (Chapter 13, above the median only).
     """
 
     as_of: date
@@ -278,6 +349,9 @@ class MeansTestResult:
     outcome: str
     determined_by: str
     lines: tuple[MeansTestLine, ...]
+    chapter: int = 7
+    commitment: CommitmentPeriod | None = None
+    disposable_income: str | None = None
 
 
 def median_comparison(
@@ -287,10 +361,10 @@ def median_comparison(
     household_size: int,
     data: MeansTestData,
 ) -> MedianComparison:
-    """B122A-1's Part 2: 12x the monthly CMI against the state median for
-    the household size (§ 707(b)(7); above 4 the table adds the statutory
-    per-person amount). Raises MeansTestError for a jurisdiction the median
-    table does not carry."""
+    """B122A-1's Part 2 / B122C-1's line 17: 12x the monthly figure against
+    the state median for the household size (§ 707(b)(7); above 4 the table
+    adds the statutory per-person amount). Raises MeansTestError for a
+    jurisdiction the median table does not carry."""
     monthly = Decimal(monthly_cmi)
     annualized = monthly * 12
     try:
@@ -356,71 +430,53 @@ def _cure_total(inputs: MeansTestInputBody) -> tuple[Decimal, str]:
     )
 
 
-def run_means_test(case: MeansTestCase, data: MeansTestData) -> MeansTestResult:
-    """The whole § 707(b) determination for one case.
-
-    Below-median debtors stop at the comparison (no presumption; B122A-2 is
-    not filed). Above-median debtors get the full line-by-line calculation.
-    Raises MeansTestError, with every problem named, when required facts
-    are missing or an entered figure breaks a statutory cap.
-    """
-    problems: list[str] = []
+def _marital_adjustment(
+    case: MeansTestCase, *, form: str, line: str, problems: list[str]
+) -> tuple[Decimal, str]:
+    """B122A-2 line 3 / B122C-1 line 13: the entered rows summed, with the
+    check that a spouse's income is actually included (Column B)."""
     inputs = case.inputs
-
-    median_size = median_household_size(inputs)
-
-    exemption = presumption_exemption(inputs)
-    if exemption is not None:
-        # Form 122A-1Supp ends the test here. The comparison is still
-        # reported when it can be made — an attorney advising a client wants
-        # to see it — but nothing depends on it.
-        preview: MedianComparison | None = None
-        if median_size is not None and median_size[0] >= 1:
-            try:
-                preview = median_comparison(
-                    monthly_cmi=case.cmi.combined_monthly_total,
-                    state=case.state,
-                    household_size=median_size[0],
-                    data=data,
-                )
-            except MeansTestError:
-                preview = None
-        return MeansTestResult(
-            as_of=data.as_of,
-            release_ids=data.release_ids,
-            comparison=preview,
-            outcome="exempt",
-            determined_by=exemption[0],
-            lines=(),
+    has_column_b = any(column.column == "B" for column in case.cmi.columns)
+    adjustments = inputs.marital_adjustments
+    if adjustments and not has_column_b:
+        problems.append(
+            f"marital adjustments are entered but Form {form} has no Column B "
+            f"— line {line} applies only when a spouse's income is included"
         )
-
-    if median_size is None:
-        raise MeansTestError(
-            [
-                "the household composition (people under 65 / 65 and older) "
-                "has not been entered — line 5's deductions and the median "
-                "comparison both need it"
-            ]
-        )
-    if median_size[0] < 1:
-        raise MeansTestError(["the household cannot be empty"])
-
-    comparison = median_comparison(
-        monthly_cmi=case.cmi.combined_monthly_total,
-        state=case.state,
-        household_size=median_size[0],
-        data=data,
+    total = Decimal("0")
+    for item in adjustments:
+        total += _entered(item.amount)
+    source = "entered (means_test_input.marital_adjustments" + (
+        ": " + "; ".join(item.description or item.id for item in adjustments)
+        if adjustments
+        else ""
     )
-    if not comparison.above_median:
-        return MeansTestResult(
-            as_of=data.as_of,
-            release_ids=data.release_ids,
-            comparison=comparison,
-            outcome="below_median",
-            determined_by="median",
-            lines=(),
-        )
+    return total, source + ")"
 
+
+class _Trace:
+    """The lines one run accumulates, in printed order."""
+
+    def __init__(self) -> None:
+        self.lines: list[MeansTestLine] = []
+
+    def put(
+        self, form: str, line: str, label: str, amount: Decimal, source: str
+    ) -> Decimal:
+        self.lines.append(
+            MeansTestLine(
+                line=line, label=label, amount=_money(amount), source=source, form=form
+            )
+        )
+        return amount
+
+
+def _household_for_deductions(
+    inputs: MeansTestInputBody,
+) -> tuple[int, int, tuple[int, str], tuple[int, str]]:
+    """Line 5 and line 7's inputs: the age bands (required above the
+    median — line 7's per-person allowances need them), the IRS family
+    size and the housing family size."""
     under_65 = inputs.people_under_65
     over_65 = inputs.people_65_or_older
     if under_65 is None or over_65 is None:
@@ -435,55 +491,30 @@ def run_means_test(case: MeansTestCase, data: MeansTestData) -> MeansTestResult:
     housing_family = irs_housing_family_size(inputs)
     assert family is not None  # both age bands are set above
     assert housing_family is not None
-    household, household_source = family
-    if household < 1:
+    if family[0] < 1:
         raise MeansTestError(["the household cannot be empty"])
+    return under_65, over_65, family, housing_family
 
-    lines: list[MeansTestLine] = []
+
+def _deductions(
+    case: MeansTestCase,
+    data: MeansTestData,
+    trace: _Trace,
+    *,
+    form: str,
+    problems: list[str],
+) -> Decimal:
+    """Lines 5-38 — the IRS allowances, the additional expense deductions
+    and the deductions for debt payment — identical on B122A-2 and B122C-2
+    except line 36's rule, which `form` selects. Returns line 38."""
+    inputs = case.inputs
+    under_65, over_65, family, housing_family = _household_for_deductions(inputs)
+    household, household_source = family
 
     def put(line: str, label: str, amount: Decimal, source: str) -> Decimal:
-        lines.append(
-            MeansTestLine(line=line, label=label, amount=_money(amount), source=source)
-        )
-        return amount
+        return trace.put(form, line, label, amount, source)
 
-    # ── Part 1: adjusted current monthly income ────────────────────────────
-    line_1 = put(
-        "1",
-        "Total current monthly income",
-        Decimal(case.cmi.combined_monthly_total),
-        "Form 122A-1 line 11 — the § 101(10A) derivation (core/cmi.py)",
-    )
-    has_column_b = any(column.column == "B" for column in case.cmi.columns)
-    adjustments = inputs.marital_adjustments
-    if adjustments and not has_column_b:
-        problems.append(
-            "marital adjustments are entered but Form 122A-1 has no Column B "
-            "— line 3 applies only when a spouse's income is included"
-        )
-    line_3 = Decimal("0")
-    for item in adjustments:
-        line_3 += _entered(item.amount)
-    put(
-        "3",
-        "Marital adjustment",
-        line_3,
-        "entered (means_test_input.marital_adjustments"
-        + (
-            ": " + "; ".join(item.description or item.id for item in adjustments)
-            if adjustments
-            else ""
-        )
-        + ")",
-    )
-    line_4 = put(
-        "4",
-        "Adjusted current monthly income",
-        line_1 - line_3,
-        "line 1 minus line 3",
-    )
-
-    # ── Part 2: IRS allowances (lines 5-24) ────────────────────────────────
+    # ── IRS allowances (lines 5-24) ────────────────────────────────────────
     put(
         "5",
         "Number of people used in determining deductions",
@@ -703,36 +734,48 @@ def run_means_test(case: MeansTestCase, data: MeansTestData) -> MeansTestResult:
         "at the IRS public transportation standard",
     )
 
-    other_necessary: list[tuple[str, str, str | None]] = [
-        ("16", "Taxes", inputs.taxes),
-        ("17", "Involuntary deductions", inputs.involuntary_deductions),
-        ("18", "Term life insurance", inputs.term_life_insurance),
-        ("19", "Court-ordered payments", inputs.court_ordered_payments),
+    other_necessary: list[tuple[str, str, str, str | None]] = [
+        ("16", "Taxes", "taxes", inputs.taxes),
+        (
+            "17",
+            "Involuntary deductions",
+            "involuntary_deductions",
+            inputs.involuntary_deductions,
+        ),
+        (
+            "18",
+            "Term life insurance",
+            "term_life_insurance",
+            inputs.term_life_insurance,
+        ),
+        (
+            "19",
+            "Court-ordered payments",
+            "court_ordered_payments",
+            inputs.court_ordered_payments,
+        ),
         (
             "20",
             "Education required for employment or for a disabled child",
+            "education_for_employment_or_disability",
             inputs.education_for_employment_or_disability,
         ),
-        ("21", "Childcare", inputs.childcare),
+        ("21", "Childcare", "childcare", inputs.childcare),
         (
             "22",
             "Additional health care expenses, excluding insurance costs",
+            "healthcare_above_allowance",
             inputs.healthcare_above_allowance,
         ),
-        ("23", "Optional telephones and telephone services", inputs.optional_telecom),
+        (
+            "23",
+            "Optional telephones and telephone services",
+            "optional_telecom",
+            inputs.optional_telecom,
+        ),
     ]
     other_necessary_total = Decimal("0")
-    for number, label, value in other_necessary:
-        field_name = {
-            "16": "taxes",
-            "17": "involuntary_deductions",
-            "18": "term_life_insurance",
-            "19": "court_ordered_payments",
-            "20": "education_for_employment_or_disability",
-            "21": "childcare",
-            "22": "healthcare_above_allowance",
-            "23": "optional_telecom",
-        }[number]
+    for number, label, field_name, value in other_necessary:
         other_necessary_total += put(
             number, label, _entered(value), f"entered (means_test_input.{field_name})"
         )
@@ -752,7 +795,7 @@ def run_means_test(case: MeansTestCase, data: MeansTestData) -> MeansTestResult:
         "lines 6 + 7 + 8 + 9c + 10 + 12 + 13 + 14 + 15 + 16 through 23",
     )
 
-    # ── Part 2: additional expense deductions (lines 25-32) ────────────────
+    # ── additional expense deductions (lines 25-32) ────────────────────────
     line_25 = put(
         "25",
         "Health insurance, disability insurance, and HSA expenses",
@@ -829,7 +872,7 @@ def run_means_test(case: MeansTestCase, data: MeansTestData) -> MeansTestResult:
         "lines 25 through 31",
     )
 
-    # ── Part 2: deductions for debt payment (lines 33-37) ──────────────────
+    # ── deductions for debt payment (lines 33-37) ──────────────────────────
     put("33a", "Copy of line 9b", line_9b, "line 9b")
     put("33b", "Copy of line 13b", line_13b, "line 13b")
     put("33c", "Copy of line 13e", line_13e, "line 13e")
@@ -868,7 +911,7 @@ def run_means_test(case: MeansTestCase, data: MeansTestData) -> MeansTestResult:
         _sixty_month_average(Decimal(case.priority_debt_total)),
         "the claims' priority portions divided by 60 — 11 U.S.C. § 707(b)(2)(A)(iv)",
     )
-    if inputs.ch13_eligible:
+    if form == FORM_122C2 or inputs.ch13_eligible:
         plan_payment = _entered(inputs.ch13_projected_plan_payment)
         try:
             multiplier = data.ch13.multiplier_for(case.district)
@@ -881,7 +924,8 @@ def run_means_test(case: MeansTestCase, data: MeansTestData) -> MeansTestResult:
             f"projected plan payment {_money(plan_payment)} x the "
             f"{case.district} multiplier {multiplier} — "
             f"{data.ch13_release.release_id}; "
-            "11 U.S.C. § 707(b)(2)(A)(ii)(III)",
+            "11 U.S.C. § 707(b)(2)(A)(ii)(III)"
+            + (" applied by § 1325(b)(3)" if form == FORM_122C2 else ""),
         )
     else:
         line_36 = put(
@@ -897,13 +941,111 @@ def run_means_test(case: MeansTestCase, data: MeansTestData) -> MeansTestResult:
         "lines 33e + 34 + 35 + 36",
     )
 
-    # ── Part 2 total, Part 3: the determination ────────────────────────────
-    line_38 = put(
+    return put(
         "38",
         "Total deductions from income",
         line_24 + line_32 + line_37,
         "lines 24 + 32 + 37",
     )
+
+
+def _median_size_or_refuse(inputs: MeansTestInputBody, *, needed_by: str) -> int:
+    median_size = median_household_size(inputs)
+    if median_size is None:
+        raise MeansTestError(
+            [
+                "the household composition (people under 65 / 65 and older) "
+                f"has not been entered — {needed_by}"
+            ]
+        )
+    if median_size[0] < 1:
+        raise MeansTestError(["the household cannot be empty"])
+    return median_size[0]
+
+
+def _run_chapter_7(case: MeansTestCase, data: MeansTestData) -> MeansTestResult:
+    """The whole § 707(b) determination: B122A-1's comparison, then B122A-2
+    for an above-median debtor."""
+    problems: list[str] = []
+    inputs = case.inputs
+
+    median_size = median_household_size(inputs)
+
+    exemption = presumption_exemption(inputs)
+    if exemption is not None:
+        # Form 122A-1Supp ends the test here. The comparison is still
+        # reported when it can be made — an attorney advising a client wants
+        # to see it — but nothing depends on it.
+        preview: MedianComparison | None = None
+        if median_size is not None and median_size[0] >= 1:
+            try:
+                preview = median_comparison(
+                    monthly_cmi=case.cmi.combined_monthly_total,
+                    state=case.state,
+                    household_size=median_size[0],
+                    data=data,
+                )
+            except MeansTestError:
+                preview = None
+        return MeansTestResult(
+            as_of=data.as_of,
+            release_ids=data.release_ids,
+            comparison=preview,
+            outcome="exempt",
+            determined_by=exemption[0],
+            lines=(),
+            chapter=7,
+        )
+
+    household_size = _median_size_or_refuse(
+        inputs,
+        needed_by="line 5's deductions and the median comparison both need it",
+    )
+    comparison = median_comparison(
+        monthly_cmi=case.cmi.combined_monthly_total,
+        state=case.state,
+        household_size=household_size,
+        data=data,
+    )
+    if not comparison.above_median:
+        return MeansTestResult(
+            as_of=data.as_of,
+            release_ids=data.release_ids,
+            comparison=comparison,
+            outcome="below_median",
+            determined_by="median",
+            lines=(),
+            chapter=7,
+        )
+
+    trace = _Trace()
+
+    def put(line: str, label: str, amount: Decimal, source: str) -> Decimal:
+        return trace.put(FORM_122A2, line, label, amount, source)
+
+    # ── Part 1: adjusted current monthly income ────────────────────────────
+    line_1 = put(
+        "1",
+        "Total current monthly income",
+        Decimal(case.cmi.combined_monthly_total),
+        "Form 122A-1 line 11 — the § 101(10A) derivation (core/cmi.py)",
+    )
+    line_3 = put(
+        "3",
+        "Marital adjustment",
+        *_marital_adjustment(case, form="122A-1", line="3", problems=problems),
+    )
+    line_4 = put(
+        "4",
+        "Adjusted current monthly income",
+        line_1 - line_3,
+        "line 1 minus line 3",
+    )
+
+    # ── Part 2: the deductions (lines 5-38) ────────────────────────────────
+    line_38 = _deductions(case, data, trace, form=FORM_122A2, problems=problems)
+
+    # ── Part 3: the determination ──────────────────────────────────────────
     put("39a", "Copy of line 4, adjusted current monthly income", line_4, "line 4")
     put("39b", "Copy of line 38, total deductions", line_38, "line 38")
     line_39c = put(
@@ -979,5 +1121,243 @@ def run_means_test(case: MeansTestCase, data: MeansTestData) -> MeansTestResult:
         comparison=comparison,
         outcome=outcome,
         determined_by=determined_by,
-        lines=tuple(lines),
+        lines=tuple(trace.lines),
+        chapter=7,
+    )
+
+
+def _run_chapter_13(case: MeansTestCase, data: MeansTestData) -> MeansTestResult:
+    """B122C-1's two comparisons (§ 1325(b)(3)'s "is disposable income
+    determined by the standards" on line 17, § 1325(b)(4)'s commitment
+    period on line 21), then B122C-2 for an above-median debtor."""
+    problems: list[str] = []
+    inputs = case.inputs
+    trace = _Trace()
+
+    def put(line: str, label: str, amount: Decimal, source: str) -> Decimal:
+        return trace.put(FORM_122C1, line, label, amount, source)
+
+    household_size = _median_size_or_refuse(
+        inputs,
+        needed_by="line 16b's household size and line 5's deductions both need it",
+    )
+
+    # ── B122C-1 Part 2: how to measure the deductions ─────────────────────
+    line_11 = put(
+        "11",
+        "Total average monthly income",
+        Decimal(case.cmi.combined_monthly_total),
+        "Form 122C-1 line 11 — the § 101(10A) derivation (core/cmi.py)",
+    )
+    line_12 = put("12", "Copy of line 11", line_11, "line 11")
+    line_13 = put(
+        "13",
+        "Marital adjustment",
+        *_marital_adjustment(case, form="122C-1", line="13", problems=problems),
+    )
+    line_14 = put(
+        "14", "Current monthly income", line_12 - line_13, "line 12 minus line 13"
+    )
+    put("15a", "Copy of line 14", line_14, "line 14")
+    comparison = median_comparison(
+        monthly_cmi=_money(line_14),
+        state=case.state,
+        household_size=household_size,
+        data=data,
+    )
+    median = Decimal(comparison.annual_median)
+    put(
+        "15b",
+        "Current monthly income for the year",
+        line_14 * 12,
+        "line 15a x 12 — 11 U.S.C. § 1325(b)(3)",
+    )
+    put(
+        "16c",
+        "Median family income for your state and size of household",
+        median,
+        comparison.source,
+    )
+    put(
+        "17",
+        "Whether disposable income is determined under 11 U.S.C. § 1325(b)(3)",
+        Decimal(1 if comparison.above_median else 0),
+        (
+            "line 15b is more than line 16c: disposable income is determined "
+            "under § 1325(b)(3) — fill out Form 122C-2 (line 17b)"
+            if comparison.above_median
+            else "line 15b is less than or equal to line 16c: disposable "
+            "income is not determined under § 1325(b)(3) — Form 122C-2 is "
+            "not filed (line 17a)"
+        ),
+    )
+
+    # ── B122C-1 Part 3: the commitment period ─────────────────────────────
+    line_18 = put("18", "Copy of line 11", line_11, "line 11")
+    if inputs.commitment_period_marital_adjustment is True:
+        line_19a = put(
+            "19a",
+            "Marital adjustment deducted for the commitment period",
+            line_13,
+            "line 13, contended to apply under 11 U.S.C. § 1325(b)(4) "
+            "(means_test_input.commitment_period_marital_adjustment)",
+        )
+    else:
+        line_19a = put(
+            "19a",
+            "Marital adjustment deducted for the commitment period",
+            Decimal("0"),
+            "the marital adjustment is not contended for the commitment "
+            "period (means_test_input.commitment_period_marital_adjustment)",
+        )
+    line_19b = put(
+        "19b", "Line 18 minus line 19a", line_18 - line_19a, "line 18 minus line 19a"
+    )
+    put("20a", "Copy of line 19b", line_19b, "line 19b")
+    line_20b = put(
+        "20b",
+        "Current monthly income for the year (commitment period)",
+        line_19b * 12,
+        "line 20a x 12 — 11 U.S.C. § 1325(b)(4)",
+    )
+    put("20c", "Copy of line 16c", median, "line 16c")
+    if line_20b < median:
+        months = COMMITMENT_PERIOD_BELOW_MEDIAN
+        commitment_source = (
+            "line 20b is less than line 20c: the commitment period is 3 years "
+            "— 11 U.S.C. § 1325(b)(4)(A)(i)"
+        )
+    else:
+        months = COMMITMENT_PERIOD_ABOVE_MEDIAN
+        commitment_source = (
+            "line 20b is more than or equal to line 20c: the commitment period "
+            "is 5 years — 11 U.S.C. § 1325(b)(4)(A)(ii)"
+        )
+    put(
+        "21",
+        "Applicable commitment period (months)",
+        Decimal(months),
+        commitment_source,
+    )
+    commitment = CommitmentPeriod(
+        months=months,
+        marital_adjustment=_money(line_19a),
+        monthly_income=_money(line_19b),
+        annualized_income=_money(line_20b),
+        annual_median=_money(median),
+        source=commitment_source,
+    )
+
+    if not comparison.above_median:
+        if problems:
+            raise MeansTestError(problems)
+        return MeansTestResult(
+            as_of=data.as_of,
+            release_ids=data.release_ids,
+            comparison=comparison,
+            outcome="below_median",
+            determined_by="median",
+            lines=tuple(trace.lines),
+            chapter=13,
+            commitment=commitment,
+        )
+
+    # ── B122C-2 Part 1: the deductions (lines 5-38) ────────────────────────
+    line_38 = _deductions(case, data, trace, form=FORM_122C2, problems=problems)
+
+    # ── B122C-2 Part 2: disposable income under § 1325(b)(2) ──────────────
+    def put_c2(line: str, label: str, amount: Decimal, source: str) -> Decimal:
+        return trace.put(FORM_122C2, line, label, amount, source)
+
+    line_39 = put_c2(
+        "39",
+        "Current monthly income (Form 122C-1 line 14)",
+        line_14,
+        "Form 122C-1 line 14",
+    )
+    line_40 = put_c2(
+        "40",
+        "Support income for dependent children",
+        _entered(inputs.child_support_for_dependents),
+        "entered (means_test_input.child_support_for_dependents) — "
+        "11 U.S.C. § 1325(b)(2)",
+    )
+    line_41 = put_c2(
+        "41",
+        "Qualified retirement deductions",
+        _entered(inputs.qualified_retirement_deductions),
+        "entered (means_test_input.qualified_retirement_deductions) — "
+        "11 U.S.C. §§ 541(b)(7), 362(b)(19)",
+    )
+    line_42 = put_c2(
+        "42",
+        "Total of all deductions allowed under 11 U.S.C. § 707(b)(2)(A)",
+        line_38,
+        "line 38",
+    )
+    circumstances = inputs.special_circumstances
+    line_43 = Decimal("0")
+    for item in circumstances:
+        line_43 += _entered(item.amount)
+    put_c2(
+        "43",
+        "Deduction for special circumstances",
+        line_43,
+        "entered (means_test_input.special_circumstances"
+        + (
+            ": " + "; ".join(item.description or item.id for item in circumstances)
+            if circumstances
+            else ""
+        )
+        + ") — 11 U.S.C. § 707(b)(2)(B)",
+    )
+    line_44 = put_c2(
+        "44",
+        "Total adjustments",
+        line_40 + line_41 + line_42 + line_43,
+        "lines 40 + 41 + 42 + 43",
+    )
+    line_45 = put_c2(
+        "45",
+        "Monthly disposable income under 11 U.S.C. § 1325(b)(2)",
+        line_39 - line_44,
+        "line 39 minus line 44",
+    )
+
+    if problems:
+        raise MeansTestError(problems)
+
+    return MeansTestResult(
+        as_of=data.as_of,
+        release_ids=data.release_ids,
+        comparison=comparison,
+        outcome="above_median",
+        determined_by="median",
+        lines=tuple(trace.lines),
+        chapter=13,
+        commitment=commitment,
+        disposable_income=_money(line_45),
+    )
+
+
+def run_means_test(case: MeansTestCase, data: MeansTestData) -> MeansTestResult:
+    """The whole determination for one case, selected by its chapter.
+
+    Chapter 7: below-median debtors stop at the comparison (no presumption;
+    B122A-2 is not filed), above-median debtors get the full line-by-line
+    calculation. Chapter 13: every debtor gets B122C-1's commitment period;
+    above-median debtors get B122C-2's disposable income as well. Raises
+    MeansTestError, with every problem named, when required facts are
+    missing or an entered figure breaks a statutory cap, and for a chapter
+    that has no means-test form.
+    """
+    if case.chapter == 13:
+        return _run_chapter_13(case, data)
+    if case.chapter == 7:
+        return _run_chapter_7(case, data)
+    raise MeansTestError(
+        [
+            f"Chapter {case.chapter} has no means-test form — Forms 122A and "
+            "122C exist for Chapters 7 and 13 only"
+        ]
     )

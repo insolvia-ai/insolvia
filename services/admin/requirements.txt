@@ -7,6 +7,9 @@ asgiref==3.8.1
 # the code that decides whether a request is authenticated.
 boto3==1.40.66
 PyJWT[crypto]==2.13.0
+# Named directly for the seeder's tax-id sealing (insolvia_core's envelope
+# module imports it by name; issue 13.12 / #382), pinned like PyJWT above.
+cryptography==50.0.1
 # The shared domain (issue #208): firms, token verification (including the
 # Google Workspace profile this service authenticates with), and their
 # adapters. pip resolves this path against the CURRENT WORKING DIRECTORY —

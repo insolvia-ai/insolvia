@@ -1,9 +1,10 @@
 # Staging environment:
 #   • web hosting    -> staging-app.insolvia.ai
 #   • backend API    -> staging-api.insolvia.ai
-#   • mailer API     -> staging-mailer-api.insolvia.ai
 #   • marketing site -> staging-www.insolvia.ai
-# References the shared zone + wildcard cert by name (not by remote state).
+# References the shared zone + wildcard cert by name (not by remote state);
+# both are infra/envs/shared in the insolvia-services repo, as is the mailer
+# (staging-mailer-api / mailer-api.insolvia.ai), which this root's API calls.
 
 locals {
   environment = "staging"
@@ -13,7 +14,7 @@ locals {
     ManagedBy   = "terraform"
   }
 
-  # The account's SES domain identity (owned by infra/envs/shared's email
+  # The account's SES domain identity (owned by insolvia-services' infra/envs/shared email
   # module), CONSTRUCTED rather than read from remote state — the same
   # cross-layer rule modules/mailer applies to the same ARN (#210). Both
   # Cognito pools send invites and reset codes through it.
@@ -33,7 +34,7 @@ data "aws_acm_certificate" "wildcard" {
   most_recent = true
 }
 
-# The shared per-service container repositories, created in infra/envs/shared.
+# The shared per-service container repositories, created in insolvia-services' infra/envs/shared.
 # Looked up rather than read from remote state, matching the zone/cert above
 # (docs/reference/terraform.md: cross-layer references are data sources,
 # never terraform_remote_state).
@@ -42,7 +43,7 @@ data "aws_acm_certificate" "wildcard" {
 # environment — is load-bearing rather than ceremonial: these lookups fail
 # outright until `shared` has applied, exactly as the certificate lookup does.
 data "aws_ecr_repository" "service" {
-  for_each = toset(["api", "admin-api", "jobs", "marketing", "mailer", "mcp"])
+  for_each = toset(["api", "admin-api", "jobs", "marketing", "mcp", "filing"])
 
   name = "insolvia-shared-${each.key}"
 }
@@ -151,43 +152,22 @@ module "mcp_service" {
   tags                = local.common_tags
 }
 
-# Mailer (issues 6.2, 6.3): the shared transactional-email microservice, with
-# exactly one registered caller — the API Lambda above. caller_role_name feeds
-# module.api_service's own execution role back into the mailer's SigV4
-# allowlist, which is why this module is declared after it. Same cert-lookup
-# reuse rationale as api_service: one REGIONAL wildcard cert, us-east-1,
-# serves every custom domain in this account.
-#
-# enable_attachment_scanning is false: no category this platform sends today
-# carries attachments, so GuardDuty Malware Protection for S3 would be a real
-# monthly cost with nothing to scan (see modules/mailer/variables.tf).
-#
-# First apply in a fresh account needs the same image-before-apply bootstrap
-# as api_service, documented at the top of modules/mailer/main.tf.
-module "mailer" {
-  source = "../../modules/mailer"
-
-  project                    = "insolvia"
-  environment                = local.environment
-  domain_name                = var.mailer_subdomain
-  hosted_zone_id             = data.aws_route53_zone.main.zone_id
-  acm_certificate_arn        = data.aws_acm_certificate.wildcard.arn
-  caller_role_name           = module.api_service.lambda_role_name
-  sender_address             = "no-reply@insolvia.ai"
-  cors_allowed_origin        = "https://${var.subdomain}"
-  enable_attachment_scanning = false
-  ecr_repository_url         = data.aws_ecr_repository.service["mailer"].repository_url
-  image_tag                  = local.environment
-  tags                       = local.common_tags
-}
+# The mailer moved to the insolvia-services repo on 2026-10-11 (ADR 0025): its
+# staging/prod resources are that repo's infra/envs/<env>, under the same
+# module.mailer address, moved there by a state migration. Nothing here
+# declares or references it; MAILER_API_URL below is built from the hostname.
 
 # Publish the mailer's URL into the API's own SSM config namespace (issue
-# 6.4) so the API Lambda can read it as MAILER_API_URL. This is an env-level
-# resource, deliberately NOT inside module.api_service: module.mailer already
-# depends on module.api_service (it reads api_service's lambda_role_name to
-# build its SigV4 caller allowlist), so having api_service read
-# module.mailer.api_url back would be a dependency cycle. An env-level
-# resource referencing both modules' outputs has no such problem.
+# 6.4) so the API Lambda can read it as MAILER_API_URL.
+#
+# CONSTRUCTED from var.mailer_subdomain, not read from the mailer: the mailer
+# is the insolvia-services repo's (its infra/envs/<env> root), and the two
+# repos reference each other by NAME, never by remote state. The hostname is
+# the contract — that root serves exactly this name from the same variable
+# default, so changing it means changing both. The dependency also only runs
+# one way at deploy time now: the mailer looks up the API's role
+# (insolvia-<env>-api-role); this root no longer waits on anything of the
+# mailer's.
 #
 # Name follows the api_service module's own /insolvia/<env>/api/<kebab-key>
 # convention exactly (see modules/api_service/main.tf's aws_ssm_parameter
@@ -197,7 +177,7 @@ module "mailer" {
 resource "aws_ssm_parameter" "mailer_api_url" {
   name  = "/insolvia/${local.environment}/api/mailer-api-url"
   type  = "String"
-  value = module.mailer.api_url
+  value = "https://${var.mailer_subdomain}"
   tags  = local.common_tags
 }
 
@@ -309,7 +289,7 @@ import {
 # config namespace (issue #79) so the API Lambda can read them as
 # AUTH_ISSUER_URL and AUTH_CLIENT_ID and verify access tokens.
 #
-# Env-level for the same reason mailer_api_url above is: module.api_service
+# Env-level, not inside module.api_service: module.api_service
 # knows nothing about module.auth, and having it read these back would couple
 # two modules that are otherwise independent. An env-level resource
 # referencing module.auth's outputs has no such problem.
@@ -341,6 +321,19 @@ resource "aws_ssm_parameter" "auth_client_id" {
   name  = "/insolvia/${local.environment}/api/auth-client-id"
   type  = "String"
   value = module.auth.web_client_id
+  tags  = local.common_tags
+}
+
+# The client portal's app client (ADR 0023), the same namespace and the same
+# derivation as auth-client-id above: the deploy workflow turns it into
+# AUTH_PORTAL_CLIENT_ID, which is the ONE client id every /v1/portal/ route
+# verifies — disjoint from AUTH_CLIENT_ID, and the API refuses to verify
+# portal tokens at all if the two are ever equal. A public value, like the
+# web client id: it rides in every portal sign-in redirect.
+resource "aws_ssm_parameter" "auth_portal_client_id" {
+  name  = "/insolvia/${local.environment}/api/auth-portal-client-id"
+  type  = "String"
+  value = module.auth.portal_client_id
   tags  = local.common_tags
 }
 
@@ -411,8 +404,9 @@ module "job_pipeline" {
   tags               = local.common_tags
 }
 
-# The queue URL, into the API's SSM config namespace — env-level for the same
-# cycle-avoidance reason as mailer_api_url above, and the deploy workflow's
+# The queue URL, into the API's SSM config namespace — env-level like the
+# other parameters in this namespace (module.api_service never reads another
+# module's outputs back, which is what keeps these roots acyclic), and the deploy workflow's
 # get-parameters-by-path step derives it into JOB_QUEUE_URL with no workflow
 # change. The WORKER reads the same namespace: it needs CASE_TABLE_NAME, which
 # is already published below.
@@ -462,6 +456,51 @@ module "firm_store" {
   deletion_protection    = false
   tags                   = local.common_tags
 }
+
+# ── Filing credentials (ADR 0024, guardrail 3) ──────────────────
+# The vault — the module says how its key policy keeps Decrypt to the filing
+# worker's role alone. Staging is where the maintainer enrols the courts'
+# TRAINING-database logins (ADR 0024 § Three environments), through the same
+# enrolment screen; never seeded. Disposable like the rest of staging.
+module "filing_credentials" {
+  source = "../../modules/filing_credentials"
+
+  project                     = "insolvia"
+  environment                 = local.environment
+  table_kms_key_arn           = module.case_store.kms_key_arn
+  access_log_table_arn        = module.case_store.access_log_table_arn
+  api_role_name               = module.api_service.lambda_role_name
+  point_in_time_recovery      = false
+  deletion_protection         = false
+  key_deletion_window_in_days = 7
+  tags                        = local.common_tags
+}
+
+# ── The filing queue (ADR 0024 PR 6, guardrail 1) ───────────────
+# Where the attorney's per-filing approval puts a filing job — the API's
+# role may send and nothing else, the filing worker's role (created by
+# module.filing_credentials above) may consume and never send. Its consumer
+# is module.filing_worker below (services/filing, ADR 0024 PR 7).
+module "filing_queue" {
+  source = "../../modules/filing_queue"
+
+  project          = "insolvia"
+  environment      = local.environment
+  api_role_name    = module.api_service.lambda_role_name
+  worker_role_name = module.filing_credentials.worker_role_name
+  tags             = local.common_tags
+}
+
+# Into the API's SSM namespace, job-queue-url's way: the deploy workflow's
+# get-parameters-by-path step derives it into FILING_QUEUE_URL with no
+# workflow change.
+resource "aws_ssm_parameter" "filing_queue_url" {
+  name  = "/insolvia/${local.environment}/api/filing-queue-url"
+  type  = "String"
+  value = module.filing_queue.queue_url
+  tags  = local.common_tags
+}
+
 # ── Case documents ──────────────────────────────────────────────
 # Takes the case store's key rather than minting one: one key protects one
 # case, rows and documents alike, and the deploy role's data-plane deny is
@@ -494,8 +533,38 @@ module "case_documents" {
   tags          = local.common_tags
 }
 
+# ── The filing worker (ADR 0024 PR 7) ───────────────────────────
+# services/filing's Lambda on the filing queue, under the role
+# module.filing_credentials created for it. Staging has NO fake court (the
+# fake is dev/CI only — services/filing/README.md says why) and no verified
+# training database yet (ADR 0024 PR 10), so the fence allows no host here and
+# every job hands back before a credential is opened. The kill switch is
+# created off. First apply in a fresh account: the image bootstrap at the top
+# of modules/filing_worker/main.tf.
+module "filing_worker" {
+  source = "../../modules/filing_worker"
+
+  project                    = "insolvia"
+  environment                = local.environment
+  insolvia_env               = "staging"
+  ecr_repository_url         = data.aws_ecr_repository.service["filing"].repository_url
+  image_tag                  = local.environment
+  worker_role_name           = module.filing_credentials.worker_role_name
+  worker_role_arn            = module.filing_credentials.worker_role_arn
+  queue_arn                  = module.filing_queue.queue_arn
+  dlq_name                   = module.filing_queue.dlq_name
+  case_table_arn             = module.case_store.table_arn
+  case_table_name            = module.case_store.table_name
+  case_access_log_table_name = module.case_store.access_log_table_name
+  case_kms_key_arn           = module.case_store.kms_key_arn
+  case_document_bucket_arn   = module.case_documents.bucket_arn
+  case_document_bucket_name  = module.case_documents.bucket_name
+  alarms_topic_arn           = module.api_service.alarms_topic_arn
+  tags                       = local.common_tags
+}
+
 # Publish the case table name into the API's SSM config namespace, env-level
-# for the same reason mailer_api_url and the auth parameters above are:
+# for the same reason the auth parameters above are:
 # module.case_store already depends on module.api_service, so having
 # api_service read the table name back would be a dependency cycle.
 #
@@ -609,16 +678,23 @@ module "audit_trail" {
   project     = "insolvia"
   environment = local.environment
 
-  # The case table, and its indexes via starts_with. The case document bucket
-  # joins this list when 8.6 lands.
-  data_resource_arns = [module.case_store.table_arn]
+  # The case table, and its indexes via starts_with; the filing-credential
+  # vault's table (ADR 0024, guardrail 3).
+  data_resource_arns = [
+    module.case_store.table_arn,
+    module.filing_credentials.table_arn,
+  ]
+
+  # The vault KEY's seals and opens are management events (the module's
+  # selector note) — this is what puts them in the retained record.
+  include_management_events = true
 
   retention_days = 90
   tags           = local.common_tags
 }
 
 # ── The shared seed-fixture bucket ──────────────────────────────
-# Owned by envs/shared (module.dev_fixtures); resolved here the way every
+# Owned by insolvia-services' envs/shared (module.dev_fixtures); resolved here the way every
 # shared resource is — a hard-failing data lookup, never shared's state — so
 # the seed step can read its name from this env's outputs alongside the
 # tables it loads into. Named deterministically by the module, which is why a

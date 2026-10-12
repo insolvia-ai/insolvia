@@ -10,6 +10,7 @@ fake; this repo is public.
 from __future__ import annotations
 
 import io
+import re
 import time
 
 import jwt
@@ -27,8 +28,13 @@ from insolvia_core.adapters.memory.debtor_store import MemoryDebtorStore
 from insolvia_core.adapters.memory.document_blobs import MemoryDocumentBlobStore
 from insolvia_core.adapters.memory.firm_store import MemoryFirmStore
 from insolvia_core.adapters.memory.jwks_provider import StaticJwksProvider
+from insolvia_core.adapters.memory.task_store import MemoryTaskStore
+from insolvia_core.adapters.memory.tax_id_cipher import LocalTaxIdCipher
+from insolvia_core.adapters.memory.tax_id_store import MemoryTaxIdStore
 from insolvia_core.firms import Firm, FirmUser, default_permissions
 from pypdf import PdfReader
+
+from tests.unit.opening import with_client
 
 ISSUER = "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_EXAMPLE00"
 CLIENT_ID = "exampleappclientid000000"
@@ -84,11 +90,13 @@ def member(subject: str, firm_id: str) -> FirmUser:
 
 @pytest.fixture
 def stores():
+    debtors = MemoryDebtorStore()
     return {
-        "case_store": MemoryCaseStore(),
-        "debtor_store": MemoryDebtorStore(),
+        "case_store": MemoryCaseStore(debtor_store=debtors),
+        "debtor_store": debtors,
         "entity_store": MemoryCaseEntityStore(),
         "blobs": MemoryDocumentBlobStore(),
+        "task_store": MemoryTaskStore(),
         "access_log": MemoryAccessLog(),
     }
 
@@ -124,8 +132,11 @@ def client(stores):
             firm_store=firms,
             access_log=stores["access_log"],
             debtor_store=stores["debtor_store"],
+            tax_id_store=MemoryTaxIdStore(),
+            tax_id_cipher=LocalTaxIdCipher(),
             case_entity_store=stores["entity_store"],
             document_blobs=stores["blobs"],
+            task_store=stores["task_store"],
         )
     )
     return app.test_client()
@@ -137,7 +148,9 @@ def open_case(client, subject=ALICE):
     # only a full name like the reference case's is one of them.
     response = client.post(
         "/v1/cases",
-        json={"chapter": 7, "district": "Middle District of Florida"},
+        json=with_client(
+            client, auth(subject), {"chapter": 7, "court": "flmb", "division": "tampa"}
+        ),
         headers=auth(subject),
     )
     assert response.status_code == 201
@@ -150,7 +163,7 @@ def add_debtor_1(client, case_id):
         json={"name": {"given": "Ada"}, "provenance": {"name.given": TYPED}},
         headers=auth(ALICE),
     )
-    assert response.status_code == 201
+    assert response.status_code == 200
     return response.get_json()["id"]
 
 
@@ -198,8 +211,10 @@ def test_a_bare_case_lists_every_chapter_7_form_all_blocked(client):
     case_id = open_case(client)
     body = client.get(f"/v1/cases/{case_id}/forms", headers=auth(ALICE)).get_json()
     assert len(body["forms"]) > 0
-    # No Debtor 1 yet — every row carries at least one problem.
-    assert all(row["problems"] for row in body["forms"])
+    # Debtor 1 is only the client's name so far (a case is opened for a
+    # client — ADR 0022), so the petition itself is far from printable.
+    by_series = {row["series"]: row for row in body["forms"]}
+    assert by_series["form/b101"]["problems"]
     series_ids = [row["series"] for row in body["forms"]]
     assert series_ids == sorted(set(series_ids), key=series_ids.index)
     assert "form/b101" in series_ids
@@ -226,6 +241,44 @@ def test_forms_with_no_defined_metric_omit_the_key(client):
     body = client.get(f"/v1/cases/{case_id}/forms", headers=auth(ALICE)).get_json()
     by_series = {row["series"]: row for row in body["forms"]}
     assert "metric" not in by_series["form/b101"]
+
+
+# ── The forms-hub row's task count (issue #356 / 14.4) ────────────
+
+
+def test_open_task_count_is_zero_with_no_anchored_tasks(client):
+    case_id = open_case(client)
+    body = client.get(f"/v1/cases/{case_id}/forms", headers=auth(ALICE)).get_json()
+    assert all(row["openTaskCount"] == 0 for row in body["forms"])
+
+
+def test_open_task_count_counts_only_not_done_tasks_anchored_to_that_form(client):
+    case_id = open_case(client)
+    client.post(
+        f"/v1/cases/{case_id}/tasks",
+        json={"subject": "Get the vehicle payoff", "formSeries": "b106d"},
+        headers=auth(ALICE),
+    )
+    second = client.post(
+        f"/v1/cases/{case_id}/tasks",
+        json={"subject": "Confirm the lien", "formSeries": "b106d"},
+        headers=auth(ALICE),
+    ).get_json()
+    client.post(
+        f"/v1/cases/{case_id}/tasks",
+        json={"subject": "Unrelated to any form"},
+        headers=auth(ALICE),
+    )
+    # Completed — should not count.
+    client.patch(
+        f"/v1/cases/{case_id}/tasks/{second['id']}",
+        json={"done": True},
+        headers=auth(ALICE),
+    )
+
+    body = client.get(f"/v1/cases/{case_id}/forms", headers=auth(ALICE)).get_json()
+    by_series = {row["series"]: row for row in body["forms"]}
+    assert by_series["form/b106d"]["openTaskCount"] == 1
 
 
 def test_a_problem_names_where_the_fix_belongs(client):
@@ -322,6 +375,74 @@ def test_the_preview_is_access_logged(client, stores):
     )
 
 
+# ── The tax id's full-value read (issue 13.12 / #382) ────────────
+# 987-65-4321 is from the SSA's never-issued advertising block.
+
+UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
+
+
+def add_debtor_1_with_a_tax_id(client, case_id):
+    response = client.put(
+        f"/v1/cases/{case_id}/debtors/debtor_1",
+        json={
+            "name": {"given": "Ada"},
+            "tax_id": {"kind": "ssn", "value": "987-65-4321"},
+            "provenance": {"name.given": TYPED, "tax_id": TYPED},
+        },
+        headers=auth(ALICE),
+    )
+    assert response.status_code == 200
+
+
+def test_previewing_b121_performs_the_logged_read_against_the_caller(client, stores):
+    case_id = open_case(client)
+    add_debtor_1_with_a_tax_id(client, case_id)
+    response = client.get(
+        f"/v1/cases/{case_id}/forms/b121/preview", headers=auth(ALICE)
+    )
+    assert response.status_code == 200
+    assert response.get_json()["problems"] == []
+    reads = [e for e in stores["access_log"].events if e.action == "taxid.read"]
+    assert [(e.principal, e.case_id, e.filing_role, e.purpose) for e in reads] == [
+        (ALICE, case_id, "debtor_1", "b121")
+    ]
+    # The number is on the rendered form — and nowhere in the response.
+    ((_, content),) = stores["blobs"].contents.items()
+    fields = PdfReader(io.BytesIO(content)).get_fields()
+    assert fields is not None
+    assert fields["Debtor1a.SSNum"].value == "987-65-4321"
+    body = str(response.get_json())
+    for spelling in ("987654321", "987-65-4321", "987 65 4321"):
+        assert spelling not in body
+    # The last four, alone or behind any mask (`***-**-4321`, `XXX-XX-4321`,
+    # "ending 4321"). The preview URL carries two random UUIDs, which can
+    # spell any short run of digits — a bare "987" check failed about one run
+    # in seventy — so they are struck out first. What remains has no run of
+    # four digits but the year.
+    assert "4321" not in UUID.sub("<uuid>", body)
+
+
+def test_previewing_any_other_form_never_opens_the_envelope(client, stores):
+    # B106G renders on a bare case (B101 waits on a petition record); the
+    # point is the log, not the form: no `taxid.read` for anything but B121.
+    # B101's last-four-from-the-record path is pinned by the projection tests.
+    case_id = open_case(client)
+    add_debtor_1_with_a_tax_id(client, case_id)
+    response = client.get(
+        f"/v1/cases/{case_id}/forms/b106g/preview", headers=auth(ALICE)
+    )
+    assert response.status_code == 200
+    assert response.get_json()["problems"] == []
+    assert not any(e.action == "taxid.read" for e in stores["access_log"].events)
+
+
+def test_the_hub_listing_never_opens_the_envelope(client, stores):
+    case_id = open_case(client)
+    add_debtor_1_with_a_tax_id(client, case_id)
+    client.get(f"/v1/cases/{case_id}/forms", headers=auth(ALICE))
+    assert not any(e.action == "taxid.read" for e in stores["access_log"].events)
+
+
 # ── Output options (issue 13.11) ─────────────────────────────────
 
 
@@ -335,6 +456,7 @@ def test_no_query_params_echo_the_default_options(client):
         "printDate": False,
         "signaturePages": "all",
         "signElectronically": False,
+        "amendedOnly": False,
     }
 
 
@@ -352,6 +474,7 @@ def test_query_params_are_validated_and_echoed_back(client, stores):
         "printDate": True,
         "signaturePages": "all",
         "signElectronically": False,
+        "amendedOnly": False,
     }
     ((_, content),) = stores["blobs"].contents.items()
     assert "DRAFT" in PdfReader(io.BytesIO(content)).pages[0].extract_text()

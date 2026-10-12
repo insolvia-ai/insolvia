@@ -1,5 +1,5 @@
-import { ApiValidationException } from '@insolvia-ai/api-client';
-import type { FirmMembership } from '@insolvia-ai/api-client';
+import { ApiValidationException, permits } from '@insolvia-ai/api-client';
+import type { Address, FirmMembership, SignatureBlock } from '@insolvia-ai/api-client';
 import { Button, Field, Input } from '@insolvia-ai/design-system';
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -10,6 +10,8 @@ import { AppShell } from '@/components/app-shell';
 import { Heading } from '@/components/heading';
 import { MePanel } from '@/components/me-panel';
 import { useSession } from '@/session';
+
+import { CourtFiling } from './filing-authorization';
 import { fontSizes, spacing, useTheme } from '@/theme';
 
 type Notice = { readonly tone: 'saved' | 'error'; readonly message: string };
@@ -105,6 +107,15 @@ export function Account({ membership }: { membership: FirmMembership }) {
           </Button>
         </View>
 
+        <SignatureBlockForm
+          initial={membership.signatureBlock}
+          onSaved={(principal) => {
+            adopt(principal);
+            setNotice({ tone: 'saved', message: 'Your signature block is saved.' });
+          }}
+          onFailed={(message) => setNotice({ tone: 'error', message })}
+        />
+
         {/* One live region for the whole screen, same rule as the firm screen. */}
         {notice === null ? null : (
           <Text
@@ -132,6 +143,14 @@ export function Account({ membership }: { membership: FirmMembership }) {
         Your email address is your sign-in name and can’t be changed from here.
       </Text>
 
+      {permits(membership.permissions.events, 'view_only') ? <CalendarFeed /> : null}
+
+      {/* ADR 0024's credential vault — only for a member an admin has granted
+          `electronic_filing`, hidden for every role by default. */}
+      {permits(membership.permissions.electronic_filing, 'view_only') ? (
+        <CourtFiling canChange={permits(membership.permissions.electronic_filing, 'add_edit')} />
+      ) : null}
+
       {/* Collapsed, and last. It was on the home screen while the pipeline was
           the product; see the component for why it survives at all. */}
       <MePanel />
@@ -139,9 +158,244 @@ export function Account({ membership }: { membership: FirmMembership }) {
   );
 }
 
+/**
+ * The ICS feed (issue 14.6 / #358): one link a calendar application
+ * subscribes to, carrying every event and deadline this person may see.
+ *
+ * THE LINK IS SHOWN ONCE, when it is made. The server stores only a hash of
+ * the secret in it, so there is no "show me again" — there is "make a new
+ * one", which retires the old link wherever it was pasted. That is the
+ * revocation story, and it is why the copy here says so out loud.
+ */
+function CalendarFeed() {
+  const theme = useTheme();
+  const { call } = useApi();
+  const [feedUrl, setFeedUrl] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<Notice | null>(null);
+  const muted = { color: theme.colors.muted, fontFamily: theme.typography.body };
+
+  const mint = async () => {
+    setBusy(true);
+    setNotice(null);
+    try {
+      const result = await call((client) => client.mintCalendarToken());
+      if (result.ok) {
+        setFeedUrl(result.value.feedUrl);
+        setNotice({
+          tone: 'saved',
+          message: 'Your feed link is ready. Any older link no longer works.',
+        });
+      }
+    } catch {
+      setNotice({ tone: 'error', message: 'Could not create a feed link. Please try again.' });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const revoke = async () => {
+    setBusy(true);
+    setNotice(null);
+    try {
+      const result = await call((client) => client.revokeCalendarToken());
+      if (result.ok) {
+        setFeedUrl(null);
+        setNotice({ tone: 'saved', message: 'Your feed link is revoked.' });
+      }
+    } catch {
+      setNotice({ tone: 'error', message: 'Could not revoke the feed link. Please try again.' });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <View style={styles.feed}>
+      <Heading level={2}>Calendar feed</Heading>
+      <Text style={[styles.body, muted]}>
+        Subscribe your calendar application to a link that carries every event and deadline you can
+        see in Insolvia. The link is shown once; making a new one retires the old.
+      </Text>
+      {feedUrl === null ? null : (
+        <Text
+          selectable
+          accessibilityLabel="Calendar feed link"
+          style={[styles.feedUrl, { color: theme.colors.ink, fontFamily: theme.typography.mono }]}
+        >
+          {feedUrl}
+        </Text>
+      )}
+      <View style={styles.actions}>
+        <Button size="lg" onPress={() => void mint()} disabled={busy}>
+          {feedUrl === null ? 'Create feed link' : 'Make a new link'}
+        </Button>
+        <Button size="lg" intent="secondary" onPress={() => void revoke()} disabled={busy}>
+          Revoke feed link
+        </Button>
+      </View>
+      {notice === null ? null : (
+        <Text
+          aria-live="polite"
+          style={[
+            styles.notice,
+            {
+              color: notice.tone === 'error' ? theme.colors.danger : theme.colors.muted,
+              fontFamily: theme.typography.body,
+            },
+          ]}
+        >
+          {notice.message}
+        </Text>
+      )}
+    </View>
+  );
+}
+
+const ADDRESS_PARTS = [
+  ['line1', 'Street'],
+  ['line2', 'Apartment, suite or unit'],
+  ['city', 'City'],
+  ['state', 'State'],
+  ['postal_code', 'ZIP code'],
+] as const;
+
+/**
+ * Your standing signature block (issue #360): the B101 Part 7 lines that do
+ * not change from case to case — bar number and state, and the firm lines.
+ * Self-service on `PATCH /v1/me` like the name, because a bar number is the
+ * attorney's own fact; the petition screen's "use firm default" copies it
+ * onto a case. Every field is optional, and the whole block is sent on save
+ * (the server prunes blanks), or `null` when every field is blank — which is
+ * how a block is cleared.
+ */
+function SignatureBlockForm({
+  initial,
+  onSaved,
+  onFailed,
+}: {
+  initial: SignatureBlock | null;
+  onSaved: (principal: Parameters<ReturnType<typeof useMeActions>['adopt']>[0]) => void;
+  onFailed: (message: string) => void;
+}) {
+  const theme = useTheme();
+  const { call } = useApi();
+  const [block, setBlock] = useState<SignatureBlock>(initial ?? {});
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+
+  const setPart = (key: keyof SignatureBlock, value: string) =>
+    setBlock((current) => ({ ...current, [key]: value === '' ? undefined : value }));
+  const setAddress = (key: keyof Address, value: string) =>
+    setBlock((current) => ({
+      ...current,
+      address: { ...current.address, [key]: value === '' ? undefined : value },
+    }));
+
+  const save = async () => {
+    setSaving(true);
+    setFieldErrors({});
+    try {
+      const address = Object.fromEntries(
+        Object.entries(block.address ?? {}).filter(([, v]) => v !== undefined),
+      ) as Address;
+      const filled: SignatureBlock = {
+        ...Object.fromEntries(
+          Object.entries(block).filter(([k, v]) => k !== 'address' && v !== undefined),
+        ),
+        ...(Object.keys(address).length > 0 ? { address } : {}),
+      };
+      const signatureBlock = Object.keys(filled).length > 0 ? filled : null;
+      const result = await call((client) => client.updateMe({ signatureBlock }));
+      if (result.ok) {
+        setBlock(result.value.firm?.signatureBlock ?? {});
+        onSaved(result.value);
+      }
+    } catch (cause) {
+      if (cause instanceof ApiValidationException) {
+        // Keyed `signatureBlock.<field>` by the server; the same paths the
+        // fields below are named by.
+        setFieldErrors(cause.fields);
+      } else {
+        onFailed('Could not save your signature block. Please try again.');
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const muted = { color: theme.colors.muted, fontFamily: theme.typography.body };
+  const error = (path: string) => fieldErrors[`signatureBlock.${path}`];
+
+  return (
+    <View style={styles.form}>
+      <Heading level={2}>Signature block</Heading>
+      <Text style={[styles.body, muted]}>
+        The lines B101 Part 7 prints for you that do not change from case to case. The petition
+        screen’s “Use firm default” copies them onto a case for you to check and save.
+      </Text>
+      <Field.Root name="bar_number" invalid={Boolean(error('bar_number'))}>
+        <Field.Label>Bar number</Field.Label>
+        <Input value={block.bar_number ?? ''} onValueChange={(v) => setPart('bar_number', v)} />
+        {error('bar_number') ? <Field.Error match>{error('bar_number')}</Field.Error> : null}
+      </Field.Root>
+      <Field.Root name="bar_state" invalid={Boolean(error('bar_state'))}>
+        <Field.Label>Bar state</Field.Label>
+        <Input
+          value={block.bar_state ?? ''}
+          onValueChange={(v) => setPart('bar_state', v)}
+          autoCapitalize="characters"
+        />
+        <Field.Description>Two letters, like FL.</Field.Description>
+        {error('bar_state') ? <Field.Error match>{error('bar_state')}</Field.Error> : null}
+      </Field.Root>
+      <Field.Root name="firm_name" invalid={Boolean(error('firm_name'))}>
+        <Field.Label>Firm name on filings</Field.Label>
+        <Input value={block.firm_name ?? ''} onValueChange={(v) => setPart('firm_name', v)} />
+        <Field.Description>Leave blank to use the firm’s letterhead.</Field.Description>
+        {error('firm_name') ? <Field.Error match>{error('firm_name')}</Field.Error> : null}
+      </Field.Root>
+      {ADDRESS_PARTS.map(([part, label]) => (
+        <Field.Root key={part} name={part} invalid={Boolean(error(`address.${part}`))}>
+          <Field.Label>{`Address — ${label}`}</Field.Label>
+          <Input value={block.address?.[part] ?? ''} onValueChange={(v) => setAddress(part, v)} />
+          {error(`address.${part}`) ? (
+            <Field.Error match>{error(`address.${part}`)}</Field.Error>
+          ) : null}
+        </Field.Root>
+      ))}
+      <Field.Root name="phone" invalid={Boolean(error('phone'))}>
+        <Field.Label>Phone on filings</Field.Label>
+        <Input value={block.phone ?? ''} onValueChange={(v) => setPart('phone', v)} />
+        {error('phone') ? <Field.Error match>{error('phone')}</Field.Error> : null}
+      </Field.Root>
+      <Field.Root name="email" invalid={Boolean(error('email'))}>
+        <Field.Label>Email on filings</Field.Label>
+        <Input value={block.email ?? ''} onValueChange={(v) => setPart('email', v)} type="email" />
+        {error('email') ? <Field.Error match>{error('email')}</Field.Error> : null}
+      </Field.Root>
+      <View style={styles.actions}>
+        <Button size="lg" onPress={() => void save()} disabled={saving}>
+          {saving ? 'Saving…' : 'Save signature block'}
+        </Button>
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   actions: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  feed: {
+    gap: spacing.sm,
+    marginTop: spacing.lg,
+  },
+  feedUrl: {
+    fontSize: fontSizes.caption,
+    lineHeight: fontSizes.caption * 1.5,
   },
   body: {
     fontSize: fontSizes.body,

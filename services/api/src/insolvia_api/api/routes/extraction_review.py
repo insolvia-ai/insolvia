@@ -23,21 +23,36 @@ race) and for the provenance the acceptance mints.
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 
 from flask import Blueprint, jsonify, request
 from flask.typing import ResponseReturnValue
 from insolvia_core.access_log import record_access
-from insolvia_core.candidates import PENDING, candidate_json
+from insolvia_core.candidates import PENDING, Candidate, candidate_json
 from insolvia_core.case_entities import create_entity, entity_json
+from insolvia_core.debtors import debtor_json, replace_debtor
 from insolvia_core.errors import ConflictError, NotFoundError, ValidationError
+from insolvia_core.expenses import HOUSEHOLD
 from insolvia_core.firms import ADD_EDIT, EXTRACTION_REVIEW, VIEW_ONLY
-from insolvia_core.ports import AccessLog, CandidateStore, CaseEntityStore, CaseStore
+from insolvia_core.ports import (
+    AccessLog,
+    CandidateStore,
+    CaseEntityStore,
+    CaseStore,
+    DebtorStore,
+)
+from insolvia_core.questions import answer_ref, review_question_json
 
 from insolvia_api.api.auth import current_accessor, require_auth, requires
 from insolvia_api.api.dependencies import dependencies
 from insolvia_api.core.extraction_review import (
+    CLIENT_LINKS,
     accept,
+    answer_filing_role,
+    build_accepted_debtor,
     build_accepted_draft,
+    fill_client_links,
+    is_debtor_answer,
     parse_review,
     parse_status_filter,
     reject,
@@ -101,6 +116,35 @@ def _reachable_case_or_404(case_id: str, action: str) -> None:
         raise NotFoundError("case not found")
 
 
+def _client_names(case_id: str) -> dict[str, str]:
+    """subject → the display name the FIRM gave at invitation, for every
+    binding the case has ever had (revoked ones too: an answer outlives
+    its author's access). From the binding, never a token — ADR 0023 §
+    Writes: a client cannot rename themselves in the review queue."""
+    store = dependencies().client_binding_store
+    if store is None:
+        return {}
+    return {
+        binding.subject: binding.display_name
+        for binding in store.list_for_case(case_id)
+    }
+
+
+def _queue_json(candidate: Candidate, names: Mapping[str, str]) -> dict[str, object]:
+    """One queue row: the candidate, and — for a client's portal answer —
+    the question it answers (section, text, the debtor it is for) and who
+    the firm says gave it. ADR 0023 § Writes: "From the client", the
+    display name from the binding, and the section and question answered."""
+    body = candidate_json(candidate)
+    ref = answer_ref(candidate)
+    if ref is not None:
+        body["question"] = review_question_json(ref)
+        name = names.get(candidate.origin.subject)
+        if name is not None:
+            body["client"] = {"displayName": name}
+    return body
+
+
 @blueprint.get("/v1/cases/<case_id>/extraction/candidates")
 @require_auth
 @requires(EXTRACTION_REVIEW, VIEW_ONLY)
@@ -114,11 +158,17 @@ def list_candidates_route(case_id: str) -> ResponseReturnValue:
     _, candidate_store, _, _ = _stores()
     status = parse_status_filter(request.args.get("status"))
     _reachable_case_or_404(case_id, "extraction.read")
-    candidates = [
-        candidate_json(candidate)
+    listed = [
+        candidate
         for candidate in candidate_store.list_for_case(case_id)
         if status is None or candidate.status == status
     ]
+    names = (
+        _client_names(case_id)
+        if any(candidate.origin.channel == "client" for candidate in listed)
+        else {}
+    )
+    candidates = [_queue_json(candidate, names) for candidate in listed]
     return jsonify({"candidates": candidates}), 200
 
 
@@ -157,6 +207,9 @@ def review_candidate_route(case_id: str, candidate_id: str) -> ResponseReturnVal
         _log_reviewed(rejected.case_id, rejected.id, "rejected")
         return jsonify({"candidate": candidate_json(rejected)}), 200
 
+    if is_debtor_answer(candidate):
+        return _accept_debtor_answer(candidate, decision.corrected_payload, moment)
+
     # Accept. Kind first (an unreviewable type is a 400 before any write),
     # then references, then the draft with its minted provenance.
     kind = reviewable_kind(candidate)
@@ -172,6 +225,7 @@ def review_candidate_route(case_id: str, candidate_id: str) -> ResponseReturnVal
         else candidate.payload,
         siblings=siblings,
     )
+    payload = _with_client_links(candidate, payload)
     draft = build_accepted_draft(
         candidate, payload, confirmed_by=accessor.subject, confirmed_at=moment
     )
@@ -193,6 +247,97 @@ def review_candidate_route(case_id: str, candidate_id: str) -> ResponseReturnVal
     _log_reviewed(case_id, candidate.id, reviewed.status)
     return (
         jsonify({"candidate": candidate_json(reviewed), "record": entity_json(entity)}),
+        200,
+    )
+
+
+def _debtor_store() -> DebtorStore:
+    store = dependencies().debtor_store
+    if store is None:
+        raise RuntimeError("the debtor store is not composed")
+    return store
+
+
+def _with_client_links(
+    candidate: Candidate, payload: Mapping[str, object]
+) -> Mapping[str, object]:
+    """A client record answer's link, from the case: the answering debtor's
+    record for an employment, the main household for an expense
+    (`core.extraction_review.CLIENT_LINKS`). Read here, on the STAFF side,
+    because the portal never reads case records and so knows no ids."""
+    field = CLIENT_LINKS.get(candidate.entity_type)
+    if candidate.origin.channel != "client" or field is None:
+        return payload
+    debtor_id: str | None = None
+    household_id: str | None = None
+    if field == "debtor_id":
+        debtor = _debtor_store().get(
+            candidate.case_id, filing_role=answer_filing_role(candidate)
+        )
+        debtor_id = debtor.id if debtor is not None else None
+    else:
+        _, _, entity_store, _ = _stores()
+        household_id = next(
+            (
+                household.id
+                for household in entity_store.list_for_case(
+                    candidate.case_id, HOUSEHOLD
+                )
+                if household.body.which_household == "main"
+            ),
+            None,
+        )
+    return fill_client_links(
+        candidate, payload, debtor_id=debtor_id, household_id=household_id
+    )
+
+
+def _accept_debtor_answer(
+    candidate: Candidate,
+    corrected_payload: Mapping[str, object] | None,
+    moment: str,
+) -> ResponseReturnValue:
+    """Accept a client's answer about a debtor's own fields by MERGING it
+    into that debtor's record (core.extraction_review.build_accepted_debtor)
+    — the debtor is keyed by filing role and already exists from the moment
+    the case was opened (ADR 0022), so an answer is a change to it, never a
+    new record. Debtor 2 that has not been linked yet is a 409 naming the
+    fix, exactly as the debtor PUT refuses to mint one.
+
+    The candidate is CAS'd before the debtor is written, the route's rule
+    for the two-reviewers race. Two different answers accepted at the same
+    moment are last-write-wins on the debtor row, the same as two staff
+    saves of the questionnaire."""
+    _, candidate_store, _, _ = _stores()
+    accessor = current_accessor()
+    debtor_store = _debtor_store()
+    role = answer_filing_role(candidate)
+    stored = debtor_store.get(candidate.case_id, filing_role=role)
+    if stored is None:
+        raise ConflictError(
+            "link a client to this debtor before accepting answers about them"
+        )
+    draft = build_accepted_debtor(
+        candidate,
+        corrected_payload if corrected_payload is not None else candidate.payload,
+        stored=stored,
+        confirmed_by=accessor.subject,
+        confirmed_at=moment,
+    )
+    debtor = replace_debtor(stored, draft, tax_id=stored.tax_id)
+    reviewed = accept(
+        candidate,
+        corrected_payload=corrected_payload,
+        resulting_record_id=debtor.id,
+        confirmed_by=accessor.subject,
+        confirmed_at=moment,
+    )
+    if candidate_store.update(reviewed, expected_status=PENDING) is None:
+        raise ConflictError("candidate was reviewed by someone else")
+    debtor_store.put(debtor)
+    _log_reviewed(candidate.case_id, candidate.id, reviewed.status)
+    return (
+        jsonify({"candidate": candidate_json(reviewed), "record": debtor_json(debtor)}),
         200,
     )
 

@@ -65,6 +65,7 @@ from __future__ import annotations
 
 import functools
 import logging
+import time
 from collections.abc import Callable
 from typing import Any, TypeVar, cast
 
@@ -74,8 +75,10 @@ from insolvia_core.access import Accessor
 from insolvia_core.auth import (
     AuthenticationError,
     AuthFailureReason,
+    AuthSettings,
     bearer_token,
     key_id,
+    require_recent_authentication,
     settings_or_raise,
     verify_access_token,
 )
@@ -95,18 +98,40 @@ _ACCESSOR_KEY = "insolvia_accessor"
 
 View = TypeVar("View", bound=Callable[..., ResponseReturnValue])
 
+# Which principal class a registered view admits, stamped by the decorator
+# that authenticates it: `staff` by `require_auth`, `client` by
+# `api/client_auth.require_client` (ADR 0023). tests/unit/test_portal_routes.py
+# reads it off every rule in the URL map — the static half of the proof that
+# every /v1/portal/ route admits clients and no other route does.
+PRINCIPAL_CLASS_ATTRIBUTE = "insolvia_principal_class"
+STAFF = "staff"
+CLIENT = "client"
+
 
 def authenticate() -> Principal:
-    """Verify the request's bearer token and return the principal.
+    """Verify the request's bearer token as a STAFF token and return the
+    principal.
 
     Raises AuthenticationError for every rejection. Composed from the pure
     pieces in core/auth.py plus exactly one impure step — asking the
     JwksProvider port for the key named by the token's `kid`.
+
+    STAFF means the web app client: `AUTH_CLIENT_ID`, compared for equality.
+    A client-portal token names a different client and fails here with
+    INVALID_CLIENT — which is the whole of why a debtor's token reaches no
+    staff route, with no role check to forget (ADR 0023).
     """
     deps = dependencies()
-    settings = settings_or_raise(
-        deps.config.auth_issuer_url, deps.config.auth_client_id
+    return verify_request_token(
+        settings_or_raise(deps.config.auth_issuer_url, deps.config.auth_client_id)
     )
+
+
+def verify_request_token(settings: AuthSettings) -> Principal:
+    """The request's bearer token, verified against `settings` — the one
+    implementation both principal classes' profiles share, so the
+    cryptographic half cannot drift between them."""
+    deps = dependencies()
     provider = deps.jwks_provider
     if provider is None:
         # Configured issuer/client but no provider composed: a broken
@@ -135,6 +160,7 @@ def require_auth(view: View) -> View:
         setattr(g, _PRINCIPAL_KEY, principal)
         return view(*args, **kwargs)
 
+    setattr(wrapper, PRINCIPAL_CLASS_ATTRIBUTE, STAFF)
     return cast("View", wrapper)
 
 
@@ -148,6 +174,23 @@ def current_principal() -> Principal:
     if principal is None:
         raise RuntimeError("current_principal() requires @require_auth on the view")
     return cast("Principal", principal)
+
+
+def require_fresh_sign_in(max_age_seconds: int) -> int:
+    """The caller's `auth_time`, if they signed in within `max_age_seconds`;
+    otherwise ReauthenticationRequiredError (403 `ReauthenticationRequired`).
+
+    For the acts ADR 0024 requires a fresh sign-in for — signing the filing
+    authorization (guardrail 2) and approving a filing (guardrail 1, PR 6).
+    The rule is `insolvia_core.auth.require_recent_authentication`; this is
+    the request's clock and principal applied to it. Call it inside a view
+    behind `@require_auth`.
+    """
+    return require_recent_authentication(
+        current_principal().authenticated_at,
+        now=time.time(),
+        max_age_seconds=max_age_seconds,
+    )
 
 
 def resolve_accessor() -> Accessor | None:

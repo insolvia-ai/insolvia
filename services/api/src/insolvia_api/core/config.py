@@ -47,6 +47,19 @@ _MARKETING_ORIGINS: dict[str, str] = {
     "local": "http://localhost:3000",
 }
 
+# Where the APP lives, per environment — the origin the client-portal
+# invitation mail (ADR 0023) sends a debtor to, as `<origin>/portal`. A
+# constant map for `_MARKETING_ORIGINS`' reason: the hosts are decided in this
+# repo (infra/envs/*/variables.tf `subdomain`) and change with a review. The
+# same origins the portal app client registers its callbacks on
+# (infra/modules/auth, `web_origins`); `local` is `npx expo start --web
+# --port 3000`, which the dev pool registers.
+_APP_ORIGINS: dict[str, str] = {
+    "production": "https://app.insolvia.ai",
+    "staging": "https://staging-app.insolvia.ai",
+    "local": "http://localhost:3000",
+}
+
 
 @dataclass(frozen=True)
 class AppConfig:
@@ -66,12 +79,15 @@ class AppConfig:
     auth_user_pool_id: str | None = None
     case_document_bucket: str | None = None
     job_queue_url: str | None = None
+    filing_queue_url: str | None = None
     anthropic_api_key: str | None = None
     mailer_api_url: str | None = None
     unsubscribe_secret: str | None = None
     auth_issuer_url: str | None = None
     auth_client_id: str | None = None
+    auth_portal_client_id: str | None = None
     marketing_origin: str = _MARKETING_ORIGINS["local"]
+    app_origin: str = _APP_ORIGINS["local"]
     cors_allowed_origins: tuple[str, ...] = ()
     cors_allow_localhost: bool = True
 
@@ -128,6 +144,13 @@ def load_config(environ: Mapping[str, str] | None = None) -> AppConfig:
     the enqueue, and POST /v1/cases/<id>/jobs answers 503 when no queue is
     composed at all — accepting work that can never run would be a lie the
     status read repeats forever.
+    FILING_QUEUE_URL is the filing worker's own SQS queue (ADR 0024 PR 6;
+    infra/modules/filing_queue, published as /insolvia/<env>/api/filing-
+    queue-url and derived the same way). The attorney's approval is its one
+    producer. Locally it is this machine's real dev queue; unset, the Lambda
+    composes no filing queue and approving answers 503 (an approval nothing
+    could ever act on is not recorded), and the plain dev server composes the
+    in-memory queue, which records the job and sends nothing.
     ANTHROPIC_API_KEY is the Anthropic API key the AI petition-review worker
     calls Claude with (issue #97, ADR 0019 — extraction 8.7 will share it).
     The SDK's own variable name, so a maintainer's exported key and the
@@ -161,6 +184,13 @@ def load_config(environ: Mapping[str, str] | None = None) -> AppConfig:
     stops checking. `core/auth.py`'s settings_or_raise turns either one
     missing into a 401 on every protected route, and api_lambda.py refuses to
     boot without both.
+    AUTH_PORTAL_CLIENT_ID is the client portal's app client (ADR 0023) — the
+    ONE client id every /v1/portal/ route verifies, and disjoint from
+    AUTH_CLIENT_ID by construction (/insolvia/<env>/api/auth-portal-client-id,
+    same derivation). Unset fails CLOSED the same way: every portal route
+    answers 401, and staff routes are untouched — see
+    insolvia_core.auth.portal_settings_or_raise, which also refuses to verify
+    anything if the two ids are ever equal.
     """
     source = os.environ if environ is None else environ
     environment = source.get("INSOLVIA_ENV", "local")
@@ -178,12 +208,15 @@ def load_config(environ: Mapping[str, str] | None = None) -> AppConfig:
         auth_user_pool_id=source.get("AUTH_USER_POOL_ID") or None,
         case_document_bucket=source.get("CASE_DOCUMENT_BUCKET") or None,
         job_queue_url=source.get("JOB_QUEUE_URL") or None,
+        filing_queue_url=source.get("FILING_QUEUE_URL") or None,
         anthropic_api_key=source.get("ANTHROPIC_API_KEY") or None,
         mailer_api_url=source.get("MAILER_API_URL") or None,
         unsubscribe_secret=source.get("UNSUBSCRIBE_SECRET") or None,
         auth_issuer_url=source.get("AUTH_ISSUER_URL") or None,
         auth_client_id=source.get("AUTH_CLIENT_ID") or None,
+        auth_portal_client_id=source.get("AUTH_PORTAL_CLIENT_ID") or None,
         marketing_origin=_MARKETING_ORIGINS[environment],
+        app_origin=_APP_ORIGINS[environment],
         cors_allowed_origins=_CORS_ALLOWED_ORIGINS[environment],
         cors_allow_localhost=environment != "production",
     )

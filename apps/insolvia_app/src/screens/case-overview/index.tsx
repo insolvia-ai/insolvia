@@ -1,17 +1,25 @@
-import type { CaseSummary, FirmColleague, InsolviaApiClient } from '@insolvia-ai/api-client';
+import type { CaseSummary, FirmColleague, InsolviaApiClient, Note } from '@insolvia-ai/api-client';
+import { permits } from '@insolvia-ai/api-client';
 import { Badge, Button } from '@insolvia-ai/design-system';
 import { Link, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
+import { useMembership } from '@/api/me';
 import { useApi } from '@/api/use-api';
 import { caseTitle, chapterAndDistrict, useCase } from '@/components/case-shell';
 import { Heading } from '@/components/heading';
+import { NotesPanel } from '@/components/notes-panel';
 import { contentMaxWidth, fontSizes, railBreakpoint, spacing, useTheme } from '@/theme';
 
+import { DocumentRequestsPanel } from './document-requests-panel';
+import { EventsPanel } from './events-panel';
+import { LifecyclePanel } from './lifecycle-panel';
+import { PortalPanel } from './portal-panel';
 import { filingStages, stagesComplete } from './stages';
 import type { Stage, StageState } from './stages';
+import { TasksPanel } from './tasks-panel';
 
 /**
  * A count this screen shows, once it knows it.
@@ -98,6 +106,14 @@ export function CaseOverview() {
   const { caseId, matter, debtors, counts: shellCounts, mayReview } = useCase();
   const { call } = useApi();
   const { width } = useWindowDimensions();
+  const membership = useMembership();
+  // The client portal panel (ADR 0023) — a courtesy, never a control, the
+  // `permits` rule every gated surface follows: `client_portal` is hidden by
+  // default, so most firm users never see the panel, and the API re-checks
+  // every call it makes.
+  const portalLevel = membership?.permissions.client_portal;
+  const mayViewPortal = portalLevel !== undefined && permits(portalLevel, 'view_only');
+  const mayEditPortal = portalLevel !== undefined && permits(portalLevel, 'add_edit');
 
   const [counts, setCounts] = useState<Counts>(NOTHING);
   const [colleagues, setColleagues] = useState<readonly FirmColleague[]>([]);
@@ -105,6 +121,24 @@ export function CaseOverview() {
   // use, and for the same reason: a case that looks ready because its summary
   // failed to load is worse than one that says nothing.
   const [summary, setSummary] = useState<CaseSummary | null>(null);
+  const [notes, setNotes] = useState<readonly Note[]>([]);
+
+  // A SEPARATE effect and callback from the one below, rather than folded into
+  // `loadAll`: `NotesPanel` re-reads through this after every add, edit and
+  // delete, which the counts/summary/colleagues trio has no reason to redo.
+  const loadNotes = useCallback(async () => {
+    try {
+      const result = await call((client) => client.listNotes(caseId));
+      if (result.ok) setNotes(result.value);
+    } catch {
+      // A nicety next to the spine, the same trade every read below makes: the
+      // panel simply keeps showing whatever it last had.
+    }
+  }, [call, caseId]);
+
+  useEffect(() => {
+    void loadNotes();
+  }, [loadNotes]);
 
   useEffect(() => {
     // Guards the state writes against a case the user navigated away from
@@ -274,6 +308,30 @@ export function CaseOverview() {
                   Filing packet
                 </Button>
               </View>
+            </Section>
+          ) : null}
+
+          {/* ── Lifecycle (issue 14.3 / #355) ────────────────────────────── */}
+          <LifecyclePanel colleagues={colleagues} />
+
+          {/* ── Notes (issue 14.5 / #357) ───────────────────────────────── */}
+          <Section title="Notes" meta={`${notes.length} on this case`}>
+            <NotesPanel caseId={caseId} notes={notes} onChanged={() => void loadNotes()} />
+          </Section>
+
+          {/* ── Events and deadlines (issue 14.6 / #358) ───────────────── */}
+          <EventsPanel colleagues={colleagues} />
+
+          {/* ── Tasks (issue #356 / 14.4) ──────────────────────────────── */}
+          <TasksPanel caseId={caseId} />
+
+          {/* ── Requested documents (ADR 0023 PR 5 / #364) ─────────────── */}
+          <DocumentRequestsPanel caseId={caseId} />
+
+          {/* ── Client portal (ADR 0023 / #361) ─────────────────────────── */}
+          {mayViewPortal ? (
+            <Section title="Client portal" meta="who can sign in to see this case">
+              <PortalPanel caseId={caseId} debtors={debtors} canEdit={mayEditPortal} />
             </Section>
           ) : null}
         </View>

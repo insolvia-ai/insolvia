@@ -5,14 +5,37 @@ from insolvia_core.adapters.aws.access_log import DynamoDbAccessLog
 from insolvia_core.adapters.aws.candidate_store import DynamoDbCandidateStore
 from insolvia_core.adapters.aws.case_entity_store import DynamoDbCaseEntityStore
 from insolvia_core.adapters.aws.case_store import DynamoDbCaseStore
+from insolvia_core.adapters.aws.client_binding_store import DynamoDbClientBindingStore
 from insolvia_core.adapters.aws.debtor_store import DynamoDbDebtorStore
 from insolvia_core.adapters.aws.document_blobs import S3DocumentBlobStore
+from insolvia_core.adapters.aws.document_request_store import (
+    DynamoDbDocumentRequestStore,
+)
 from insolvia_core.adapters.aws.document_store import DynamoDbDocumentStore
+from insolvia_core.adapters.aws.filing_credentials import (
+    DynamoDbFilingAuthorizationStore,
+    DynamoDbFilingCredentialStore,
+    KmsCredentialSealer,
+    filing_credentials_key_alias,
+    filing_credentials_table_name,
+)
+from insolvia_core.adapters.aws.filing_store import DynamoDbFilingStore
 from insolvia_core.adapters.aws.firm_store import DynamoDbFirmStore
 from insolvia_core.adapters.aws.jwks_provider import CognitoJwksProvider
+from insolvia_core.adapters.aws.task_store import DynamoDbTaskStore
+from insolvia_core.adapters.aws.tax_id_cipher import KmsTaxIdCipher, case_key_alias
+from insolvia_core.adapters.aws.tax_id_store import DynamoDbTaxIdStore
 from insolvia_core.adapters.aws.user_directory import CognitoUserDirectory
 from mangum import Mangum
 
+from insolvia_api.adapters.aws.event_store import (
+    DynamoDbCalendarTokenStore,
+    DynamoDbEventStore,
+)
+from insolvia_api.adapters.aws.filing_approval_store import (
+    DynamoDbFilingApprovalStore,
+)
+from insolvia_api.adapters.aws.filing_queue import SqsFilingQueue
 from insolvia_api.adapters.aws.job_queue import SqsJobQueue
 from insolvia_api.adapters.aws.job_store import DynamoDbJobStore
 from insolvia_api.adapters.aws.mailer_client import SigV4MailerClient
@@ -23,7 +46,7 @@ from insolvia_api.api.app_factory import create_app
 from insolvia_api.api.dependencies import ApiDependencies
 from insolvia_api.core.config import load_config
 from insolvia_api.core.logging import configure_logging
-from insolvia_api.core.ports import JobQueue, Mailer
+from insolvia_api.core.ports import FilingQueue, JobQueue, Mailer
 
 configure_logging()
 
@@ -61,6 +84,21 @@ if not config.case_table_name or not config.case_access_log_table_name:
 if not config.firm_table_name:
     raise RuntimeError("FIRM_TABLE_NAME must be set for the Lambda entrypoint")
 
+# NOT hard-required, unlike AUTH_CLIENT_ID: without it every /v1/portal/ route
+# fails CLOSED with a 401 (insolvia_core.auth.portal_settings_or_raise) and
+# every staff route is untouched — refusing to boot would take attorneys down
+# over a portal nobody can reach yet. What IS refused is the one
+# misconfiguration that would make the portal an open door: the same client
+# id in both, which would make every staff token a portal token and back.
+if (
+    config.auth_portal_client_id
+    and config.auth_portal_client_id == config.auth_client_id
+):
+    raise RuntimeError(
+        "AUTH_PORTAL_CLIENT_ID must differ from AUTH_CLIENT_ID — the disjoint "
+        "client ids ARE the audience check between staff and clients (ADR 0023)"
+    )
+
 # Hard-required, and it is the pool this deployment already verifies tokens
 # against — published alongside the issuer as /insolvia/<env>/api/auth-user-pool-id.
 # Booting without it would leave POST /v1/firm/users answering 500, which a
@@ -97,6 +135,13 @@ job_queue: JobQueue | None = None
 if config.job_queue_url:
     job_queue = SqsJobQueue(config.job_queue_url)
 
+# The filing queue (ADR 0024 PR 6), job_queue's shape and for its reason: an
+# in-memory queue in a Lambda would record an approval no filing worker ever
+# sees, so absence composes None and approving answers 503.
+filing_queue: FilingQueue | None = None
+if config.filing_queue_url:
+    filing_queue = SqsFilingQueue(config.filing_queue_url)
+
 app = create_app(
     ApiDependencies(
         config=config,
@@ -107,7 +152,13 @@ app = create_app(
         # until the first token arrives — an unauthenticated request path
         # never touches the network.
         jwks_provider=CognitoJwksProvider(config.auth_issuer_url),
-        case_store=DynamoDbCaseStore(config.case_table_name),
+        # With the FIRM table: opening a case conditions each debtor's link
+        # on its client's row, in the case's own transaction — the merge
+        # race (insolvia_core.client_merge). The debtor store's link, below,
+        # the same.
+        case_store=DynamoDbCaseStore(
+            config.case_table_name, firm_table_name=config.firm_table_name
+        ),
         access_log=DynamoDbAccessLog(config.case_access_log_table_name),
         # Its own table, not the case table — read on every authenticated
         # request, with a grant of its own (infra/modules/firm_store).
@@ -118,8 +169,17 @@ app = create_app(
         document_store=DynamoDbDocumentStore(config.case_table_name),
         document_blobs=S3DocumentBlobStore(config.case_document_bucket),
         # Same table as the case store, deliberately: a debtor is stored in
-        # its case's partition, so this needs no configuration of its own.
-        debtor_store=DynamoDbDebtorStore(config.case_table_name),
+        # its case's partition. The firm table is the client row `link`
+        # conditions on.
+        debtor_store=DynamoDbDebtorStore(
+            config.case_table_name, firm_table_name=config.firm_table_name
+        ),
+        # The sealed tax ids (issue 13.12 / #382): items in the case table,
+        # data keys under the case KEY — whose alias is derived from the
+        # table's name (case_key_alias says why that is a derivation and not
+        # a coincidence), so this needs no environment variable either.
+        tax_id_store=DynamoDbTaxIdStore(config.case_table_name),
+        tax_id_cipher=KmsTaxIdCipher(case_key_alias(config.case_table_name)),
         # Likewise: the generic collections (issue #249) are child items of
         # their case's partition — no new table, no new environment variable.
         case_entity_store=DynamoDbCaseEntityStore(config.case_table_name),
@@ -134,6 +194,42 @@ app = create_app(
         # by the extraction worker and the MCP service — the API composes
         # this store to list and resolve them.
         candidate_store=DynamoDbCandidateStore(config.case_table_name),
+        # Events and the feed token (issue 14.6 / #358): the case table once
+        # more — the calendar query rides its existing by-firm index.
+        event_store=DynamoDbEventStore(config.case_table_name),
+        calendar_token_store=DynamoDbCalendarTokenStore(config.case_table_name),
+        # Case tasks (issue #356 / 14.4): rows in the case table, no second
+        # table to provision.
+        task_store=DynamoDbTaskStore(config.case_table_name),
+        # The filing-credential vault (ADR 0024, guardrail 3): its OWN
+        # table and key, both named from the case table's name
+        # (infra/modules/filing_credentials keeps them one local), so no
+        # environment variable. Seal-only — no opener is composed here.
+        filing_credential_store=DynamoDbFilingCredentialStore(
+            filing_credentials_table_name(config.case_table_name)
+        ),
+        filing_credential_sealer=KmsCredentialSealer(
+            filing_credentials_key_alias(config.case_table_name)
+        ),
+        # The signed authorization (guardrail 2), in the same vault table.
+        filing_authorization_store=DynamoDbFilingAuthorizationStore(
+            filing_credentials_table_name(config.case_table_name)
+        ),
+        # The per-filing approval (guardrail 1): child items of the case
+        # partition, and the filing worker's own queue — Optional, above.
+        filing_approval_store=DynamoDbFilingApprovalStore(config.case_table_name),
+        filing_queue=filing_queue,
+        # The filing records (ADR 0024 PR 8): read for the approval screen,
+        # and a hand-back's resolution written onto them — the case table.
+        filing_store=DynamoDbFilingStore(config.case_table_name),
+        # A case's document requests (ADR 0023 PR 5 / #364): the case table
+        # again.
+        document_request_store=DynamoDbDocumentRequestStore(config.case_table_name),
+        # The client portal's bindings (ADR 0023): one store over BOTH tables
+        # already named above — its writes are one transaction across them.
+        client_binding_store=DynamoDbClientBindingStore(
+            config.firm_table_name, config.case_table_name
+        ),
     )
 )
 handler = Mangum(WsgiToAsgi(app), lifespan="off")  # type: ignore[no-untyped-call]

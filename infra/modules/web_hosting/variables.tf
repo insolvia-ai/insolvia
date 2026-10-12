@@ -43,6 +43,6 @@ variable "component" {
 
   validation {
     condition     = contains(["app", "admin"], var.component)
-    error_message = "component must be one of: app, admin. A new value needs a matching arn:aws:s3:::insolvia-*-<component>-* grant in infra/envs/ci-trust, which is human-applied."
+    error_message = "component must be one of: app, admin. A new value needs a matching arn:aws:s3:::insolvia-*-<component>-* grant in insolvia-services' infra/envs/ci-trust, which is human-applied."
   }
 }
