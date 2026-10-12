@@ -34,7 +34,9 @@ That repository publishes each pool's public identifiers as SSM parameters,
 | — | **new:** `infra/envs/dev-shared`, the shared dev pool's branding |
 
 **The shared development pool** is `insolvia-dev-users`, in
-insolvia-services' `infra/envs/dev`. A human applies it there with
+insolvia-services' `infra/envs/dev`, signing in on `dev-auth.insolvia.ai`. A
+custom domain per machine was never affordable; one shared pool makes it a
+single domain, and gives a future identity provider a redirect URI we own. A human applies it there with
 `scripts/apply-dev-auth.sh` when its configuration changes. Every
 developer machine's `infra/envs/dev` reads it through the same contract as
 staging and prod, and keeps its own tables, queues and buckets.
