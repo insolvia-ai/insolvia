@@ -31,7 +31,7 @@ not here.
 - This repo is **public** — never commit secrets, credentials, real mailbox
   addresses, or customer/case data.
 - Never commit to `main` — work on a branch (`claude/<name>-<id>`) and open a PR.
-  *(A `PreToolUse` hook enforces this.)*
+  *(The `main` ruleset on GitHub enforces this.)*
 - **Three environments, every time: local, staging, prod.** A change is not
   finished when staging and prod are wired — say what it does on a developer's
   machine, and do that too. `infra/envs/dev` is a real environment
@@ -216,7 +216,7 @@ invites the next agent to overrule it.
 | `pr` (mattpocock) | **Do not use** | Its template (Summary / Evidence / Merge Danger) competes with `insolvia-pr-description`, which owns PR bodies here. |
 | `code-review` (mattpocock) | **Use by its full intent only** | Same name as the built-in `/code-review`; this one is a two-axis standards/spec review that wants the tracker setup above. If `/code-review` behaves unexpectedly, this is why. |
 | `setup-pre-commit` (mattpocock) | **Do not use** | Adds Husky + lint-staged + Prettier at the root. Hooks here are per-area and installed by each `scripts/dev-setup.sh`; this would add a second hook system. |
-| `git-guardrails-claude-code` (mattpocock) | **Do not use** | Blocks every `git push` — which is how every change here ships (branch → PR). `.claude/hooks/guard-main.sh` already guards what matters: `main`. |
+| `git-guardrails-claude-code` (mattpocock) | **Do not use** | Blocks every `git push` — which is how every change here ships (branch → PR). The `main` ruleset on GitHub already guards what matters: `main`. |
 | everything else | **Case by case** | Not evaluated. Check the frontmatter first: **"EAS service (paid)" or an `allowed-tools: Bash(eas *)` line means it is out of scope**, whatever the task looks like. |
 
 **All six `eas-*` skills are out of scope for one reason:** we are on Expo's free
