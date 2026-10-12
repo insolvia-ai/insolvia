@@ -212,7 +212,7 @@ invites the next agent to overrule it.
 | `eas-update-insights` | **Do not use** | Reports on EAS Update, which we do not publish. Also `allowed-tools: Bash(eas *)`. |
 | `gluestack-ui-v5` | **Uninstalled** — do not reinstall | It described a component library this codebase deliberately does not have, and its first principle was *"gluestack components over React Native primitives"* — the exact inversion of our decision. It is gone from `skills-lock.json`, so dev-setup no longer installs it. [ADR 0004](docs/adr/0004-react-native-replaces-flutter.md) keeps the measurements that rejected the library, including two accessibility defects it caused. |
 | `expo-tailwind-setup` | **Uninstalled** — do not reinstall | Expo removed it upstream ([expo/skills#151](https://github.com/expo/skills/pull/151)), so it is gone from `skills-lock.json` too. The row stays because the reasons still hold: **there is no Tailwind in the app at all** (it stays on the web side: the design system's `.web` leaves and marketing). It also pinned `react-native-css@0.0.0-nightly.5ce6396`, whose own npm metadata reads *"Outdated SDK 54 era nightly… cannot resolve on Expo SDK 55 or newer"* — we are on SDK 57. |
-| `mattpocock/skills` (all 38) | **Use**, case by case, with the four below | Matt Pocock's engineering skills (`tdd`, `diagnosing-bugs`, `grill-me`, `to-spec`, `domain-modeling`, `writing-for-agents`, …) and his General group. Most are user-invoked only (`disable-model-invocation`). The tracker-based ones (`triage`, `to-tickets`, `code-review`, `implement`, …) expect `/setup-matt-pocock-skills` to have run, and it writes a section into this file and `docs/` — not done yet; run it deliberately, and keep its output to this file's catalog style. |
+| `mattpocock/skills` (all 38) | **Use**, case by case, with the four below | Matt Pocock's engineering skills (`tdd`, `diagnosing-bugs`, `grill-me`, `to-spec`, `domain-modeling`, `writing-for-agents`, …) and his General group. Most are user-invoked only (`disable-model-invocation`). The tracker-based ones (`triage`, `to-tickets`, `code-review`, `implement`, …) read their config from `docs/agents/` (written by `/setup-matt-pocock-skills`; see **Agent skills** below). |
 | `pr` (mattpocock) | **Do not use** | Its template (Summary / Evidence / Merge Danger) competes with `insolvia-pr-description`, which owns PR bodies here. |
 | `code-review` (mattpocock) | **Use by its full intent only** | Same name as the built-in `/code-review`; this one is a two-axis standards/spec review that wants the tracker setup above. If `/code-review` behaves unexpectedly, this is why. |
 | `setup-pre-commit` (mattpocock) | **Do not use** | Adds Husky + lint-staged + Prettier at the root. Hooks here are per-area and installed by each `scripts/dev-setup.sh`; this would add a second hook system. |
@@ -236,3 +236,20 @@ own description.)
   `services/api` — one trust boundary, one place that touches the data stores
   ([ADR 0001](docs/adr/0001-client-stays-dumb-trust-boundary.md)). Shipping
   Expo Router API routes would also need EAS Hosting.
+
+## Agent skills
+
+Config the mattpocock engineering skills read. `docs/agents/` owns it; edit
+those files directly.
+
+### Issue tracker
+
+GitHub Issues on `insolvia-ai/insolvia`, via `gh`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The five defaults (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: root `GLOSSARY.md` (created lazily) plus `docs/adr/`. See `docs/agents/domain.md`.

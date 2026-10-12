@@ -14,6 +14,7 @@ this wrong is what produced the flat pile this structure replaced.
 | `runbooks/` | A procedure a human executes | It has steps, an order, and a "done". |
 | `adr/` | A decision and its reasoning | Someone will otherwise re-litigate it. See [`adr/README.md`](adr/README.md). |
 | `business/` | Company artifacts, not engineering | Different audience entirely. Self-contained `noindex` HTML. |
+| `agents/` | Config the mattpocock engineering skills read | Written by `/setup-matt-pocock-skills`, then hand-edited. Its readers are skills, not people. |
 | `plan.md` | The single living plan | Rewritten as work lands. There is exactly one, and it is not a runbook. |
 
 ## What does *not* belong in `docs/`
