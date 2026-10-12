@@ -131,13 +131,12 @@ bootstrap is its
   the ONE shared dev pool (`insolvia-dev-users`), whose branding
   `envs/dev-shared` owns and `scripts/dev-aws-setup.sh` applies. Pool
   configuration — callback origins, the custom domain, deletion protection,
-  a new client or contract key — is a PR there, released first. The eight
-  `removed { from = module.auth.… destroy = false }` blocks in staging/prod
-  are the cutover's safety net (insolvia-services'
-  [`docs/runbooks/auth-state-migration.md`](https://github.com/insolvia-ai/insolvia-services/blob/main/docs/runbooks/auth-state-migration.md));
-  delete them only as it says. Keep `module "auth"` at that name — the
-  branding and grants never moved in state because their addresses did not
-  change.
+  a new client or contract key — is a PR there, released first. Keep
+  `module "auth"` at that name: the branding and grants never moved in state
+  because their addresses did not change, and renaming the call would be a
+  destroy-and-create of the sign-in page's style. The move itself is recorded
+  in insolvia-services'
+  [`docs/runbooks/auth-state-migration.md`](https://github.com/insolvia-ai/insolvia-services/blob/main/docs/runbooks/auth-state-migration.md).
 - **A deploy job must declare `environment:`** matching the Terraform env
   (`insolvia-staging|production` here; `insolvia-shared` is insolvia-services')
   — env-scoped secrets are invisible otherwise and resolve to empty strings
