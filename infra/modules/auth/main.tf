@@ -17,8 +17,8 @@
 # Called as module "auth" by staging, prod and dev-shared, and the four
 # resources above kept their addresses (module.auth.aws_cognito_managed_login_branding.*,
 # module.auth.aws_iam_role_policy.*): when the pool moved, these stayed put in
-# this repo's state, untouched. The env roots' `removed` blocks cover the
-# addresses that left. A developer machine's infra/envs/dev calls
+# this repo's state, untouched; the addresses that left moved to
+# insolvia-services' state on 2026-10-12. A developer machine's infra/envs/dev calls
 # modules/auth_contract directly instead: it brands nothing (the shared dev
 # pool's branding is dev-shared's, once for every machine) and grants nothing
 # (no Lambda).

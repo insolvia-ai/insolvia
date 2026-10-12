@@ -1,9 +1,10 @@
 # ADR 0026 — Auth is a shared service: the Cognito pools move to `insolvia-services`
 
-- **Status:** Proposed (2026-10-12). The direction is the maintainer's
-  decision. They also chose the SSM contract, the shared development pool and
-  the human-applied dev pool, all on review of the first draft. This
-  record is accepted when the maintainer merges it.
+- **Status:** Accepted (2026-10-12, by the maintainer). The direction, the
+  SSM contract, the shared development pool and the human-applied dev pool
+  are all the maintainer's choices, made on review of the first draft. The
+  cutover ran the same day: staging and prod moved with no resource changes
+  on either side, and the shared dev pool is live on `dev-auth.insolvia.ai`.
 - **Date:** 2026-10-11, revised 2026-10-12
 - **Amends:** [ADR 0025](0025-shared-infra-and-mailer-move-to-insolvia-services.md).
   Auth joins the list of what moves, and rule 1 gains a fourth cross-repo
@@ -168,7 +169,8 @@ the prep PR) to insolvia's prod. The move script refuses otherwise.
   `removed { … destroy = false }` blocks, one per address that left, until
   both have applied after the move. They protect the window where the new
   code could plan against a state that still holds the pool, turning a
-  mistake from a destroy into a recoverable forget.
+  mistake from a destroy into a recoverable forget. (Deleted on 2026-10-12,
+  once both environments had released after the move with "No changes".)
 - **insolvia-services gains its first `dev` root**, applied by a human.
   ADR 0025 said it had none because the mailer runs under Docker. That is
   still true for the mailer; auth has no local stand-in.
