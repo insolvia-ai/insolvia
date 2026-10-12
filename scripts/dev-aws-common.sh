@@ -88,7 +88,9 @@ load_aws_identity() {
   CASE_TABLE_NAME_EXPECTED="insolvia-$DEV_ENVIRONMENT-cases"
   CASE_ACCESS_LOG_TABLE_NAME_EXPECTED="insolvia-$DEV_ENVIRONMENT-case-access-log"
   FIRM_TABLE_NAME_EXPECTED="insolvia-$DEV_ENVIRONMENT-firms"
-  USER_POOL_NAME_EXPECTED="insolvia-$DEV_ENVIRONMENT-users"
+  # The pool every machine shares (insolvia-services' infra/envs/dev), not a
+  # per-machine one — see "The shared development pool" below.
+  USER_POOL_NAME_EXPECTED="insolvia-dev-users"
   STATE_KEY="insolvia/dev/$AWS_ACCOUNT_ID/$MACHINE_ID/terraform.tfstate"
 }
 
@@ -235,28 +237,34 @@ terraform_output_json() {
   terraform -chdir="$TF_DIR" output -json
 }
 
-# ── This machine's Cognito pool (insolvia-services) ─────────────
-# Auth is a shared service since ADR 0026: this machine's pool is
-# insolvia-services' per-machine infra/envs/dev root, not this repo's. Its
-# scripts/dev-aws-auth.sh is run from the sibling checkout that
-# scripts/services-checkout.sh finds (the same one dev-up.sh uses for the
-# mailer), with the same machine id and profile.
+# ── The shared development pool ─────────────────────────────────
+# Every machine signs in against ONE pool, insolvia-dev-users. The pool is
+# insolvia-services' (its infra/envs/dev, applied there by a human,
+# ADR 0026) and this repo only READS it, through the SSM contract
+# /insolvia/dev/auth/* — so nothing here needs that repository checked out.
 #
-# Unlike the mailer, there is no fallback without that checkout: local sign-in
-# needs a real pool, and this repo's dev root looks the pool up by name, so it
-# cannot even plan until the pool exists. Hence `die`, with the fix.
-services_auth() {
-  local action="$1" dir
-  # shellcheck source=services-checkout.sh
-  . "$REPO_ROOT/scripts/services-checkout.sh"
-  dir="$(services_checkout "$REPO_ROOT")"
-  if [[ -z "$dir" || ! -x "$dir/scripts/dev-aws-auth.sh" ]]; then
-    die "This machine's Cognito pool lives in insolvia-ai/insolvia-services, and no checkout of it with scripts/dev-aws-auth.sh was found. Clone it next to this repo (git clone https://github.com/insolvia-ai/insolvia-services.git \"$(dirname "$(dirname "$(git -C "$REPO_ROOT" rev-parse --path-format=absolute --git-common-dir)")")/insolvia-services\") or set INSOLVIA_SERVICES_DIR, then re-run."
-  fi
-  local args=("$action" --profile "$AWS_PROFILE_VALUE")
-  [[ "$action" != check && "${AUTO_APPROVE:-0}" -eq 1 ]] && args+=(--yes)
-  log "Cognito pool: $dir/scripts/dev-aws-auth.sh ${args[*]}"
-  AWS_REGION="$AWS_REGION_VALUE" "$dir/scripts/dev-aws-auth.sh" "${args[@]}"
+# The one thing this repo applies to it is the managed-login BRANDING of its
+# two clients (generated from this repo's brand): infra/envs/dev-shared, one
+# shared state key, applied by every machine before its own stack. Idempotent,
+# so whoever runs last is irrelevant; the S3 lockfile serialises two at once.
+SHARED_TF_DIR="$REPO_ROOT/infra/envs/dev-shared"
+SHARED_POOL_NAME="insolvia-dev-users"
+SHARED_CONTRACT_PATH="/insolvia/dev/auth"
+
+# Fail early, by name, when the shared pool has never been applied — rather
+# than letting Terraform report a missing data source halfway through a plan.
+require_shared_pool() {
+  aws_dev ssm get-parameter --name "$SHARED_CONTRACT_PATH/user-pool-id" --query Parameter.Value --output text >/dev/null 2>&1 ||
+    die "The shared development pool's contract ($SHARED_CONTRACT_PATH/*) does not exist yet. It is insolvia-services' infra/envs/dev; from a checkout of that repository, run scripts/apply-dev-auth.sh once (insolvia-services' docs/runbooks/auth-state-migration.md § Shared dev pool), then re-run this."
+}
+
+apply_dev_shared() {
+  require_shared_pool
+  log "Shared dev pool branding: infra/envs/dev-shared (one state for every machine)"
+  terraform -chdir="$SHARED_TF_DIR" init -reconfigure -input=false >/dev/null
+  local args=(apply -input=false)
+  [[ "${AUTO_APPROVE:-0}" -eq 1 ]] && args+=(-auto-approve)
+  terraform -chdir="$SHARED_TF_DIR" "${args[@]}"
 }
 
 # ── Local env-file editing ──────────────────────────────────────

@@ -28,11 +28,12 @@ jobs:
       # a re-run is the only way to learn anything.
       fail-fast: false
       matrix:
-        # `dev` (per-developer machine) is validated offline here like the
-        # others but never applied by CI. Its "Terraform validate (dev)" check is
-        # NOT part of the required-checks contract (the ruleset requires
-        # staging/prod); it runs for coverage, not as a gate.
-        env: [staging, prod, dev]
+        # `dev` (per-developer machine) and `dev-shared` (the shared dev
+        # pool's branding, ADR 0026) are validated offline here like the
+        # others but never applied by CI — scripts/dev-aws-setup.sh applies
+        # both. Their checks are NOT part of the required-checks contract (the
+        # ruleset requires staging/prod); they run for coverage, not as a gate.
+        env: [staging, prod, dev, dev-shared]
     steps:
       - uses: actions/checkout@v5
         with:

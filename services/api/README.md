@@ -48,7 +48,7 @@ rather than empty) — see `core/waitlist.py::record_item`.
 Local dev runs against **this machine's real AWS dev table** — there is no
 local DynamoDB emulator. The per-machine layer
 (`infra/envs/dev`: an isolated waitlist table and case store per developer
-machine, plus that machine's Cognito pool from insolvia-services) is the dev
+machine; sign-in uses the one shared dev pool from insolvia-services) is the dev
 database:
 
 ```sh

@@ -65,45 +65,15 @@ const PORTAL_QUESTIONNAIRE = {
   ],
 };
 
-// The portal client's callback and sign-out URLs are registered by
-// insolvia-services' infra/modules/auth/main.tf (`portal_callback_urls`,
-// `portal_logout_urls`) since the pool moved there (ADR 0026). Found the way
-// scripts/services-checkout.sh finds that checkout: $INSOLVIA_SERVICES_DIR, or
-// a sibling of the PRIMARY checkout (a worktree lives under
-// <primary>/.claude/worktrees/<name>). Null when there is none — CI checks out
-// this repo alone.
-function servicesAuthModule(): string | null {
-  const repoRoot = path.resolve(__dirname, '..', '..', '..', '..', '..');
-  const primary =
-    repoRoot.split(`${path.sep}.claude${path.sep}worktrees${path.sep}`)[0] ?? repoRoot;
-  const candidates = [
-    process.env.INSOLVIA_SERVICES_DIR,
-    path.join(path.dirname(primary), 'insolvia-services'),
-  ].filter((dir): dir is string => Boolean(dir));
-  for (const dir of candidates) {
-    const file = path.join(dir, 'infra', 'modules', 'auth', 'main.tf');
-    if (existsSync(file)) return file;
-  }
-  return null;
-}
-const SERVICES_AUTH_MODULE = servicesAuthModule();
-
 describe('the portal routes', () => {
   it('are declared at the paths the portal client registers', () => {
-    // <origin>/portal/auth/callback and <origin>/portal. Under file-based
-    // routing the path IS the file, so these two files are this repo's half
-    // of the contract, checked everywhere.
+    // <origin>/portal/auth/callback and <origin>/portal — the URLs
+    // insolvia-services' infra/modules/auth registers on the portal client
+    // (the pool moved there, ADR 0026). Under file-based routing the path IS
+    // the file, so these two files are this repo's half of that contract.
+    // The other half is that repository's to keep; nothing here reads it.
     expect(existsSync(path.join(APP_DIR, 'portal', 'auth', 'callback.tsx'))).toBe(true);
     expect(existsSync(path.join(APP_DIR, 'portal', 'index.tsx'))).toBe(true);
-  });
-
-  // The other half, in the other repository: checked wherever a checkout of it
-  // is reachable (every developer machine, since dev-aws-setup.sh needs one),
-  // and reported as SKIPPED — not passed — where it is not.
-  (SERVICES_AUTH_MODULE ? it : it.skip)('match what insolvia-services registers', () => {
-    const infra = readFileSync(SERVICES_AUTH_MODULE as string, 'utf8');
-    expect(infra).toContain('"${o}/portal/auth/callback"');
-    expect(infra).toContain('"${o}/portal"');
   });
 
   it('never reach for the staff session, API hook or frame', () => {

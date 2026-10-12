@@ -1,105 +1,44 @@
 # Cognito auth — the CONSUMER half. The user pool, its hosted domains and the
 # app clients are insolvia-services' (its infra/modules/auth, in its
-# infra/envs/{dev,staging,prod}) since 2026-10-11 — auth is a shared service,
-# ADR 0026. What stayed here is what belongs to the consumer:
+# infra/envs/{dev,staging,prod}) since ADR 0026: auth is a shared service.
+# What stayed here is what belongs to the consumer:
 #
 #   • the managed-login BRANDING of this app's two clients — generated from
 #     this repo's brand by `npm run tokens` and gated by `npm run tokens:check`
 #     (ADR 0020: the brand is a consumer-owned override);
 #   • the AdminCreateUser GRANTS on this repo's API and admin Lambda roles — a
 #     consumer grants its own role access to the pool, so insolvia-services
-#     never needs one of our role names, and a fresh account has no cycle;
-#   • the LOOKUPS, by name, that every env root here reads through this
-#     module's outputs (unchanged names: user_pool_id, web_client_id, …).
+#     never needs one of our role names, and a fresh account has no cycle.
 #
-# The module is still called as module "auth", and the four resources above
-# kept their addresses (module.auth.aws_cognito_managed_login_branding.*,
+# Both reach the pool through modules/auth_contract — the SSM parameters
+# insolvia-services publishes — whose outputs this module passes through
+# under the names it always had (user_pool_id, web_client_id, …).
+#
+# Called as module "auth" by staging, prod and dev-shared, and the four
+# resources above kept their addresses (module.auth.aws_cognito_managed_login_branding.*,
 # module.auth.aws_iam_role_policy.*): when the pool moved, these stayed put in
 # this repo's state, untouched. The env roots' `removed` blocks cover the
-# addresses that left.
-#
-# BY NAME, NEVER BY STATE (ADR 0025 rule 1). The names are insolvia-services'
-# contract, written down at the top of its modules/auth/main.tf:
-#   insolvia-<env>-users          the pool — and it must be the ONLY one
-#   insolvia-<env>-app            the web SPA's client
-#   insolvia-<env>-portal         the client portal's client
-#   insolvia-<env>-mcp-<harness>  every MCP harness client (the allowlist)
-# A rename there, a missing client, or a second pool of the same name fails
-# THIS plan, loudly, before anything is applied. That is the point: a stale
-# client id in the API's configuration would fail every sign-in quietly.
-#
-# ORDER. These lookups need the pool to exist, so insolvia-services' env root
-# applies before this repo's (a fresh account: its runbook; a developer
-# machine: scripts/dev-aws-setup.sh runs its dev root first). A NEW client that
-# this repo must know about is a PR there, released there, before the PR here
-# that reads it — the same rule as a new service's container repository.
+# addresses that left. A developer machine's infra/envs/dev calls
+# modules/auth_contract directly instead: it brands nothing (the shared dev
+# pool's branding is dev-shared's, once for every machine) and grants nothing
+# (no Lambda).
 
-data "aws_region" "current" {}
+module "contract" {
+  source = "../auth_contract"
 
-locals {
-  pool_name     = "${var.project}-${var.environment}-users"
-  client_prefix = "${var.project}-${var.environment}-"
-  mcp_prefix    = "${local.client_prefix}mcp-"
-}
-
-# Cognito does not make pool names unique, so "the pool named X" is only an
-# answer when there is exactly one. Zero fails inside the data source; two is
-# the postcondition, and it is the dangerous case — an accidental second pool
-# (an apply onto empty state, say) would otherwise be a coin toss between the
-# real users and nobody.
-data "aws_cognito_user_pools" "this" {
-  name = local.pool_name
-
-  lifecycle {
-    postcondition {
-      condition     = length(self.ids) == 1
-      error_message = "Expected exactly one Cognito user pool named ${local.pool_name}, found ${length(self.ids)}. It is insolvia-services' (infra/envs/<env>, module.auth); a second pool of the same name must be removed there before this root can plan."
-    }
-  }
-}
-
-# The pool itself, for its ARN and its hosted domains.
-data "aws_cognito_user_pool" "this" {
-  user_pool_id = one(data.aws_cognito_user_pools.this.ids)
-}
-
-data "aws_cognito_user_pool_clients" "this" {
-  user_pool_id = data.aws_cognito_user_pool.this.id
-
-  lifecycle {
-    postcondition {
-      condition     = length(distinct(self.client_names)) == length(self.client_names)
-      error_message = "Two app clients on ${local.pool_name} share a name; clients are found by name, so each name must be unique."
-    }
-    postcondition {
-      condition = alltrue([
-        for name in ["${local.client_prefix}app", "${local.client_prefix}portal"] :
-        contains(self.client_names, name)
-      ])
-      error_message = "${local.pool_name} is missing the ${local.client_prefix}app or ${local.client_prefix}portal client. Both are insolvia-services' (modules/auth) — release it there first."
-    }
-  }
+  project     = var.project
+  environment = var.environment
 }
 
 locals {
-  user_pool_id  = data.aws_cognito_user_pool.this.id
-  user_pool_arn = data.aws_cognito_user_pool.this.arn
+  # The pool's NAME is the invite grants' policy-name prefix, unchanged from
+  # when this module created the pool, so the grants keep their names.
+  pool_name = "${var.project}-${var.environment}-users"
 
-  clients          = zipmap(data.aws_cognito_user_pool_clients.this.client_names, data.aws_cognito_user_pool_clients.this.client_ids)
-  web_client_id    = local.clients["${local.client_prefix}app"]
-  portal_client_id = local.clients["${local.client_prefix}portal"]
-
-  # Every client named insolvia-<env>-mcp-<harness>, keyed by harness — so
-  # registering a harness in insolvia-services IS adding it to the MCP
-  # service's allowlist, with nothing hand-listed on either side.
-  mcp_clients = {
-    for name, id in local.clients :
-    trimprefix(name, local.mcp_prefix) => id
-    if startswith(name, local.mcp_prefix)
-  }
-
-  prefix_domain = "${data.aws_cognito_user_pool.this.domain}.auth.${data.aws_region.current.region}.amazoncognito.com"
-  custom_domain = data.aws_cognito_user_pool.this.custom_domain == null ? "" : data.aws_cognito_user_pool.this.custom_domain
+  user_pool_id     = module.contract.user_pool_id
+  user_pool_arn    = module.contract.user_pool_arn
+  web_client_id    = module.contract.web_client_id
+  portal_client_id = module.contract.portal_client_id
 }
 
 # ── Managed login branding ──────────────────────────────────────

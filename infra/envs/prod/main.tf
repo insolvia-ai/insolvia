@@ -6,7 +6,7 @@
 # both are infra/envs/shared in the insolvia-services repo, as is the mailer
 # (staging-mailer-api / mailer-api.insolvia.ai), which this root's API calls.
 # Auth (the Cognito pool, its domains and app clients) is that repo's too, and
-# found by name the same way — module.auth below is the consumer half (ADR 0026).
+# read through its SSM contract (/insolvia/<env>/auth/*) — module.auth below is the consumer half (ADR 0026).
 
 locals {
   environment = "prod"
@@ -180,7 +180,8 @@ resource "aws_ssm_parameter" "mailer_api_url" {
 # Auth (#65): the CONSUMER half of the production pool. The pool (with its
 # deletion protection — it holds the real attorney accounts), its domain and
 # its app clients are insolvia-services' (infra/envs/prod, module.auth) since
-# ADR 0026. This finds them by name, renders this app's managed-login branding
+# ADR 0026. This reads them from its SSM contract
+# (/insolvia/prod/auth/*, modules/auth_contract), renders this app's managed-login branding
 # onto its two clients, and grants this repo's two Lambda roles their one
 # action on the pool. Prod's custom auth domain, when it comes, is a change
 # there; the auth_domain output here picks it up by itself.
@@ -200,13 +201,13 @@ module "auth" {
   admin_invite_role_name = module.admin_service.lambda_role_name
 }
 
-# Auth moved to the insolvia-services repo on 2026-10-11 (ADR 0026): the pool,
-# its domains and its app clients live on in that repo's infra/envs/prod root, under
+# Auth moved to the insolvia-services repo (ADR 0026): the pool, its domains,
+# its app clients and its SSM contract parameters live on in that repo's infra/envs/prod root, under
 # the SAME addresses (module.auth.*), and their state was moved there by its
 # docs/runbooks/auth-state-migration.md — nothing destroyed or recreated.
 #
 # THESE BLOCKS ARE THE SAFETY NET for that move. module.auth is still declared
-# here (it is the consumer half now), but these seven resources are not. Without
+# here (it is the consumer half now), but these eight resources are not. Without
 # the blocks, a plan of this root against a state that still held them would
 # DESTROY them — and the pool's users with them. With them, Terraform forgets
 # the objects instead. After the migration the state holds nothing at these
@@ -262,6 +263,14 @@ removed {
 
 removed {
   from = module.auth.aws_cognito_user_pool_client.mcp
+
+  lifecycle {
+    destroy = false
+  }
+}
+
+removed {
+  from = module.auth.aws_ssm_parameter.contract
 
   lifecycle {
     destroy = false

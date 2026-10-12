@@ -74,7 +74,8 @@ starts from them rather than rediscovering them:
    deprecated-but-MAY) and explicitly allows pre-registered client IDs. So
    v1 is **one pre-registered app client per harness**, created in
    insolvia-services' `infra/modules/auth` like the existing app clients
-   (ADR 0026); this repo's allowlist picks it up by its `-mcp-` name. Whether the harnesses
+   (ADR 0026); this repo's allowlist picks it up from the `mcp-client-ids`
+   contract parameter. Whether the harnesses
    we claim can work with a pre-registered client is a 12.5 question.
 2. **Cognito access tokens carry `client_id` and `scope`, not an RFC 8707
    `aud`.** Audience binding is approximated the way `services/api` already

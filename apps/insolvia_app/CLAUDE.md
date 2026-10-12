@@ -351,7 +351,8 @@ below the `<title>` and why this paragraph is here rather than in the file.
   `EXPO_PUBLIC_COGNITO_PORTAL_CLIENT_ID`; without it `/portal` says sign-in is
   not configured and the staff app is unaffected.
 - **The dev server is pinned to port 3000.** Expo defaults to 8081, and
-  `infra/envs/{dev,staging}` register `http://localhost:3000` as an
+  the dev and staging Cognito pools (insolvia-services' `infra/envs/{dev,staging}`,
+  ADR 0026) register `http://localhost:3000` as an
   **exact-match** Cognito allowed origin.
 - **The Metro cache does not key on environment variables**, only on file content
   and config. Two exports in one shell with different `EXPO_PUBLIC_INSOLVIA_ENV`

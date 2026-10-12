@@ -8,15 +8,11 @@
 # machine-id's state key. This script finds the orphan's state object in the
 # state bucket by its 12-char short id (the suffix visible in the leftover
 # resource names), runs `terraform destroy` against THAT state — so the whole
-# environment goes (waitlist table, case store, whatever else the state
-# tracks), not just the resource that was noticed — and then deletes the state
-# object itself.
-#
-# THE COGNITO POOL IS NOT IN THAT STATE since auth moved to insolvia-services
-# (ADR 0026): it lives under insolvia-services/dev/<account>/<machine-id>/ and
-# this script only reports it at the end. An orphan from BEFORE the move
-# still tracks its pool here — and the `removed` blocks in infra/envs/dev make
-# this destroy FORGET it rather than delete it, so it too is reported.
+# environment goes (waitlist table, case store, whatever else the state tracks
+# — including, for a machine set up before ADR 0026, its old per-machine
+# Cognito pool, which current code no longer declares), not just the resource
+# that was noticed — and then deletes the state object itself. The SHARED dev
+# pool is never in a machine's state and is never touched.
 #
 # Without --yes, `terraform destroy` shows its plan and asks for interactive
 # confirmation, so a plain run is a safe way to see what would be removed.
@@ -126,12 +122,3 @@ aws_dev s3api delete-object --bucket "$STATE_BUCKET" --key "$ORPHAN_STATE_KEY" >
 aws_dev s3api delete-object --bucket "$STATE_BUCKET" --key "$ORPHAN_STATE_KEY.tflock" >/dev/null 2>&1 || true
 
 ok "Orphaned environment dev-$ORPHAN_SHORT_ID destroyed and its state object removed."
-
-orphan_pool="insolvia-dev-$ORPHAN_SHORT_ID-users"
-orphan_pool_ids="$(aws_dev cognito-idp list-user-pools --max-results 60 --query "UserPools[?Name=='$orphan_pool'].Id" --output text)"
-if [[ -n "$orphan_pool_ids" ]]; then
-  warn "Cognito pool $orphan_pool ($orphan_pool_ids) still exists — it is not this repo's state."
-  warn "If insolvia-services/dev/$AWS_ACCOUNT_ID/$ORPHAN_MACHINE_ID/terraform.tfstate exists, destroy it from"
-  warn "an insolvia-services checkout with that key; otherwise delete the pool's domain"
-  warn "(insolvia-dev-$ORPHAN_SHORT_ID-auth) and then the pool with the aws cognito-idp CLI."
-fi

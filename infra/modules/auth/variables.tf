@@ -4,12 +4,10 @@ variable "project" {
   default     = "insolvia"
 }
 
-# The pool and clients are found as insolvia-<environment>-users,
-# insolvia-<environment>-app, … — the environment segment insolvia-services'
-# root of the same environment created them under (dev-<machine_short_id> on a
-# developer's machine).
+# The AUTH environment whose pool this brands and grants on: staging, prod, or
+# "dev" for the shared development pool (infra/envs/dev-shared).
 variable "environment" {
-  description = "Infra environment name (staging, prod, dev-<id>), used to find the pool and clients by name."
+  description = "Auth environment (staging, prod, dev) — the contract path /<project>/<environment>/auth/*."
   type        = string
 }
 
@@ -20,8 +18,8 @@ variable "environment" {
 
 # ── The API's invite grant ──────────────────────────────────────
 # Name of the API's Lambda execution role, or null where there is no Lambda
-# (infra/envs/dev — the local API runs as a dev server under the developer's
-# own IAM user). Same optional shape, and the same reason, as
+# (infra/envs/dev-shared — the local API runs as a dev server under the
+# developer's own IAM user). Same optional shape, and the same reason, as
 # modules/case_store's.
 variable "api_role_name" {
   description = "API Lambda execution role name to grant AdminCreateUser on this pool, or null."

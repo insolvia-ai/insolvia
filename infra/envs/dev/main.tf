@@ -26,9 +26,9 @@
 #     an attorney's approval puts a filing job on, so the dev proof
 #     (services/api/scripts/dev-filing-approval-proof.sh) enqueues on a real
 #     per-machine queue;
-#   • the consumer half of this machine's Cognito pool via modules/auth —
-#     the pool itself is insolvia-services' per-machine dev root (ADR 0026),
-#     applied first by scripts/dev-aws-setup.sh, and found here by name;
+#   • the SHARED development Cognito pool's identifiers, READ from
+#     insolvia-services' SSM contract via modules/auth_contract — the pool is
+#     that repo's and every machine's (ADR 0026), not this machine's;
 #   • OPTIONALLY the case-data audit trail (-var=enable_audit_trail=true),
 #     off by default because a per-developer trail is cost with no evidentiary
 #     value — but standable-up, so modules/audit_trail can be exercised on a
@@ -284,102 +284,35 @@ resource "aws_dynamodb_table" "admin_audit" {
 }
 
 # ── Auth ────────────────────────────────────────────────────────
-# The same module staging and prod instantiate, with the machine environment
-# name. The Cognito hosted-domain prefix the module derives
-# (insolvia-dev-<machine_short_id>-auth) is GLOBALLY unique across all of AWS —
-# the machine short id in it is what makes a per-developer pool safe to
-# create at all. Registers only the localhost web origin staging also
-# registers for dev (`npx expo start --web --port 3000` — the port is pinned
-# to match, since Cognito callback URLs are exact-match); nothing deployed
-# ever redirects here. Outputs only for now: this preps local auth work, the
-# app does not consume it yet.
-
-# ── Auth ────────────────────────────────────────────────────────
-# The CONSUMER half of this machine's pool, the same module staging and prod
-# call. The pool itself — insolvia-dev-<machine_short_id>-users, its prefix
-# domain and its clients — is insolvia-services' per-machine dev root since
-# ADR 0026, applied by scripts/dev-aws-setup.sh BEFORE this root (it finds the
-# sibling checkout through scripts/services-checkout.sh), because the lookups
-# here need the pool to exist to plan. That ordering is the point: this
-# machine reaches its pool by name exactly as staging and prod reach theirs,
-# so the cross-repo contract is exercised locally rather than first met on
-# staging.
+# READ-ONLY. This machine signs in against the ONE shared development pool
+# (insolvia-dev-users), which is insolvia-services' (its infra/envs/dev,
+# ADR 0026) and is shared by every machine — the pattern humbugg uses, for the
+# reason that reaches every product the day sign-in federates: an identity
+# provider registers exact redirect URIs, so one pool is one URI, registered
+# once. Only identities are shared; every table, queue and bucket in this root
+# stays this machine's.
 #
-# No role grants: dev has no Lambda (the local API runs under the developer's
-# own IAM user). The branding is real, so local sign-in renders the brand.
+# Read through the same SSM contract staging and prod read
+# (/insolvia/dev/auth/*, modules/auth_contract), so a developer machine
+# exercises that seam itself. If the parameters do not exist yet, this plan
+# fails naming the missing one: the shared pool has not been applied
+# (insolvia-services' scripts/apply-dev-auth.sh, once).
+#
+# Named module "auth" so every reference below (module.auth.issuer_url, …)
+# reads as it always did. No branding here — the shared pool's two clients
+# are branded ONCE, by infra/envs/dev-shared, which scripts/dev-aws-setup.sh
+# applies before this root — and no role grants (dev has no Lambda).
+#
+# A machine set up before ADR 0026 still holds its own per-machine pool
+# (insolvia-dev-<machine_short_id>-users) under module.auth.* in this state;
+# this code no longer declares it, so the next apply DESTROYS it — on purpose:
+# the shared pool replaces it, and scripts/dev-aws-seed.sh puts your account
+# there.
 module "auth" {
-  source = "../../modules/auth"
+  source = "../../modules/auth_contract"
 
   project     = "insolvia"
-  environment = local.environment
-}
-
-# Auth moved to the insolvia-services repo on 2026-10-11 (ADR 0026): the pool,
-# its domains and its app clients live on in that repo's infra/envs/dev (per machine) root, under
-# the SAME addresses (module.auth.*), and their state was moved there by its
-# docs/runbooks/auth-state-migration.md — nothing destroyed or recreated.
-#
-# THESE BLOCKS ARE THE SAFETY NET for that move. module.auth is still declared
-# here (it is the consumer half now), but these seven resources are not. Without
-# the blocks, a plan of this root against a state that still held them would
-# DESTROY them — and the pool's users with them. With them, Terraform forgets
-# the objects instead. After the migration the state holds nothing at these
-# addresses and every block is a no-op. Delete them once this machine's dev root has
-# applied after the migration; they guard the window, and only the window.
-removed {
-  from = module.auth.aws_cognito_user_pool.main
-
-  lifecycle {
-    destroy = false
-  }
-}
-
-removed {
-  from = module.auth.aws_cognito_user_pool_domain.main
-
-  lifecycle {
-    destroy = false
-  }
-}
-
-removed {
-  from = module.auth.aws_cognito_user_pool_domain.custom
-
-  lifecycle {
-    destroy = false
-  }
-}
-
-removed {
-  from = module.auth.aws_route53_record.auth
-
-  lifecycle {
-    destroy = false
-  }
-}
-
-removed {
-  from = module.auth.aws_cognito_user_pool_client.web
-
-  lifecycle {
-    destroy = false
-  }
-}
-
-removed {
-  from = module.auth.aws_cognito_user_pool_client.portal
-
-  lifecycle {
-    destroy = false
-  }
-}
-
-removed {
-  from = module.auth.aws_cognito_user_pool_client.mcp
-
-  lifecycle {
-    destroy = false
-  }
+  environment = "dev"
 }
 
 # ── API auth configuration ──────────────────────────────────────
