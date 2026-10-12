@@ -61,6 +61,7 @@ and ask; don't invent a workaround.
 | `terraform plan` / `apply` against `infra/envs/*` | **Yes** — Go SDK can't read the session |
 | `docker` build **push** to ECR | **Yes** — plus `aws ecr get-login-password \| docker login …` first |
 | Anything via a language SDK (boto3 script, etc.) with no other creds | **Yes** |
+| A long-running local **container** (the API's / admin's `dev-up.sh`) | **No — never export into one.** An exported set is a snapshot and expires mid-run (`ExpiredTokenException`). `dev-up.sh` keeps a host-refreshed `credential_process` file mounted instead; `scripts/README.md` § *Credentials in a container* |
 | **Anything in CI / GitHub Actions** | **No, and never export** — CI assumes an OIDC role; there are no static keys anywhere |
 
 CI is a different mechanism entirely: workflows authenticate through the

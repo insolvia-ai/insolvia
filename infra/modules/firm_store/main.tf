@@ -134,6 +134,13 @@ resource "aws_iam_role_policy" "api_firm_access" {
         # exactly as it is for the case table (see modules/case_store) and for
         # the same reason ADR 0001 gives: one execution role, one trust
         # boundary, enforcement in code that can be read and tested.
+        #
+        # ConditionCheckItem: linking a debtor to a client, and opening a case
+        # for one, carry a ConditionCheck on the client's row HERE inside the
+        # case table's TransactWriteItems (cross-table) — the write's own
+        # condition that the client is not being merged away
+        # (insolvia_core.client_merge). IAM authorises a transaction by the
+        # per-item actions it contains, so this is the whole grant it needs.
         Sid    = "FirmDirectory"
         Effect = "Allow"
         Action = [
@@ -143,6 +150,7 @@ resource "aws_iam_role_policy" "api_firm_access" {
           "dynamodb:UpdateItem",
           "dynamodb:DeleteItem",
           "dynamodb:BatchGetItem",
+          "dynamodb:ConditionCheckItem",
         ]
         Resource = [
           aws_dynamodb_table.firms.arn,

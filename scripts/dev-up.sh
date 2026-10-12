@@ -11,9 +11,9 @@
 #   ./apps/insolvia_app/scripts/dev-up.sh
 #
 # This script starts and stops NOTHING itself. Every area owns a dev-up.sh
-# that knows how to run its own thing (the API's exports short-lived AWS
-# credentials before `compose up`; the app's pins port 3000 because Cognito
-# registers that exact origin) and a dev-down.sh that knows how to stop it
+# that knows how to run its own thing (the API's keeps its container's
+# short-lived AWS credentials refreshed while `compose up` runs; the app's
+# pins port 3000 because Cognito registers that exact origin) and a dev-down.sh that knows how to stop it
 # (compose containers outlive the process that started them; a stray npx
 # grandchild keeps holding 3000). Both halves of that knowledge belong next to
 # the thing they describe. This file is an orchestrator: preflight, launch,

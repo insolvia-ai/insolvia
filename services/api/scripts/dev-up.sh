@@ -7,11 +7,15 @@
 #
 # REQUIRES the per-machine AWS layer: ./scripts/dev-aws-setup.sh provisions
 # the table (infra/envs/dev) and writes services/api/.env with
-# WAITLIST_TABLE_NAME + AWS_PROFILE. Before `up`, this script exports
-# short-lived credentials from that profile into the shell (compose
-# substitutes them into the container; shell env beats .env) and forces a
-# recreate so an existing container never keeps expired credentials.
-# Credentials are never written to a file.
+# WAITLIST_TABLE_NAME + AWS_PROFILE. The container never sees that profile
+# or a snapshot of keys: this script writes short-lived credentials from it
+# to a 0600 file under ~/.cache/insolvia/aws-container/api (never the repo),
+# keeps rewriting it from the host for as long as compose runs, and the
+# container reads it through a generated `credential_process` config that
+# botocore re-runs before each set expires — so a run longer than the
+# session's credential lifetime keeps working
+# (start_container_aws_credentials in scripts/dev-aws-common.sh says why it
+# is not a ~/.aws mount). The file is removed when compose exits.
 #
 set -euo pipefail
 
@@ -40,11 +44,12 @@ region_from_env="$(sed -n 's/^AWS_DEFAULT_REGION=//p' "$env_file" | tail -n 1)"
 [[ -n "$region_from_env" ]] && AWS_REGION_VALUE="$region_from_env"
 
 for command in aws jq; do require_command "$command"; done
-log "Exporting short-lived credentials from AWS profile '$AWS_PROFILE_VALUE' for the per-machine waitlist table."
-export_temporary_aws_credentials
+log "Refreshing short-lived credentials from AWS profile '$AWS_PROFILE_VALUE' for the API container."
+start_container_aws_credentials api
 export AWS_DEFAULT_REGION="$AWS_REGION_VALUE"
 
 cd "$API_DIR"
-# Credentials are injected environment values: always replace any existing
-# container so it cannot hold an expired set.
+# Recreate so a container from before this mechanism (which held a static
+# key set in its environment) never survives into this run. exec keeps this
+# PID, which is what the refresh loop watches.
 exec docker compose up --build --force-recreate "$@"

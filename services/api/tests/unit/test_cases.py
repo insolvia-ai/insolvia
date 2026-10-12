@@ -60,7 +60,7 @@ from insolvia_core.firms import (
     default_permissions,
 )
 
-from tests.unit.opening import add_client, with_client
+from tests.unit.opening import add_client, claim_merge_after_read, with_client
 
 ISSUER = "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_EXAMPLE00"
 CLIENT_ID = "exampleappclientid000000"
@@ -148,8 +148,10 @@ def member(
 
 
 @pytest.fixture
-def debtors():
-    return MemoryDebtorStore()
+def debtors(firms):
+    # Composed with the firm store, as the API is: a link and a case open
+    # are conditional on the client row (the merge race).
+    return MemoryDebtorStore(firm_store=firms)
 
 
 @pytest.fixture
@@ -1154,6 +1156,29 @@ def test_an_archived_client_is_restored_before_a_case_is_opened_for_them(client)
     )
     assert response.status_code == 400
     assert "archived" in response.get_json()["fields"]["client_ids"]
+
+
+def test_a_case_opened_for_a_client_a_merge_claimed_after_the_read_is_refused(
+    client, firms, store, monkeypatch
+):
+    """`CaseStore.create`'s condition on the client row: the route read the
+    client active, a merge claimed it, then the case's transaction ran. The
+    same 400 the read check gives, and no case."""
+    client_id = add_client(client, auth(ALICE))
+    survivor = add_client(client, auth(ALICE), name={"given": "Jordan B."})
+    claim_merge_after_read(
+        monkeypatch, firms, firm_id=FIRM_A, merged_id=client_id, survivor_id=survivor
+    )
+
+    response = client.post(
+        "/v1/cases", json={**TAMPA, "client_ids": [client_id]}, headers=auth(ALICE)
+    )
+
+    assert response.status_code == 400
+    assert response.get_json()["fields"] == {
+        "client_ids": "That client is being merged into another client."
+    }
+    assert store.cases == {}
 
 
 def test_opening_a_case_needs_the_client_directory_too(client, firms):

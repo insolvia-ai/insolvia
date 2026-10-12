@@ -5,8 +5,10 @@
 # and the container talks to this machine's REAL per-developer AWS resources
 # (scripts/dev-aws-setup.sh writes services/admin/.env once the dev audit
 # table exists — issue #213); unset, the in-memory adapters run and the
-# service works standalone. AWS credentials arrive from the shell (dev-up.sh
-# exports short-lived ones), never from a file.
+# service works standalone. AWS credentials are the API's mechanism: dev-up.sh
+# keeps a host-refreshed credentials file and a credential_process config in
+# ~/.cache/insolvia/aws-container/admin, mounted read-only below, so they never
+# expire under a running container.
 services:
   admin:
     build:
@@ -29,9 +31,9 @@ services:
       # The environment's Google OAuth client id (#209) — a public value.
       # Unset fails CLOSED: every staff route 401s, /health keeps working.
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
-      AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}
+      AWS_CONFIG_FILE: /run/insolvia-aws/config
       AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-us-east-1}
+    volumes:
+      - ${HOME}/.cache/insolvia/aws-container/admin:/run/insolvia-aws:ro
     ports:
       - "127.0.0.1:8090:8090"
