@@ -52,6 +52,17 @@ Durable decisions that stay expensive to re-litigate. See
 [`adr/README.md`](adr/README.md) for the register and the numbering rule.
 Shorter-lived planning decisions live as `D<n>` entries in [`plan.md`](plan.md).
 
+## [`research/`](research/) — dated audits and investigations
+
+Point-in-time findings, each named with its date and citing the owner of
+every fact it reports. They own nothing: what they find is fixed in its owner
+(usually `plan.md` or an ADR), and the file stays as the record of what was
+found when.
+
+| Doc | What |
+|---|---|
+| [`decision-status-2026-10-13.md`](research/decision-status-2026-10-13.md) | What is decided, superseded, half-built and open across `plan.md`, the ADRs, the business plan and the open issues — with the inconsistencies between them, since fixed in their owners. |
+
 ## [`agents/`](agents/) — config for the engineering skills
 
 Read by the mattpocock skills (`triage`, `to-tickets`, `to-spec`, `wayfinder`, …), not
