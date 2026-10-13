@@ -242,13 +242,7 @@ terraform_output_json() {
 # insolvia-services' (its infra/envs/dev, applied there by a human,
 # ADR 0026) and this repo only READS it, through the SSM contract
 # /insolvia/dev/auth/* — so nothing here needs that repository checked out.
-#
-# Its sign-in page's style is insolvia-services' too (ADR 0026, amended
-# 2026-10-12). infra/envs/dev-shared, which used to own it, is RETIRING: it now
-# only lets go of the styles in its one shared state (removed, destroy =
-# false), so applying it on every run performs that hand-over once and is a
-# no-op after. Delete apply_dev_shared and its call with that root.
-SHARED_TF_DIR="$REPO_ROOT/infra/envs/dev-shared"
+# Its sign-in page's style is insolvia-services' too (ADR 0026, amended).
 SHARED_POOL_NAME="insolvia-dev-users"
 SHARED_CONTRACT_PATH="/insolvia/dev/auth"
 
@@ -257,15 +251,6 @@ SHARED_CONTRACT_PATH="/insolvia/dev/auth"
 require_shared_pool() {
   aws_dev ssm get-parameter --name "$SHARED_CONTRACT_PATH/user-pool-id" --query Parameter.Value --output text >/dev/null 2>&1 ||
     die "The shared development pool's contract ($SHARED_CONTRACT_PATH/*) does not exist yet. It is insolvia-services' infra/envs/dev; from a checkout of that repository, run scripts/apply-dev-auth.sh once (insolvia-services' docs/runbooks/auth-state-migration.md § Shared dev pool), then re-run this."
-}
-
-apply_dev_shared() {
-  require_shared_pool
-  log "Retiring infra/envs/dev-shared (hands the shared pool's branding to insolvia-services; a no-op once done)"
-  terraform -chdir="$SHARED_TF_DIR" init -reconfigure -input=false >/dev/null
-  local args=(apply -input=false)
-  [[ "${AUTO_APPROVE:-0}" -eq 1 ]] && args+=(-auto-approve)
-  terraform -chdir="$SHARED_TF_DIR" "${args[@]}"
 }
 
 # ── Local env-file editing ──────────────────────────────────────

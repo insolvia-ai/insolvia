@@ -5,8 +5,7 @@
 # emulator): the compose stack's API talks to the real
 # per-machine waitlist table this script creates. Sign-in uses the ONE shared
 # development pool (insolvia-services', ADR 0026 — its sign-in page's style
-# too), read through SSM; this script checks the pool exists, applies the
-# retiring infra/envs/dev-shared (a one-time hand-over, then a no-op), then
+# too), read through SSM; this script checks the pool exists, then applies
 # this machine's own stack. services/api/scripts/dev-setup.sh
 # chains into this script unconditionally.
 #
@@ -107,11 +106,11 @@ if [[ "$CHECK_ONLY" -eq 1 ]]; then
   exit 0
 fi
 
-# dev-shared's one-time hand-over of the shared pool's branding (a no-op once
-# done). This root reads the pool's contract at plan time; on a machine set up
-# before ADR 0026 its plan also DESTROYS the old per-machine pool, which the
-# shared one replaces (run scripts/dev-aws-seed.sh afterwards).
-apply_dev_shared
+# This root reads the shared pool's contract at plan time, so check it exists
+# first and fail by name. On a machine set up before ADR 0026 the plan also
+# DESTROYS the old per-machine pool, which the shared one replaces (run
+# scripts/dev-aws-seed.sh afterwards).
+require_shared_pool
 
 terraform_init
 apply_args=(apply -input=false "${TF_VARS[@]}")
