@@ -30,10 +30,19 @@ not against this file.
 - **Advice is UPL even when free.** The same Maryland court reportedly held
   that one Upsolve feature — filling in an exemption statute for the user —
   was UPL under Maryland law [S5 — secondary, not confirmed in the opinion].
-- **What a preparer may not do removes Insolvia's differentiators**: the
-  exemption engine (ADR 0017's data), Claude's petition review (ADR 0019),
-  filing on the debtor's behalf (ADR 0024) and handling the court fee
-  (ADR 0024 PR 11) [S2].
+- **What a preparer may not do removes Insolvia's differentiators** (§6):
+  of the case engine's judgment-bearing features, only form typing, the
+  creditor matrix and extraction survive a paid no-attorney posture intact;
+  the exemption workbench, the means-test conclusion, the lien split, the
+  Chapter 13 calculator, Claude's petition review and the deadline calendar
+  all touch §110(e)(2)'s list, and filing on the debtor's behalf (ADR 0024)
+  and handling the court fee (PR 11) are barred outright [S2].
+- **It also reaches past features** (§6.2): Insolvia's support staff, a fee
+  ceiling per district, an officer's SSN on every petition, two official forms
+  not in `forms/specs/`, the marketing copy, and the word *preparer*, which the
+  code already uses for firm staff.
+- **Under an attorney posture almost everything built survives** — the firm /
+  client / case model (ADRs 0009, 0022, 0023) is already that posture's shape.
 - **Postures that avoid §110 exist** (§5): an attorney makes the legal
   judgments; the debtor pays nothing; or a non-lawyer-owned legal entity
   where a state allows one. The first makes firms the *delivery channel* for
@@ -144,14 +153,102 @@ product is "a self-filer buys Insolvia and gets an attorney through it", firms
 are the delivery channel, and a model where self-filers and firms are both
 first-class is a legal requirement, not only a design preference.
 
-## 6. Bearing on existing decisions
+## 6. Impact on Insolvia
 
-| Decision | Exposure if paid Insolvia is a §110 preparer |
-|---|---|
-| ADR 0017 (FL/TX/GA exemption data) | Choosing or characterising exemptions is listed advice (§110(e)(2)) and was UPL in *Reynoso* [S1] and, reportedly, Maryland [S5]. Texas and Florida are in the 5th and 11th Circuits; *Reynoso* is persuasive there, not binding. |
-| ADR 0019 (Claude reviews the petition) | Tailored review of a self-filer's petition is advice-shaped. |
-| ADR 0024 (Insolvia files) | §110(e)(1) bars executing documents for the debtor; the attorney CM/ECF login it rides on does not exist for a self-filer. |
-| ADR 0024 PR 11 (court fee) | §110(g) bars a preparer from collecting the filing fee. |
+Checked against the tree at `6f65824` (main, 2026-10-13). The exposure
+column is this file's reading of §110 [S2], *Reynoso* [S1] and the Maryland
+summary [S5] — an input to the attorney's opinion, not a substitute for it.
+Florida, Texas and Georgia sit in the 5th and 11th Circuits, where *Reynoso*
+is persuasive, not binding.
+
+### 6.1 Feature by feature
+
+Postures are §5's: **A** an attorney makes the legal judgments, **B** free to
+the self-filer, **C** paid forms software with no attorney. Exposure is under
+**C** unless a cell says otherwise. Under **A** every row is ordinary firm
+software, which is what it was built as.
+
+| Feature | Where | What it does for a self-filer | Exposure under C | Under B |
+|---|---|---|---|---|
+| Intake and form assembly | `core/packet_assembly.py`, `core/form_fill.py`, `forms/specs/` | Turns the debtor's answers into B101, the B106 schedules, B107, B108, B121 | **This alone makes paid Insolvia a preparer** — it is *Reynoso*'s "translated that information into responses" [S1]. Not UPL while it only types. | Not a preparer. Low. |
+| Creditor matrix | `core/creditor_matrix.py` | Formats the debtor's creditors for the court | Clerical. Low. | Low. |
+| Extraction | `core/extraction.py`, `core/extraction_review.py` | Reads credit reports and pay stubs into candidates the debtor confirms | Mostly data entry. **Classifying** a debt (secured, priority, unsecured) is characterising it, §110(e)(2)(B)(vi). Medium. Still gated on ZDR (ADR 0019). | Same UPL point. |
+| Exemption data and Schedule C workbench | `core/exemptions.py`, `core/exemption_analysis.py` (ADR 0017) | Resolves the opt-out rule, lists the statutes this case "may claim", shows the room left on each and the unexempt equity per asset | **High.** The code already chooses nothing ("nothing here chooses a statute for an asset"), but listing which exemptions fit *this* debtor's asset is the narrowing the Maryland court reportedly called advice [S5], and whether the debtor keeps the property is §110(e)(2)(B)(iii). Texas's federal-or-state election is a pure legal choice with no default — the module leaves it to "the preparer", who in C is the debtor alone. | **High** — the feature Upsolve reportedly lost on [S5]. |
+| Means test | `core/means_test.py`, `core/means_test_trace.py`, `core/cmi.py` | Computes B122A-1/A-2, ending in the presumption of abuse | Computing the official form's lines is close to typing. Presenting the **result** — "you qualify for Chapter 7" — is advice on which chapter, §110(e)(2)(B)(i). Medium-high; turns on presentation. | Medium. |
+| Lien arithmetic | `core/liens.py` | Splits each secured claim into secured and unsecured portions for B106D | Arithmetic over the debtor's values, but the split *is* a characterisation of debt, §110(e)(2)(B)(vi). Medium. | Medium. |
+| Chapter 13 plan calculator | `core/chapter13_plan.py` | Payment waterfall, feasibility, liquidation test | **High** — a plan proposal is legal strategy. Moot at launch if Chapter 13 is out of scope for self-filers. | High. |
+| AI petition review | `core/petition_review.py` (ADR 0019) | Claude flags inconsistencies, missing creditors, "SOFA answers that look like undisclosed transfers" | **High.** Tailored, per-case findings are *Reynoso*'s "personalized" advice [S1]; a possible fraudulent transfer is a legal conclusion. Its design premise, "the attorney disposes of the list", has no attorney to rest on. | High. |
+| Deadlines and calendar | `core/deadline_rules.py`, `core/deadlines.py` | Computes post-filing deadlines from the petition and §341 dates | General procedural information is safer than tailored advice, but "bankruptcy procedures and rights" is on the §110(e)(2)(B)(vii) list. Medium. | Medium. |
+| Filing set, checklist, automated filing | `core/filing_set.py`, `services/filing` (ADR 0024) | Orders and checks the packet; files under the attorney's CM/ECF login | **Barred.** §110(e)(1): no executing documents for the debtor. The attorney login does not exist. A self-filer's own e-filing route is a separate, unresearched question. The checklist survives as a document the debtor files themselves. | Filing for the debtor is still the debtor's own act to perform. |
+| Court fee | ADR 0024 PR 11 | Fee paid by the attorney at hand-back | **Barred.** §110(g): no collecting the filing fee. | — |
+| Client portal | `routes/portal*.py`, `insolvia_core/clients.py` (ADR 0023) | A debtor answers; the **firm** confirms into the case | The confirmer is gone: the self-filer would confirm their own answers, which inverts ADR 0023's principal model. **Under A this is the attorney-in-the-loop channel, already built.** | Same inversion. |
+| MCP server | `services/mcp` (ADRs 0013, 0016) | Firm staff work a case from an agent harness | Not a self-filer surface. Survives under A. | — |
+
+**Net under C:** typing, the creditor matrix and confirmed extraction
+survive. The exemption workbench, the means-test conclusion, the lien split,
+the Chapter 13 calculator, petition review and the deadline guidance must be
+removed or reduced to neutral information, and filing and fee handling go
+outright. **Under A** they all survive, and the remaining work is the legal
+and commercial structure plus routing a self-filer to a firm.
+
+### 6.2 Beyond the features
+
+- **Support becomes an advice channel.** Under C, an Insolvia employee who
+  answers "should I list this?" or "can I keep my car?" gives §110(e)(2)
+  advice, and an employee who corrects a self-filer's record through the
+  admin portal (`services/admin`, ADR 0011) is Insolvia making the choice.
+  Support scripts and admin write access to self-filer cases are in scope for
+  the posture decision, not just the product.
+- **Revenue is capped per district.** A preparer's fee is limited by each
+  district's guideline (Maryland: $125 presumptive [S6]); FL/TX/GA's ten
+  launch districts' caps are unknown. A violation costs the greater of $2,000
+  or twice the fee per debtor, and *Reynoso*'s seller disgorged **every** fee
+  from the district for twelve months [S1, S2]. Pricing is a regulatory input
+  under C, not a free business choice.
+- **An officer's SSN on every petition.** §110(c) requires the responsible
+  officer's SSN after the preparer's signature on every document [S2] —
+  printed on public court records for every self-filer case.
+- **Forms Insolvia does not have.** A preparer files a notice, declaration
+  and signature, and a fee disclosure, with the petition — Official Forms 119
+  and 2800 (numbers from memory; verify). Neither is in `forms/specs/`. Under
+  A the counterpart is B2030, the attorney's compensation disclosure, which
+  is already specified (`forms/specs/b2030.json`).
+- **Marketing copy.** §110(f) bars the word "legal" in a preparer's
+  advertising; the site has a "Legal" footer group, and its disclaimer says
+  Insolvia "does not provide legal advice" (`apps/insolvia_marketing`). The
+  copy also sells to firms ("MyCase-native", "your staff") and leans on AI
+  expertise — *Reynoso* penalised an "expert system" with an "aura of
+  expertise" [S1]. Under C the positioning has to invert: a typing service,
+  not an advisor.
+- **The word *preparer* collides.** `services/api` uses "preparer" for the
+  firm staff member preparing a case (31 occurrences in `core/`, e.g.
+  `core/cmi.py`, `core/exemption_analysis.py`). §110 makes "bankruptcy
+  petition preparer" a regulated legal status. The glossary the pivot creates
+  must keep the two apart.
+- **Confirm-before-entry still holds, but its meaning shifts.** The invariant
+  in `docs/reference/case-data-model.md` names a confirming human on every
+  machine-sourced field. Under C that human is the self-filer — which is the
+  legally safe reading — and never Insolvia staff.
+- **The domain model follows the posture.** Under A, a firm represents every
+  case and the model of ADRs 0009, 0022 and 0023 already fits; the new piece
+  is a self-filer who starts alone and is routed to a firm. Under B or C, a
+  case with **no firm** must exist, which supersedes ADR 0009 ("a case
+  belongs to a firm") and changes who confirms under ADR 0023.
+
+### 6.3 Decisions this reopens
+
+| Decision | Under C (paid, no attorney) | Under A (attorney) |
+|---|---|---|
+| ADR 0009 — a case belongs to a firm | Superseded: a case can have no firm. | Holds. |
+| ADR 0011 — staff as a separate principal | Holds, but staff write access to self-filer cases needs a rule (§6.2). | Holds. |
+| ADR 0013 / 0016 — MCP | Not a self-filer surface. | Holds. |
+| ADR 0017 — FL/TX/GA exemption data | Data survives; the workbench over it does not (§6.1). | Holds. |
+| ADR 0019 — Claude reviews the petition | Not offered to self-filers. | Holds. |
+| ADR 0022 — a client is not a case | A self-filer is a debtor with no firm-scoped client; the split needs a no-firm case. | Holds; the self-filer becomes a client on routing. |
+| ADR 0023 — client portal identity | The self-filer confirms their own answers; the principal model inverts. | Holds; becomes the main self-filer surface. |
+| ADR 0024 — Insolvia files under the attorney's login | Superseded for self-filers: no login, and §110(e)(1). | Holds. |
+| ADR 0024 PR 11 — the fee | Superseded: §110(g). | Holds. |
+| Business plan | Pricing capped per district; copy inverts. | Rewritten around a self-filer channel into firms. |
 
 ## 7. Not checked — open threads
 
