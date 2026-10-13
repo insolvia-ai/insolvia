@@ -254,6 +254,6 @@ settings (whitespace).
   three surfaces (app, admin portal, marketing) plus the app's favicon. The
   required check keeps its name, `Cognito branding`, for the ruleset.
 - ADR 0020's "four surfaces" is now three; its status records this.
-- `infra/envs/dev-shared` does nothing but the hand-over. Once its state is
-  empty, the root, its call in `scripts/dev-aws-common.sh` and its state
-  object are deleted.
+- `infra/envs/dev-shared` did nothing but the hand-over, and was deleted
+  with its call in `scripts/dev-aws-setup.sh` once every root had applied.
+  The `import` and `removed` blocks went at the same time.

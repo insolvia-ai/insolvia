@@ -538,8 +538,6 @@ What it owns is deliberately only what local dev consumes today:
   `/insolvia/dev/auth/*` — the same seam staging and prod read, so a laptop
   exercises it. Only identities are shared; every table here stays this
   machine's. The sign-in page's style is insolvia-services' too.
-  (`infra/envs/dev-shared` is a retiring root: it only hands that style over,
-  once, and is deleted when its state is empty.)
 - **Job queue** via the same `modules/job_pipeline` as staging/prod, worker
   half absent (`ecr_repository_url = null` — dev has no Lambda). The local
   API enqueues onto `insolvia-dev-<short-id>-jobs` (`JOB_QUEUE_URL` in

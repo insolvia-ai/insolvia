@@ -105,7 +105,7 @@ bootstrap is its
   `docs/reference/architecture.md` owns the full comparison.
 - **Before a large or risky change, dispatch the env's infra workflow with
   `mode: plan` and read it.** Both default to `plan`. `shared-infra-plan.yml`
-  (staging, prod, dev, dev-shared) only validates offline (`init -backend=false`), so it
+  (staging, prod, dev) only validates offline (`init -backend=false`), so it
   catches syntax and type errors but never shows what a change would *do*. Fine to skip for a routine
   change; not for a provider major-version bump or anything that might replace
   a resource.
