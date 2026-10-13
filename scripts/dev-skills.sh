@@ -163,7 +163,7 @@ link_from_primary() {
 # --- pruning ----------------------------------------------------------------
 #
 # Removing a skill from the lock is how one is uninstalled (gluestack-ui-v5,
-# expo-tailwind-setup, mattpocock's `pr`, `setup-pre-commit` and
+# expo-tailwind-setup, and mattpocock's `setup-pre-commit` and
 # `git-guardrails-claude-code` all were). But nothing above ever deletes, so on
 # a machine that had installed one it stays on disk, symlinked into
 # `.claude/skills/`, and the agent keeps loading it — the uninstall lands in the

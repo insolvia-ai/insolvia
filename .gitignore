@@ -136,6 +136,7 @@ storybook-static/
 .claude/skills/improve-codebase-architecture
 .claude/skills/loop-me
 .claude/skills/migrate-to-shoehorn
+.claude/skills/pr
 .claude/skills/prototype
 .claude/skills/research
 .claude/skills/retro
