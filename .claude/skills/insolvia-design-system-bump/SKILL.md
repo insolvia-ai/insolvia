@@ -11,7 +11,8 @@ description: >-
   packages live in github.com/insolvia-ai/design-system and reach this repo
   only as published versions. It covers which manifests and which THREE
   lockfiles must move together, and why a bump that skips `npm run tokens`
-  leaves the sign-in page's colours behind. Read it too when a surface suddenly
+  leaves one app's colours behind (the sign-in page's style is
+  insolvia-services' since 2026-10-12, and is updated there). Read it too when a surface suddenly
   renders monochrome, or to change a brand colour: the package's base theme is
   deliberately unbranded, and Insolvia's palette lives in brand/colors.json.
 ---
@@ -74,8 +75,8 @@ npm run tokens
 ```
 
 Commit whatever that writes. `npm run tokens:check` is a required PR check
-(`Cognito branding` — the job kept its name after it grew), and it fails on a
-bump that did not regenerate.
+(`Cognito branding` — the job kept its name, though Cognito's page left for
+insolvia-services), and it fails on a bump that did not regenerate.
 
 **`brand/colors.json` is where Insolvia's colours live**
 ([ADR 0020](../../../docs/adr/0020-the-brand-is-a-consumer-owned-override.md)),
@@ -86,7 +87,7 @@ empty seam is the package's intent — a re-brand belongs to the consumer — so
 Insolvia's navy and brass are **overrides layered on top**, not package
 defaults.
 
-`npm run tokens` renders that palette into the four surfaces that cannot read
+`npm run tokens` renders that palette into the three surfaces that cannot read
 the JSON themselves:
 
 | Generated | Consumed by |
@@ -94,9 +95,14 @@ the JSON themselves:
 | `apps/insolvia_app/src/theme/brand-colors.ts` | the app — both `themeFor()` and the `ThemeProvider` that themes the package's `.native` leaves |
 | `apps/insolvia_marketing/app/styles/brand.css` | marketing, imported after the package's `theme.css` |
 | `apps/insolvia_admin/src/styles/brand.css` | the admin portal, same shape |
-| `infra/modules/auth/managed-login-settings.json` | Cognito's hosted sign-in page |
 
-**Never hand-edit one of those four** — the next `npm run tokens` overwrites it
+**The sign-in page is not one of them any more.** Cognito's managed-login style
+(colours, logo, tab icon) moved to insolvia-services with the rest of auth on
+2026-10-12 (ADR 0026), as checked-in files beside its `infra/modules/auth`. A
+bump that changes a brand colour needs a matching change there; nothing here
+checks it.
+
+**Never hand-edit one of those three** — the next `npm run tokens` overwrites it
 and the drift check fails in between. Change `brand/colors.json` and regenerate.
 
 Two things that follow, and are easy to get wrong:
@@ -111,8 +117,8 @@ Two things that follow, and are easy to get wrong:
   emitting them would freeze a live derivation. React Native has no blend and
   needs them stated. `tool/brand-palette.ts`'s `DERIVED` owns that split.
 
-Skipping the regeneration leaves the sign-in page — or one app — on a different
-palette from the rest, and nothing else in the tree would say so.
+Skipping the regeneration leaves one app on a different palette from the
+rest, and nothing else in the tree would say so.
 
 ## Then verify, locally
 

@@ -1,6 +1,9 @@
 # ADR 0020 — The brand is a consumer-owned override, generated from one file
 
-- **Status:** Accepted
+- **Status:** Accepted — amended 2026-10-12 by
+  [ADR 0026](0026-auth-is-a-shared-service.md): Cognito's sign-in page is no
+  longer a generated surface. Its style moved to insolvia-services with the
+  rest of auth, as checked-in files; three surfaces remain generated here.
 - **Date:** 2026-09-05
 - **Relates to:** follows from
   [ADR 0010](0010-design-system-moves-to-its-own-repository.md) — the design

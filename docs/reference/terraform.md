@@ -19,8 +19,7 @@ infra/
 │   ├── api_service/          # reusable: Docker Lambda + alias + HTTP API + custom domain
 │   │                         #   + waitlist DynamoDB + SSM config namespace + alarms
 │   ├── auth/                 # the CONSUMER half of auth (ADR 0026): the contract
-│   │                         #   reader below + this app's branding on its
-│   │                         #   clients + its roles' AdminCreateUser grants
+│   │                         #   reader below + its roles' AdminCreateUser grants
 │   ├── auth_contract/        # reads insolvia-services' SSM contract
 │   │                         #   /insolvia/<env>/auth/* (the pool's identifiers)
 │   ├── case_store/           # GLBA-scope case data: customer-managed KMS key +
@@ -200,8 +199,9 @@ lives in the case table — this module owns no store.
 **The Cognito pools are not in this repo.** The pool for each environment
 (`insolvia-<env>-users`), its hosted domains (the prefix
 `insolvia-<env>-auth.auth.us-east-1.amazoncognito.com`, and on staging
-`staging-auth.insolvia.ai`) and its app clients (`-app`, `-portal`,
-`-mcp-<harness>`) are insolvia-services' `infra/modules/auth`. They are
+`staging-auth.insolvia.ai`, `dev-auth.insolvia.ai`), its app clients (`-app`,
+`-portal`, `-mcp-<harness>`) and the sign-in page's style are
+insolvia-services' `infra/modules/auth`. They are
 applied from its `infra/envs/{staging,prod}`, and — for development — as ONE
 shared pool, `insolvia-dev-users`, from its `infra/envs/dev`
 ([ADR 0026](../adr/0026-auth-is-a-shared-service.md)). That module's header
@@ -215,7 +215,7 @@ that reads the result.
 names (`user_pool_id`, `user_pool_arn`, `web_client_id`, `portal_client_id`,
 `domain`, `issuer_url`, `mcp_client_ids`, `mcp_client_ids_by_harness`). Every
 env root, SSM parameter and deploy workflow reads it exactly as before. It
-does three things:
+does two things:
 
 - **Reads the pool's identifiers from SSM**, through `modules/auth_contract`:
   `/insolvia/<env>/auth/{user-pool-id,user-pool-arn,client-id,portal-client-id,domain,issuer-url,mcp-client-ids}`,
@@ -224,10 +224,6 @@ does three things:
   the custom domain wherever one exists, decided there, so a new one moves the
   app on its next build with no change here; `mcp-client-ids` is the MCP
   allowlist, so a harness registered there is allowed here.
-- **Renders this app's managed-login branding** onto its two clients
-  (`aws_cognito_managed_login_branding.web` / `.portal`). Branding is per
-  client and generated from this repo's brand by `npm run tokens`, so it stays
-  with the consumer ([ADR 0020](../adr/0020-the-brand-is-a-consumer-owned-override.md)).
 - **Grants this repo's Lambda roles their one action** on the pool
   (`aws_iam_role_policy.api_invite` / `.admin_invite`: `AdminCreateUser`,
   scoped to the pool's ARN). The module header explains why it is one action.
@@ -541,10 +537,9 @@ What it owns is deliberately only what local dev consumes today:
   applied there by a human), read through `modules/auth_contract` from
   `/insolvia/dev/auth/*` — the same seam staging and prod read, so a laptop
   exercises it. Only identities are shared; every table here stays this
-  machine's. The pool's branding has one owner, `infra/envs/dev-shared` (one
-  state key, `insolvia/dev-shared/terraform.tfstate`), which
-  `scripts/dev-aws-setup.sh` applies before this root on every machine — a
-  client carries one style, so per-machine roots cannot each brand it.
+  machine's. The sign-in page's style is insolvia-services' too.
+  (`infra/envs/dev-shared` is a retiring root: it only hands that style over,
+  once, and is deleted when its state is empty.)
 - **Job queue** via the same `modules/job_pipeline` as staging/prod, worker
   half absent (`ecr_repository_url = null` — dev has no Lambda). The local
   API enqueues onto `insolvia-dev-<short-id>-jobs` (`JOB_QUEUE_URL` in

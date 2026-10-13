@@ -178,10 +178,10 @@ resource "aws_ssm_parameter" "mailer_api_url" {
 # Auth (#65): the CONSUMER half of the staging pool. The pool, its domains
 # (staging-auth.insolvia.ai) and its app clients — including the localhost:3000
 # dev origin staging registers for local web dev — are insolvia-services'
-# (infra/envs/staging, module.auth) since ADR 0026. This reads them from its SSM contract
-# (/insolvia/staging/auth/*, modules/auth_contract),
-# renders this app's managed-login branding onto its two clients, and grants
-# this repo's two Lambda roles their one action on the pool.
+# (infra/envs/staging, module.auth) since ADR 0026, and so is the sign-in
+# page's style. This reads them from its SSM contract (/insolvia/staging/auth/*,
+# modules/auth_contract) and grants this repo's two Lambda roles their one
+# action on the pool.
 #
 # The localhost:3000 callback and `npx expo start --web --port 3000` are still
 # one contract — now across two repositories.
@@ -201,28 +201,26 @@ module "auth" {
   admin_invite_role_name = module.admin_service.lambda_role_name
 }
 
-# One-time adoption of the branding style that already exists in staging.
-#
-# It was created by hand (`aws cognito-idp create-managed-login-branding`) to
-# restore sign-in: managed login was switched on before any style existed, and
-# an app client with no style does not fall back to defaults — Cognito serves
-# "Login pages unavailable" and sign-in is simply down. That style is what the
-# console branding editor has been editing since.
-#
-# An `import` block rather than a CLI `terraform import`, because staging is
-# only ever applied by CI (infra/CLAUDE.md) and an import block is declarative:
-# CI adopts the existing style on the next apply instead of trying to CREATE
-# one, which AWS rejects with ManagedLoginBrandingExistsException when the
-# client already has a style.
-#
-# Staging-only. Prod has no style yet, so prod's apply creates one from the same
-# committed settings — no import, and nothing to adopt.
-#
-# Safe to delete once this has applied; it is idempotent, so leaving it costs
-# nothing but noise.
-import {
-  to = module.auth.aws_cognito_managed_login_branding.web
-  id = "us-east-1_M3y3AxIit,b978dad0-ece6-4262-9484-caa7b9bc8d73"
+# The sign-in page's style (the managed-login branding of the web and portal
+# clients) moved to insolvia-services on 2026-10-12 (ADR 0026, amended): it is
+# auth's, so it lives with the pool. That repo ADOPTS the live styles with
+# `import` blocks; these let go of them here WITHOUT deleting them — a delete
+# would take sign-in down until the other side re-created them. Either side
+# may apply first. Delete these once this root has applied them.
+removed {
+  from = module.auth.aws_cognito_managed_login_branding.web
+
+  lifecycle {
+    destroy = false
+  }
+}
+
+removed {
+  from = module.auth.aws_cognito_managed_login_branding.portal
+
+  lifecycle {
+    destroy = false
+  }
 }
 
 # Publish the pool's issuer and web app client id into the API's own SSM

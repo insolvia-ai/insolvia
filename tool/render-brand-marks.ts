@@ -14,11 +14,10 @@
 // baked in is a logo that survives the next re-brand.
 //
 // WHY THE FILES EXIST AT ALL. Everywhere the app itself renders the mark, it
-// renders the `Wordmark` COMPONENT and no file is involved. These copies are
-// for the two places a component cannot reach: Cognito's managed-login page,
-// which serves the logo as an <img> from AWS's own origin, and the favicon,
-// which has no document to inherit anything from. Both are outside React, and
-// both are the first thing a user sees.
+// renders the `Wordmark` COMPONENT and no file is involved. The copy here is
+// for the one place a component cannot reach: the favicon, which has no
+// document to inherit anything from. (Cognito's managed-login page was the
+// other, until its marks became insolvia-services' on 2026-10-12, ADR 0026.)
 //
 // WHY THE RASTERS ARE NOT HERE. `favicon.ico` and the PWA icons are pixels,
 // and pixels cannot defer a colour to render time, so the cutter bakes the
@@ -30,25 +29,19 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { BRAND, MODES, palette, repoRoot } from './brand-palette.ts';
+import { BRAND, palette, repoRoot } from './brand-palette.ts';
 import type { Mode, Palette } from './brand-palette.ts';
 
 const REGEN_COMMAND = 'npm run tokens';
 const CUTTER = 'scripts/render-brand-marks.sh';
 
 /**
- * A mark's paths, by `id`, mapped to the semantic role each one wears.
+ * A mark's paths, by `id`, mapped to the semantic role each one wears —
+ * semantic roles only, never palette names, so a re-brand moves the mark
+ * without anything here being edited. (A WORDMARK recipe sat here too while
+ * this tool coloured Cognito's logo; it left with that output on 2026-10-12
+ * and is in git history if the sign-in page's marks are ever re-cut.)
  *
- * Semantic roles only, never palette names — the same rule the Cognito
- * reconciler follows, and for the same reason: a re-brand should move the mark
- * without anything here being edited.
- */
-const WORDMARK = {
-  source: 'brand/wordmark.svg',
-  roles: { mark: 'brand', dot: 'accent' },
-} as const;
-
-/**
  * The icon is DARK IN BOTH SCHEMES, so it resolves its roles in the dark
  * palette whatever the viewer's browser is doing.
  *
@@ -67,23 +60,17 @@ const ICON = {
 /**
  * Where each coloured copy goes.
  *
- * Every one is committed. A generated file that is gitignored is absent from a
- * fresh clone, and Terraform reads two of these at plan time.
+ * Every one is committed: a generated file that is gitignored is absent from
+ * a fresh clone.
  */
 const OUTPUTS: ReadonlyArray<{
   readonly path: string;
-  readonly mark: typeof WORDMARK | typeof ICON;
+  readonly mark: typeof ICON;
   readonly mode: Mode;
 }> = [
-  // Cognito's managed-login page: the form's logo, one asset per colour mode,
-  // uploaded by infra/modules/auth/main.tf.
-  ...MODES.map((mode) => ({
-    path: `infra/modules/auth/wordmark-${mode}.svg`,
-    mark: WORDMARK,
-    mode,
-  })),
-  // …and its favicon, for the tab the sign-in page opens in.
-  { path: 'infra/modules/auth/favicon.svg', mark: ICON, mode: ICON.mode },
+  // (Cognito's managed-login page used to take two wordmarks and a favicon
+  // from here. Its marks are insolvia-services' since 2026-10-12, checked in
+  // beside its modules/auth — ADR 0026.)
   // The app's own favicon. The .ico beside it is the fallback for browsers
   // without SVG icon support, and comes from the cutter.
   { path: 'apps/insolvia_app/public/favicon.svg', mark: ICON, mode: ICON.mode },
@@ -142,7 +129,9 @@ function main(args: string[]): void {
  * Re-emit the mark as a MINIMAL document, with every path filled by the role
  * its `id` names.
  *
- * Rebuilt rather than string-patched, and that is Cognito's doing. It
+ * Rebuilt rather than string-patched, and that was Cognito's doing (its
+ * copies now live in insolvia-services, cut by this function); a minimal
+ * document is also the right favicon, so it stays. Cognito
  * sanitises an uploaded SVG against an allowlist and rejects the file outright
  * — `InvalidParameterException: element [svg#role|aria-label] is not allowed`
  * — for anything outside it, including the `role="img"` and `aria-label` the
@@ -166,7 +155,7 @@ function main(args: string[]): void {
  */
 function render(
   source: string,
-  mark: typeof WORDMARK | typeof ICON,
+  mark: typeof ICON,
   colors: Palette,
   mode: Mode,
   out: string,

@@ -1,11 +1,12 @@
 // Insolvia's colour palette: the installed `@insolvia-ai/tokens`, with
 // `brand/colors.json` layered on top.
 //
-// Shared by the two generators that consume it —
-// `reconcile-cognito-branding.ts` (the sign-in page) and `render-brand-theme.ts`
-// (the app, the marketing site, the admin portal). Neither reads the tokens
-// package directly any more, so there is exactly one answer in this repo to
-// "what colour is `primary`?" and all four surfaces are generated from it.
+// Shared by the generators that consume it — `render-brand-theme.ts` (the
+// app, the marketing site, the admin portal) and `render-brand-marks.ts` (the
+// app's favicon). Neither reads the tokens package directly, so there is
+// exactly one answer in this repo to "what colour is `primary`?". (Cognito's
+// sign-in page was a fourth surface until 2026-10-12; its style is
+// insolvia-services' now — ADR 0026.)
 //
 // ── Why a merge, and not simply our own palette ──────────────────────────────
 //

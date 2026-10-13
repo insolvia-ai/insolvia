@@ -5,6 +5,9 @@
   are all the maintainer's choices, made on review of the first draft. The
   cutover ran the same day: staging and prod moved with no resource changes
   on either side, and the shared dev pool is live on `dev-auth.insolvia.ai`.
+  **Amended the same day** (§ Amendment, at the end): the sign-in page's
+  style moved to insolvia-services as well. Rule 5 and the table's first
+  "stays here" row are superseded by it.
 - **Date:** 2026-10-11, revised 2026-10-12
 - **Amends:** [ADR 0025](0025-shared-infra-and-mailer-move-to-insolvia-services.md).
   Auth joins the list of what moves, and rule 1 gains a fourth cross-repo
@@ -75,7 +78,7 @@ Seven rules follow.
 4. **Grants live with the consumer.** This repo grants its own roles
    `AdminCreateUser` on the pool ARN it reads from the contract. The shared
    service never learns a consumer's role name.
-5. **The brand stays with the consumer.** Branding is set per app client, and
+5. *(Superseded by the Amendment.)* **The brand stays with the consumer.** Branding is set per app client, and
    the clients serve this app. The generator, its inputs (`brand/`) and its
    gate (`npm run tokens:check`, the `Cognito branding` check) do not move.
    The shared dev pool's branding has exactly one owner,
@@ -193,7 +196,8 @@ the prep PR) to insolvia's prod. The move script refuses otherwise.
 - **The shared dev pool applied by CI.** That is a workflow, a job and a
   check for a pool whose configuration almost never changes. humbugg
   applies its shared pool locally too. It is easy to add later.
-- **Move the whole module, branding and grants included.** The branding is
+- **Move the whole module, branding and grants included.** *(The branding
+  half of this was reversed by the Amendment; the grants half stands.)* The branding is
   generated here from this repo's brand. Moving its output either makes the
   generator write into another repo, with a gate that can no longer see the
   output, or needs a second `brand/` copy (the "two truths" that ADR 0010
@@ -209,3 +213,47 @@ the prep PR) to insolvia's prod. The move script refuses otherwise.
   configuration to match the live pool exactly on its first apply. The state
   move proves the same thing with a plan before anything is written, and
   restores automatically if it does not.
+
+## Amendment (2026-10-12): the sign-in page's style is auth's too
+
+**The managed-login branding of every pool's app clients — the sign-in
+page's colours, its logo and its tab icon — moves to insolvia-services**,
+into its `infra/modules/auth` (`branding.tf`, with the settings document and
+three SVGs checked in beside it). Rule 5 above is superseded. The
+`AdminCreateUser` grants stay in this repo; rule 4 stands.
+
+**Why.** The maintainer's objection to the split was simple, and right: the
+sign-in page is a page *of* auth. Keeping its style here made "where is
+auth?" a two-repo answer, and it cost the one ordering guarantee that kept
+sign-in from going dark: the domains' `depends_on` on the styles, which
+cannot cross repositories. With the styles back beside the pool and clients,
+it is restored.
+
+**What that gives up, and where it goes next.** The styles were generated
+from this repo's `brand/` by `npm run tokens` and checked by `Cognito
+branding`. They are now hand-maintained files in insolvia-services, with
+nothing comparing them to the app's palette. The maintainer's direction is
+that **brand consistency belongs to the design system**: once
+`@insolvia-ai/tokens` carries Insolvia's brand, insolvia-services can render
+these files from the published package, as any consumer does, and regain the
+check without either repo reading the other. Until then a re-brand updates
+them there by hand.
+
+**How it moved.** Not a state move: insolvia-services' env roots adopt the
+live styles with `import` blocks (id `<pool id>,<branding id>`), and this
+repo's staging, prod and retiring `infra/envs/dev-shared` let go with
+`removed { … destroy = false }`. Either side may apply first, and nothing is
+deleted at any point. A delete-and-create would have left a window where
+Cognito served "Login pages unavailable". Read-only plans before merging:
+insolvia forgets 2 per root, 0 to add/change/destroy; insolvia-services
+imports 2 per root, with an in-place update that only re-sends the same
+settings (whitespace).
+
+**Consequences.**
+- `tool/reconcile-cognito-branding.ts` is gone. `npm run tokens` renders
+  three surfaces (app, admin portal, marketing) plus the app's favicon. The
+  required check keeps its name, `Cognito branding`, for the ruleset.
+- ADR 0020's "four surfaces" is now three; its status records this.
+- `infra/envs/dev-shared` does nothing but the hand-over. Once its state is
+  empty, the root, its call in `scripts/dev-aws-common.sh` and its state
+  object are deleted.

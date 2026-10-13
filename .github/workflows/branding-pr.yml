@@ -1,34 +1,21 @@
 name: Cognito branding · PR
 
 # The drift gate for every surface generated from Insolvia's brand palette:
-# the colours of Cognito's hosted sign-in page
-# (infra/modules/auth/managed-login-settings.json), the app's ThemeProvider
-# overrides, and the marketing site's and admin portal's brand.css.
+# the app's ThemeProvider overrides and favicon, and the marketing site's and
+# admin portal's brand.css.
 #
-# The job KEEPS the name `Cognito branding` even though it now gates more than
-# Cognito. `protect-main` matches a required check by exact name (see the
-# insolvia-branch-protection skill), so renaming it here silently orphans the
-# gate on `main` — a rename has to be made in the ruleset first.
+# The job KEEPS the name `Cognito branding` although it no longer gates
+# anything of Cognito's. `protect-main` matches a required check by exact name
+# (see the insolvia-branch-protection skill), so renaming it here silently
+# orphans the gate on `main` — a rename has to be made in the ruleset first.
+# Cognito's sign-in page was the surface this check was first written for; its
+# style moved to insolvia-services with the rest of auth on 2026-10-12 (ADR
+# 0026, amended), as checked-in files beside its modules/auth.
 #
-# It used to be a step inside design-system-pr.yml, because the token generator
-# that wrote this file lived in packages/insolvia_tokens next door. Both left
-# for github.com/insolvia-ai/design-system, and the gate could not go with
-# them: the file they gate is this repo's infrastructure, and a published
-# package must not reach into a consumer's tree. So the reconciler stayed
-# (tool/reconcile-cognito-branding.ts) and it now checks the committed document
-# against the INSTALLED @insolvia-ai/tokens rather than against a tokens.json
-# this repo no longer has.
-#
-# That makes the gate strictly stronger than the one it replaces. It fails on a
-# hand-edit, as before — and it also fails when @insolvia-ai/tokens is bumped
-# in package.json without regenerating, which is the new way for the sign-in
-# page to silently fall out of step with the app.
-#
-# Since the design system's base theme became deliberately unbranded (tokens
-# 0.5.0), it gates a second input too: brand/colors.json, which is where
-# Insolvia's navy and brass now live. Four surfaces are generated from it and
-# none of them share an import, so this check is the only thing that can notice
-# one falling behind the other three.
+# It checks the committed outputs against the INSTALLED @insolvia-ai/tokens
+# and against brand/ (colors, fonts, radii, marks): it fails on a hand-edit,
+# and when a tokens bump lands without regenerating. The surfaces share no
+# import, so this check is the only thing that can notice one falling behind.
 #
 # No `on.pull_request.paths:` filter, deliberately — see
 # `.github/actions/changed-paths/action.yml`. This job is a required status
@@ -65,10 +52,6 @@ jobs:
         with:
           paths: |
             # The documents under gate, and the tools that write them.
-            infra/modules/auth/managed-login-settings.json
-            infra/modules/auth/wordmark-light.svg
-            infra/modules/auth/wordmark-dark.svg
-            infra/modules/auth/favicon.svg
             apps/insolvia_app/src/theme/brand-colors.ts
             apps/insolvia_app/public/favicon.svg
             apps/insolvia_marketing/app/styles/brand.css

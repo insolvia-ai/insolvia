@@ -6,8 +6,7 @@
 //
 // `--check` renders in memory and exits non-zero if a committed output has
 // drifted, so CI gates both a hand-edit and a palette change that forgot to
-// regenerate. Same contract as `reconcile-cognito-branding.ts`, which handles
-// the fourth surface (Cognito's hosted sign-in page).
+// regenerate. Same contract as `render-brand-marks.ts`.
 //
 // ── Why generate at all ─────────────────────────────────────────────────────
 //
