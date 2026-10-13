@@ -10,7 +10,7 @@ Two layers — a shared base plus thin per-package scripts:
 | Script | Scope | Does |
 |---|---|---|
 | `scripts/dev-setup.sh` | Shared base (all packages) | Terraform, tflint, AWS CLI, jq, Node.js (>= 24), Watchman, Python 3.12 (+ Docker check), **the root npm workspace** (the pre-commit hook runs `prettier`/`eslint` from it), **and the agent skills in `.agents/skills/`** — installed from `skills-lock.json`, not committed (see below) |
-| `scripts/dev-skills.sh` | Agent skills (all checkouts, **worktrees included**) | Makes the skills in `skills-lock.json` present in THIS checkout — both halves: the files under `.agents/skills/` and the `.claude/skills/<name>` symlinks that are what actually make an agent see them. In a **git worktree** it symlinks them from the primary checkout (offline, instant, and it leaves `skills-lock.json` alone); elsewhere, or when the primary has nothing to link, it installs from the network. `--link` never touches the network, `--install` forces a fresh install, `--check` reports. Called by `dev-setup.sh` and by the `SessionStart` hook, so a new worktree repairs itself |
+| `scripts/dev-skills.sh` | Agent skills (all checkouts, **worktrees included**) | Makes the skills in `skills-lock.json` present in THIS checkout — both halves: the files under `.agents/skills/` and the `.claude/skills/<name>` symlinks that are what actually make an agent see them. In a **git worktree** it symlinks them from the primary checkout (offline, instant, and it leaves `skills-lock.json` alone); elsewhere, or when the primary has nothing to link, it installs from the network. `--link` never touches the network, `--install` forces a fresh install, `--check` reports. Every mode but `--check` also deletes skills the lock no longer lists, so removing an entry uninstalls it everywhere. Called by `dev-setup.sh` and by the `SessionStart` hook, so a new worktree repairs itself |
 | `scripts/dev-env-files.sh` | Per-machine `.env` files (**worktrees**) | Makes the four gitignored env files `dev-aws-setup.sh` writes (`services/{api,admin,mcp}/.env`, `apps/insolvia_app/.env`) present in THIS checkout. In a **git worktree** it symlinks them from the primary checkout — a link, not a copy, so a re-provision in the primary is seen at once; in the primary it only reports. The list is read from the anchored `/<path>/.env` lines in `.gitignore`, which is where a new one is declared. `--link` (default) never overwrites a real file, `--check` reports. Run by the `SessionStart` hook, so a new worktree repairs itself |
 | `scripts/dev-up.sh` | Whole system | Brings the API, mailer, app and marketing site up together in one terminal by delegating to each area's own `dev-up.sh` (the mailer's from a sibling insolvia-services checkout — skipped, with the API recording mail in memory, when there is none); prefixed logs, and one Ctrl-C that runs every `dev-down.sh`. Takes no arguments — to run one part, run that part's own script |
 | `scripts/dev-down.sh` | Whole system | Stops everything `dev-up.sh` starts — containers included — for when Ctrl-C never got the chance: a closed terminal, a killed process, or a stack started from **another checkout** (ports and compose project names are machine-global, so one machine runs one stack). Delegates to each area's `dev-down.sh`; idempotent, and also what `dev-up.sh`'s own Ctrl-C trap runs |
@@ -117,6 +117,13 @@ To add one, install it and commit the resulting lock change:
 ```bash
 npx skills add <owner/repo> --skill <name> --agent universal --agent claude-code -y
 ```
+
+To remove one, delete its entry from `skills-lock.json` (and its
+`.claude/skills/<name>` line in `.gitignore`, for a mattpocock skill) and
+commit. Every `dev-skills.sh` run except `--check` then deletes anything on
+disk the lock no longer lists, so the uninstall reaches each machine at its
+next session rather than living in the lock alone; `--check` names the
+leftovers without touching them.
 
 Root [`CLAUDE.md`](../CLAUDE.md) carries the applicability table — which of the
 installed skills this repo actually follows, and which it deliberately ignores.

@@ -160,6 +160,51 @@ link_from_primary() {
   return 0
 }
 
+# --- pruning ----------------------------------------------------------------
+#
+# Removing a skill from the lock is how one is uninstalled (gluestack-ui-v5,
+# expo-tailwind-setup, mattpocock's `pr`, `setup-pre-commit` and
+# `git-guardrails-claude-code` all were). But nothing above ever deletes, so on
+# a machine that had installed one it stays on disk, symlinked into
+# `.claude/skills/`, and the agent keeps loading it — the uninstall lands in the
+# lock and nowhere else. This makes the lock the whole truth on every run.
+#
+# Safe to delete outright: `.agents/skills/` is entirely the installer's (or, in
+# a worktree, symlinks into the primary's), and in `.claude/skills/` only
+# SYMLINKS into `.agents/skills/` are touched — our tracked skills there are
+# real directories and never match. With $1 = "dry" it only reports.
+prune_unlisted() {
+  local dry="${1:-}" names entry name pruned=()
+  names="$(lock_names)" || return 0
+  [[ -n "$names" ]] || return 0      # an unreadable lock must never mean "delete everything"
+  in_lock() { grep -qxF "$1" <<< "$names"; }
+
+  for entry in "$REPO_ROOT/.claude/skills/"*; do
+    [[ -L "$entry" ]] || continue
+    [[ "$(readlink "$entry")" == *".agents/skills/"* ]] || continue
+    name="$(basename "$entry")"
+    in_lock "$name" && continue
+    pruned+=("$name")
+    [[ "$dry" == "dry" ]] || rm -f "$entry"
+  done
+
+  for entry in "$REPO_ROOT/.agents/skills/"*; do
+    [[ -e "$entry" || -L "$entry" ]] || continue
+    name="$(basename "$entry")"
+    in_lock "$name" && continue
+    [[ " ${pruned[*]:-} " == *" $name "* ]] || pruned+=("$name")
+    [[ "$dry" == "dry" ]] || rm -rf "$entry"
+  done
+
+  [[ ${#pruned[@]} -gt 0 ]] || return 0
+  if [[ "$dry" == "dry" ]]; then
+    warn "not in skills-lock.json but still on disk (the agent loads them): ${pruned[*]}"
+    warn "run: ./scripts/dev-skills.sh --link    (removes them)"
+  else
+    log "removed skill(s) no longer in skills-lock.json: ${pruned[*]}"
+  fi
+}
+
 # --- installing -------------------------------------------------------------
 #
 # The installer is `skills` (github.com/vercel-labs/skills), run through npx so
@@ -229,9 +274,11 @@ status() {
 have node || { warn "node missing — cannot read skills-lock.json; skipping agent skills"; exit 0; }
 
 case "$MODE" in
-  link)    link_from_primary ;;
-  install) install_from_lock; link_from_primary ;;   # link_from_primary also repairs .claude/ links
+  check)   prune_unlisted dry ;;
+  link)    prune_unlisted; link_from_primary ;;
+  install) install_from_lock; prune_unlisted; link_from_primary ;;   # link_from_primary also repairs .claude/ links
   auto)
+    prune_unlisted
     link_from_primary
     read -r total ready _ <<< "$(status)"
     if [[ "$ready" -lt "$total" ]]; then
