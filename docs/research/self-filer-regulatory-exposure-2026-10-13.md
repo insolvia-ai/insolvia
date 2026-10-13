@@ -1,5 +1,18 @@
 # Self-filer regulatory exposure — 2026-10-13
 
+> **Outcome (2026-10-13): explored, and a non-starter. Insolvia is not
+> moving forward with the self-filer pivot.** The maintainer's constraints
+> were no attorney in the loop and a profit, not cost recovery. Under those
+> constraints Insolvia is a §110 bankruptcy petition preparer:
+>
+> - its fee is capped per district;
+> - it may not give advice, which rules out the exemption, means-test and
+>   petition-review features;
+> - it may not file for the debtor or collect the court fee.
+>
+> What remains is a low-price typing service, not the product. Nothing below
+> is planned work. The file stays as the record of why the pivot was dropped.
+
 A first pass at one question, asked before charting the individual-first
 pivot: **if a debtor pays Insolvia and files their own bankruptcy with no
 attorney, what does federal and state law allow the product to do?** The
