@@ -309,7 +309,7 @@ first.
 
 **Enforced today:** a PR is required (no direct pushes); linear history; no
 force-push; no branch deletion; squash or rebase merges only; review threads must
-be resolved, and pushes dismiss stale reviews. **Plus the seven required status
+be resolved, and pushes dismiss stale reviews. **Plus the thirteen required status
 checks below** — red CI cannot merge.
 
 **Not enforced today** (despite `.github/CODEOWNERS` existing):
@@ -321,17 +321,28 @@ last paragraph of this section.
 ### Required status checks
 
 Red CI blocks a merge to `main`. The `protect-main` ruleset requires these
-**seven** job `name:` values (matrix legs get a `(leg)` suffix):
+**thirteen** job `name:` values (matrix legs get a `(leg)` suffix) — every
+`*-pr.yml` job, so a new PR gate is not finished until it is on this list:
 
 | Check name | Workflow |
 |---|---|
 | `App` | `app-pr.yml` |
-| `Cognito branding` | `branding-pr.yml` |
-| `Marketing site` | `marketing-pr.yml` |
-| `API service` | `api-pr.yml` |
+| `Admin portal` | `admin-pr.yml` |
+| `Admin service` | `admin-pr.yml` |
 | `API client` | `api-client-pr.yml` |
+| `API service` | `api-pr.yml` |
+| `Cognito branding` | `branding-pr.yml` — the brand drift gate (ADR 0020); the name outlived Cognito, see the workflow's header |
+| `Core package` | `core-pr.yml` |
+| `Filing worker` | `filing-pr.yml` |
+| `Form specs` | `forms-pr.yml` |
+| `Marketing site` | `marketing-pr.yml` |
+| `MCP service` | `mcp-pr.yml` |
 | `Terraform validate (staging)` | `shared-infra-plan.yml` |
 | `Terraform validate (prod)` | `shared-infra-plan.yml` |
+
+`Admin portal`, `Admin service` and `Cognito branding` were missing from the
+ruleset until 2026-10-13 although their workflows already said they were
+required — `scripts/update-ruleset.sh show` is the check, not this table.
 
 `Terraform validate (dev)` runs alongside the two above but is deliberately
 **not** required — dev is never applied by CI, so it exists for coverage rather
@@ -352,10 +363,12 @@ matrix leg) silently orphans the required check — GitHub accepts a required
 check nobody reports, and every PR then parks on *"Expected — waiting for status
 to be reported"* forever. Rename a job only alongside the ruleset.
 
-**Two settings are deliberately off.** *Require branches to be up to date before
-merging* (`strict_required_status_checks_policy`) is `false`: with seven checks
-it would force a rebase-and-rerun on every PR whenever anything lands first.
-`required_approving_review_count` is unset, and should stay that way — Insolvia
+*Require branches to be up to date before merging*
+(`strict_required_status_checks_policy`) is **on**: a branch must be at
+`main`'s head to merge, so merges are strictly one at a time and each one
+rebases the next.
+
+**One setting is deliberately off.** `required_approving_review_count` is unset, and should stay that way — Insolvia
 is maintained by one person, and GitHub does not let you approve your own PR, so
 requiring an approval would block every merge permanently. The gate here is CI,
 not review.
