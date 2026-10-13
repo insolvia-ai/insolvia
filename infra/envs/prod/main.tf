@@ -200,28 +200,6 @@ module "auth" {
   admin_invite_role_name = module.admin_service.lambda_role_name
 }
 
-# The sign-in page's style (the managed-login branding of the web and portal
-# clients) moved to insolvia-services on 2026-10-12 (ADR 0026, amended): it is
-# auth's, so it lives with the pool. That repo ADOPTS the live styles with
-# `import` blocks; these let go of them here WITHOUT deleting them — a delete
-# would take sign-in down until the other side re-created them. Either side
-# may apply first. Delete these once this root has applied them.
-removed {
-  from = module.auth.aws_cognito_managed_login_branding.web
-
-  lifecycle {
-    destroy = false
-  }
-}
-
-removed {
-  from = module.auth.aws_cognito_managed_login_branding.portal
-
-  lifecycle {
-    destroy = false
-  }
-}
-
 # Publish the pool's issuer and web app client id into the API's own SSM
 # config namespace (issue #79) so the API Lambda can read them as
 # AUTH_ISSUER_URL and AUTH_CLIENT_ID and verify access tokens.
