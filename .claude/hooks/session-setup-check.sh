@@ -30,7 +30,22 @@
 # It must never block session start, so it always exits 0.
 set -uo pipefail
 
+# WHICH checkout to repair is the session's, not the config root's. The two
+# differ in the desktop app: it starts a worktree session with
+# `--project-config-root <primary checkout>`, and that makes CLAUDE_PROJECT_DIR
+# — and this hook's own working directory — the PRIMARY. Repairing "$root"
+# there links the primary to itself, a silent no-op, and the worktree starts
+# with no `.env` files and no linked skills. The session's real directory
+# arrives only as `cwd` in the JSON on stdin, so resolve the checkout from that
+# and fall back to the config root when it is missing (run by hand, on a tty).
 root="${CLAUDE_PROJECT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+input=""
+[ -t 0 ] || input="$(cat 2>/dev/null || true)"
+cwd="$(printf '%s' "$input" | sed -nE 's/.*"cwd"[[:space:]]*:[[:space:]]*"([^"]*)".*/\1/p')"
+if [ -n "$cwd" ] && top="$(git -C "$cwd" rev-parse --show-toplevel 2>/dev/null)" \
+   && [ -x "$top/scripts/dev-skills.sh" ]; then
+  root="$top"
+fi
 setup="$root/scripts/dev-setup.sh"
 skills="$root/scripts/dev-skills.sh"
 envfiles="$root/scripts/dev-env-files.sh"
