@@ -99,7 +99,7 @@ account** (the app reports it as `forbidden`). Don't retry the switch. To
 gh pr checks <n> --watch --fail-fast && gh pr merge <n> --squash --delete-branch
 ```
 
-Stacks merge with `gh stack merge --yes` (see `insolvia-pr-description`).
+Stacks merge with `gh stack merge --yes` (see the `gh-stack` skill).
 Check the setting before assuming it's still off:
 `gh api repos/insolvia-ai/insolvia --jq .allow_auto_merge`.
 

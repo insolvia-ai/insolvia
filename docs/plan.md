@@ -321,7 +321,7 @@ order. Nothing here needs a new decision except where marked.
 
 **How this has been built, for whoever picks it up:** one agent per PR in its
 own git worktree, committing only; the orchestrator pushes, opens the PR per
-the `insolvia-pr-description` skill, and merges on green — **one at a time**,
+the `pr` skill, and merges on green — **one at a time**,
 because the default branch's ruleset requires a branch at its head, then
 rebases the next. A decision the maintainer has made in chat is written into
 its ADR and the ADR merged; an undecided ADR stays open for them. Agents never
