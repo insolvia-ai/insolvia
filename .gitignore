@@ -127,6 +127,7 @@ storybook-static/
 .claude/skills/codebase-design
 .claude/skills/diagnosing-bugs
 .claude/skills/domain-modeling
+.claude/skills/git-guardrails-claude-code
 .claude/skills/grill-me
 .claude/skills/grill-with-docs
 .claude/skills/grilling
@@ -142,6 +143,7 @@ storybook-static/
 .claude/skills/retro
 .claude/skills/scaffold-exercises
 .claude/skills/setup-matt-pocock-skills
+.claude/skills/setup-pre-commit
 .claude/skills/setup-ts-deep-modules
 .claude/skills/tdd
 .claude/skills/teach
