@@ -13,7 +13,8 @@
   Auth joins the list of what moves, and rule 1 gains a fourth cross-repo
   seam. 0025 is otherwise unchanged.
 - **Relates to:** [ADR 0020](0020-the-brand-is-a-consumer-owned-override.md)
-  (why the branding stays here), [ADR 0023](0023-client-portal-identity-and-isolation.md)
+  (why the branding stayed here — until this ADR's Amendment moved the
+  sign-in page's style too), [ADR 0023](0023-client-portal-identity-and-isolation.md)
   and [ADR 0016](0016-mcp-server-is-its-own-service.md) (the disjoint client ids
   the contract carries), [ADR 0009](0009-a-case-belongs-to-a-firm.md) (why a
   recreated pool is a data migration, not a redeploy). The cutover procedure

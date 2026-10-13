@@ -1,6 +1,8 @@
 # ADR 0001 — The client-stays-dumb trust boundary
 
-- **Status:** Accepted
+- **Status:** Accepted — amended by [ADR 0011](0011-cross-tenant-administration-is-a-separate-principal-class.md)
+  (a second application principal) and [ADR 0024](0024-electronic-filing-path.md)
+  (a third party's credential held server-side); both notes are at the end.
 - **Date:** 2026-07-22
 - **Relates to:** decision D6 in `docs/plan.md`; issue #67
 
@@ -15,7 +17,7 @@ own execution role authenticates to AWS.
 
 The desktop app is a fat client running on an attorney's machine — an
 environment we do not control, cannot patch on our schedule, and must assume
-can be inspected. Per `docs/regulatory-source-register.html`, the data it
+can be inspected. Per [the regulatory source register](../business/regulatory-source-register.html), the data it
 handles — SSNs and full client financials — puts us under the GLBA Safeguards
 Rule and state data-security law. A credential shipped to a client is a
 credential we no longer control, and scoping tricks (Cognito identity pools,
@@ -38,6 +40,14 @@ client-side. It already came up once: the marketing site's waitlist form.
   application principal with data-store access.
 - Cost accepted: an extra network hop and an endpoint to build for each new
   capability, even "trivial" ones.
+
+> **Amended by [ADR 0011](0011-cross-tenant-administration-is-a-separate-principal-class.md) (2026-08-10).**
+> "The API's execution role is the only application principal with
+> data-store access" no longer holds: `services/admin`, the Insolvia-staff
+> service that provisions firms, is a second one, reaching the firm table
+> under its own role. The rule about clients is untouched — the admin portal
+> holds no AWS credential either, and every staff mutation is brokered and
+> audited by that service.
 
 > **Amended by [ADR 0024](0024-electronic-filing-path.md) (2026-09-26).**
 > The rule about clients stands. What this ADR did not contemplate is the
