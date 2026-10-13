@@ -62,7 +62,7 @@ found when.
 | Doc | What |
 |---|---|
 | [`decision-status-2026-10-13.md`](research/decision-status-2026-10-13.md) | What is decided, superseded, half-built and open across `plan.md`, the ADRs, the business plan and the open issues — with the inconsistencies between them, since fixed in their owners. |
-| [`self-filer-regulatory-exposure-2026-10-13.md`](research/self-filer-regulatory-exposure-2026-10-13.md) | Whether a paid, non-attorney product for debtors filing their own bankruptcy is a §110 petition preparer or unauthorized practice of law — *Reynoso*, Upsolve, the postures that avoid it, and what it puts at risk in ADRs 0017, 0019 and 0024. Not legal advice; feeds the pivot's regulatory-posture decision. |
+| [`self-filer-regulatory-exposure-2026-10-13.md`](research/self-filer-regulatory-exposure-2026-10-13.md) | Whether a paid, non-attorney product for debtors filing their own bankruptcy is a §110 petition preparer or unauthorized practice of law — *Reynoso*, Upsolve, the postures that avoid it, and its impact on Insolvia feature by feature and on ADRs 0009–0024. Not legal advice; feeds the pivot's regulatory-posture decision. |
 
 ## [`agents/`](agents/) — config for the engineering skills
 
