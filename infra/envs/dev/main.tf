@@ -299,9 +299,8 @@ resource "aws_dynamodb_table" "admin_audit" {
 # (insolvia-services' scripts/apply-dev-auth.sh, once).
 #
 # Named module "auth" so every reference below (module.auth.issuer_url, …)
-# reads as it always did. No branding here — the shared pool's two clients
-# are branded ONCE, by infra/envs/dev-shared, which scripts/dev-aws-setup.sh
-# applies before this root — and no role grants (dev has no Lambda).
+# reads as it always did. No branding here — the sign-in page's style is
+# insolvia-services', with the pool — and no role grants (dev has no Lambda).
 #
 # A machine set up before ADR 0026 still holds its own per-machine pool
 # (insolvia-dev-<machine_short_id>-users) under module.auth.* in this state;

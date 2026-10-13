@@ -21,7 +21,8 @@ bootstrap is its
 - **Terraform `>= 1.10`** (native S3 state locking via `use_lockfile`; no
   DynamoDB lock table), AWS provider `~> 6.37` — **6.37 is a deliberate floor,
   not a stale `~> 6.0`**. Two things set it, and the floor is the later:
-  `aws_cognito_managed_login_branding` first shipped in 6.12.0, and
+  `aws_cognito_managed_login_branding` first shipped in 6.12.0 (it lives in
+  insolvia-services now, which keeps the same pin), and
   `modules/case_store`'s `global_secondary_index.key_schema` first shipped in
   6.29.0 — but *working* `key_schema` is 6.37.0, because 6.32.1 fixed a
   perpetual diff on an index that has a range key (ours does) and 6.37.0 fixed
@@ -104,7 +105,7 @@ bootstrap is its
   `docs/reference/architecture.md` owns the full comparison.
 - **Before a large or risky change, dispatch the env's infra workflow with
   `mode: plan` and read it.** Both default to `plan`. `shared-infra-plan.yml`
-  (staging, prod, dev) only validates offline (`init -backend=false`), so it
+  (staging, prod, dev, dev-shared) only validates offline (`init -backend=false`), so it
   catches syntax and type errors but never shows what a change would *do*. Fine to skip for a routine
   change; not for a provider major-version bump or anything that might replace
   a resource.
@@ -124,17 +125,16 @@ bootstrap is its
   `/insolvia/<env>/auth/*`** that insolvia-services publishes (pool id/ARN,
   web and portal client ids, sign-in domain, issuer, MCP client ids). A
   missing parameter fails the plan by name — the pool's root there has not
-  applied. `modules/auth` is the consumer half staging, prod and
-  `envs/dev-shared` call: the reader, plus this app's managed-login branding
-  on its two clients and `AdminCreateUser` grants on its own roles. A
-  developer machine's `envs/dev` calls the reader alone — it signs in against
-  the ONE shared dev pool (`insolvia-dev-users`), whose branding
-  `envs/dev-shared` owns and `scripts/dev-aws-setup.sh` applies. Pool
-  configuration — callback origins, the custom domain, deletion protection,
-  a new client or contract key — is a PR there, released first. Keep
-  `module "auth"` at that name: the branding and grants never moved in state
-  because their addresses did not change, and renaming the call would be a
-  destroy-and-create of the sign-in page's style. The move itself is recorded
+  applied. `modules/auth` is the consumer half staging and prod call: the
+  reader plus `AdminCreateUser` grants on this repo's own roles. A developer
+  machine's `envs/dev` calls the reader alone — it signs in against the ONE
+  shared dev pool (`insolvia-dev-users`). Pool configuration — callback
+  origins, the custom domain, deletion protection, a new client or contract
+  key — **and the sign-in page's style** (its managed-login branding, since
+  2026-10-12) is a PR there, released first. Keep `module "auth"` at that
+  name: the grants never moved in state because their addresses did not
+  change, and renaming the call would destroy and re-create them. The move
+  itself is recorded
   in insolvia-services'
   [`docs/runbooks/auth-state-migration.md`](https://github.com/insolvia-ai/insolvia-services/blob/main/docs/runbooks/auth-state-migration.md).
 - **A deploy job must declare `environment:`** matching the Terraform env

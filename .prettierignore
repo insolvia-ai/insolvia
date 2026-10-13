@@ -21,11 +21,6 @@ build/
 # tokens.ts, and the generated theme.css are all that repo's now, and its own
 # .prettierignore carries the reasoning.
 #
-# What remains generated HERE is Cognito's managed-login branding,
-# infra/modules/auth/managed-login-settings.json, written by
-# tool/reconcile-cognito-branding.ts from the installed @insolvia-ai/tokens.
-# It needs no entry: the root `format` script targets apps/insolvia_app,
-# packages/insolvia_api_client and tool/, so nothing under infra/ is checked in
-# the first place. `npm run tokens:check` is what guards that file, and it
-# compares bytes — so if infra/ is ever added to the format target, this is the
-# line that has to come back with it.
+# Cognito's managed-login branding used to be generated here too
+# (infra/modules/auth/managed-login-settings.json). It is insolvia-services'
+# since 2026-10-12 (ADR 0026), so nothing generated under infra/ remains.

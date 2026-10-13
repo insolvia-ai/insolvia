@@ -243,10 +243,11 @@ terraform_output_json() {
 # ADR 0026) and this repo only READS it, through the SSM contract
 # /insolvia/dev/auth/* — so nothing here needs that repository checked out.
 #
-# The one thing this repo applies to it is the managed-login BRANDING of its
-# two clients (generated from this repo's brand): infra/envs/dev-shared, one
-# shared state key, applied by every machine before its own stack. Idempotent,
-# so whoever runs last is irrelevant; the S3 lockfile serialises two at once.
+# Its sign-in page's style is insolvia-services' too (ADR 0026, amended
+# 2026-10-12). infra/envs/dev-shared, which used to own it, is RETIRING: it now
+# only lets go of the styles in its one shared state (removed, destroy =
+# false), so applying it on every run performs that hand-over once and is a
+# no-op after. Delete apply_dev_shared and its call with that root.
 SHARED_TF_DIR="$REPO_ROOT/infra/envs/dev-shared"
 SHARED_POOL_NAME="insolvia-dev-users"
 SHARED_CONTRACT_PATH="/insolvia/dev/auth"
@@ -260,7 +261,7 @@ require_shared_pool() {
 
 apply_dev_shared() {
   require_shared_pool
-  log "Shared dev pool branding: infra/envs/dev-shared (one state for every machine)"
+  log "Retiring infra/envs/dev-shared (hands the shared pool's branding to insolvia-services; a no-op once done)"
   terraform -chdir="$SHARED_TF_DIR" init -reconfigure -input=false >/dev/null
   local args=(apply -input=false)
   [[ "${AUTO_APPROVE:-0}" -eq 1 ]] && args+=(-auto-approve)

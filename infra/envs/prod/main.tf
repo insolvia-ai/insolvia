@@ -180,10 +180,9 @@ resource "aws_ssm_parameter" "mailer_api_url" {
 # Auth (#65): the CONSUMER half of the production pool. The pool (with its
 # deletion protection — it holds the real attorney accounts), its domain and
 # its app clients are insolvia-services' (infra/envs/prod, module.auth) since
-# ADR 0026. This reads them from its SSM contract
-# (/insolvia/prod/auth/*, modules/auth_contract), renders this app's managed-login branding
-# onto its two clients, and grants this repo's two Lambda roles their one
-# action on the pool. Prod's custom auth domain, when it comes, is a change
+# ADR 0026, and so is the sign-in page's style. This reads them from its SSM
+# contract (/insolvia/prod/auth/*, modules/auth_contract) and grants this
+# repo's two Lambda roles their one action on the pool. Prod's custom auth domain, when it comes, is a change
 # there; the auth_domain output here picks it up by itself.
 module "auth" {
   source = "../../modules/auth"
@@ -199,6 +198,28 @@ module "auth" {
   # Provisioning a firm's first administrator (#213) — same one-action grant
   # on the admin service's own role.
   admin_invite_role_name = module.admin_service.lambda_role_name
+}
+
+# The sign-in page's style (the managed-login branding of the web and portal
+# clients) moved to insolvia-services on 2026-10-12 (ADR 0026, amended): it is
+# auth's, so it lives with the pool. That repo ADOPTS the live styles with
+# `import` blocks; these let go of them here WITHOUT deleting them — a delete
+# would take sign-in down until the other side re-created them. Either side
+# may apply first. Delete these once this root has applied them.
+removed {
+  from = module.auth.aws_cognito_managed_login_branding.web
+
+  lifecycle {
+    destroy = false
+  }
+}
+
+removed {
+  from = module.auth.aws_cognito_managed_login_branding.portal
+
+  lifecycle {
+    destroy = false
+  }
 }
 
 # Publish the pool's issuer and web app client id into the API's own SSM

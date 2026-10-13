@@ -44,8 +44,8 @@ destroy_args=(destroy -input=false "${TF_VARS[@]}")
 [[ "$AUTO_APPROVE" -eq 1 ]] && destroy_args+=(-auto-approve)
 terraform -chdir="$TF_DIR" "${destroy_args[@]}"
 
-# The shared development pool and its branding (infra/envs/dev-shared) are
-# NOT this machine's and are left alone: every machine signs in against them.
+# The shared development pool (insolvia-services', its style included) is NOT
+# this machine's and is left alone: every machine signs in against it.
 
 # Unwind the setup script's wiring — a services/api/.env still naming the
 # destroyed table would send dev-up.sh at a table that no longer exists.

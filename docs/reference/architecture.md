@@ -19,7 +19,7 @@ insolvia/
 │   └── insolvia_api_client/           @insolvia-ai/api-client
 ├── services/                          api · admin · mcp · filing (Python on Lambda)
 ├── infra/                             Terraform — staging / prod / dev
-├── tool/                              reconcile-cognito-branding.ts
+├── tool/                              brand generators (themes, favicon)
 └── docs/                              business plan + runbooks
 ```
 
@@ -61,12 +61,12 @@ behind all of it, including the measurements that ruled out a component library.
   the package is no longer here. **Never give either consumer a path
   dependency on it** — the app had one, through a workspace symlink, and one
   package with two simultaneous truths is what ADR 0010 removed.
-- **Tokens generate elsewhere, with one output left behind.** The token values
-  render in the design-system repo. Cognito's managed-login branding
-  (`infra/modules/auth/managed-login-settings.json`) is this repo's
-  infrastructure, so it stayed: `tool/reconcile-cognito-branding.ts` reconciles
-  it against the installed `@insolvia-ai/tokens`, gated by the `Cognito
-  branding` check. See [`package-publishing.md`](package-publishing.md).
+- **Tokens generate elsewhere.** The token values render in the
+  design-system repo; this repo layers `brand/` over the installed
+  `@insolvia-ai/tokens` into the app, admin and marketing themes, gated by the
+  `Cognito branding` check (a name kept for the ruleset). Cognito's sign-in
+  page style is insolvia-services' since 2026-10-12 (ADR 0026). See
+  [`package-publishing.md`](package-publishing.md).
 
 ## Toolchain
 

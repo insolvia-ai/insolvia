@@ -13,8 +13,7 @@
 # ORDER. The parameters must exist before a root that reads them can plan:
 #   • staging, prod — insolvia-services' env root applies first (its release);
 #   • dev — insolvia-services' shared dev pool (scripts/apply-dev-auth.sh
-#     there, run once); every developer machine's infra/envs/dev and this
-#     repo's infra/envs/dev-shared read it.
+#     there, run once); every developer machine's infra/envs/dev reads it.
 # A NEW key this repo must read is added there, released there, before the PR
 # here that reads it — the same rule as a new service's container repository.
 #
