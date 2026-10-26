@@ -9,6 +9,9 @@
   [#353](https://github.com/insolvia-ai/insolvia/issues/353) (model, store,
   API), [#354](https://github.com/insolvia-ai/insolvia/issues/354) (screens)
   and [#355](https://github.com/insolvia-ai/insolvia/issues/355) (lifecycle).
+- **Amended by:** [ADR 0027](0027-a-cases-chapter-is-history.md) (2026-10-25) —
+  the lifecycle's history becomes one history of events, and Copy case is the
+  tool for a refiling, never a conversion.
 - **Date:** 2026-09-23
 - **Relates to:** [ADR 0009](0009-a-case-belongs-to-a-firm.md) owns the
   permission axes this extends; [ADR 0012](0012-shared-python-domain-package.md)

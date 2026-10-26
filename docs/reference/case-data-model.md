@@ -148,6 +148,14 @@ it still reads and prints, and is asked for a court on its next edit.
 The case's status is its lifecycle as data (issue 14.3 / #355), owned by
 `insolvia_core.cases` (`STATUSES`, `TRANSITIONS`, `apply_changes`):
 
+> **Decided, not yet built — [ADR 0027](../adr/0027-a-cases-chapter-is-history.md).**
+> A case's chapter becomes history: a conversion is a dated event on the same
+> case (never a new case), the `STATUS#` rows below become one lifecycle
+> history of events (status moves, conversions, Chapter 13 confirmation and
+> its denial), the petition packet belongs to the petition chapter, and
+> Chapters 11 and 12 are refused at creation until built. This section is
+> rewritten as its build rows land; until then it describes what runs.
+
 ```
             client (prospect, prospect_stage) ──► case opened = RETAINED
                                                      │
