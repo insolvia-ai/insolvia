@@ -47,6 +47,16 @@ _Avoid_: original chapter, filing chapter
 The chapter a case is in now: before filing, the one being prepared; after filing, the petition chapter or the latest conversion's.
 _Avoid_: case chapter (when the petition chapter is meant)
 
+### Firms and staff
+
+**Firm user**:
+A person's membership of one firm as staff, carrying that firm's role and permissions. One login may be a firm user at several firms, and each membership is separate.
+_Avoid_: staff account, member
+
+**Chosen firm**:
+The one firm a request acts in. A person with more than one firm names it; a person with one firm need not.
+_Avoid_: active firm (a firm's status), current firm, tenant
+
 ### Clients and the portal
 
 **Client**:

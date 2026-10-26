@@ -1,6 +1,9 @@
 # ADR 0009 — A case belongs to a firm, and membership lives in our own store
 
 - **Status:** Accepted
+- **Amended:** 2026-10-25 ([#491](https://github.com/insolvia-ai/insolvia/issues/491)) —
+  one firm per person was a temporary rule; a request names its firm. See
+  [§ 2026-10-25](#2026-10-25--one-person-many-firms-maintainer).
 - **Date:** 2026-08-05
 - **Amends:** [ADR 0007](0007-hosted-ui-pkce-refresh-token-in-local-storage.md),
   whose *"server-side authorization decisions read only verified access-token
@@ -187,3 +190,43 @@ needing a second action.
   firm onboards it stops being a replacement and becomes a data migration.
   The lesson generalises: an immutable identity setting is cheapest to get
   wrong on the day you notice.
+
+## Amendments
+
+### 2026-10-25 — one person, many firms (maintainer)
+
+Decided on [#491](https://github.com/insolvia-ai/insolvia/issues/491).
+
+**One firm per person was a temporary rule, never part of this decision.** It
+lives in the code alone, as the by-subject resolver's refusal to choose
+between two firms. The rows were always `PK FIRM#<firm_id> / SK
+USER#<subject>`, so nothing stored forbids a second firm. The rule stays until
+#491's build lands, and then it goes. Of counsel attorneys and contract
+paralegals work at more than one firm, and a debtor who changes counsel is a
+client of two.
+
+- **A request names its firm.** The app and the portal send an
+  `Insolvia-Firm` header. A person with exactly one active membership may omit
+  it. MCP takes the firm from its connector URL, `/mcp/firms/<firm_id>`,
+  because harnesses cannot be relied on to send a header. Plain `/mcp` serves
+  people who have one firm.
+- **This is not the "firm id in the URL" rejected above.** That alternative
+  took a firm id from the client *as* the scope. Here it is only a selector.
+  The accessor is still resolved from our store, from the verified subject
+  and the named firm together. A firm in which the subject has no active
+  membership is the same 403 as having none. "May I act in this firm" still
+  has one answer, and the store gives it.
+- **Everything else stays per firm.** Each membership has its own role,
+  permissions and status. Every check reads the chosen firm's row alone, and
+  audit rows are written to that firm alone. Removing someone from one firm
+  touches neither their other firms nor their login.
+- **Who sees the other memberships:** only the person and Insolvia staff
+  ([ADR 0011](0011-cross-tenant-administration-is-a-separate-principal-class.md)).
+  Nothing a firm reads changes because of another firm's membership.
+  Adding a colleague whose email already has a login therefore attaches that
+  login, and the firm gets the same response either way.
+
+The mechanics (resolver, routes, the firm switcher and picker, seeds) are
+#491's resolution. The portal side of the same rule is
+[ADR 0023](0023-client-portal-identity-and-isolation.md) § 2026-10-25,
+"walled per firm".
