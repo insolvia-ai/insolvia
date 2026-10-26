@@ -46,3 +46,21 @@ _Avoid_: original chapter, filing chapter
 **Current chapter**:
 The chapter a case is in now: before filing, the one being prepared; after filing, the petition chapter or the latest conversion's.
 _Avoid_: case chapter (when the petition chapter is meant)
+
+### Clients and the portal
+
+**Client**:
+A person a firm represents or may represent, kept once per firm. One client may have many cases over time; a joint case is two clients.
+_Avoid_: debtor (for the firm's record of the person), customer
+
+**Debtor**:
+A client as named in one case, in a filing role. The case keeps its own copy of the client's identity.
+_Avoid_: client (when the person on one case is meant)
+
+**Portal login**:
+A person's own sign-in to the client portal: one per email address, shared by every firm that invites them. On its own it grants nothing.
+_Avoid_: portal account, client account
+
+**Portal access**:
+A client's standing permission, at one firm, to use the portal for their cases. Each firm's portal access is separate; nothing one firm holds reaches another.
+_Avoid_: binding, portal account

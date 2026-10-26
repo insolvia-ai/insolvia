@@ -1,6 +1,10 @@
 # ADR 0023 — A client is a third principal class: one case, candidates only
 
 - **Status:** Accepted (2026-09-26)
+- **Amended:** 2026-10-25 ([#477](https://github.com/insolvia-ai/insolvia/issues/477)) —
+  portal access belongs to the client record, not the case; it reaches the
+  client's cases, and portal routes name the case. See
+  [§ 2026-10-25](#2026-10-25--portal-access-belongs-to-the-client-maintainer).
 - **Date:** 2026-09-23
 - **Relates to:** issue [#361](https://github.com/insolvia-ai/insolvia/issues/361)
   (15.1), building toward #362–#364. Sits inside
@@ -55,6 +59,8 @@ otherwise:
    with an active binding cannot be bound again until revoked. When
    **0022 (proposed)** lands, the binding moves from the case to the client
    record; no portal URL names a case id, so the move is server-side.
+   *Amended 2026-10-25: the binding is keyed to the client record and
+   reaches the client's cases; see the amendment below.*
 
    **A joint case: a login per debtor by default, one for both on the
    firm's choice.** The binding also names the filing roles its holder
@@ -82,7 +88,9 @@ otherwise:
    feature map. The portal is a separate `ClientAccessor` type
    (`subject, firm_id, case_id`) that no function taking an `Accessor` can
    receive, and routes under `/v1/portal/*` that **carry no case id** — the
-   case comes from the binding. A client reads the configured questionnaire
+   case comes from the binding. *Amended 2026-10-25: routes are
+   `/v1/portal/cases/<case_id>/…`, checked against portal access; what a
+   client may read on a case is unchanged.* A client reads the configured questionnaire
    sections, **their own** candidates (`origin.subject == self`) with review
    status, their document requests and their own uploads' metadata, the
    case's public status (chapter, stage) and the firm's name. Never: the
@@ -233,6 +241,57 @@ confirmation rule. An accepted answer is the opposite, so it takes its own
 name under the rule; the channel stays `client`. The shapes are
 [`case-data-model.md`](../reference/case-data-model.md)'s answers section.
 
+### 2026-10-25 — portal access belongs to the client (maintainer)
+
+Decided on [#477](https://github.com/insolvia-ai/insolvia/issues/477), which
+carries out §3's "the binding moves … to the client record" now that ADR 0022
+is built. ADR [0027](0027-a-cases-chapter-is-history.md) makes it urgent: a
+refiling is a new case for the same client, so a binding that names one case
+loses the client at the first refiling. The terms are `GLOSSARY.md`'s:
+**portal login** (the pool account, one per email, granting nothing alone) and
+**portal access** (a client's standing permission at one firm). "Binding"
+stays the code's word.
+
+- **Owner: the client record.** Portal access is keyed `(firm, client_id)`.
+  The case alone and a cross-firm person record were both weighed. The case
+  is the shape 0022 says a person is not, and a person record would be the
+  only row in the firm table that no firm owns.
+- **Reach: the client's cases.** Every case the client is a debtor on is
+  reachable, derived and never granted case by case, so a refiling needs no
+  new invitation. Staff may **switch one case off** for one client. A
+  switched-off case is hidden entirely (as if the client were never on it),
+  and nothing the client already gave is withdrawn. The switch is on by
+  default, needs `client_portal` at `add_edit`, and is written to the access
+  log. §4's read policy still decides what the client sees on a reachable
+  case.
+- **Joint cases.** One login answering for both spouses remains the firm's
+  choice, but it is recorded **on the case** and limited to that case.
+  Otherwise a login answers for the filing role its own client holds.
+- **Routes name the case.** They become `/v1/portal/cases/<case_id>/…`, and
+  each request is checked against portal access, so a case outside it is a
+  404. The portal opens on a list of the client's cases. A server-side
+  "current case" was rejected because the portal session is memory-only.
+- **Walled per firm.** Another firm may invite a login that one firm already
+  uses, and gets its own portal access to its own client. Nothing crosses
+  between firms, the first firm is not revoked automatically, and a login
+  live at two firms chooses one in the portal. A handover carrying a client's
+  history to the new firm was rejected as the only path by which one firm's
+  data would reach another. The mechanics are #491's.
+- **One to one within a firm.** A login is at most one client, and a client
+  has at most one login. Revoking and re-inviting change the one record's
+  status, and the access log, not kept rows, answers who had access when.
+- **Lifecycle.** Invitations are made from the client and refused while it
+  has no case: answers and uploads are written to a case, so a prospect has
+  nowhere to put them. Archiving a client revokes its access, and
+  unarchiving does not restore it. Merging two clients is refused while both
+  have live access with different logins.
+
+The re-key, the index and the `client.*` → `portal.*` audit rename land before
+first real data, specified by
+[#489](https://github.com/insolvia-ai/insolvia/issues/489). The decisions
+above replace §3's "exactly one active case" and the `case_id` in §4's
+`ClientAccessor`. The title's "one case" now describes v1 only.
+
 **Risks.** SES sandbox and the ZDR gate bound real use. One invitation
 template serves two audiences. ESSENTIALS has no threat protection for a
 public class. Whether managed login offers a first factor per app client
@@ -245,5 +304,6 @@ surface.
 Pool-level policy that must differ for debtors (passwordless, a different
 password policy); PLUS-tier threat protection becoming a condition of a
 firm's engagement; portal traffic or cadence diverging enough to want its own
-Lambda (the `ClientAccessor` seam is the cut); or 0022 landing with a client
-record the binding should own instead of a case.
+Lambda (the `ClientAccessor` seam is the cut); a firm needing to hide part of
+a reachable case from its own client (today a case is wholly on or off); or
+a client's portal history needing to follow them to a new firm.
