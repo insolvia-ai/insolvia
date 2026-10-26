@@ -1,6 +1,8 @@
 # ADR 0024 — Insolvia files the case itself, from its own infrastructure, under the attorney's CM/ECF login and on the attorney's per-filing approval
 
-- **Status:** Accepted (2026-09-26)
+- **Status:** Accepted (2026-09-26) — amended by
+  [ADR 0027](0027-a-cases-chapter-is-history.md) (2026-10-25): the `filed`
+  history row is a lifecycle event and carries the petition chapter.
 - **Date:** 2026-09-23 (spike and first draft); 2026-09-26 (decision reversed
   and accepted by the maintainer)
 - **Amends:** [ADR 0001](0001-client-stays-dumb-trust-boundary.md) — see
