@@ -9,12 +9,13 @@
 #   docker build --target admin-lambda          -t insolvia-admin .      # the staff admin Lambda
 #   docker build --target admin-development     -t insolvia-admin .      # the admin under Kestrel, :8090
 #   docker build --target worker-lambda         -t insolvia-worker .     # the pipeline worker Lambda (SQS)
+#   docker build --target filing-lambda         -t insolvia-filing .     # the filing worker Lambda (SQS)
 #
 # One build stage compiles every host; each deployable unit gets its own final
 # stage(s), so a host's weight lands in its own image and never in another's
-# (ADR 0015). The API, the migrator, the MCP server, the admin service and the
-# pipeline worker have stages today. Filing gets a `<host>` stage on the Lambda
-# base image in the PR that gives it a handler:
+# (ADR 0015). Every host has its stage(s): the API, the migrator, the MCP
+# server, the admin service, the pipeline worker and the filing worker. A new
+# host gets a `<host>` stage on the Lambda base image in the PR that gives it a handler:
 # publish that project into /out/<host> in the build stage and copy it the
 # same way the lambda stage below does.
 
@@ -52,11 +53,13 @@ COPY src/Insolvia.Migrator/*.csproj src/Insolvia.Migrator/packages.lock.json src
 COPY src/Insolvia.Mcp/*.csproj src/Insolvia.Mcp/packages.lock.json src/Insolvia.Mcp/
 COPY src/Insolvia.Admin/*.csproj src/Insolvia.Admin/packages.lock.json src/Insolvia.Admin/
 COPY src/Insolvia.Worker/*.csproj src/Insolvia.Worker/packages.lock.json src/Insolvia.Worker/
+COPY src/Insolvia.Filing/*.csproj src/Insolvia.Filing/packages.lock.json src/Insolvia.Filing/
 RUN dotnet restore src/Insolvia.Api/Insolvia.Api.csproj --locked-mode \
  && dotnet restore src/Insolvia.Migrator/Insolvia.Migrator.csproj --locked-mode \
  && dotnet restore src/Insolvia.Mcp/Insolvia.Mcp.csproj --locked-mode \
  && dotnet restore src/Insolvia.Admin/Insolvia.Admin.csproj --locked-mode \
- && dotnet restore src/Insolvia.Worker/Insolvia.Worker.csproj --locked-mode
+ && dotnet restore src/Insolvia.Worker/Insolvia.Worker.csproj --locked-mode \
+ && dotnet restore src/Insolvia.Filing/Insolvia.Filing.csproj --locked-mode
 
 COPY src/ src/
 RUN dotnet publish src/Insolvia.Api/Insolvia.Api.csproj \
@@ -68,7 +71,9 @@ RUN dotnet publish src/Insolvia.Api/Insolvia.Api.csproj \
  && dotnet publish src/Insolvia.Admin/Insolvia.Admin.csproj \
       --configuration Release --no-restore --output /out/admin \
  && dotnet publish src/Insolvia.Worker/Insolvia.Worker.csproj \
-      --configuration Release --no-restore --output /out/worker
+      --configuration Release --no-restore --output /out/worker \
+ && dotnet publish src/Insolvia.Filing/Insolvia.Filing.csproj \
+      --configuration Release --no-restore --output /out/filing
 
 # ── lambda: the API as AWS runs it ──────────────────────────────────────────
 # The AWS base image carries the .NET and ASP.NET Core runtimes and the
@@ -158,3 +163,13 @@ ENTRYPOINT ["dotnet", "Insolvia.Admin.dll"]
 FROM public.ecr.aws/lambda/dotnet:10 AS worker-lambda
 COPY --from=build /out/worker ${LAMBDA_TASK_ROOT}/
 CMD ["Insolvia.Worker"]
+
+# ── filing-lambda: the filing worker as AWS runs it ─────────────────────────
+# The SQS event source mapping's target, batch size 1 (ADR 0024 PR 7). The
+# executable runs its own handler under the Lambda runtime client
+# (src/Insolvia.Filing/FilingProgram.cs). The fake CM/ECF is a test fixture
+# under tests/ and never reaches this image. No development stage: the local
+# worker is `dotnet run --project src/Insolvia.Filing` (the poller).
+FROM public.ecr.aws/lambda/dotnet:10 AS filing-lambda
+COPY --from=build /out/filing ${LAMBDA_TASK_ROOT}/
+CMD ["Insolvia.Filing"]
