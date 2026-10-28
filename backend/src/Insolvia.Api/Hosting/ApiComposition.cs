@@ -231,6 +231,7 @@ public static class ApiComposition
         builder.Services.AddSingleton<IEndpointModule, TaskRoutes>();
         builder.Services.AddSingleton<IEndpointModule, EventRoutes>();
         builder.Services.AddSingleton<IEndpointModule, CalendarRoutes>();
+        builder.Services.AddSingleton<IEndpointModule, CaseAnalysisRoutes>(); // 18.15 part 2: the computed analyses
         builder.Services.AddSingleton<IEndpointModule, CaseEntityRoutes>();
 
         // The portal (18.18): the firm's invitation routes, then the client's
