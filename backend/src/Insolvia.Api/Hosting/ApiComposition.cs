@@ -9,6 +9,7 @@ using Insolvia.Api.Mail;
 using Insolvia.Api.Routes;
 using Insolvia.Aws.Documents;
 using Insolvia.Aws.Jobs;
+using Insolvia.Aws.Filing;
 using Insolvia.Aws.Jwks;
 using Insolvia.Aws.Mailer;
 using Insolvia.Aws.Sealing;
@@ -25,6 +26,7 @@ using Insolvia.Data.Pagination;
 using Insolvia.Data.Portal;
 using Insolvia.Data.Vault;
 using Insolvia.Data.Waitlist;
+using Insolvia.Forms;
 using Microsoft.Extensions.Logging.Console;
 
 namespace Insolvia.Api.Hosting;
@@ -111,6 +113,12 @@ public static class ApiComposition
             builder.Services.AddScoped<IDocumentRequestStore>(services => new PostgresDocumentRequestStore(services.GetRequiredService<InsolviaDbContext>()));
             builder.Services.AddScoped<IFilingStore>(services => new PostgresFilingStore(services.GetRequiredService<InsolviaDbContext>()));
             builder.Services.AddScoped<ITaxIdStore>(services => new PostgresTaxIdStore(services.GetRequiredService<InsolviaDbContext>()));
+            builder.Services.AddScoped<IFilingApprovalStore>(services => new PostgresFilingApprovalStore(services.GetRequiredService<InsolviaDbContext>()));
+
+            // Not composed until the packet store lands (#528; plan 18.22
+            // wires it as the IPacketReader): the approval routes answer the
+            // 500 that names the gap, never an empty listing that would make
+            // every case look unassembled.
 
             // The pipeline (18.17): the API creates and reads job rows, reads
             // packets; the worker advances the one and writes the other.
@@ -217,6 +225,8 @@ public static class ApiComposition
             builder.Services.AddSingleton<ITaxIdStore, MemoryTaxIdStore>();
             builder.Services.AddSingleton<IJobStore, MemoryJobStore>();
             builder.Services.AddSingleton<IPacketStore>(services => new MemoryPacketStore(services.GetRequiredService<MemoryCaseStore>()));
+            builder.Services.AddSingleton<IFilingApprovalStore, MemoryFilingApprovalStore>();
+            builder.Services.AddSingleton<IPacketReader, MemoryPacketReader>();
 
             // The vault's twins and the deterministic local key — never
             // composed beside a real table. Still a SEALER only: the
@@ -232,6 +242,18 @@ public static class ApiComposition
             // No local object store: the memory twin mints memory+s3:// URLs no
             // client can fetch.
             builder.Services.AddSingleton<IDocumentBlobStore, MemoryDocumentBlobStore>();
+        }
+
+        // The filing queue (ADR 0024): with FILING_QUEUE_URL — this machine's
+        // dev queue locally, the environment's deployed — the SQS sender, the
+        // approve rule's one way to reach the worker. Without it no sender at
+        // all, and POST …/filing-approval answers 503 before recording anything.
+        if (configuration["FILING_QUEUE_URL"] is { Length: > 0 } filingQueue)
+        {
+            builder.Services.AddSingleton<IAmazonSQS>(_ => configuration["AWS_REGION"] is { Length: > 0 } region
+                ? new AmazonSQSClient(RegionEndpoint.GetBySystemName(region))
+                : new AmazonSQSClient());
+            builder.Services.AddSingleton<IFilingJobSender>(services => new SqsFilingJobSender(services.GetRequiredService<IAmazonSQS>(), filingQueue));
         }
 
         // The firm-side routes (18.14), mapped after /health in this order.
@@ -269,6 +291,10 @@ public static class ApiComposition
         builder.Services.AddSingleton<IEndpointModule, PacketRoutes>();
         builder.Services.AddSingleton<IEndpointModule, CaseSummaryRoutes>();
         builder.Services.AddSingleton<IEndpointModule, ExtractionReviewRoutes>();
+        // Electronic filing (18.19 / #530): the vault and authorization under
+        // /v1/me, the per-filing approval and the hand-back resolution.
+        builder.Services.AddSingleton<IEndpointModule, FilingCredentialRoutes>();
+        builder.Services.AddSingleton<IEndpointModule, FilingApprovalRoutes>();
 
         // The forms hub, the single-form preview and the filing set (18.15c).
         builder.Services.AddSingleton<IEndpointModule, FormsHubRoutes>();
