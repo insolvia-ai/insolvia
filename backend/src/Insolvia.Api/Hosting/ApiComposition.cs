@@ -4,6 +4,11 @@ using Insolvia.Api.Logging;
 using Insolvia.Aws.Jwks;
 using Insolvia.Core.Memory;
 using Insolvia.Core.Ports;
+using Insolvia.Data;
+using Insolvia.Data.AccessLogging;
+using Insolvia.Data.Connections;
+using Insolvia.Data.Firms;
+using Insolvia.Data.Portal;
 using Microsoft.Extensions.Logging.Console;
 
 namespace Insolvia.Api.Hosting;
@@ -14,10 +19,10 @@ namespace Insolvia.Api.Hosting;
 /// with two shapes, chosen by <see cref="LambdaBootRequirements.LambdaFunctionVariable"/>:
 /// <list type="bullet">
 /// <item><b>Lambda</b> (api_lambda.py): refuses to boot without its
-/// requirements; composes the HTTP JWKS provider; composes NO in-memory store
-/// — until the Postgres stores land, an authenticated route there is a 500
-/// ("not composed"), never an empty store that makes every user look
-/// unprovisioned.</item>
+/// requirements — the database's <c>INSOLVIA_DB_*</c> among them; composes
+/// the HTTP JWKS provider and the Postgres stores (request-scoped, over one
+/// <see cref="InsolviaDbContext"/> per request). Never an in-memory store: an
+/// empty one would make every user look unprovisioned.</item>
 /// <item><b>Everything else</b> — <c>dotnet run</c>, docker compose, the test
 /// host — (development_server.py): auth is optional and fails CLOSED when
 /// absent; the stores are empty in-memory ones, so a signed-in developer with
@@ -53,6 +58,15 @@ public static class ApiComposition
         if (isLambda)
         {
             LambdaBootRequirements.Enforce(config);
+
+            // Throws at composition when the INSOLVIA_DB_* contract is
+            // incomplete, so a misconfigured Lambda never takes a request.
+            builder.Services.AddInsolviaData(DatabaseSettings.FromEnvironment(name => configuration[name], applicationName: "insolvia-api"));
+            builder.Services.AddScoped<IFirmStore>(services => new PostgresFirmStore(
+                services.GetRequiredService<InsolviaDbContext>(),
+                services.GetRequiredService<TimeProvider>()));
+            builder.Services.AddScoped<IClientBindingStore>(services => new PostgresClientBindingStore(services.GetRequiredService<InsolviaDbContext>()));
+            builder.Services.AddScoped<IAccessLog>(services => new PostgresAccessLog(services.GetRequiredService<InsolviaDbContext>()));
         }
 
         // Constructed once, at start, so its key cache lives as long as the

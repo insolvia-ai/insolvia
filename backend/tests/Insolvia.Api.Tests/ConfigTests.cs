@@ -137,6 +137,25 @@ public sealed class ConfigTests(WebApplicationFactory<Program> factory) : IClass
     }
 
     [Fact]
+    public void The_host_inside_lambda_refuses_to_start_without_its_database()
+    {
+        // Everything else the Lambda needs is set: the Postgres stores are
+        // what is composed there, and they need the INSOLVIA_DB_* contract.
+        using var lambda = factory.WithWebHostBuilder(host =>
+        {
+            host.UseSetting(LambdaBootRequirements.LambdaFunctionVariable, "insolvia-staging-api");
+            foreach (var (name, value) in Complete)
+            {
+                host.UseSetting(name, value);
+            }
+        });
+
+        var error = Assert.Throws<InvalidOperationException>(() => lambda.CreateClient());
+
+        Assert.StartsWith("The database is not configured.", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task The_development_host_starts_without_auth_and_fails_closed()
     {
         using var client = factory.CreateClient();
