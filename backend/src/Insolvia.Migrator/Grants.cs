@@ -92,10 +92,51 @@ public sealed record TableGrant(string Table, string Role, TablePrivileges Privi
 /// a table that does not exist fails the migrator, so a typo cannot leave a
 /// table silently ungranted.
 /// </para>
-/// <para>Empty until the first domain table (18.10).</para>
 /// </remarks>
 public static class GrantTable
 {
+    // Least privilege per table: a role holds DELETE only where a port
+    // deletes, and INSERT only where its service creates.
+    private const TablePrivileges ReadInsertUpdate = TablePrivileges.Select | TablePrivileges.Insert | TablePrivileges.Update;
+    private const TablePrivileges ReadUpdate = TablePrivileges.Select | TablePrivileges.Update;
+
     /// <summary>The grants the migrator applies.</summary>
-    public static IReadOnlyList<TableGrant> All { get; } = [];
+    public static IReadOnlyList<TableGrant> All { get; } =
+    [
+        // ── Firm stores (18.10) ─────────────────────────────────────
+        // Firms are provisioned by the admin service; the API reads its
+        // tenant and edits the firm's own record (PATCH /v1/firm), and never
+        // creates or deletes one. The MCP server reads who the caller is.
+        new("firms", ServiceRoles.Admin, ReadInsertUpdate),
+        new("firms", ServiceRoles.Api, ReadUpdate),
+        new("firms", ServiceRoles.Mcp, TablePrivileges.Select),
+
+        // Firm users: the admin service provisions a firm's first admin, the
+        // API's firm administration adds, edits and detaches staff.
+        new("firm_users", ServiceRoles.Admin, TablePrivileges.ReadWrite),
+        new("firm_users", ServiceRoles.Api, TablePrivileges.ReadWrite),
+        new("firm_users", ServiceRoles.Mcp, TablePrivileges.Select),
+
+        // The client directory: no delete exists (archiving is a status write).
+        new("firm_clients", ServiceRoles.Api, ReadInsertUpdate),
+        new("firm_clients", ServiceRoles.Mcp, TablePrivileges.Select),
+
+        // The firm's own configuration: reset is a delete.
+        new("library_creditors", ServiceRoles.Api, TablePrivileges.ReadWrite),
+        new("firm_questionnaires", ServiceRoles.Api, TablePrivileges.ReadWrite),
+        new("firm_document_checklists", ServiceRoles.Api, TablePrivileges.ReadWrite),
+
+        // Portal bindings: rows are rewritten, never deleted (a revoked
+        // binding is the record of access); a revocation deletes its claims.
+        new("client_bindings", ServiceRoles.Api, ReadInsertUpdate),
+        new("case_client_bindings", ServiceRoles.Api, ReadInsertUpdate),
+        new("case_client_role_claims", ServiceRoles.Api, TablePrivileges.ReadWrite),
+
+        // The access log: append-only for every service that writes it, and
+        // no UPDATE, DELETE or TRUNCATE for anyone (ADR 0028 § Data).
+        TableGrant.AppendOnly("access_log", ServiceRoles.Api),
+        TableGrant.AppendOnly("access_log", ServiceRoles.Mcp),
+        TableGrant.AppendOnly("access_log", ServiceRoles.Admin),
+        TableGrant.AppendOnly("access_log", ServiceRoles.Worker),
+    ];
 }
