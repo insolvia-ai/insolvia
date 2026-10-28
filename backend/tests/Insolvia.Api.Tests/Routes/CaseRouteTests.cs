@@ -166,6 +166,19 @@ public sealed class CaseRouteTests : IAsyncLifetime, IDisposable
         Assert.Contains(field, answer.FieldErrors);
     }
 
+    // json.loads keeps the last of a repeated key; it was a 500 here (the
+    // JsonNode threw on first read).
+    [Fact]
+    public async Task A_repeated_key_reads_as_its_last_value_as_flask_did()
+    {
+        var clientId = await _world.AddClientAsync();
+
+        var answer = await _world.Post("/v1/cases", $$"""{"chapter": 9, "court": "flmb", "division": "tampa", "chapter": 13, "client_ids": ["{{clientId}}"]}""");
+
+        Assert.Equal(201, answer.Status);
+        Assert.Equal(13, answer.Object["chapter"]!.GetValue<int>());
+    }
+
     [Fact]
     public async Task Create_rejects_a_non_object_body()
     {

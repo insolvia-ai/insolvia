@@ -263,7 +263,11 @@ public static class RequestBodies
         JsonNode? parsed;
         try
         {
-            parsed = JsonNode.Parse(text, documentOptions: new JsonDocumentOptions { AllowDuplicateProperties = true });
+            // Python's json.loads keeps the LAST of a repeated key. A JsonNode
+            // parsed with duplicates allowed only throws later, when first
+            // read (a 500), so the tree is rebuilt here, last value winning.
+            using var document = JsonDocument.Parse(text, new JsonDocumentOptions { AllowDuplicateProperties = true });
+            parsed = LastWins(document.RootElement);
         }
         catch (Exception error) when (error is JsonException or ArgumentException or InvalidOperationException)
         {
@@ -271,6 +275,27 @@ public static class RequestBodies
         }
 
         return parsed as JsonObject ?? throw new ValidationException("request body must be a JSON object");
+    }
+
+    private static JsonNode? LastWins(JsonElement element)
+    {
+        switch (element.ValueKind)
+        {
+            case JsonValueKind.Object:
+                var obj = new JsonObject();
+                foreach (var property in element.EnumerateObject())
+                {
+                    obj[property.Name] = LastWins(property.Value);
+                }
+
+                return obj;
+            case JsonValueKind.Array:
+                return new JsonArray([.. element.EnumerateArray().Select(LastWins)]);
+            case JsonValueKind.Null:
+                return null;
+            default:
+                return JsonValue.Create(element.Clone());
+        }
     }
 
     // Werkzeug's Request.is_json: application/json, or application/*+json.
