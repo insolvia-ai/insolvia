@@ -12,8 +12,31 @@
     <!-- ASP.NET Core on Lambda behind an HTTP API (payload format 2.0). -->
     <PackageVersion Include="Amazon.Lambda.AspNetCoreServer.Hosting" Version="2.2.1" />
   </ItemGroup>
+  <ItemGroup Label="Lambda (non-HTTP hosts)">
+    <!-- A one-shot host (the migrator) runs its own handler under the Lambda
+         runtime client. Same versions the API's hosting package resolves, so
+         one image family never carries two copies. -->
+    <PackageVersion Include="Amazon.Lambda.Core" Version="3.3.0" />
+    <PackageVersion Include="Amazon.Lambda.RuntimeSupport" Version="2.2.0" />
+    <PackageVersion Include="Amazon.Lambda.Serialization.SystemTextJson" Version="3.0.1" />
+  </ItemGroup>
+  <ItemGroup Label="Data">
+    <!-- EF Core and its design-time half move together: a migration generated
+         by one version and applied by another is how snapshots drift. -->
+    <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="10.0.14" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.14" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.14" />
+    <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
+    <PackageVersion Include="EFCore.NamingConventions" Version="10.0.1" />
+    <!-- IAM database authentication tokens (RDSAuthTokenGenerator), and the
+         migrator's read of the RDS-managed master secret. -->
+    <PackageVersion Include="AWSSDK.RDS" Version="4.0.107.2" />
+    <PackageVersion Include="AWSSDK.SecretsManager" Version="4.0.100.22" />
+  </ItemGroup>
   <ItemGroup Label="Tests">
     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.13" />
+    <!-- The data tier tests against a real Postgres, never an in-memory provider. -->
+    <PackageVersion Include="Testcontainers.PostgreSql" Version="4.16.0" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
     <PackageVersion Include="xunit.v3" Version="3.2.2" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />

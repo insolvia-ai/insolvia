@@ -1,6 +1,14 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!-- EF Core, migrations and the Postgres stores behind Core's ports. Referenced by hosts only. -->
   <ItemGroup>
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <PackageReference Include="EFCore.NamingConventions" />
+    <PackageReference Include="AWSSDK.RDS" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="../Insolvia.Core/Insolvia.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Insolvia.Data.Tests" />
   </ItemGroup>
 </Project>

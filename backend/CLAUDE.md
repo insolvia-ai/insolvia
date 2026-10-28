@@ -43,12 +43,55 @@ brings its Python tests across, translated, not rewritten.
 - `spikes/` holds standalone throwaway projects, deliberately **not** in the
   solution.
 
+## The data tier — `Insolvia.Data` and `Insolvia.Migrator`
+
+- **One context, `InsolviaDbContext`, one schema, `insolvia`.** An entity
+  joins the model through an `IEntityTypeConfiguration<T>` in `Insolvia.Data`
+  (picked up by assembly scan); nobody edits the context to add a table. Its
+  conventions are the rules above made mechanical: snake_case names,
+  `DateTimeOffset` → `timestamptz` (written as UTC), `decimal` → `numeric`,
+  `DateOnly` → `date`, `JsonDocument` → `jsonb` (an entity's `body` /
+  `provenance`). A `DateTime` property fails the model build.
+- **Adding a migration:** change the model, then
+  ```bash
+  cd backend && dotnet tool restore
+  dotnet ef migrations add <PascalCaseName> --project src/Insolvia.Data --startup-project src/Insolvia.Migrator --output-dir Migrations
+  ```
+  and commit the migration, its `.Designer.cs` and the updated snapshot
+  together. `ModelTests.The_real_model_has_no_change_that_a_migration_does_not_capture`
+  fails CI when a model change has no migration.
+- **Never edit an applied migration** — one that has reached `main`. Write a
+  new one. Staging and prod are wiped and reseeded before launch (ADR 0028),
+  which is not a licence to rewrite history: a developer's database and every
+  test run replay the chain as committed.
+- **Conditional writes** (`Concurrency/ConditionalWrite`): the precondition
+  goes in the statement's `WHERE`, and zero rows affected throws the caller's
+  domain error — the Python store's `ConditionalCheckFailed` translation.
+  Never read-then-write. A once-only insert is `SaveChangesOrConflictAsync`.
+  A multi-row change is `InTransactionAsync`.
+- **Listings page by keyset** (`Pagination/`): a `Keyset<TRow, TKey>` with a
+  total order and a name that includes everything that changes the rows
+  (index, view). `CursorCodec` binds a cursor to that name and refuses edits;
+  a store maps `InvalidCursorException` to the domain's validation error.
+- **Roles and grants live in the migrator's table**
+  (`src/Insolvia.Migrator/Grants.cs`, `GrantTable.All`) — never in a
+  migration. A store that adds a table adds its rows there in the same PR; a
+  table no row names is reachable by no service. An append-only log is
+  `TableGrant.AppendOnly(table, role)`. The migrator re-asserts the whole
+  table on every run, so removing a row revokes the grant.
+- **Who connects as whom:** each service as its own role (`api`, `worker`,
+  `admin`, `mcp`, `filing`) — locally with a password, deployed with an IAM
+  token (`INSOLVIA_DB_*`, `DatabaseSettings`). Only the migrator connects as
+  the superuser / RDS master, because only it creates roles.
+
 ## Test tiers
 
 - **Unit / route:** xUnit v3. Route tests run in-process through
   `WebApplicationFactory<Program>` (`tests/Insolvia.Api.Tests`).
-- **Data:** a real Postgres through Testcontainers (arrives with 18.9) —
-  never an in-memory EF provider.
+- **Data:** a real Postgres 17 through Testcontainers — never an in-memory
+  EF provider. One container per test assembly (`PostgresFixture`, a
+  collection fixture), a fresh database per test (`CreateDatabaseAsync`).
+  Needs Docker locally; GitHub's ubuntu runners have it.
 - **Contract:** `contract/` at the repo root, against a running base URL.
 
 ## Run it
@@ -59,7 +102,10 @@ dotnet build Insolvia.slnx                       # warnings are errors
 dotnet test Insolvia.slnx                        # what the pre-push hook runs
 dotnet format Insolvia.slnx                      # fix; CI runs --verify-no-changes
 dotnet run --project src/Insolvia.Api            # http://127.0.0.1:8080/health
-docker compose up --build                        # Postgres 17 on :55432 + the API on :8080
+docker compose up --build                        # Postgres 17 on :55432, the migrator, then the API on :8080
+INSOLVIA_DB_CONNECTION_STRING='Host=127.0.0.1;Port=55432;Database=insolvia;Username=insolvia;Password=insolvia-local-only' \
+INSOLVIA_DB_ROLE_PASSWORD=insolvia-local-only \
+  dotnet run --project src/Insolvia.Migrator      # migrate the compose database by hand
 ```
 
 The API on 8080 is the same port as the Python API: run one at a time. The

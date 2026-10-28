@@ -1,7 +1,11 @@
-# The local .NET stack: Postgres 17 and the API.
+# The local .NET stack: Postgres 17, the migrator, then the API.
 #
 #   docker compose -f backend/docker-compose.yml up --build
 #   curl http://127.0.0.1:8080/health
+#
+# The migrator runs once per `up`, after Postgres is healthy and before the
+# API starts: it applies EF migrations and (re)creates the per-service roles
+# with the local role password below. Running it again changes nothing.
 #
 # Port 8080 is the API's everywhere (ADR 0028, § Local), which is also the
 # Python API's: run one stack at a time until the switch.
@@ -33,20 +37,35 @@ services:
       timeout: 3s
       retries: 15
 
+  # A one-shot: it exits 0 when the database is current, and the API waits
+  # for that. It connects as the superuser because it creates roles, as the
+  # deployed migrator connects as the RDS master user.
+  migrator:
+    build:
+      context: .
+      target: migrator-development
+    environment:
+      INSOLVIA_DB_CONNECTION_STRING: Host=postgres;Port=5432;Database=insolvia;Username=insolvia;Password=insolvia-local-only
+      INSOLVIA_DB_ROLE_PASSWORD: insolvia-local-only
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   api:
     build:
       context: .
       target: development
     environment:
       INSOLVIA_ENV: ${INSOLVIA_ENV:-local}
-      # Read by nothing yet: the stores and the migrator arrive with 18.9.
-      # Written now so local is configured the way it will be used.
-      ConnectionStrings__Insolvia: Host=postgres;Port=5432;Database=insolvia;Username=insolvia;Password=insolvia-local-only
+      # The API connects as its own role, `api`, never as the superuser — the
+      # same least privilege it has on Aurora through IAM. Read by nothing
+      # yet: the stores arrive with 18.10.
+      INSOLVIA_DB_CONNECTION_STRING: Host=postgres;Port=5432;Database=insolvia;Username=api;Password=insolvia-local-only
     ports:
       - '127.0.0.1:8080:8080'
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrator:
+        condition: service_completed_successfully
 
 volumes:
   pgdata:
