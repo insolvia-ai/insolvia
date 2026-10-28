@@ -87,16 +87,23 @@ public sealed class MemoryClientBindingStore : IClientBindingStore
                 return Task.FromResult<ClientBinding?>(null);
             }
 
+            // A revocation releases the claims it names, each only if this
+            // subject holds it or nobody does. One another subject now holds
+            // (a revoke from a stale read) cancels the WHOLE write — the
+            // DynamoDB store's transaction was cancelled, nothing written.
+            var revoking = binding.Status == BindingStatus.Revoked;
+            if (revoking && binding.Roles.Any(role => _claims.TryGetValue((binding.CaseId, role), out var holder) && holder != binding.Subject))
+            {
+                throw new ConflictException(ClientBindings.AccessChanged);
+            }
+
             _bindings[key] = binding;
             _mirrors[(binding.CaseId, binding.Subject)] = binding;
-            if (binding.Status == BindingStatus.Revoked)
+            if (revoking)
             {
                 foreach (var role in binding.Roles)
                 {
-                    if (_claims.TryGetValue((binding.CaseId, role), out var holder) && holder == binding.Subject)
-                    {
-                        _claims.Remove((binding.CaseId, role));
-                    }
+                    _claims.Remove((binding.CaseId, role));
                 }
             }
 

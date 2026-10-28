@@ -111,15 +111,26 @@ public abstract class ClientBindingStoreConformance : IAsyncLifetime
     [Fact]
     public async Task Revoking_releases_only_the_claims_this_subject_holds()
     {
-        // A revocation from a stale read names a role the subject no longer
-        // holds: the other holder's claim stays.
+        // A revocation from a stale read names a role another subject now
+        // holds: the whole revocation is refused (DynamoDB cancelled the
+        // transaction), and nothing — binding, mirror or claim — moves.
         var store = Connect();
         var first = Binding(Ids.Pat, [ClientRole.Debtor1, ClientRole.Debtor2], BindingStatus.Active);
         await store.BindAsync(first, [], Ct);
         await store.BindAsync(Binding(Ids.Sam, [ClientRole.Debtor2]), [first with { Roles = [ClientRole.Debtor1] }], Ct);
 
-        await store.UpdateAsync(ClientBindings.Revoke(first), Ct);
+        var error = await Assert.ThrowsAsync<ConflictException>(() => store.UpdateAsync(ClientBindings.Revoke(first), Ct));
+        Assert.Equal(ClientBindings.AccessChanged, error.Message);
 
+        Assert.Equal(Ids.Pat, await ClaimHolderAsync(Ids.Case, ClientRole.Debtor1));
+        Assert.Equal(Ids.Sam, await ClaimHolderAsync(Ids.Case, ClientRole.Debtor2));
+        var stored = await Connect().GetAsync(Ids.Firm, Ids.Pat, Ct);
+        Assert.Equal(BindingStatus.Active, stored!.Status);
+        Assert.Equal([ClientRole.Debtor1], stored.Roles);
+        Assert.Equal(BindingStatus.Active, (await store.ListForCaseAsync(Ids.Case, Ct)).Single(b => b.Subject == Ids.Pat).Status);
+
+        // Revoking what Pat holds NOW releases exactly that.
+        await store.UpdateAsync(ClientBindings.Revoke(stored), Ct);
         Assert.Null(await ClaimHolderAsync(Ids.Case, ClientRole.Debtor1));
         Assert.Equal(Ids.Sam, await ClaimHolderAsync(Ids.Case, ClientRole.Debtor2));
     }

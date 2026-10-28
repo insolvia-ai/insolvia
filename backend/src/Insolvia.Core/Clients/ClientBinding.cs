@@ -65,6 +65,12 @@ public sealed record InvitationDraft(string Email, string DisplayName, ValueColl
 /// <summary>Parsing and the transitions of a portal binding (from <c>clients.py</c>).</summary>
 public static class ClientBindings
 {
+    /// <summary>
+    /// A revocation named a role another subject now holds — the binding was
+    /// read before a narrowing moved the role. 409: reload and try again.
+    /// </summary>
+    public const string AccessChanged = "that client's access changed while this was written; reload and try again";
+
     private static readonly HashSet<string> InvitationFields = new(StringComparer.Ordinal) { "email", "displayName", "roles" };
 
     /// <summary>
