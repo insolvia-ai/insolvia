@@ -85,3 +85,11 @@ jobs:
       - name: Build migrator development image
         if: steps.filter.outputs.run == 'true'
         run: docker build --target migrator-development -t insolvia-backend-migrator-dev-pr-check .
+
+      - name: Build MCP Lambda image
+        if: steps.filter.outputs.run == 'true'
+        run: docker build --target mcp-lambda -t insolvia-backend-mcp-pr-check .
+
+      - name: Build MCP development image
+        if: steps.filter.outputs.run == 'true'
+        run: docker build --target mcp-development -t insolvia-backend-mcp-dev-pr-check .
