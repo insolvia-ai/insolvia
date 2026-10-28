@@ -93,7 +93,7 @@ OUT.mkdir(exist_ok=True)
             "request": review_cap,
         },
         indent=1, ensure_ascii=False, sort_keys=True,
-    )
+    ) + "\n"
 )
 (OUT / "extraction.json").write_text(
     json.dumps(
@@ -104,6 +104,6 @@ OUT.mkdir(exist_ok=True)
             "cases": cases,
         },
         indent=1, ensure_ascii=False, sort_keys=True,
-    )
+    ) + "\n"
 )
 print("anthropic python sdk", anthropic.__version__, "| wrote", OUT)
