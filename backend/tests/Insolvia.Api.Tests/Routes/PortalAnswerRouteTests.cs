@@ -12,15 +12,14 @@ namespace Insolvia.Api.Tests.Routes;
 /// edit-while-pending, withdrawal, and what a client cannot do.
 /// </summary>
 /// <remarks>
-/// The staff review queue (<c>/v1/cases/&lt;id&gt;/extraction/candidates</c>
-/// and its <c>…/review</c>) is not ported yet (18.17), so where the Python
-/// read the queue these read the candidate store behind the API, and where it
-/// accepted an answer through the review route these move the row to
-/// <c>accepted</c> in the store. The eight tests that are ABOUT acceptance —
-/// the debtor write, <c>client_answered</c> provenance, corrected payloads,
-/// appended names, record answers, the employment link, the queue's
-/// <c>client</c>/<c>question</c> blocks and the two staff-save provenance
-/// tests — belong with the review route and move with it.
+/// Where the Python read the staff review queue these read the candidate
+/// store behind the API, and where it accepted an answer these move the row
+/// to <c>accepted</c> in the store: the client half needs nothing more. The
+/// tests that are ABOUT acceptance — the debtor write, <c>client_answered</c>
+/// provenance, corrected payloads, appended names, record answers, the
+/// employment link, the queue's <c>client</c>/<c>question</c> blocks and the
+/// two staff-save provenance tests — are <see cref="PortalAnswerReviewTests"/>,
+/// beside the review route (18.17).
 /// </remarks>
 public sealed class PortalAnswerRouteTests : IAsyncLifetime, IDisposable
 {

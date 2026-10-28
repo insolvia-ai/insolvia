@@ -48,7 +48,7 @@ public sealed class RouteTableTests : IDisposable
         { "DELETE", "/v1/firm/document-checklist" },
     };
 
-    /// <summary>The case-side slice 18.15 maps: part 1's records and part 2's computed analyses (no summary, forms, packets, jobs, extraction, approval or portal).</summary>
+    /// <summary>The case-side slice 18.15 maps: part 1's records and part 2's computed analyses (no forms or approval; the pipeline and the portal have their own slices).</summary>
     public static TheoryData<string, string> CaseSideRoutes => new()
     {
         { "POST", "/v1/cases" },
@@ -144,12 +144,25 @@ public sealed class RouteTableTests : IDisposable
         { "POST", "/v1/portal/documents/{documentId}/complete" },
     };
 
+    /// <summary>The pipeline slice 18.17 maps: jobs, packets, the case summary, the extraction review queue.</summary>
+    public static TheoryData<string, string> PipelineRoutes => new()
+    {
+        { "POST", "/v1/cases/{caseId}/jobs" },
+        { "GET", "/v1/cases/{caseId}/jobs/{jobId}" },
+        { "GET", "/v1/cases/{caseId}/packets" },
+        { "GET", "/v1/cases/{caseId}/packets/{packetId}/url" },
+        { "GET", "/v1/cases/{caseId}/summary" },
+        { "GET", "/v1/cases/{caseId}/extraction/candidates" },
+        { "POST", "/v1/cases/{caseId}/extraction/candidates/{candidateId}/review" },
+    };
+
     public void Dispose() => _world.Dispose();
 
     [Theory]
     [MemberData(nameof(FirmSideRoutes))]
     [MemberData(nameof(CaseSideRoutes))]
     [MemberData(nameof(PortalStaffRoutes))]
+    [MemberData(nameof(PipelineRoutes))]
     public async Task Every_firm_side_route_is_a_staff_route_and_401s_without_a_token(string method, string template)
     {
         var path = System.Text.RegularExpressions.Regex.Replace(
@@ -182,7 +195,7 @@ public sealed class RouteTableTests : IDisposable
     public void The_route_table_is_exactly_the_firm_and_case_side_slices_plus_the_two_public_routes()
     {
         var mapped = Endpoints().Where(e => e.Name.Contains("/v1/", StringComparison.Ordinal)).Select(e => e.Name).Order(StringComparer.Ordinal);
-        var expected = FirmSideRoutes.Concat(CaseSideRoutes).Concat(PortalStaffRoutes).Concat(PortalClientRoutes).Select(row => $"{row.Data.Item1} {row.Data.Item2}").Concat(Public).Order(StringComparer.Ordinal);
+        var expected = FirmSideRoutes.Concat(CaseSideRoutes).Concat(PortalStaffRoutes).Concat(PortalClientRoutes).Concat(PipelineRoutes).Select(row => $"{row.Data.Item1} {row.Data.Item2}").Concat(Public).Order(StringComparer.Ordinal);
 
         Assert.Equal(expected, mapped);
         Assert.All(Endpoints().Where(e => Public.Contains(e.Name)), e => Assert.Null(e.Principal));

@@ -1,10 +1,28 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- Host: the job worker Lambda (packet assembly, AI review, extraction). Gets its own Dockerfile target when it has a handler. -->
+  <!-- Host: the pipeline worker (ADR 0018) — packet assembly, the AI petition
+       review and document extraction, dispatched by kind from one SQS queue.
+       Under Lambda it handles one SQS event per invocation; anywhere else
+       `dotnet run` is the local poller over this machine's dev queue. The
+       Anthropic SDK lives HERE only (ADR 0015/0019): the API image never grows it. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <!-- The Lambda base image runs an executable assembly by name: the
+         Dockerfile's CMD is this name. -->
+    <AssemblyName>Insolvia.Worker</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Amazon.Lambda.Core" />
+    <PackageReference Include="Amazon.Lambda.RuntimeSupport" />
+    <PackageReference Include="Anthropic" />
+  </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../Insolvia.Core/Insolvia.Core.csproj" />
     <ProjectReference Include="../Insolvia.Engines/Insolvia.Engines.csproj" />
     <ProjectReference Include="../Insolvia.Forms/Insolvia.Forms.csproj" />
     <ProjectReference Include="../Insolvia.Data/Insolvia.Data.csproj" />
     <ProjectReference Include="../Insolvia.Aws/Insolvia.Aws.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Insolvia.Worker.Tests" />
   </ItemGroup>
 </Project>

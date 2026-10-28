@@ -134,6 +134,37 @@ public enum AccessAction
     /// <summary>The attorney's answer to a hand-back or unknown outcome.</summary>
     [JsonStringEnumMemberName("filing.resolve")]
     FilingResolve,
+
+    // The pipeline's reads (18.17). Python's routes and workers wrote these
+    // strings without listing them in ACTIONS; the enum makes them a closed set.
+
+    /// <summary>A case's packets were listed.</summary>
+    [JsonStringEnumMemberName("packet.read")]
+    PacketRead,
+
+    /// <summary>One packet's download URL was minted.</summary>
+    [JsonStringEnumMemberName("packet.download")]
+    PacketDownload,
+
+    /// <summary>The packet worker read the whole case file, on the accepting preparer's behalf.</summary>
+    [JsonStringEnumMemberName("packet.assemble")]
+    PacketAssemble,
+
+    /// <summary>The review worker read the whole case file, on the accepting preparer's behalf.</summary>
+    [JsonStringEnumMemberName("petition.review")]
+    PetitionReview,
+
+    /// <summary>The extraction worker read a source document, on the accepting preparer's behalf.</summary>
+    [JsonStringEnumMemberName("document.extract")]
+    DocumentExtract,
+
+    /// <summary>A case's review queue was read.</summary>
+    [JsonStringEnumMemberName("extraction.read")]
+    ExtractionRead,
+
+    /// <summary>A candidate was accepted or rejected.</summary>
+    [JsonStringEnumMemberName("extraction.review")]
+    ExtractionReview,
 }
 
 /// <summary>Whether the caller got the data. A denied read is the interesting row: it is what probing looks like.</summary>

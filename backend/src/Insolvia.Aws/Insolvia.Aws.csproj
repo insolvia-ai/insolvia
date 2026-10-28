@@ -10,6 +10,7 @@
     <PackageReference Include="AWSSDK.KeyManagementService" />
     <PackageReference Include="AWSSDK.CognitoIdentityProvider" />
     <PackageReference Include="AWSSDK.S3" />
+    <PackageReference Include="AWSSDK.SQS" />
   </ItemGroup>
   <ItemGroup>
     <!-- The byte-identity test against Python seals with a fixed nonce, which

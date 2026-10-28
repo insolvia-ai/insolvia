@@ -21,5 +21,17 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/Insolvia.Api/Insolvia.Api.csproj" />
+    <!-- The pipeline end to end (PipelineEndToEndTests): the API accepts, the
+         WORKER consumes the message it sent, the API serves the result. Under
+         an extern alias: both hosts compile a top-level `Program`, and only
+         the API's is the factory's. A test project may hold two hosts; a host
+         never references another. -->
+    <ProjectReference Include="../../src/Insolvia.Worker/Insolvia.Worker.csproj" Aliases="worker" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The reference case the end-to-end test assembles, read in place. -->
+    <None Include="../Insolvia.Engines.Tests/Parity/reference-ch7.case.json" Link="CaseFiles/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <Compile Include="../Insolvia.Forms.Tests/Support/CaseFiles.cs" Link="Support/CaseFiles.cs" />
+    <Compile Include="../Insolvia.Forms.Tests/Support/CaseDatas.cs" Link="Support/CaseDatas.cs" />
   </ItemGroup>
 </Project>

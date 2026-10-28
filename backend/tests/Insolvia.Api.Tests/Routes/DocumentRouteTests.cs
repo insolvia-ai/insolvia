@@ -5,6 +5,7 @@ using Insolvia.Core.Documents;
 using Insolvia.Core.Firms;
 using Insolvia.Core.Memory;
 using Insolvia.Core.Ports;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using static Insolvia.Api.Tests.Support.CaseWorld;
 
 namespace Insolvia.Api.Tests.Routes;
@@ -13,8 +14,8 @@ namespace Insolvia.Api.Tests.Routes;
 /// test_document_routes.py, and the staff half of test_portal_documents.py
 /// (the case's document requests): tenancy, the validated upload and its
 /// presigned capability, completion against the bucket, the list, download,
-/// delete, the access log's four verbs, and who may. The extraction trigger's
-/// four tests wait for the job store (18.17).
+/// delete, the access log's four verbs, who may, and the extraction
+/// auto-trigger on complete (best effort; never for a client's upload).
 /// </summary>
 public sealed class DocumentRouteTests : IAsyncLifetime, IDisposable
 {
@@ -391,6 +392,75 @@ public sealed class DocumentRouteTests : IAsyncLifetime, IDisposable
         var answer = await _world.Post($"/v1/cases/{caseId}/document-requests/from-checklist", null);
         Assert.True(answer.Status == 200, answer.Body);
         return answer.Object;
+    }
+
+    // ── Extraction auto-trigger (issue 8.7) ─────────────────────────
+
+    private MemoryJobSender Sender => (MemoryJobSender)_world.Service<IJobSender>();
+
+    private IJobStore Jobs => _world.Service<IJobStore>();
+
+    [Fact]
+    public async Task Completing_an_extractable_upload_triggers_extraction_once()
+    {
+        var caseId = await _world.OpenCaseIdAsync();
+        var documentId = await AddedAsync(caseId, """ "kind": "credit_report" """);
+        Blobs.AcceptUpload($"cases/{caseId}/{documentId}", 2048, "etag-1");
+
+        Assert.Equal(200, (await Complete(caseId, documentId)).Status);
+
+        var job = Assert.Single(await Jobs.ListForCaseAsync(caseId, HttpAssert.Ct));
+        Assert.Equal(Core.Jobs.JobRules.DocumentExtractionKind, job.Kind);
+        Assert.Equal(documentId, job.DocumentId);
+        Assert.Equal(Alice, job.CreatedBy);
+        Assert.Equal(documentId, Assert.Single(Sender.Messages)["documentId"]!.GetValue<string>());
+
+        // A retried complete finds the active job and queues no second run.
+        Assert.Equal(200, (await Complete(caseId, documentId)).Status);
+        Assert.Single(await Jobs.ListForCaseAsync(caseId, HttpAssert.Ct));
+        Assert.Single(Sender.Bodies);
+    }
+
+    [Fact]
+    public async Task Completing_an_unextractable_kind_triggers_nothing()
+    {
+        var caseId = await _world.OpenCaseIdAsync();
+        var documentId = await UploadedAsync(caseId);
+        Assert.Equal(200, (await Complete(caseId, documentId)).Status);
+        Assert.Empty(await Jobs.ListForCaseAsync(caseId, HttpAssert.Ct));
+        Assert.Empty(Sender.Bodies);
+    }
+
+    [Fact]
+    public async Task A_pipeline_failure_does_not_fail_the_upload()
+    {
+        var caseId = await _world.OpenCaseIdAsync();
+        var documentId = await AddedAsync(caseId, """ "kind": "credit_report" """);
+        Blobs.AcceptUpload($"cases/{caseId}/{documentId}", 2048, "etag-1");
+        Sender.FailWith = new InvalidOperationException("sqs is down");
+
+        Assert.Equal(200, (await Complete(caseId, documentId)).Status);
+
+        // The wedged row is failed, so a later accept starts clean.
+        var job = Assert.Single(await Jobs.ListForCaseAsync(caseId, HttpAssert.Ct));
+        Assert.Equal(Core.Jobs.JobStatus.Failed, job.Status);
+        Assert.Equal("enqueue_failed", job.Failure!.Category);
+    }
+
+    [Fact]
+    public async Task Without_a_pipeline_the_upload_still_completes()
+    {
+        using var world = new CaseWorld(services =>
+        {
+            services.RemoveAll<IJobSender>();
+            services.RemoveAll<IJobStore>();
+        });
+        await world.SeedAsync();
+        var caseId = await world.OpenCaseIdAsync();
+        var answer = await world.Post($"/v1/cases/{caseId}/documents", Upload.Replace("bank_statement", "credit_report", StringComparison.Ordinal));
+        var documentId = answer.Object["document"]!.AsObject().Str("id")!;
+        ((MemoryDocumentBlobStore)world.Service<IDocumentBlobStore>()).AcceptUpload($"cases/{caseId}/{documentId}", 2048, "etag-1");
+        Assert.Equal(200, (await world.Post($"/v1/cases/{caseId}/documents/{documentId}/complete", null)).Status);
     }
 
     private Task RestrictAliceAsync(PermissionLevel level) =>

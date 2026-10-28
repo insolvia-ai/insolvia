@@ -335,6 +335,33 @@ public sealed class MemoryCaseStore(MemoryDebtorStore? debtors = null) : ICaseSt
         }
     }
 
+    /// <summary>
+    /// The packet store's half of its transaction (Python's
+    /// <c>MemoryPacketStore</c> reached into <c>cases</c>): write the pinned
+    /// case only if the stored one still exists in its firm, still carries the
+    /// <c>updated_at</c> the worker read, and — unless
+    /// <paramref name="allowFiled"/> — is not filed. Runs
+    /// <paramref name="alsoWrite"/> under the same lock before the case write,
+    /// so the packet and the pins land together. False, writing nothing, otherwise.
+    /// </summary>
+    internal bool TryPin(Case pinned, DateTimeOffset expectedUpdatedAt, bool allowFiled, Action alsoWrite)
+    {
+        lock (_gate)
+        {
+            if (!_cases.TryGetValue(pinned.Id, out var current)
+                || current.FirmId != pinned.FirmId
+                || current.UpdatedAt != expectedUpdatedAt
+                || (!allowFiled && CaseRules.IsFiled(current.Status)))
+            {
+                return false;
+            }
+
+            alsoWrite();
+            _cases[current.Id] = pinned;
+            return true;
+        }
+    }
+
     // The history's half of the version: the latest event is still the one
     // the writer read, and none shares the new event's instant.
     private bool AtVersion(string caseId, LifecycleWrite write)

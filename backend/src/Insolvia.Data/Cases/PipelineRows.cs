@@ -20,6 +20,8 @@ internal sealed class JobRow
 {
     public const string Table = "jobs";
 
+    public const string PrimaryKey = "pk_jobs";
+
     public string CaseId { get; set; } = "";
 
     public string Id { get; set; } = "";
@@ -60,6 +62,8 @@ internal sealed class JobRow
 internal sealed class PacketRow
 {
     public const string Table = "packets";
+
+    public const string PrimaryKey = "pk_packets";
 
     public string CaseId { get; set; } = "";
 

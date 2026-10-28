@@ -8,12 +8,13 @@
 #   docker build --target mcp-development       -t insolvia-mcp .        # the MCP server on :8788
 #   docker build --target admin-lambda          -t insolvia-admin .      # the staff admin Lambda
 #   docker build --target admin-development     -t insolvia-admin .      # the admin under Kestrel, :8090
+#   docker build --target worker-lambda         -t insolvia-worker .     # the pipeline worker Lambda (SQS)
 #
 # One build stage compiles every host; each deployable unit gets its own final
 # stage(s), so a host's weight lands in its own image and never in another's
-# (ADR 0015). The API, the migrator, the MCP server and the admin service have
-# stages today. Worker and Filing each get a `<host>` stage on the Lambda base
-# image in the PR that gives them a handler:
+# (ADR 0015). The API, the migrator, the MCP server, the admin service and the
+# pipeline worker have stages today. Filing gets a `<host>` stage on the Lambda
+# base image in the PR that gives it a handler:
 # publish that project into /out/<host> in the build stage and copy it the
 # same way the lambda stage below does.
 
@@ -50,10 +51,12 @@ COPY src/Insolvia.Api/*.csproj src/Insolvia.Api/packages.lock.json src/Insolvia.
 COPY src/Insolvia.Migrator/*.csproj src/Insolvia.Migrator/packages.lock.json src/Insolvia.Migrator/
 COPY src/Insolvia.Mcp/*.csproj src/Insolvia.Mcp/packages.lock.json src/Insolvia.Mcp/
 COPY src/Insolvia.Admin/*.csproj src/Insolvia.Admin/packages.lock.json src/Insolvia.Admin/
+COPY src/Insolvia.Worker/*.csproj src/Insolvia.Worker/packages.lock.json src/Insolvia.Worker/
 RUN dotnet restore src/Insolvia.Api/Insolvia.Api.csproj --locked-mode \
  && dotnet restore src/Insolvia.Migrator/Insolvia.Migrator.csproj --locked-mode \
  && dotnet restore src/Insolvia.Mcp/Insolvia.Mcp.csproj --locked-mode \
- && dotnet restore src/Insolvia.Admin/Insolvia.Admin.csproj --locked-mode
+ && dotnet restore src/Insolvia.Admin/Insolvia.Admin.csproj --locked-mode \
+ && dotnet restore src/Insolvia.Worker/Insolvia.Worker.csproj --locked-mode
 
 COPY src/ src/
 RUN dotnet publish src/Insolvia.Api/Insolvia.Api.csproj \
@@ -63,7 +66,9 @@ RUN dotnet publish src/Insolvia.Api/Insolvia.Api.csproj \
  && dotnet publish src/Insolvia.Mcp/Insolvia.Mcp.csproj \
       --configuration Release --no-restore --output /out/mcp \
  && dotnet publish src/Insolvia.Admin/Insolvia.Admin.csproj \
-      --configuration Release --no-restore --output /out/admin
+      --configuration Release --no-restore --output /out/admin \
+ && dotnet publish src/Insolvia.Worker/Insolvia.Worker.csproj \
+      --configuration Release --no-restore --output /out/worker
 
 # ── lambda: the API as AWS runs it ──────────────────────────────────────────
 # The AWS base image carries the .NET and ASP.NET Core runtimes and the
@@ -142,3 +147,14 @@ COPY --from=build /out/admin ./
 EXPOSE 8090
 USER $APP_UID
 ENTRYPOINT ["dotnet", "Insolvia.Admin.dll"]
+
+# ── worker-lambda: the pipeline worker as AWS runs it (ADR 0018) ────────────
+# One SQS event per invocation (batch size 1, the event source mapping);
+# Program.cs runs the Lambda runtime client when AWS_LAMBDA_RUNTIME_API is
+# set. The Anthropic SDK and the PDF engine's weight live in THIS image only
+# (ADR 0015/0019). No development stage, as in Python: locally the worker is
+# `dotnet run --project src/Insolvia.Worker` — the poller over this machine's
+# own dev queue (JOB_QUEUE_URL), which needs real AWS credentials anyway.
+FROM public.ecr.aws/lambda/dotnet:10 AS worker-lambda
+COPY --from=build /out/worker ${LAMBDA_TASK_ROOT}/
+CMD ["Insolvia.Worker"]

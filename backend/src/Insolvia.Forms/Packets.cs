@@ -1,6 +1,8 @@
+using System.Globalization;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Insolvia.Core;
+using Insolvia.Core.Packets;
 
 namespace Insolvia.Forms;
 
@@ -175,5 +177,137 @@ public static partial class Packets
             ["createdAt"] = packet.CreatedAt,
             ["options"] = FormOverlay.OutputOptionsJson(packet.Options),
         };
+    }
+
+    /// <summary>The stored shape (<c>packet_item</c>) the packet store holds.</summary>
+    public static PacketItem ToItem(Packet packet)
+    {
+        ArgumentNullException.ThrowIfNull(packet);
+        return new PacketItem(
+            packet.Id,
+            packet.CaseId,
+            packet.JobId,
+            packet.FileName,
+            packet.ContentType,
+            packet.ByteSize,
+            packet.Sha256,
+            packet.StorageRef,
+            packet.FormRevisions,
+            packet.ConstantsSetId,
+            packet.CreditorCount,
+            packet.CreatedBy,
+            DateTimeOffset.Parse(packet.CreatedAt, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal),
+            FormOverlay.OutputOptionsJson(packet.Options),
+            new JsonArray([.. packet.Parts.Select(part => (JsonNode)PacketPartJson(part))]));
+    }
+
+    /// <summary>
+    /// Inverse of <see cref="ToItem"/> (<c>packet_from_item</c>), tolerant the
+    /// stored item's way: absent options are the plain filing set. A row this
+    /// service did not write is a loud <see cref="ValidationException"/>.
+    /// </summary>
+    public static Packet FromItem(PacketItem item)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        try
+        {
+            return new Packet(
+                item.Id,
+                item.CaseId,
+                item.JobId,
+                item.FileName,
+                item.ContentType,
+                item.ByteSize,
+                item.Sha256,
+                item.StorageRef,
+                item.FormRevisions,
+                item.ConstantsSetId,
+                item.CreditorCount,
+                item.CreatedBy,
+                item.CreatedAt.UtcDateTime.ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'", CultureInfo.InvariantCulture))
+            {
+                Options = OptionsFromItem(item.Options),
+                Parts = PartsFromItem(item.Parts).ToValueCollection(),
+            };
+        }
+        catch (FormatException error)
+        {
+            throw new ValidationException($"stored packet item is malformed: {error.Message}", error);
+        }
+    }
+
+    private static OutputOptions OptionsFromItem(JsonObject? raw)
+    {
+        if (raw is null)
+        {
+            return FormOverlay.DefaultOutputOptions;
+        }
+
+        var mode = Json.AsString(raw["signaturePages"]) ?? "all";
+        var signaturePages = mode switch
+        {
+            "all" => SignaturePagesMode.All,
+            "only" => SignaturePagesMode.Only,
+            "omit" => SignaturePagesMode.Omit,
+            _ => throw new FormatException($"options.signaturePages '{mode}' is invalid"),
+        };
+        var forms = raw["forms"] is JsonArray list && list.Count > 0 ? list.Select(form => form?.ToString() ?? string.Empty).ToValueCollection() : null;
+        return new OutputOptions
+        {
+            DraftWatermark = Json.AsBool(raw["draftWatermark"]) ?? false,
+            PrintDate = Json.AsBool(raw["printDate"]) ?? false,
+            SignaturePages = signaturePages,
+            SignElectronically = Json.AsBool(raw["signElectronically"]) ?? false,
+            Forms = forms,
+            AmendedOnly = Json.AsBool(raw["amendedOnly"]) ?? false,
+        };
+    }
+
+    private static List<PacketPart> PartsFromItem(JsonArray raw)
+    {
+        var parts = new List<PacketPart>();
+        foreach (var entry in raw)
+        {
+            if (entry is not JsonObject part)
+            {
+                throw new FormatException("a part is not a map");
+            }
+
+            var byteSize = Count(part, "byteSize") ?? throw new FormatException("a part has no byteSize");
+            var digest = part["sha256"];
+            if (digest is not null && Json.AsString(digest) is null)
+            {
+                throw new FormatException("a part's sha256 is not a string");
+            }
+
+            parts.Add(new PacketPart(
+                Json.AsString(part["name"]) ?? throw new FormatException("a part has no name"),
+                byteSize,
+                (int?)Count(part, "pageCount"),
+                (int?)Count(part, "nonLetterPages"),
+                (int?)Count(part, "pagesWithoutText"),
+                Json.AsBool(part["unreadable"]) ?? false,
+                Json.AsString(digest)));
+        }
+
+        return parts;
+    }
+
+    private static long? Count(JsonObject raw, string key)
+    {
+        var value = raw[key];
+        if (value is null)
+        {
+            return null;
+        }
+
+        if (Json.TryGetWholeNumber(value, out var number))
+        {
+            return number;
+        }
+
+        return Json.AsString(value) is { } text && long.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out number)
+            ? number
+            : throw new FormatException($"part {key} has a non-numeric type");
     }
 }

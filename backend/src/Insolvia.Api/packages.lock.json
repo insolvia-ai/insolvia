@@ -92,6 +92,7 @@
           "AWSSDK.Core": "[4.0.102.14, )",
           "AWSSDK.KeyManagementService": "[4.0.101, )",
           "AWSSDK.S3": "[4.0.104.3, )",
+          "AWSSDK.SQS": "[4.0.100.17, )",
           "Insolvia.Core": "[1.0.0, )"
         }
       },
@@ -188,6 +189,15 @@
         "requested": "[4.0.104.3, )",
         "resolved": "4.0.104.3",
         "contentHash": "AWtrk6Nn9v2+9HdD1qR3o/7zqFnSNWymqAYGQgzs53i2WJHM58avatVJROtF8WjaUzi1k463+uQUsYtUBA8Elg==",
+        "dependencies": {
+          "AWSSDK.Core": "[4.0.102.10, 5.0.0)"
+        }
+      },
+      "AWSSDK.SQS": {
+        "type": "CentralTransitive",
+        "requested": "[4.0.100.17, )",
+        "resolved": "4.0.100.17",
+        "contentHash": "dtFV8i7/GfSb0e6MHT7gPDwIHhoq3MERO1YFs/VU6FGRBCB/pInqBJhlipXWS9AbdV1+Bu5+KftpAsIhmoPtcA==",
         "dependencies": {
           "AWSSDK.Core": "[4.0.102.10, 5.0.0)"
         }

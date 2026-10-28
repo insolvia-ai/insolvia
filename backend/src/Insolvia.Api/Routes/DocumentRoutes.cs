@@ -8,6 +8,7 @@ using Insolvia.Core.AccessLog;
 using Insolvia.Core.DocumentRequests;
 using Insolvia.Core.Documents;
 using Insolvia.Core.Firms;
+using Insolvia.Core.Jobs;
 using Insolvia.Core.Ports;
 
 namespace Insolvia.Api.Routes;
@@ -20,10 +21,8 @@ namespace Insolvia.Api.Routes;
 /// reaper's tag and records what S3 counted; a read mints a short presigned GET.
 /// </summary>
 /// <remarks>
-/// <para><b>Not here yet</b>: the extraction auto-trigger on complete
-/// (<c>_trigger_extraction</c>) — the job store and queue are 18.17's. Its
-/// failure never failed an upload in Python either, so a completed upload
-/// answers the same body without it.</para>
+/// A completed staff upload of an extractable kind starts extraction on its
+/// own (<see cref="TriggerExtractionAsync"/>), best effort.
 /// </remarks>
 public sealed class DocumentRoutes : IEndpointModule
 {
@@ -96,6 +95,47 @@ public sealed class DocumentRoutes : IEndpointModule
         }
     }
 
+    /// <summary>
+    /// A confirmed upload of an extractable kind starts extraction (issue 8.7)
+    /// — BEST EFFORT: the upload already succeeded, and failing the confirm
+    /// over a pipeline hiccup would tell the user their document did not
+    /// arrive. Everything that goes wrong is logged and swallowed; the jobs
+    /// endpoint is the retry path. Without a queue composed, nothing happens.
+    /// The accept endpoint's one-active-job-per-document rule holds here too.
+    /// A CLIENT'S upload is never auto-extracted (ADR 0023 decision 6): the
+    /// portal's complete route may call this, and the channel check makes it a no-op.
+    /// </summary>
+    internal static async Task TriggerExtractionAsync(HttpContext context, Document document, string acceptedBy, CancellationToken cancellationToken)
+    {
+        if (document.Channel == DocumentChannel.Client
+            || !JobRules.ExtractableDocumentKinds.Contains(document.Kind)
+            || context.RequestServices.GetService<IJobStore>() is not { } jobs
+            || context.RequestServices.GetService<IJobSender>() is null)
+        {
+            return;
+        }
+
+        Job job;
+        try
+        {
+            var active = JobRules.FindActive(await jobs.ListForCaseAsync(document.CaseId, cancellationToken), JobRules.DocumentExtractionKind, document.Id);
+            if (active is not null)
+            {
+                return;
+            }
+
+            job = JobRules.NewJob(JobRules.DocumentExtractionKind, document.CaseId, acceptedBy, document.Id, clock: context.Clock());
+            await JobRoutes.SendAsync(context, job, cancellationToken);
+        }
+        catch (Exception error) when (error is not OperationCanceledException)
+        {
+            context.Log(Logger, "extraction auto-trigger failed; the upload itself succeeded", ("case_id", document.CaseId), ("document_id", document.Id));
+            return;
+        }
+
+        context.Log(Logger, "extraction triggered by upload", ("case_id", document.CaseId), ("document_id", document.Id), ("job_id", job.Id));
+    }
+
     private static async Task<IResult> CreateAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
     {
         var accessor = await context.CurrentAccessorAsync();
@@ -131,6 +171,8 @@ public sealed class DocumentRoutes : IEndpointModule
 
         context.Log(Logger, "document completed", ("case_id", caseId), ("document_id", documentId), ("byte_size", confirmed.ByteSize));
         await SatisfyRequestAsync(context, confirmed, cancellationToken);
+        var accessor = await context.CurrentAccessorAsync();
+        await TriggerExtractionAsync(context, confirmed, accessor.Subject, cancellationToken);
         return FlaskJson.Result(new JsonObject { ["document"] = CaseViews.Document(confirmed) });
     }
 
