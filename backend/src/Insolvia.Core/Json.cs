@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
@@ -127,7 +126,4 @@ public static class Json
 
     private static bool HasFractionOrExponent(string raw) =>
         raw.Contains('.', StringComparison.Ordinal) || raw.Contains('e', StringComparison.OrdinalIgnoreCase);
-
-    /// <summary>A double's shortest round-trip spelling, for messages.</summary>
-    internal static string Invariant(double value) => value.ToString("R", CultureInfo.InvariantCulture);
 }
