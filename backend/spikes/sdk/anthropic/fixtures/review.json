@@ -1,0 +1,150 @@
+{
+ "client_max_retries": 1,
+ "document": "PETITION REVIEW INPUT\nline two é \"quoted\" <tag> & more\n",
+ "model_constant": "claude-opus-5",
+ "request": {
+  "body": {
+   "max_tokens": 16000,
+   "messages": [
+    {
+     "content": "PETITION REVIEW INPUT\nline two é \"quoted\" <tag> & more\n",
+     "role": "user"
+    }
+   ],
+   "model": "claude-opus-5",
+   "output_config": {
+    "format": {
+     "schema": {
+      "additionalProperties": false,
+      "properties": {
+       "findings": {
+        "items": {
+         "additionalProperties": false,
+         "properties": {
+          "category": {
+           "enum": [
+            "consistency",
+            "arithmetic",
+            "missing_creditor",
+            "exemption",
+            "transfer",
+            "incomplete",
+            "other"
+           ],
+           "type": "string"
+          },
+          "form": {
+           "description": "The form the finding points at, as its series id in the packet content (e.g. form/b106i), or 'packet' for a cross-form finding.",
+           "type": "string"
+          },
+          "line": {
+           "description": "The line or field key on that form (e.g. 4_combined_monthly_income), or '' when the finding has no single line.",
+           "type": "string"
+          },
+          "message": {
+           "description": "One or two sentences a petition preparer can act on.",
+           "type": "string"
+          },
+          "severity": {
+           "enum": [
+            "high",
+            "medium",
+            "low"
+           ],
+           "type": "string"
+          }
+         },
+         "required": [
+          "severity",
+          "category",
+          "form",
+          "line",
+          "message"
+         ],
+         "type": "object"
+        },
+        "type": "array"
+       }
+      },
+      "required": [
+       "findings"
+      ],
+      "type": "object"
+     },
+     "type": "json_schema"
+    }
+   },
+   "system": "You are reviewing a completed U.S. Chapter 7 individual bankruptcy petition\npacket before filing: form B101, the B106 schedules and summary, the B107\nstatement of financial affairs, and the creditor mailing matrix. You are the\nsecond set of eyes AFTER deterministic assembly — the packet is structurally\ncomplete and every form filled from confirmed case data. Your job is to find\nsubstantive problems that rules-based checks cannot see.\n\nLook for, in rough order of importance:\n- Internal contradictions: schedules disagreeing with each other or with the\n  statement of financial affairs (income on 106I vs employment answers vs\n  SOFA income; property on 106A/B vs secured claims on 106D; expenses on\n  106J inconsistent with dependents or household answers).\n- Arithmetic that does not hold: totals, subtotals and derived lines that do\n  not follow from their inputs.\n- Missing creditors: a creditor in the case records with no claim on any\n  schedule, a claim whose creditor is absent from the mailing matrix, or\n  debts the other answers imply (a mortgage on scheduled real property, a\n  lender behind a vehicle) that no schedule lists.\n- Exemption red flags: exemptions claimed against property that does not\n  appear, amounts that look inconsistent with the property's stated value.\n- Undisclosed-transfer signals: SOFA answers (payments, transfers, closed\n  accounts, property held for another) that look incomplete or inconsistent\n  with the schedules.\n- Answers that look missing rather than genuinely empty: a filled section\n  whose content implies a companion answer that is blank.\n\nRules for every finding:\n- Advisory only. Never propose a value to enter; describe the problem and\n  where it shows.\n- Cite the specific form and the line or field key it points at, exactly as\n  they appear in the packet content you are given.\n- One finding per distinct problem; do not restate one defect on every form\n  it touches — cite the primary location and mention the others in the\n  message.\n- Report only defects you are confident an attorney preparing this filing\n  would want to see. Do not report style, formatting, absent optional facts,\n  or anything the deterministic gate already guarantees (completeness of the\n  form set, dangling record references, matrix generation).\n- A consistent, complete petition yields an EMPTY findings list. That is the\n  expected outcome for most packets, not a failure to do your job.\n"
+  },
+  "headers": {
+   "anthropic-version": "2023-06-01",
+   "content-type": "application/json"
+  },
+  "method": "POST",
+  "path": "/v1/messages",
+  "timeout": {
+   "connect": 240.0,
+   "pool": 240.0,
+   "read": 240.0,
+   "write": 240.0
+  }
+ },
+ "schema": {
+  "additionalProperties": false,
+  "properties": {
+   "findings": {
+    "items": {
+     "additionalProperties": false,
+     "properties": {
+      "category": {
+       "enum": [
+        "consistency",
+        "arithmetic",
+        "missing_creditor",
+        "exemption",
+        "transfer",
+        "incomplete",
+        "other"
+       ],
+       "type": "string"
+      },
+      "form": {
+       "description": "The form the finding points at, as its series id in the packet content (e.g. form/b106i), or 'packet' for a cross-form finding.",
+       "type": "string"
+      },
+      "line": {
+       "description": "The line or field key on that form (e.g. 4_combined_monthly_income), or '' when the finding has no single line.",
+       "type": "string"
+      },
+      "message": {
+       "description": "One or two sentences a petition preparer can act on.",
+       "type": "string"
+      },
+      "severity": {
+       "enum": [
+        "high",
+        "medium",
+        "low"
+       ],
+       "type": "string"
+      }
+     },
+     "required": [
+      "severity",
+      "category",
+      "form",
+      "line",
+      "message"
+     ],
+     "type": "object"
+    },
+    "type": "array"
+   }
+  },
+  "required": [
+   "findings"
+  ],
+  "type": "object"
+ },
+ "system_prompt": "You are reviewing a completed U.S. Chapter 7 individual bankruptcy petition\npacket before filing: form B101, the B106 schedules and summary, the B107\nstatement of financial affairs, and the creditor mailing matrix. You are the\nsecond set of eyes AFTER deterministic assembly — the packet is structurally\ncomplete and every form filled from confirmed case data. Your job is to find\nsubstantive problems that rules-based checks cannot see.\n\nLook for, in rough order of importance:\n- Internal contradictions: schedules disagreeing with each other or with the\n  statement of financial affairs (income on 106I vs employment answers vs\n  SOFA income; property on 106A/B vs secured claims on 106D; expenses on\n  106J inconsistent with dependents or household answers).\n- Arithmetic that does not hold: totals, subtotals and derived lines that do\n  not follow from their inputs.\n- Missing creditors: a creditor in the case records with no claim on any\n  schedule, a claim whose creditor is absent from the mailing matrix, or\n  debts the other answers imply (a mortgage on scheduled real property, a\n  lender behind a vehicle) that no schedule lists.\n- Exemption red flags: exemptions claimed against property that does not\n  appear, amounts that look inconsistent with the property's stated value.\n- Undisclosed-transfer signals: SOFA answers (payments, transfers, closed\n  accounts, property held for another) that look incomplete or inconsistent\n  with the schedules.\n- Answers that look missing rather than genuinely empty: a filled section\n  whose content implies a companion answer that is blank.\n\nRules for every finding:\n- Advisory only. Never propose a value to enter; describe the problem and\n  where it shows.\n- Cite the specific form and the line or field key it points at, exactly as\n  they appear in the packet content you are given.\n- One finding per distinct problem; do not restate one defect on every form\n  it touches — cite the primary location and mention the others in the\n  message.\n- Report only defects you are confident an attorney preparing this filing\n  would want to see. Do not report style, formatting, absent optional facts,\n  or anything the deterministic gate already guarantees (completeness of the\n  form set, dangling record references, matrix generation).\n- A consistent, complete petition yields an EMPTY findings list. That is the\n  expected outcome for most packets, not a failure to do your job.\n"
+}
