@@ -13,6 +13,10 @@
     <Using Include="Microsoft.Extensions.DependencyInjection" />
   </ItemGroup>
   <ItemGroup>
+    <!-- core/mail.py's own output, which MailTemplateTests holds the port to. -->
+    <None Include="Fixtures/*.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="../../src/Insolvia.Api/Insolvia.Api.csproj" />
   </ItemGroup>
 </Project>
