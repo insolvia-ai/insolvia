@@ -1,0 +1,11 @@
+{
+  "series_id": "courts/us-bankruptcy",
+  "effective_date": "2026-10-06",
+  "sequence": 1,
+  "source": {
+    "url": "https://pacer.uscourts.gov/file-case/court-cmecf-lookup/data.json",
+    "published": null,
+    "sha256": null
+  },
+  "notes": "The court registry's fourth release (ADR 0024, build PR 3 \u2014 the filing set and checklist): every record of courts/us-bankruptcy@2026-09-26+2, unchanged, plus two facts under `opening` that ADR 0024's record specification names and no release yet carried \u2014 `docket_order`, the order a Chapter 7 individual opening's documents are docketed in, and `file_names`, any file names the court prescribes for them. No page read for any launch court states either for today's NextGen filings, so all ten are unverified with no value, and the filing set falls back to the packet's own order and names, its documented common default. M.D. Fla. notes its July 2009 Case Upload guide [S19], which does prescribe both and is not recorded as today's rule. A new release rather than an edit because the registry is append-only (effective-dating.md); effective the day it was compiled."
+}

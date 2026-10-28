@@ -1,0 +1,501 @@
+{
+  "code": "ganb",
+  "court_id": "GANBK",
+  "name": "Northern District of Georgia",
+  "state": "GA",
+  "circuit": 11,
+  "website": "https://www.ganb.uscourts.gov/",
+  "divisions": [
+    {
+      "code": "gainesville",
+      "name": "Gainesville Division",
+      "office_code": {
+        "value": null,
+        "status": "unverified",
+        "source": null,
+        "verified_at": null,
+        "note": "The CM/ECF office code (the digit before the colon in the case number; Case Upload field 10) was not found on a page read for this court. It is a fact the training-database session (ADR 0024, PR 5) confirms per court."
+      },
+      "courthouse": {
+        "value": null,
+        "status": "unverified",
+        "source": "S48",
+        "verified_at": null,
+        "note": "The court-locations page names the division but its address is on a sub-page not read; the PACER lookup [S34] gives no per-division address."
+      },
+      "counties": [
+        {
+          "name": "Banks",
+          "fips": "13011"
+        },
+        {
+          "name": "Barrow",
+          "fips": "13013"
+        },
+        {
+          "name": "Dawson",
+          "fips": "13085"
+        },
+        {
+          "name": "Fannin",
+          "fips": "13111"
+        },
+        {
+          "name": "Forsyth",
+          "fips": "13117"
+        },
+        {
+          "name": "Gilmer",
+          "fips": "13123"
+        },
+        {
+          "name": "Habersham",
+          "fips": "13137"
+        },
+        {
+          "name": "Hall",
+          "fips": "13139"
+        },
+        {
+          "name": "Jackson",
+          "fips": "13157"
+        },
+        {
+          "name": "Lumpkin",
+          "fips": "13187"
+        },
+        {
+          "name": "Pickens",
+          "fips": "13227"
+        },
+        {
+          "name": "Rabun",
+          "fips": "13241"
+        },
+        {
+          "name": "Stephens",
+          "fips": "13257"
+        },
+        {
+          "name": "Towns",
+          "fips": "13281"
+        },
+        {
+          "name": "Union",
+          "fips": "13291"
+        },
+        {
+          "name": "White",
+          "fips": "13311"
+        }
+      ],
+      "counties_source": "S41"
+    },
+    {
+      "code": "atlanta",
+      "name": "Atlanta Division",
+      "office_code": {
+        "value": null,
+        "status": "unverified",
+        "source": null,
+        "verified_at": null,
+        "note": "The CM/ECF office code (the digit before the colon in the case number; Case Upload field 10) was not found on a page read for this court. It is a fact the training-database session (ADR 0024, PR 5) confirms per court."
+      },
+      "courthouse": {
+        "value": {
+          "name": "Richard B. Russell Federal Building and United States Courthouse",
+          "line1": "75 Ted Turner Drive, SW",
+          "line2": null,
+          "city": "Atlanta",
+          "state": "GA",
+          "postal_code": "30303"
+        },
+        "status": "verified",
+        "source": "S48",
+        "verified_at": "2026-09-24",
+        "note": null
+      },
+      "counties": [
+        {
+          "name": "Cherokee",
+          "fips": "13057"
+        },
+        {
+          "name": "Clayton",
+          "fips": "13063"
+        },
+        {
+          "name": "Cobb",
+          "fips": "13067"
+        },
+        {
+          "name": "DeKalb",
+          "fips": "13089"
+        },
+        {
+          "name": "Douglas",
+          "fips": "13097"
+        },
+        {
+          "name": "Fulton",
+          "fips": "13121"
+        },
+        {
+          "name": "Gwinnett",
+          "fips": "13135"
+        },
+        {
+          "name": "Henry",
+          "fips": "13151"
+        },
+        {
+          "name": "Newton",
+          "fips": "13217"
+        },
+        {
+          "name": "Rockdale",
+          "fips": "13247"
+        }
+      ],
+      "counties_source": "S41"
+    },
+    {
+      "code": "rome",
+      "name": "Rome Division",
+      "office_code": {
+        "value": null,
+        "status": "unverified",
+        "source": null,
+        "verified_at": null,
+        "note": "The CM/ECF office code (the digit before the colon in the case number; Case Upload field 10) was not found on a page read for this court. It is a fact the training-database session (ADR 0024, PR 5) confirms per court."
+      },
+      "courthouse": {
+        "value": null,
+        "status": "unverified",
+        "source": "S48",
+        "verified_at": null,
+        "note": "The court-locations page names the division but its address is on a sub-page not read; the PACER lookup [S34] gives no per-division address."
+      },
+      "counties": [
+        {
+          "name": "Bartow",
+          "fips": "13015"
+        },
+        {
+          "name": "Catoosa",
+          "fips": "13047"
+        },
+        {
+          "name": "Chattooga",
+          "fips": "13055"
+        },
+        {
+          "name": "Dade",
+          "fips": "13083"
+        },
+        {
+          "name": "Floyd",
+          "fips": "13115"
+        },
+        {
+          "name": "Gordon",
+          "fips": "13129"
+        },
+        {
+          "name": "Murray",
+          "fips": "13213"
+        },
+        {
+          "name": "Paulding",
+          "fips": "13223"
+        },
+        {
+          "name": "Polk",
+          "fips": "13233"
+        },
+        {
+          "name": "Walker",
+          "fips": "13295"
+        },
+        {
+          "name": "Whitfield",
+          "fips": "13313"
+        }
+      ],
+      "counties_source": "S41"
+    },
+    {
+      "code": "newnan",
+      "name": "Newnan Division",
+      "office_code": {
+        "value": null,
+        "status": "unverified",
+        "source": null,
+        "verified_at": null,
+        "note": "The CM/ECF office code (the digit before the colon in the case number; Case Upload field 10) was not found on a page read for this court. It is a fact the training-database session (ADR 0024, PR 5) confirms per court."
+      },
+      "courthouse": {
+        "value": null,
+        "status": "unverified",
+        "source": "S48",
+        "verified_at": null,
+        "note": "The court-locations page names the division but its address is on a sub-page not read; the PACER lookup [S34] gives no per-division address."
+      },
+      "counties": [
+        {
+          "name": "Carroll",
+          "fips": "13045"
+        },
+        {
+          "name": "Coweta",
+          "fips": "13077"
+        },
+        {
+          "name": "Fayette",
+          "fips": "13113"
+        },
+        {
+          "name": "Haralson",
+          "fips": "13143"
+        },
+        {
+          "name": "Heard",
+          "fips": "13149"
+        },
+        {
+          "name": "Meriwether",
+          "fips": "13199"
+        },
+        {
+          "name": "Pike",
+          "fips": "13231"
+        },
+        {
+          "name": "Spalding",
+          "fips": "13255"
+        },
+        {
+          "name": "Troup",
+          "fips": "13285"
+        }
+      ],
+      "counties_source": "S41"
+    }
+  ],
+  "cmecf": {
+    "live_url": {
+      "value": "https://ecf.ganb.uscourts.gov",
+      "status": "verified",
+      "source": "S34",
+      "verified_at": "2026-09-24",
+      "note": null
+    },
+    "training_url": {
+      "value": null,
+      "status": "unverified",
+      "source": "S37",
+      "verified_at": null,
+      "note": "The registration page [S37] points to training videos at https://www.ganb.uscourts.gov/cmecf-training-videos and names no training database."
+    },
+    "help_desk": {
+      "value": "ecf_helpdesk@ganb.uscourts.gov; (404) 215-1000",
+      "status": "verified",
+      "source": "S34",
+      "verified_at": "2026-09-24",
+      "note": null
+    },
+    "release": {
+      "value": "1.8.3",
+      "status": "verified",
+      "source": "S34",
+      "verified_at": "2026-09-24",
+      "note": "software_version 'NextGen CM/ECF Release 1.8 (Revision 1.8.3)'."
+    }
+  },
+  "pdf": {
+    "max_bytes": {
+      "value": null,
+      "status": "unverified",
+      "source": "S11",
+      "verified_at": null,
+      "note": "ADR 0024: 'not on pages read'; no GANB page read today states a cap. The PACER lookup [S34] carries merge_doc_size '10' with no unit."
+    },
+    "text_searchable_required": {
+      "value": null,
+      "status": "unverified",
+      "source": null,
+      "verified_at": null,
+      "note": "Not stated on a page read for this court."
+    },
+    "flatten_required": {
+      "value": null,
+      "status": "unverified",
+      "source": null,
+      "verified_at": null,
+      "note": "Not stated on a page read for this court."
+    },
+    "pdf_a_required": {
+      "value": false,
+      "status": "unverified",
+      "source": "S16",
+      "verified_at": null,
+      "note": "No page of this court read mentions PDF/A; the figure is ADR 0024's 'no launch court requires PDF/A today' [S16], not confirmed on a court page."
+    }
+  },
+  "matrix": {
+    "max_line_chars": {
+      "value": 40,
+      "status": "verified",
+      "source": "S49",
+      "verified_at": "2026-09-24",
+      "note": "'Each line may contain no more than 40 characters.'"
+    },
+    "max_creditor_lines": {
+      "value": 5,
+      "status": "verified",
+      "source": "S49",
+      "verified_at": "2026-09-24",
+      "note": "'No more than five lines of information per creditor.'"
+    },
+    "blank_lines_between": {
+      "value": 1,
+      "status": "verified",
+      "source": "S49",
+      "verified_at": "2026-09-24",
+      "note": "'Each creditor must be separated by one blank line.'"
+    },
+    "pad_to_lines": {
+      "value": null,
+      "status": "verified",
+      "source": "S49",
+      "verified_at": "2026-09-24",
+      "note": "No fixed block size is stated."
+    },
+    "name_line_chars": {
+      "value": null,
+      "status": "verified",
+      "source": "S49",
+      "verified_at": "2026-09-24",
+      "note": "No separate name-line width."
+    },
+    "comma_after_city": {
+      "value": null,
+      "status": "unverified",
+      "source": "S49",
+      "verified_at": null,
+      "note": "The guidelines do not say whether a comma follows the city."
+    },
+    "case_number_header_when_separate": {
+      "value": false,
+      "status": "verified",
+      "source": "S49",
+      "verified_at": "2026-09-24",
+      "note": "Do not include 'Headers/titles, footers, page numbers.'"
+    },
+    "certification_required": {
+      "value": null,
+      "status": "unverified",
+      "source": "S49",
+      "verified_at": null,
+      "note": "The guidelines state no certification requirement."
+    }
+  },
+  "opening": {
+    "signature_instrument": {
+      "value": {
+        "kind": "other",
+        "title": "Per the CM/ECF Administrative Procedures (Aug 2021)",
+        "wet_ink_required": null,
+        "retention": null,
+        "own_docket_event": null,
+        "form_url": null
+      },
+      "status": "unverified",
+      "source": "S11",
+      "verified_at": null,
+      "note": "ADR 0024's row: 'per 2021 procedures' [S11]; the procedures were not re-read today and name no specific instrument here."
+    },
+    "ssn_statement": {
+      "value": null,
+      "status": "unverified",
+      "source": null,
+      "verified_at": null,
+      "note": "Not stated on a page read for this court."
+    },
+    "local_forms": [],
+    "fee_rule": {
+      "value": null,
+      "status": "unverified",
+      "source": null,
+      "verified_at": null,
+      "note": "Not stated on a page read for this court."
+    }
+  },
+  "case_upload": {
+    "status": "unverified",
+    "kind": null,
+    "verified_at": null,
+    "note": "ADR 0024 [S11]: GANB calls Case Upload 'optional'; the court's required field set has not been verified in a training-database session."
+  },
+  "registration": {
+    "training_required": {
+      "value": true,
+      "status": "verified",
+      "source": "S37",
+      "verified_at": "2026-09-24",
+      "note": "'All Applicants seeking permission to file electronically in GANB must view the CM/ECF Training Videos before access to GANB's Live CM/ECF database will be granted.' Waivable for a current e-filer in another bankruptcy court."
+    },
+    "notes": "Training videos, then live access [S37]; registration through PACER."
+  },
+  "sources": [
+    {
+      "id": "S11",
+      "title": "GANB, CM/ECF Administrative Procedures (Aug 2021; carried from ADR 0024, not re-read)",
+      "url": "https://www.ganb.uscourts.gov/sites/default/files/cmecf_admin_procedures_08-2021.pdf",
+      "read": "2026-09-23"
+    },
+    {
+      "id": "S16",
+      "title": "PACER FAQ, Is there a limit on the size of the PDF files which CM/ECF will accept (carried from ADR 0024; not re-read)",
+      "url": "https://pacer.uscourts.gov/help/faqs/there-limit-size-pdf-files-which-cmecf-will-accept",
+      "read": "2026-09-23"
+    },
+    {
+      "id": "S34",
+      "title": "PACER, Court CM/ECF Lookup data (last_updated Thu, 24 Sep 2026 06:10:04 -0400)",
+      "url": "https://pacer.uscourts.gov/file-case/court-cmecf-lookup/data.json",
+      "read": "2026-09-24"
+    },
+    {
+      "id": "S37",
+      "title": "GANB, CM/ECF Registration",
+      "url": "https://www.ganb.uscourts.gov/cmecf-registration",
+      "read": "2026-09-24"
+    },
+    {
+      "id": "S41",
+      "title": "28 U.S.C. § 90 — Georgia (judicial districts and divisions)",
+      "url": "https://www.law.cornell.edu/uscode/text/28/90",
+      "read": "2026-09-24"
+    },
+    {
+      "id": "S42",
+      "title": "U.S. Census Bureau, 2020 national county file (FIPS codes)",
+      "url": "https://www2.census.gov/geo/docs/reference/codes2020/national_county2020.txt",
+      "read": "2026-09-24"
+    },
+    {
+      "id": "S48",
+      "title": "GANB, Court Locations (Atlanta Division address and counties)",
+      "url": "https://www.ganb.uscourts.gov/court-info/court-locations",
+      "read": "2026-09-24"
+    },
+    {
+      "id": "S49",
+      "title": "GANB, List of Creditors Guidelines",
+      "url": "https://www.ganb.uscourts.gov/list-creditors-guidelines",
+      "read": "2026-09-24"
+    }
+  ],
+  "notes": "Divisions and counties are 28 U.S.C. § 90(a)'s four divisions [S41]; the court-locations page [S48] lists the same four and the same ten Atlanta counties ('Cherokee, Clayton, Cobb, DeKalb, Douglas, Fulton, Gwinnett, Henry, Newton, Rockdale'). The statute's 'De Kalb' is the Census 'DeKalb' (13089). Office codes, the PDF cap, the signature instrument, the SSN-statement handling and the fee rule are unverified."
+}
