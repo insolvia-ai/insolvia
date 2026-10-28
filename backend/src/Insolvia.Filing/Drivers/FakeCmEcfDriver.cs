@@ -18,12 +18,13 @@ namespace Insolvia.Filing.Drivers;
 /// Composed only where the fake exists (<c>INSOLVIA_ENV=local</c> with
 /// <c>FAKE_CMECF_URL</c>), and even then it reaches nothing but loopback —
 /// the fence is the second wall. <paramref name="caseUpload"/> picks the
-/// fake court's configuration: <c>false</c> (the default here) is the
-/// screen-entry court, which takes no Debtor.txt; <c>true</c> asks for the
-/// Case Upload file, which the worker hands back (<c>case_upload_invalid</c>)
-/// until ADR 0024 PR 9's builder is ported (#530 report).
+/// fake court's configuration (ADR 0024's two): <c>true</c> (the default —
+/// what a laptop and the end-to-end tests file against) opens the case with a
+/// Case Upload file (Debtor.txt, Insolvia.Forms' <c>CaseUploads</c>) that the
+/// fake checks the way a court does; <c>false</c> is the screen-entry-only
+/// court, which receives no Debtor.txt and for which no tax id is opened.
 /// </remarks>
-public sealed class FakeCmEcfDriver(string baseUrl, bool caseUpload = false) : ICourtDriver
+public sealed class FakeCmEcfDriver(string baseUrl, bool caseUpload = true) : ICourtDriver
 {
     /// <summary>The recorded driver id.</summary>
     public const string Id = "fake-cmecf/1";

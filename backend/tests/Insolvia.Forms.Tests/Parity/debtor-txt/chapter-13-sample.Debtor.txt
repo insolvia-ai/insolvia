@@ -1,0 +1,5 @@
+stat||||i|o||13|i|c|v||y|A|H|B|n||||n|||y|240000.00|72550.00|202400.00|3650.00|22800.00|8149.50|5060.00|8700.00|15650.00||294000.00|5200.00|3000.00|950.50|0.00|3089.50||||||||||||||||||||||||||||||||||||||||
+debt|db|Avery|Quinn|Sampleton|||987-65-4322|12-3456789|8|4501 Postal Way|PO Box 99||Tampa|FL|33602|12057|||||
+debt|jdb|Blake||Sampleton||Jr.|987-65-4323||8|12 Fixture Court|Apt 4||Tampa|FL|33601|12057|||||
+alas|db|aka|Avery||Example|||
+alas|db|aka|||Avery's Fixture Repair|||

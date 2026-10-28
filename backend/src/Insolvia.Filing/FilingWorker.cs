@@ -72,11 +72,14 @@ public sealed record FilingDeps
     public Func<ICourtDriver>? FakeDriver { get; init; }
 
     /// <summary>
-    /// Builds the Case Upload file (Debtor.txt, ADR 0024 PR 9) for a driver
-    /// that opens the case by Case Upload. NOT PORTED YET: null, and such a
-    /// driver hands back <c>case_upload_invalid</c> before any credential opens.
+    /// The sealed tax ids — read by the Case Upload file's logged full-value
+    /// read (ADR 0024 PR 9, purpose <see cref="CaseUploads.TaxIdPurpose"/>),
+    /// and by nothing else in this worker.
     /// </summary>
-    public Func<FilingApproval, CancellationToken, Task<FilingFile>>? CaseUpload { get; init; }
+    public required ITaxIdStore TaxIds { get; init; }
+
+    /// <summary>The case key's cipher, OPENING only, under the tax-id encryption context.</summary>
+    public required ITaxIdCipher TaxIdCipher { get; init; }
 
     /// <summary>The record's clock: claims, leases, the approval's expiry.</summary>
     public TimeProvider Clock { get; init; } = TimeProvider.System;
@@ -106,7 +109,8 @@ public sealed record FilingResult(string Outcome, string? FilingId = null, strin
 /// <item>CLAIM: create the record (<c>claimed</c>), conditional on there being none.</item>
 /// <item>CONSUME the approval over the digest recomputed from the stores (Forms' <see cref="FilingApprovals"/>).</item>
 /// <item>The kill switch. 6. The driver (none for every real court today). 7. The fence for every origin — all BEFORE the credential opens.</item>
-/// <item>The documents, each checked against the SHA-256 the approval bound.</item>
+/// <item>The documents, each checked against the SHA-256 the approval bound; for a Case Upload court, Debtor.txt built first
+/// (<see cref="Run.CaseUploadAsync"/>) — a file that cannot be built stops here, before the credential.</item>
 /// <item>OPEN the credential (logged before decrypt), sign in (TOTP at the court's ask) → signed_in; open → uploading; upload.</item>
 /// <item>RE-CHECK immediately before the final submit: kill switch, credential (opened again), approval, digest.</item>
 /// <item>MARK <c>at_final_submit</c>, durably, BEFORE the click. 12. SUBMIT — anything but a confirmation is <c>outcome_unknown</c>.</item>
@@ -295,8 +299,7 @@ public static class FilingWorker
         var (files, followUps) = await run.FilesAsync(basis, cancellationToken).ConfigureAwait(false);
         if (driver.CaseUpload)
         {
-            var built = deps.CaseUpload is null ? throw new StopException("case_upload_invalid") : await deps.CaseUpload(approval, cancellationToken).ConfigureAwait(false);
-            files = [built, .. files];
+            files = [await run.CaseUploadAsync(cancellationToken).ConfigureAwait(false), .. files];
         }
 
         var joint = (await deps.Debtors.ListForCaseAsync(approval.CaseId, cancellationToken).ConfigureAwait(false)).Count > 1;
@@ -587,6 +590,42 @@ public static class FilingWorker
 
             var (_, basis) = await FilingApprovals.BasisForCaseAsync(@case, Deps.Debtors, Deps.Entities, Deps.Packets, Clock.Today(Deps.Clock), cancellationToken: cancellationToken).ConfigureAwait(false);
             return basis;
+        }
+
+        /// <summary>
+        /// Debtor.txt, built now from the stores — the records the approval's
+        /// digest binds — with the full SSNs from the logged read (one
+        /// <c>taxid.read</c> per debtor, principal the approving attorney). In
+        /// memory only: returned for the upload, never stored, never logged. A
+        /// file that cannot be built or does not validate is a stop, BEFORE the
+        /// credential opens; the problems name fields, never values, and only
+        /// their codes are logged.
+        /// </summary>
+        public async Task<FilingFile> CaseUploadAsync(CancellationToken cancellationToken)
+        {
+            var @case = await Deps.Cases.ReadForWorkerAsync(Approval.CaseId, cancellationToken).ConfigureAwait(false);
+            await Deps.AccessLog.RecordAsync(
+                AccessEvents.Record(Approval.AttorneyId, AccessAction.CaseRead, caseId: Approval.CaseId, outcome: @case is not null ? AccessOutcome.Allowed : AccessOutcome.Denied, purpose: CaseUploads.TaxIdPurpose, filingId: Approval.FilingId, clock: Deps.Clock),
+                cancellationToken).ConfigureAwait(false);
+            if (@case is null)
+            {
+                throw new StopException("approval_unavailable");
+            }
+
+            CaseUploadFile built;
+            try
+            {
+                built = await CaseUploads.ForFilingAsync(
+                    @case, Approval.AttorneyId, Clock.Today(Deps.Clock), Deps.Debtors, Deps.Entities, Deps.TaxIds, Deps.TaxIdCipher, Deps.AccessLog, cancellationToken: cancellationToken).ConfigureAwait(false);
+            }
+            catch (CaseUploadException refused)
+            {
+                var codes = refused.Problems.Select(p => $"{p.Record}.{p.Field}:{p.Code}").Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal);
+                Deps.Log.Write("INFO", "case upload file refused", ("filing_id", Approval.FilingId), ("problems", string.Join(",", codes)));
+                throw new StopException("case_upload_invalid");
+            }
+
+            return new FilingFile(0, CaseUploads.DocumentKey, built.FileName, CaseUploads.DocumentKey, built.Content, built.Sha256);
         }
 
         /// <summary>

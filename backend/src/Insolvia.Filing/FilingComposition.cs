@@ -30,6 +30,7 @@ namespace Insolvia.Filing;
 /// <item>THE OPENER — <see cref="KmsFilingCredentialOpener"/> under the vault alias
 /// (<see cref="SealingKeys"/>), composed in this host and no other; locally,
 /// without an alias, the local twin the API's local sealer pairs with;</item>
+/// <item>the tax-id cipher (the Case Upload file's SSNs): <c>KmsTaxIdCipher</c> under the case key; locally the local twin;</item>
 /// <item>the kill switch: the SSM parameter deployed, <c>FILING_SUBMISSIONS_ENABLED</c> locally;</item>
 /// <item>the fake driver: only with <c>INSOLVIA_ENV=local</c> AND <c>FAKE_CMECF_URL</c>;</item>
 /// <item>the fence: <see cref="HostFence.For"/> — the code's allowlist, no input.</item>
@@ -73,6 +74,7 @@ public static class FilingComposition
         services.AddScoped<IFilingCredentialStore>(provider => new PostgresFilingCredentialStore(provider.GetRequiredService<InsolviaDbContext>()));
         services.AddScoped<IFilingAuthorizationStore>(provider => new PostgresFilingAuthorizationStore(provider.GetRequiredService<InsolviaDbContext>()));
         services.AddScoped<IAccessLog>(provider => new PostgresAccessLog(provider.GetRequiredService<InsolviaDbContext>()));
+        services.AddScoped<ITaxIdStore>(provider => new PostgresTaxIdStore(provider.GetRequiredService<InsolviaDbContext>()));
         services.AddScoped(packets);
 
         var bucket = config.CaseDocumentBucket;
@@ -89,6 +91,22 @@ public static class FilingComposition
             services.AddSingleton<IFilingCredentialOpener>(_ => new KmsFilingCredentialOpener(
                 region is null ? new AmazonKeyManagementServiceClient() : new AmazonKeyManagementServiceClient(region),
                 alias));
+        }
+
+        // The Case Upload file's tax-id read (ADR 0024 PR 9): the case key by
+        // its alias, Decrypt only, under the tax-id encryption context — the
+        // same key the API sealed under. Locally, with no key named, the local
+        // twin the API's local host seals with.
+        if (config.Environment == "local" && read(SealingKeys.CaseKeyVariable) is not { Length: > 0 } && read("CASE_TABLE_NAME") is not { Length: > 0 })
+        {
+            services.AddSingleton<ITaxIdCipher>(new LocalTaxIdCipher());
+        }
+        else
+        {
+            var caseKey = SealingKeys.Load(read).CaseKeyAlias;
+            services.AddSingleton<ITaxIdCipher>(_ => new KmsTaxIdCipher(
+                region is null ? new AmazonKeyManagementServiceClient() : new AmazonKeyManagementServiceClient(region),
+                caseKey));
         }
 
         if (config.Environment == "local")
@@ -134,6 +152,8 @@ public static class FilingComposition
             Authorizations = scope.GetRequiredService<IFilingAuthorizationStore>(),
             Opener = scope.GetRequiredService<IFilingCredentialOpener>(),
             AccessLog = scope.GetRequiredService<IAccessLog>(),
+            TaxIds = scope.GetRequiredService<ITaxIdStore>(),
+            TaxIdCipher = scope.GetRequiredService<ITaxIdCipher>(),
             KillSwitch = scope.GetRequiredService<IKillSwitch>(),
             Fence = fence,
             Http = () => new FencedHttpClient(fence, timeout),

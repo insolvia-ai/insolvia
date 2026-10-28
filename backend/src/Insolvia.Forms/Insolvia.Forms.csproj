@@ -28,4 +28,12 @@
     <EmbeddedResource Include="Templates/**/*.pdf" LogicalName="Insolvia.Forms.Templates/%(RecursiveDir)%(Filename)%(Extension)" />
     <EmbeddedResource Include="Pdf/FontData.json" LogicalName="Insolvia.Forms.FontData.json" />
   </ItemGroup>
+  <!-- The filing/ series of the regulatory registry (ADR 0014): the AO's Case
+       Upload specification as data (CaseUploadSpecs), copied byte for byte
+       from services/api/src/insolvia_api/regulatory/filing (frozen, ADR 0028);
+       CaseUploadSpecTests pins every copy to the Python original by sha256
+       until 18.23 deletes it. -->
+  <ItemGroup>
+    <EmbeddedResource Include="Regulatory/**/*.json" LogicalName="Insolvia.Forms.Regulatory/%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
 </Project>

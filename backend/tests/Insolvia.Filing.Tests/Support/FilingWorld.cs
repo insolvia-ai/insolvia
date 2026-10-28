@@ -12,6 +12,7 @@ using Insolvia.Core.Filings;
 using Insolvia.Core.Firms;
 using Insolvia.Core.Memory;
 using Insolvia.Core.Ports;
+using Insolvia.Core.TaxIds;
 using Insolvia.Filing.Drivers;
 using Insolvia.Filing.Fence;
 using Insolvia.Filing.Http;
@@ -158,6 +159,20 @@ internal sealed class FilingWorld : IAsyncDisposable
 
         var data = Reference(CaseId);
         await Service<ICaseStore>().CreateAsync(data.Case, new CaseAssignment(CaseId, Attorney, data.Case.CreatedAt, data.Case.CreatedAt, Attorney), data.Debtors);
+        // The reference tax ids, SEALED the way the debtor route seals them —
+        // under the firm and each debtor's ref, with the API's own cipher — so
+        // the worker's logged read (not the fixture's digits) is what puts the
+        // number in Debtor.txt.
+        var cipher = Service<ITaxIdCipher>();
+        foreach (var debtor in data.Debtors)
+        {
+            if (debtor.TaxId is { } taxId)
+            {
+                var envelope = await cipher.SealAsync(data.TaxIds[Wire.ToWire(debtor.FilingRole)], TaxIdRules.EncryptionContext(Firm, taxId.Ref));
+                await Service<ITaxIdStore>().PutAsync(CaseId, new SealedTaxId(taxId.Ref, Firm, taxId.Kind, taxId.LastFour, envelope, seeded, seeded));
+            }
+        }
+
         var entities = Service<ICaseEntityStore>();
         foreach (var (_, members) in data.Collections())
         {
@@ -295,6 +310,8 @@ internal sealed class FilingWorld : IAsyncDisposable
             // THE OPENER — the worker's, composed here and never in the API.
             Opener = new LocalFilingCredentialOpener(),
             AccessLog = AccessLog,
+            TaxIds = Service<ITaxIdStore>(),
+            TaxIdCipher = Service<ITaxIdCipher>(),
             KillSwitch = KillSwitch,
             Fence = fence,
             Http = () => new FencedHttpClient(fence, TimeSpan.FromSeconds(1)),

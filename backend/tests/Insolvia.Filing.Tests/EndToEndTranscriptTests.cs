@@ -7,7 +7,7 @@ namespace Insolvia.Filing.Tests;
 /// <summary>
 /// The local end-to-end run, narrated: approve with a fresh-sign-in token
 /// through the API → the job on the queue → the worker signs in to the fake
-/// court with TOTP, uploads, final-submits, stores the receipt and files the
+/// court with TOTP, uploads Debtor.txt (the Case Upload court, the fake's default) then the packet, final-submits, stores the receipt and files the
 /// case with a lifecycle event carrying the petition chapter → the same
 /// message delivered again does nothing. The transcript goes to the test
 /// output (<c>dotnet test --logger "console;verbosity=detailed"</c>).
@@ -31,7 +31,9 @@ public sealed class EndToEndTranscriptTests
         var filed = (await world.CaseAsync())!;
         var recorded = (await world.Service<ICaseStore>().LifecycleAsync(world.CaseId, TestContext.Current.CancellationToken))[^1];
         output.WriteLine($"delivery 1 -> {first.Outcome}; states {string.Join(" > ", filing.History.Select(s => Core.Wire.ToWire(s.State)))}");
-        output.WriteLine($"court: sign-ins {court.SignIns}, uploads {court.Uploads}, submissions {court.Submissions}; case number {filing.Confirmation!.CaseNumber}; receipt document {filing.ReceiptDocumentId}");
+        var reads = world.AccessLog.Events.Where(e => e.Action == Core.AccessLog.AccessAction.TaxIdRead).Select(e => $"{e.FilingRole}/{e.Purpose}");
+        output.WriteLine($"court: sign-ins {court.SignIns}, uploads {court.Uploads} (Case Upload files accepted: {court.CaseUploads}; docket {string.Join(", ", filing.Confirmation!.DocketEntries.Take(2))}, …), submissions {court.Submissions}; case number {filing.Confirmation.CaseNumber}; receipt document {filing.ReceiptDocumentId}");
+        output.WriteLine($"taxid.read rows: {string.Join(", ", reads)}");
         output.WriteLine($"case: status {Core.Wire.ToWire(filed.Status)}, number {filed.CaseNumber}, petition date {filed.FiledAt:yyyy-MM-dd}; lifecycle event {Core.Wire.ToWire(recorded.Kind)} -> {Core.Wire.ToWire(recorded.ToStatus!.Value)}, chapter {recorded.Chapter}, filing {recorded.FilingId}, by {recorded.RecordedBy} ({Core.Wire.ToWire(recorded.Provenance)})");
 
         var second = await world.RunAsync(body);
@@ -40,6 +42,8 @@ public sealed class EndToEndTranscriptTests
         Assert.Equal("filed", first.Outcome);
         Assert.Equal(("noop", "filed"), (second.Outcome, second.Reason));
         Assert.Equal(1, court.Submissions);
+        Assert.Equal(1, court.CaseUploads);
+        Assert.Equal("0 Debtor.txt", filing.Confirmation.DocketEntries[0]);
         Assert.Equal(7, recorded.Chapter);
     }
 }

@@ -119,8 +119,11 @@ public sealed class FilingAgainstTheFakeTests : IAsyncLifetime
 
         await _world.RunAsync(body);
 
+        // Every filed packet document, plus the Case Upload file the fake court
+        // opens the case from (CaseUploadAgainstTheFakeTests).
         var filed = documents.Count(d => d!["source"]!.GetValue<string>() == "packet" && d["handling"]!.GetValue<string>() != "not_filed");
-        Assert.Equal(filed, _court.Uploads);
+        Assert.Equal(1 + filed, _court.Uploads);
+        Assert.Equal(1, _court.CaseUploads);
     }
 
     [Fact]

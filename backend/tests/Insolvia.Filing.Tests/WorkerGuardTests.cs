@@ -163,20 +163,6 @@ public sealed partial class WorkerGuardTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task A_case_upload_court_hands_back_before_the_credential_until_debtor_txt_is_ported()
-    {
-        var baseUrl = _court.BaseUrl;
-        _world.Driver = () => new FakeCmEcfDriver(baseUrl, caseUpload: true);
-        var (_, body) = await _world.ApproveAsync();
-
-        var result = await _world.RunAsync(body);
-
-        Assert.Equal(("handed_back", "case_upload_invalid"), (result.Outcome, result.Reason));
-        Assert.Empty(Opened());
-        Assert.Equal(0, _court.SignIns);
-    }
-
-    [Fact]
     public async Task An_expired_approval_is_handed_back_and_never_signs_in()
     {
         var (_, body) = await _world.ApproveAsync();
@@ -254,6 +240,16 @@ public sealed partial class WorkerGuardTests : IAsyncLifetime
             ]);
         Assert.DoesNotContain(_court.Password, haystack, StringComparison.Ordinal);
         Assert.DoesNotContain(_court.TotpSeed, haystack, StringComparison.Ordinal);
+
+        // The reference debtors' tax ids — in the file the court received
+        // (one Case Upload), and nowhere else.
+        Assert.Equal(1, _court.CaseUploads);
+        foreach (var digits in new[] { "987654321", "987654322" })
+        {
+            Assert.DoesNotContain(digits, haystack, StringComparison.Ordinal);
+            Assert.DoesNotContain($"{digits[..3]}-{digits[3..5]}-{digits[5..]}", haystack, StringComparison.Ordinal);
+        }
+
         var now = DateTimeOffset.UtcNow;
         foreach (var code in new[] { -30, 0, 30 }.Select(drift => Totp.At(_court.TotpSeed, now.AddSeconds(drift))))
         {

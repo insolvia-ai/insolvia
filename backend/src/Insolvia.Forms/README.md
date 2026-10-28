@@ -20,6 +20,7 @@ storing a packet is the worker's job (18.17).
 | `filing_approval.py` (the basis and its digest) | `ApprovalDigest` | `ApprovalDigestTests` |
 | `case_summary.py` | `CaseSummaries` | `CaseSummaryTests` |
 | `forms_hub.py` | `FormsHub` | `FormsHubTests` |
+| `case_upload.py` (Debtor.txt; `Regulatory/filing/**` is its spec) | `CaseUploads`, `CaseUploadSpecs` | `CaseUploadTests`, `CaseUploadParityTests` |
 
 ## PDFsharp is pinned at 6.2.4, and used only as an object model
 
@@ -86,3 +87,8 @@ pypdf cannot fill them either.
   the four parity case files, compared on fields, widget states,
   appearance-stream bytes, official pages, text runs and PDFium pixels.
   CI runs it (`backend-pr.yml`, "Forms parity") until cut-over.
+- `tests/Insolvia.Forms.Tests/Parity/debtor_txt.py` — the Case Upload
+  oracle: services/api's Debtor.txt for the same four case files, written to
+  `Parity/debtor-txt/`; `CaseUploadParityTests` asserts the .NET file is
+  byte-identical. Regenerate (same `PYTHONPATH` as `run.sh`) and review the
+  diff when the Python changes.

@@ -80,6 +80,9 @@ public sealed class FakeCmEcf : IAsyncDisposable
     /// <summary>Documents accepted.</summary>
     public int Uploads { get; private set; }
 
+    /// <summary>Case Upload files (Debtor.txt) the court ACCEPTED — the count only; the bytes are never kept.</summary>
+    public int CaseUploads { get; private set; }
+
     /// <summary>Completed sign-ins.</summary>
     public int SignIns { get; private set; }
 
@@ -160,6 +163,7 @@ public sealed class FakeCmEcf : IAsyncDisposable
         {
             Submissions = 0;
             Uploads = 0;
+            CaseUploads = 0;
             SignIns = 0;
             _caseNumbers.Clear();
             _sessions.Clear();
@@ -428,6 +432,8 @@ public sealed class FakeCmEcf : IAsyncDisposable
             content = stream.ToArray();
         }
 
+        var caseUpload = form["event"].ToString() == "case_upload";
+        var refusal = caseUpload ? CaseUploadRefusal(content) : null;
         byte[] page;
         lock (_gate)
         {
@@ -439,12 +445,73 @@ public sealed class FakeCmEcf : IAsyncDisposable
                 return;
             }
 
-            session.Uploads.Add((int.Parse(form["position"].ToString(), System.Globalization.CultureInfo.InvariantCulture), form["file_name"].ToString(), Convert.ToHexStringLower(SHA256.HashData(content)), content.Length));
-            Uploads++;
-            page = UploadPage(session);
+            if (refusal is not null)
+            {
+                // The court's own refusal: nothing is accepted, the page says why.
+                page = UploadPage(session, refusal);
+            }
+            else
+            {
+                if (caseUpload)
+                {
+                    CaseUploads++;
+                }
+
+                session.Uploads.Add((int.Parse(form["position"].ToString(), System.Globalization.CultureInfo.InvariantCulture), form["file_name"].ToString(), Convert.ToHexStringLower(SHA256.HashData(content)), content.Length));
+                Uploads++;
+                page = UploadPage(session);
+            }
         }
 
         await SendAsync(context, 200, page).ConfigureAwait(false);
+    }
+
+    /// <summary>The statistics-record field counts NextGen 1.5.4-1.7.1 accept (the AO's Case Upload spec, ADR 0024 source S22, pp. 11-12).</summary>
+    public static readonly IReadOnlyList<int> CaseUploadStatCounts = [73, 78, 80];
+
+    /// <summary>The court's own words when the statistics record's count is wrong.</summary>
+    public const string CaseUploadWrongCount =
+        "The statistics record (type \"stat\") in the case information file (Debtor.txt) does not have the correct number of data items. "
+        + "Be sure you are using the correct Case Upload specification for this court.";
+
+    /// <summary>
+    /// What the fake court says about a Debtor.txt, or null to accept it — the
+    /// checks a court makes before it opens anything: ASCII, a first
+    /// <c>stat</c> record with an accepted field count, and one or two
+    /// <c>debt</c> records each carrying an nnn-nn-nnnn tax id. Not the spec
+    /// validator (Insolvia.Forms' <c>CaseUploadSpecs</c> is that); a court's
+    /// own refusal.
+    /// </summary>
+    public static string? CaseUploadRefusal(byte[] content)
+    {
+        ArgumentNullException.ThrowIfNull(content);
+        if (content.Any(b => b > 0x7F))
+        {
+            return "The case information file (Debtor.txt) could not be read.";
+        }
+
+        var lines = Encoding.ASCII.GetString(content).Split('\n');
+        if (!lines[0].StartsWith("stat|", StringComparison.Ordinal) || !CaseUploadStatCounts.Contains(lines[0].Split('|').Length))
+        {
+            return CaseUploadWrongCount;
+        }
+
+        var debtors = lines.Where(line => line.StartsWith("debt|", StringComparison.Ordinal)).Select(line => line.Split('|')).ToList();
+        if (debtors.Count is not (1 or 2))
+        {
+            return "The case information file (Debtor.txt) has no debtor record.";
+        }
+
+        foreach (var debtor in debtors)
+        {
+            var ssn = debtor.Length > 7 ? debtor[7] : string.Empty;
+            if (ssn.Length != 11 || !ssn.Replace("-", string.Empty, StringComparison.Ordinal).All(char.IsAsciiDigit) || ssn[3] != '-' || ssn[6] != '-')
+            {
+                return "A debtor record's SSN/ITIN is not in nnn-nn-nnnn format.";
+            }
+        }
+
+        return null;
     }
 
     private async Task SubmitAsync(HttpContext context)

@@ -2,7 +2,7 @@
   <!-- Unit tests for Insolvia.Forms, translated from services/api's
        test_form_fill, test_form_overlay, test_packet_assembly,
        test_filing_set, test_case_summary, test_forms_hub,
-       test_amendment_cover_sheet and test_form_templates' template half;
+       test_amendment_cover_sheet and test_form_templates' template half, test_case_upload;
        the .NET goldens (Goldens/*.json); and the parity export
        (Parity/, run by backend-pr.yml's "Forms parity" step). -->
   <ItemGroup>
@@ -11,6 +11,8 @@
   <ItemGroup>
     <None Include="Goldens/*.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="Fixtures/*" CopyToOutputDirectory="PreserveNewest" />
+    <!-- services/api's Debtor.txt for the four parity case files (Parity/debtor_txt.py). -->
+    <None Include="Parity/debtor-txt/*.txt" Link="DebtorTxt/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <!-- The parity case files the Engines suite already shares, read in place. -->
     <None Include="../Insolvia.Engines.Tests/Parity/*.case.json" Link="CaseFiles/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <!-- The Python goldens (services/api) — their field read-backs are what
