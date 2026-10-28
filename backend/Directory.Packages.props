@@ -52,7 +52,8 @@
     <PackageVersion Include="AWSSDK.S3" Version="4.0.104.3" />
   </ItemGroup>
   <ItemGroup Label="Job pipeline">
-    <!-- The pipeline queue (ADR 0018): the API's enqueue (SqsJobSender) and
+    <!-- The pipeline queue (ADR 0018) and the filing queue (ADR 0024): the
+         API's two sends (SqsJobSender, SqsFilingJobSender) and
          the worker's local poller. On the same AWSSDK.Core as the rest. -->
     <PackageVersion Include="AWSSDK.SQS" Version="4.0.100.17" />
     <!-- The worker's model calls (ADR 0019), pinned exact: the request bodies

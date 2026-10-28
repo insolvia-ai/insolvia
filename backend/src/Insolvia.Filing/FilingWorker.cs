@@ -35,8 +35,8 @@ public sealed record FilingDeps
     /// <summary>The case records.</summary>
     public required ICaseEntityStore Entities { get; init; }
 
-    /// <summary>The packets, newest first.</summary>
-    public required IPacketReader Packets { get; init; }
+    /// <summary>The packets, newest first (the job worker writes them).</summary>
+    public required IPacketStore Packets { get; init; }
 
     /// <summary>The case-document bucket.</summary>
     public required IDocumentBlobStore Blobs { get; init; }

@@ -278,10 +278,46 @@ public sealed class ConfigTests
     }
 
     [Fact]
-    public void The_host_refuses_to_start_without_a_packet_reader_rather_than_claim_what_it_could_only_hand_back()
+    public void The_local_host_composes_the_postgres_stores_the_local_opener_and_the_static_switch()
     {
-        var error = Assert.Throws<InvalidOperationException>(() => FilingComposition.Services(FilingConfig.Load(Env()), Env()));
-        Assert.Equal(FilingComposition.PacketReaderMissing, error.Message);
+        // Composing opens nothing: no connection is made until a run asks.
+        var read = Env(
+            ("INSOLVIA_DB_CONNECTION_STRING", "Host=127.0.0.1;Port=1;Database=insolvia;Username=filing;Password=unused"),
+            ("CASE_DOCUMENT_BUCKET", "insolvia-local-case-documents"),
+            ("FILING_SUBMISSIONS_ENABLED", "true"),
+            ("FAKE_CMECF_URL", "http://127.0.0.1:8790"));
+        var config = FilingConfig.Load(read);
+        using var services = FilingComposition.Services(config, read, new CapturingLog());
+        using var scope = services.CreateScope();
+
+        var deps = FilingComposition.Deps(scope.ServiceProvider, config);
+
+        Assert.IsType<Insolvia.Data.Cases.PostgresPacketStore>(deps.Packets);
+        Assert.IsType<Insolvia.Data.Cases.PostgresFilingApprovalStore>(deps.Approvals);
+        Assert.IsType<Insolvia.Aws.Sealing.LocalFilingCredentialOpener>(deps.Opener);
+        Assert.IsType<StaticKillSwitch>(deps.KillSwitch);
+        Assert.NotNull(deps.FakeDriver);
+    }
+
+    [Fact]
+    public void A_deployed_host_composes_the_kms_opener_under_the_vault_alias_and_the_ssm_switch()
+    {
+        var read = Env(
+            ("INSOLVIA_ENV", "staging"),
+            ("INSOLVIA_DB_CONNECTION_STRING", "Host=127.0.0.1;Port=1;Database=insolvia;Username=filing;Password=unused"),
+            ("CASE_DOCUMENT_BUCKET", "insolvia-staging-case-documents"),
+            ("FILING_KILL_SWITCH_PARAMETER", "/insolvia/staging/filing/submissions-enabled"),
+            ("CASE_TABLE_NAME", "insolvia-staging-cases"),
+            ("AWS_REGION", "us-east-1"));
+        var config = FilingConfig.Load(read);
+        using var services = FilingComposition.Services(config, read, new CapturingLog());
+        using var scope = services.CreateScope();
+
+        var deps = FilingComposition.Deps(scope.ServiceProvider, config);
+
+        Assert.Equal("alias/insolvia-staging-filing-credentials", Assert.IsType<Insolvia.Aws.Sealing.KmsFilingCredentialOpener>(deps.Opener).KeyId);
+        Assert.IsType<Insolvia.Aws.Filing.SsmKillSwitch>(deps.KillSwitch);
+        Assert.Null(deps.FakeDriver);
     }
 }
 

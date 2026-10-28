@@ -95,8 +95,6 @@ internal sealed class FilingWorld : IAsyncDisposable
 
     public MemoryFilingJobSender Queue { get; } = new();
 
-    public MemoryPacketReader Packets { get; } = new();
-
     public MemoryAccessLog AccessLog { get; } = new();
 
     public MemoryFirmStore Firms { get; } = new();
@@ -137,8 +135,6 @@ internal sealed class FilingWorld : IAsyncDisposable
                 services.AddSingleton<IFirmStore>(_ => world!.Firms);
                 services.RemoveAll<IAccessLog>();
                 services.AddSingleton<IAccessLog>(_ => world!.AccessLog);
-                services.RemoveAll<IPacketReader>();
-                services.AddSingleton<IPacketReader>(_ => world!.Packets);
                 services.AddSingleton<IFilingJobSender>(_ => world!.Queue);
             });
         });
@@ -184,8 +180,7 @@ internal sealed class FilingWorld : IAsyncDisposable
 
         var (zip, assembled) = Assembly.Value;
         var packet = Packets_New(zip, assembled);
-        await Service<IDocumentBlobStore>().PutBytesAsync(packet.StorageRef, zip, Forms.Packets.PacketContentType);
-        Packets.Add(packet);
+        await StorePacketAsync(packet, zip);
 
         await SignAsync();
         CredentialId = await EnrolAsync(FakeCmEcf.Login, CourtFake.Password, CourtFake.TotpSeed);
@@ -208,9 +203,16 @@ internal sealed class FilingWorld : IAsyncDisposable
     public async Task ReassembleAsync()
     {
         var (zip, assembled) = Assembly.Value;
-        var packet = Packets_New(zip, assembled);
+        await StorePacketAsync(Packets_New(zip, assembled), zip);
+    }
+
+    /// <summary>The bytes in the bucket and the row in the API's own packet store, the case pinned with it — what the job worker writes.</summary>
+    private async Task StorePacketAsync(Packet packet, byte[] zip)
+    {
         await Service<IDocumentBlobStore>().PutBytesAsync(packet.StorageRef, zip, Forms.Packets.PacketContentType);
-        Packets.Add(packet);
+        var stored = (await Service<ICaseStore>().ReadForWorkerAsync(CaseId))!;
+        var pinned = stored with { FormRevisions = packet.FormRevisions, ConstantsSetId = packet.ConstantsSetId };
+        Assert.True(await Service<IPacketStore>().CreateAsync(Forms.Packets.ToItem(packet), pinned, stored.UpdatedAt));
     }
 
     /// <summary>The reference case, in flmb, under <paramref name="caseId"/>, owned by the firm.</summary>
@@ -301,7 +303,7 @@ internal sealed class FilingWorld : IAsyncDisposable
             Cases = Service<ICaseStore>(),
             Debtors = Service<IDebtorStore>(),
             Entities = Service<ICaseEntityStore>(),
-            Packets = Packets,
+            Packets = Service<IPacketStore>(),
             Blobs = Service<IDocumentBlobStore>(),
             Documents = Service<IDocumentStore>(),
             Credentials = Service<IFilingCredentialStore>(),

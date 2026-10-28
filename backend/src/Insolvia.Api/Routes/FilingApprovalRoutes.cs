@@ -63,13 +63,13 @@ public sealed class FilingApprovalRoutes : IEndpointModule
         // Every port this module needs, checked before anything is read.
         _ = context.Port<IFilingApprovalStore>();
         _ = context.Port<IFilingStore>();
-        var packets = context.Port<IPacketReader>();
+        var packets = context.Port<IPacketStore>();
         var @case = await context.ReachableCaseAsync(caseId, AccessAction.CaseRead, cancellationToken);
         var (data, basis) = await BasisOfAsync(context, @case, packets, cancellationToken);
         return (@case, data, basis);
     }
 
-    private static Task<(CaseData Data, ApprovalBasis Basis)> BasisOfAsync(HttpContext context, Case @case, IPacketReader packets, CancellationToken cancellationToken) =>
+    private static Task<(CaseData Data, ApprovalBasis Basis)> BasisOfAsync(HttpContext context, Case @case, IPacketStore packets, CancellationToken cancellationToken) =>
         FilingApprovals.BasisForCaseAsync(
             @case,
             context.Port<IDebtorStore>(),
@@ -187,7 +187,7 @@ public sealed class FilingApprovalRoutes : IEndpointModule
     {
         var approvals = context.Port<IFilingApprovalStore>();
         var filings = context.Port<IFilingStore>();
-        var packets = context.Port<IPacketReader>();
+        var packets = context.Port<IPacketStore>();
         var documents = context.Port<IDocumentStore>();
         var body = await RequestBodies.ReadSilentAsync(context, MaxRequestBytes);
         var @case = await context.ReachableCaseAsync(caseId, AccessAction.CaseRead, cancellationToken);

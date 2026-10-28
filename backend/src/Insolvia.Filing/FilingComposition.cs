@@ -14,7 +14,6 @@ using Insolvia.Data.Vault;
 using Insolvia.Filing.Drivers;
 using Insolvia.Filing.Fence;
 using Insolvia.Filing.Http;
-using Insolvia.Forms;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Insolvia.Filing;
@@ -38,24 +37,11 @@ namespace Insolvia.Filing;
 /// </summary>
 public static class FilingComposition
 {
-    /// <summary>
-    /// The packet store is #528's (the job worker writes packets); until 18.22
-    /// wires it as an <see cref="IPacketReader"/> this host refuses to start
-    /// rather than claim approvals it could only hand back.
-    /// </summary>
-    public const string PacketReaderMissing =
-        "the packet store is not composed in the filing host yet (#528); plan 18.22 wires it as Insolvia.Forms.IPacketReader";
-
-    /// <summary>The services, once per process. <paramref name="packets"/> is the packet store's reader (18.22).</summary>
-    public static ServiceProvider Services(FilingConfig config, Func<string, string?> read, Func<IServiceProvider, IPacketReader>? packets = null, IFilingLog? log = null)
+    /// <summary>The services, once per process.</summary>
+    public static ServiceProvider Services(FilingConfig config, Func<string, string?> read, IFilingLog? log = null)
     {
         ArgumentNullException.ThrowIfNull(config);
         ArgumentNullException.ThrowIfNull(read);
-        if (packets is null)
-        {
-            throw new InvalidOperationException(PacketReaderMissing);
-        }
-
         if (config.CaseDocumentBucket is null)
         {
             throw new InvalidOperationException("CASE_DOCUMENT_BUCKET must be set for the filing worker");
@@ -75,7 +61,7 @@ public static class FilingComposition
         services.AddScoped<IFilingAuthorizationStore>(provider => new PostgresFilingAuthorizationStore(provider.GetRequiredService<InsolviaDbContext>()));
         services.AddScoped<IAccessLog>(provider => new PostgresAccessLog(provider.GetRequiredService<InsolviaDbContext>()));
         services.AddScoped<ITaxIdStore>(provider => new PostgresTaxIdStore(provider.GetRequiredService<InsolviaDbContext>()));
-        services.AddScoped(packets);
+        services.AddScoped<IPacketStore>(provider => new PostgresPacketStore(provider.GetRequiredService<InsolviaDbContext>()));
 
         var bucket = config.CaseDocumentBucket;
         services.AddSingleton<IDocumentBlobStore>(_ => new S3DocumentBlobStore(new AmazonS3Client(S3DocumentBlobStore.ClientConfig()), bucket));
@@ -145,7 +131,7 @@ public static class FilingComposition
             Cases = scope.GetRequiredService<ICaseStore>(),
             Debtors = scope.GetRequiredService<IDebtorStore>(),
             Entities = scope.GetRequiredService<ICaseEntityStore>(),
-            Packets = scope.GetRequiredService<IPacketReader>(),
+            Packets = scope.GetRequiredService<IPacketStore>(),
             Blobs = scope.GetRequiredService<IDocumentBlobStore>(),
             Documents = scope.GetRequiredService<IDocumentStore>(),
             Credentials = scope.GetRequiredService<IFilingCredentialStore>(),

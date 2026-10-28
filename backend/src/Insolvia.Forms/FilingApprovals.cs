@@ -148,15 +148,15 @@ public static class FilingApprovals
         Case @case,
         IDebtorStore debtors,
         ICaseEntityStore entities,
-        IPacketReader packets,
+        IPacketStore packets,
         DateOnly asOf,
         CourtRegistry? registry = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(@case);
         ArgumentNullException.ThrowIfNull(packets);
-        var data = await CaseDataReader.ReadAsync(@case, debtors, entities, cancellationToken).ConfigureAwait(false);
-        var listed = await packets.ListForCaseAsync(@case.Id, cancellationToken).ConfigureAwait(false);
+        var data = await CaseDataReads.ReadAsync(@case, debtors, entities, cancellationToken).ConfigureAwait(false);
+        var listed = (await packets.ListForCaseAsync(@case.Id, cancellationToken).ConfigureAwait(false)).Select(Packets.FromItem).ToList();
         var release = (registry ?? CourtRegistry.Shipped).Resolve(asOf);
         return (data, ApprovalDigest.Basis(data, listed, release, asOf));
     }

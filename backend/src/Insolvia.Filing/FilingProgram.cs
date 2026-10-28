@@ -30,7 +30,7 @@ public static class FilingProgram
     {
         var config = FilingConfig.Load(Environment.GetEnvironmentVariable);
         var log = new ConsoleFilingLog();
-        using var services = FilingComposition.Services(config, Environment.GetEnvironmentVariable, packets: null, log);
+        using var services = FilingComposition.Services(config, Environment.GetEnvironmentVariable, log);
         if (Environment.GetEnvironmentVariable("AWS_LAMBDA_RUNTIME_API") is not null)
         {
             var handler = async (Stream input, ILambdaContext context) =>

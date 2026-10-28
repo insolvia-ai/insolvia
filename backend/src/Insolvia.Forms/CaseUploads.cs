@@ -8,7 +8,6 @@ using Insolvia.Core.Debtors;
 using Insolvia.Core.Fields;
 using Insolvia.Core.Petitions;
 using Insolvia.Core.Ports;
-using Insolvia.Core.TaxIds;
 using Insolvia.Engines;
 using Insolvia.Engines.MeansTest;
 using Insolvia.Engines.Projections;
@@ -53,7 +52,7 @@ public sealed record CaseUploadFile(string FileName, string SpecRelease, byte[] 
 /// county is the debtor's residence county looked up by name among the
 /// district's divisions.</para>
 /// <para><b>The SSN.</b> Debt field 8 is the full nine digits, opened through
-/// <see cref="DiscloseTaxIdsAsync"/> with purpose
+/// <see cref="CaseDataReads.DiscloseTaxIdsAsync"/> with purpose
 /// <see cref="TaxIdPurpose"/> — a <c>taxid.read</c> row per debtor BEFORE the
 /// envelope opens. The file is GENERATED ON DEMAND and STREAMED: built in the
 /// filing worker's memory at upload time, handed to the driver and dropped,
@@ -147,46 +146,9 @@ public static class CaseUploads
         CourtRegistry? courts = null,
         CancellationToken cancellationToken = default)
     {
-        var data = await CaseDataReader.ReadAsync(@case, debtors, entities, cancellationToken).ConfigureAwait(false);
-        var disclosed = await DiscloseTaxIdsAsync(data, principal, TaxIdPurpose, taxIdStore, taxIdCipher, accessLog, cancellationToken).ConfigureAwait(false);
+        var data = await CaseDataReads.ReadAsync(@case, debtors, entities, cancellationToken).ConfigureAwait(false);
+        var disclosed = await CaseDataReads.DiscloseTaxIdsAsync(data, principal, TaxIdPurpose, taxIdStore, taxIdCipher, accessLog, cancellationToken).ConfigureAwait(false);
         return Build(disclosed, asOf, (courts ?? CourtRegistry.Shipped).Resolve(asOf), CaseUploadSpecs.Resolve(asOf));
-    }
-
-    /// <summary>
-    /// The logged full-value read (Python's <c>packet_assembly.disclose_tax_ids</c>):
-    /// for every debtor carrying a tax id, ONE <c>taxid.read</c> row naming
-    /// <paramref name="principal"/> and <paramref name="purpose"/>
-    /// (<see cref="TaxIdRules.ReadAsync"/> records it before the envelope
-    /// opens) — returning the data with <see cref="CaseData.TaxIds"/> filled.
-    /// Kept here, not in <see cref="PacketAssembly"/>, until the job worker's
-    /// B121 read (18.17) lands beside it; then both callers share one.
-    /// </summary>
-    public static async Task<CaseData> DiscloseTaxIdsAsync(
-        CaseData data,
-        string principal,
-        string purpose,
-        ITaxIdStore taxIdStore,
-        ITaxIdCipher taxIdCipher,
-        IAccessLog accessLog,
-        CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(data);
-        var disclosed = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var debtor in data.Debtors)
-        {
-            if (debtor.TaxId is not { } taxId)
-            {
-                continue;
-            }
-
-            var digits = await TaxIdRules.ReadAsync(taxId, data.Case.FirmId, data.Case.Id, debtor.FilingRole, principal, purpose, taxIdCipher, taxIdStore, accessLog, cancellationToken).ConfigureAwait(false);
-            if (digits is not null)
-            {
-                disclosed[debtor.FilingRole.ToWire()] = digits;
-            }
-        }
-
-        return data with { TaxIds = disclosed };
     }
 
     /// <summary>
