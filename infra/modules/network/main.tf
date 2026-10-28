@@ -139,7 +139,7 @@ resource "aws_route_table_association" "public" {
 # its job. fck-nat's own image does the masquerading — no user data needed.
 resource "aws_security_group" "nat" {
   name        = "${local.name}-nat"
-  description = "fck-nat instance: forwards the VPC's egress"
+  description = "fck-nat instance: forwards the VPC egress"
   vpc_id      = aws_vpc.main.id
 
   tags = merge(var.tags, { Name = "${local.name}-nat" })
