@@ -168,7 +168,19 @@ public static class ApiComposition
             // The bytes: the case-document bucket, which LambdaBootRequirements
             // already refuses to boot without. One client per process.
             var bucket = config.CaseDocumentBucket!;
-            builder.Services.AddSingleton<IDocumentBlobStore>(_ => new S3DocumentBlobStore(new AmazonS3Client(S3DocumentBlobStore.ClientConfig()), bucket));
+            // The region is read the way KMS and SQS read it: from
+            // configuration first, so a host that sets AWS_REGION there (and
+            // not in its process environment) still gets one.
+            builder.Services.AddSingleton<IDocumentBlobStore>(_ =>
+            {
+                var s3 = S3DocumentBlobStore.ClientConfig();
+                if (configuration["AWS_REGION"] is { Length: > 0 } region)
+                {
+                    s3.RegionEndpoint = RegionEndpoint.GetBySystemName(region);
+                }
+
+                return new S3DocumentBlobStore(new AmazonS3Client(s3), bucket);
+            });
         }
 
         // Constructed once, at start, so its key cache lives as long as the
