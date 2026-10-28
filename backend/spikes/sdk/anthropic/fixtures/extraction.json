@@ -1,0 +1,571 @@
+{
+ "cases": {
+  "pdf": {
+   "data_hex": "255044462d312e340a257370696b6500fffe2062696e617279200a",
+   "media_type": "application/pdf",
+   "request": {
+    "body": {
+     "max_tokens": 16000,
+     "messages": [
+      {
+       "content": [
+        {
+         "source": {
+          "data": "JVBERi0xLjQKJXNwaWtlAP/+IGJpbmFyeSAK",
+          "media_type": "application/pdf",
+          "type": "base64"
+         },
+         "type": "document"
+        },
+        {
+         "text": "Extract this document into the required output format, following your instructions exactly.",
+         "type": "text"
+        }
+       ],
+       "role": "user"
+      }
+     ],
+     "model": "claude-opus-5",
+     "output_config": {
+      "format": {
+       "schema": {
+        "additionalProperties": false,
+        "properties": {
+         "creditors": {
+          "items": {
+           "additionalProperties": false,
+           "properties": {
+            "address": {
+             "additionalProperties": false,
+             "properties": {
+              "city": {
+               "type": [
+                "string",
+                "null"
+               ]
+              },
+              "line1": {
+               "type": [
+                "string",
+                "null"
+               ]
+              },
+              "line2": {
+               "type": [
+                "string",
+                "null"
+               ]
+              },
+              "postal_code": {
+               "type": [
+                "string",
+                "null"
+               ]
+              },
+              "raw": {
+               "description": "The address exactly as printed, when it does not split cleanly into the parts.",
+               "type": [
+                "string",
+                "null"
+               ]
+              },
+              "state": {
+               "type": [
+                "string",
+                "null"
+               ]
+              }
+             },
+             "required": [
+              "line1",
+              "line2",
+              "city",
+              "state",
+              "postal_code",
+              "raw"
+             ],
+             "type": "object"
+            },
+            "claims": {
+             "items": {
+              "additionalProperties": false,
+              "properties": {
+               "account_last4": {
+                "description": "Last four digits of the account number ONLY — never more.",
+                "type": [
+                 "string",
+                 "null"
+                ]
+               },
+               "amount": {
+                "description": "Balance owed as a plain decimal string, like \"1234.56\".",
+                "type": [
+                 "string",
+                 "null"
+                ]
+               },
+               "claim_class": {
+                "description": "secured for collateralised debts (auto, mortgage); nonpriority_unsecured for ordinary consumer debt; priority_unsecured only for taxes or support obligations.",
+                "enum": [
+                 "secured",
+                 "priority_unsecured",
+                 "nonpriority_unsecured"
+                ],
+                "type": "string"
+               },
+               "confidence": {
+                "description": "How certain you are this record is read correctly, 0-1.",
+                "type": "number"
+               },
+               "date_incurred": {
+                "description": "Date the account was opened, YYYY-MM-DD.",
+                "type": [
+                 "string",
+                 "null"
+                ]
+               },
+               "disputed": {
+                "description": "True only when the report marks the account disputed.",
+                "type": [
+                 "boolean",
+                 "null"
+                ]
+               },
+               "page": {
+                "description": "1-based page of the document this record was read from, or null when unclear.",
+                "type": [
+                 "integer",
+                 "null"
+                ]
+               }
+              },
+              "required": [
+               "account_last4",
+               "amount",
+               "date_incurred",
+               "claim_class",
+               "disputed",
+               "page",
+               "confidence"
+              ],
+              "type": "object"
+             },
+             "type": "array"
+            },
+            "confidence": {
+             "description": "How certain you are this record is read correctly, 0-1.",
+             "type": "number"
+            },
+            "name": {
+             "description": "The creditor as the mailing matrix should print it — issuer or current servicer name.",
+             "type": "string"
+            },
+            "page": {
+             "description": "1-based page of the document this record was read from, or null when unclear.",
+             "type": [
+              "integer",
+              "null"
+             ]
+            }
+           },
+           "required": [
+            "name",
+            "address",
+            "page",
+            "confidence",
+            "claims"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "required": [
+         "creditors"
+        ],
+        "type": "object"
+       },
+       "type": "json_schema"
+      }
+     },
+     "system": "You are reading a consumer credit report uploaded as source material for a\nU.S. consumer bankruptcy filing. Extract every tradeline into the schema you\nwere given: one creditor entry per distinct creditor (name and mailing\naddress as the report shows them — collections and servicers count as the\ncreditor currently holding the account), each carrying its claims (one per\naccount/tradeline). Include open, delinquent, charged-off and collection\naccounts; skip inquiries, employment history and score commentary — they are\nnot debts. Do not merge creditors that merely look similar; a human reviews\nduplicates.\n\nRules, all of them binding:\n- Extract only what the document actually shows. Never infer, estimate, or\n  fill a value the page does not state; use null for anything absent.\n- Amounts are plain decimal strings with two places, like \"1234.56\" — no\n  currency symbols, no thousands separators.\n- Dates are YYYY-MM-DD exactly as the document states them.\n- NEVER output a Social Security number, taxpayer identification number, or\n  full account number — account numbers are last four digits only, even when\n  the document prints more.\n- Give every record a page anchor (1-based) and a confidence between 0 and 1.\n- If the document is not actually what it was described as, answer with the\n  empty result rather than forcing records out of the wrong document.\n"
+    },
+    "headers": {
+     "anthropic-version": "2023-06-01",
+     "content-type": "application/json"
+    },
+    "method": "POST",
+    "path": "/v1/messages",
+    "timeout": {
+     "connect": 240.0,
+     "pool": 240.0,
+     "read": 240.0,
+     "write": 240.0
+    }
+   }
+  },
+  "png": {
+   "data_hex": "89504e470d0a1a0a00007370696b65",
+   "media_type": "image/png",
+   "request": {
+    "body": {
+     "max_tokens": 16000,
+     "messages": [
+      {
+       "content": [
+        {
+         "source": {
+          "data": "iVBORw0KGgoAAHNwaWtl",
+          "media_type": "image/png",
+          "type": "base64"
+         },
+         "type": "image"
+        },
+        {
+         "text": "Extract this document into the required output format, following your instructions exactly.",
+         "type": "text"
+        }
+       ],
+       "role": "user"
+      }
+     ],
+     "model": "claude-opus-5",
+     "output_config": {
+      "format": {
+       "schema": {
+        "additionalProperties": false,
+        "properties": {
+         "creditors": {
+          "items": {
+           "additionalProperties": false,
+           "properties": {
+            "address": {
+             "additionalProperties": false,
+             "properties": {
+              "city": {
+               "type": [
+                "string",
+                "null"
+               ]
+              },
+              "line1": {
+               "type": [
+                "string",
+                "null"
+               ]
+              },
+              "line2": {
+               "type": [
+                "string",
+                "null"
+               ]
+              },
+              "postal_code": {
+               "type": [
+                "string",
+                "null"
+               ]
+              },
+              "raw": {
+               "description": "The address exactly as printed, when it does not split cleanly into the parts.",
+               "type": [
+                "string",
+                "null"
+               ]
+              },
+              "state": {
+               "type": [
+                "string",
+                "null"
+               ]
+              }
+             },
+             "required": [
+              "line1",
+              "line2",
+              "city",
+              "state",
+              "postal_code",
+              "raw"
+             ],
+             "type": "object"
+            },
+            "claims": {
+             "items": {
+              "additionalProperties": false,
+              "properties": {
+               "account_last4": {
+                "description": "Last four digits of the account number ONLY — never more.",
+                "type": [
+                 "string",
+                 "null"
+                ]
+               },
+               "amount": {
+                "description": "Balance owed as a plain decimal string, like \"1234.56\".",
+                "type": [
+                 "string",
+                 "null"
+                ]
+               },
+               "claim_class": {
+                "description": "secured for collateralised debts (auto, mortgage); nonpriority_unsecured for ordinary consumer debt; priority_unsecured only for taxes or support obligations.",
+                "enum": [
+                 "secured",
+                 "priority_unsecured",
+                 "nonpriority_unsecured"
+                ],
+                "type": "string"
+               },
+               "confidence": {
+                "description": "How certain you are this record is read correctly, 0-1.",
+                "type": "number"
+               },
+               "date_incurred": {
+                "description": "Date the account was opened, YYYY-MM-DD.",
+                "type": [
+                 "string",
+                 "null"
+                ]
+               },
+               "disputed": {
+                "description": "True only when the report marks the account disputed.",
+                "type": [
+                 "boolean",
+                 "null"
+                ]
+               },
+               "page": {
+                "description": "1-based page of the document this record was read from, or null when unclear.",
+                "type": [
+                 "integer",
+                 "null"
+                ]
+               }
+              },
+              "required": [
+               "account_last4",
+               "amount",
+               "date_incurred",
+               "claim_class",
+               "disputed",
+               "page",
+               "confidence"
+              ],
+              "type": "object"
+             },
+             "type": "array"
+            },
+            "confidence": {
+             "description": "How certain you are this record is read correctly, 0-1.",
+             "type": "number"
+            },
+            "name": {
+             "description": "The creditor as the mailing matrix should print it — issuer or current servicer name.",
+             "type": "string"
+            },
+            "page": {
+             "description": "1-based page of the document this record was read from, or null when unclear.",
+             "type": [
+              "integer",
+              "null"
+             ]
+            }
+           },
+           "required": [
+            "name",
+            "address",
+            "page",
+            "confidence",
+            "claims"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "required": [
+         "creditors"
+        ],
+        "type": "object"
+       },
+       "type": "json_schema"
+      }
+     },
+     "system": "You are reading a consumer credit report uploaded as source material for a\nU.S. consumer bankruptcy filing. Extract every tradeline into the schema you\nwere given: one creditor entry per distinct creditor (name and mailing\naddress as the report shows them — collections and servicers count as the\ncreditor currently holding the account), each carrying its claims (one per\naccount/tradeline). Include open, delinquent, charged-off and collection\naccounts; skip inquiries, employment history and score commentary — they are\nnot debts. Do not merge creditors that merely look similar; a human reviews\nduplicates.\n\nRules, all of them binding:\n- Extract only what the document actually shows. Never infer, estimate, or\n  fill a value the page does not state; use null for anything absent.\n- Amounts are plain decimal strings with two places, like \"1234.56\" — no\n  currency symbols, no thousands separators.\n- Dates are YYYY-MM-DD exactly as the document states them.\n- NEVER output a Social Security number, taxpayer identification number, or\n  full account number — account numbers are last four digits only, even when\n  the document prints more.\n- Give every record a page anchor (1-based) and a confidence between 0 and 1.\n- If the document is not actually what it was described as, answer with the\n  empty result rather than forcing records out of the wrong document.\n"
+    },
+    "headers": {
+     "anthropic-version": "2023-06-01",
+     "content-type": "application/json"
+    },
+    "method": "POST",
+    "path": "/v1/messages",
+    "timeout": {
+     "connect": 240.0,
+     "pool": 240.0,
+     "read": 240.0,
+     "write": 240.0
+    }
+   }
+  }
+ },
+ "client_max_retries": 1,
+ "schema": {
+  "additionalProperties": false,
+  "properties": {
+   "creditors": {
+    "items": {
+     "additionalProperties": false,
+     "properties": {
+      "address": {
+       "additionalProperties": false,
+       "properties": {
+        "city": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "line1": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "line2": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "postal_code": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "raw": {
+         "description": "The address exactly as printed, when it does not split cleanly into the parts.",
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "state": {
+         "type": [
+          "string",
+          "null"
+         ]
+        }
+       },
+       "required": [
+        "line1",
+        "line2",
+        "city",
+        "state",
+        "postal_code",
+        "raw"
+       ],
+       "type": "object"
+      },
+      "claims": {
+       "items": {
+        "additionalProperties": false,
+        "properties": {
+         "account_last4": {
+          "description": "Last four digits of the account number ONLY — never more.",
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "amount": {
+          "description": "Balance owed as a plain decimal string, like \"1234.56\".",
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "claim_class": {
+          "description": "secured for collateralised debts (auto, mortgage); nonpriority_unsecured for ordinary consumer debt; priority_unsecured only for taxes or support obligations.",
+          "enum": [
+           "secured",
+           "priority_unsecured",
+           "nonpriority_unsecured"
+          ],
+          "type": "string"
+         },
+         "confidence": {
+          "description": "How certain you are this record is read correctly, 0-1.",
+          "type": "number"
+         },
+         "date_incurred": {
+          "description": "Date the account was opened, YYYY-MM-DD.",
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "disputed": {
+          "description": "True only when the report marks the account disputed.",
+          "type": [
+           "boolean",
+           "null"
+          ]
+         },
+         "page": {
+          "description": "1-based page of the document this record was read from, or null when unclear.",
+          "type": [
+           "integer",
+           "null"
+          ]
+         }
+        },
+        "required": [
+         "account_last4",
+         "amount",
+         "date_incurred",
+         "claim_class",
+         "disputed",
+         "page",
+         "confidence"
+        ],
+        "type": "object"
+       },
+       "type": "array"
+      },
+      "confidence": {
+       "description": "How certain you are this record is read correctly, 0-1.",
+       "type": "number"
+      },
+      "name": {
+       "description": "The creditor as the mailing matrix should print it — issuer or current servicer name.",
+       "type": "string"
+      },
+      "page": {
+       "description": "1-based page of the document this record was read from, or null when unclear.",
+       "type": [
+        "integer",
+        "null"
+       ]
+      }
+     },
+     "required": [
+      "name",
+      "address",
+      "page",
+      "confidence",
+      "claims"
+     ],
+     "type": "object"
+    },
+    "type": "array"
+   }
+  },
+  "required": [
+   "creditors"
+  ],
+  "type": "object"
+ },
+ "system_prompt": "You are reading a consumer credit report uploaded as source material for a\nU.S. consumer bankruptcy filing. Extract every tradeline into the schema you\nwere given: one creditor entry per distinct creditor (name and mailing\naddress as the report shows them — collections and servicers count as the\ncreditor currently holding the account), each carrying its claims (one per\naccount/tradeline). Include open, delinquent, charged-off and collection\naccounts; skip inquiries, employment history and score commentary — they are\nnot debts. Do not merge creditors that merely look similar; a human reviews\nduplicates.\n\nRules, all of them binding:\n- Extract only what the document actually shows. Never infer, estimate, or\n  fill a value the page does not state; use null for anything absent.\n- Amounts are plain decimal strings with two places, like \"1234.56\" — no\n  currency symbols, no thousands separators.\n- Dates are YYYY-MM-DD exactly as the document states them.\n- NEVER output a Social Security number, taxpayer identification number, or\n  full account number — account numbers are last four digits only, even when\n  the document prints more.\n- Give every record a page anchor (1-based) and a confidence between 0 and 1.\n- If the document is not actually what it was described as, answer with the\n  empty result rather than forcing records out of the wrong document.\n"
+}
