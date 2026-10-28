@@ -86,10 +86,80 @@ public sealed class MigratorTests(PostgresFixture postgres)
 
         var report = await RunAsync(connectionString, []);
 
-        Assert.Equal(["note_demo"], report.Tables);
+        Assert.Contains("note_demo", report.Tables);
         var error = await Assert.ThrowsAsync<PostgresException>(() =>
             ScalarAsync<long>(As(connectionString, ServiceRoles.Api), "SELECT count(*) FROM insolvia.note_demo"));
         Assert.Equal(PostgresErrorCodes.InsufficientPrivilege, error.SqlState);
+    }
+
+    [Fact]
+    public async Task The_access_log_takes_inserts_from_its_writers_and_an_update_or_delete_from_no_service_role()
+    {
+        var connectionString = await postgres.CreateDatabaseAsync();
+        await RunAsync(connectionString, GrantTable.All);
+        string[] writers = [ServiceRoles.Api, ServiceRoles.Mcp, ServiceRoles.Admin, ServiceRoles.Worker];
+
+        foreach (var role in writers)
+        {
+            await ExecuteAsync(
+                As(connectionString, role),
+                $"INSERT INTO insolvia.access_log (event_id, subject_kind, subject_id, principal, action, outcome, recorded_at) "
+                + $"VALUES ('event-{role}', 'CASE', 'case-1', 'sub-{role}', 'case.read', 'allowed', now())");
+        }
+
+        Assert.Equal((long)writers.Length, await ScalarAsync<long>(connectionString, "SELECT count(*) FROM insolvia.access_log"));
+        foreach (var role in ServiceRoles.All)
+        {
+            foreach (var rewrite in new[]
+            {
+                "UPDATE insolvia.access_log SET outcome = 'denied'",
+                "DELETE FROM insolvia.access_log",
+                "TRUNCATE insolvia.access_log",
+            })
+            {
+                var error = await Assert.ThrowsAsync<PostgresException>(() => ExecuteAsync(As(connectionString, role), rewrite));
+                Assert.Equal(PostgresErrorCodes.InsufficientPrivilege, error.SqlState);
+            }
+        }
+
+        Assert.Equal((long)writers.Length, await ScalarAsync<long>(connectionString, "SELECT count(*) FROM insolvia.access_log WHERE outcome = 'allowed'"));
+    }
+
+    [Fact]
+    public async Task Every_table_the_migrations_create_is_named_by_the_grant_table()
+    {
+        // A table no grant names is reachable by no service: a store that
+        // forgot its row would fail on its first deployed request.
+        var connectionString = await postgres.CreateDatabaseAsync();
+        var report = await RunAsync(connectionString, GrantTable.All);
+
+        Assert.Equal(report.Tables.Order(StringComparer.Ordinal), GrantTable.All.Select(grant => grant.Table).Distinct().Order(StringComparer.Ordinal));
+    }
+
+    [Fact]
+    public async Task The_firm_tables_are_granted_by_service_least_privilege_first()
+    {
+        var connectionString = await postgres.CreateDatabaseAsync();
+        await RunAsync(connectionString, GrantTable.All);
+
+        // The API never creates or deletes a firm; the admin service provisions them.
+        Assert.False(await HasPrivilegeAsync(connectionString, ServiceRoles.Api, "firms", "INSERT"));
+        Assert.True(await HasPrivilegeAsync(connectionString, ServiceRoles.Api, "firms", "UPDATE"));
+        Assert.True(await HasPrivilegeAsync(connectionString, ServiceRoles.Admin, "firms", "INSERT"));
+        Assert.True(await HasPrivilegeAsync(connectionString, ServiceRoles.Admin, "firm_users", "INSERT"));
+
+        // The MCP server reads the firm side and writes none of it.
+        foreach (var table in new[] { "firms", "firm_users", "firm_clients" })
+        {
+            Assert.True(await HasPrivilegeAsync(connectionString, ServiceRoles.Mcp, table, "SELECT"));
+            Assert.False(await HasPrivilegeAsync(connectionString, ServiceRoles.Mcp, table, "UPDATE"));
+        }
+
+        // No delete where no port deletes; the filing worker holds nothing here.
+        Assert.False(await HasPrivilegeAsync(connectionString, ServiceRoles.Api, "firm_clients", "DELETE"));
+        Assert.False(await HasPrivilegeAsync(connectionString, ServiceRoles.Api, "client_bindings", "DELETE"));
+        Assert.True(await HasPrivilegeAsync(connectionString, ServiceRoles.Api, "case_client_role_claims", "DELETE"));
+        Assert.False(await HasPrivilegeAsync(connectionString, ServiceRoles.Filing, "firm_users", "SELECT"));
     }
 
     [Fact]
@@ -174,6 +244,9 @@ public sealed class MigratorTests(PostgresFixture postgres)
         await using var dataSource = InsolviaDataSource.Create(new DatabaseSettings { ConnectionString = connectionString });
         return await MigrationRunner.RunAsync(dataSource, grants, RolePassword, None);
     }
+
+    private static Task<bool> HasPrivilegeAsync(string connectionString, string role, string table, string privilege) =>
+        ScalarAsync<bool>(connectionString, $"SELECT has_table_privilege('{role}', 'insolvia.{table}', '{privilege}')");
 
     private static string As(string connectionString, string role) =>
         new NpgsqlConnectionStringBuilder(connectionString) { Username = role, Password = RolePassword, Pooling = false }.ConnectionString;
