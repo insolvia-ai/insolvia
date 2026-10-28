@@ -24,6 +24,12 @@ infra/
 │   │                         #   /insolvia/<env>/auth/* (the pool's identifiers)
 │   ├── case_store/           # GLBA-scope case data: customer-managed KMS key +
 │   │                         #   single-table DynamoDB + the API role's grant
+│   ├── network/              # ADR 0028: VPC, two AZs of private subnets, a fck-nat
+│   │                         #   egress instance, S3/DynamoDB gateway endpoints,
+│   │                         #   the backend Lambdas' security group (staging, prod)
+│   ├── aurora/               # ADR 0028: Aurora Serverless v2 PostgreSQL 17 under its
+│   │                         #   own KMS key + the /insolvia/<env>/db/* SSM contract
+│   │                         #   inputs (staging, prod; not attached to a Lambda yet)
 │   ├── audit_trail/          # CloudTrail data events on the case store, into
 │   │                         #   insolvia-<env>-audit under its own key
 │   ├── filing_credentials/   # the CM/ECF credential vault (ADR 0024): a dedicated

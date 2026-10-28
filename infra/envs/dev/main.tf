@@ -116,6 +116,8 @@ module "case_store" {
   tags                        = local.common_tags
 }
 
+# No VPC and no Aurora here, deliberately: local development uses Postgres in Docker (backend/docker-compose.yml, ADR 0028 § Local, dev, staging, prod).
+
 # ── Job pipeline (ADR 0018), queue half only ────────────────────
 # The same module staging and prod instantiate, with the WORKER half absent:
 # ecr_repository_url is null (there is no Lambda in dev, same as everywhere
