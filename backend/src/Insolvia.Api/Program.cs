@@ -1,4 +1,4 @@
-using Insolvia.Api;
+using Insolvia.Api.Hosting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -8,17 +8,12 @@ var builder = WebApplication.CreateBuilder(args);
 // and Kestrel serves: `dotnet run`, docker compose, WebApplicationFactory.
 builder.Services.AddAWSLambdaHosting(LambdaEventSource.HttpApi);
 
-// INSOLVIA_ENV is read through configuration (environment variables are one
-// of its sources), so a test host can set it with UseSetting.
-builder.Services.AddSingleton(services =>
-    InsolviaEnvironment.FromVariable(services.GetRequiredService<IConfiguration>()["INSOLVIA_ENV"]));
+// Configuration, logging and the ports; Hosting/ApiComposition.cs says what
+// differs between the Lambda and a developer's machine.
+builder.AddInsolviaApi();
 
 var app = builder.Build();
 
-// Resolve it once now: a misspelt INSOLVIA_ENV stops the process at start,
-// not on the first request.
-_ = app.Services.GetRequiredService<InsolviaEnvironment>();
-
-app.MapHealth();
+app.UseInsolviaApi();
 
 app.Run();
