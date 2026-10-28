@@ -1,0 +1,53 @@
+# The local .NET stack: Postgres 17 and the API.
+#
+#   docker compose -f backend/docker-compose.yml up --build
+#   curl http://127.0.0.1:8080/health
+#
+# Port 8080 is the API's everywhere (ADR 0028, § Local), which is also the
+# Python API's: run one stack at a time until the switch.
+#
+# Postgres listens on 127.0.0.1:55432, not 5432, so it never collides with a
+# Postgres already installed on the machine. The credentials are fixed,
+# local-only development values: the database holds nothing but what a
+# developer puts in it, and is reachable from this machine alone. Deployed
+# environments use IAM database authentication, never a password from here.
+#
+# Data lives in the named volume `insolvia-backend-pgdata`;
+# `docker compose -f backend/docker-compose.yml down -v` wipes it.
+name: insolvia-backend
+
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: insolvia
+      POSTGRES_USER: insolvia
+      POSTGRES_PASSWORD: insolvia-local-only
+    ports:
+      - '127.0.0.1:55432:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U insolvia -d insolvia']
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  api:
+    build:
+      context: .
+      target: development
+    environment:
+      INSOLVIA_ENV: ${INSOLVIA_ENV:-local}
+      # Read by nothing yet: the stores and the migrator arrive with 18.9.
+      # Written now so local is configured the way it will be used.
+      ConnectionStrings__Insolvia: Host=postgres;Port=5432;Database=insolvia;Username=insolvia;Password=insolvia-local-only
+    ports:
+      - '127.0.0.1:8080:8080'
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+    name: insolvia-backend-pgdata

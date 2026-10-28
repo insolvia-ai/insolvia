@@ -1,0 +1,56 @@
+<Project>
+  <!--
+    Every project under backend/ inherits this file (and Directory.Packages.props
+    beside it). Settings that hold for the WHOLE backend live here; a project
+    file says only what is particular to it. backend/CLAUDE.md owns the
+    layering these projects follow.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <!-- A warning is a defect nobody has triaged yet. CI and the pre-push hook
+         build with the same switch, so "it built here" means the same thing
+         everywhere. -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <MSBuildTreatWarningsAsErrors>true</MSBuildTreatWarningsAsErrors>
+
+    <!-- The .NET analyzers at their recommended set, and the code-style rules in
+         .editorconfig enforced at build time, so `dotnet build` and
+         `dotnet format verify-no-changes` agree on what is wrong. -->
+    <AnalysisLevel>latest</AnalysisLevel>
+    <AnalysisMode>Recommended</AnalysisMode>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+
+    <!-- Same inputs, same bytes. ContinuousIntegrationBuild also normalises
+         source paths in the PDBs; it is on under CI only, because locally it
+         would break the debugger's path mapping. -->
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+
+    <!-- packages.lock.json per project: a transitive bump is a reviewed diff,
+         not a surprise. CI and the Dockerfile restore with locked-mode. -->
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <!-- Test projects: xUnit v3 plus the VSTest adapter, so a bare
+       `dotnet test backend` runs every suite. Test names read as sentences
+       (Health_reports_the_configured_environment), which CA1707 would reject;
+       and a test class is not public API, so it needs no XML docs. -->
+  <PropertyGroup Condition="$(MSBuildProjectName.EndsWith('.Tests'))">
+    <IsTestProject>true</IsTestProject>
+    <OutputType>Exe</OutputType>
+    <NoWarn>$(NoWarn);CA1707;CS1591</NoWarn>
+  </PropertyGroup>
+  <ItemGroup Condition="$(MSBuildProjectName.EndsWith('.Tests'))">
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <Using Include="Xunit" />
+  </ItemGroup>
+</Project>

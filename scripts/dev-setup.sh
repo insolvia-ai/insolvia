@@ -3,7 +3,7 @@
 # Shared developer / CI toolchain bootstrap for the Insolvia monorepo.
 #
 # Installs the cross-cutting tools every package needs (Terraform, tflint, AWS
-# CLI, jq, Node.js, Watchman, Python 3.12) with Homebrew on BOTH macOS and
+# CLI, jq, Node.js, Watchman, Python 3.12, the .NET SDK) with Homebrew on BOTH macOS and
 # Linux. Package-specific setup lives in per-package scripts, e.g.
 # services/api/scripts/dev-setup.sh (venv + pip).
 #
@@ -29,6 +29,8 @@
 #     open-file limit on a tree this size.
 #   - Python:   3.12, matching services/api (pyproject `requires-python` and the
 #     public.ecr.aws/lambda/python:3.12 base image).
+#   - .NET SDK: 10.0, as backend/global.json pins it (the .NET backend, ADR
+#     0028). Checked against that file below, not here.
 #
 # NOT INSTALLED, deliberately: Xcode (+ its command line tools) and CocoaPods.
 # The app is a web SPA today — `expo start --web` / `expo export --platform web`
@@ -149,11 +151,27 @@ brew_ensure jq        jq
 brew_ensure node      node
 brew_ensure watchman  watchman
 brew_ensure python3.12 python@3.12
+brew_ensure dotnet    dotnet
 
 # Node version floor (the OS may already ship a newer/older node than brew's).
 if have node; then
   major="$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)"
   [[ "$major" -ge "$NODE_MAJOR_MIN" ]] || warn "node $(node --version) is below required v${NODE_MAJOR_MIN} (engines.node in the npm packages)"
+fi
+
+# .NET SDK (ADR 0028). backend/global.json owns the pin: 10.0.302 or any
+# later 10.0 feature band (rollForward latestFeature). `dotnet --version` run
+# inside backend/ applies exactly that rule, so it is the check. Any SDK on
+# the machine counts — Homebrew's formula, Microsoft's .pkg, or dotnet-install.sh
+# — because the muxer picks a matching one from whichever are installed. The
+# formula tracks the newest major, so on the day it moves past 10 this warns,
+# and the fix is the exact pin from Microsoft's installer.
+if have dotnet; then
+  if dotnet_sdk="$(cd "$SCRIPT_DIR/../backend" && dotnet --version 2>/dev/null)"; then
+    ok ".NET SDK $dotnet_sdk satisfies backend/global.json"
+  else
+    warn "no installed .NET SDK satisfies backend/global.json (have: $(dotnet --list-sdks 2>/dev/null | awk '{print $1}' | tr '\n' ' ')). Install it with: curl -fsSL https://dot.net/v1/dotnet-install.sh | bash -s -- --jsonfile backend/global.json"
+  fi
 fi
 
 # --- agent skills ----------------------------------------------------------

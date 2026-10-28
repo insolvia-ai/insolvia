@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Unit tests for Insolvia.Filing. Empty until its first ported module. -->
+  <ItemGroup>
+    <ProjectReference Include="../../src/Insolvia.Filing/Insolvia.Filing.csproj" />
+  </ItemGroup>
+</Project>

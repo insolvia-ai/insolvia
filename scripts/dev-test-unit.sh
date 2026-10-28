@@ -17,7 +17,8 @@
 # anywhere" question before opening a PR.
 #
 # UNIT MEANS UNIT. Nothing here needs AWS, a running server, a password, or
-# the network: pytest over memory adapters, Jest and Vitest over mocks.
+# the network: pytest over memory adapters, Jest and Vitest over mocks, xUnit
+# in-process for the .NET backend.
 # The integration tier is a different script with a different name
 # (services/api/scripts/dev-test-integration.sh) precisely so that a hook
 # can never accidentally reach for it.
@@ -67,7 +68,7 @@ die()  { printf '%s[fail]%s %s\n' "$c_red" "$c_reset" "$*" >&2; exit 1; }
 
 # Every area, in the order they run. Python first because a core change is
 # the most common reason for a broad run and its suites are the fastest.
-ALL_AREAS="core api admin mcp filing api-client app portal marketing forms ci-scripts"
+ALL_AREAS="core api admin mcp filing backend api-client app portal marketing forms ci-scripts"
 
 # ── Which areas a path can break ────────────────────────────────────────────
 # One line per path family; an area listed twice is run once. Kept broad on
@@ -86,6 +87,8 @@ areas_for_path() {
     services/admin/*)                               echo "admin" ;;
     services/mcp/*)                                 echo "mcp" ;;
     services/filing/*)                              echo "filing" ;;
+    # The .NET backend (ADR 0028): one solution, one suite.
+    backend/*)                                      echo "backend" ;;
     forms/*)                                        echo "forms api" ;;
     .github/scripts/*|.github/workflows/release.yml) echo "ci-scripts" ;;
     packages/insolvia_api_client/*)                 echo "api-client app" ;;
@@ -125,6 +128,17 @@ python_suite() { # $1 area  $2 directory  $3 venv directory  $4 setup script
   ( cd "$REPO_ROOT/$2" && "$venv/bin/pytest" )
 }
 
+# .NET: exactly backend-pr.yml's Format check and Test steps, run in backend/.
+# The SDK backend/global.json pins is the toolchain; without it the area
+# fails, as a missing venv does, rather than skipping.
+dotnet_suite() {
+  command -v dotnet >/dev/null 2>&1 && (cd "$REPO_ROOT/backend" && dotnet --version >/dev/null 2>&1) ||
+    die "backend: no .NET SDK matching backend/global.json — run ./scripts/dev-setup.sh first (a push touching backend/ must be tested, not skipped)."
+  ( cd "$REPO_ROOT/backend" && dotnet format Insolvia.slnx --verify-no-changes ) ||
+    die "backend: dotnet format failed as CI's Format check would. Fix: (cd backend && dotnet format Insolvia.slnx)"
+  ( cd "$REPO_ROOT/backend" && dotnet test Insolvia.slnx )
+}
+
 node_workspace_suite() { # $1 area  $2 workspace
   [[ -d "$REPO_ROOT/node_modules" ]] ||
     die "$1: no root node_modules — run ./apps/insolvia_app/scripts/dev-setup.sh first."
@@ -144,6 +158,7 @@ run_area() {
     admin)      python_suite admin services/admin services/admin/.venv services/admin/scripts/dev-setup.sh ;;
     mcp)        python_suite mcp services/mcp services/mcp/.venv services/mcp/scripts/dev-setup.sh ;;
     filing)     python_suite filing services/filing services/filing/.venv services/filing/scripts/dev-setup.sh ;;
+    backend)    dotnet_suite ;;
     api-client) node_workspace_suite api-client @insolvia-ai/api-client ;;
     app)        node_workspace_suite app apps/insolvia_app ;;
     portal)     node_standalone_suite portal apps/insolvia_admin apps/insolvia_admin/scripts/dev-setup.sh ;;
@@ -161,6 +176,7 @@ describe_area() {
     admin)      echo "services/admin           ruff check + format --check, pytest" ;;
     mcp)        echo "services/mcp             ruff check + format --check, pytest" ;;
     filing)     echo "services/filing          ruff check + format --check, pytest (the fake court in-process)" ;;
+    backend)    echo "backend/                 dotnet format --verify-no-changes, dotnet test (xUnit)" ;;
     api-client) echo "packages/insolvia_api_client  npm run test --workspace" ;;
     app)        echo "apps/insolvia_app        npm run test --workspace (jest)" ;;
     portal)     echo "apps/insolvia_admin      npm test (own lockfile)" ;;

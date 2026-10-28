@@ -10,6 +10,13 @@ build/
 .expo/
 **/expo-env.d.ts
 
+# NuGet's lock files (backend/, ADR 0028) are written by `dotnet restore` in its
+# own layout; reformatting them would be undone by the next restore. Build
+# output under backend/ is gitignored there, which Prettier does not read.
+backend/**/packages.lock.json
+backend/**/bin/
+backend/**/obj/
+
 # Markdown is hand-authored and hand-wrapped throughout this repo, with compact
 # `|---|---|` tables and `*emphasis*`. Prettier rewrites both on sight, which
 # would turn every docs edit into a reformatting diff and bury the actual

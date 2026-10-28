@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Pure calculation engines: means test, CMI, exemptions, plan, deadlines. References Core only. -->
+  <ItemGroup>
+    <ProjectReference Include="../Insolvia.Core/Insolvia.Core.csproj" />
+  </ItemGroup>
+</Project>

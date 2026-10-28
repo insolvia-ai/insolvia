@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Unit tests for Insolvia.Migrator. Empty until its first ported module. -->
+  <ItemGroup>
+    <ProjectReference Include="../../src/Insolvia.Migrator/Insolvia.Migrator.csproj" />
+  </ItemGroup>
+</Project>

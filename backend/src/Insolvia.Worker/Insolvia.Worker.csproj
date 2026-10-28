@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Host: the job worker Lambda (packet assembly, AI review, extraction). Gets its own Dockerfile target when it has a handler. -->
+  <ItemGroup>
+    <ProjectReference Include="../Insolvia.Core/Insolvia.Core.csproj" />
+    <ProjectReference Include="../Insolvia.Engines/Insolvia.Engines.csproj" />
+    <ProjectReference Include="../Insolvia.Forms/Insolvia.Forms.csproj" />
+    <ProjectReference Include="../Insolvia.Data/Insolvia.Data.csproj" />
+    <ProjectReference Include="../Insolvia.Aws/Insolvia.Aws.csproj" />
+  </ItemGroup>
+</Project>

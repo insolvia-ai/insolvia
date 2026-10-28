@@ -1,0 +1,6 @@
+# Build output. Anchored to backend/ by living here.
+bin/
+obj/
+TestResults/
+*.user
+.vs/

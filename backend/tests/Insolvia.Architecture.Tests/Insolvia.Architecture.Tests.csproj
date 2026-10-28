@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The layering rule, pinned. It reads the project files themselves rather
+       than compiled assemblies: the compiler drops a reference no code uses
+       yet, so an empty project would pass an assembly check while declaring
+       exactly the dependency the rule forbids. -->
+</Project>
