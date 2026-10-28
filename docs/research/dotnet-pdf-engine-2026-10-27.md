@@ -122,7 +122,7 @@ serialise. Both sides were warm, with the .NET JIT already done. Lambda cold
 start was not measured. The .NET output is deterministic: two fills give
 identical bytes once the two save-time nondeterminisms below are pinned.
 The outputs are not byte-identical to pypdf's, as ADR 0028 expects: the
-serialisers differ, and files are 3 to 10% smaller.
+serialisers differ. Most .NET files are 3 to 10% smaller; B2030 is 1% larger.
 
 ## What it took to match
 
