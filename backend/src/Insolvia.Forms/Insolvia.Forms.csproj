@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Form projections and the PDF engine, with the regulatory files embedded. References Core only. -->
+  <ItemGroup>
+    <ProjectReference Include="../Insolvia.Core/Insolvia.Core.csproj" />
+  </ItemGroup>
+</Project>

@@ -49,6 +49,7 @@ not here.
 apps/       insolvia_app (Expo / React Native, web) · insolvia_admin (staff portal, Vite SPA) · insolvia_marketing (React SSR)
 packages/   insolvia_api_client · insolvia_core (Python — shared by the services, not an npm member)
 services/   api · admin · mcp · filing    (Python on Lambda; the mailer is in insolvia-services)
+backend/    the .NET 10 + Postgres rewrite of services/ and insolvia_core (ADR 0028) — deploys nowhere until the switch
 forms/      official-form field specs (B101, B106*, B107) — data + checker, no build
 seeds/      who exists per environment (dev.json, staging.json) · fixtures/<version>/ — what a seeded case contains
 e2e/        Playwright against deployed environments: flows (signed in; dev, staging) · smoke (no credentials; also prod)

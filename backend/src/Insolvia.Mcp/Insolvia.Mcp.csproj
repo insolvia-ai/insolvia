@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Host: the MCP server. Gets its own Dockerfile target when it has tools. -->
+  <ItemGroup>
+    <ProjectReference Include="../Insolvia.Core/Insolvia.Core.csproj" />
+    <ProjectReference Include="../Insolvia.Data/Insolvia.Data.csproj" />
+    <ProjectReference Include="../Insolvia.Aws/Insolvia.Aws.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- AWS adapters behind Core's ports: KMS envelope, S3, SQS, Cognito directory, the mailer client. Referenced by hosts only. -->
+  <ItemGroup>
+    <ProjectReference Include="../Insolvia.Core/Insolvia.Core.csproj" />
+  </ItemGroup>
+</Project>

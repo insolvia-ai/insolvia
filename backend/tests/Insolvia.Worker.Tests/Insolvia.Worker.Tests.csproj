@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Unit tests for Insolvia.Worker. Empty until its first ported module. -->
+  <ItemGroup>
+    <ProjectReference Include="../../src/Insolvia.Worker/Insolvia.Worker.csproj" />
+  </ItemGroup>
+</Project>

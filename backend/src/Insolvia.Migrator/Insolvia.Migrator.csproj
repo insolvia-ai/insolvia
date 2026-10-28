@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Host: the one-shot Lambda that applies migrations and loads seeds inside the VPC. Gets its own Dockerfile target when it has a handler. -->
+  <ItemGroup>
+    <ProjectReference Include="../Insolvia.Core/Insolvia.Core.csproj" />
+    <ProjectReference Include="../Insolvia.Data/Insolvia.Data.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,29 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Insolvia.Core/Insolvia.Core.csproj" />
+    <Project Path="src/Insolvia.Engines/Insolvia.Engines.csproj" />
+    <Project Path="src/Insolvia.Forms/Insolvia.Forms.csproj" />
+    <Project Path="src/Insolvia.Data/Insolvia.Data.csproj" />
+    <Project Path="src/Insolvia.Aws/Insolvia.Aws.csproj" />
+    <Project Path="src/Insolvia.Api/Insolvia.Api.csproj" />
+    <Project Path="src/Insolvia.Worker/Insolvia.Worker.csproj" />
+    <Project Path="src/Insolvia.Admin/Insolvia.Admin.csproj" />
+    <Project Path="src/Insolvia.Mcp/Insolvia.Mcp.csproj" />
+    <Project Path="src/Insolvia.Filing/Insolvia.Filing.csproj" />
+    <Project Path="src/Insolvia.Migrator/Insolvia.Migrator.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Insolvia.Architecture.Tests/Insolvia.Architecture.Tests.csproj" />
+    <Project Path="tests/Insolvia.Core.Tests/Insolvia.Core.Tests.csproj" />
+    <Project Path="tests/Insolvia.Engines.Tests/Insolvia.Engines.Tests.csproj" />
+    <Project Path="tests/Insolvia.Forms.Tests/Insolvia.Forms.Tests.csproj" />
+    <Project Path="tests/Insolvia.Data.Tests/Insolvia.Data.Tests.csproj" />
+    <Project Path="tests/Insolvia.Aws.Tests/Insolvia.Aws.Tests.csproj" />
+    <Project Path="tests/Insolvia.Api.Tests/Insolvia.Api.Tests.csproj" />
+    <Project Path="tests/Insolvia.Worker.Tests/Insolvia.Worker.Tests.csproj" />
+    <Project Path="tests/Insolvia.Admin.Tests/Insolvia.Admin.Tests.csproj" />
+    <Project Path="tests/Insolvia.Mcp.Tests/Insolvia.Mcp.Tests.csproj" />
+    <Project Path="tests/Insolvia.Filing.Tests/Insolvia.Filing.Tests.csproj" />
+    <Project Path="tests/Insolvia.Migrator.Tests/Insolvia.Migrator.Tests.csproj" />
+  </Folder>
+</Solution>

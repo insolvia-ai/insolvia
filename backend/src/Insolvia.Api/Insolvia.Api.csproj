@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <!-- Host: the API lambdalith. ASP.NET Core minimal APIs, served by Kestrel
+       under `dotnet run` and by the Lambda runtime behind an HTTP API in a
+       deployed environment; Program.cs says how one binary does both. -->
+  <PropertyGroup>
+    <!-- The Lambda base image runs an executable assembly by name: the
+         Dockerfile's CMD is this name. -->
+    <AssemblyName>Insolvia.Api</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Amazon.Lambda.AspNetCoreServer.Hosting" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Insolvia.Core/Insolvia.Core.csproj" />
+    <ProjectReference Include="../Insolvia.Engines/Insolvia.Engines.csproj" />
+    <ProjectReference Include="../Insolvia.Forms/Insolvia.Forms.csproj" />
+    <ProjectReference Include="../Insolvia.Data/Insolvia.Data.csproj" />
+    <ProjectReference Include="../Insolvia.Aws/Insolvia.Aws.csproj" />
+  </ItemGroup>
+</Project>
