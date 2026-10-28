@@ -112,6 +112,8 @@ def non_ascii_values(release: FormRelease) -> dict[str, Any]:
             "line_1_debtor1_last_name": Text("Núñez-Ibáñez"),
             "line_5_debtor1_street": Text("12 Rue de l’Église, Ste. 3"),
             "line_5_debtor1_city": Text("São Paulo"),
+            "line_1_debtor2_first_name": Text("Łukasz"),
+            "line_1_debtor2_last_name": Text("Šebek-Œuvre Ž, ł €"),
         }
     return {
         "caption.debtor1_name": Text("Zoë Ångström-Øresund"),
