@@ -43,6 +43,15 @@ public sealed class MemoryCaseStore(MemoryDebtorStore? debtors = null) : ICaseSt
         }
     }
 
+    /// <summary>Place <paramref name="stored"/> directly, no conditions — a test affordance (a row as another writer left it).</summary>
+    internal void Put(Case stored)
+    {
+        lock (_gate)
+        {
+            _cases[stored.Id] = stored;
+        }
+    }
+
     /// <inheritdoc />
     public async Task CreateAsync(Case created, CaseAssignment assignment, IReadOnlyList<Debtor>? debtors = null, CancellationToken cancellationToken = default)
     {
