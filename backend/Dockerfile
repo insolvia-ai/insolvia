@@ -6,12 +6,14 @@
 #   docker build --target migrator-development  -t insolvia-migrator .   # compose's one-shot
 #   docker build --target mcp-lambda            -t insolvia-mcp .        # the MCP server Lambda
 #   docker build --target mcp-development       -t insolvia-mcp .        # the MCP server on :8788
+#   docker build --target admin-lambda          -t insolvia-admin .      # the staff admin Lambda
+#   docker build --target admin-development     -t insolvia-admin .      # the admin under Kestrel, :8090
 #
 # One build stage compiles every host; each deployable unit gets its own final
 # stage(s), so a host's weight lands in its own image and never in another's
-# (ADR 0015). The API, the migrator and the MCP server have stages today.
-# Worker, Admin and Filing each get a `<host>` stage on the Lambda base image (and Admin a
-# `<host>-development` stage, port 8090) in the PR that gives them a handler:
+# (ADR 0015). The API, the migrator, the MCP server and the admin service have
+# stages today. Worker and Filing each get a `<host>` stage on the Lambda base
+# image in the PR that gives them a handler:
 # publish that project into /out/<host> in the build stage and copy it the
 # same way the lambda stage below does.
 
@@ -34,9 +36,11 @@ COPY src/Insolvia.Aws/*.csproj src/Insolvia.Aws/packages.lock.json src/Insolvia.
 COPY src/Insolvia.Api/*.csproj src/Insolvia.Api/packages.lock.json src/Insolvia.Api/
 COPY src/Insolvia.Migrator/*.csproj src/Insolvia.Migrator/packages.lock.json src/Insolvia.Migrator/
 COPY src/Insolvia.Mcp/*.csproj src/Insolvia.Mcp/packages.lock.json src/Insolvia.Mcp/
+COPY src/Insolvia.Admin/*.csproj src/Insolvia.Admin/packages.lock.json src/Insolvia.Admin/
 RUN dotnet restore src/Insolvia.Api/Insolvia.Api.csproj --locked-mode \
  && dotnet restore src/Insolvia.Migrator/Insolvia.Migrator.csproj --locked-mode \
- && dotnet restore src/Insolvia.Mcp/Insolvia.Mcp.csproj --locked-mode
+ && dotnet restore src/Insolvia.Mcp/Insolvia.Mcp.csproj --locked-mode \
+ && dotnet restore src/Insolvia.Admin/Insolvia.Admin.csproj --locked-mode
 
 COPY src/ src/
 RUN dotnet publish src/Insolvia.Api/Insolvia.Api.csproj \
@@ -44,7 +48,9 @@ RUN dotnet publish src/Insolvia.Api/Insolvia.Api.csproj \
  && dotnet publish src/Insolvia.Migrator/Insolvia.Migrator.csproj \
       --configuration Release --no-restore --output /out/migrator \
  && dotnet publish src/Insolvia.Mcp/Insolvia.Mcp.csproj \
-      --configuration Release --no-restore --output /out/mcp
+      --configuration Release --no-restore --output /out/mcp \
+ && dotnet publish src/Insolvia.Admin/Insolvia.Admin.csproj \
+      --configuration Release --no-restore --output /out/admin
 
 # ── lambda: the API as AWS runs it ──────────────────────────────────────────
 # The AWS base image carries the .NET and ASP.NET Core runtimes and the
@@ -101,3 +107,21 @@ COPY --from=build /out/mcp ./
 EXPOSE 8788
 USER $APP_UID
 ENTRYPOINT ["dotnet", "Insolvia.Mcp.dll"]
+
+# ── admin-lambda: the staff admin service as AWS runs it ────────────────────
+# Same shape as the API's lambda stage: Program.cs swaps Kestrel for the
+# Lambda runtime client when AWS_LAMBDA_FUNCTION_NAME is set.
+FROM public.ecr.aws/lambda/dotnet:10 AS admin-lambda
+COPY --from=build /out/admin ${LAMBDA_TASK_ROOT}/
+CMD ["Insolvia.Admin"]
+
+# ── admin-development: the admin under Kestrel, on the admin's port ─────────
+# 8090 everywhere locally, as the Python admin service: the API owns 8080.
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS admin-development
+WORKDIR /app
+ENV ASPNETCORE_URLS=http://0.0.0.0:8090 \
+    INSOLVIA_ENV=local
+COPY --from=build /out/admin ./
+EXPOSE 8090
+USER $APP_UID
+ENTRYPOINT ["dotnet", "Insolvia.Admin.dll"]

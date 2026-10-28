@@ -1,4 +1,5 @@
-# The local .NET stack: Postgres 17, the migrator, then the API.
+# The local .NET stack: Postgres 17, the migrator, then the API and the
+# staff admin service.
 #
 #   docker compose -f backend/docker-compose.yml up --build
 #   curl http://127.0.0.1:8080/health
@@ -63,6 +64,24 @@ services:
       INSOLVIA_DB_CONNECTION_STRING: Host=postgres;Port=5432;Database=insolvia;Username=api;Password=insolvia-local-only
     ports:
       - '127.0.0.1:8080:8080'
+    depends_on:
+      migrator:
+        condition: service_completed_successfully
+
+  # The staff admin service on 8090, as its own role `admin` (firms, firm
+  # users, the append-only audit). GOOGLE_CLIENT_ID unset fails every staff
+  # route closed; FIRM_USER_POOL_ID unset mints subjects and mails nothing.
+  admin:
+    build:
+      context: .
+      target: admin-development
+    environment:
+      INSOLVIA_ENV: ${INSOLVIA_ENV:-local}
+      INSOLVIA_DB_CONNECTION_STRING: Host=postgres;Port=5432;Database=insolvia;Username=admin;Password=insolvia-local-only
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      FIRM_USER_POOL_ID: ${FIRM_USER_POOL_ID:-}
+    ports:
+      - '127.0.0.1:8090:8090'
     depends_on:
       migrator:
         condition: service_completed_successfully

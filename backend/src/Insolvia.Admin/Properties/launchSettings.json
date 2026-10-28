@@ -1,0 +1,13 @@
+{
+  "profiles": {
+    "Insolvia.Admin": {
+      "commandName": "Project",
+      "launchBrowser": false,
+      "applicationUrl": "http://127.0.0.1:8090",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "INSOLVIA_ENV": "local"
+      }
+    }
+  }
+}
