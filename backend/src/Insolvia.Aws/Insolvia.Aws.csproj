@@ -8,6 +8,7 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="AWSSDK.KeyManagementService" />
+    <PackageReference Include="AWSSDK.CognitoIdentityProvider" />
     <PackageReference Include="AWSSDK.S3" />
   </ItemGroup>
   <ItemGroup>

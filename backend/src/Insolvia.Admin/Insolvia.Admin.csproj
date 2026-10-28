@@ -1,5 +1,15 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <!-- Host: the staff admin service (port 8090 locally). Gets its own Dockerfile target when it has routes. -->
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <!-- Host: the staff admin service (ADR 0011). ASP.NET Core minimal APIs,
+       served by Kestrel under `dotnet run` (port 8090: the API owns 8080) and
+       by the Lambda runtime behind an HTTP API when deployed. -->
+  <PropertyGroup>
+    <!-- The Lambda base image runs an executable assembly by name: the
+         Dockerfile's CMD is this name. -->
+    <AssemblyName>Insolvia.Admin</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Amazon.Lambda.AspNetCoreServer.Hosting" />
+  </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../Insolvia.Core/Insolvia.Core.csproj" />
     <ProjectReference Include="../Insolvia.Data/Insolvia.Data.csproj" />

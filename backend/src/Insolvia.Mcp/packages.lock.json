@@ -118,6 +118,7 @@
       "insolvia.aws": {
         "type": "Project",
         "dependencies": {
+          "AWSSDK.CognitoIdentityProvider": "[4.0.106.2, )",
           "AWSSDK.Core": "[4.0.102.14, )",
           "AWSSDK.KeyManagementService": "[4.0.101, )",
           "AWSSDK.S3": "[4.0.104.3, )",
@@ -162,6 +163,15 @@
         "contentHash": "QsHygaMyxQdgh5NPs5GGyBjK6mqQr5nv8rpqlrWC5+e1k7sVx+2xwDHv493S5IMw461S/PyHfjkUDjIQU5ArSA==",
         "dependencies": {
           "Amazon.Lambda.Core": "3.3.0"
+        }
+      },
+      "AWSSDK.CognitoIdentityProvider": {
+        "type": "CentralTransitive",
+        "requested": "[4.0.106.2, )",
+        "resolved": "4.0.106.2",
+        "contentHash": "V1ikDIRZtcqxgo7WKvylNJCwxFKYIu76G/AWR0YpKRY6bk+R0ToTVZTc7Syjt7DRkGnxLMnAZrFhWeiJ+G/FGw==",
+        "dependencies": {
+          "AWSSDK.Core": "[4.0.102.10, 5.0.0)"
         }
       },
       "AWSSDK.Core": {

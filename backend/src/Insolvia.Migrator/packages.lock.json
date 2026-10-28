@@ -325,6 +325,16 @@
           "System.Composition.Runtime": "9.0.0"
         }
       },
+      "insolvia.aws": {
+        "type": "Project",
+        "dependencies": {
+          "AWSSDK.CognitoIdentityProvider": "[4.0.106.2, )",
+          "AWSSDK.Core": "[4.0.102.14, )",
+          "AWSSDK.KeyManagementService": "[4.0.101, )",
+          "AWSSDK.S3": "[4.0.104.3, )",
+          "Insolvia.Core": "[1.0.0, )"
+        }
+      },
       "insolvia.core": {
         "type": "Project",
         "dependencies": {
@@ -340,11 +350,29 @@
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )"
         }
       },
+      "AWSSDK.CognitoIdentityProvider": {
+        "type": "CentralTransitive",
+        "requested": "[4.0.106.2, )",
+        "resolved": "4.0.106.2",
+        "contentHash": "V1ikDIRZtcqxgo7WKvylNJCwxFKYIu76G/AWR0YpKRY6bk+R0ToTVZTc7Syjt7DRkGnxLMnAZrFhWeiJ+G/FGw==",
+        "dependencies": {
+          "AWSSDK.Core": "[4.0.102.10, 5.0.0)"
+        }
+      },
       "AWSSDK.Core": {
         "type": "CentralTransitive",
         "requested": "[4.0.102.14, )",
         "resolved": "4.0.102.14",
         "contentHash": "pRYOOIyj40UdQ6G9iq8AOU30sFPqWS/umM/sFTmAl4n1S6AVbVa67DJpJTxD+9qJFqweHPcyVW7Qb4BbUBLJdg=="
+      },
+      "AWSSDK.KeyManagementService": {
+        "type": "CentralTransitive",
+        "requested": "[4.0.101, )",
+        "resolved": "4.0.101",
+        "contentHash": "gxbt9QeDTO1wXqTyO8Zdd3cZOndwxzu4E/7BOorKE/UUhK5bI0Tzdr/lHXj3UmgxazTdW1zH9kkslpqE8wf9GQ==",
+        "dependencies": {
+          "AWSSDK.Core": "[4.0.102.14, 5.0.0)"
+        }
       },
       "AWSSDK.RDS": {
         "type": "CentralTransitive",
@@ -353,6 +381,15 @@
         "contentHash": "Oxzgg+2ViszJaaobY4W+gBN9D7Sk6cb1u52fQ478cFXVKzgAi3we0WFQm9mXUS9qEBxXOB9O2a7Wh4pzvIAYtA==",
         "dependencies": {
           "AWSSDK.Core": "[4.0.102.14, 5.0.0)"
+        }
+      },
+      "AWSSDK.S3": {
+        "type": "CentralTransitive",
+        "requested": "[4.0.104.3, )",
+        "resolved": "4.0.104.3",
+        "contentHash": "AWtrk6Nn9v2+9HdD1qR3o/7zqFnSNWymqAYGQgzs53i2WJHM58avatVJROtF8WjaUzi1k463+uQUsYtUBA8Elg==",
+        "dependencies": {
+          "AWSSDK.Core": "[4.0.102.10, 5.0.0)"
         }
       },
       "EFCore.NamingConventions": {

@@ -79,6 +79,17 @@ public static partial class RoleProvisioner
                 await EnsureRoleAsync(connection, role, login, localPassword, cancellationToken).ConfigureAwait(false);
             }
 
+            // The seeder takes the migrator role on THIS login (SET ROLE), which
+            // needs membership unless the login is a superuser (local, tests).
+            // Aurora's master is not one; as the role's creator it may grant
+            // itself membership — SET only, never INHERIT, so the master's own
+            // sessions gain nothing from the migrator's grants.
+            if (!await ScalarAsync(connection, "SELECT rolsuper FROM pg_roles WHERE rolname = current_user", cancellationToken).ConfigureAwait(false)
+                && !await ScalarAsync(connection, "SELECT pg_has_role(current_user, @name, 'SET')", cancellationToken, ServiceRoles.Migrator).ConfigureAwait(false))
+            {
+                await ExecuteAsync(connection, $"GRANT {Quote(ServiceRoles.Migrator)} TO CURRENT_USER WITH INHERIT FALSE, SET TRUE", cancellationToken).ConfigureAwait(false);
+            }
+
             var everyRole = string.Join(", ", ServiceRoles.All.Select(Quote));
             var schema = Quote(InsolviaDbContext.Schema);
             await ExecuteAsync(connection, $"GRANT USAGE ON SCHEMA {schema} TO {everyRole}", cancellationToken).ConfigureAwait(false);

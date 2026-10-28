@@ -87,12 +87,10 @@ public static class ApiComposition
             builder.Services.AddScoped<IAccessLog>(services => new PostgresAccessLog(services.GetRequiredService<InsolviaDbContext>()));
             builder.Services.AddScoped<IWaitlistStore>(services => new PostgresWaitlistStore(services.GetRequiredService<InsolviaDbContext>()));
 
-            // Not composed until its adapter is ported, so the route that
-            // needs it answers the 500 that names the gap — never a memory
-            // twin that would accept a write and lose it:
-            //   IUserDirectory (Cognito AdminCreateUser) — POST /v1/firm/users
-            //   and the portal invitation's POST …/portal/invitation and
-            //   …/resend (18.20 brings the adapter; 18.22 wires it here).
+            // Cognito AdminCreateUser for POST /v1/firm/users and the portal
+            // invitation's POST …/portal/invitation and …/resend, over the pool
+            // LambdaBootRequirements already demanded.
+            builder.Services.AddSingleton<IUserDirectory>(_ => new Insolvia.Aws.Cognito.CognitoUserDirectory(new Amazon.CognitoIdentityProvider.AmazonCognitoIdentityProviderClient(), config.AuthUserPoolId!));
 
             // The case side (18.11): every store over the request's one
             // context, so a route's writes share its connection. Cursors are

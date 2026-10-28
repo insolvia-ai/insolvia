@@ -2,7 +2,8 @@
   <!-- Host: the one-shot that migrates a database, then provisions its per-service
        roles and grants. Under Lambda (staging, prod: the database is private) it
        is invoked once per release; anywhere else it is `dotnet run`, and docker
-       compose runs it before the API. Seeding arrives with 18.20. -->
+       compose runs it before the API. It also seeds (dev, staging) and runs the
+       pre-client purge: MigratorCommand.cs. -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <!-- The Lambda base image runs an executable assembly by name: the
@@ -22,6 +23,9 @@
   <ItemGroup>
     <ProjectReference Include="../Insolvia.Core/Insolvia.Core.csproj" />
     <ProjectReference Include="../Insolvia.Data/Insolvia.Data.csproj" />
+    <!-- The seeder's adapters: the KMS case-key cipher, the S3 document store,
+         and the SDK clients for the pool and the fixture bucket. -->
+    <ProjectReference Include="../Insolvia.Aws/Insolvia.Aws.csproj" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Insolvia.Migrator.Tests" />
