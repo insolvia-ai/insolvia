@@ -294,5 +294,10 @@ public static class GrantTable
         TableGrant.AppendOnly("access_log", ServiceRoles.Mcp),
         TableGrant.AppendOnly("access_log", ServiceRoles.Admin),
         TableGrant.AppendOnly("access_log", ServiceRoles.Worker),
+
+        // The filing worker writes the vault's `credential.open` rows (before
+        // it decrypts), the consume, the hand-back and the submit — append
+        // only, like every other writer (#530).
+        TableGrant.AppendOnly("access_log", ServiceRoles.Filing),
     ];
 }
