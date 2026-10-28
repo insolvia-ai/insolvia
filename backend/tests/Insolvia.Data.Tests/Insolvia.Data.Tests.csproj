@@ -1,5 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- Unit tests for Insolvia.Data. Empty until its first ported module. -->
+  <!-- The data tier's tests, against a real Postgres 17 in Docker (Testcontainers):
+       one container per test run, one fresh database per test. -->
+  <ItemGroup>
+    <PackageReference Include="Testcontainers.PostgreSql" />
+  </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/Insolvia.Data/Insolvia.Data.csproj" />
   </ItemGroup>

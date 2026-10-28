@@ -1,5 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- Unit tests for Insolvia.Migrator. Empty until its first ported module. -->
+  <!-- The migrator's tests, against a real Postgres 17 in Docker (Testcontainers).
+       Roles are cluster-wide, so every test here shares one collection and runs
+       serially; the fixture is Data.Tests' file, linked rather than copied. -->
+  <ItemGroup>
+    <PackageReference Include="Testcontainers.PostgreSql" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="../Insolvia.Data.Tests/PostgresFixture.cs" Link="PostgresFixture.cs" />
+  </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/Insolvia.Migrator/Insolvia.Migrator.csproj" />
   </ItemGroup>

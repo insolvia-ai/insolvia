@@ -1,7 +1,29 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- Host: the one-shot Lambda that applies migrations and loads seeds inside the VPC. Gets its own Dockerfile target when it has a handler. -->
+  <!-- Host: the one-shot that migrates a database, then provisions its per-service
+       roles and grants. Under Lambda (staging, prod: the database is private) it
+       is invoked once per release; anywhere else it is `dotnet run`, and docker
+       compose runs it before the API. Seeding arrives with 18.20. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <!-- The Lambda base image runs an executable assembly by name: the
+         Dockerfile's CMD is this name. -->
+    <AssemblyName>Insolvia.Migrator</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Amazon.Lambda.Core" />
+    <PackageReference Include="Amazon.Lambda.RuntimeSupport" />
+    <PackageReference Include="Amazon.Lambda.Serialization.SystemTextJson" />
+    <PackageReference Include="AWSSDK.SecretsManager" />
+    <!-- `dotnet ef migrations add` uses this project as its startup project
+         (backend/CLAUDE.md). Design-time only: Publish="false" keeps it, and
+         the compiler it carries, out of the image. -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" Publish="false" />
+  </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../Insolvia.Core/Insolvia.Core.csproj" />
     <ProjectReference Include="../Insolvia.Data/Insolvia.Data.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Insolvia.Migrator.Tests" />
   </ItemGroup>
 </Project>

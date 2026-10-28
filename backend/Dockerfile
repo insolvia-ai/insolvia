@@ -1,12 +1,14 @@
 # The backend's images. Build context is backend/ (this directory):
 #
-#   docker build --target lambda      -t insolvia-api .   # what a deploy ships
-#   docker build --target development -t insolvia-api .   # what compose runs
+#   docker build --target lambda                -t insolvia-api .        # what a deploy ships
+#   docker build --target development           -t insolvia-api .        # what compose runs
+#   docker build --target migrator              -t insolvia-migrator .   # the migrator Lambda
+#   docker build --target migrator-development  -t insolvia-migrator .   # compose's one-shot
 #
 # One build stage compiles every host; each deployable unit gets its own final
 # stage(s), so a host's weight lands in its own image and never in another's
-# (ADR 0015). Only the API has a stage today. Worker, Admin, Mcp, Filing and
-# Migrator each get a `<host>` stage on the Lambda base image (and Admin a
+# (ADR 0015). The API and the migrator have stages today. Worker, Admin, Mcp
+# and Filing each get a `<host>` stage on the Lambda base image (and Admin a
 # `<host>-development` stage, port 8090) in the PR that gives them a handler:
 # publish that project into /out/<host> in the build stage and copy it the
 # same way the lambda stage below does.
@@ -28,11 +30,15 @@ COPY src/Insolvia.Forms/*.csproj src/Insolvia.Forms/packages.lock.json src/Insol
 COPY src/Insolvia.Data/*.csproj src/Insolvia.Data/packages.lock.json src/Insolvia.Data/
 COPY src/Insolvia.Aws/*.csproj src/Insolvia.Aws/packages.lock.json src/Insolvia.Aws/
 COPY src/Insolvia.Api/*.csproj src/Insolvia.Api/packages.lock.json src/Insolvia.Api/
-RUN dotnet restore src/Insolvia.Api/Insolvia.Api.csproj --locked-mode
+COPY src/Insolvia.Migrator/*.csproj src/Insolvia.Migrator/packages.lock.json src/Insolvia.Migrator/
+RUN dotnet restore src/Insolvia.Api/Insolvia.Api.csproj --locked-mode \
+ && dotnet restore src/Insolvia.Migrator/Insolvia.Migrator.csproj --locked-mode
 
 COPY src/ src/
 RUN dotnet publish src/Insolvia.Api/Insolvia.Api.csproj \
-      --configuration Release --no-restore --output /out/api
+      --configuration Release --no-restore --output /out/api \
+ && dotnet publish src/Insolvia.Migrator/Insolvia.Migrator.csproj \
+      --configuration Release --no-restore --output /out/migrator
 
 # ── lambda: the API as AWS runs it ──────────────────────────────────────────
 # The AWS base image carries the .NET and ASP.NET Core runtimes and the
@@ -52,3 +58,19 @@ COPY --from=build /out/api ./
 EXPOSE 8080
 USER $APP_UID
 ENTRYPOINT ["dotnet", "Insolvia.Api.dll"]
+
+# ── migrator: the one-shot Lambda that migrates and provisions roles ────────
+# Invoked by CI before the `live` alias shifts (ADR 0028 § Runtime shape).
+# Program.cs runs one migration per invocation under the Lambda runtime
+# client, and exits after one run anywhere else.
+FROM public.ecr.aws/lambda/dotnet:10 AS migrator
+COPY --from=build /out/migrator ${LAMBDA_TASK_ROOT}/
+CMD ["Insolvia.Migrator"]
+
+# ── migrator-development: the same build as compose's one-shot ──────────────
+# No ASP.NET Core: the migrator is a console program on the plain runtime.
+FROM mcr.microsoft.com/dotnet/runtime:10.0 AS migrator-development
+WORKDIR /app
+COPY --from=build /out/migrator ./
+USER $APP_UID
+ENTRYPOINT ["dotnet", "Insolvia.Migrator.dll"]
