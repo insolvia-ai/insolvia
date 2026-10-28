@@ -99,7 +99,7 @@ died in — this plan no longer carries their bodies.
 | D3 | Marketing is **React Router v7 SSR** — Flutter web could not be crawled, and the replacement stack must stay dramatically lighter than any app runtime | `apps/insolvia_marketing/lighthouserc.json` (the enforced budget) |
 | D4 | **One owned cross-platform design system**, platform-split leaves, over one token source | [ADR 0006](adr/0006-owned-cross-platform-design-system.md) |
 | D5 | **The API is required for MVP** — GLBA-scope data (SSNs, financials) keeps the trust boundary server-side | [ADR 0001](adr/0001-client-stays-dumb-trust-boundary.md) |
-| D6 | Backend is **Python + Flask + Mangum on Lambda** | house pattern, shipped |
+| D6 | Backend is **Python + Flask + Mangum on Lambda** — **being superseded**: the backend is rewritten in .NET 10 on Aurora PostgreSQL (milestone 18) | [ADR 0028](adr/0028-backend-moves-to-dotnet-and-postgres.md) |
 | D7 | Human email and product email are **separate providers** (Workspace in, SES out) | insolvia-services' [`email.md`](https://github.com/insolvia-ai/insolvia-services/blob/main/docs/reference/email.md) |
 | D10 | **A case belongs to a FIRM, not to a user.** Firm, role, admin flag, per-case linking and per-feature permissions live in our own store rather than in Cognito claims — an access token carries a `sub` and nothing else authorization-bearing | [ADR 0009](adr/0009-a-case-belongs-to-a-firm.md) |
 | D9 | **React Native on Expo replaced Flutter**; Expo free tier only, CI-enforced; **desktop deleted**, mobile held open by `expo prebuild` | [ADR 0004](adr/0004-react-native-replaces-flutter.md) |
@@ -215,6 +215,15 @@ a runbook issue (9.8), and the UST refresh pipeline anchors the means-test
 milestone (10.1).
 
 ---
+
+## Platform · .NET + Postgres rewrite (milestone 18, from 2026-10-27)
+
+The backend (`services/*`, `insolvia_core`) is rewritten in C# on .NET 10,
+and DynamoDB is replaced by Aurora Serverless v2 PostgreSQL in a VPC. It is
+built in `backend/` and cut over once. [ADR 0028](adr/0028-backend-moves-to-dotnet-and-postgres.md)
+owns the decision and the **18.1–18.23 build breakdown**. Accepted
+2026-10-27: the Python backend takes fixes only, and the items in § Next
+below that need new backend code are built in `backend/`.
 
 ## Next — the build order (as of 2026-10-13)
 
