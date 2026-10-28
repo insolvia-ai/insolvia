@@ -9,10 +9,11 @@ namespace Insolvia.Data.Portal;
 // The three records a portal binding is (ADR 0023), formerly spread over the
 // firm table (CLIENT#<subject>) and the case table (the CLIENT#<subject>
 // mirror and the CLIENTROLE#<role> claims). In one database they are three
-// tables and one transaction. The two case-keyed tables need no case table
-// to exist; they carry firm_id (indexed with case_id) so the case stores
-// (18.11) can add the composite foreign key (firm_id, case_id) → cases, ON
-// DELETE CASCADE, in a migration of their own without rewriting this one.
+// tables and one transaction. All three carry the composite foreign key
+// (firm_id, case_id) → cases (18.11's migration), ON DELETE CASCADE: a binding
+// cannot name another firm's case, and a purged case takes its portal access
+// with it — the authoritative binding included, since a binding to a case
+// that no longer exists grants nothing (the access log keeps the history).
 
 /// <summary>
 /// The authoritative binding, keyed (firm, subject): which case a portal
@@ -105,6 +106,7 @@ internal sealed class ClientBindingRowConfiguration : IEntityTypeConfiguration<C
         // unscoped read. Not unique, for FindUserAsync's reason.
         builder.HasIndex(binding => binding.Subject);
         builder.HasIndex(binding => new { binding.FirmId, binding.Email });
+        Cases.CaseChild.BelongsToCase(builder, ClientBindingRow.Table, binding => new { binding.FirmId, binding.CaseId });
         builder.HasOne<FirmRow>().WithMany().HasForeignKey(binding => binding.FirmId).HasConstraintName(FirmRow.ForeignKeyFrom(ClientBindingRow.Table)).OnDelete(DeleteBehavior.Restrict);
         builder.Property(binding => binding.Status).HasConversion<WireEnumConverter<BindingStatus>>();
     }
@@ -117,7 +119,7 @@ internal sealed class CaseClientBindingRowConfiguration : IEntityTypeConfigurati
         builder.ToTable(CaseClientBindingRow.Table, table =>
             table.HasCheckConstraint("ck_case_client_bindings_status", WireEnums.CheckIn<BindingStatus>("status")));
         builder.HasKey(binding => new { binding.CaseId, binding.Subject });
-        builder.HasIndex(binding => new { binding.FirmId, binding.CaseId });
+        Cases.CaseChild.BelongsToCase(builder, CaseClientBindingRow.Table, binding => new { binding.FirmId, binding.CaseId });
         builder.HasOne<FirmRow>().WithMany().HasForeignKey(binding => binding.FirmId).HasConstraintName(FirmRow.ForeignKeyFrom(CaseClientBindingRow.Table)).OnDelete(DeleteBehavior.Restrict);
         builder.Property(binding => binding.Status).HasConversion<WireEnumConverter<BindingStatus>>();
     }
@@ -130,7 +132,7 @@ internal sealed class CaseClientRoleClaimRowConfiguration : IEntityTypeConfigura
         builder.ToTable(CaseClientRoleClaimRow.Table, table =>
             table.HasCheckConstraint("ck_case_client_role_claims_role", WireEnums.CheckIn<ClientRole>("role")));
         builder.HasKey(claim => new { claim.CaseId, claim.Role });
-        builder.HasIndex(claim => new { claim.FirmId, claim.CaseId });
+        Cases.CaseChild.BelongsToCase(builder, CaseClientRoleClaimRow.Table, claim => new { claim.FirmId, claim.CaseId });
         builder.HasOne<FirmRow>().WithMany().HasForeignKey(claim => claim.FirmId).HasConstraintName(FirmRow.ForeignKeyFrom(CaseClientRoleClaimRow.Table)).OnDelete(DeleteBehavior.Restrict);
         builder.Property(claim => claim.Role).HasConversion<WireEnumConverter<ClientRole>>();
     }

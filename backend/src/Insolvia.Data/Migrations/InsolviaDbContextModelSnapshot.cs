@@ -92,6 +92,1304 @@ namespace Insolvia.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Insolvia.Data.Cases.CalendarEventRow", b =>
+                {
+                    b.Property<string>("FirmId")
+                        .HasColumnType("text")
+                        .HasColumnName("firm_id");
+
+                    b.Property<string>("Id")
+                        .HasColumnType("text")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("AllDay")
+                        .HasColumnType("boolean")
+                        .HasColumnName("all_day");
+
+                    b.PrimitiveCollection<string[]>("Attendees")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("attendees");
+
+                    b.Property<string>("CaseId")
+                        .HasColumnType("text")
+                        .HasColumnName("case_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("text")
+                        .HasColumnName("description");
+
+                    b.Property<bool>("Dismissed")
+                        .HasColumnType("boolean")
+                        .HasColumnName("dismissed");
+
+                    b.Property<DateTimeOffset?>("EndsAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("ends_at");
+
+                    b.Property<DateOnly?>("EndsOn")
+                        .HasColumnType("date")
+                        .HasColumnName("ends_on");
+
+                    b.Property<string>("Location")
+                        .HasColumnType("text")
+                        .HasColumnName("location");
+
+                    b.Property<string>("RuleCitation")
+                        .HasColumnType("text")
+                        .HasColumnName("rule_citation");
+
+                    b.Property<string>("RuleId")
+                        .HasColumnType("text")
+                        .HasColumnName("rule_id");
+
+                    b.Property<DateTimeOffset>("SortAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("sort_at");
+
+                    b.Property<DateTimeOffset?>("StartsAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("starts_at");
+
+                    b.Property<DateOnly?>("StartsOn")
+                        .HasColumnType("date")
+                        .HasColumnName("starts_on");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("title");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("FirmId", "Id")
+                        .HasName("pk_calendar_events");
+
+                    b.HasIndex("FirmId", "CaseId")
+                        .HasDatabaseName("ix_calendar_events_firm_id_case_id");
+
+                    b.HasIndex("FirmId", "SortAt")
+                        .HasDatabaseName("ix_calendar_events_firm_id_sort_at");
+
+                    b.ToTable("calendar_events", "insolvia", t =>
+                        {
+                            t.HasCheckConstraint("ck_calendar_events_days", "(all_day AND starts_on IS NOT NULL AND ends_on IS NOT NULL AND starts_at IS NULL AND ends_at IS NULL) OR (NOT all_day AND starts_at IS NOT NULL AND ends_at IS NOT NULL AND starts_on IS NULL AND ends_on IS NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("Insolvia.Data.Cases.CalendarTokenRow", b =>
+                {
+                    b.Property<string>("FirmId")
+                        .HasColumnType("text")
+                        .HasColumnName("firm_id");
+
+                    b.Property<string>("Subject")
+                        .HasColumnType("text")
+                        .HasColumnName("subject");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("SecretHash")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("secret_hash");
+
+                    b.HasKey("FirmId", "Subject")
+                        .HasName("pk_calendar_tokens");
+
+                    b.ToTable("calendar_tokens", "insolvia");
+                });
+
+            modelBuilder.Entity("Insolvia.Data.Cases.CandidateRow", b =>
+                {
+                    b.Property<string>("CaseId")
+                        .HasColumnType("text")
+                        .HasColumnName("case_id");
+
+                    b.Property<string>("Id")
+                        .HasColumnType("text")
+                        .HasColumnName("id");
+
+                    b.Property<double?>("Confidence")
+                        .HasColumnType("double precision")
+                        .HasColumnName("confidence");
+
+                    b.Property<string>("ConfirmedAt")
+                        .HasColumnType("text")
+                        .HasColumnName("confirmed_at");
+
+                    b.Property<string>("ConfirmedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("confirmed_by");
+
+                    b.Property<JsonDocument>("CorrectedPayload")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("corrected_payload");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("DocumentId")
+                        .HasColumnType("text")
+                        .HasColumnName("document_id");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("entity_type");
+
+                    b.Property<JsonDocument>("ExternalRef")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("external_ref");
+
+                    b.Property<string>("FirmId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("firm_id");
+
+                    b.Property<JsonDocument>("Locator")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("locator");
+
+                    b.Property<string>("Note")
+                        .HasColumnType("text")
+                        .HasColumnName("note");
+
+                    b.Property<string>("OriginChannel")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("origin_channel");
+
+                    b.Property<string>("OriginClientId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("origin_client_id");
+
+                    b.Property<string>("OriginSubject")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("origin_subject");
+
+                    b.Property<JsonDocument>("Payload")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("payload");
+
+                    b.Property<string>("ResultingRecordId")
+                        .HasColumnType("text")
+                        .HasColumnName("resulting_record_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("CaseId", "Id")
+                        .HasName("pk_candidates");
+
+                    b.HasIndex("FirmId", "CaseId")
+                        .HasDatabaseName("ix_candidates_firm_id_case_id");
+
+                    b.ToTable("candidates", "insolvia", t =>
+                        {
+                            t.HasCheckConstraint("ck_candidates_origin_channel", "origin_channel IN ('mcp', 'extraction', 'client')");
+
+                            t.HasCheckConstraint("ck_candidates_status", "status IN ('pending', 'accepted', 'corrected', 'rejected', 'withdrawn')");
+                        });
+                });
+
+            modelBuilder.Entity("Insolvia.Data.Cases.CaseAssignmentRow", b =>
+                {
+                    b.Property<string>("CaseId")
+                        .HasColumnType("text")
+                        .HasColumnName("case_id");
+
+                    b.Property<string>("Subject")
+                        .HasColumnType("text")
+                        .HasColumnName("subject");
+
+                    b.Property<DateTimeOffset>("AssignedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("assigned_at");
+
+                    b.Property<string>("AssignedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("assigned_by");
+
+                    b.Property<DateTimeOffset>("CaseCreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("case_created_at");
+
+                    b.Property<string>("FirmId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("firm_id");
+
+                    b.HasKey("CaseId", "Subject")
+                        .HasName("pk_case_assignments");
+
+                    b.HasIndex("FirmId", "CaseId")
+                        .HasDatabaseName("ix_case_assignments_firm_id_case_id");
+
+                    b.HasIndex("Subject", "CaseCreatedAt")
+                        .HasDatabaseName("ix_case_assignments_subject_case_created_at");
+
+                    b.ToTable("case_assignments", "insolvia");
+                });
+
+            modelBuilder.Entity("Insolvia.Data.Cases.CaseEntityRow", b =>
+                {
+                    b.Property<string>("CaseId")
+                        .HasColumnType("text")
+                        .HasColumnName("case_id");
+
+                    b.Property<string>("Kind")
+                        .HasColumnType("text")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("Id")
+                        .HasColumnType("text")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("Amended")
+                        .HasColumnType("boolean")
+                        .HasColumnName("amended");
+
+                    b.Property<JsonDocument>("Body")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("body");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("FirmId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("firm_id");
+
+                    b.Property<JsonDocument>("Provenance")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("provenance");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("CaseId", "Kind", "Id")
+                        .HasName("pk_case_entities");
+
+                    b.HasIndex("FirmId", "CaseId")
+                        .HasDatabaseName("ix_case_entities_firm_id_case_id");
+
+                    b.ToTable("case_entities", "insolvia");
+                });
+
+            modelBuilder.Entity("Insolvia.Data.Cases.CaseRow", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("text")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset?>("ArchivedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("archived_at");
+
+                    b.Property<string>("ArchivedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("archived_by");
+
+                    b.Property<string>("CaseNumber")
+                        .HasColumnType("text")
+                        .HasColumnName("case_number");
+
+                    b.Property<string>("CaseNumberKey")
+                        .HasColumnType("text")
+                        .HasColumnName("case_number_key");
+
+                    b.Property<int>("Chapter")
+                        .HasColumnType("integer")
+                        .HasColumnName("chapter");
+
+                    b.Property<string>("ConstantsSetId")
+                        .HasColumnType("text")
+                        .HasColumnName("constants_set_id");
+
+                    b.Property<string>("Court")
+                        .HasColumnType("text")
+                        .HasColumnName("court");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<string>("DeletedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("deleted_by");
+
+                    b.Property<string>("District")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("district");
+
+                    b.Property<string>("Division")
+                        .HasColumnType("text")
+                        .HasColumnName("division");
+
+                    b.Property<string>("ExemptionSet")
+                        .HasColumnType("text")
+                        .HasColumnName("exemption_set");
+
+                    b.Property<DateOnly?>("FiledAt")
+                        .HasColumnType("date")
+                        .HasColumnName("filed_at");
+
+                    b.Property<string>("FirmId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("firm_id");
+
+                    b.Property<JsonDocument>("FormRevisions")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("form_revisions");
+
+                    b.Property<string>("Judge")
+                        .HasColumnType("text")
+                        .HasColumnName("judge");
+
+                    b.Property<DateTimeOffset?>("LifecycleRecordedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("lifecycle_recorded_at");
+
+                    b.Property<DateOnly?>("Meeting341At")
+                        .HasColumnType("date")
+                        .HasColumnName("meeting341at");
+
+                    b.Property<string>("OfficeFileNumber")
+                        .HasColumnType("text")
+                        .HasColumnName("office_file_number");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.Property<string>("Trustee")
+                        .HasColumnType("text")
+                        .HasColumnName("trustee");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_cases");
+
+                    b.HasAlternateKey("FirmId", "Id")
+                        .HasName("ak_cases_firm_id_id");
+
+                    b.HasIndex("CaseNumberKey")
+                        .HasDatabaseName("ix_cases_case_number_key");
+
+                    b.HasIndex("FirmId", "CreatedAt", "Id")
+                        .IsDescending(false, true, true)
+                        .HasDatabaseName("ix_cases_firm_id_created_at_id");
+
+                    b.ToTable("cases", "insolvia", t =>
+                        {
+                            t.HasCheckConstraint("ck_cases_archived", "(archived_at IS NULL) = (archived_by IS NULL)");
+
+                            t.HasCheckConstraint("ck_cases_court", "(court IS NULL) = (division IS NULL)");
+
+                            t.HasCheckConstraint("ck_cases_deleted", "(deleted_at IS NULL) = (deleted_by IS NULL)");
+
+                            t.HasCheckConstraint("ck_cases_exemption_set", "exemption_set IS NULL OR exemption_set IN ('state_and_federal_nonbankruptcy', 'federal')");
+
+                            t.HasCheckConstraint("ck_cases_status", "status IN ('intake', 'ready_to_file', 'filed', 'discharged', 'dismissed', 'closed')");
+                        });
+                });
+
+            modelBuilder.Entity("Insolvia.Data.Cases.CaseTaskRow", b =>
+                {
+                    b.Property<string>("CaseId")
+                        .HasColumnType("text")
+                        .HasColumnName("case_id");
+
+                    b.Property<string>("Id")
+                        .HasColumnType("text")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AssigneeSubject")
+                        .HasColumnType("text")
+                        .HasColumnName("assignee_subject");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("completed_at");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("text")
+                        .HasColumnName("description");
+
+                    b.Property<bool>("Done")
+                        .HasColumnType("boolean")
+                        .HasColumnName("done");
+
+                    b.Property<DateOnly?>("DueDate")
+                        .HasColumnType("date")
+                        .HasColumnName("due_date");
+
+                    b.Property<string>("FirmId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("firm_id");
+
+                    b.Property<string>("FormSeries")
+                        .HasColumnType("text")
+                        .HasColumnName("form_series");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("subject");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("CaseId", "Id")
+                        .HasName("pk_case_tasks");
+
+                    b.HasIndex("FirmId", "CaseId")
+                        .HasDatabaseName("ix_case_tasks_firm_id_case_id");
+
+                    b.ToTable("case_tasks", "insolvia");
+                });
+
+            modelBuilder.Entity("Insolvia.Data.Cases.CurrentFilingApprovalRow", b =>
+                {
+                    b.Property<string>("CaseId")
+                        .HasColumnType("text")
+                        .HasColumnName("case_id");
+
+                    b.Property<string>("ApprovalId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("approval_id");
+
+                    b.Property<string>("FirmId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("firm_id");
+
+                    b.HasKey("CaseId")
+                        .HasName("pk_current_filing_approvals");
+
+                    b.HasIndex("CaseId", "ApprovalId")
+                        .HasDatabaseName("ix_current_filing_approvals_case_id_approval_id");
+
+                    b.HasIndex("FirmId", "CaseId")
+                        .HasDatabaseName("ix_current_filing_approvals_firm_id_case_id");
+
+                    b.ToTable("current_filing_approvals", "insolvia");
+                });
+
+            modelBuilder.Entity("Insolvia.Data.Cases.DebtorRow", b =>
+                {
+                    b.Property<string>("CaseId")
+                        .HasColumnType("text")
+                        .HasColumnName("case_id");
+
+                    b.Property<string>("FilingRole")
+                        .HasColumnType("text")
+                        .HasColumnName("filing_role");
+
+                    b.Property<JsonDocument>("Body")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("body");
+
+                    b.Property<DateTimeOffset?>("CaseCreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("case_created_at");
+
+                    b.Property<string>("ClientId")
+                        .HasColumnType("text")
+                        .HasColumnName("client_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("FirmId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("firm_id");
+
+                    b.Property<string>("Id")
+                        .HasColumnType("text")
+                        .HasColumnName("id");
+
+                    b.Property<JsonDocument>("Provenance")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("provenance");
+
+                    b.Property<string>("TaxIdKind")
+                        .HasColumnType("text")
+                        .HasColumnName("tax_id_kind");
+
+                    b.Property<string>("TaxIdLastFour")
+                        .HasColumnType("text")
+                        .HasColumnName("tax_id_last_four");
+
+                    b.Property<string>("TaxIdRef")
+                        .HasColumnType("text")
+                        .HasColumnName("tax_id_ref");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("CaseId", "FilingRole")
+                        .HasName("pk_debtors");
+
+                    b.HasIndex("ClientId")
+                        .HasDatabaseName("ix_debtors_client_id");
+
+                    b.HasIndex("CaseId", "ClientId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_debtors_case_id_client_id")
+                        .HasFilter("client_id IS NOT NULL");
+
+                    b.HasIndex("FirmId", "CaseId")
+                        .HasDatabaseName("ix_debtors_firm_id_case_id");
+
+                    b.HasIndex("FirmId", "ClientId")
+                        .HasDatabaseName("ix_debtors_firm_id_client_id");
+
+                    b.ToTable("debtors", "insolvia", t =>
+                        {
+                            t.HasCheckConstraint("ck_debtors_client", "(client_id IS NULL) = (case_created_at IS NULL)");
+
+                            t.HasCheckConstraint("ck_debtors_filing_role", "filing_role IN ('debtor_1', 'debtor_2', 'non_filing_spouse')");
+
+                            t.HasCheckConstraint("ck_debtors_tax_id_kind", "tax_id_kind IS NULL OR tax_id_kind IN ('ssn', 'itin')");
+                        });
+                });
+
+            modelBuilder.Entity("Insolvia.Data.Cases.DocumentRequestRow", b =>
+                {
+                    b.Property<string>("CaseId")
+                        .HasColumnType("text")
+                        .HasColumnName("case_id");
+
+                    b.Property<string>("Id")
+                        .HasColumnType("text")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("text")
+                        .HasColumnName("description");
+
+                    b.PrimitiveCollection<string[]>("DocumentIds")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("document_ids");
+
+                    b.Property<string>("FirmId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("firm_id");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("kind");
+
+                    b.Property<DateTimeOffset?>("ReceivedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("received_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("title");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("CaseId", "Id")
+                        .HasName("pk_document_requests");
+
+                    b.HasIndex("FirmId", "CaseId")
+                        .HasDatabaseName("ix_document_requests_firm_id_case_id");
+
+                    b.ToTable("document_requests", "insolvia", t =>
+                        {
+                            t.HasCheckConstraint("ck_document_requests_kind", "kind IN ('credit_report', 'pay_stub', 'bank_statement', 'tax_return', 'identification', 'court_notice', 'other')");
+
+                            t.HasCheckConstraint("ck_document_requests_status", "status IN ('requested', 'received', 'waived')");
+                        });
+                });
+
+            modelBuilder.Entity("Insolvia.Data.Cases.DocumentRow", b =>
+                {
+                    b.Property<string>("CaseId")
+                        .HasColumnType("text")
+                        .HasColumnName("case_id");
+
+                    b.Property<string>("Id")
+                        .HasColumnType("text")
+                        .HasColumnName("id");
+
+                    b.Property<long>("ByteSize")
+                        .HasColumnType("bigint")
+                        .HasColumnName("byte_size");
+
+                    b.Property<string>("Channel")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("channel");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("content_type");
+
+                    b.Property<string>("Etag")
+                        .HasColumnType("text")
+                        .HasColumnName("etag");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("file_name");
+
+                    b.Property<string>("FirmId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("firm_id");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("RequestId")
+                        .HasColumnType("text")
+                        .HasColumnName("request_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.Property<string>("StorageRef")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("storage_ref");
+
+                    b.Property<DateTimeOffset>("UploadedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("uploaded_at");
+
+                    b.Property<string>("UploadedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("uploaded_by");
+
+                    b.HasKey("CaseId", "Id")
+                        .HasName("pk_documents");
+
+                    b.HasIndex("FirmId", "CaseId")
+                        .HasDatabaseName("ix_documents_firm_id_case_id");
+
+                    b.ToTable("documents", "insolvia", t =>
+                        {
+                            t.HasCheckConstraint("ck_documents_channel", "channel IN ('staff', 'client')");
+
+                            t.HasCheckConstraint("ck_documents_content_type", "content_type IN ('application/pdf', 'image/jpeg', 'image/png', 'image/heic', 'image/tiff')");
+
+                            t.HasCheckConstraint("ck_documents_kind", "kind IN ('credit_report', 'pay_stub', 'bank_statement', 'tax_return', 'identification', 'court_notice', 'other')");
+
+                            t.HasCheckConstraint("ck_documents_status", "status IN ('pending', 'stored')");
+                        });
+                });
+
+            modelBuilder.Entity("Insolvia.Data.Cases.FilingApprovalRow", b =>
+                {
+                    b.Property<string>("CaseId")
+                        .HasColumnType("text")
+                        .HasColumnName("case_id");
+
+                    b.Property<string>("ApprovalId")
+                        .HasColumnType("text")
+                        .HasColumnName("approval_id");
+
+                    b.Property<DateTimeOffset>("ApprovedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("approved_at");
+
+                    b.Property<string>("AttorneyId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("attorney_id");
+
+                    b.Property<DateTimeOffset>("AuthenticatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("authenticated_at");
+
+                    b.Property<string>("AuthorizationId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("authorization_id");
+
+                    b.Property<DateTimeOffset?>("ConsumedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("consumed_at");
+
+                    b.Property<string>("Court")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("court");
+
+                    b.Property<string>("CredentialId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("credential_id");
+
+                    b.Property<string>("Digest")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("digest");
+
+                    b.Property<string>("Division")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("division");
+
+                    b.Property<long>("ExpiresAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("expires_at");
+
+                    b.Property<string>("FilingId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("filing_id");
+
+                    b.Property<string>("FirmId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("firm_id");
+
+                    b.Property<string>("PacketId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("packet_id");
+
+                    b.Property<string>("RegistryRelease")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("registry_release");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.Property<string>("VoidReason")
+                        .HasColumnType("text")
+                        .HasColumnName("void_reason");
+
+                    b.Property<DateTimeOffset?>("VoidedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("voided_at");
+
+                    b.HasKey("CaseId", "ApprovalId")
+                        .HasName("ak_filing_approval_row_case_id_approval_id");
+
+                    b.HasIndex("FirmId", "CaseId")
+                        .HasDatabaseName("ix_filing_approvals_firm_id_case_id");
+
+                    b.ToTable("filing_approvals", "insolvia", t =>
+                        {
+                            t.HasCheckConstraint("ck_filing_approvals_status", "status IN ('pending', 'consumed', 'voided')");
+                        });
+                });
+
+            modelBuilder.Entity("Insolvia.Data.Cases.FilingRow", b =>
+                {
+                    b.Property<string>("CaseId")
+                        .HasColumnType("text")
+                        .HasColumnName("case_id");
+
+                    b.Property<string>("FilingId")
+                        .HasColumnType("text")
+                        .HasColumnName("filing_id");
+
+                    b.Property<string>("ApprovalId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("approval_id");
+
+                    b.Property<string>("AttemptId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("attempt_id");
+
+                    b.Property<string>("AttorneyId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("attorney_id");
+
+                    b.Property<DateTimeOffset>("ClaimedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("claimed_at");
+
+                    b.Property<JsonDocument>("Confirmation")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("confirmation");
+
+                    b.Property<string>("Court")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("court");
+
+                    b.Property<string>("CredentialId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("credential_id");
+
+                    b.Property<string>("Division")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("division");
+
+                    b.Property<string>("Driver")
+                        .HasColumnType("text")
+                        .HasColumnName("driver");
+
+                    b.Property<string>("FirmId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("firm_id");
+
+                    b.PrimitiveCollection<string[]>("FollowUps")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("follow_ups");
+
+                    b.Property<JsonDocument>("HandBack")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("hand_back");
+
+                    b.Property<JsonDocument>("History")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("history");
+
+                    b.Property<long>("LeaseExpiresAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("lease_expires_at");
+
+                    b.Property<string>("ReceiptDocumentId")
+                        .HasColumnType("text")
+                        .HasColumnName("receipt_document_id");
+
+                    b.Property<JsonDocument>("Resolution")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("resolution");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("state");
+
+                    b.Property<string>("UnknownReason")
+                        .HasColumnType("text")
+                        .HasColumnName("unknown_reason");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("CaseId", "FilingId")
+                        .HasName("pk_filings");
+
+                    b.HasIndex("FirmId", "CaseId")
+                        .HasDatabaseName("ix_filings_firm_id_case_id");
+
+                    b.ToTable("filings", "insolvia", t =>
+                        {
+                            t.HasCheckConstraint("ck_filings_state", "state IN ('claimed', 'signed_in', 'uploading', 'at_final_submit', 'submitted', 'filed', 'handed_back', 'outcome_unknown')");
+                        });
+                });
+
+            modelBuilder.Entity("Insolvia.Data.Cases.JobRow", b =>
+                {
+                    b.Property<string>("CaseId")
+                        .HasColumnType("text")
+                        .HasColumnName("case_id");
+
+                    b.Property<string>("Id")
+                        .HasColumnType("text")
+                        .HasColumnName("id");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempts");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("DocumentId")
+                        .HasColumnType("text")
+                        .HasColumnName("document_id");
+
+                    b.Property<JsonDocument>("Failure")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("failure");
+
+                    b.Property<string>("FirmId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("firm_id");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("kind");
+
+                    b.Property<JsonDocument>("Options")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("options");
+
+                    b.Property<JsonDocument>("Result")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("result");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("CaseId", "Id")
+                        .HasName("pk_jobs");
+
+                    b.HasIndex("FirmId", "CaseId")
+                        .HasDatabaseName("ix_jobs_firm_id_case_id");
+
+                    b.ToTable("jobs", "insolvia", t =>
+                        {
+                            t.HasCheckConstraint("ck_jobs_status", "status IN ('queued', 'running', 'succeeded', 'failed')");
+                        });
+                });
+
+            modelBuilder.Entity("Insolvia.Data.Cases.LifecycleEventRow", b =>
+                {
+                    b.Property<string>("CaseId")
+                        .HasColumnType("text")
+                        .HasColumnName("case_id");
+
+                    b.Property<DateTimeOffset>("RecordedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("recorded_at");
+
+                    b.Property<string>("CandidateId")
+                        .HasColumnType("text")
+                        .HasColumnName("candidate_id");
+
+                    b.Property<int?>("Chapter")
+                        .HasColumnType("integer")
+                        .HasColumnName("chapter");
+
+                    b.Property<DateOnly?>("EffectiveOn")
+                        .HasColumnType("date")
+                        .HasColumnName("effective_on");
+
+                    b.Property<string>("FilingId")
+                        .HasColumnType("text")
+                        .HasColumnName("filing_id");
+
+                    b.Property<string>("FirmId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("firm_id");
+
+                    b.Property<int?>("FromChapter")
+                        .HasColumnType("integer")
+                        .HasColumnName("from_chapter");
+
+                    b.Property<string>("FromStatus")
+                        .HasColumnType("text")
+                        .HasColumnName("from_status");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("PlanVersionId")
+                        .HasColumnType("text")
+                        .HasColumnName("plan_version_id");
+
+                    b.Property<string>("Provenance")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("provenance");
+
+                    b.Property<string>("RecordedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("recorded_by");
+
+                    b.Property<int?>("ToChapter")
+                        .HasColumnType("integer")
+                        .HasColumnName("to_chapter");
+
+                    b.Property<string>("ToStatus")
+                        .HasColumnType("text")
+                        .HasColumnName("to_status");
+
+                    b.HasKey("CaseId", "RecordedAt")
+                        .HasName("pk_case_lifecycle_events");
+
+                    b.HasIndex("FirmId", "CaseId")
+                        .HasDatabaseName("ix_case_lifecycle_events_firm_id_case_id");
+
+                    b.ToTable("case_lifecycle_events", "insolvia", t =>
+                        {
+                            t.HasCheckConstraint("ck_case_lifecycle_events_candidate", "(provenance = 'court_notice') = (candidate_id IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_case_lifecycle_events_conversion", "(kind = 'conversion') = (from_chapter IS NOT NULL AND to_chapter IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_case_lifecycle_events_court_date", "kind = 'status' OR effective_on IS NOT NULL");
+
+                            t.HasCheckConstraint("ck_case_lifecycle_events_kind", "kind IN ('status', 'conversion', 'confirmation', 'confirmation_denied')");
+
+                            t.HasCheckConstraint("ck_case_lifecycle_events_provenance", "provenance IN ('manual', 'court_notice', 'filing-worker')");
+
+                            t.HasCheckConstraint("ck_case_lifecycle_events_status", "(kind = 'status') = (from_status IS NOT NULL AND to_status IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_case_lifecycle_events_statuses", "(from_status IS NULL OR from_status IN ('intake', 'ready_to_file', 'filed', 'discharged', 'dismissed', 'closed')) AND (to_status IS NULL OR to_status IN ('intake', 'ready_to_file', 'filed', 'discharged', 'dismissed', 'closed'))");
+                        });
+                });
+
+            modelBuilder.Entity("Insolvia.Data.Cases.PacketRow", b =>
+                {
+                    b.Property<string>("CaseId")
+                        .HasColumnType("text")
+                        .HasColumnName("case_id");
+
+                    b.Property<string>("Id")
+                        .HasColumnType("text")
+                        .HasColumnName("id");
+
+                    b.Property<long>("ByteSize")
+                        .HasColumnType("bigint")
+                        .HasColumnName("byte_size");
+
+                    b.Property<string>("ConstantsSetId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("constants_set_id");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("content_type");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<int>("CreditorCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("creditor_count");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("file_name");
+
+                    b.Property<string>("FirmId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("firm_id");
+
+                    b.Property<JsonDocument>("FormRevisions")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("form_revisions");
+
+                    b.Property<string>("JobId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("job_id");
+
+                    b.Property<JsonDocument>("Options")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("options");
+
+                    b.Property<JsonDocument>("Parts")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("parts");
+
+                    b.Property<string>("Sha256")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("sha256");
+
+                    b.Property<string>("StorageRef")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("storage_ref");
+
+                    b.HasKey("CaseId", "Id")
+                        .HasName("pk_packets");
+
+                    b.HasIndex("FirmId", "CaseId")
+                        .HasDatabaseName("ix_packets_firm_id_case_id");
+
+                    b.ToTable("packets", "insolvia");
+                });
+
+            modelBuilder.Entity("Insolvia.Data.Cases.TaxIdRow", b =>
+                {
+                    b.Property<string>("CaseId")
+                        .HasColumnType("text")
+                        .HasColumnName("case_id");
+
+                    b.Property<string>("Ref")
+                        .HasColumnType("text")
+                        .HasColumnName("ref");
+
+                    b.Property<byte[]>("Ciphertext")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("ciphertext");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("FirmId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("firm_id");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("LastFour")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("last_four");
+
+                    b.Property<byte[]>("Nonce")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("nonce");
+
+                    b.Property<string>("Scheme")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("scheme");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("updated_at");
+
+                    b.Property<byte[]>("WrappedKey")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("wrapped_key");
+
+                    b.HasKey("CaseId", "Ref")
+                        .HasName("pk_tax_ids");
+
+                    b.HasIndex("FirmId", "CaseId")
+                        .HasDatabaseName("ix_tax_ids_firm_id_case_id");
+
+                    b.ToTable("tax_ids", "insolvia", t =>
+                        {
+                            t.HasCheckConstraint("ck_tax_ids_kind", "kind IN ('ssn', 'itin')");
+                        });
+                });
+
             modelBuilder.Entity("Insolvia.Data.Firms.FirmClientRow", b =>
                 {
                     b.Property<string>("FirmId")
@@ -551,6 +1849,9 @@ namespace Insolvia.Data.Migrations
                     b.HasIndex("Subject")
                         .HasDatabaseName("ix_client_bindings_subject");
 
+                    b.HasIndex("FirmId", "CaseId")
+                        .HasDatabaseName("ix_client_bindings_firm_id_case_id");
+
                     b.HasIndex("FirmId", "Email")
                         .HasDatabaseName("ix_client_bindings_firm_id_email");
 
@@ -612,6 +1913,210 @@ namespace Insolvia.Data.Migrations
                         {
                             t.HasCheckConstraint("ck_waitlist_entries_status", "status IN ('new')");
                         });
+                });
+
+            modelBuilder.Entity("Insolvia.Data.Cases.CalendarEventRow", b =>
+                {
+                    b.HasOne("Insolvia.Data.Firms.FirmRow", null)
+                        .WithMany()
+                        .HasForeignKey("FirmId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_calendar_events_firm");
+
+                    b.HasOne("Insolvia.Data.Cases.CaseRow", null)
+                        .WithMany()
+                        .HasForeignKey("FirmId", "CaseId")
+                        .HasPrincipalKey("FirmId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .HasConstraintName("fk_calendar_events_case");
+                });
+
+            modelBuilder.Entity("Insolvia.Data.Cases.CalendarTokenRow", b =>
+                {
+                    b.HasOne("Insolvia.Data.Firms.FirmRow", null)
+                        .WithMany()
+                        .HasForeignKey("FirmId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_calendar_tokens_firm");
+                });
+
+            modelBuilder.Entity("Insolvia.Data.Cases.CandidateRow", b =>
+                {
+                    b.HasOne("Insolvia.Data.Cases.CaseRow", null)
+                        .WithMany()
+                        .HasForeignKey("FirmId", "CaseId")
+                        .HasPrincipalKey("FirmId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_candidates_case");
+                });
+
+            modelBuilder.Entity("Insolvia.Data.Cases.CaseAssignmentRow", b =>
+                {
+                    b.HasOne("Insolvia.Data.Cases.CaseRow", null)
+                        .WithMany()
+                        .HasForeignKey("FirmId", "CaseId")
+                        .HasPrincipalKey("FirmId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_case_assignments_case");
+                });
+
+            modelBuilder.Entity("Insolvia.Data.Cases.CaseEntityRow", b =>
+                {
+                    b.HasOne("Insolvia.Data.Cases.CaseRow", null)
+                        .WithMany()
+                        .HasForeignKey("FirmId", "CaseId")
+                        .HasPrincipalKey("FirmId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_case_entities_case");
+                });
+
+            modelBuilder.Entity("Insolvia.Data.Cases.CaseRow", b =>
+                {
+                    b.HasOne("Insolvia.Data.Firms.FirmRow", null)
+                        .WithMany()
+                        .HasForeignKey("FirmId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_cases_firm");
+                });
+
+            modelBuilder.Entity("Insolvia.Data.Cases.CaseTaskRow", b =>
+                {
+                    b.HasOne("Insolvia.Data.Cases.CaseRow", null)
+                        .WithMany()
+                        .HasForeignKey("FirmId", "CaseId")
+                        .HasPrincipalKey("FirmId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_case_tasks_case");
+                });
+
+            modelBuilder.Entity("Insolvia.Data.Cases.CurrentFilingApprovalRow", b =>
+                {
+                    b.HasOne("Insolvia.Data.Cases.FilingApprovalRow", null)
+                        .WithMany()
+                        .HasForeignKey("CaseId", "ApprovalId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_current_filing_approvals_approval");
+
+                    b.HasOne("Insolvia.Data.Cases.CaseRow", null)
+                        .WithMany()
+                        .HasForeignKey("FirmId", "CaseId")
+                        .HasPrincipalKey("FirmId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_current_filing_approvals_case");
+                });
+
+            modelBuilder.Entity("Insolvia.Data.Cases.DebtorRow", b =>
+                {
+                    b.HasOne("Insolvia.Data.Cases.CaseRow", null)
+                        .WithMany()
+                        .HasForeignKey("FirmId", "CaseId")
+                        .HasPrincipalKey("FirmId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_debtors_case");
+
+                    b.HasOne("Insolvia.Data.Firms.FirmClientRow", null)
+                        .WithMany()
+                        .HasForeignKey("FirmId", "ClientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_debtors_client");
+                });
+
+            modelBuilder.Entity("Insolvia.Data.Cases.DocumentRequestRow", b =>
+                {
+                    b.HasOne("Insolvia.Data.Cases.CaseRow", null)
+                        .WithMany()
+                        .HasForeignKey("FirmId", "CaseId")
+                        .HasPrincipalKey("FirmId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_document_requests_case");
+                });
+
+            modelBuilder.Entity("Insolvia.Data.Cases.DocumentRow", b =>
+                {
+                    b.HasOne("Insolvia.Data.Cases.CaseRow", null)
+                        .WithMany()
+                        .HasForeignKey("FirmId", "CaseId")
+                        .HasPrincipalKey("FirmId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_documents_case");
+                });
+
+            modelBuilder.Entity("Insolvia.Data.Cases.FilingApprovalRow", b =>
+                {
+                    b.HasOne("Insolvia.Data.Cases.CaseRow", null)
+                        .WithMany()
+                        .HasForeignKey("FirmId", "CaseId")
+                        .HasPrincipalKey("FirmId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_filing_approvals_case");
+                });
+
+            modelBuilder.Entity("Insolvia.Data.Cases.FilingRow", b =>
+                {
+                    b.HasOne("Insolvia.Data.Cases.CaseRow", null)
+                        .WithMany()
+                        .HasForeignKey("FirmId", "CaseId")
+                        .HasPrincipalKey("FirmId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_filings_case");
+                });
+
+            modelBuilder.Entity("Insolvia.Data.Cases.JobRow", b =>
+                {
+                    b.HasOne("Insolvia.Data.Cases.CaseRow", null)
+                        .WithMany()
+                        .HasForeignKey("FirmId", "CaseId")
+                        .HasPrincipalKey("FirmId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_jobs_case");
+                });
+
+            modelBuilder.Entity("Insolvia.Data.Cases.LifecycleEventRow", b =>
+                {
+                    b.HasOne("Insolvia.Data.Cases.CaseRow", null)
+                        .WithMany()
+                        .HasForeignKey("FirmId", "CaseId")
+                        .HasPrincipalKey("FirmId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_case_lifecycle_events_case");
+                });
+
+            modelBuilder.Entity("Insolvia.Data.Cases.PacketRow", b =>
+                {
+                    b.HasOne("Insolvia.Data.Cases.CaseRow", null)
+                        .WithMany()
+                        .HasForeignKey("FirmId", "CaseId")
+                        .HasPrincipalKey("FirmId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_packets_case");
+                });
+
+            modelBuilder.Entity("Insolvia.Data.Cases.TaxIdRow", b =>
+                {
+                    b.HasOne("Insolvia.Data.Cases.CaseRow", null)
+                        .WithMany()
+                        .HasForeignKey("FirmId", "CaseId")
+                        .HasPrincipalKey("FirmId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_tax_ids_case");
                 });
 
             modelBuilder.Entity("Insolvia.Data.Firms.FirmClientRow", b =>
@@ -690,6 +2195,14 @@ namespace Insolvia.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_case_client_bindings_firm");
+
+                    b.HasOne("Insolvia.Data.Cases.CaseRow", null)
+                        .WithMany()
+                        .HasForeignKey("FirmId", "CaseId")
+                        .HasPrincipalKey("FirmId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_case_client_bindings_case");
                 });
 
             modelBuilder.Entity("Insolvia.Data.Portal.CaseClientRoleClaimRow", b =>
@@ -700,6 +2213,14 @@ namespace Insolvia.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_case_client_role_claims_firm");
+
+                    b.HasOne("Insolvia.Data.Cases.CaseRow", null)
+                        .WithMany()
+                        .HasForeignKey("FirmId", "CaseId")
+                        .HasPrincipalKey("FirmId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_case_client_role_claims_case");
                 });
 
             modelBuilder.Entity("Insolvia.Data.Portal.ClientBindingRow", b =>
@@ -710,6 +2231,14 @@ namespace Insolvia.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_client_bindings_firm");
+
+                    b.HasOne("Insolvia.Data.Cases.CaseRow", null)
+                        .WithMany()
+                        .HasForeignKey("FirmId", "CaseId")
+                        .HasPrincipalKey("FirmId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_client_bindings_case");
                 });
 #pragma warning restore 612, 618
         }

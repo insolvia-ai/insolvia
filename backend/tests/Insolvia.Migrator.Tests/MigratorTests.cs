@@ -188,6 +188,52 @@ public sealed class MigratorTests(PostgresFixture postgres)
     }
 
     [Fact]
+    public async Task The_case_tables_are_granted_by_service_least_privilege_first()
+    {
+        var connectionString = await postgres.CreateDatabaseAsync();
+        await RunAsync(connectionString, GrantTable.All);
+
+        // A case is soft-deleted: nobody deletes its row.
+        foreach (var role in ServiceRoles.All)
+        {
+            Assert.False(await HasPrivilegeAsync(connectionString, role, "cases", "DELETE"));
+        }
+
+        // The lifecycle history is append-only for its writers, and nobody
+        // rewrites or removes an event (ADR 0027).
+        foreach (var role in new[] { ServiceRoles.Api, ServiceRoles.Filing })
+        {
+            Assert.True(await HasPrivilegeAsync(connectionString, role, "case_lifecycle_events", "INSERT"));
+        }
+
+        foreach (var role in ServiceRoles.All)
+        {
+            Assert.False(await HasPrivilegeAsync(connectionString, role, "case_lifecycle_events", "UPDATE"));
+            Assert.False(await HasPrivilegeAsync(connectionString, role, "case_lifecycle_events", "DELETE"));
+        }
+
+        // The MCP server's only case-side write is a candidate (ADR 0016).
+        foreach (var table in new[] { "cases", "case_assignments", "case_lifecycle_events", "debtors", "case_entities", "documents" })
+        {
+            Assert.True(await HasPrivilegeAsync(connectionString, ServiceRoles.Mcp, table, "SELECT"));
+            Assert.False(await HasPrivilegeAsync(connectionString, ServiceRoles.Mcp, table, "INSERT"));
+            Assert.False(await HasPrivilegeAsync(connectionString, ServiceRoles.Mcp, table, "UPDATE"));
+        }
+
+        Assert.True(await HasPrivilegeAsync(connectionString, ServiceRoles.Mcp, "candidates", "UPDATE"));
+
+        // The filing worker files a case and writes its record; it never
+        // creates a case, and the admin service touches no case table.
+        Assert.True(await HasPrivilegeAsync(connectionString, ServiceRoles.Filing, "cases", "UPDATE"));
+        Assert.False(await HasPrivilegeAsync(connectionString, ServiceRoles.Filing, "cases", "INSERT"));
+        Assert.True(await HasPrivilegeAsync(connectionString, ServiceRoles.Filing, "filings", "INSERT"));
+        Assert.False(await HasPrivilegeAsync(connectionString, ServiceRoles.Api, "filings", "INSERT"));
+        Assert.False(await HasPrivilegeAsync(connectionString, ServiceRoles.Admin, "cases", "SELECT"));
+        Assert.False(await HasPrivilegeAsync(connectionString, ServiceRoles.Admin, "tax_ids", "SELECT"));
+        Assert.False(await HasPrivilegeAsync(connectionString, ServiceRoles.Mcp, "tax_ids", "SELECT"));
+    }
+
+    [Fact]
     public async Task A_grant_naming_a_missing_table_or_an_unknown_role_fails_the_run()
     {
         var connectionString = await postgres.CreateDatabaseAsync();

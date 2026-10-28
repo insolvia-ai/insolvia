@@ -181,7 +181,7 @@ public abstract class ClientBindingStoreConformance : IAsyncLifetime
     {
         var store = Connect();
         await store.BindAsync(Binding(firmId: Ids.Firm), [], Ct);
-        await store.BindAsync(Binding(firmId: Ids.OtherFirm, caseId: Ids.OtherCase), [], Ct);
+        await store.BindAsync(Binding(firmId: Ids.OtherFirm, caseId: Ids.TheirCase), [], Ct);
         await Assert.ThrowsAsync<InvalidOperationException>(() => store.FindAsync(Ids.Pat, Ct));
     }
 
@@ -189,7 +189,7 @@ public abstract class ClientBindingStoreConformance : IAsyncLifetime
     public async Task The_email_lookup_is_firm_scoped_and_case_insensitive()
     {
         var store = Connect();
-        await store.BindAsync(Binding(firmId: Ids.OtherFirm), [], Ct);
+        await store.BindAsync(Binding(firmId: Ids.OtherFirm, caseId: Ids.TheirCase), [], Ct);
         Assert.Null(await store.FindByEmailAsync(Ids.Firm, "a1@example.test", Ct));
         Assert.NotNull(await store.FindByEmailAsync(Ids.OtherFirm, "A1@example.test", Ct));
     }
@@ -296,6 +296,7 @@ public sealed class PostgresClientBindingStoreConformance(PostgresFixture postgr
     {
         await _harness.InitializeAsync();
         await _harness.SeedFirmsAsync();
+        await _harness.SeedCasesAsync();
     }
 
     public override async ValueTask DisposeAsync()
