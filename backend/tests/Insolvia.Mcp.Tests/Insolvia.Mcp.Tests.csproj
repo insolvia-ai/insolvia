@@ -1,6 +1,17 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- Unit tests for Insolvia.Mcp. Empty until its first ported module. -->
+  <!-- Tests for Insolvia.Mcp: services/mcp/tests/unit, translated. The tool
+       layer over the memory twins, the auth seam, the config, and the wire —
+       real JSON-RPC POSTs with real RS256 tokens through the real pipeline
+       (WebApplicationFactory), as test_protocol.py drove the ASGI app. -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+  </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/Insolvia.Mcp/Insolvia.Mcp.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The Python server's tools/list, captured from mcp==2.1.1: the schema
+         parity test compares against it. -->
+    <None Include="Fixtures/**" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
