@@ -1,5 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- Unit tests for Insolvia.Core. Empty until its first ported module. -->
+  <!-- Unit tests for Insolvia.Core, translated from packages/insolvia_core/tests/unit. -->
   <ItemGroup>
     <ProjectReference Include="../../src/Insolvia.Core/Insolvia.Core.csproj" />
   </ItemGroup>

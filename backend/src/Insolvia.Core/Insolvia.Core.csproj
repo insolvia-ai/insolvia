@@ -1,3 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!-- The domain and its ports: the insolvia_core successor. References nothing in the solution; no AWS SDK, no EF Core. -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Insolvia.Core.Tests" />
+  </ItemGroup>
 </Project>
