@@ -10,8 +10,10 @@ using Insolvia.Core.Memory;
 using Insolvia.Core.Ports;
 using Insolvia.Data;
 using Insolvia.Data.AccessLogging;
+using Insolvia.Data.Cases;
 using Insolvia.Data.Connections;
 using Insolvia.Data.Firms;
+using Insolvia.Data.Pagination;
 using Insolvia.Data.Portal;
 using Insolvia.Data.Waitlist;
 using Microsoft.Extensions.Logging.Console;
@@ -78,11 +80,28 @@ public static class ApiComposition
             builder.Services.AddScoped<IAccessLog>(services => new PostgresAccessLog(services.GetRequiredService<InsolviaDbContext>()));
             builder.Services.AddScoped<IWaitlistStore>(services => new PostgresWaitlistStore(services.GetRequiredService<InsolviaDbContext>()));
 
-            // Not composed until their adapters are ported, so the routes
-            // that need them answer the 500 that names the gap — never a
-            // memory twin that would accept a write and lose it:
-            //   IUserDirectory (Cognito AdminCreateUser) — POST /v1/firm/users;
-            //   IDebtorClientLinks (the debtor store, 18.11) — the client merge.
+            // Not composed until its adapter is ported, so the route that
+            // needs it answers the 500 that names the gap — never a memory
+            // twin that would accept a write and lose it:
+            //   IUserDirectory (Cognito AdminCreateUser) — POST /v1/firm/users.
+
+            // The case side (18.11): every store over the request's one
+            // context, so a route's writes share its connection. Cursors are
+            // signed with INSOLVIA_CURSOR_KEY when set (CursorCodec). The
+            // debtor store is also the client merge's IDebtorClientLinks.
+            builder.Services.AddSingleton(_ => CursorCodec.FromEnvironment(name => configuration[name]));
+            builder.Services.AddScoped<ICaseStore>(services => new PostgresCaseStore(
+                services.GetRequiredService<InsolviaDbContext>(),
+                services.GetRequiredService<CursorCodec>()));
+            builder.Services.AddScoped<IDebtorStore>(services => new PostgresDebtorStore(services.GetRequiredService<InsolviaDbContext>()));
+            builder.Services.AddScoped<IDebtorClientLinks>(services => services.GetRequiredService<IDebtorStore>());
+            builder.Services.AddScoped<ICaseEntityStore>(services => new PostgresCaseEntityStore(services.GetRequiredService<InsolviaDbContext>()));
+            builder.Services.AddScoped<IDocumentStore>(services => new PostgresDocumentStore(services.GetRequiredService<InsolviaDbContext>()));
+            builder.Services.AddScoped<ICandidateStore>(services => new PostgresCandidateStore(services.GetRequiredService<InsolviaDbContext>()));
+            builder.Services.AddScoped<ICaseTaskStore>(services => new PostgresCaseTaskStore(services.GetRequiredService<InsolviaDbContext>()));
+            builder.Services.AddScoped<IDocumentRequestStore>(services => new PostgresDocumentRequestStore(services.GetRequiredService<InsolviaDbContext>()));
+            builder.Services.AddScoped<IFilingStore>(services => new PostgresFilingStore(services.GetRequiredService<InsolviaDbContext>()));
+            builder.Services.AddScoped<ITaxIdStore>(services => new PostgresTaxIdStore(services.GetRequiredService<InsolviaDbContext>()));
         }
 
         // Constructed once, at start, so its key cache lives as long as the
@@ -121,6 +140,23 @@ public static class ApiComposition
 
             // Mints a subject where Cognito would; sends no invitation.
             builder.Services.AddSingleton<IUserDirectory, MemoryUserDirectory>();
+
+            // The case twins, wired as the real stores share one database:
+            // the debtor store reads its client conditions from the firm
+            // store, the case store writes debtors into it, and the filing
+            // store files into the case store.
+            builder.Services.AddSingleton(services => new MemoryDebtorStore(services.GetRequiredService<IFirmStore>()));
+            builder.Services.AddSingleton<IDebtorStore>(services => services.GetRequiredService<MemoryDebtorStore>());
+            builder.Services.AddSingleton<IDebtorClientLinks>(services => services.GetRequiredService<MemoryDebtorStore>());
+            builder.Services.AddSingleton(services => new MemoryCaseStore(services.GetRequiredService<MemoryDebtorStore>()));
+            builder.Services.AddSingleton<ICaseStore>(services => services.GetRequiredService<MemoryCaseStore>());
+            builder.Services.AddSingleton<IFilingStore>(services => new MemoryFilingStore(services.GetRequiredService<MemoryCaseStore>()));
+            builder.Services.AddSingleton<ICaseEntityStore, MemoryCaseEntityStore>();
+            builder.Services.AddSingleton<IDocumentStore, MemoryDocumentStore>();
+            builder.Services.AddSingleton<ICandidateStore, MemoryCandidateStore>();
+            builder.Services.AddSingleton<ICaseTaskStore, MemoryCaseTaskStore>();
+            builder.Services.AddSingleton<IDocumentRequestStore, MemoryDocumentRequestStore>();
+            builder.Services.AddSingleton<ITaxIdStore, MemoryTaxIdStore>();
         }
 
         // The firm-side routes (18.14), mapped after /health in this order.

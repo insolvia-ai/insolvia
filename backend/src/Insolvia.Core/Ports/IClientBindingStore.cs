@@ -24,8 +24,11 @@ public interface IClientBindingStore
 
     /// <summary>
     /// Rewrite an existing binding and its mirror — a status change. A
-    /// revocation also releases the role claims this subject holds, in the
-    /// same transaction. Null when the binding does not exist.
+    /// revocation also releases the role claims it names, in the same
+    /// transaction — and MUST throw <see cref="ConflictException"/>
+    /// (<see cref="Clients.ClientBindings.AccessChanged"/>), writing nothing,
+    /// when one of them is now held by another subject (a revoke from a stale
+    /// read). Null when the binding does not exist.
     /// </summary>
     Task<ClientBinding?> UpdateAsync(ClientBinding binding, CancellationToken cancellationToken = default);
 

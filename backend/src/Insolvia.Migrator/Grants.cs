@@ -137,6 +137,90 @@ public static class GrantTable
         // change a row or remove one.
         new("waitlist_entries", ServiceRoles.Api, TablePrivileges.Insert),
 
+        // ── Case stores (18.11) ─────────────────────────────────────
+        // Derived from which Python service composed which store over the
+        // case table (services/*/entrypoints) and what it called: the API
+        // does everything a route does; the pipeline WORKER reads the case
+        // file it assembles or extracts from, pins the case, advances jobs,
+        // writes packets and proposes candidates; the MCP server reads and
+        // proposes (ADR 0016: candidates are its only write); the FILING
+        // worker reads what it files, consumes the approval, writes its
+        // filing record and files the case. The admin service touches no
+        // case table (its seeder is the migrator role's, 18.20). No delete
+        // where no port deletes: a case is soft-deleted, a debtor replaced.
+        new("cases", ServiceRoles.Api, ReadInsertUpdate),
+        new("cases", ServiceRoles.Worker, ReadUpdate),
+        new("cases", ServiceRoles.Mcp, TablePrivileges.Select),
+        new("cases", ServiceRoles.Filing, ReadUpdate),
+
+        // Who may see a case: the API links and unlinks; the MCP server's
+        // case read decides access with it.
+        new("case_assignments", ServiceRoles.Api, TablePrivileges.ReadWrite),
+        new("case_assignments", ServiceRoles.Mcp, TablePrivileges.Select),
+
+        // The lifecycle history is APPEND-ONLY for its writers (ADR 0027):
+        // an event is never rewritten or removed. The worker reads the
+        // petition chapter for the packet gate; the MCP server reads it.
+        TableGrant.AppendOnly("case_lifecycle_events", ServiceRoles.Api),
+        TableGrant.AppendOnly("case_lifecycle_events", ServiceRoles.Filing),
+        new("case_lifecycle_events", ServiceRoles.Worker, TablePrivileges.Select),
+        new("case_lifecycle_events", ServiceRoles.Mcp, TablePrivileges.Select),
+
+        // The case file: the API writes it; every other service reads it.
+        new("debtors", ServiceRoles.Api, ReadInsertUpdate),
+        new("debtors", ServiceRoles.Worker, TablePrivileges.Select),
+        new("debtors", ServiceRoles.Mcp, TablePrivileges.Select),
+        new("debtors", ServiceRoles.Filing, TablePrivileges.Select),
+        new("case_entities", ServiceRoles.Api, TablePrivileges.ReadWrite),
+        new("case_entities", ServiceRoles.Worker, TablePrivileges.Select),
+        new("case_entities", ServiceRoles.Mcp, TablePrivileges.Select),
+        new("case_entities", ServiceRoles.Filing, TablePrivileges.Select),
+
+        // Documents: the API uploads, confirms and deletes; the worker
+        // reads what it extracts from; the filing worker stores its receipt.
+        new("documents", ServiceRoles.Api, TablePrivileges.ReadWrite),
+        new("documents", ServiceRoles.Worker, TablePrivileges.Select),
+        new("documents", ServiceRoles.Mcp, TablePrivileges.Select),
+        new("documents", ServiceRoles.Filing, TablePrivileges.Select | TablePrivileges.Insert),
+
+        // Candidates: proposed by extraction (worker) and MCP harnesses,
+        // reviewed by staff (API), withdrawn by the harness (MCP's CAS).
+        new("candidates", ServiceRoles.Api, ReadInsertUpdate),
+        new("candidates", ServiceRoles.Worker, TablePrivileges.Select | TablePrivileges.Insert),
+        new("candidates", ServiceRoles.Mcp, ReadInsertUpdate),
+
+        // The API's own case work.
+        new("case_tasks", ServiceRoles.Api, TablePrivileges.ReadWrite),
+        new("document_requests", ServiceRoles.Api, TablePrivileges.ReadWrite),
+
+        // Sealed tax ids: the API seals (an upsert, never a delete); the
+        // worker and the filing worker open them for B121.
+        new("tax_ids", ServiceRoles.Api, ReadInsertUpdate),
+        new("tax_ids", ServiceRoles.Worker, TablePrivileges.Select),
+        new("tax_ids", ServiceRoles.Filing, TablePrivileges.Select),
+
+        // The pipeline: the API accepts a job, the worker advances it and
+        // writes the packet the API then serves.
+        new("jobs", ServiceRoles.Api, ReadInsertUpdate),
+        new("jobs", ServiceRoles.Worker, ReadUpdate),
+        new("packets", ServiceRoles.Api, TablePrivileges.Select),
+        new("packets", ServiceRoles.Worker, TablePrivileges.Select | TablePrivileges.Insert),
+        new("packets", ServiceRoles.Filing, TablePrivileges.Select),
+
+        // Electronic filing (ADR 0024): the API approves (and voids) and
+        // resolves a hand-back; the filing worker claims and advances the
+        // record and consumes the approval. Nobody deletes either.
+        new("filing_approvals", ServiceRoles.Api, ReadInsertUpdate),
+        new("filing_approvals", ServiceRoles.Filing, ReadUpdate),
+        new("current_filing_approvals", ServiceRoles.Api, ReadInsertUpdate),
+        new("current_filing_approvals", ServiceRoles.Filing, TablePrivileges.Select),
+        new("filings", ServiceRoles.Api, ReadUpdate),
+        new("filings", ServiceRoles.Filing, ReadInsertUpdate),
+
+        // The calendar and its feed tokens: the API's alone.
+        new("calendar_events", ServiceRoles.Api, TablePrivileges.ReadWrite),
+        new("calendar_tokens", ServiceRoles.Api, TablePrivileges.ReadWrite),
+
         // The access log: append-only for every service that writes it, and
         // no UPDATE, DELETE or TRUNCATE for anyone (ADR 0028 § Data).
         TableGrant.AppendOnly("access_log", ServiceRoles.Api),

@@ -1,3 +1,4 @@
+using Insolvia.Core.Cases;
 using Insolvia.Core.Filings;
 using Insolvia.Core.Ports;
 
@@ -49,16 +50,21 @@ public sealed class MemoryFilingStore(MemoryCaseStore? cases = null) : IFilingSt
     }
 
     /// <inheritdoc />
-    public Task<bool> TransitionAsync(Filing filing, FilingState expectedState, FiledCase? filedCase = null, CancellationToken cancellationToken = default) =>
+    public Task<bool> TransitionAsync(Filing filing, FilingState expectedState, LifecycleWrite? filedCase = null, CancellationToken cancellationToken = default) =>
         Task.FromResult(Write(filing, expectedState, filedCase, unresolved: false));
 
     /// <inheritdoc />
-    public Task<bool> ResolveAsync(Filing filing, FilingState expectedState, FiledCase? filedCase = null, CancellationToken cancellationToken = default) =>
+    public Task<bool> ResolveAsync(Filing filing, FilingState expectedState, LifecycleWrite? filedCase = null, CancellationToken cancellationToken = default) =>
         Task.FromResult(Write(filing, expectedState, filedCase, unresolved: true));
 
-    private bool Write(Filing filing, FilingState expectedState, FiledCase? filedCase, bool unresolved)
+    private bool Write(Filing filing, FilingState expectedState, LifecycleWrite? filedCase, bool unresolved)
     {
         ArgumentNullException.ThrowIfNull(filing);
+        if (filedCase is not null && (!filedCase.FilesTheCase || filedCase.Case.Id != filing.CaseId))
+        {
+            throw new ArgumentException("a filing's case half moves its own case into filed", nameof(filedCase));
+        }
+
         lock (_gate)
         {
             var key = (filing.CaseId, filing.FilingId);
@@ -70,7 +76,7 @@ public sealed class MemoryFilingStore(MemoryCaseStore? cases = null) : IFilingSt
                 return false;
             }
 
-            if (filedCase is not null && !Cases.TryFile(filedCase.Case, filedCase.ExpectedStatus, filedCase.StatusChange))
+            if (filedCase is not null && !Cases.TryFile(filedCase))
             {
                 return false;
             }

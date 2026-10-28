@@ -42,6 +42,27 @@ internal static class StoredJson
     public static T? FromNullableDocument<T>(JsonDocument? document)
         where T : class => document is null ? null : FromDocument<T>(document);
 
+    /// <summary>A JSON tree the domain built itself (a body, a provenance map, a payload) as a document, verbatim.</summary>
+    public static JsonDocument FromNode(JsonNode node)
+    {
+        ArgumentNullException.ThrowIfNull(node);
+        return JsonDocument.Parse(node.ToJsonString());
+    }
+
+    /// <summary><see cref="FromNode"/>, or null.</summary>
+    public static JsonDocument? FromNullableNode(JsonNode? node) => node is null ? null : FromNode(node);
+
+    /// <summary>A stored object document as a fresh, mutable tree.</summary>
+    public static JsonObject ToObject(JsonDocument document)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        return JsonNode.Parse(document.RootElement.GetRawText()) as JsonObject
+            ?? throw new InvalidOperationException("a stored document is not an object");
+    }
+
+    /// <summary><see cref="ToObject"/>, or null.</summary>
+    public static JsonObject? ToNullableObject(JsonDocument? document) => document is null ? null : ToObject(document);
+
     /// <summary>A permission map as <c>{"feature": "level"}</c>, both in their wire spelling.</summary>
     public static JsonDocument PermissionsToDocument(ValueDictionary<Feature, PermissionLevel> permissions)
     {

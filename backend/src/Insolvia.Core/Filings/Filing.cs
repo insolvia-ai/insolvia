@@ -1,6 +1,5 @@
 using System.Collections.Frozen;
 using System.Text.Json.Serialization;
-using Insolvia.Core.Cases;
 
 namespace Insolvia.Core.Filings;
 
@@ -88,14 +87,6 @@ public sealed record Filing(
     /// <summary>The attorney's resolution of a hand-back.</summary>
     public Resolution? Resolution { get; init; }
 }
-
-/// <summary>
-/// The case half of a write that files it: the case as it will be stored,
-/// the status it must still have, and the history row — written in the same
-/// transaction as the filing record, so the case is filed exactly when its
-/// filing says so.
-/// </summary>
-public sealed record FiledCase(Case Case, CaseStatus ExpectedStatus, StatusChange StatusChange);
 
 /// <summary>The filing state machine.</summary>
 public static class FilingRules

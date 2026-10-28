@@ -26,7 +26,7 @@ public sealed class MemoryCaseStore(MemoryDebtorStore? debtors = null) : ICaseSt
     private readonly Lock _gate = new();
     private readonly Dictionary<string, Case> _cases = new(StringComparer.Ordinal);
     private readonly Dictionary<(string CaseId, string Subject), CaseAssignment> _assignments = [];
-    private readonly Dictionary<string, List<StatusChange>> _history = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, List<LifecycleEvent>> _history = new(StringComparer.Ordinal);
 
     /// <summary>The debtor store this case store writes into.</summary>
     public MemoryDebtorStore Debtors { get; } = debtors ?? new MemoryDebtorStore();
@@ -202,7 +202,7 @@ public sealed class MemoryCaseStore(MemoryDebtorStore? debtors = null) : ICaseSt
     }
 
     /// <inheritdoc />
-    public Task<Case?> UpdateAsync(Case updated, CaseStatus? expectedStatus = null, StatusChange? statusChange = null, CancellationToken cancellationToken = default)
+    public Task<Case?> UpdateAsync(Case updated, CaseStatus? expectedStatus = null, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(updated);
         lock (_gate)
@@ -212,29 +212,54 @@ public sealed class MemoryCaseStore(MemoryDebtorStore? debtors = null) : ICaseSt
                 return Task.FromResult<Case?>(null);
             }
 
-            if (expectedStatus is not null && existing.Status != expectedStatus)
+            // The status read, AND no move: a plain write is conditioned on the
+            // stored status being the one it carries.
+            if ((expectedStatus is not null && existing.Status != expectedStatus) || existing.Status != updated.Status)
             {
                 throw new ConflictException(CaseRules.StatusMoved);
             }
 
-            // Both, together — the real store's transaction.
             _cases[updated.Id] = updated;
-            if (statusChange is not null)
-            {
-                History(updated.Id).Add(statusChange);
-            }
-
             return Task.FromResult<Case?>(updated);
         }
     }
 
     /// <inheritdoc />
-    public Task<IReadOnlyList<StatusChange>> StatusHistoryAsync(string caseId, CancellationToken cancellationToken = default)
+    public Task<Case?> RecordAsync(LifecycleWrite write, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(write);
+        lock (_gate)
+        {
+            var updated = write.Case;
+            if (!_cases.TryGetValue(updated.Id, out var existing) || existing.FirmId != updated.FirmId)
+            {
+                return Task.FromResult<Case?>(null);
+            }
+
+            if (existing.Status != write.ReadAt.Status || existing.Chapter != write.ReadAt.Chapter)
+            {
+                throw new ConflictException(CaseRules.StatusMoved);
+            }
+
+            if (!AtVersion(updated.Id, write))
+            {
+                throw new ConflictException(CaseLifecycle.HistoryMoved);
+            }
+
+            // Both, together — the real store's transaction.
+            _cases[updated.Id] = updated;
+            History(updated.Id).Add(write.Event);
+            return Task.FromResult<Case?>(updated);
+        }
+    }
+
+    /// <inheritdoc />
+    public Task<IReadOnlyList<LifecycleEvent>> LifecycleAsync(string caseId, CancellationToken cancellationToken = default)
     {
         lock (_gate)
         {
-            IReadOnlyList<StatusChange> history = _history.TryGetValue(caseId, out var changes)
-                ? [.. changes.OrderBy(change => change.ChangedAt)]
+            IReadOnlyList<LifecycleEvent> history = _history.TryGetValue(caseId, out var events)
+                ? [.. events.OrderBy(recorded => recorded.RecordedAt)]
                 : [];
             return Task.FromResult(history);
         }
@@ -278,19 +303,22 @@ public sealed class MemoryCaseStore(MemoryDebtorStore? debtors = null) : ICaseSt
     /// <summary>
     /// The filing store's half of its transaction (Python's
     /// <c>MemoryFilingStore</c> reached into <c>cases</c> and <c>history</c>):
-    /// move the stored case to filed with its history row, only if it still
-    /// exists undeleted in its firm with <paramref name="expectedStatus"/> and no
-    /// history row shares the change's instant. False, writing nothing, otherwise.
+    /// move the stored case to filed — status, petition date, case number and
+    /// <c>updated_at</c>, nothing else — with its lifecycle event, only if it
+    /// still exists undeleted in its firm at the version the writer read and
+    /// no event shares the event's instant. False, writing nothing, otherwise.
     /// </summary>
-    internal bool TryFile(Case filed, CaseStatus expectedStatus, StatusChange change)
+    internal bool TryFile(LifecycleWrite write)
     {
+        var filed = write.Case;
         lock (_gate)
         {
             if (!_cases.TryGetValue(filed.Id, out var current)
                 || current.Deleted
                 || current.FirmId != filed.FirmId
-                || current.Status != expectedStatus
-                || History(current.Id).Any(row => row.ChangedAt == change.ChangedAt))
+                || current.Status != write.ReadAt.Status
+                || current.Chapter != write.ReadAt.Chapter
+                || !AtVersion(current.Id, write))
             {
                 return false;
             }
@@ -302,12 +330,21 @@ public sealed class MemoryCaseStore(MemoryDebtorStore? debtors = null) : ICaseSt
                 CaseNumber = filed.CaseNumber,
                 UpdatedAt = filed.UpdatedAt,
             };
-            History(current.Id).Add(change);
+            History(current.Id).Add(write.Event);
             return true;
         }
     }
 
-    private List<StatusChange> History(string caseId)
+    // The history's half of the version: the latest event is still the one
+    // the writer read, and none shares the new event's instant.
+    private bool AtVersion(string caseId, LifecycleWrite write)
+    {
+        var history = History(caseId);
+        DateTimeOffset? latest = history.Count == 0 ? null : history.Max(recorded => recorded.RecordedAt);
+        return latest == write.ReadAt.LatestRecordedAt && history.All(recorded => recorded.RecordedAt != write.Event.RecordedAt);
+    }
+
+    private List<LifecycleEvent> History(string caseId)
     {
         if (!_history.TryGetValue(caseId, out var changes))
         {

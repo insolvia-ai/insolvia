@@ -116,8 +116,20 @@ public sealed class PostgresClientBindingStore : IClientBindingStore
                 await _db.Database.ExecuteSqlInterpolatedAsync(UpsertMirror(binding, onlyOverRevoked: false), token).ConfigureAwait(false);
                 if (binding.Status == BindingStatus.Revoked)
                 {
-                    // Release only the claims this subject holds; one another
-                    // subject holds is left alone, as the memory store does.
+                    // Python: Delete … attribute_not_exists(SK) OR #subject = :subject,
+                    // per role. A claim another subject holds cancels the whole
+                    // transaction — checked under a row lock, then released.
+                    var heldByOthers = await _db.Database.SqlQuery<int>(
+                        $"""
+                        SELECT 1 AS "Value" FROM insolvia.case_client_role_claims
+                        WHERE case_id = {binding.CaseId} AND role = ANY({RolesOf(binding)}) AND subject <> {binding.Subject}
+                        FOR UPDATE
+                        """).ToListAsync(token).ConfigureAwait(false);
+                    if (heldByOthers.Count > 0)
+                    {
+                        throw new ConflictException(ClientBindings.AccessChanged);
+                    }
+
                     await _db.Database.ExecuteSqlInterpolatedAsync(
                         $"""
                         DELETE FROM insolvia.case_client_role_claims
