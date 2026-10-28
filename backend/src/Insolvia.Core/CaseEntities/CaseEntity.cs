@@ -25,6 +25,12 @@ public interface IEntityKind
 
     /// <summary><see cref="CaseEntityRules.ParseEntity{TBody}"/> for this kind, untyped.</summary>
     IEntityDraft ParseDraft(JsonObject payload, bool enforceProvenance = true);
+
+    /// <summary>
+    /// A stored record rebuilt from its identity and a draft this kind parsed
+    /// — a store's read, untyped (a store holds the kind, not the body type).
+    /// </summary>
+    ICaseEntity Restore(string id, string caseId, DateTimeOffset createdAt, DateTimeOffset updatedAt, IEntityDraft draft);
 }
 
 /// <summary>
@@ -64,6 +70,14 @@ public sealed class EntityKind<TBody> : IEntityKind
     /// <inheritdoc />
     public IEntityDraft ParseDraft(JsonObject payload, bool enforceProvenance = true) =>
         CaseEntityRules.ParseEntity(this, payload, enforceProvenance);
+
+    /// <inheritdoc />
+    public ICaseEntity Restore(string id, string caseId, DateTimeOffset createdAt, DateTimeOffset updatedAt, IEntityDraft draft)
+    {
+        ArgumentNullException.ThrowIfNull(draft);
+        var typed = draft as EntityDraft<TBody> ?? throw new ArgumentException($"a {Name} draft was expected", nameof(draft));
+        return new CaseEntity<TBody>(this, id, caseId, createdAt, updatedAt, typed.Body, typed.Provenance, typed.Amended);
+    }
 
     /// <inheritdoc />
     public override string ToString() => Name;

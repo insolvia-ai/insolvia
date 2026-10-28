@@ -46,17 +46,30 @@ public interface ICaseStore
     Task<CasePage> ListForAccessorAsync(Accessor accessor, int limit, string? cursor, bool archived = false, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Write <paramref name="updated"/> back, only if it still belongs to its
-    /// firm (null otherwise). <paramref name="expectedStatus"/> is the status the
-    /// caller READ: when the stored one differs, nothing is written and this
-    /// throws <see cref="ConflictException"/> (<see cref="CaseRules.StatusMoved"/>).
-    /// <paramref name="statusChange"/> is written in the SAME transaction. No
-    /// assignment check: the route resolved the case through <see cref="GetAsync"/>.
+    /// Write <paramref name="updated"/> back — an edit, not an event — only if
+    /// it still belongs to its firm (null otherwise). <paramref name="expectedStatus"/>
+    /// is the status the caller READ: when the stored one differs, nothing is
+    /// written and this throws <see cref="ConflictException"/>
+    /// (<see cref="CaseRules.StatusMoved"/>). A plain update NEVER moves the
+    /// status: one whose status differs from the stored one is refused the
+    /// same way (a status move is <see cref="RecordAsync"/>, with its event).
+    /// No assignment check: the route resolved the case through <see cref="GetAsync"/>.
     /// </summary>
-    Task<Case?> UpdateAsync(Case updated, CaseStatus? expectedStatus = null, StatusChange? statusChange = null, CancellationToken cancellationToken = default);
+    Task<Case?> UpdateAsync(Case updated, CaseStatus? expectedStatus = null, CancellationToken cancellationToken = default);
 
-    /// <summary>Every lifecycle move of one case, oldest first. Case-scoped: the caller resolved the case first.</summary>
-    Task<IReadOnlyList<StatusChange>> StatusHistoryAsync(string caseId, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Write a lifecycle event (ADR 0027) and the case it moved, IN ONE
+    /// TRANSACTION — the only way an event reaches the history. Conditioned on
+    /// the version the writer checked (<see cref="LifecycleWrite.ReadAt"/>):
+    /// null when the case is gone or in another firm; <see cref="ConflictException"/>
+    /// with <see cref="CaseRules.StatusMoved"/> when its status or chapter
+    /// moved, or <see cref="CaseLifecycle.HistoryMoved"/> when another event
+    /// landed since (or one shares this event's instant). Nothing is written then.
+    /// </summary>
+    Task<Case?> RecordAsync(LifecycleWrite write, CancellationToken cancellationToken = default);
+
+    /// <summary>Every lifecycle event of one case, oldest first. Case-scoped: the caller resolved the case first.</summary>
+    Task<IReadOnlyList<LifecycleEvent>> LifecycleAsync(string caseId, CancellationToken cancellationToken = default);
 
     /// <summary>Link someone to a case. Idempotent — the admin UI cannot tell whether its first request landed.</summary>
     Task AssignAsync(CaseAssignment assignment, CancellationToken cancellationToken = default);

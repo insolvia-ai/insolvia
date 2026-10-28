@@ -84,19 +84,6 @@ public sealed record Case(
 }
 
 /// <summary>
-/// One move of a case through its lifecycle — who, when, from what to what
-/// (#355). Written in the same transaction as the case record it describes,
-/// so the history cannot disagree with the status.
-/// </summary>
-/// <param name="CaseId">The case.</param>
-/// <param name="ChangedAt">When — the case's own <c>updated_at</c> for that write.</param>
-/// <param name="ChangedBy">Who: a subject, or <see cref="CaseRules.FilingWorkerActor"/>.</param>
-/// <param name="FromStatus">The status before.</param>
-/// <param name="ToStatus">The status after.</param>
-/// <param name="FilingId">The electronic filing that made the move, when one did.</param>
-public sealed record StatusChange(string CaseId, DateTimeOffset ChangedAt, string ChangedBy, CaseStatus FromStatus, CaseStatus ToStatus, string? FilingId = null);
-
-/// <summary>
 /// One person linked to one case. Its own row (not a list on the case), so
 /// linking somebody and making the case appear in their listing are one
 /// write. <see cref="CaseCreatedAt"/> is the CASE's creation, so every
@@ -148,6 +135,12 @@ public sealed record CaseChanges
 
     /// <summary>A new § 341 date.</summary>
     public DateOnly? Meeting341At { get; init; }
+
+    /// <summary>
+    /// The court's date for a status move after filing (<c>effective_on</c>;
+    /// ADR 0027) — today when absent. Only beside <see cref="Status"/>.
+    /// </summary>
+    public DateOnly? EffectiveOn { get; init; }
 
     /// <summary>Clear the petition date.</summary>
     public bool ClearFiledAt { get; init; }

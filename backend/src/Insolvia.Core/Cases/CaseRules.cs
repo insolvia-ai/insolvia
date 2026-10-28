@@ -159,7 +159,7 @@ public static class CaseRules
                 changes = changes with { ClearFiledAt = true };
                 any = true;
             }
-            else if (ParseFormDate(rawFiled, "filed_at", errors) is { } parsed)
+            else if (ParseCourtDate(rawFiled, "filed_at", errors) is { } parsed)
             {
                 filedAt = parsed;
                 changes = changes with { FiledAt = parsed };
@@ -174,11 +174,25 @@ public static class CaseRules
                 changes = changes with { ClearMeeting341At = true };
                 any = true;
             }
-            else if (ParseFormDate(rawMeeting, "meeting_341_at", errors) is { } parsed)
+            else if (ParseCourtDate(rawMeeting, "meeting_341_at", errors) is { } parsed)
             {
                 meetingAt = parsed;
                 changes = changes with { Meeting341At = parsed };
                 any = true;
+            }
+        }
+
+        // A status move's court date (ADR 0027): only beside a status, and
+        // checked against the history by the lifecycle writer, not here.
+        if (payload.TryGetPropertyValue("effective_on", out var rawEffective))
+        {
+            if (!payload.ContainsKey("status"))
+            {
+                errors["effective_on"] = "Only a status move takes an effective date.";
+            }
+            else if (ParseCourtDate(rawEffective, "effective_on", errors) is { } effective)
+            {
+                changes = changes with { EffectiveOn = effective };
             }
         }
 
@@ -288,60 +302,6 @@ public static class CaseRules
         }
 
         return updated with { UpdatedAt = Clock.Now(clock) };
-    }
-
-    /// <summary>
-    /// The history row for a write that moved <paramref name="before"/> to
-    /// <paramref name="after"/>, or null when the status did not move — stamped
-    /// with the case's own <c>updated_at</c>, so the two agree on when.
-    /// </summary>
-    public static StatusChange? StatusChangeFor(Case before, Case after, string changedBy, string? filingId = null)
-    {
-        ArgumentNullException.ThrowIfNull(before);
-        ArgumentNullException.ThrowIfNull(after);
-        return before.Status == after.Status
-            ? null
-            : new StatusChange(after.Id, after.UpdatedAt, changedBy, before.Status, after.Status, filingId);
-    }
-
-    /// <summary>
-    /// The case moved to filed by an electronic filing (ADR 0024 PR 8), through
-    /// <see cref="ApplyChanges"/> — the same move a person's PATCH makes, refused
-    /// where theirs would be. The CALLER checks <see cref="IsFiled"/> first.
-    /// </summary>
-    public static (Case Case, StatusChange Change) FileCase(Case current, string caseNumber, string filedAt, string changedBy, string filingId, TimeProvider? clock = null)
-    {
-        ArgumentNullException.ThrowIfNull(current);
-        ArgumentNullException.ThrowIfNull(caseNumber);
-        if (IsFiled(current.Status))
-        {
-            throw new ConflictException("This case is already filed.");
-        }
-
-        var errors = new Dictionary<string, string>(StringComparer.Ordinal);
-        var date = ParseFormDate(JsonValue.Create(filedAt), "filed_at", errors);
-        if (PyText.Strip(caseNumber).Length == 0)
-        {
-            errors["case_number"] = "A filed case needs its case number.";
-        }
-
-        if (errors.Count > 0)
-        {
-            throw new FieldValidationException(errors);
-        }
-
-        var after = ApplyChanges(
-            current,
-            new CaseChanges
-            {
-                Status = CaseStatus.Filed,
-                FiledAt = date,
-                Texts = new Dictionary<string, string?> { ["case_number"] = PyText.Strip(caseNumber) }.ToValueDictionary(),
-            },
-            clock);
-        var change = StatusChangeFor(current, after, changedBy, filingId)
-            ?? throw new InvalidOperationException("the status moved: not filed -> filed");
-        return (after, change);
     }
 
     /// <summary><c>PUT /v1/cases/&lt;id&gt;/archived</c>'s body: <c>{"archived": true|false}</c>.</summary>
@@ -593,7 +553,7 @@ public static class CaseRules
     /// <c>YYYY-MM-DD</c>, parsed rather than pattern-matched. Unlike
     /// <see cref="FieldParsers.FormDate"/>, a blank string is an error here.
     /// </summary>
-    private static DateOnly? ParseFormDate(JsonNode? value, string field, Dictionary<string, string> errors)
+    internal static DateOnly? ParseCourtDate(JsonNode? value, string field, Dictionary<string, string> errors)
     {
         var raw = Json.AsString(value);
         if (raw is null || PyText.Strip(raw).Length == 0)

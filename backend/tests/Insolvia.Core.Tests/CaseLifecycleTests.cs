@@ -159,11 +159,13 @@ public sealed class CaseLifecycleTests
     {
         var before = ACase();
         var ready = Moved(before, """{"status": "ready_to_file"}""");
-        var change = CaseRules.StatusChangeFor(before, ready, Ids.Alice);
-        Assert.NotNull(change);
-        Assert.Equal((CaseStatus.Intake, CaseStatus.ReadyToFile), (change.FromStatus, change.ToStatus));
-        Assert.Equal(ready.UpdatedAt, change.ChangedAt);
-        Assert.Null(CaseRules.StatusChangeFor(ready, Moved(ready, """{"judge": "X"}"""), Ids.Alice));
+        var write = CaseLifecycle.StatusMove(before, ready, [], Ids.Alice);
+        Assert.NotNull(write);
+        var change = write.Event;
+        Assert.Equal((CaseStatus.Intake, CaseStatus.ReadyToFile), (change.FromStatus!.Value, change.ToStatus!.Value));
+        Assert.Equal(ready.UpdatedAt, change.RecordedAt);
+        Assert.Null(change.EffectiveOn);
+        Assert.Null(CaseLifecycle.StatusMove(ready, Moved(ready, """{"judge": "X"}"""), [], Ids.Alice));
     }
 
     // test_the_history_row_round_trips, test_the_lifecycle_round_trips_the_item_and_reaches_the_wire,
@@ -240,7 +242,7 @@ public sealed class CaseLifecycleTests
         var store = new MemoryCaseStore();
         var (created, assignment) = NewCase();
         await store.CreateAsync(created, assignment, cancellationToken: Ct);
-        await store.UpdateAsync(Moved(created, """{"status": "ready_to_file"}"""), CaseStatus.Intake, cancellationToken: Ct);
+        await store.RecordAsync(CaseLifecycle.StatusMove(created, Moved(created, """{"status": "ready_to_file"}"""), [], Ids.Alice)!, Ct);
         await Assert.ThrowsAsync<ConflictException>(() => store.UpdateAsync(Moved(created, """{"judge": "J"}"""), CaseStatus.Intake, cancellationToken: Ct));
     }
 
@@ -251,8 +253,8 @@ public sealed class CaseLifecycleTests
         var (created, assignment) = NewCase();
         await store.CreateAsync(created, assignment, cancellationToken: Ct);
         var after = Moved(created, """{"status": "ready_to_file"}""");
-        await store.UpdateAsync(after, CaseStatus.Intake, CaseRules.StatusChangeFor(created, after, Ids.Alice), Ct);
-        Assert.Equal([CaseStatus.ReadyToFile], (await store.StatusHistoryAsync(created.Id, Ct)).Select(change => change.ToStatus));
+        await store.RecordAsync(CaseLifecycle.StatusMove(created, after, [], Ids.Alice)!, Ct);
+        Assert.Equal([CaseStatus.ReadyToFile], (await store.LifecycleAsync(created.Id, Ct)).Select(change => change.ToStatus!.Value));
     }
 
     // ── Copy case ───────────────────────────────────────────────────
@@ -318,11 +320,12 @@ public sealed class CaseLifecycleTests
     public void An_electronic_filing_files_the_case_with_its_history_row()
     {
         var ready = ACase() with { Status = CaseStatus.ReadyToFile };
-        var (filed, change) = CaseRules.FileCase(ready, " 8:26-bk-01234 ", "2026-09-01", CaseRules.FilingWorkerActor, "filing-1");
+        var write = CaseLifecycle.FileCase(ready, [], " 8:26-bk-01234 ", "2026-09-01", CaseRules.FilingWorkerActor, "filing-1");
+        var (filed, change) = (write.Case, write.Event);
         Assert.Equal((CaseStatus.Filed, "8:26-bk-01234", new DateOnly(2026, 9, 1)), (filed.Status, filed.CaseNumber, filed.FiledAt!.Value));
-        Assert.Equal(("filing-1", CaseRules.FilingWorkerActor), (change.FilingId, change.ChangedBy));
-        Assert.Throws<ConflictException>(() => CaseRules.FileCase(filed, "8:26-bk-1", "2026-09-01", CaseRules.FilingWorkerActor, "filing-2"));
-        var error = Assert.Throws<FieldValidationException>(() => CaseRules.FileCase(ready, " ", "September", CaseRules.FilingWorkerActor, "filing-3"));
+        Assert.Equal(("filing-1", CaseRules.FilingWorkerActor), (change.FilingId, change.RecordedBy));
+        Assert.Throws<ConflictException>(() => CaseLifecycle.FileCase(filed, [], "8:26-bk-1", "2026-09-01", CaseRules.FilingWorkerActor, "filing-2"));
+        var error = Assert.Throws<FieldValidationException>(() => CaseLifecycle.FileCase(ready, [], " ", "September", CaseRules.FilingWorkerActor, "filing-3"));
         Assert.Equal(["case_number", "filed_at"], error.Fields.Keys.Order(StringComparer.Ordinal));
     }
 

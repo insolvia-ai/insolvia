@@ -42,12 +42,8 @@ public sealed class FilingTests
             Meeting341At = new DateOnly(2099, 2, 20),
         };
 
-    private static FiledCase Filed(Case? current = null)
-    {
-        var before = current ?? MakeCase();
-        var (after, change) = CaseRules.FileCase(before, "6:26-bk-10000", "2099-01-15", CaseRules.FilingWorkerActor, FilingId);
-        return new FiledCase(after, before.Status, change);
-    }
+    private static LifecycleWrite Filed(Case? current = null) =>
+        CaseLifecycle.FileCase(current ?? MakeCase(), [], "6:26-bk-10000", "2099-01-15", CaseRules.FilingWorkerActor, FilingId);
 
     private static (MemoryCaseStore Cases, MemoryFilingStore Store) Stores()
     {
@@ -128,29 +124,35 @@ public sealed class FilingTests
     {
         var write = Filed();
         Assert.Equal((CaseStatus.Filed, "6:26-bk-10000", new DateOnly(2099, 1, 15)), (write.Case.Status, write.Case.CaseNumber, write.Case.FiledAt!.Value));
-        Assert.Equal(CaseStatus.ReadyToFile, write.ExpectedStatus);
-        var change = write.StatusChange;
-        Assert.Equal((CaseStatus.ReadyToFile, CaseStatus.Filed), (change.FromStatus, change.ToStatus));
-        Assert.Equal((CaseRules.FilingWorkerActor, FilingId), (change.ChangedBy, change.FilingId));
-        Assert.Equal(write.Case.UpdatedAt, change.ChangedAt);
+        Assert.Equal(new LifecycleVersion(CaseStatus.ReadyToFile, 7, null), write.ReadAt);
+        var change = write.Event;
+        Assert.Equal((LifecycleEventKind.Status, CaseStatus.ReadyToFile, CaseStatus.Filed), (change.Kind, change.FromStatus!.Value, change.ToStatus!.Value));
+        Assert.Equal((CaseRules.FilingWorkerActor, FilingId, LifecycleProvenance.FilingWorker), (change.RecordedBy, change.FilingId, change.Provenance));
+        Assert.Equal(write.Case.UpdatedAt, change.RecordedAt);
+
+        // ADR 0027: the filed event carries the petition chapter and the petition date.
+        Assert.Equal((7, new DateOnly(2099, 1, 15)), (change.Chapter!.Value, change.EffectiveOn!.Value));
+        Assert.True(write.FilesTheCase);
     }
 
     // test_the_history_row_says_which_filing_and_round_trips: item and JSON; dropped.
 
     [Fact]
     public void A_filed_case_is_not_filed_again() =>
-        Assert.Throws<ConflictException>(() => CaseRules.FileCase(
+        Assert.Throws<ConflictException>(() => CaseLifecycle.FileCase(
             MakeCase() with { Status = CaseStatus.Filed, FiledAt = new DateOnly(2099, 1, 1), CaseNumber = "x" },
+            [],
             "6:26-bk-10000",
             "2099-01-15",
             Attorney,
-            FilingId));
+            FilingId,
+            LifecycleProvenance.Manual));
 
     [Theory]
     [InlineData("", "2099-01-15", "case_number")]
     [InlineData("6:26-bk-1", "15/01/2099", "filed_at")]
     public void A_filing_needs_its_number_and_a_petition_date(string number, string date, string field) =>
-        Assert.Contains(field, Assert.Throws<FieldValidationException>(() => CaseRules.FileCase(MakeCase(), number, date, Attorney, FilingId)).Fields.Keys);
+        Assert.Contains(field, Assert.Throws<FieldValidationException>(() => CaseLifecycle.FileCase(MakeCase(), [], number, date, Attorney, FilingId, LifecycleProvenance.Manual)).Fields.Keys);
 
     // ── The memory store ────────────────────────────────────────────
 
@@ -181,7 +183,7 @@ public sealed class FilingTests
         Assert.True(await store.TransitionAsync(MakeFiling(FilingState.Filed), FilingState.Submitted, Filed(), Ct));
         var filed = cases.Cases[CaseId];
         Assert.Equal((CaseStatus.Filed, "6:26-bk-10000", new DateOnly(2099, 1, 15)), (filed.Status, filed.CaseNumber, filed.FiledAt!.Value));
-        Assert.Equal([FilingId], (await cases.StatusHistoryAsync(CaseId, Ct)).Select(row => row.FilingId));
+        Assert.Equal([FilingId], (await cases.LifecycleAsync(CaseId, Ct)).Select(row => row.FilingId));
         Assert.Equal(FilingState.Filed, (await store.GetAsync(CaseId, FilingId, Ct))!.State);
     }
 
@@ -198,6 +200,7 @@ public sealed class FilingTests
 
     [Theory]
     [InlineData("status")]
+    [InlineData("chapter")]
     [InlineData("firm")]
     [InlineData("deleted")]
     public async Task A_case_that_moved_underneath_writes_nothing_at_all(string moved)
@@ -209,12 +212,42 @@ public sealed class FilingTests
         cases.Put(moved switch
         {
             "status" => current with { Status = CaseStatus.Intake },
+            "chapter" => current with { Chapter = 13 },
             "firm" => current with { FirmId = "another-firm" },
             _ => current with { DeletedAt = Claimed, DeletedBy = "x" },
         });
         Assert.False(await store.TransitionAsync(MakeFiling(FilingState.Filed), FilingState.Submitted, write, Ct));
         Assert.Equal(FilingState.Submitted, (await store.GetAsync(CaseId, FilingId, Ct))!.State);
-        Assert.Empty(await cases.StatusHistoryAsync(CaseId, Ct));
+        Assert.Empty(await cases.LifecycleAsync(CaseId, Ct));
+    }
+
+    [Fact]
+    public async Task An_event_that_landed_since_the_read_refuses_the_filed_write()
+    {
+        var (cases, store) = Stores();
+        await store.ClaimAsync(MakeFiling(FilingState.Submitted), Ct);
+        var write = Filed();
+
+        // Back to intake and forward again: the status is what the worker
+        // read, but the history is not.
+        var ready = cases.Cases[CaseId];
+        var intake = await cases.RecordAsync(CaseLifecycle.StatusMove(ready, ready with { Status = CaseStatus.Intake }, [], Attorney)!, Ct);
+        var history = await cases.LifecycleAsync(CaseId, Ct);
+        await cases.RecordAsync(CaseLifecycle.StatusMove(intake!, intake! with { Status = CaseStatus.ReadyToFile }, history, Attorney)!, Ct);
+
+        Assert.False(await store.TransitionAsync(MakeFiling(FilingState.Filed), FilingState.Submitted, write, Ct));
+        Assert.Equal(CaseStatus.ReadyToFile, cases.Cases[CaseId].Status);
+        Assert.Equal(2, (await cases.LifecycleAsync(CaseId, Ct)).Count);
+    }
+
+    [Fact]
+    public async Task Only_a_move_into_filed_rides_on_a_filing_write()
+    {
+        var (cases, store) = Stores();
+        await store.ClaimAsync(MakeFiling(FilingState.Submitted), Ct);
+        var ready = cases.Cases[CaseId];
+        var back = CaseLifecycle.StatusMove(ready, ready with { Status = CaseStatus.Intake }, [], Attorney)!;
+        await Assert.ThrowsAsync<ArgumentException>(() => store.TransitionAsync(MakeFiling(FilingState.Filed), FilingState.Submitted, back, Ct));
     }
 
     [Fact]
