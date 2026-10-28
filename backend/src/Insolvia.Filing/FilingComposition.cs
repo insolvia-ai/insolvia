@@ -63,10 +63,22 @@ public static class FilingComposition
         services.AddScoped<ITaxIdStore>(provider => new PostgresTaxIdStore(provider.GetRequiredService<InsolviaDbContext>()));
         services.AddScoped<IPacketStore>(provider => new PostgresPacketStore(provider.GetRequiredService<InsolviaDbContext>()));
 
-        var bucket = config.CaseDocumentBucket;
-        services.AddSingleton<IDocumentBlobStore>(_ => new S3DocumentBlobStore(new AmazonS3Client(S3DocumentBlobStore.ClientConfig()), bucket));
-
+        // The region is read from configuration first, for every client here,
+        // so a host given AWS_REGION as configuration (not only in its process
+        // environment) never builds a client with no region.
         var region = read("AWS_REGION") is { Length: > 0 } named ? RegionEndpoint.GetBySystemName(named) : null;
+
+        var bucket = config.CaseDocumentBucket;
+        services.AddSingleton<IDocumentBlobStore>(_ =>
+        {
+            var s3 = S3DocumentBlobStore.ClientConfig();
+            if (region is not null)
+            {
+                s3.RegionEndpoint = region;
+            }
+
+            return new S3DocumentBlobStore(new AmazonS3Client(s3), bucket);
+        });
         if (config.Environment == "local" && read(SealingKeys.FilingKeyVariable) is not { Length: > 0 } && read("CASE_TABLE_NAME") is not { Length: > 0 })
         {
             services.AddSingleton<IFilingCredentialOpener>(new LocalFilingCredentialOpener());

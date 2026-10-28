@@ -285,7 +285,10 @@ public sealed class ConfigTests
             ("INSOLVIA_DB_CONNECTION_STRING", "Host=127.0.0.1;Port=1;Database=insolvia;Username=filing;Password=unused"),
             ("CASE_DOCUMENT_BUCKET", "insolvia-local-case-documents"),
             ("FILING_SUBMISSIONS_ENABLED", "true"),
-            ("FAKE_CMECF_URL", "http://127.0.0.1:8790"));
+            ("FAKE_CMECF_URL", "http://127.0.0.1:8790"),
+            // The local host still talks to the dev bucket, so it needs a
+            // region; the test names one rather than relying on ~/.aws.
+            ("AWS_REGION", "us-east-1"));
         var config = FilingConfig.Load(read);
         using var services = FilingComposition.Services(config, read, new CapturingLog());
         using var scope = services.CreateScope();
