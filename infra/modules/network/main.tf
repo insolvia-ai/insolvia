@@ -85,13 +85,11 @@ resource "aws_vpc" "main" {
   tags = merge(var.tags, { Name = local.name })
 }
 
-# The default security group allows all traffic between its members, and
-# anything created without naming a group lands in it. Adopting it with no
-# rules turns "forgot to name a group" into "cannot talk to anything".
-resource "aws_default_security_group" "main" {
-  vpc_id = aws_vpc.main.id
-  tags   = merge(var.tags, { Name = "${local.name}-default" })
-}
+# The VPC's default security group is deliberately NOT adopted
+# (aws_default_security_group). Adopting it means tagging a group AWS created
+# untagged, and the deploy role can only be allowed that by letting it tag ANY
+# security group in the account. Nothing here uses the default group: the NAT
+# instance, the backend Lambdas and Aurora each name their own.
 
 # ── Subnets ─────────────────────────────────────────────────────
 resource "aws_subnet" "private" {
