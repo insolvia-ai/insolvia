@@ -1,0 +1,11 @@
+{
+  "series_id": "form/b113",
+  "effective_date": "2017-12-01",
+  "sequence": 1,
+  "source": {
+    "url": "https://www.uscourts.gov/sites/default/files/b_113_1217_0.pdf",
+    "published": null,
+    "sha256": "633e8d822cc749e4e97994cf7b9a0c42958517782635286befab13e97a1bdbd1"
+  },
+  "notes": "Official Form 113, Chapter 13 Plan, printed revision 12/17 (current as of ingestion 2026-09-26; the form page states effective December 1, 2017 and the PDF prints 12/17 beside the title — the two agree). template.pdf is the official PDF vendored verbatim from uscourts.gov, fetched twice with identical digests (sha256 above; the loader re-hashes it). A FLAT release: the PDF has no AcroForm, so spec.json claims overlay boxes measured from the page's own text operators (the printed underscores) and the rasterised box glyphs, and the fill engine draws onto an appended content stream, leaving the official page streams untouched; the table cells' boxes carry their own point size. spec.json and acroform.json are the issue-367 field spec and (empty) AcroForm dump for this revision, copied from forms/ at ingestion — tests/test_form_templates.py refuses drift between the copies and forms/ while this is the current revision. A district that has replaced this form under Bankruptcy Rule 3015.1 is recorded on the court registry, not here."
+}

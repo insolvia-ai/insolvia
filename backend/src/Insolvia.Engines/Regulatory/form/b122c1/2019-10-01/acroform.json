@@ -1,0 +1,723 @@
+{
+ "form": "b122c1",
+ "official_number": "122C-1",
+ "title": "Chapter 13 Statement of Your Current Monthly Income and Calculation of Commitment Period",
+ "revision": "10/19",
+ "effective_date": "2019-10-01",
+ "source": {
+  "page_url": "https://www.uscourts.gov/forms-rules/forms/chapter-13-statement-your-current-monthly-income-and-calculation-commitment-period-0",
+  "pdf_url": "https://www.uscourts.gov/sites/default/files/form_b122c-1.pdf",
+  "pdf_sha256": "97dfdda0e74b33d7c2d8466e6722651766526ca4dcb0ca80d8d4a127b8af0b73",
+  "retrieved": "2026-09-26"
+ },
+ "pages": 4,
+ "field_count": 71,
+ "fields": [
+  {
+   "name": "Debtor 2",
+   "kind": "text",
+   "tooltip": "Debtor 2",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Bankruptcy District Information",
+   "kind": "choice",
+   "tooltip": "District Information",
+   "pages": [
+    1
+   ],
+   "options": [
+    " ",
+    "__________ District of __________",
+    "Middle District of Alabama",
+    "Northern District of Alabama",
+    "Southern District of Alabama",
+    "District of Alaska",
+    "District of Arizona",
+    "Eastern and Western District of Arkansas",
+    "Central District of California",
+    "Eastern District of California",
+    "Northern District of California",
+    "Southern District of California",
+    "District of Colorado",
+    "District of Connecticut",
+    "District of Columbia",
+    "District of Delaware",
+    "Middle District of Florida",
+    "Northern District of Florida",
+    "Southern District of Florida",
+    "Middle District of Georgia",
+    "Northern District of Georgia ",
+    "Southern District of Georgia ",
+    "District of Guam",
+    "District of Hawaii",
+    "District of Idaho",
+    "Central District of Illinois",
+    "Northern District of Illinois",
+    "Southern District of Illinois",
+    "Northern District of Indiana",
+    "Southern District of Indiana",
+    "Northern District of Iowa",
+    "Southern District of Iowa",
+    "District of Kansas",
+    "Eastern District of Kentucky",
+    "Western District of Kentucky",
+    "Eastern District of Louisiana",
+    "Middle District of Louisiana",
+    "Western District of Louisiana",
+    "District of Maine",
+    "District of Maryland",
+    "District of Massachusetts",
+    "District of Montana",
+    "Eastern District of Michigan",
+    "Western District of Michigan",
+    "District of Minnesota",
+    "Northern District of Mississippi",
+    "Southern District of Mississippi",
+    "Eastern District of Missouri",
+    "Western District of Missouri",
+    "District of Nebraska",
+    "District of Nevada",
+    "District of New Hampshire",
+    "District of New Jersey",
+    "District of New Mexico",
+    "Eastern District of New York",
+    "Northern District of New York",
+    "Southern District of New York",
+    "Western District of New York",
+    "Eastern District of North Carolina",
+    "Middle District of North Carolina",
+    "Western District of North Carolina",
+    "District of North Dakota",
+    "District of Northern Mariana Islands",
+    "Northern District of Ohio",
+    "Southern District of Ohio",
+    "Eastern District of Oklahoma",
+    "Northern District of Oklahoma",
+    "Western District of Oklahoma",
+    "District of Oregon",
+    "Eastern District of Pennsylvania",
+    "Middle District of Pennsylvania",
+    "Western District of Pennsylvania",
+    "District of Puerto Rico",
+    "District of Rhode Island",
+    "District of South Carolina",
+    "District of South Dakota",
+    "Eastern District of Tennessee",
+    "Middle District of Tennessee",
+    "Western District of Tennessee",
+    "Eastern District of Texas",
+    "Northern District of Texas",
+    "Southern District of Texas",
+    "Western District of Texas",
+    "District of Utah",
+    "District of Vermont",
+    "District of Virgin Islands",
+    "Eastern District of Virginia",
+    "Western District of Virginia",
+    "Eastern District of Washington",
+    "Western District of Washington",
+    "Northern District of West Virginia",
+    "Southern District of West Virginia",
+    "Eastern District of Wisconsin",
+    "Western District of Wisconsin",
+    "District of Wyoming"
+   ]
+  },
+  {
+   "name": "check1",
+   "kind": "checkbox",
+   "tooltip": "Not married. Fill out Column A, lines 2-11",
+   "pages": [
+    1
+   ],
+   "states": [
+    "married",
+    "single"
+   ]
+  },
+  {
+   "name": "undefined_12",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "check",
+   "kind": "checkbox",
+   "tooltip": "2. Disposable income is determined",
+   "pages": [
+    1
+   ],
+   "states": [
+    "1",
+    "2"
+   ]
+  },
+  {
+   "name": "check2",
+   "kind": "checkbox",
+   "tooltip": "2. Disposable income is determined",
+   "pages": [
+    1
+   ],
+   "states": [
+    "3",
+    "4"
+   ]
+  },
+  {
+   "name": "Check if this is an amended filing",
+   "kind": "checkbox",
+   "tooltip": "Check if this is an amended filing",
+   "pages": [
+    1
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "undefined",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "undefined_11",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "undefined_2",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "undefined_10.1",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "undefined_10.0",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "undefined_3",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "undefined_13",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "undefined_4.0",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "undefined_4.1",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "undefined_5.0",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "undefined_5.1",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "undefined_6.0",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "undefined_6.1",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "undefined_8.0",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "undefined_8.1",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "undefined_9.0",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "undefined_9.1",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Debtor 1",
+   "kind": "text",
+   "tooltip": "Debtor 1",
+   "pages": [
+    1,
+    2,
+    3,
+    4
+   ]
+  },
+  {
+   "name": "undefined_20",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "undefined_21",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "10a",
+   "kind": "text",
+   "tooltip": "10a",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "10b",
+   "kind": "text",
+   "tooltip": "10b",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "check13",
+   "kind": "checkbox",
+   "tooltip": "You are married and your spouse is filing with you. Fill in 0 in line 13d",
+   "pages": [
+    2
+   ],
+   "states": [
+    "3",
+    "1",
+    "2"
+   ]
+  },
+  {
+   "name": "Case number",
+   "kind": "text",
+   "tooltip": "Case number",
+   "pages": [
+    1,
+    2,
+    3,
+    4
+   ]
+  },
+  {
+   "name": "undefined_16",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "undefined_17",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "undefined_18",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "undefined_19",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "undefined_22",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "undefined_23",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "undefined_24",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "undefined_25",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "undefined_26",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "undefined_27",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "undefined_28",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "undefined_29",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "undefined_30",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "undefined_31",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "undefined_32",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    2,
+    3
+   ]
+  },
+  {
+   "name": "13a",
+   "kind": "text",
+   "tooltip": "13a",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "undefined_34",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "13b",
+   "kind": "text",
+   "tooltip": "13b",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "undefined_35",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "13c",
+   "kind": "text",
+   "tooltip": "13c",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "undefined_36",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "undefined_37",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "undefined_38",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    2,
+    3
+   ]
+  },
+  {
+   "name": "undefined_40",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    2,
+    3
+   ]
+  },
+  {
+   "name": "Button.Print1",
+   "kind": "pushbutton",
+   "tooltip": "Opens Print Menu",
+   "pages": [
+    3,
+    4
+   ]
+  },
+  {
+   "name": "Button.Reset",
+   "kind": "pushbutton",
+   "tooltip": "Resets the entire form",
+   "pages": [
+    3,
+    4
+   ]
+  },
+  {
+   "name": "Button.SaveAs",
+   "kind": "pushbutton",
+   "tooltip": "Allows you to give the file a new name when saving",
+   "pages": [
+    3,
+    4
+   ]
+  },
+  {
+   "name": "16 Calculate the median family income that applies to you Follow these steps",
+   "kind": "text",
+   "tooltip": "16. Calculate the median family income that applies to you. Follow these steps",
+   "pages": [
+    3
+   ]
+  },
+  {
+   "name": "Fill in the number of people in your household",
+   "kind": "text",
+   "tooltip": "Fill in the number of people in your household",
+   "pages": [
+    3
+   ]
+  },
+  {
+   "name": "check17",
+   "kind": "checkbox",
+   "tooltip": "17a",
+   "pages": [
+    3
+   ],
+   "states": [
+    "17a",
+    "17b"
+   ]
+  },
+  {
+   "name": "check21",
+   "kind": "checkbox",
+   "tooltip": "Line 20b is less than line 20c. Unless otherwise ordered by the court, on the top of page 1 of this form, check box 3, The commitment period is",
+   "pages": [
+    3
+   ],
+   "states": [
+    "yes",
+    "no"
+   ]
+  },
+  {
+   "name": "undefined_41",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    3
+   ]
+  },
+  {
+   "name": "fill_7",
+   "kind": "text",
+   "tooltip": "─",
+   "pages": [
+    3
+   ]
+  },
+  {
+   "name": "undefined_43",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    3
+   ]
+  },
+  {
+   "name": "undefined_45",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    3
+   ]
+  },
+  {
+   "name": "undefined_48",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    4
+   ]
+  },
+  {
+   "name": "Date",
+   "kind": "text",
+   "tooltip": "Date",
+   "pages": [
+    4
+   ]
+  },
+  {
+   "name": "undefined_47",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    4
+   ]
+  },
+  {
+   "name": "Date_2",
+   "kind": "text",
+   "tooltip": "Date",
+   "pages": [
+    4
+   ]
+  },
+  {
+   "name": "attach",
+   "kind": "pushbutton",
+   "tooltip": "Attach a file",
+   "pages": [
+    3,
+    4
+   ]
+  }
+ ]
+}

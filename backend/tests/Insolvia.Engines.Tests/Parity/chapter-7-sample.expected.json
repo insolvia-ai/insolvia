@@ -1,0 +1,1134 @@
+{
+ "creditor_matrix": {
+  "value": {
+   "content": "Example Card Services (fictitious)\r\nPO Box 4100\r\nOrlando, FL 32801\r\n\r\nExample Community Bank (fictitious)\r\n1 Example Plaza\r\nTampa, FL 33602\r\n",
+   "creditorCount": 2,
+   "duplicatesOmitted": 0,
+   "fileName": "creditor-matrix.txt",
+   "problems": []
+  }
+ },
+ "exemptions": {
+  "value": {
+   "asOf": "2026-08-03",
+   "asOfSource": "expected_filing_date",
+   "assets": [],
+   "election": {
+    "effective": "state_and_federal_nonbankruptcy",
+    "optOutCitation": "Fla. Stat. § 222.20",
+    "optedOut": true,
+    "options": [
+     {
+      "name": "Florida exemptions (Fla. Const. art. X, § 4; Fla. Stat. ch. 222)",
+      "schemeId": "fl",
+      "value": "state_and_federal_nonbankruptcy"
+     }
+    ],
+    "state": "FL",
+    "stored": null
+   },
+   "entries": [
+    {
+     "available": null,
+     "carryover": null,
+     "category": "homestead",
+     "citation": "Fla. Const. art. X, § 4(a)(1); Fla. Stat. §§ 222.01-222.02",
+     "claimed": "0.00",
+     "description": "Homestead: residence of the owner or owner's family — unlimited value; limited to 1/2 acre of contiguous land within a municipality or 160 contiguous acres outside one",
+     "entryId": "fl-homestead",
+     "limit": null,
+     "notes": "Value-unlimited but acreage-limited. Subject in bankruptcy to 11 U.S.C. § 522(p)/(q) caps for recently acquired or misconduct-tainted homesteads. The flsenate.gov constitution page could not be machine-read at build time; text verified against mirrors — re-verify against the official page before first filing.",
+     "perItemAmount": null,
+     "unlimited": true
+    },
+    {
+     "available": "1000.00",
+     "carryover": null,
+     "category": "personal_property",
+     "citation": "Fla. Const. art. X, § 4(a)(2)",
+     "claimed": "0.00",
+     "description": "Personal property of any kind",
+     "entryId": "fl-personal-property",
+     "limit": "1000.00",
+     "notes": "Constitutional figure, unchanged since the 1968 revision; doubles in practice for joint filers as each spouse claims it. Same build-time mirror caveat as fl-homestead.",
+     "perItemAmount": null,
+     "unlimited": false
+    },
+    {
+     "available": "5000.00",
+     "carryover": null,
+     "category": "vehicle",
+     "citation": "Fla. Stat. § 222.25(1)",
+     "claimed": "0.00",
+     "description": "A single motor vehicle",
+     "entryId": "fl-vehicle",
+     "limit": "5000.00",
+     "notes": "Raised from $1,000.00 by ch. 2024-110, eff. 2024-07-01. A case filed before that date needs the old figure; none can still be prepared in this product, so the historical row is omitted.",
+     "perItemAmount": null,
+     "unlimited": false
+    },
+    {
+     "available": null,
+     "carryover": null,
+     "category": "health_aids",
+     "citation": "Fla. Stat. § 222.25(2)",
+     "claimed": "0.00",
+     "description": "Professionally prescribed health aids for the debtor or a dependent",
+     "entryId": "fl-health-aids",
+     "limit": null,
+     "notes": "",
+     "perItemAmount": null,
+     "unlimited": true
+    },
+    {
+     "available": "4000.00",
+     "carryover": null,
+     "category": "wildcard",
+     "citation": "Fla. Stat. § 222.25(4)",
+     "claimed": "0.00",
+     "description": "Personal property of any kind — ONLY if the debtor does not claim or receive the benefit of the homestead exemption",
+     "entryId": "fl-wildcard-no-homestead",
+     "limit": "4000.00",
+     "notes": "Conditional, not a carryover: available instead of, never alongside, the homestead benefit. Enacted 2007; amendment date of the current figure not separately verified — the figure itself is the current statute text.",
+     "perItemAmount": null,
+     "unlimited": false
+    },
+    {
+     "available": null,
+     "carryover": null,
+     "category": "wages",
+     "citation": "Fla. Stat. § 222.11",
+     "claimed": "0.00",
+     "description": "Disposable earnings of a head of family (provides more than half the support of a child or other dependent)",
+     "entryId": "fl-wages-head-of-family",
+     "limit": null,
+     "notes": "No flat cap: earnings <= $750.00/week are fully exempt; above that, exempt absent a written waiver (14-point type, separate document). Non-head-of-family earnings get only federal CCPA limits (15 U.S.C. § 1673). Exemption follows earnings into a bank account for 6 months if traceable.",
+     "perItemAmount": null,
+     "unlimited": false
+    },
+    {
+     "available": null,
+     "carryover": null,
+     "category": "life_insurance",
+     "citation": "Fla. Stat. § 222.14",
+     "claimed": "0.00",
+     "description": "Cash surrender value of life insurance policies and proceeds of annuity contracts issued to Florida residents",
+     "entryId": "fl-life-insurance-annuities",
+     "limit": null,
+     "notes": "Not exempt against a creditor the policy or contract was effected for the benefit of.",
+     "perItemAmount": null,
+     "unlimited": true
+    },
+    {
+     "available": null,
+     "carryover": null,
+     "category": "retirement",
+     "citation": "Fla. Stat. § 222.21(2)",
+     "claimed": "0.00",
+     "description": "Assets in tax-qualified retirement plans and accounts (IRC §§ 401(a), 403(a)/(b), 408, 408A, 409, 414, 457(b), 501(a)), including inherited IRAs",
+     "entryId": "fl-retirement",
+     "limit": null,
+     "notes": "Last substantively amended by ch. 2022-167.",
+     "perItemAmount": null,
+     "unlimited": true
+    }
+   ],
+   "limits": [
+    {
+     "amount": "8575.00",
+     "citation": "11 U.S.C. § 522(f)(3)",
+     "description": "Cap on lien avoidance against implements, professional books, tools of the trade, farm animals, and crops",
+     "limitId": "us-lien-avoidance-tools"
+    },
+    {
+     "amount": "900.00",
+     "citation": "11 U.S.C. § 522(f)(4)",
+     "description": "Per-item value above which household goods fall outside the nonpossessory, nonpurchase-money lien avoidance definition",
+     "limitId": "us-lien-avoidance-household"
+    },
+    {
+     "amount": "1711975.00",
+     "citation": "11 U.S.C. § 522(n)",
+     "description": "Aggregate cap on exempt traditional and Roth IRA assets (rollovers excluded), applicable under every scheme",
+     "limitId": "us-ira-cap"
+    },
+    {
+     "amount": "214000.00",
+     "citation": "11 U.S.C. § 522(p)",
+     "description": "Cap on the homestead interest a debtor may exempt in property acquired within 1,215 days before filing — binds even under unlimited state homesteads (FL, TX); pairs with the exemption entity's acquired_within_1215_days fact",
+     "limitId": "us-homestead-1215-day-cap"
+    },
+    {
+     "amount": "214000.00",
+     "citation": "11 U.S.C. § 522(q)",
+     "description": "Homestead cap where the debtor has certain felony convictions or debts from securities fraud or similar misconduct — the question 106C asks every filer",
+     "limitId": "us-homestead-misconduct-cap"
+    }
+   ],
+   "lookbacks": {
+    "domicilePeriodStart": "2024-08-03",
+    "section522o": "2016-08-03",
+    "section522p": "2023-04-06",
+    "section522q": "2021-08-03"
+   },
+   "problems": [],
+   "warnings": []
+  }
+ },
+ "forms": {
+  "form/b101": {
+   "value": {
+    "caption.chapter": {
+     "option": "Chapter 7"
+    },
+    "caption.district": {
+     "text": "Middle District of Florida"
+    },
+    "caption.header_debtor1_name": {
+     "text": "Sample Debtor"
+    },
+    "line_10_related_pending": {
+     "option": "No"
+    },
+    "line_11_eviction_judgment": {
+     "option": "No"
+    },
+    "line_11_rents_residence": {
+     "option": "Yes"
+    },
+    "line_12_sole_proprietor": {
+     "option": "No"
+    },
+    "line_13_small_business_status": {
+     "option": "Not filing under Chapter 11"
+    },
+    "line_14_hazardous_property": {
+     "option": "No"
+    },
+    "line_16a_consumer_debts": {
+     "option": "Yes"
+    },
+    "line_17_filing_under_ch7": {
+     "option": "Yes"
+    },
+    "line_17_funds_available": {
+     "option": "No"
+    },
+    "line_18_estimated_creditors": {
+     "option": "1-49"
+    },
+    "line_19_estimated_assets": {
+     "option": "0-50000"
+    },
+    "line_1_debtor1_first_name": {
+     "text": "Sample"
+    },
+    "line_1_debtor1_last_name": {
+     "text": "Debtor"
+    },
+    "line_20_estimated_liabilities": {
+     "option": "0-50000"
+    },
+    "line_3_debtor1_ssn_last4": {
+     "text": "4321"
+    },
+    "line_5_debtor1_city": {
+     "text": "Tampa"
+    },
+    "line_5_debtor1_county": {
+     "text": "Hillsborough"
+    },
+    "line_5_debtor1_state": {
+     "text": "FL"
+    },
+    "line_5_debtor1_street": {
+     "text": "123 Fixture Street"
+    },
+    "line_5_debtor1_zip": {
+     "text": "33602"
+    },
+    "line_8_fee_handling": {
+     "option": "Pay entirely"
+    },
+    "line_9_prior_bankruptcy": {
+     "option": "No"
+    },
+    "prose.paid_preparer": {
+     "option": "no"
+    }
+   }
+  },
+  "form/b106ab": {
+   "value": {
+    "caption.debtor1_name": {
+     "text": "Sample Debtor"
+    },
+    "caption.district": {
+     "text": "Middle District of Florida"
+    },
+    "line_10_gate": {
+     "option": "no"
+    },
+    "line_11_gate": {
+     "option": "no"
+    },
+    "line_12_gate": {
+     "option": "no"
+    },
+    "line_13_gate": {
+     "option": "no"
+    },
+    "line_14_gate": {
+     "option": "no"
+    },
+    "line_15_part3_total": {
+     "text": "0.00"
+    },
+    "line_16_gate": {
+     "option": "no"
+    },
+    "line_17_gate": {
+     "option": "no"
+    },
+    "line_18_gate": {
+     "option": "no"
+    },
+    "line_19_gate": {
+     "option": "no"
+    },
+    "line_1_any_real_estate": {
+     "option": "On"
+    },
+    "line_20_gate": {
+     "option": "no"
+    },
+    "line_21_gate": {
+     "option": "no"
+    },
+    "line_22_gate": {
+     "option": "no"
+    },
+    "line_23_gate": {
+     "option": "no"
+    },
+    "line_24_gate": {
+     "option": "no"
+    },
+    "line_25_gate": {
+     "option": "no"
+    },
+    "line_26_gate": {
+     "option": "no"
+    },
+    "line_27_gate": {
+     "option": "no"
+    },
+    "line_28_gate": {
+     "option": "no"
+    },
+    "line_29_gate": {
+     "option": "no"
+    },
+    "line_2_part1_total": {
+     "text": "0.00"
+    },
+    "line_30_gate": {
+     "option": "no"
+    },
+    "line_31_gate": {
+     "option": "no"
+    },
+    "line_32_gate": {
+     "option": "no"
+    },
+    "line_33_gate": {
+     "option": "no"
+    },
+    "line_34_gate": {
+     "option": "no"
+    },
+    "line_35_gate": {
+     "option": "no"
+    },
+    "line_36_part4_total": {
+     "text": "0.00"
+    },
+    "line_37_gate": {
+     "option": "no"
+    },
+    "line_38_gate": {
+     "option": "no"
+    },
+    "line_39_gate": {
+     "option": "no"
+    },
+    "line_3_any_vehicles": {
+     "option": "no"
+    },
+    "line_40_gate": {
+     "option": "no"
+    },
+    "line_41_gate": {
+     "option": "no"
+    },
+    "line_42_gate": {
+     "option": "no"
+    },
+    "line_43_gate": {
+     "option": "no"
+    },
+    "line_44_gate": {
+     "option": "no"
+    },
+    "line_45_part5_total": {
+     "text": "0.00"
+    },
+    "line_46_gate": {
+     "option": "no"
+    },
+    "line_47_gate": {
+     "option": "no"
+    },
+    "line_48_gate": {
+     "option": "no"
+    },
+    "line_49_gate": {
+     "option": "no"
+    },
+    "line_4_any_other_vehicles": {
+     "option": "No_2"
+    },
+    "line_50_gate": {
+     "option": "no"
+    },
+    "line_51_gate": {
+     "option": "no"
+    },
+    "line_52_part6_total": {
+     "text": "0.00"
+    },
+    "line_53_gate": {
+     "option": "no"
+    },
+    "line_54_part7_total": {
+     "text": "0.00"
+    },
+    "line_55_total": {
+     "text": "0.00"
+    },
+    "line_56_total": {
+     "text": "0.00"
+    },
+    "line_57_total": {
+     "text": "0.00"
+    },
+    "line_58_total": {
+     "text": "0.00"
+    },
+    "line_59_total": {
+     "text": "0.00"
+    },
+    "line_5_part2_total": {
+     "text": "0.00"
+    },
+    "line_60_total": {
+     "text": "0.00"
+    },
+    "line_61_total": {
+     "text": "0.00"
+    },
+    "line_62_total_personal_property": {
+     "text": "0.00"
+    },
+    "line_63_total_all_property": {
+     "text": "0.00"
+    },
+    "line_6_gate": {
+     "option": "no"
+    },
+    "line_7_gate": {
+     "option": "no"
+    },
+    "line_8_gate": {
+     "option": "no"
+    },
+    "line_9_gate": {
+     "option": "no"
+    }
+   }
+  },
+  "form/b106c": {
+   "value": {
+    "caption.debtor1_name": {
+     "text": "Sample Debtor"
+    },
+    "caption.district": {
+     "text": "Middle District of Florida"
+    },
+    "line_1_exemption_set": {
+     "option": "state and federal"
+    },
+    "line_3_homestead_over_cap": {
+     "option": "no"
+    }
+   }
+  },
+  "form/b106d": {
+   "value": {
+    "caption.debtor1_name": {
+     "text": "Sample Debtor"
+    },
+    "caption.district": {
+     "text": "Middle District of Florida"
+    },
+    "line_1_any_secured_claims": {
+     "option": "no"
+    }
+   }
+  },
+  "form/b106dec": {
+   "value": {
+    "caption.debtor1_name": {
+     "text": "Sample Debtor"
+    },
+    "caption.district": {
+     "text": "Middle District of Florida"
+    },
+    "paid_nonattorney_preparer": {
+     "option": "no"
+    }
+   }
+  },
+  "form/b106ef": {
+   "value": {
+    "caption.debtor1_name": {
+     "text": "Sample Debtor"
+    },
+    "caption.district": {
+     "text": "Middle District of Florida"
+    },
+    "line_1_any_priority_claims": {
+     "option": "no"
+    },
+    "line_3_any_nonpriority_claims": {
+     "option": "no"
+    },
+    "line_6a_total": {
+     "text": "0.00"
+    },
+    "line_6b_total": {
+     "text": "0.00"
+    },
+    "line_6c_total": {
+     "text": "0.00"
+    },
+    "line_6d_total": {
+     "text": "0.00"
+    },
+    "line_6e_total": {
+     "text": "0.00"
+    },
+    "line_6f_total": {
+     "text": "0.00"
+    },
+    "line_6g_total": {
+     "text": "0.00"
+    },
+    "line_6h_total": {
+     "text": "0.00"
+    },
+    "line_6i_total": {
+     "text": "0.00"
+    },
+    "line_6j_total": {
+     "text": "0.00"
+    }
+   }
+  },
+  "form/b106g": {
+   "value": {
+    "caption.debtor1_name": {
+     "text": "Sample Debtor"
+    },
+    "caption.district": {
+     "text": "Middle District of Florida"
+    },
+    "line_1_any_contracts": {
+     "option": "no"
+    }
+   }
+  },
+  "form/b106h": {
+   "value": {
+    "caption.debtor1_name": {
+     "text": "Sample Debtor"
+    },
+    "caption.district": {
+     "text": "Middle District of Florida"
+    },
+    "line_1_any_codebtors": {
+     "option": "no"
+    },
+    "line_2_lived_in_community_state": {
+     "option": "no"
+    }
+   }
+  },
+  "form/b106i": {
+   "value": {
+    "caption.debtor1_name": {
+     "text": "Sample Debtor"
+    },
+    "caption.district": {
+     "text": "Middle District of Florida"
+    }
+   }
+  },
+  "form/b106j": {
+   "value": {
+    "caption.debtor1_name": {
+     "text": "Sample Debtor"
+    },
+    "caption.district": {
+     "text": "Middle District of Florida"
+    },
+    "line_1_joint_case": {
+     "option": "no"
+    },
+    "line_22a_total_expenses": {
+     "text": "0.00"
+    },
+    "line_22c_monthly_expenses": {
+     "text": "0.00"
+    },
+    "line_23a_combined_monthly_income": {
+     "text": "0.00"
+    },
+    "line_23b_monthly_expenses": {
+     "text": "0.00"
+    },
+    "line_23c_net_income": {
+     "text": "0.00"
+    }
+   }
+  },
+  "form/b106j2": {
+   "value": {
+    "caption.debtor1_name": {
+     "text": "Sample Debtor"
+    },
+    "caption.district": {
+     "text": "Middle District of Florida"
+    },
+    "line_1_separate_households": {
+     "option": "no"
+    }
+   }
+  },
+  "form/b106sum": {
+   "value": {
+    "caption.debtor1_name": {
+     "text": "Sample Debtor"
+    },
+    "caption.district": {
+     "text": "Middle District of Florida"
+    },
+    "line_1a_total_real_estate": {
+     "text": "0.00"
+    },
+    "line_1b_total_personal_property": {
+     "text": "0.00"
+    },
+    "line_1c_total_property": {
+     "text": "0.00"
+    },
+    "line_2_secured_claims_total": {
+     "text": "0.00"
+    },
+    "line_3_total_liabilities": {
+     "text": "0.00"
+    },
+    "line_3a_priority_unsecured_total": {
+     "text": "0.00"
+    },
+    "line_3b_nonpriority_unsecured_total": {
+     "text": "0.00"
+    },
+    "line_4_combined_monthly_income": {
+     "text": "0.00"
+    },
+    "line_5_monthly_expenses": {
+     "text": "0.00"
+    },
+    "line_6_filing_under_7_11_13": {
+     "option": "yes"
+    },
+    "line_7_kind_of_debt": {
+     "option": "consumer"
+    },
+    "line_9a_domestic_support": {
+     "text": "0.00"
+    },
+    "line_9b_taxes_government": {
+     "text": "0.00"
+    },
+    "line_9c_intoxicated_injury": {
+     "text": "0.00"
+    },
+    "line_9d_student_loans": {
+     "text": "0.00"
+    },
+    "line_9e_separation_divorce": {
+     "text": "0.00"
+    },
+    "line_9f_pension_profit_sharing": {
+     "text": "0.00"
+    },
+    "line_9g_total": {
+     "text": "0.00"
+    }
+   }
+  },
+  "form/b107": {
+   "value": {
+    "caption.debtor1_name": {
+     "text": "Sample Debtor"
+    },
+    "caption.district": {
+     "text": "Middle District of Florida"
+    },
+    "q10_gate": {
+     "option": "no"
+    },
+    "q11_gate": {
+     "option": "no"
+    },
+    "q12_assignee": {
+     "option": "no"
+    },
+    "q13_gate": {
+     "option": "no"
+    },
+    "q14_gate": {
+     "option": "no"
+    },
+    "q15_gate": {
+     "option": "no"
+    },
+    "q16_gate": {
+     "option": "no"
+    },
+    "q17_gate": {
+     "option": "no"
+    },
+    "q18_gate": {
+     "option": "no"
+    },
+    "q19_gate": {
+     "option": "no"
+    },
+    "q20_gate": {
+     "option": "no"
+    },
+    "q21_gate": {
+     "option": "no"
+    },
+    "q22_gate": {
+     "option": "no"
+    },
+    "q23_gate": {
+     "option": "no"
+    },
+    "q24_gate": {
+     "option": "no"
+    },
+    "q25_gate": {
+     "option": "no"
+    },
+    "q26_gate_and_status": {
+     "option": "no"
+    },
+    "q27_gate": {
+     "option": "no"
+    },
+    "q28_gate": {
+     "option": "no"
+    },
+    "q2_gate": {
+     "option": "no"
+    },
+    "q3_community_property": {
+     "option": "no"
+    },
+    "q4_gate": {
+     "option": "no"
+    },
+    "q5_gate": {
+     "check": true
+    },
+    "q6_consumer_debts": {
+     "option": "yes"
+    },
+    "q6_paid_600": {
+     "option": "no"
+    },
+    "q7_gate": {
+     "option": "no"
+    },
+    "q8_gate": {
+     "option": "no"
+    },
+    "q9_gate": {
+     "option": "no"
+    },
+    "sign.paid_preparer": {
+     "option": "no"
+    }
+   }
+  },
+  "form/b108": {
+   "value": {
+    "caption.debtor1_name": {
+     "text": "Sample Debtor"
+    },
+    "caption.district": {
+     "text": "Middle District of Florida"
+    }
+   }
+  },
+  "form/b113": {
+   "value": {
+    "caption.debtor1_name": {
+     "text": "Sample Debtor"
+    },
+    "caption.district": {
+     "rows": {
+      "district.1": {
+       "text": "Middle"
+      },
+      "district.2": {
+       "text": "Florida"
+      }
+     }
+    },
+    "header.debtor_name": {
+     "rows": {
+      "header.debtor.p2": {
+       "text": "Sample Debtor"
+      },
+      "header.debtor.p3": {
+       "text": "Sample Debtor"
+      },
+      "header.debtor.p4": {
+       "text": "Sample Debtor"
+      },
+      "header.debtor.p5": {
+       "text": "Sample Debtor"
+      },
+      "header.debtor.p6": {
+       "text": "Sample Debtor"
+      },
+      "header.debtor.p7": {
+       "text": "Sample Debtor"
+      },
+      "header.debtor.p8": {
+       "text": "Sample Debtor"
+      }
+     }
+    }
+   }
+  },
+  "form/b121": {
+   "value": {
+    "caption.district": {
+     "text": "Middle District of Florida"
+    },
+    "line_1_debtor1_first_name": {
+     "text": "Sample"
+    },
+    "line_1_debtor1_last_name": {
+     "text": "Debtor"
+    },
+    "line_2_debtor1_ssn": {
+     "rows": {
+      "Debtor1a.SSNum": {
+       "text": "987-65-4321"
+      }
+     }
+    }
+   }
+  },
+  "form/b122a1": {
+   "value": {
+    "caption.debtor1_name": {
+     "text": "Sample Debtor"
+    },
+    "caption.district": {
+     "text": "Middle District of Florida"
+    },
+    "marital_filing_status": {
+     "option": "Not married"
+    }
+   }
+  },
+  "form/b122a2": {
+   "problems": [
+    "the debtor's annualized income is below the applicable median — Form 122A-2 is not filed (B122A-1 line 14a)"
+   ]
+  },
+  "form/b122c1": {
+   "problems": [
+    "Form 122C-1 is the Chapter 13 statement of current monthly income — this is a Chapter 7 case"
+   ]
+  },
+  "form/b122c2": {
+   "problems": [
+    "Form 122C-2 is the Chapter 13 disposable-income calculation — this is a Chapter 7 case"
+   ]
+  },
+  "form/b2010": {
+   "value": {}
+  },
+  "form/b2030": {
+   "value": {
+    "caption.chapter": {
+     "text": "7"
+    },
+    "caption.debtor1_name": {
+     "text": "Sample Debtor"
+    },
+    "caption.district": {
+     "rows": {
+      "district.1": {
+       "text": "Middle"
+      },
+      "district.2": {
+       "text": "Florida"
+      }
+     }
+    }
+   }
+  }
+ },
+ "liens": {
+  "value": {
+   "assets": [],
+   "claims": []
+  }
+ },
+ "means_test": {
+  "value": {
+   "asOf": "2026-08-03",
+   "asOfSource": "petition.expected_filing_date",
+   "chapter": 7,
+   "chapter13": null,
+   "cmi": {
+    "annualized": "0.00",
+    "columns": [],
+    "combinedMonthlyTotal": "0.00",
+    "gaps": [],
+    "problems": [],
+    "window": {
+     "end": "2026-07-31",
+     "filingDate": "2026-08-03",
+     "months": [
+      "2026-02",
+      "2026-03",
+      "2026-04",
+      "2026-05",
+      "2026-06",
+      "2026-07"
+     ],
+     "start": "2026-02-01"
+    }
+   },
+   "comparison": {
+    "aboveMedian": false,
+    "annualMedian": "69876.00",
+    "annualizedCmi": "0.00",
+    "householdSize": 1,
+    "monthlyCmi": "0.00",
+    "source": "Census median family income, FL household of 1 — ust/census-median-family-income@2026-04-01",
+    "state": "FL"
+   },
+   "debt": {
+    "nonpriorityUnsecuredTotal": "0",
+    "priorityTotal": "0"
+   },
+   "determinedBy": "median",
+   "exemptions": {
+    "applied": null,
+    "available": [
+     "non_consumer_debts",
+     "disabled_veteran",
+     "reservist_national_guard"
+    ],
+    "disabledVeteran": false,
+    "nonConsumerDebts": false,
+    "reservistNationalGuard": false,
+    "rule": null
+   },
+   "household": {
+    "childrenUnder18": 0,
+    "irsFamilySize": {
+     "source": "entered (means_test_input.people_under_65 + people_65_or_older)",
+     "value": 1
+    },
+    "irsHousingFamilySize": {
+     "source": "entered (means_test_input.people_under_65 + people_65_or_older)",
+     "value": 1
+    },
+    "medianHouseholdSize": {
+     "source": "entered (means_test_input.people_under_65 + people_65_or_older)",
+     "value": 1
+    },
+    "people65OrOlder": 0,
+    "peopleUnder65": 1
+   },
+   "jurisdiction": {
+    "county": "Hillsborough",
+    "district": "Middle District of Florida",
+    "state": "FL"
+   },
+   "lines": [],
+   "maritalFilingStatus": {
+    "source": "the case's debtor records (no spouse recorded)",
+    "value": "not_married"
+   },
+   "outcome": "below_median",
+   "problems": [],
+   "releaseIds": {
+    "code/dollar-amounts": "code/dollar-amounts@2025-04-01",
+    "ust/census-median-family-income": "ust/census-median-family-income@2026-04-01",
+    "ust/ch13-admin-multipliers": "ust/ch13-admin-multipliers@2026-07-15",
+    "ust/irs-local-standards": "ust/irs-local-standards@2026-07-15",
+    "ust/irs-national-standards": "ust/irs-national-standards@2026-07-15"
+   }
+  }
+ },
+ "plan": {
+  "value": {
+   "bestInterests": {
+    "liquidationPercentage": null,
+    "passes": null,
+    "planPercentage": null,
+    "planUnsecuredValue": "0.00",
+    "presentValueRate": null,
+    "rule": "11 U.S.C. § 1325(a)(4): unsecured creditors receive at least what a Chapter 7 liquidation would pay them, compared nominally — type a present-value rate to discount the plan's future payments"
+   },
+   "chapter": 7,
+   "classes": [
+    {
+     "allowed": "0.00",
+     "firstMonth": null,
+     "interest": "0.00",
+     "key": "general_unsecured",
+     "label": "General unsecured claims",
+     "lastMonth": null,
+     "payout": "0.00",
+     "principal": "0.00",
+     "rows": [
+      {
+       "allowed": "0.00",
+       "claimId": null,
+       "firstMonth": null,
+       "interest": "0.00",
+       "key": "unsecured",
+       "label": "General unsecured claims, pro rata",
+       "lastMonth": null,
+       "monthlyPayment": null,
+       "monthsPaid": 0,
+       "payout": "0.00",
+       "principal": "0.00",
+       "rate": null,
+       "source": "whatever remains, up to the full unsecured pool (a pot plan)",
+       "treatment": "pot",
+       "unpaid": "0.00"
+      }
+     ],
+     "unpaid": "0.00"
+    }
+   ],
+   "commitmentPeriod": {
+    "months": null,
+    "source": null
+   },
+   "feasibility": {
+    "exceedsScheduleJ": null,
+    "feasible": null,
+    "reasons": [],
+    "scheduleJExcess": {
+     "amount": "0.00",
+     "source": "Schedule J line 23c: 106I line 12 ($0.00) less 106J line 22c ($0.00)"
+    },
+    "shortfall": "0.00",
+    "surplus": "0.00",
+    "totalDistributed": "0.00",
+    "totalFunding": "0.00"
+   },
+   "funding": {
+    "basePayment": null,
+    "baseSource": null,
+    "lumpSums": [],
+    "schedule": [],
+    "termMonths": null,
+    "termSource": null,
+    "total": "0.00"
+   },
+   "liquidation": {
+    "assets": [],
+    "available": "0.00",
+    "exemptionsTotal": "0.00",
+    "liensTotal": "0.00",
+    "otherCosts": "0.00",
+    "otherCostsSource": "none typed",
+    "percentage": null,
+    "pool": [],
+    "poolTotal": "0.00",
+    "priorityTotal": "0.00",
+    "propertyTotal": "0.00",
+    "trusteeCommission": "0.00",
+    "trusteeCommissionRule": "11 U.S.C. § 326(a): 25% of the first $5,000, 10% of the next $45,000, 5% of the next $950,000, 3% above $1,000,000",
+    "unexemptTotal": "0.00"
+   },
+   "planPresent": false,
+   "problems": [
+    "The plan has no term: type one, or complete the means test so the commitment period (B122C-1 line 21) can supply it.",
+    "There is no plan yet: choose a monthly payment."
+   ],
+   "trusteePercentage": null,
+   "unsecured": {
+    "percentage": null,
+    "pool": [],
+    "poolTotal": "0.00",
+    "target": "0.00",
+    "targetSource": "whatever remains, up to the full unsecured pool (a pot plan)"
+   },
+   "warnings": [
+    "This is a Chapter 7 case; a plan is proposed only under Chapter 13."
+   ]
+  }
+ },
+ "standards": {
+  "value": {
+   "as_of": "2026-10-01",
+   "county": "Hillsborough",
+   "household_size": 1,
+   "housing_mortgage_rent": "1481.00",
+   "housing_non_mortgage": "592.00",
+   "jurisdiction_source": "Debtor 1's residence address, plus 0 dependent(s) recorded as living with the debtor",
+   "local_release_id": "ust/irs-local-standards@2026-07-15",
+   "national_allowance": "867.00",
+   "national_release_id": "ust/irs-national-standards@2026-07-15",
+   "oop_healthcare_65_and_older": "163.00",
+   "oop_healthcare_under_65": "90.00",
+   "problems": [],
+   "state": "FL",
+   "transportation_operating_one_car": "320.00",
+   "transportation_operating_two_cars": "640.00",
+   "transportation_ownership_one_car": "703.00",
+   "transportation_ownership_two_cars": "1406.00",
+   "transportation_public_national": "220.00"
+  }
+ }
+}

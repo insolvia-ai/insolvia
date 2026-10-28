@@ -1,0 +1,11 @@
+{
+  "series_id": "exemptions/federal",
+  "effective_date": "2025-04-01",
+  "sequence": 1,
+  "source": {
+    "url": "https://www.govinfo.gov/content/pkg/FR-2025-02-04/html/2025-02207.htm",
+    "published": "2025-02-04",
+    "sha256": "d6582c71329e8f7857e43aec5e6e93a574659568ef708c17f35f562494b33ede"
+  },
+  "notes": "The Apr. 1, 2025 triennial adjustment under 11 U.S.C. § 104(b) (90 Fed. Reg. 8941, a 13.2004% increase, rounded to nearest $25); every dollar figure cross-checked against Cornell LII's § 522 text. Next adjustment takes effect 2028-04-01 — ingest it as the next release of this series before that date. Verified current as of 2026-09-01."
+}

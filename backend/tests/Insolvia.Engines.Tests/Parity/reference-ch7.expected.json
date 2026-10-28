@@ -1,0 +1,5163 @@
+{
+ "creditor_matrix": {
+  "value": {
+   "content": "Bayside General Hospital\r\n2 Care Circle\r\nTampa FL 33606\r\n\r\nDrive Away Financial LLC\r\n88 Motor Row\r\nOrlando FL 32801\r\n\r\nGreat Plains Student Servicing\r\n500 Loan Loop\r\nLincoln NE 68501\r\n\r\nGulf Coast Home Loans\r\n100 Lender Way\r\nTampa FL 33602\r\n\r\nInternal Revenue Service\r\nPO Box 7346\r\nPhiladelphia PA 19101\r\n\r\nMeridian Bank Card Services\r\n1 Meridian Plaza\r\nWilmington DE 19801\r\n",
+   "creditorCount": 6,
+   "duplicatesOmitted": 0,
+   "fileName": "creditor-matrix.txt",
+   "problems": []
+  }
+ },
+ "exemptions": {
+  "value": {
+   "asOf": "2026-10-01",
+   "asOfSource": "today",
+   "assets": [
+    {
+     "assetId": "asset-house",
+     "capApplied": false,
+     "category": "real_property",
+     "claimed": "240000.00",
+     "claims": [
+      {
+       "acquiredWithin1215Days": false,
+       "amount": null,
+       "claimed": "240000.00",
+       "claimsFullFmv": true,
+       "exemptionId": "exemption-0",
+       "knownStatute": true,
+       "statuteCitation": "Fla. Const. art. X, § 4(a)(1)"
+      }
+     ],
+     "currentValue": "240000.00",
+     "description": "12 Byron Court, Tampa, FL 33601",
+     "homesteadCap": null,
+     "liens": "195000.00",
+     "netEquity": "45000.00",
+     "suggestions": {
+      "fl-health-aids": "0.00",
+      "fl-homestead": "0.00",
+      "fl-life-insurance-annuities": "0.00",
+      "fl-personal-property": "0.00",
+      "fl-retirement": "0.00",
+      "fl-vehicle": "0.00",
+      "fl-wages-head-of-family": "0.00",
+      "fl-wildcard-no-homestead": "0.00"
+     },
+     "unexempt": "0.00"
+    },
+    {
+     "assetId": "asset-civic",
+     "capApplied": false,
+     "category": "vehicle",
+     "claimed": "5000.00",
+     "claims": [
+      {
+       "acquiredWithin1215Days": null,
+       "amount": "5000.00",
+       "claimed": "5000.00",
+       "claimsFullFmv": false,
+       "exemptionId": "exemption-1",
+       "knownStatute": true,
+       "statuteCitation": "Fla. Stat. § 222.25(1)"
+      }
+     ],
+     "currentValue": "9000.00",
+     "description": "2016 Honda Civic LX",
+     "homesteadCap": null,
+     "liens": "7400.00",
+     "netEquity": "1600.00",
+     "suggestions": {
+      "fl-health-aids": "0.00",
+      "fl-homestead": "0.00",
+      "fl-life-insurance-annuities": "0.00",
+      "fl-personal-property": "0.00",
+      "fl-retirement": "0.00",
+      "fl-vehicle": "0.00",
+      "fl-wages-head-of-family": "0.00",
+      "fl-wildcard-no-homestead": "0.00"
+     },
+     "unexempt": "0.00"
+    },
+    {
+     "assetId": "asset-pontoon",
+     "capApplied": false,
+     "category": "watercraft_aircraft_or_recreational_vehicle",
+     "claimed": "0.00",
+     "claims": [],
+     "currentValue": "3500.00",
+     "description": "2005 Sun Tracker pontoon boat",
+     "homesteadCap": null,
+     "liens": "0.00",
+     "netEquity": "3500.00",
+     "suggestions": {
+      "fl-health-aids": "3500.00",
+      "fl-homestead": "3500.00",
+      "fl-life-insurance-annuities": "3500.00",
+      "fl-personal-property": "0.00",
+      "fl-retirement": "3500.00",
+      "fl-vehicle": "0.00",
+      "fl-wages-head-of-family": "3500.00",
+      "fl-wildcard-no-homestead": "3500.00"
+     },
+     "unexempt": "3500.00"
+    },
+    {
+     "assetId": "asset-household",
+     "capApplied": false,
+     "category": "household_goods",
+     "claimed": "1000.00",
+     "claims": [
+      {
+       "acquiredWithin1215Days": null,
+       "amount": "1000.00",
+       "claimed": "1000.00",
+       "claimsFullFmv": false,
+       "exemptionId": "exemption-2",
+       "knownStatute": true,
+       "statuteCitation": "Fla. Const. art. X, § 4(a)(2)"
+      }
+     ],
+     "currentValue": "2200.00",
+     "description": "Used furniture and kitchen appliances",
+     "homesteadCap": null,
+     "liens": "0.00",
+     "netEquity": "2200.00",
+     "suggestions": {
+      "fl-health-aids": "1200.00",
+      "fl-homestead": "1200.00",
+      "fl-life-insurance-annuities": "1200.00",
+      "fl-personal-property": "0.00",
+      "fl-retirement": "1200.00",
+      "fl-vehicle": "0.00",
+      "fl-wages-head-of-family": "1200.00",
+      "fl-wildcard-no-homestead": "1200.00"
+     },
+     "unexempt": "1200.00"
+    },
+    {
+     "assetId": "asset-electronics",
+     "capApplied": false,
+     "category": "electronics",
+     "claimed": "0.00",
+     "claims": [],
+     "currentValue": "900.00",
+     "description": "Two laptops, one television",
+     "homesteadCap": null,
+     "liens": "0.00",
+     "netEquity": "900.00",
+     "suggestions": {
+      "fl-health-aids": "900.00",
+      "fl-homestead": "900.00",
+      "fl-life-insurance-annuities": "900.00",
+      "fl-personal-property": "0.00",
+      "fl-retirement": "900.00",
+      "fl-vehicle": "0.00",
+      "fl-wages-head-of-family": "900.00",
+      "fl-wildcard-no-homestead": "900.00"
+     },
+     "unexempt": "900.00"
+    },
+    {
+     "assetId": "asset-clothes",
+     "capApplied": false,
+     "category": "clothes",
+     "claimed": "0.00",
+     "claims": [],
+     "currentValue": "400.00",
+     "description": "Everyday clothing",
+     "homesteadCap": null,
+     "liens": "0.00",
+     "netEquity": "400.00",
+     "suggestions": {
+      "fl-health-aids": "400.00",
+      "fl-homestead": "400.00",
+      "fl-life-insurance-annuities": "400.00",
+      "fl-personal-property": "0.00",
+      "fl-retirement": "400.00",
+      "fl-vehicle": "0.00",
+      "fl-wages-head-of-family": "400.00",
+      "fl-wildcard-no-homestead": "400.00"
+     },
+     "unexempt": "400.00"
+    },
+    {
+     "assetId": "asset-rings",
+     "capApplied": false,
+     "category": "jewelry",
+     "claimed": "0.00",
+     "claims": [],
+     "currentValue": "1800.00",
+     "description": "Wedding rings",
+     "homesteadCap": null,
+     "liens": "0.00",
+     "netEquity": "1800.00",
+     "suggestions": {
+      "fl-health-aids": "1800.00",
+      "fl-homestead": "1800.00",
+      "fl-life-insurance-annuities": "1800.00",
+      "fl-personal-property": "0.00",
+      "fl-retirement": "1800.00",
+      "fl-vehicle": "0.00",
+      "fl-wages-head-of-family": "1800.00",
+      "fl-wildcard-no-homestead": "1800.00"
+     },
+     "unexempt": "1800.00"
+    },
+    {
+     "assetId": "asset-cash",
+     "capApplied": false,
+     "category": "cash",
+     "claimed": "0.00",
+     "claims": [],
+     "currentValue": "150.00",
+     "description": "Cash on hand",
+     "homesteadCap": null,
+     "liens": "0.00",
+     "netEquity": "150.00",
+     "suggestions": {
+      "fl-health-aids": "150.00",
+      "fl-homestead": "150.00",
+      "fl-life-insurance-annuities": "150.00",
+      "fl-personal-property": "0.00",
+      "fl-retirement": "150.00",
+      "fl-vehicle": "0.00",
+      "fl-wages-head-of-family": "150.00",
+      "fl-wildcard-no-homestead": "150.00"
+     },
+     "unexempt": "150.00"
+    },
+    {
+     "assetId": "asset-checking",
+     "capApplied": false,
+     "category": "deposits_of_money",
+     "claimed": "0.00",
+     "claims": [],
+     "currentValue": "1250.00",
+     "description": null,
+     "homesteadCap": null,
+     "liens": "0.00",
+     "netEquity": "1250.00",
+     "suggestions": {
+      "fl-health-aids": "1250.00",
+      "fl-homestead": "1250.00",
+      "fl-life-insurance-annuities": "1250.00",
+      "fl-personal-property": "0.00",
+      "fl-retirement": "1250.00",
+      "fl-vehicle": "0.00",
+      "fl-wages-head-of-family": "1250.00",
+      "fl-wildcard-no-homestead": "1250.00"
+     },
+     "unexempt": "1250.00"
+    },
+    {
+     "assetId": "asset-biz-checking",
+     "capApplied": false,
+     "category": "deposits_of_money",
+     "claimed": "0.00",
+     "claims": [],
+     "currentValue": "2100.00",
+     "description": null,
+     "homesteadCap": null,
+     "liens": "0.00",
+     "netEquity": "2100.00",
+     "suggestions": {
+      "fl-health-aids": "2100.00",
+      "fl-homestead": "2100.00",
+      "fl-life-insurance-annuities": "2100.00",
+      "fl-personal-property": "0.00",
+      "fl-retirement": "2100.00",
+      "fl-vehicle": "0.00",
+      "fl-wages-head-of-family": "2100.00",
+      "fl-wildcard-no-homestead": "2100.00"
+     },
+     "unexempt": "2100.00"
+    },
+    {
+     "assetId": "asset-401k",
+     "capApplied": false,
+     "category": "retirement_accounts",
+     "claimed": "48000.00",
+     "claims": [
+      {
+       "acquiredWithin1215Days": null,
+       "amount": null,
+       "claimed": "48000.00",
+       "claimsFullFmv": true,
+       "exemptionId": "exemption-3",
+       "knownStatute": true,
+       "statuteCitation": "Fla. Stat. § 222.21(2)"
+      }
+     ],
+     "currentValue": "48000.00",
+     "description": "401(k) retirement account",
+     "homesteadCap": null,
+     "liens": "0.00",
+     "netEquity": "48000.00",
+     "suggestions": {
+      "fl-health-aids": "0.00",
+      "fl-homestead": "0.00",
+      "fl-life-insurance-annuities": "0.00",
+      "fl-personal-property": "0.00",
+      "fl-retirement": "0.00",
+      "fl-vehicle": "0.00",
+      "fl-wages-head-of-family": "0.00",
+      "fl-wildcard-no-homestead": "0.00"
+     },
+     "unexempt": "0.00"
+    },
+    {
+     "assetId": "asset-utility-deposit",
+     "capApplied": false,
+     "category": "security_deposits_and_prepayments",
+     "claimed": "0.00",
+     "claims": [],
+     "currentValue": "200.00",
+     "description": null,
+     "homesteadCap": null,
+     "liens": "0.00",
+     "netEquity": "200.00",
+     "suggestions": {
+      "fl-health-aids": "200.00",
+      "fl-homestead": "200.00",
+      "fl-life-insurance-annuities": "200.00",
+      "fl-personal-property": "0.00",
+      "fl-retirement": "200.00",
+      "fl-vehicle": "0.00",
+      "fl-wages-head-of-family": "200.00",
+      "fl-wildcard-no-homestead": "200.00"
+     },
+     "unexempt": "200.00"
+    },
+    {
+     "assetId": "asset-tax-refund",
+     "capApplied": false,
+     "category": "money_owed_to_you",
+     "claimed": "0.00",
+     "claims": [],
+     "currentValue": "1100.00",
+     "description": "2025 federal income tax refund, return filed",
+     "homesteadCap": null,
+     "liens": "0.00",
+     "netEquity": "1100.00",
+     "suggestions": {
+      "fl-health-aids": "1100.00",
+      "fl-homestead": "1100.00",
+      "fl-life-insurance-annuities": "1100.00",
+      "fl-personal-property": "0.00",
+      "fl-retirement": "1100.00",
+      "fl-vehicle": "0.00",
+      "fl-wages-head-of-family": "1100.00",
+      "fl-wildcard-no-homestead": "1100.00"
+     },
+     "unexempt": "1100.00"
+    },
+    {
+     "assetId": "asset-term-life",
+     "capApplied": false,
+     "category": "insurance_policy_interests",
+     "claimed": "0.00",
+     "claims": [],
+     "currentValue": "0.00",
+     "description": "Term life policy, Prudential",
+     "homesteadCap": null,
+     "liens": "0.00",
+     "netEquity": "0.00",
+     "suggestions": {
+      "fl-health-aids": "0.00",
+      "fl-homestead": "0.00",
+      "fl-life-insurance-annuities": "0.00",
+      "fl-personal-property": "0.00",
+      "fl-retirement": "0.00",
+      "fl-vehicle": "0.00",
+      "fl-wages-head-of-family": "0.00",
+      "fl-wildcard-no-homestead": "0.00"
+     },
+     "unexempt": "0.00"
+    },
+    {
+     "assetId": "asset-workbench",
+     "capApplied": false,
+     "category": "office_equipment",
+     "claimed": "0.00",
+     "claims": [],
+     "currentValue": "750.00",
+     "description": "Workbench, test rigs, and hand tools",
+     "homesteadCap": null,
+     "liens": "0.00",
+     "netEquity": "750.00",
+     "suggestions": {
+      "fl-health-aids": "750.00",
+      "fl-homestead": "750.00",
+      "fl-life-insurance-annuities": "750.00",
+      "fl-personal-property": "0.00",
+      "fl-retirement": "750.00",
+      "fl-vehicle": "0.00",
+      "fl-wages-head-of-family": "750.00",
+      "fl-wildcard-no-homestead": "750.00"
+     },
+     "unexempt": "750.00"
+    },
+    {
+     "assetId": "asset-parts",
+     "capApplied": false,
+     "category": "inventory",
+     "claimed": "0.00",
+     "claims": [],
+     "currentValue": "1200.00",
+     "description": "Replacement engine parts inventory",
+     "homesteadCap": null,
+     "liens": "0.00",
+     "netEquity": "1200.00",
+     "suggestions": {
+      "fl-health-aids": "1200.00",
+      "fl-homestead": "1200.00",
+      "fl-life-insurance-annuities": "1200.00",
+      "fl-personal-property": "0.00",
+      "fl-retirement": "1200.00",
+      "fl-vehicle": "0.00",
+      "fl-wages-head-of-family": "1200.00",
+      "fl-wildcard-no-homestead": "1200.00"
+     },
+     "unexempt": "1200.00"
+    },
+    {
+     "assetId": "asset-customer-list",
+     "capApplied": false,
+     "category": "customer_lists_and_intangibles",
+     "claimed": "0.00",
+     "claims": [],
+     "currentValue": null,
+     "description": "Walk-in repair customers' names and phone numbers",
+     "homesteadCap": null,
+     "liens": "0.00",
+     "netEquity": null,
+     "suggestions": {
+      "fl-personal-property": "0.00",
+      "fl-vehicle": "0.00",
+      "fl-wildcard-no-homestead": "4000.00"
+     },
+     "unexempt": null
+    }
+   ],
+   "election": {
+    "effective": "state_and_federal_nonbankruptcy",
+    "optOutCitation": "Fla. Stat. § 222.20",
+    "optedOut": true,
+    "options": [
+     {
+      "name": "Florida exemptions (Fla. Const. art. X, § 4; Fla. Stat. ch. 222)",
+      "schemeId": "fl",
+      "value": "state_and_federal_nonbankruptcy"
+     }
+    ],
+    "state": "FL",
+    "stored": null
+   },
+   "entries": [
+    {
+     "available": null,
+     "carryover": null,
+     "category": "homestead",
+     "citation": "Fla. Const. art. X, § 4(a)(1); Fla. Stat. §§ 222.01-222.02",
+     "claimed": "240000.00",
+     "description": "Homestead: residence of the owner or owner's family — unlimited value; limited to 1/2 acre of contiguous land within a municipality or 160 contiguous acres outside one",
+     "entryId": "fl-homestead",
+     "limit": null,
+     "notes": "Value-unlimited but acreage-limited. Subject in bankruptcy to 11 U.S.C. § 522(p)/(q) caps for recently acquired or misconduct-tainted homesteads. The flsenate.gov constitution page could not be machine-read at build time; text verified against mirrors — re-verify against the official page before first filing.",
+     "perItemAmount": null,
+     "unlimited": true
+    },
+    {
+     "available": "0.00",
+     "carryover": null,
+     "category": "personal_property",
+     "citation": "Fla. Const. art. X, § 4(a)(2)",
+     "claimed": "1000.00",
+     "description": "Personal property of any kind",
+     "entryId": "fl-personal-property",
+     "limit": "1000.00",
+     "notes": "Constitutional figure, unchanged since the 1968 revision; doubles in practice for joint filers as each spouse claims it. Same build-time mirror caveat as fl-homestead.",
+     "perItemAmount": null,
+     "unlimited": false
+    },
+    {
+     "available": "0.00",
+     "carryover": null,
+     "category": "vehicle",
+     "citation": "Fla. Stat. § 222.25(1)",
+     "claimed": "5000.00",
+     "description": "A single motor vehicle",
+     "entryId": "fl-vehicle",
+     "limit": "5000.00",
+     "notes": "Raised from $1,000.00 by ch. 2024-110, eff. 2024-07-01. A case filed before that date needs the old figure; none can still be prepared in this product, so the historical row is omitted.",
+     "perItemAmount": null,
+     "unlimited": false
+    },
+    {
+     "available": null,
+     "carryover": null,
+     "category": "health_aids",
+     "citation": "Fla. Stat. § 222.25(2)",
+     "claimed": "0.00",
+     "description": "Professionally prescribed health aids for the debtor or a dependent",
+     "entryId": "fl-health-aids",
+     "limit": null,
+     "notes": "",
+     "perItemAmount": null,
+     "unlimited": true
+    },
+    {
+     "available": "4000.00",
+     "carryover": null,
+     "category": "wildcard",
+     "citation": "Fla. Stat. § 222.25(4)",
+     "claimed": "0.00",
+     "description": "Personal property of any kind — ONLY if the debtor does not claim or receive the benefit of the homestead exemption",
+     "entryId": "fl-wildcard-no-homestead",
+     "limit": "4000.00",
+     "notes": "Conditional, not a carryover: available instead of, never alongside, the homestead benefit. Enacted 2007; amendment date of the current figure not separately verified — the figure itself is the current statute text.",
+     "perItemAmount": null,
+     "unlimited": false
+    },
+    {
+     "available": null,
+     "carryover": null,
+     "category": "wages",
+     "citation": "Fla. Stat. § 222.11",
+     "claimed": "0.00",
+     "description": "Disposable earnings of a head of family (provides more than half the support of a child or other dependent)",
+     "entryId": "fl-wages-head-of-family",
+     "limit": null,
+     "notes": "No flat cap: earnings <= $750.00/week are fully exempt; above that, exempt absent a written waiver (14-point type, separate document). Non-head-of-family earnings get only federal CCPA limits (15 U.S.C. § 1673). Exemption follows earnings into a bank account for 6 months if traceable.",
+     "perItemAmount": null,
+     "unlimited": false
+    },
+    {
+     "available": null,
+     "carryover": null,
+     "category": "life_insurance",
+     "citation": "Fla. Stat. § 222.14",
+     "claimed": "0.00",
+     "description": "Cash surrender value of life insurance policies and proceeds of annuity contracts issued to Florida residents",
+     "entryId": "fl-life-insurance-annuities",
+     "limit": null,
+     "notes": "Not exempt against a creditor the policy or contract was effected for the benefit of.",
+     "perItemAmount": null,
+     "unlimited": true
+    },
+    {
+     "available": null,
+     "carryover": null,
+     "category": "retirement",
+     "citation": "Fla. Stat. § 222.21(2)",
+     "claimed": "48000.00",
+     "description": "Assets in tax-qualified retirement plans and accounts (IRC §§ 401(a), 403(a)/(b), 408, 408A, 409, 414, 457(b), 501(a)), including inherited IRAs",
+     "entryId": "fl-retirement",
+     "limit": null,
+     "notes": "Last substantively amended by ch. 2022-167.",
+     "perItemAmount": null,
+     "unlimited": true
+    }
+   ],
+   "limits": [
+    {
+     "amount": "8575.00",
+     "citation": "11 U.S.C. § 522(f)(3)",
+     "description": "Cap on lien avoidance against implements, professional books, tools of the trade, farm animals, and crops",
+     "limitId": "us-lien-avoidance-tools"
+    },
+    {
+     "amount": "900.00",
+     "citation": "11 U.S.C. § 522(f)(4)",
+     "description": "Per-item value above which household goods fall outside the nonpossessory, nonpurchase-money lien avoidance definition",
+     "limitId": "us-lien-avoidance-household"
+    },
+    {
+     "amount": "1711975.00",
+     "citation": "11 U.S.C. § 522(n)",
+     "description": "Aggregate cap on exempt traditional and Roth IRA assets (rollovers excluded), applicable under every scheme",
+     "limitId": "us-ira-cap"
+    },
+    {
+     "amount": "214000.00",
+     "citation": "11 U.S.C. § 522(p)",
+     "description": "Cap on the homestead interest a debtor may exempt in property acquired within 1,215 days before filing — binds even under unlimited state homesteads (FL, TX); pairs with the exemption entity's acquired_within_1215_days fact",
+     "limitId": "us-homestead-1215-day-cap"
+    },
+    {
+     "amount": "214000.00",
+     "citation": "11 U.S.C. § 522(q)",
+     "description": "Homestead cap where the debtor has certain felony convictions or debts from securities fraud or similar misconduct — the question 106C asks every filer",
+     "limitId": "us-homestead-misconduct-cap"
+    }
+   ],
+   "lookbacks": {
+    "domicilePeriodStart": "2024-10-01",
+    "section522o": "2016-10-01",
+    "section522p": "2023-06-04",
+    "section522q": "2021-10-01"
+   },
+   "problems": [],
+   "warnings": []
+  }
+ },
+ "forms": {
+  "form/b101": {
+   "value": {
+    "attorney.bar_number": {
+     "text": "112233"
+    },
+    "attorney.bar_state": {
+     "text": "FL"
+    },
+    "attorney.city": {
+     "text": "Tampa"
+    },
+    "attorney.date_signed": {
+     "text": "08/31/2026"
+    },
+    "attorney.email": {
+     "text": "alex@example.com"
+    },
+    "attorney.firm_name": {
+     "text": "Counsel & Counsel PA"
+    },
+    "attorney.phone": {
+     "text": "(813) 555-0100"
+    },
+    "attorney.printed_name": {
+     "text": "Alex Counsel"
+    },
+    "attorney.state": {
+     "text": "FL"
+    },
+    "attorney.street": {
+     "text": "1 Example Way"
+    },
+    "attorney.zip": {
+     "text": "33604"
+    },
+    "caption.chapter": {
+     "option": "Chapter 7"
+    },
+    "caption.district": {
+     "text": "Middle District of Florida"
+    },
+    "caption.header_debtor1_name": {
+     "text": "Ada Quinn Lovelace"
+    },
+    "line_10_related_case_number": {
+     "rows": {
+      "Case number if known_3": {
+       "text": "26-00042"
+      }
+     }
+    },
+    "line_10_related_debtor": {
+     "rows": {
+      "Debtor": {
+       "text": "Analytical Engines LLC"
+      }
+     }
+    },
+    "line_10_related_district": {
+     "rows": {
+      "District_4": {
+       "text": "Middle District of Florida"
+      }
+     }
+    },
+    "line_10_related_pending": {
+     "option": "Yes"
+    },
+    "line_10_related_relationship": {
+     "rows": {
+      "Relationship to you": {
+       "text": "Affiliate"
+      }
+     }
+    },
+    "line_10_related_when": {
+     "rows": {
+      "When_4": {
+       "text": "06/15/2026"
+      }
+     }
+    },
+    "line_11_rents_residence": {
+     "option": "No"
+    },
+    "line_12_business_city": {
+     "text": "Tampa"
+    },
+    "line_12_business_name": {
+     "text": "Ada's Analytical Engines"
+    },
+    "line_12_business_state": {
+     "text": "FL"
+    },
+    "line_12_business_street": {
+     "text": "88 Difference Drive"
+    },
+    "line_12_business_type": {
+     "option": "None of above"
+    },
+    "line_12_business_zip": {
+     "text": "33603"
+    },
+    "line_12_sole_proprietor": {
+     "option": "Yes"
+    },
+    "line_13_small_business_status": {
+     "option": "Not filing under Chapter 11"
+    },
+    "line_14_hazard_description": {
+     "rows": {
+      "What is the hazard1": {
+       "text": "Two corroding propane tanks behind the shed"
+      }
+     }
+    },
+    "line_14_hazardous_property": {
+     "option": "Yes"
+    },
+    "line_14_property_city": {
+     "text": "Tampa"
+    },
+    "line_14_property_state": {
+     "text": "FL"
+    },
+    "line_14_property_street": {
+     "text": "12 Byron Court"
+    },
+    "line_14_property_zip": {
+     "text": "33601"
+    },
+    "line_14_why_immediate": {
+     "rows": {
+      "If immediate attention is needed why is it needed1": {
+       "text": "A slow leak was found in August"
+      }
+     }
+    },
+    "line_15_debtor1_credit_counseling": {
+     "option": "1"
+    },
+    "line_15_debtor2_credit_counseling": {
+     "option": "4"
+    },
+    "line_15_debtor2_exemption_reason": {
+     "option": "Disability"
+    },
+    "line_16a_consumer_debts": {
+     "option": "Yes"
+    },
+    "line_17_filing_under_ch7": {
+     "option": "Yes"
+    },
+    "line_17_funds_available": {
+     "option": "No"
+    },
+    "line_18_estimated_creditors": {
+     "option": "1-49"
+    },
+    "line_19_estimated_assets": {
+     "option": "100000000-500000000"
+    },
+    "line_1_debtor1_first_name": {
+     "text": "Ada"
+    },
+    "line_1_debtor1_last_name": {
+     "text": "Lovelace"
+    },
+    "line_1_debtor1_middle_name": {
+     "text": "Quinn"
+    },
+    "line_1_debtor2_first_name": {
+     "text": "Ben"
+    },
+    "line_1_debtor2_last_name": {
+     "text": "Lovelace"
+    },
+    "line_1_debtor2_suffix": {
+     "text": "Jr."
+    },
+    "line_20_estimated_liabilities": {
+     "option": "50001-100000"
+    },
+    "line_2_debtor1_business_name": {
+     "rows": {
+      "Debtor1.Business name_3": {
+       "text": "Ada's Analytical Engines"
+      }
+     }
+    },
+    "line_2_debtor1_other_given": {
+     "rows": {
+      "Debtor1.First name_3": {
+       "text": "Ada"
+      }
+     }
+    },
+    "line_2_debtor1_other_surname": {
+     "rows": {
+      "Debtor1.Last name_3": {
+       "text": "Byron"
+      }
+     }
+    },
+    "line_3_debtor1_ssn_last4": {
+     "text": "4321"
+    },
+    "line_3_debtor2_itin_last4": {
+     "text": "4322"
+    },
+    "line_4_debtor1_ein": {
+     "rows": {
+      "Debtor1.Employer Identification Number1": {
+       "text": "123456789"
+      }
+     }
+    },
+    "line_5_debtor1_city": {
+     "text": "Tampa"
+    },
+    "line_5_debtor1_county": {
+     "text": "Hillsborough"
+    },
+    "line_5_debtor1_mailing_city": {
+     "text": "Tampa"
+    },
+    "line_5_debtor1_mailing_pobox": {
+     "text": "PO Box 99"
+    },
+    "line_5_debtor1_mailing_state": {
+     "text": "FL"
+    },
+    "line_5_debtor1_mailing_street": {
+     "text": "4501 Postal Way"
+    },
+    "line_5_debtor1_mailing_zip": {
+     "text": "33602"
+    },
+    "line_5_debtor1_state": {
+     "text": "FL"
+    },
+    "line_5_debtor1_street": {
+     "text": "12 Byron Court"
+    },
+    "line_5_debtor1_street2": {
+     "text": "Apt 4"
+    },
+    "line_5_debtor1_zip": {
+     "text": "33601"
+    },
+    "line_5_debtor2_city": {
+     "text": "Tampa"
+    },
+    "line_5_debtor2_county": {
+     "text": "Hillsborough"
+    },
+    "line_5_debtor2_state": {
+     "text": "FL"
+    },
+    "line_5_debtor2_street": {
+     "text": "12 Byron Court"
+    },
+    "line_5_debtor2_street2": {
+     "text": "Apt 4"
+    },
+    "line_5_debtor2_zip": {
+     "text": "33601"
+    },
+    "line_6_debtor1_venue_basis": {
+     "option": "Lived in this district"
+    },
+    "line_6_debtor2_venue_basis": {
+     "option": "Other"
+    },
+    "line_6_debtor2_venue_explanation": {
+     "rows": {
+      "Debtor2.See 28 USC  1408 1_2": {
+       "text": "Moved from Georgia in July; the greater part of the last 180 days was spent in this"
+      },
+      "Debtor2.See 28 USC  1408 2_2": {
+       "text": "district."
+      }
+     }
+    },
+    "line_8_fee_handling": {
+     "option": "Pay in installments"
+    },
+    "line_9_prior_bankruptcy": {
+     "option": "Yes"
+    },
+    "line_9_prior_case_number": {
+     "rows": {
+      "Case number": {
+       "text": "19-01234"
+      }
+     }
+    },
+    "line_9_prior_district": {
+     "rows": {
+      "District": {
+       "text": "Northern District of Georgia"
+      }
+     }
+    },
+    "line_9_prior_when": {
+     "rows": {
+      "When": {
+       "text": "03/04/2019"
+      }
+     }
+    },
+    "sign.debtor1_executed_on": {
+     "text": "08/30/2026"
+    },
+    "sign.debtor2_executed_on": {
+     "text": "08/30/2026"
+    }
+   }
+  },
+  "form/b106ab": {
+   "value": {
+    "caption.debtor1_name": {
+     "text": "Ada Quinn Lovelace"
+    },
+    "caption.debtor2_name": {
+     "text": "Ben Lovelace Jr."
+    },
+    "caption.district": {
+     "text": "Middle District of Florida"
+    },
+    "line_10_gate": {
+     "option": "no"
+    },
+    "line_11_amount": {
+     "text": "400.00"
+    },
+    "line_11_description": {
+     "text": "Everyday clothing"
+    },
+    "line_11_gate": {
+     "option": "yes"
+    },
+    "line_12_amount": {
+     "text": "1,800.00"
+    },
+    "line_12_description": {
+     "text": "Wedding rings"
+    },
+    "line_12_gate": {
+     "option": "yes"
+    },
+    "line_13_gate": {
+     "option": "no"
+    },
+    "line_14_gate": {
+     "option": "no"
+    },
+    "line_15_part3_total": {
+     "text": "5,300.00"
+    },
+    "line_16_amount": {
+     "text": "150.00"
+    },
+    "line_16_gate": {
+     "option": "yes"
+    },
+    "line_17_amount": {
+     "rows": {
+      "17.1 Checking amount": {
+       "text": "1,250.00"
+      },
+      "17.2 Checking amount": {
+       "text": "2,100.00"
+      }
+     }
+    },
+    "line_17_gate": {
+     "option": "yes"
+    },
+    "line_17_institution": {
+     "rows": {
+      "17.1 Checking account": {
+       "text": "Checking account, Suncoast Credit Union"
+      },
+      "17.2 Checking account": {
+       "text": "Business checking account, Wells Fargo"
+      }
+     }
+    },
+    "line_18_gate": {
+     "option": "no"
+    },
+    "line_19_gate": {
+     "option": "no"
+    },
+    "line_1_any_real_estate": {
+     "option": "yes"
+    },
+    "line_20_gate": {
+     "option": "no"
+    },
+    "line_21_amount": {
+     "rows": {
+      "21.1 401k or similar plan amount": {
+       "text": "48,000.00"
+      }
+     }
+    },
+    "line_21_gate": {
+     "option": "yes"
+    },
+    "line_21_institution": {
+     "rows": {
+      "21.1 401k or similar plan": {
+       "text": "401(k), Fidelity — Menabrea Machines Inc"
+      }
+     }
+    },
+    "line_22_amount": {
+     "rows": {
+      "22.1 Electric amount": {
+       "text": "200.00"
+      }
+     }
+    },
+    "line_22_gate": {
+     "option": "yes"
+    },
+    "line_22_institution": {
+     "rows": {
+      "22.1 Electric": {
+       "text": "Utility deposit, Tampa Electric"
+      }
+     }
+    },
+    "line_23_gate": {
+     "option": "no"
+    },
+    "line_24_gate": {
+     "option": "no"
+    },
+    "line_25_gate": {
+     "option": "no"
+    },
+    "line_26_gate": {
+     "option": "no"
+    },
+    "line_27_gate": {
+     "option": "no"
+    },
+    "line_28_amount_federal": {
+     "text": "1,100.00"
+    },
+    "line_28_description": {
+     "text": "2025 federal income tax refund, return filed; Federal"
+    },
+    "line_28_gate": {
+     "option": "On"
+    },
+    "line_29_gate": {
+     "option": "no"
+    },
+    "line_2_part1_total": {
+     "text": "240,000.00"
+    },
+    "line_30_gate": {
+     "option": "no"
+    },
+    "line_31_beneficiary": {
+     "rows": {
+      "Beneficiary 1": {
+       "text": "Beneficiary: Ben Lovelace"
+      }
+     }
+    },
+    "line_31_company": {
+     "rows": {
+      "Company name 1": {
+       "text": "Term life policy, Prudential"
+      }
+     }
+    },
+    "line_31_gate": {
+     "option": "yes"
+    },
+    "line_31_value": {
+     "rows": {
+      "undefined_109": {
+       "text": "0.00"
+      }
+     }
+    },
+    "line_32_gate": {
+     "option": "no"
+    },
+    "line_33_gate": {
+     "option": "no"
+    },
+    "line_34_gate": {
+     "option": "no"
+    },
+    "line_35_gate": {
+     "option": "no"
+    },
+    "line_36_part4_total": {
+     "text": "52,800.00"
+    },
+    "line_37_gate": {
+     "option": "yes"
+    },
+    "line_38_gate": {
+     "option": "no"
+    },
+    "line_39_amount": {
+     "text": "750.00"
+    },
+    "line_39_description": {
+     "text": "Workbench, test rigs, and hand tools"
+    },
+    "line_39_gate": {
+     "option": "yes"
+    },
+    "line_3_any_vehicles": {
+     "option": "yes"
+    },
+    "line_40_gate": {
+     "option": "no"
+    },
+    "line_41_amount": {
+     "text": "1,200.00"
+    },
+    "line_41_description": {
+     "text": "Replacement engine parts inventory"
+    },
+    "line_41_gate": {
+     "option": "yes"
+    },
+    "line_42_gate": {
+     "option": "no"
+    },
+    "line_43_amount": {
+     "text": "0.00"
+    },
+    "line_43_description": {
+     "text": "Walk-in repair customers' names and phone numbers"
+    },
+    "line_43_gate": {
+     "option": "yes"
+    },
+    "line_43_pii_gate": {
+     "option": "yes"
+    },
+    "line_44_gate": {
+     "option": "no"
+    },
+    "line_45_part5_total": {
+     "text": "1,950.00"
+    },
+    "line_46_gate": {
+     "option": "no"
+    },
+    "line_47_gate": {
+     "option": "no"
+    },
+    "line_48_gate": {
+     "option": "no"
+    },
+    "line_49_gate": {
+     "option": "no"
+    },
+    "line_4_any_other_vehicles": {
+     "option": "Yes_2"
+    },
+    "line_50_gate": {
+     "option": "no"
+    },
+    "line_51_gate": {
+     "option": "no"
+    },
+    "line_52_part6_total": {
+     "text": "0.00"
+    },
+    "line_53_gate": {
+     "option": "no"
+    },
+    "line_54_part7_total": {
+     "text": "0.00"
+    },
+    "line_55_total": {
+     "text": "240,000.00"
+    },
+    "line_56_total": {
+     "text": "12,500.00"
+    },
+    "line_57_total": {
+     "text": "5,300.00"
+    },
+    "line_58_total": {
+     "text": "52,800.00"
+    },
+    "line_59_total": {
+     "text": "1,950.00"
+    },
+    "line_5_part2_total": {
+     "text": "12,500.00"
+    },
+    "line_60_total": {
+     "text": "0.00"
+    },
+    "line_61_total": {
+     "text": "0.00"
+    },
+    "line_62_total_personal_property": {
+     "text": "72,550.00"
+    },
+    "line_63_total_all_property": {
+     "text": "312,550.00"
+    },
+    "line_6_amount": {
+     "text": "2,200.00"
+    },
+    "line_6_description": {
+     "text": "Used furniture and kitchen appliances"
+    },
+    "line_6_gate": {
+     "option": "yes"
+    },
+    "line_7_amount": {
+     "text": "900.00"
+    },
+    "line_7_description": {
+     "text": "Two laptops, one television"
+    },
+    "line_7_gate": {
+     "option": "yes"
+    },
+    "line_8_gate": {
+     "option": "no"
+    },
+    "line_9_gate": {
+     "option": "no"
+    },
+    "other_vehicle.make": {
+     "rows": {
+      "Make": {
+       "text": "Sun Tracker"
+      }
+     }
+    },
+    "other_vehicle.model": {
+     "rows": {
+      "Model": {
+       "text": "Pontoon boat"
+      }
+     }
+    },
+    "other_vehicle.other_information": {
+     "rows": {
+      "Other information_5": {
+       "text": "Trailer included; engine needs work"
+      }
+     }
+    },
+    "other_vehicle.value_entire": {
+     "rows": {
+      "undefined_22": {
+       "text": "3,500.00"
+      }
+     }
+    },
+    "other_vehicle.value_portion": {
+     "rows": {
+      "undefined_23": {
+       "text": "3,500.00"
+      }
+     }
+    },
+    "other_vehicle.who_has_interest": {
+     "rows": {
+      "Who has interest in property 8": {
+       "option": "Debtor 1 and 2"
+      }
+     }
+    },
+    "other_vehicle.year": {
+     "rows": {
+      "Year": {
+       "text": "2005"
+      }
+     }
+    },
+    "real_estate.county": {
+     "rows": {
+      "County": {
+       "text": "Hillsborough"
+      }
+     }
+    },
+    "real_estate.other_information": {
+     "rows": {
+      "property identification number": {
+       "text": "Two-bedroom bungalow; the family homestead"
+      }
+     }
+    },
+    "real_estate.ownership_nature": {
+     "rows": {
+      "the entireties or a life estate if known": {
+       "text": "Fee simple, tenancy by the entireties"
+      }
+     }
+    },
+    "real_estate.street": {
+     "rows": {
+      "1 1": {
+       "text": "12 Byron Court, Tampa, FL 33601"
+      }
+     }
+    },
+    "real_estate.type_single_family_home": {
+     "rows": {
+      "Singlefamily home": {
+       "check": true
+      }
+     }
+    },
+    "real_estate.value_entire": {
+     "rows": {
+      "undefined_2": {
+       "text": "265,000.00"
+      }
+     }
+    },
+    "real_estate.value_portion": {
+     "rows": {
+      "undefined_3": {
+       "text": "240,000.00"
+      }
+     }
+    },
+    "real_estate.who_has_interest": {
+     "rows": {
+      "Who has interest in property": {
+       "option": "Debtor 1 and 2"
+      }
+     }
+    },
+    "vehicle.make": {
+     "rows": {
+      "3 1": {
+       "text": "Honda"
+      }
+     }
+    },
+    "vehicle.mileage": {
+     "rows": {
+      "3 4": {
+       "text": "92000"
+      }
+     }
+    },
+    "vehicle.model": {
+     "rows": {
+      "3 2": {
+       "text": "Civic LX"
+      }
+     }
+    },
+    "vehicle.other_information": {
+     "rows": {
+      "Other information": {
+       "text": "One owner; always garaged"
+      }
+     }
+    },
+    "vehicle.value_entire": {
+     "rows": {
+      "undefined_14": {
+       "text": "9,000.00"
+      }
+     }
+    },
+    "vehicle.value_portion": {
+     "rows": {
+      "undefined_15": {
+       "text": "9,000.00"
+      }
+     }
+    },
+    "vehicle.who_has_interest": {
+     "rows": {
+      "Who has interest in property 4": {
+       "option": "Debtor 1"
+      }
+     }
+    },
+    "vehicle.year": {
+     "rows": {
+      "3 3": {
+       "text": "2016"
+      }
+     }
+    }
+   }
+  },
+  "form/b106c": {
+   "value": {
+    "caption.debtor1_name": {
+     "text": "Ada Quinn Lovelace"
+    },
+    "caption.debtor2_name": {
+     "text": "Ben Lovelace Jr."
+    },
+    "caption.district": {
+     "text": "Middle District of Florida"
+    },
+    "line_1_exemption_set": {
+     "option": "state and federal"
+    },
+    "line_2_current_value": {
+     "rows": {
+      "undefined": {
+       "text": "240,000.00"
+      },
+      "undefined_11": {
+       "text": "48,000.00"
+      },
+      "undefined_6": {
+       "text": "9,000.00"
+      },
+      "undefined_8": {
+       "text": "2,200.00"
+      }
+     }
+    },
+    "line_2_exemption_amount": {
+     "rows": {
+      "undefined_7": {
+       "text": "5,000.00"
+      },
+      "undefined_9": {
+       "text": "1,000.00"
+      }
+     }
+    },
+    "line_2_exemption_kind": {
+     "rows": {
+      "check 2.1": {
+       "option": "fair market"
+      },
+      "check 2.2": {
+       "option": "On"
+      },
+      "check 2.3": {
+       "option": "On"
+      },
+      "check 4": {
+       "option": "fair market"
+      }
+     }
+    },
+    "line_2_property_description": {
+     "rows": {
+      "description": {
+       "text": "12 Byron Court, Tampa, FL 33601"
+      },
+      "description_2": {
+       "text": "2016 Honda Civic LX"
+      },
+      "description_3": {
+       "text": "Used furniture and kitchen appliances"
+      },
+      "description_4": {
+       "text": "401(k) retirement account"
+      }
+     }
+    },
+    "line_2_statute_citation": {
+     "rows": {
+      "2.1": {
+       "text": "Fla. Const. art. X, § 4(a)(1)"
+      },
+      "2.2": {
+       "text": "Fla. Stat. § 222.25(1)"
+      },
+      "2.3": {
+       "text": "Fla. Const. art. X, § 4(a)(2)"
+      },
+      "3": {
+       "text": "Fla. Stat. § 222.21(2)"
+      }
+     }
+    },
+    "line_3_acquired_within_1215_days": {
+     "option": "no"
+    },
+    "line_3_homestead_over_cap": {
+     "option": "yes"
+    }
+   }
+  },
+  "form/b106d": {
+   "value": {
+    "caption.debtor1_name": {
+     "text": "Ada Quinn Lovelace"
+    },
+    "caption.debtor2_name": {
+     "text": "Ben Lovelace Jr."
+    },
+    "caption.district": {
+     "text": "Middle District of Florida"
+    },
+    "claim.account_last4": {
+     "rows": {
+      "account number": {
+       "text": "3321"
+      },
+      "account number 2": {
+       "text": "8890"
+      }
+     }
+    },
+    "claim.amount": {
+     "rows": {
+      "undefined": {
+       "text": "195,000.00"
+      },
+      "undefined_5": {
+       "text": "7,400.00"
+      }
+     }
+    },
+    "claim.collateral_description": {
+     "rows": {
+      "As of the date you file the claim is Check all that apply": {
+       "text": "12 Byron Court, Tampa, FL 33601"
+      },
+      "As of the date you file the claim is Check all that apply_2": {
+       "text": "2016 Honda Civic LX"
+      }
+     }
+    },
+    "claim.collateral_value": {
+     "rows": {
+      "undefined_2": {
+       "text": "240,000.00"
+      },
+      "undefined_6": {
+       "text": "9,000.00"
+      }
+     }
+    },
+    "claim.creditor_city": {
+     "rows": {
+      "2": {
+       "text": "Tampa"
+      },
+      "2_2": {
+       "text": "Orlando"
+      }
+     }
+    },
+    "claim.creditor_name": {
+     "rows": {
+      "Creditors Name": {
+       "text": "Gulf Coast Home Loans"
+      },
+      "Creditors Name_2": {
+       "text": "Drive Away Financial LLC"
+      }
+     }
+    },
+    "claim.creditor_state": {
+     "rows": {
+      "3": {
+       "text": "FL"
+      },
+      "3_2": {
+       "text": "FL"
+      }
+     }
+    },
+    "claim.creditor_street": {
+     "rows": {
+      "Street": {
+       "text": "100 Lender Way"
+      },
+      "Street_2": {
+       "text": "88 Motor Row"
+      }
+     }
+    },
+    "claim.creditor_zip": {
+     "rows": {
+      "4": {
+       "text": "33602"
+      },
+      "4_2": {
+       "text": "32801"
+      }
+     }
+    },
+    "claim.date_incurred": {
+     "rows": {
+      "Date debt was incurred": {
+       "text": "06/01/2019"
+      },
+      "Date debt was incurred_2": {
+       "text": "04/15/2023"
+      }
+     }
+    },
+    "claim.lien_agreement": {
+     "rows": {
+      "An agreement you made such as mortgage or secured": {
+       "check": true
+      },
+      "An agreement you made such as mortgage or secured_2": {
+       "check": true
+      }
+     }
+    },
+    "claim.unsecured_portion": {
+     "rows": {
+      "undefined_3": {
+       "text": "0.00"
+      },
+      "undefined_7": {
+       "text": "0.00"
+      }
+     }
+    },
+    "claim.who_owes": {
+     "rows": {
+      "check 2": {
+       "option": "Debtor 1 and 2"
+      },
+      "check 3": {
+       "option": "debtor 1"
+      }
+     }
+    },
+    "line_1_any_secured_claims": {
+     "option": "yes"
+    },
+    "notify.account_last4": {
+     "rows": {
+      "account number 6": {
+       "text": "3321"
+      }
+     }
+    },
+    "notify.city": {
+     "rows": {
+      "Street 2": {
+       "text": "Tampa"
+      }
+     }
+    },
+    "notify.name": {
+     "rows": {
+      "Name": {
+       "text": "Gulf Coast Loan Servicing"
+      }
+     }
+    },
+    "notify.state": {
+     "rows": {
+      "Street 3": {
+       "text": "FL"
+      }
+     }
+    },
+    "notify.street": {
+     "rows": {
+      "Number_6": {
+       "text": "101 Lender Way"
+      }
+     }
+    },
+    "notify.street2": {
+     "rows": {
+      "Street 1": {
+       "text": "Suite 4"
+      }
+     }
+    },
+    "notify.zip": {
+     "rows": {
+      "Street 4": {
+       "text": "33602"
+      }
+     }
+    },
+    "part1_page_subtotal": {
+     "rows": {
+      "undefined_9": {
+       "text": "202,400.00"
+      }
+     }
+    },
+    "part1_total": {
+     "text": "202,400.00"
+    }
+   }
+  },
+  "form/b106dec": {
+   "value": {
+    "caption.debtor1_name": {
+     "text": "Ada Quinn Lovelace"
+    },
+    "caption.debtor2_name": {
+     "text": "Ben Lovelace Jr."
+    },
+    "caption.district": {
+     "text": "Middle District of Florida"
+    },
+    "debtor1_signature_date": {
+     "text": "08/30/2026"
+    },
+    "debtor2_signature_date": {
+     "text": "08/30/2026"
+    },
+    "paid_nonattorney_preparer": {
+     "option": "no"
+    }
+   }
+  },
+  "form/b106ef": {
+   "value": {
+    "caption.debtor1_name": {
+     "text": "Ada Quinn Lovelace"
+    },
+    "caption.debtor2_name": {
+     "text": "Ben Lovelace Jr."
+    },
+    "caption.district": {
+     "text": "Middle District of Florida"
+    },
+    "line_1_any_priority_claims": {
+     "option": "yes"
+    },
+    "line_3_any_nonpriority_claims": {
+     "option": "yes"
+    },
+    "line_6a_total": {
+     "text": "0.00"
+    },
+    "line_6b_total": {
+     "text": "3,650.00"
+    },
+    "line_6c_total": {
+     "text": "0.00"
+    },
+    "line_6d_total": {
+     "text": "0.00"
+    },
+    "line_6e_total": {
+     "text": "3,650.00"
+    },
+    "line_6f_total": {
+     "text": "12,000.00"
+    },
+    "line_6g_total": {
+     "text": "0.00"
+    },
+    "line_6h_total": {
+     "text": "0.00"
+    },
+    "line_6i_total": {
+     "text": "10,800.00"
+    },
+    "line_6j_total": {
+     "text": "22,800.00"
+    },
+    "nonpriority.account_last4": {
+     "rows": {
+      "account number 6": {
+       "text": "4412"
+      },
+      "account number 7": {
+       "text": "0072"
+      },
+      "account number 8": {
+       "text": "5510"
+      }
+     }
+    },
+    "nonpriority.amount": {
+     "rows": {
+      "Total_26": {
+       "text": "8,200.00"
+      },
+      "Total_27": {
+       "text": "2,600.00"
+      },
+      "Total_28": {
+       "text": "12,000.00"
+      }
+     }
+    },
+    "nonpriority.creditor_city": {
+     "rows": {
+      "City 4.1": {
+       "text": "Wilmington"
+      },
+      "City 4.2": {
+       "text": "Tampa"
+      },
+      "City 4.3": {
+       "text": "Lincoln"
+      }
+     }
+    },
+    "nonpriority.creditor_name": {
+     "rows": {
+      "Creditors Name_6": {
+       "text": "Meridian Bank Card Services"
+      },
+      "Creditors Name_7": {
+       "text": "Bayside General Hospital"
+      },
+      "Creditors Name_8": {
+       "text": "Great Plains Student Servicing"
+      }
+     }
+    },
+    "nonpriority.creditor_state": {
+     "rows": {
+      "State 4.1": {
+       "text": "DE"
+      },
+      "State 4.2": {
+       "text": "FL"
+      },
+      "State 4.3": {
+       "text": "NE"
+      }
+     }
+    },
+    "nonpriority.creditor_street": {
+     "rows": {
+      "Street_6": {
+       "text": "1 Meridian Plaza"
+      },
+      "Street_7": {
+       "text": "2 Care Circle"
+      },
+      "Street_8": {
+       "text": "500 Loan Loop"
+      }
+     }
+    },
+    "nonpriority.creditor_zip": {
+     "rows": {
+      "Zip 4.1": {
+       "text": "19801"
+      },
+      "Zip 4.2": {
+       "text": "33606"
+      },
+      "Zip 4.3": {
+       "text": "68501"
+      }
+     }
+    },
+    "nonpriority.date_incurred": {
+     "rows": {
+      "Date debt was incurred_6": {
+       "text": "11/01/2020"
+      },
+      "Date debt was incurred_7": {
+       "text": "02/10/2026"
+      },
+      "Date debt was incurred_8": {
+       "text": "09/01/2012"
+      }
+     }
+    },
+    "nonpriority.disputed": {
+     "rows": {
+      "Disputed_7": {
+       "check": true
+      }
+     }
+    },
+    "nonpriority.subject_to_offset": {
+     "rows": {
+      "check10": {
+       "option": "no"
+      },
+      "check8": {
+       "option": "no"
+      },
+      "check9": {
+       "option": "yes"
+      }
+     }
+    },
+    "nonpriority.type_other": {
+     "rows": {
+      "Other_6": {
+       "check": true
+      },
+      "Other_7": {
+       "check": true
+      }
+     }
+    },
+    "nonpriority.type_other_specify": {
+     "rows": {
+      "Other unsecurecured claim 4.1": {
+       "text": "Credit card purchases"
+      },
+      "Other unsecurecured claim 4.2": {
+       "text": "Medical services"
+      }
+     }
+    },
+    "nonpriority.type_student_loans": {
+     "rows": {
+      "Student loans_8": {
+       "check": true
+      }
+     }
+    },
+    "nonpriority.who_incurred": {
+     "rows": {
+      "check 6": {
+       "option": "debtor 1 and 2"
+      },
+      "check 7": {
+       "option": "debtor 2"
+      },
+      "check 8": {
+       "option": "debtor 1"
+      }
+     }
+    },
+    "notify.account_last4": {
+     "rows": {
+      "account number 12": {
+       "text": "4412"
+      }
+     }
+    },
+    "notify.city": {
+     "rows": {
+      "City 5.1": {
+       "text": "Wilmington"
+      }
+     }
+    },
+    "notify.name": {
+     "rows": {
+      "Creditors Name_12": {
+       "text": "Meridian Recovery Services"
+      }
+     }
+    },
+    "notify.referenced_part": {
+     "rows": {
+      "check14": {
+       "option": "yes"
+      }
+     }
+    },
+    "notify.state": {
+     "rows": {
+      "State 5.1": {
+       "text": "DE"
+      }
+     }
+    },
+    "notify.street": {
+     "rows": {
+      "Street_12": {
+       "text": "9 Collection Court"
+      }
+     }
+    },
+    "notify.zip": {
+     "rows": {
+      "Zip 5.1": {
+       "text": "19801"
+      }
+     }
+    },
+    "priority.creditor_city": {
+     "rows": {
+      "2": {
+       "text": "Philadelphia"
+      }
+     }
+    },
+    "priority.creditor_name": {
+     "rows": {
+      "Creditors Name": {
+       "text": "Internal Revenue Service"
+      }
+     }
+    },
+    "priority.creditor_state": {
+     "rows": {
+      "3": {
+       "text": "PA"
+      }
+     }
+    },
+    "priority.creditor_street": {
+     "rows": {
+      "Street": {
+       "text": "PO Box 7346"
+      }
+     }
+    },
+    "priority.creditor_zip": {
+     "rows": {
+      "4": {
+       "text": "19101"
+      }
+     }
+    },
+    "priority.date_incurred": {
+     "rows": {
+      "Date debt was incurred": {
+       "text": "04/15/2025"
+      }
+     }
+    },
+    "priority.nonpriority_amount": {
+     "rows": {
+      "undefined_3": {
+       "text": "450.00"
+      }
+     }
+    },
+    "priority.priority_amount": {
+     "rows": {
+      "undefined_2": {
+       "text": "3,200.00"
+      }
+     }
+    },
+    "priority.subject_to_offset": {
+     "rows": {
+      "check2": {
+       "option": "no"
+      }
+     }
+    },
+    "priority.total_claim": {
+     "rows": {
+      "undefined": {
+       "text": "3,650.00"
+      }
+     }
+    },
+    "priority.type_taxes": {
+     "rows": {
+      "Taxes and ceratin other debts you owe the government": {
+       "check": true
+      }
+     }
+    },
+    "priority.who_incurred": {
+     "rows": {
+      "check 1": {
+       "option": "Debtor 1 and 2"
+      }
+     }
+    }
+   }
+  },
+  "form/b106g": {
+   "value": {
+    "caption.debtor1_name": {
+     "text": "Ada Quinn Lovelace"
+    },
+    "caption.debtor2_name": {
+     "text": "Ben Lovelace Jr."
+    },
+    "caption.district": {
+     "text": "Middle District of Florida"
+    },
+    "line_1_any_contracts": {
+     "option": "yes"
+    },
+    "line_2_contract_description": {
+     "rows": {
+      "Contact Info 2.1": {
+       "text": "Month-to-month storage unit lease, unit 214; debtor's interest: lessee"
+      },
+      "Contact Info 2.2": {
+       "text": "Two-year wireless service agreement, 14 months remaining"
+      },
+      "Contact Info 2.3": {
+       "text": "Lease of a 2024 Toyota RAV4, 22 months remaining; debtor's interest: lessee"
+      }
+     }
+    },
+    "line_2_counterparty_city": {
+     "rows": {
+      "City 2.1": {
+       "text": "Tampa"
+      },
+      "City 2.2": {
+       "text": "Tampa"
+      },
+      "City 2.3": {
+       "text": "Orlando"
+      }
+     }
+    },
+    "line_2_counterparty_name": {
+     "rows": {
+      "Company Name 2.1": {
+       "text": "StorSafe Tampa LLC"
+      },
+      "Company Name 2.2": {
+       "text": "Gulf Wireless LLC"
+      },
+      "Company Name 2.3": {
+       "text": "Sunshine Auto Leasing LLC"
+      }
+     }
+    },
+    "line_2_counterparty_state": {
+     "rows": {
+      "State 2.1": {
+       "text": "FL"
+      },
+      "State 2.2": {
+       "text": "FL"
+      },
+      "State 2.3": {
+       "text": "FL"
+      }
+     }
+    },
+    "line_2_counterparty_street": {
+     "rows": {
+      "Street 2.1": {
+       "text": "77 Keeper Street"
+      },
+      "Street 2.2": {
+       "text": "300 Signal Drive"
+      },
+      "Street 2.3": {
+       "text": "500 Lease Lane"
+      }
+     }
+    },
+    "line_2_counterparty_zip": {
+     "rows": {
+      "Zip 2.1": {
+       "text": "33605"
+      },
+      "Zip 2.2": {
+       "text": "33607"
+      },
+      "Zip 2.3": {
+       "text": "32801"
+      }
+     }
+    }
+   }
+  },
+  "form/b106h": {
+   "value": {
+    "caption.debtor1_name": {
+     "text": "Ada Quinn Lovelace"
+    },
+    "caption.debtor2_name": {
+     "text": "Ben Lovelace Jr."
+    },
+    "caption.district": {
+     "text": "Middle District of Florida"
+    },
+    "line_1_any_codebtors": {
+     "option": "yes"
+    },
+    "line_2_lived_in_community_state": {
+     "option": "no"
+    },
+    "line_3_codebtor_city": {
+     "rows": {
+      "Codebtor City 3.1": {
+       "text": "Tampa"
+      },
+      "Codebtor City 3.2": {
+       "text": "Tampa"
+      }
+     }
+    },
+    "line_3_codebtor_name": {
+     "rows": {
+      "Codebtor Name 3.1": {
+       "text": "Margaret Lovelace"
+      },
+      "Codebtor Name 3.2": {
+       "text": "Charles Menabrea"
+      }
+     }
+    },
+    "line_3_codebtor_state": {
+     "rows": {
+      "Codebtor State 3.1": {
+       "text": "FL"
+      },
+      "Codebtor State 3.2": {
+       "text": "FL"
+      }
+     }
+    },
+    "line_3_codebtor_street": {
+     "rows": {
+      "Codebtor Street 3.1": {
+       "text": "9 Garden Lane"
+      },
+      "Codebtor Street 3.2": {
+       "text": "41 Engine Row"
+      }
+     }
+    },
+    "line_3_codebtor_zip": {
+     "rows": {
+      "Codebtor Zip 3.1": {
+       "text": "33603"
+      },
+      "Codebtor Zip 3.2": {
+       "text": "33605"
+      }
+     }
+    },
+    "line_3_schedule_d_applies": {
+     "rows": {
+      "check schedule line D 3.1": {
+       "check": true
+      }
+     }
+    },
+    "line_3_schedule_ef_applies": {
+     "rows": {
+      "check schedule line E/F 3.2": {
+       "check": true
+      }
+     }
+    },
+    "line_3_schedule_g_applies": {
+     "rows": {
+      "check schedule line G 3.2": {
+       "check": true
+      }
+     }
+    }
+   }
+  },
+  "form/b106i": {
+   "value": {
+    "caption.debtor1_name": {
+     "text": "Ada Quinn Lovelace"
+    },
+    "caption.debtor2_name": {
+     "text": "Ben Lovelace Jr."
+    },
+    "caption.district": {
+     "text": "Middle District of Florida"
+    },
+    "employer_address": {
+     "rows": {
+      "Employers City Debtor 1": {
+       "text": "Tampa"
+      },
+      "Employers State Debtor 1": {
+       "text": "FL"
+      },
+      "Employers Street1 Debtor 1": {
+       "text": "200 Engine Row"
+      },
+      "Employers Zip debtor 1": {
+       "text": "33605"
+      }
+     }
+    },
+    "employer_name": {
+     "rows": {
+      "Employers Name Debtor 1": {
+       "text": "Menabrea Machines Inc"
+      }
+     }
+    },
+    "employment_status": {
+     "rows": {
+      "Check emploment status Debtor 1": {
+       "option": "employed"
+      },
+      "Check emploment status Debtor 2": {
+       "option": "unemployed"
+      }
+     }
+    },
+    "how_long_employed": {
+     "text": "Since 02/14/2019"
+    },
+    "line_10_combined": {
+     "text": "7,899.50"
+    },
+    "line_10_monthly_income": {
+     "rows": {
+      "Amount 10 Debtor 1": {
+       "text": "4,899.50"
+      },
+      "Amount 10 Debtor 2": {
+       "text": "3,000.00"
+      }
+     }
+    },
+    "line_11_household_contributions": {
+     "text": "250.00"
+    },
+    "line_12_combined_monthly_income": {
+     "text": "8,149.50"
+    },
+    "line_13_change_expected": {
+     "option": "yes"
+    },
+    "line_13_change_explanation": {
+     "text": "Overtime ends in November."
+    },
+    "line_2_gross_wages": {
+     "rows": {
+      "Amount 2 Debtor 1": {
+       "text": "5,200.00"
+      },
+      "Amount 2 Debtor 2": {
+       "text": "3,000.00"
+      }
+     }
+    },
+    "line_3_overtime": {
+     "rows": {
+      "Amount 3 Debtor 1": {
+       "text": "250.00"
+      }
+     }
+    },
+    "line_4_copy": {
+     "rows": {
+      "Amount 4 Debtor 1a": {
+       "text": "5,450.00"
+      },
+      "Amount 4 Debtor 2a": {
+       "text": "3,000.00"
+      }
+     }
+    },
+    "line_4_gross_income": {
+     "rows": {
+      "Amount 4 Debtor 1": {
+       "text": "5,450.00"
+      },
+      "Amount 4 Debtor 2": {
+       "text": "3,000.00"
+      }
+     }
+    },
+    "line_5a_tax_medicare_ss": {
+     "rows": {
+      "Amount 5a Debtor 1": {
+       "text": "830.00"
+      }
+     }
+    },
+    "line_5e_insurance": {
+     "rows": {
+      "Amount 5e Debtor 1": {
+       "text": "120.50"
+      }
+     }
+    },
+    "line_6_total_deductions": {
+     "rows": {
+      "Amount 6 Debtor 1": {
+       "text": "950.50"
+      },
+      "Amount 6 Debtor 2": {
+       "text": "0.00"
+      }
+     }
+    },
+    "line_7_take_home_pay": {
+     "rows": {
+      "Amount 7 Debtor 1": {
+       "text": "4,499.50"
+      },
+      "Amount 7 Debtor 2": {
+       "text": "3,000.00"
+      }
+     }
+    },
+    "line_8c_family_support": {
+     "rows": {
+      "Amount 8c Debtor 1": {
+       "text": "400.00"
+      }
+     }
+    },
+    "line_9_total_other_income": {
+     "rows": {
+      "Amount 9 Debtor 1": {
+       "text": "400.00"
+      },
+      "Amount 9 Debtor 2": {
+       "text": "0.00"
+      }
+     }
+    },
+    "occupation": {
+     "rows": {
+      "Occupation Debtor 1": {
+       "text": "Systems analyst"
+      }
+     }
+    }
+   }
+  },
+  "form/b106j": {
+   "value": {
+    "caption.debtor1_name": {
+     "text": "Ada Quinn Lovelace"
+    },
+    "caption.debtor2_name": {
+     "text": "Ben Lovelace Jr."
+    },
+    "caption.district": {
+     "text": "Middle District of Florida"
+    },
+    "line_10_personal_care": {
+     "text": "60.00"
+    },
+    "line_11_medical_dental": {
+     "text": "180.00"
+    },
+    "line_12_transportation": {
+     "text": "240.00"
+    },
+    "line_13_entertainment": {
+     "text": "90.00"
+    },
+    "line_14_charitable": {
+     "text": "50.00"
+    },
+    "line_15a_life_insurance": {
+     "text": "45.00"
+    },
+    "line_15b_health_insurance": {
+     "text": "380.00"
+    },
+    "line_15c_vehicle_insurance": {
+     "text": "165.00"
+    },
+    "line_16_taxes": {
+     "text": "150.00"
+    },
+    "line_16_taxes_specify": {
+     "text": "Self-employment tax estimate"
+    },
+    "line_17a_car_payment_vehicle1": {
+     "text": "260.00"
+    },
+    "line_17c_installment_other_1": {
+     "text": "55.00"
+    },
+    "line_17c_installment_other_1_specify": {
+     "text": "Financed laptop"
+    },
+    "line_1_debtor2_separate_household": {
+     "option": "no"
+    },
+    "line_1_joint_case": {
+     "option": "yes"
+    },
+    "line_21_other": {
+     "text": "70.00"
+    },
+    "line_21_other_specify": {
+     "text": "Dog food and veterinary care"
+    },
+    "line_22a_total_expenses": {
+     "text": "5,060.00"
+    },
+    "line_22c_monthly_expenses": {
+     "text": "5,060.00"
+    },
+    "line_23a_combined_monthly_income": {
+     "text": "8,149.50"
+    },
+    "line_23b_monthly_expenses": {
+     "text": "5,060.00"
+    },
+    "line_23c_net_income": {
+     "text": "3,089.50"
+    },
+    "line_24_change_expected": {
+     "option": "yes"
+    },
+    "line_24_change_explanation": {
+     "text": "Health insurance premiums increase in January."
+    },
+    "line_2_dependent_age": {
+     "rows": {
+      "Dependant age 2a": {
+       "text": "9"
+      }
+     }
+    },
+    "line_2_dependent_lives_with_you": {
+     "rows": {
+      "check2a": {
+       "option": "yes"
+      }
+     }
+    },
+    "line_2_dependent_relationship": {
+     "rows": {
+      "Dependant Relation 2a": {
+       "text": "Daughter"
+      }
+     }
+    },
+    "line_2_have_dependents": {
+     "option": "yes"
+    },
+    "line_3_expenses_include_others": {
+     "option": "yes"
+    },
+    "line_4_rent_or_home_ownership": {
+     "text": "1,480.00"
+    },
+    "line_4c_home_maintenance": {
+     "text": "120.00"
+    },
+    "line_6a_electricity_heat_gas": {
+     "text": "210.00"
+    },
+    "line_6b_water_sewer_garbage": {
+     "text": "95.00"
+    },
+    "line_6c_telecom": {
+     "text": "140.00"
+    },
+    "line_7_food_housekeeping": {
+     "text": "850.00"
+    },
+    "line_8_childcare_education": {
+     "text": "300.00"
+    },
+    "line_9_clothing_laundry": {
+     "text": "120.00"
+    }
+   }
+  },
+  "form/b106j2": {
+   "value": {
+    "caption.debtor1_name": {
+     "text": "Ada Quinn Lovelace"
+    },
+    "caption.debtor2_name": {
+     "text": "Ben Lovelace Jr."
+    },
+    "caption.district": {
+     "text": "Middle District of Florida"
+    },
+    "line_1_separate_households": {
+     "option": "no"
+    }
+   }
+  },
+  "form/b106sum": {
+   "value": {
+    "caption.debtor1_name": {
+     "text": "Ada Quinn Lovelace"
+    },
+    "caption.debtor2_name": {
+     "text": "Ben Lovelace Jr."
+    },
+    "caption.district": {
+     "text": "Middle District of Florida"
+    },
+    "line_1a_total_real_estate": {
+     "text": "240,000.00"
+    },
+    "line_1b_total_personal_property": {
+     "text": "72,550.00"
+    },
+    "line_1c_total_property": {
+     "text": "312,550.00"
+    },
+    "line_2_secured_claims_total": {
+     "text": "202,400.00"
+    },
+    "line_3_total_liabilities": {
+     "text": "228,850.00"
+    },
+    "line_3a_priority_unsecured_total": {
+     "text": "3,650.00"
+    },
+    "line_3b_nonpriority_unsecured_total": {
+     "text": "22,800.00"
+    },
+    "line_4_combined_monthly_income": {
+     "text": "8,149.50"
+    },
+    "line_5_monthly_expenses": {
+     "text": "5,060.00"
+    },
+    "line_6_filing_under_7_11_13": {
+     "option": "yes"
+    },
+    "line_7_kind_of_debt": {
+     "option": "consumer"
+    },
+    "line_9a_domestic_support": {
+     "text": "0.00"
+    },
+    "line_9b_taxes_government": {
+     "text": "3,650.00"
+    },
+    "line_9c_intoxicated_injury": {
+     "text": "0.00"
+    },
+    "line_9d_student_loans": {
+     "text": "12,000.00"
+    },
+    "line_9e_separation_divorce": {
+     "text": "0.00"
+    },
+    "line_9f_pension_profit_sharing": {
+     "text": "0.00"
+    },
+    "line_9g_total": {
+     "text": "15,650.00"
+    }
+   }
+  },
+  "form/b107": {
+   "value": {
+    "caption.debtor1_name": {
+     "text": "Ada Quinn Lovelace"
+    },
+    "caption.debtor2_name": {
+     "text": "Ben Lovelace Jr."
+    },
+    "caption.district": {
+     "text": "Middle District of Florida"
+    },
+    "q10_gate": {
+     "option": "no"
+    },
+    "q11_gate": {
+     "option": "no"
+    },
+    "q12_assignee": {
+     "option": "no"
+    },
+    "q13_dates": {
+     "rows": {
+      "Date1 13a": {
+       "text": "10/12/2025"
+      }
+     }
+    },
+    "q13_describe": {
+     "rows": {
+      "Describe 13a": {
+       "text": "Wedding gift"
+      }
+     }
+    },
+    "q13_gate": {
+     "option": "yes"
+    },
+    "q13_recipient_city": {
+     "rows": {
+      "City 13a": {
+       "text": "Atlanta"
+      }
+     }
+    },
+    "q13_recipient_name": {
+     "rows": {
+      "Name to who you gave gift 13a": {
+       "text": "Clara Byron"
+      }
+     }
+    },
+    "q13_recipient_state": {
+     "rows": {
+      "State 13a": {
+       "text": "GA"
+      }
+     }
+    },
+    "q13_recipient_street": {
+     "rows": {
+      "address 13a": {
+       "text": "15 Loom Lane"
+      }
+     }
+    },
+    "q13_recipient_zip": {
+     "rows": {
+      "ZIP Code 13a": {
+       "text": "30301"
+      }
+     }
+    },
+    "q13_relationship": {
+     "rows": {
+      "Relation 13a": {
+       "text": "Niece"
+      }
+     }
+    },
+    "q13_values": {
+     "rows": {
+      "Amount1 13a": {
+       "text": "650.00"
+      }
+     }
+    },
+    "q14_charity_city": {
+     "text": "Tampa"
+    },
+    "q14_charity_name": {
+     "text": "Tampa Bay Food Bank"
+    },
+    "q14_charity_state": {
+     "text": "FL"
+    },
+    "q14_charity_street": {
+     "text": "5 Harvest Road"
+    },
+    "q14_charity_zip": {
+     "text": "33610"
+    },
+    "q14_dates": {
+     "rows": {
+      "Date1 14": {
+       "text": "11/30/2025"
+      }
+     }
+    },
+    "q14_describe": {
+     "text": "Cash donations"
+    },
+    "q14_gate": {
+     "option": "yes"
+    },
+    "q14_values": {
+     "rows": {
+      "Amount1 14": {
+       "text": "700.00"
+      }
+     }
+    },
+    "q15_date": {
+     "text": "09/28/2025"
+    },
+    "q15_describe_insurance": {
+     "text": "Not covered; below the deductible"
+    },
+    "q15_describe_loss": {
+     "text": "Hurricane damage to the back fence"
+    },
+    "q15_gate": {
+     "option": "yes"
+    },
+    "q15_value": {
+     "text": "1,400.00"
+    },
+    "q16_amounts": {
+     "rows": {
+      "Amount1 16a": {
+       "text": "1,500.00"
+      }
+     }
+    },
+    "q16_dates": {
+     "rows": {
+      "Date1 16a": {
+       "text": "07/15/2026"
+      }
+     }
+    },
+    "q16_describe": {
+     "rows": {
+      "Describe 16a": {
+       "text": "Attorney fees for this bankruptcy case"
+      }
+     }
+    },
+    "q16_email": {
+     "rows": {
+      "Email 16a": {
+       "text": "alex@example.com"
+      }
+     }
+    },
+    "q16_gate": {
+     "option": "yes"
+    },
+    "q16_payee_city": {
+     "rows": {
+      "City 16a": {
+       "text": "Tampa"
+      }
+     }
+    },
+    "q16_payee_name": {
+     "rows": {
+      "Name to who you was paid 16a": {
+       "text": "Counsel & Counsel PA"
+      }
+     }
+    },
+    "q16_payee_state": {
+     "rows": {
+      "State 16a": {
+       "text": "FL"
+      }
+     }
+    },
+    "q16_payee_street": {
+     "rows": {
+      "address 16a": {
+       "text": "1 Example Way"
+      }
+     }
+    },
+    "q16_payee_zip": {
+     "rows": {
+      "ZIP Code 16a": {
+       "text": "33604"
+      }
+     }
+    },
+    "q17_gate": {
+     "option": "no"
+    },
+    "q18_date": {
+     "rows": {
+      "Date1 18a": {
+       "text": "03/15/2025"
+      }
+     }
+    },
+    "q18_describe_exchange": {
+     "rows": {
+      "Describe2 18a": {
+       "text": "$500 cash"
+      }
+     }
+    },
+    "q18_describe_property": {
+     "rows": {
+      "Describe1 18a": {
+       "text": "Sold a spare engine lathe valued at about $800"
+      }
+     }
+    },
+    "q18_gate": {
+     "option": "yes"
+    },
+    "q18_recipient_city": {
+     "rows": {
+      "City 18a": {
+       "text": "Tampa"
+      }
+     }
+    },
+    "q18_recipient_name": {
+     "rows": {
+      "Name to who you received transfer 18a": {
+       "text": "Charles Menabrea"
+      }
+     }
+    },
+    "q18_recipient_state": {
+     "rows": {
+      "State 18a": {
+       "text": "FL"
+      }
+     }
+    },
+    "q18_recipient_street": {
+     "rows": {
+      "address 18a": {
+       "text": "41 Engine Row"
+      }
+     }
+    },
+    "q18_recipient_zip": {
+     "rows": {
+      "ZIP Code 18a": {
+       "text": "33605"
+      }
+     }
+    },
+    "q18_relationship": {
+     "rows": {
+      "Relation 18a": {
+       "text": "Friend"
+      }
+     }
+    },
+    "q19_gate": {
+     "option": "no"
+    },
+    "q1_marital_status": {
+     "option": "married"
+    },
+    "q20_account_last4": {
+     "rows": {
+      "account number 20a": {
+       "text": "2210"
+      }
+     }
+    },
+    "q20_balance": {
+     "rows": {
+      "Balance 20a": {
+       "text": "25.00"
+      }
+     }
+    },
+    "q20_date_closed": {
+     "rows": {
+      "Date closed 20a": {
+       "text": "01/15/2026"
+      }
+     }
+    },
+    "q20_gate": {
+     "option": "yes"
+    },
+    "q20_institution_city": {
+     "rows": {
+      "City 20a": {
+       "text": "Tampa"
+      }
+     }
+    },
+    "q20_institution_name": {
+     "rows": {
+      "Name of financial institution 20a": {
+       "text": "First Gulf Bank"
+      }
+     }
+    },
+    "q20_institution_state": {
+     "rows": {
+      "State 20a": {
+       "text": "FL"
+      }
+     }
+    },
+    "q20_institution_street": {
+     "rows": {
+      "address 20a": {
+       "text": "12 Bay Street"
+      }
+     }
+    },
+    "q20_institution_zip": {
+     "text": "33601"
+    },
+    "q20_type_checking": {
+     "rows": {
+      "check Checking 20a": {
+       "check": true
+      }
+     }
+    },
+    "q21_gate": {
+     "option": "no"
+    },
+    "q22_access_name": {
+     "text": "Ada Lovelace"
+    },
+    "q22_describe": {
+     "text": "Business records and spare parts"
+    },
+    "q22_facility_city": {
+     "text": "Tampa"
+    },
+    "q22_facility_name": {
+     "text": "StorSafe Tampa LLC"
+    },
+    "q22_facility_state": {
+     "text": "FL"
+    },
+    "q22_facility_street": {
+     "text": "77 Keeper Street"
+    },
+    "q22_facility_zip": {
+     "text": "33605"
+    },
+    "q22_gate": {
+     "option": "yes"
+    },
+    "q22_still_have": {
+     "option": "yes"
+    },
+    "q23_describe": {
+     "text": "Loaned test equipment"
+    },
+    "q23_gate": {
+     "option": "yes"
+    },
+    "q23_owner_city": {
+     "text": "Tampa"
+    },
+    "q23_owner_name": {
+     "text": "Menabrea Machines Inc"
+    },
+    "q23_owner_state": {
+     "text": "FL"
+    },
+    "q23_owner_street": {
+     "text": "200 Engine Row"
+    },
+    "q23_owner_zip": {
+     "text": "33605"
+    },
+    "q23_value": {
+     "text": "900.00"
+    },
+    "q23_where_street": {
+     "text": "Workshop shelf at 12 Byron Court"
+    },
+    "q24_gate": {
+     "option": "no"
+    },
+    "q25_gate": {
+     "option": "no"
+    },
+    "q26_gate_and_status": {
+     "option": "no"
+    },
+    "q27_business_city": {
+     "rows": {
+      "City 27a": {
+       "text": "Tampa"
+      }
+     }
+    },
+    "q27_business_name": {
+     "rows": {
+      "Business Name 27a": {
+       "text": "Ada's Analytical Engines"
+      }
+     }
+    },
+    "q27_business_state": {
+     "rows": {
+      "State 27a": {
+       "text": "FL"
+      }
+     }
+    },
+    "q27_business_street": {
+     "rows": {
+      "address 27a": {
+       "text": "88 Difference Drive"
+      }
+     }
+    },
+    "q27_business_zip": {
+     "rows": {
+      "ZIP Code 27a": {
+       "text": "33603"
+      }
+     }
+    },
+    "q27_connection_sole_proprietor": {
+     "check": true
+    },
+    "q27_date_from": {
+     "rows": {
+      "Date from 27a": {
+       "text": "01/01/2019"
+      }
+     }
+    },
+    "q27_ein": {
+     "rows": {
+      "Debtor1.Employer Identification Number27a": {
+       "text": "123456789"
+      }
+     }
+    },
+    "q27_gate": {
+     "option": "yes"
+    },
+    "q27_nature": {
+     "rows": {
+      "Describe nature 27a": {
+       "text": "Repair and resale of analytical engines"
+      }
+     }
+    },
+    "q28_city": {
+     "text": "Tampa"
+    },
+    "q28_date_issued": {
+     "text": "06/01/2025"
+    },
+    "q28_gate": {
+     "option": "yes"
+    },
+    "q28_name": {
+     "text": "Suncoast Credit Union"
+    },
+    "q28_state": {
+     "text": "FL"
+    },
+    "q28_street": {
+     "text": "6801 Croom Road"
+    },
+    "q28_zip": {
+     "text": "33607"
+    },
+    "q2_debtor1_city": {
+     "rows": {
+      "City 1b Debtor1": {
+       "text": "Tampa"
+      }
+     }
+    },
+    "q2_debtor1_from": {
+     "rows": {
+      "Date from 1b Debtor1": {
+       "text": "01/01/2023"
+      }
+     }
+    },
+    "q2_debtor1_state": {
+     "rows": {
+      "State 1b Debtor1": {
+       "text": "FL"
+      }
+     }
+    },
+    "q2_debtor1_street": {
+     "rows": {
+      "Street address 1b Debtor 1": {
+       "text": "3 Difference Court"
+      }
+     }
+    },
+    "q2_debtor1_to": {
+     "rows": {
+      "Date to 1b Debtor1": {
+       "text": "06/30/2024"
+      }
+     }
+    },
+    "q2_debtor1_zip": {
+     "rows": {
+      "ZIP Code 1b Debtor 1": {
+       "text": "33604"
+      }
+     }
+    },
+    "q2_debtor2_city": {
+     "rows": {
+      "City 1b Debtor2": {
+       "text": "Decatur"
+      }
+     }
+    },
+    "q2_debtor2_from": {
+     "rows": {
+      "Date from 1b Debtor2": {
+       "text": "11/01/2024"
+      }
+     }
+    },
+    "q2_debtor2_state": {
+     "rows": {
+      "State 1b Debtor2": {
+       "text": "GA"
+      }
+     }
+    },
+    "q2_debtor2_street": {
+     "rows": {
+      "Street address 1b Debtor 2": {
+       "text": "8 Peachtree Lane"
+      }
+     }
+    },
+    "q2_debtor2_to": {
+     "rows": {
+      "Date to 1b Debtor2": {
+       "text": "07/01/2026"
+      }
+     }
+    },
+    "q2_debtor2_zip": {
+     "rows": {
+      "ZIP Code 1b Debtor 2": {
+       "text": "30030"
+      }
+     }
+    },
+    "q2_gate": {
+     "option": "yes"
+    },
+    "q3_community_property": {
+     "option": "no"
+    },
+    "q4_debtor1_current_gross": {
+     "text": "41,600.00"
+    },
+    "q4_debtor1_current_wages": {
+     "check": true
+    },
+    "q4_debtor1_last_year_business": {
+     "check": true
+    },
+    "q4_debtor1_last_year_gross": {
+     "text": "65,200.00"
+    },
+    "q4_debtor1_last_year_wages": {
+     "check": true
+    },
+    "q4_debtor1_year_before_gross": {
+     "text": "58,300.00"
+    },
+    "q4_debtor1_year_before_wages": {
+     "check": true
+    },
+    "q4_debtor2_current_gross": {
+     "text": "24,000.00"
+    },
+    "q4_debtor2_current_wages": {
+     "check": true
+    },
+    "q4_debtor2_last_year_gross": {
+     "text": "35,000.00"
+    },
+    "q4_debtor2_last_year_wages": {
+     "check": true
+    },
+    "q4_gate": {
+     "option": "yes"
+    },
+    "q4_last_year_yyyy": {
+     "text": "2025"
+    },
+    "q4_year_before_yyyy": {
+     "text": "2024"
+    },
+    "q5_debtor1_gross": {
+     "rows": {
+      "Income 5a Debtor 1": {
+       "text": "3,100.00"
+      }
+     }
+    },
+    "q5_debtor1_source": {
+     "rows": {
+      "Income source 5a Debtor 1": {
+       "text": "Unemployment compensation"
+      }
+     }
+    },
+    "q6_consumer_debts": {
+     "option": "yes"
+    },
+    "q6_creditor_city": {
+     "rows": {
+      "Creditors City 1": {
+       "text": "Tampa"
+      }
+     }
+    },
+    "q6_creditor_name": {
+     "rows": {
+      "Creditors Name 1": {
+       "text": "Gulf Coast Home Loans"
+      }
+     }
+    },
+    "q6_creditor_state": {
+     "rows": {
+      "Creditors State 1": {
+       "text": "FL"
+      }
+     }
+    },
+    "q6_creditor_street": {
+     "rows": {
+      "Creditors address a 1": {
+       "text": "100 Lender Way"
+      }
+     }
+    },
+    "q6_creditor_zip": {
+     "rows": {
+      "Creditors ZIP Code 1": {
+       "text": "33602"
+      }
+     }
+    },
+    "q6_paid_600": {
+     "option": "yes"
+    },
+    "q6_payment_dates": {
+     "rows": {
+      "Creditors payment Date 1a": {
+       "text": "05/01/2026"
+      },
+      "Creditors payment Date 1b": {
+       "text": "06/01/2026"
+      },
+      "Creditors payment Date 1c": {
+       "text": "07/01/2026"
+      }
+     }
+    },
+    "q6_still_owe": {
+     "rows": {
+      "Creditors amount owe 1": {
+       "text": "195,000.00"
+      }
+     }
+    },
+    "q6_total_paid": {
+     "rows": {
+      "Creditors amount paid 1": {
+       "text": "4,440.00"
+      }
+     }
+    },
+    "q6_was_payment_for_mortgage": {
+     "rows": {
+      "check mortgage 1": {
+       "check": true
+      }
+     }
+    },
+    "q7_gate": {
+     "option": "yes"
+    },
+    "q7_insider_city": {
+     "rows": {
+      "Insiders City 7a": {
+       "text": "Tampa"
+      }
+     }
+    },
+    "q7_insider_name": {
+     "rows": {
+      "Insider Name 7a": {
+       "text": "Margaret Lovelace"
+      }
+     }
+    },
+    "q7_insider_state": {
+     "rows": {
+      "Insiders State 7a": {
+       "text": "FL"
+      }
+     }
+    },
+    "q7_insider_street": {
+     "rows": {
+      "Insiders address 7a": {
+       "text": "9 Garden Lane"
+      }
+     }
+    },
+    "q7_insider_zip": {
+     "rows": {
+      "Insiders ZIP Code 7a": {
+       "text": "33603"
+      }
+     }
+    },
+    "q7_payment_dates": {
+     "rows": {
+      "Insiders payment Date1 7a": {
+       "text": "12/20/2025"
+      }
+     }
+    },
+    "q7_reason": {
+     "rows": {
+      "Insider reason of pay 7b": {
+       "text": "Repayment of a family loan"
+      }
+     }
+    },
+    "q7_still_owe": {
+     "rows": {
+      "Insiders amount owe 7a": {
+       "text": "0.00"
+      }
+     }
+    },
+    "q7_total_paid": {
+     "rows": {
+      "Insiders amount paid 7a": {
+       "text": "1,200.00"
+      }
+     }
+    },
+    "q8_gate": {
+     "option": "no"
+    },
+    "q9_case_nature": {
+     "rows": {
+      "Case nature 9a": {
+       "text": "Credit card collection"
+      }
+     }
+    },
+    "q9_case_number": {
+     "rows": {
+      "Case number 9a": {
+       "text": "26-CC-1184"
+      }
+     }
+    },
+    "q9_case_title": {
+     "rows": {
+      "Case title1 9a": {
+       "text": "Meridian Bank Card Services v. Lovelace"
+      }
+     }
+    },
+    "q9_court_city": {
+     "rows": {
+      "Court City 9a": {
+       "text": "Tampa"
+      }
+     }
+    },
+    "q9_court_name": {
+     "rows": {
+      "Court Name 9a": {
+       "text": "Hillsborough County Court"
+      }
+     }
+    },
+    "q9_court_state": {
+     "rows": {
+      "Court State 9a": {
+       "text": "FL"
+      }
+     }
+    },
+    "q9_court_street": {
+     "rows": {
+      "Court address 9a": {
+       "text": "800 E Twiggs Street"
+      }
+     }
+    },
+    "q9_court_zip": {
+     "rows": {
+      "Court ZIP Code 9a": {
+       "text": "33602"
+      }
+     }
+    },
+    "q9_gate": {
+     "option": "yes"
+    },
+    "q9_status": {
+     "rows": {
+      "check9a": {
+       "option": "pending"
+      }
+     }
+    },
+    "sign.debtor1_date": {
+     "text": "08/30/2026"
+    },
+    "sign.debtor2_date": {
+     "text": "08/30/2026"
+    },
+    "sign.paid_preparer": {
+     "option": "no"
+    }
+   }
+  },
+  "form/b108": {
+   "value": {
+    "caption.debtor1_name": {
+     "text": "Ada Quinn Lovelace"
+    },
+    "caption.debtor2_name": {
+     "text": "Ben Lovelace Jr."
+    },
+    "caption.district": {
+     "text": "Middle District of Florida"
+    },
+    "debtor1_signature_date": {
+     "text": "08/30/2026"
+    },
+    "debtor2_signature_date": {
+     "text": "08/30/2026"
+    },
+    "line_1_claimed_exempt": {
+     "rows": {
+      "check2 1a": {
+       "option": "yes"
+      },
+      "check2 1b": {
+       "option": "yes"
+      }
+     }
+    },
+    "line_1_creditor_name": {
+     "rows": {
+      "Creditors Name 1a": {
+       "text": "Gulf Coast Home Loans"
+      },
+      "Creditors Name 1b": {
+       "text": "Drive Away Financial LLC"
+      }
+     }
+    },
+    "line_1_intention": {
+     "rows": {
+      "check1 1a": {
+       "option": "retain and reaffirmation"
+      },
+      "check1 1b": {
+       "option": "retain and redeem"
+      }
+     }
+    },
+    "line_1_property_description": {
+     "rows": {
+      "PropertyDescription 1a": {
+       "text": "12 Byron Court, Tampa, FL 33601"
+      },
+      "PropertyDescription 1b": {
+       "text": "2016 Honda Civic LX"
+      }
+     }
+    },
+    "line_2_assumed": {
+     "rows": {
+      "check2a": {
+       "option": "yes"
+      }
+     }
+    },
+    "line_2_lessor_name": {
+     "rows": {
+      "Lessors Name 2a": {
+       "text": "Sunshine Auto Leasing LLC"
+      }
+     }
+    },
+    "line_2_property_description": {
+     "rows": {
+      "PropertyDescription 2a": {
+       "text": "Lease of a 2024 Toyota RAV4, 22 months remaining; debtor's interest: lessee"
+      }
+     }
+    }
+   }
+  },
+  "form/b113": {
+   "value": {
+    "caption.debtor1_name": {
+     "text": "Ada Quinn Lovelace"
+    },
+    "caption.debtor2_name": {
+     "text": "Ben Lovelace Jr."
+    },
+    "caption.district": {
+     "rows": {
+      "district.1": {
+       "text": "Middle"
+      },
+      "district.2": {
+       "text": "Florida"
+      }
+     }
+    },
+    "header.debtor_name": {
+     "rows": {
+      "header.debtor.p2": {
+       "text": "Ada Quinn Lovelace"
+      },
+      "header.debtor.p3": {
+       "text": "Ada Quinn Lovelace"
+      },
+      "header.debtor.p4": {
+       "text": "Ada Quinn Lovelace"
+      },
+      "header.debtor.p5": {
+       "text": "Ada Quinn Lovelace"
+      },
+      "header.debtor.p6": {
+       "text": "Ada Quinn Lovelace"
+      },
+      "header.debtor.p7": {
+       "text": "Ada Quinn Lovelace"
+      },
+      "header.debtor.p8": {
+       "text": "Ada Quinn Lovelace"
+      }
+     }
+    },
+    "sign.attorney_date": {
+     "text": "08/31/2026"
+    },
+    "sign.debtor1_executed_on": {
+     "text": "08/30/2026"
+    },
+    "sign.debtor2_executed_on": {
+     "text": "08/30/2026"
+    }
+   }
+  },
+  "form/b121": {
+   "value": {
+    "caption.district": {
+     "text": "Middle District of Florida"
+    },
+    "debtor1_signature_date": {
+     "text": "08/30/2026"
+    },
+    "debtor2_signature_date": {
+     "text": "08/30/2026"
+    },
+    "line_1_debtor1_first_name": {
+     "text": "Ada"
+    },
+    "line_1_debtor1_last_name": {
+     "text": "Lovelace"
+    },
+    "line_1_debtor1_middle_name": {
+     "text": "Quinn"
+    },
+    "line_1_debtor2_first_name": {
+     "text": "Ben"
+    },
+    "line_1_debtor2_last_name": {
+     "text": "Lovelace"
+    },
+    "line_2_debtor1_ssn": {
+     "rows": {
+      "Debtor1a.SSNum": {
+       "text": "987-65-4321"
+      }
+     }
+    },
+    "line_3_debtor2_itin": {
+     "rows": {
+      "Debtor2a ITINNum": {
+       "text": "87-65-4322"
+      }
+     }
+    }
+   }
+  },
+  "form/b122a1": {
+   "value": {
+    "alimony": {
+     "rows": {
+      "Debto1.Quest3": {
+       "text": "0.00"
+      },
+      "Debto2.Quest3": {
+       "text": "0.00"
+      }
+     }
+    },
+    "annualized_cmi": {
+     "text": "104,400.00"
+    },
+    "business_expenses": {
+     "rows": {
+      "Debto1.Quest5B": {
+       "text": "0.00"
+      },
+      "Debto2.Quest5B": {
+       "text": "0.00"
+      }
+     }
+    },
+    "business_gross": {
+     "rows": {
+      "Debto1.Quest5A": {
+       "text": "0.00"
+      },
+      "Debto2.Quest5A": {
+       "text": "0.00"
+      }
+     }
+    },
+    "business_net": {
+     "rows": {
+      "Debto1.Quest5C": {
+       "text": "0.00"
+      },
+      "Debto2.Quest5C": {
+       "text": "0.00"
+      }
+     }
+    },
+    "caption.debtor1_name": {
+     "text": "Ada Quinn Lovelace"
+    },
+    "caption.debtor2_name": {
+     "text": "Ben Lovelace Jr."
+    },
+    "caption.district": {
+     "text": "Middle District of Florida"
+    },
+    "caption.presumption_box": {
+     "option": "Presumption of abuse applies"
+    },
+    "column_total": {
+     "rows": {
+      "Debto1.Quest11": {
+       "text": "7,400.00"
+      },
+      "Debto2.Quest11": {
+       "text": "1,300.00"
+      }
+     }
+    },
+    "debtor1_signature_date": {
+     "text": "08/30/2026"
+    },
+    "debtor2_signature_date": {
+     "text": "08/30/2026"
+    },
+    "household_contributions": {
+     "rows": {
+      "Debto1.Quest4": {
+       "text": "0.00"
+      },
+      "Debto2.Quest2.2": {
+       "text": "0.00"
+      }
+     }
+    },
+    "interest_dividends": {
+     "rows": {
+      "Debto1.Quest7": {
+       "text": "0.00"
+      },
+      "Debto2.Quest7": {
+       "text": "0.00"
+      }
+     }
+    },
+    "marital_filing_status": {
+     "option": "Maried and filing"
+    },
+    "median_comparison": {
+     "option": "12b more than 13"
+    },
+    "median_household_size": {
+     "text": "3"
+    },
+    "median_income": {
+     "text": "97,540.00"
+    },
+    "median_state": {
+     "text": "FL"
+    },
+    "other_income_1": {
+     "rows": {
+      "Debto1.Quest10A": {
+       "text": "0.00"
+      },
+      "Debto2.Quest10A": {
+       "text": "0.00"
+      }
+     }
+    },
+    "pension": {
+     "rows": {
+      "Debto1.Quest9": {
+       "text": "0.00"
+      },
+      "Debto2.Quest9": {
+       "text": "0.00"
+      }
+     }
+    },
+    "rental_expenses": {
+     "rows": {
+      "Debto1.Quest6B": {
+       "text": "0.00"
+      },
+      "Debto2.Quest6B": {
+       "text": "0.00"
+      }
+     }
+    },
+    "rental_gross": {
+     "rows": {
+      "Debto1.Quest6A": {
+       "text": "0.00"
+      },
+      "Debto2.Quest6A": {
+       "text": "0.00"
+      }
+     }
+    },
+    "rental_net": {
+     "rows": {
+      "Debto1.Quest6C": {
+       "text": "0.00"
+      },
+      "Debto2.Quest6C": {
+       "text": "0.00"
+      }
+     }
+    },
+    "ssa_contention": {
+     "rows": {
+      "Debto2.Quest8A": {
+       "text": "150.00"
+      }
+     }
+    },
+    "total_cmi": {
+     "text": "8,700.00"
+    },
+    "unemployment": {
+     "rows": {
+      "Debto1.Quest8.0": {
+       "text": "0.00"
+      },
+      "Debto2.Quest8.0": {
+       "text": "1,300.00"
+      }
+     }
+    },
+    "wages": {
+     "rows": {
+      "Debto1.Quest2.0": {
+       "text": "7,400.00"
+      },
+      "Debto2.Quest2.0": {
+       "text": "0.00"
+      }
+     }
+    }
+   }
+  },
+  "form/b122a2": {
+   "value": {
+    "additional_deductions_total": {
+     "text": "890.00"
+    },
+    "additional_food_clothing": {
+     "text": "60.00"
+    },
+    "additional_health_care": {
+     "text": "0.00"
+    },
+    "additional_public_transportation": {
+     "text": "0.00"
+    },
+    "adjusted_cmi": {
+     "text": "8,700.00"
+    },
+    "caption.debtor1_name": {
+     "text": "Ada Quinn Lovelace"
+    },
+    "caption.debtor2_name": {
+     "text": "Ben Lovelace Jr."
+    },
+    "caption.district": {
+     "text": "Middle District of Florida"
+    },
+    "caption.presumption_box": {
+     "option": "No Abuse"
+    },
+    "ch13_admin_expense": {
+     "text": "65.00"
+    },
+    "ch13_eligible": {
+     "option": "Yes"
+    },
+    "ch13_multiplier": {
+     "text": "0.1"
+    },
+    "charitable_contributions": {
+     "text": "100.00"
+    },
+    "childcare": {
+     "text": "450.00"
+    },
+    "column_b_filled": {
+     "option": "Yes"
+    },
+    "court_ordered_payments": {
+     "text": "0.00"
+    },
+    "cure_claimed": {
+     "option": "Yes"
+    },
+    "cure_monthly_total": {
+     "text": "35.00"
+    },
+    "debt_payment_total": {
+     "text": "2,143.33"
+    },
+    "debtor1_signature_date": {
+     "text": "08/30/2026"
+    },
+    "debtor2_signature_date": {
+     "text": "08/30/2026"
+    },
+    "disposable_income_60_months": {
+     "text": "-23,359.80"
+    },
+    "education_for_employment": {
+     "text": "0.00"
+    },
+    "education_under_18": {
+     "text": "150.00"
+    },
+    "family_care": {
+     "text": "0.00"
+    },
+    "family_violence": {
+     "text": "0.00"
+    },
+    "food_clothing_allowance": {
+     "text": "1,857.00"
+    },
+    "home_debt_total": {
+     "text": "1,480.00"
+    },
+    "home_energy": {
+     "text": "0.00"
+    },
+    "household_size": {
+     "text": "3"
+    },
+    "housing_adjustment": {
+     "text": "0.00"
+    },
+    "housing_mortgage_rent_standard": {
+     "text": "1,833.00"
+    },
+    "housing_operating": {
+     "text": "733.00"
+    },
+    "involuntary_deductions": {
+     "text": "85.00"
+    },
+    "irs_allowances_total": {
+     "text": "6,056.00"
+    },
+    "marital_adjustment_total": {
+     "text": "0.00"
+    },
+    "monthly_disposable_income": {
+     "text": "-389.33"
+    },
+    "net_mortgage_rent": {
+     "text": "353.00"
+    },
+    "oop_health_over_65_count": {
+     "text": "0"
+    },
+    "oop_health_over_65_rate": {
+     "text": "163.00"
+    },
+    "oop_health_over_65_subtotal": {
+     "text": "0.00"
+    },
+    "oop_health_total": {
+     "text": "270.00"
+    },
+    "oop_health_under_65_count": {
+     "text": "3"
+    },
+    "oop_health_under_65_rate": {
+     "text": "90.00"
+    },
+    "oop_health_under_65_subtotal": {
+     "text": "270.00"
+    },
+    "optional_telecom": {
+     "text": "45.00"
+    },
+    "other_secured_creditor": {
+     "rows": {
+      "undefined_71": {
+       "text": "Suncoast Equipment Finance"
+      }
+     }
+    },
+    "other_secured_monthly": {
+     "rows": {
+      "undefined_73": {
+       "text": "95.00"
+      }
+     }
+    },
+    "other_secured_property": {
+     "rows": {
+      "undefined_72": {
+       "text": "Utility trailer"
+      }
+     }
+    },
+    "presumption_thresholds": {
+     "option": "1"
+    },
+    "priority_claims_monthly": {
+     "text": "53.33"
+    },
+    "priority_claims_owed": {
+     "option": "Yes"
+    },
+    "priority_claims_total": {
+     "text": "3,200.00"
+    },
+    "public_transportation": {
+     "text": "0.00"
+    },
+    "secured_debt_total": {
+     "text": "1,990.00"
+    },
+    "spouse_filing": {
+     "option": "Yes"
+    },
+    "taxes": {
+     "text": "1,620.00"
+    },
+    "term_life_insurance": {
+     "text": "35.00"
+    },
+    "total_cmi": {
+     "text": "8,700.00"
+    },
+    "total_deductions": {
+     "text": "9,089.33"
+    },
+    "vehicle_1_loan_total": {
+     "text": "415.00"
+    },
+    "vehicle_1_net": {
+     "text": "288.00"
+    },
+    "vehicle_1_ownership_standard": {
+     "text": "703.00"
+    },
+    "vehicle_count": {
+     "option": "1"
+    },
+    "vehicle_operating": {
+     "text": "320.00"
+    }
+   }
+  },
+  "form/b122c1": {
+   "problems": [
+    "Form 122C-1 is the Chapter 13 statement of current monthly income — this is a Chapter 7 case"
+   ]
+  },
+  "form/b122c2": {
+   "problems": [
+    "Form 122C-2 is the Chapter 13 disposable-income calculation — this is a Chapter 7 case"
+   ]
+  },
+  "form/b2010": {
+   "value": {}
+  },
+  "form/b2030": {
+   "value": {
+    "caption.chapter": {
+     "text": "7"
+    },
+    "caption.debtor1_name": {
+     "text": "Ada Quinn Lovelace"
+    },
+    "caption.debtor2_name": {
+     "text": "Ben Lovelace Jr."
+    },
+    "caption.district": {
+     "rows": {
+      "district.1": {
+       "text": "Middle"
+      },
+      "district.2": {
+       "text": "Florida"
+      }
+     }
+    },
+    "certification.date": {
+     "text": "08/31/2026"
+    },
+    "certification.firm_name": {
+     "text": "Counsel & Counsel PA"
+    },
+    "line_1_balance_due": {
+     "text": "500.00"
+    },
+    "line_1_fee_agreed": {
+     "text": "1,500.00"
+    },
+    "line_1_fee_received": {
+     "text": "1,000.00"
+    },
+    "line_2_source_paid_debtor": {
+     "check": true
+    },
+    "line_3_source_to_be_paid_other": {
+     "check": true
+    },
+    "line_3_source_to_be_paid_other_specify": {
+     "text": "Margaret Lovelace, Debtor 1's mother"
+    },
+    "line_4_not_shared": {
+     "check": true
+    },
+    "line_5e_other_services": {
+     "rows": {
+      "services_other.1": {
+       "text": "Negotiation of the reaffirmation agreement with Gulf Coast Loan Servicing and the redemption of"
+      },
+      "services_other.2": {
+       "text": "the Honda Civic."
+      }
+     }
+    },
+    "line_6_excluded_services": {
+     "rows": {
+      "services_excluded.1": {
+       "text": "Representation in any adversary proceeding, appeal, or non-bankruptcy matter; motions to avoid liens;"
+      },
+      "services_excluded.2": {
+       "text": "and defense of any motion to dismiss under section 707(b). Each is billed separately under a written"
+      },
+      "services_excluded.3": {
+       "text": "agreement."
+      }
+     }
+    }
+   }
+  }
+ },
+ "liens": {
+  "value": {
+   "assets": [
+    {
+     "assetId": "asset-house",
+     "claimIds": [
+      "claim-mortgage"
+     ],
+     "securedTotal": "195000.00"
+    },
+    {
+     "assetId": "asset-civic",
+     "claimIds": [
+      "claim-auto"
+     ],
+     "securedTotal": "7400.00"
+    }
+   ],
+   "claims": [
+    {
+     "amount": "195000.00",
+     "assetId": "asset-house",
+     "claimId": "claim-mortgage",
+     "collateralDescription": "12 Byron Court, Tampa, FL 33601",
+     "collateralValue": "240000.00",
+     "lienPosition": 1,
+     "securedAmount": "195000.00",
+     "seniorLiens": "0.00",
+     "unsecuredAmount": "0.00",
+     "unsecuredSource": "derived"
+    },
+    {
+     "amount": "7400.00",
+     "assetId": "asset-civic",
+     "claimId": "claim-auto",
+     "collateralDescription": "2016 Honda Civic LX",
+     "collateralValue": "9000.00",
+     "lienPosition": 1,
+     "securedAmount": "7400.00",
+     "seniorLiens": "0.00",
+     "unsecuredAmount": "0.00",
+     "unsecuredSource": "derived"
+    }
+   ]
+  }
+ },
+ "means_test": {
+  "value": {
+   "asOf": "2026-08-01",
+   "asOfSource": "case.created_at",
+   "chapter": 7,
+   "chapter13": null,
+   "cmi": {
+    "annualized": "104400.00",
+    "columns": [
+     {
+      "column": "A",
+      "excluded": [],
+      "lines": [
+       {
+        "category": "wages",
+        "citation": "",
+        "entries": [
+         {
+          "amount": "7400.00",
+          "description": "paycheck (gross) — Menabrea Machines Inc",
+          "receivedOn": "2026-02-27"
+         },
+         {
+          "amount": "7400.00",
+          "description": "paycheck (gross) — Menabrea Machines Inc",
+          "receivedOn": "2026-03-27"
+         },
+         {
+          "amount": "7400.00",
+          "description": "paycheck (gross) — Menabrea Machines Inc",
+          "receivedOn": "2026-04-27"
+         },
+         {
+          "amount": "7400.00",
+          "description": "paycheck (gross) — Menabrea Machines Inc",
+          "receivedOn": "2026-05-27"
+         },
+         {
+          "amount": "7400.00",
+          "description": "paycheck (gross) — Menabrea Machines Inc",
+          "receivedOn": "2026-06-27"
+         },
+         {
+          "amount": "7400.00",
+          "description": "paycheck (gross) — Menabrea Machines Inc",
+          "receivedOn": "2026-07-27"
+         }
+        ],
+        "label": "Gross wages, salary, tips, bonuses, overtime, commissions",
+        "monthlyAverage": "7400.00",
+        "note": "",
+        "totalReceived": "44400.00"
+       }
+      ],
+      "monthlyTotal": "7400.00"
+     },
+     {
+      "column": "B",
+      "excluded": [
+       {
+        "category": "social_security_act_benefit",
+        "citation": "11 U.S.C. § 101(10A)(B)(ii)",
+        "entries": [
+         {
+          "amount": "900.00",
+          "description": "Benefits received under the Social Security Act — Social Security Administration",
+          "receivedOn": "2026-05-20"
+         }
+        ],
+        "label": "Benefits received under the Social Security Act",
+        "monthlyAverage": "150.00",
+        "note": "recorded and excluded from current monthly income",
+        "totalReceived": "900.00"
+       }
+      ],
+      "lines": [
+       {
+        "category": "unemployment",
+        "citation": "",
+        "entries": [
+         {
+          "amount": "1300.00",
+          "description": "Unemployment compensation — Florida Reemployment Assistance",
+          "receivedOn": "2026-02-10"
+         },
+         {
+          "amount": "1300.00",
+          "description": "Unemployment compensation — Florida Reemployment Assistance",
+          "receivedOn": "2026-03-10"
+         },
+         {
+          "amount": "1300.00",
+          "description": "Unemployment compensation — Florida Reemployment Assistance",
+          "receivedOn": "2026-04-10"
+         },
+         {
+          "amount": "1300.00",
+          "description": "Unemployment compensation — Florida Reemployment Assistance",
+          "receivedOn": "2026-05-10"
+         },
+         {
+          "amount": "1300.00",
+          "description": "Unemployment compensation — Florida Reemployment Assistance",
+          "receivedOn": "2026-06-10"
+         },
+         {
+          "amount": "1300.00",
+          "description": "Unemployment compensation — Florida Reemployment Assistance",
+          "receivedOn": "2026-07-10"
+         }
+        ],
+        "label": "Unemployment compensation",
+        "monthlyAverage": "1300.00",
+        "note": "",
+        "totalReceived": "7800.00"
+       }
+      ],
+      "monthlyTotal": "1300.00"
+     }
+    ],
+    "combinedMonthlyTotal": "8700.00",
+    "gaps": [],
+    "problems": [],
+    "window": {
+     "end": "2026-07-31",
+     "filingDate": "2026-08-01",
+     "months": [
+      "2026-02",
+      "2026-03",
+      "2026-04",
+      "2026-05",
+      "2026-06",
+      "2026-07"
+     ],
+     "start": "2026-02-01"
+    }
+   },
+   "comparison": {
+    "aboveMedian": true,
+    "annualMedian": "97540.00",
+    "annualizedCmi": "104400.00",
+    "householdSize": 3,
+    "monthlyCmi": "8700.00",
+    "source": "Census median family income, FL household of 3 — ust/census-median-family-income@2026-04-01",
+    "state": "FL"
+   },
+   "debt": {
+    "nonpriorityUnsecuredTotal": "23250.00",
+    "priorityTotal": "3200.00"
+   },
+   "determinedBy": "threshold_floor",
+   "exemptions": {
+    "applied": null,
+    "available": [
+     "non_consumer_debts",
+     "disabled_veteran",
+     "reservist_national_guard"
+    ],
+    "disabledVeteran": false,
+    "nonConsumerDebts": false,
+    "reservistNationalGuard": false,
+    "rule": null
+   },
+   "household": {
+    "childrenUnder18": 1,
+    "irsFamilySize": {
+     "source": "entered (means_test_input.people_under_65 + people_65_or_older)",
+     "value": 3
+    },
+    "irsHousingFamilySize": {
+     "source": "entered (means_test_input.people_under_65 + people_65_or_older)",
+     "value": 3
+    },
+    "medianHouseholdSize": {
+     "source": "entered (means_test_input.people_under_65 + people_65_or_older)",
+     "value": 3
+    },
+    "people65OrOlder": 0,
+    "peopleUnder65": 3
+   },
+   "jurisdiction": {
+    "county": "Hillsborough",
+    "district": "Middle District of Florida",
+    "state": "FL"
+   },
+   "lines": [
+    {
+     "amount": "8700.00",
+     "form": "122A-2",
+     "label": "Total current monthly income",
+     "line": "1",
+     "source": "Form 122A-1 line 11 — the § 101(10A) derivation (core/cmi.py)"
+    },
+    {
+     "amount": "0.00",
+     "form": "122A-2",
+     "label": "Marital adjustment",
+     "line": "3",
+     "source": "entered (means_test_input.marital_adjustments)"
+    },
+    {
+     "amount": "8700.00",
+     "form": "122A-2",
+     "label": "Adjusted current monthly income",
+     "line": "4",
+     "source": "line 1 minus line 3"
+    },
+    {
+     "amount": "3.00",
+     "form": "122A-2",
+     "label": "Number of people used in determining deductions",
+     "line": "5",
+     "source": "entered (means_test_input.people_under_65 + people_65_or_older)"
+    },
+    {
+     "amount": "1857.00",
+     "form": "122A-2",
+     "label": "Food, clothing, and other items",
+     "line": "6",
+     "source": "IRS National Standards, household of 3 — ust/irs-national-standards@2026-07-15"
+    },
+    {
+     "amount": "90.00",
+     "form": "122A-2",
+     "label": "Out-of-pocket health care allowance per person (under 65)",
+     "line": "7a",
+     "source": "IRS National Standards, household of 3 — ust/irs-national-standards@2026-07-15"
+    },
+    {
+     "amount": "3.00",
+     "form": "122A-2",
+     "label": "Number of people who are under 65",
+     "line": "7b",
+     "source": "entered"
+    },
+    {
+     "amount": "270.00",
+     "form": "122A-2",
+     "label": "Subtotal (under 65)",
+     "line": "7c",
+     "source": "line 7a x line 7b"
+    },
+    {
+     "amount": "163.00",
+     "form": "122A-2",
+     "label": "Out-of-pocket health care allowance per person (65 or older)",
+     "line": "7d",
+     "source": "IRS National Standards, household of 3 — ust/irs-national-standards@2026-07-15"
+    },
+    {
+     "amount": "0.00",
+     "form": "122A-2",
+     "label": "Number of people who are 65 or older",
+     "line": "7e",
+     "source": "entered"
+    },
+    {
+     "amount": "0.00",
+     "form": "122A-2",
+     "label": "Subtotal (65 or older)",
+     "line": "7f",
+     "source": "line 7d x line 7e"
+    },
+    {
+     "amount": "270.00",
+     "form": "122A-2",
+     "label": "Out-of-pocket health care allowance",
+     "line": "7",
+     "source": "line 7c plus line 7f"
+    },
+    {
+     "amount": "733.00",
+     "form": "122A-2",
+     "label": "Housing and utilities — insurance and operating expenses",
+     "line": "8",
+     "source": "IRS Local Standards, Hillsborough County, FL, household of 3 — ust/irs-local-standards@2026-07-15"
+    },
+    {
+     "amount": "1833.00",
+     "form": "122A-2",
+     "label": "Housing and utilities — mortgage or rent expense (IRS Local Standard)",
+     "line": "9a",
+     "source": "IRS Local Standards, Hillsborough County, FL, household of 3 — ust/irs-local-standards@2026-07-15"
+    },
+    {
+     "amount": "1480.00",
+     "form": "122A-2",
+     "label": "Average monthly payment for all debts secured by your home",
+     "line": "9b",
+     "source": "entered (means_test_input.home_secured_monthly_total)"
+    },
+    {
+     "amount": "353.00",
+     "form": "122A-2",
+     "label": "Net mortgage or rent expense",
+     "line": "9c",
+     "source": "line 9a minus line 9b, not below zero"
+    },
+    {
+     "amount": "0.00",
+     "form": "122A-2",
+     "label": "Claimed adjustment to the housing standard",
+     "line": "10",
+     "source": "entered (means_test_input.housing_adjustment_amount)"
+    },
+    {
+     "amount": "1.00",
+     "form": "122A-2",
+     "label": "Number of vehicles claimed for ownership or operating expenses",
+     "line": "11",
+     "source": "entered (means_test_input.vehicle_count)"
+    },
+    {
+     "amount": "320.00",
+     "form": "122A-2",
+     "label": "Vehicle operation expense",
+     "line": "12",
+     "source": "IRS Local Standards transportation — ust/irs-local-standards@2026-07-15, operating costs, Hillsborough"
+    },
+    {
+     "amount": "703.00",
+     "form": "122A-2",
+     "label": "Vehicle 1 ownership costs (IRS Local Standard)",
+     "line": "13a",
+     "source": "IRS Local Standards transportation — ust/irs-local-standards@2026-07-15"
+    },
+    {
+     "amount": "415.00",
+     "form": "122A-2",
+     "label": "Average monthly payment for debts secured by Vehicle 1",
+     "line": "13b",
+     "source": "entered (means_test_input.vehicle_1_loan_monthly)"
+    },
+    {
+     "amount": "288.00",
+     "form": "122A-2",
+     "label": "Net Vehicle 1 ownership or lease expense",
+     "line": "13c",
+     "source": "line 13a minus line 13b, not below zero"
+    },
+    {
+     "amount": "288.00",
+     "form": "122A-2",
+     "label": "Vehicle ownership or lease expense",
+     "line": "13",
+     "source": "net vehicle expenses added"
+    },
+    {
+     "amount": "0.00",
+     "form": "122A-2",
+     "label": "Public transportation expense",
+     "line": "14",
+     "source": "vehicles claimed on line 11"
+    },
+    {
+     "amount": "0.00",
+     "form": "122A-2",
+     "label": "Additional public transportation expense",
+     "line": "15",
+     "source": "entered (means_test_input.additional_public_transportation), capped at the IRS public transportation standard"
+    },
+    {
+     "amount": "1620.00",
+     "form": "122A-2",
+     "label": "Taxes",
+     "line": "16",
+     "source": "entered (means_test_input.taxes)"
+    },
+    {
+     "amount": "85.00",
+     "form": "122A-2",
+     "label": "Involuntary deductions",
+     "line": "17",
+     "source": "entered (means_test_input.involuntary_deductions)"
+    },
+    {
+     "amount": "35.00",
+     "form": "122A-2",
+     "label": "Term life insurance",
+     "line": "18",
+     "source": "entered (means_test_input.term_life_insurance)"
+    },
+    {
+     "amount": "0.00",
+     "form": "122A-2",
+     "label": "Court-ordered payments",
+     "line": "19",
+     "source": "entered (means_test_input.court_ordered_payments)"
+    },
+    {
+     "amount": "0.00",
+     "form": "122A-2",
+     "label": "Education required for employment or for a disabled child",
+     "line": "20",
+     "source": "entered (means_test_input.education_for_employment_or_disability)"
+    },
+    {
+     "amount": "450.00",
+     "form": "122A-2",
+     "label": "Childcare",
+     "line": "21",
+     "source": "entered (means_test_input.childcare)"
+    },
+    {
+     "amount": "0.00",
+     "form": "122A-2",
+     "label": "Additional health care expenses, excluding insurance costs",
+     "line": "22",
+     "source": "entered (means_test_input.healthcare_above_allowance)"
+    },
+    {
+     "amount": "45.00",
+     "form": "122A-2",
+     "label": "Optional telephones and telephone services",
+     "line": "23",
+     "source": "entered (means_test_input.optional_telecom)"
+    },
+    {
+     "amount": "6056.00",
+     "form": "122A-2",
+     "label": "All expenses allowed under the IRS expense allowances",
+     "line": "24",
+     "source": "lines 6 + 7 + 8 + 9c + 10 + 12 + 13 + 14 + 15 + 16 through 23"
+    },
+    {
+     "amount": "580.00",
+     "form": "122A-2",
+     "label": "Health insurance, disability insurance, and HSA expenses",
+     "line": "25",
+     "source": "entered (means_test_input.health_insurance + disability_insurance + health_savings_account)"
+    },
+    {
+     "amount": "0.00",
+     "form": "122A-2",
+     "label": "Continuing contributions to the care of household or family members",
+     "line": "26",
+     "source": "entered (means_test_input.family_care_contributions) — 11 U.S.C. § 707(b)(2)(A)(ii)(II)"
+    },
+    {
+     "amount": "0.00",
+     "form": "122A-2",
+     "label": "Protection against family violence",
+     "line": "27",
+     "source": "entered (means_test_input.family_violence_protection)"
+    },
+    {
+     "amount": "0.00",
+     "form": "122A-2",
+     "label": "Additional home energy costs",
+     "line": "28",
+     "source": "entered (means_test_input.home_energy_excess)"
+    },
+    {
+     "amount": "150.00",
+     "form": "122A-2",
+     "label": "Education expenses for dependent children younger than 18",
+     "line": "29",
+     "source": "entered (means_test_input.education_under_18), capped per child by 11 U.S.C. § 707(b)(2)(A)(ii)(IV) — code/dollar-amounts@2025-04-01"
+    },
+    {
+     "amount": "60.00",
+     "form": "122A-2",
+     "label": "Additional food and clothing expense",
+     "line": "30",
+     "source": "entered (means_test_input.additional_food_clothing), capped at 5% of the food and clothing allowances — ust/irs-national-standards@2026-07-15"
+    },
+    {
+     "amount": "100.00",
+     "form": "122A-2",
+     "label": "Continuing charitable contributions",
+     "line": "31",
+     "source": "entered (means_test_input.charitable_contributions)"
+    },
+    {
+     "amount": "890.00",
+     "form": "122A-2",
+     "label": "All additional expense deductions",
+     "line": "32",
+     "source": "lines 25 through 31"
+    },
+    {
+     "amount": "1480.00",
+     "form": "122A-2",
+     "label": "Copy of line 9b",
+     "line": "33a",
+     "source": "line 9b"
+    },
+    {
+     "amount": "415.00",
+     "form": "122A-2",
+     "label": "Copy of line 13b",
+     "line": "33b",
+     "source": "line 13b"
+    },
+    {
+     "amount": "0.00",
+     "form": "122A-2",
+     "label": "Copy of line 13e",
+     "line": "33c",
+     "source": "line 13e"
+    },
+    {
+     "amount": "95.00",
+     "form": "122A-2",
+     "label": "Other debts secured by your property",
+     "line": "33d",
+     "source": "entered (means_test_input.other_secured_payments: Suncoast Equipment Finance (Utility trailer))"
+    },
+    {
+     "amount": "1990.00",
+     "form": "122A-2",
+     "label": "Total average monthly payment on secured debts",
+     "line": "33e",
+     "source": "lines 33a through 33d"
+    },
+    {
+     "amount": "35.00",
+     "form": "122A-2",
+     "label": "Past-due amounts on secured debts necessary for support (÷ 60)",
+     "line": "34",
+     "source": "entered (means_test_input.priority_cure_total) divided by 60 — 11 U.S.C. § 707(b)(2)(A)(iii)(II)"
+    },
+    {
+     "amount": "53.33",
+     "form": "122A-2",
+     "label": "Priority claims (÷ 60)",
+     "line": "35",
+     "source": "the claims' priority portions divided by 60 — 11 U.S.C. § 707(b)(2)(A)(iv)"
+    },
+    {
+     "amount": "65.00",
+     "form": "122A-2",
+     "label": "Chapter 13 administrative expenses",
+     "line": "36",
+     "source": "projected plan payment 650.00 x the Middle District of Florida multiplier 0.1 — ust/ch13-admin-multipliers@2026-07-15; 11 U.S.C. § 707(b)(2)(A)(ii)(III)"
+    },
+    {
+     "amount": "2143.33",
+     "form": "122A-2",
+     "label": "All deductions for debt payment",
+     "line": "37",
+     "source": "lines 33e + 34 + 35 + 36"
+    },
+    {
+     "amount": "9089.33",
+     "form": "122A-2",
+     "label": "Total deductions from income",
+     "line": "38",
+     "source": "lines 24 + 32 + 37"
+    },
+    {
+     "amount": "8700.00",
+     "form": "122A-2",
+     "label": "Copy of line 4, adjusted current monthly income",
+     "line": "39a",
+     "source": "line 4"
+    },
+    {
+     "amount": "9089.33",
+     "form": "122A-2",
+     "label": "Copy of line 38, total deductions",
+     "line": "39b",
+     "source": "line 38"
+    },
+    {
+     "amount": "-389.33",
+     "form": "122A-2",
+     "label": "Monthly disposable income (11 U.S.C. § 707(b)(2))",
+     "line": "39c",
+     "source": "line 39a minus line 39b"
+    },
+    {
+     "amount": "-23359.80",
+     "form": "122A-2",
+     "label": "Total over 60 months",
+     "line": "39d",
+     "source": "line 39c x 60"
+    },
+    {
+     "amount": "-23359.80",
+     "form": "122A-2",
+     "label": "Presumption determination",
+     "line": "40",
+     "source": "line 39d is less than 10275.00: no presumption of abuse (11 U.S.C. § 707(b)(2)(A)(i)(I) / 11 U.S.C. § 707(b)(2)(A)(i)(II) — code/dollar-amounts@2025-04-01)"
+    }
+   ],
+   "maritalFilingStatus": {
+    "source": "the case's debtor_2 record",
+    "value": "married_filing_jointly"
+   },
+   "outcome": "no_presumption",
+   "problems": [],
+   "releaseIds": {
+    "code/dollar-amounts": "code/dollar-amounts@2025-04-01",
+    "ust/census-median-family-income": "ust/census-median-family-income@2026-04-01",
+    "ust/ch13-admin-multipliers": "ust/ch13-admin-multipliers@2026-07-15",
+    "ust/irs-local-standards": "ust/irs-local-standards@2026-07-15",
+    "ust/irs-national-standards": "ust/irs-national-standards@2026-07-15"
+   }
+  }
+ },
+ "plan": {
+  "value": {
+   "bestInterests": {
+    "liquidationPercentage": "39.33",
+    "passes": null,
+    "planPercentage": "0.00",
+    "planUnsecuredValue": "0.00",
+    "presentValueRate": null,
+    "rule": "11 U.S.C. § 1325(a)(4): unsecured creditors receive at least what a Chapter 7 liquidation would pay them, compared nominally — type a present-value rate to discount the plan's future payments"
+   },
+   "chapter": 7,
+   "classes": [
+    {
+     "allowed": "3200.00",
+     "firstMonth": null,
+     "interest": "0.00",
+     "key": "priority",
+     "label": "Priority claims",
+     "lastMonth": null,
+     "payout": "0.00",
+     "principal": "0.00",
+     "rows": [
+      {
+       "allowed": "3200.00",
+       "claimId": "claim-irs",
+       "firstMonth": null,
+       "interest": "0.00",
+       "key": "priority:claim-irs",
+       "label": "Internal Revenue Service",
+       "lastMonth": null,
+       "monthlyPayment": null,
+       "monthsPaid": 0,
+       "payout": "0.00",
+       "principal": "0.00",
+       "rate": null,
+       "source": "claim claim-irs: priority amount, paid in full (§ 1322(a)(2))",
+       "treatment": null,
+       "unpaid": "3200.00"
+      }
+     ],
+     "unpaid": "3200.00"
+    },
+    {
+     "allowed": "23250.00",
+     "firstMonth": null,
+     "interest": "0.00",
+     "key": "general_unsecured",
+     "label": "General unsecured claims",
+     "lastMonth": null,
+     "payout": "0.00",
+     "principal": "0.00",
+     "rows": [
+      {
+       "allowed": "23250.00",
+       "claimId": null,
+       "firstMonth": null,
+       "interest": "0.00",
+       "key": "unsecured",
+       "label": "General unsecured claims, pro rata",
+       "lastMonth": null,
+       "monthlyPayment": null,
+       "monthsPaid": 0,
+       "payout": "0.00",
+       "principal": "0.00",
+       "rate": null,
+       "source": "whatever remains, up to the full unsecured pool (a pot plan)",
+       "treatment": "pot",
+       "unpaid": "23250.00"
+      }
+     ],
+     "unpaid": "23250.00"
+    }
+   ],
+   "commitmentPeriod": {
+    "months": null,
+    "source": null
+   },
+   "feasibility": {
+    "exceedsScheduleJ": null,
+    "feasible": null,
+    "reasons": [
+     "Priority claims: $3,200.00 is still unpaid after month 0."
+    ],
+    "scheduleJExcess": {
+     "amount": "3089.50",
+     "source": "Schedule J line 23c: 106I line 12 ($8,149.50) less 106J line 22c ($5,060.00)"
+    },
+    "shortfall": "3200.00",
+    "surplus": "0.00",
+    "totalDistributed": "0.00",
+    "totalFunding": "0.00"
+   },
+   "funding": {
+    "basePayment": null,
+    "baseSource": null,
+    "lumpSums": [],
+    "schedule": [],
+    "termMonths": null,
+    "termSource": null,
+    "total": "0.00"
+   },
+   "liquidation": {
+    "assets": [
+     {
+      "assetId": "asset-house",
+      "description": "12 Byron Court, Tampa, FL 33601",
+      "exempt": "45000.00",
+      "liens": "195000.00",
+      "unexempt": "0.00",
+      "value": "240000.00"
+     },
+     {
+      "assetId": "asset-civic",
+      "description": "2016 Honda Civic LX",
+      "exempt": "1600.00",
+      "liens": "7400.00",
+      "unexempt": "0.00",
+      "value": "9000.00"
+     },
+     {
+      "assetId": "asset-pontoon",
+      "description": "2005 Sun Tracker pontoon boat",
+      "exempt": "0.00",
+      "liens": "0.00",
+      "unexempt": "3500.00",
+      "value": "3500.00"
+     },
+     {
+      "assetId": "asset-household",
+      "description": "Used furniture and kitchen appliances",
+      "exempt": "1000.00",
+      "liens": "0.00",
+      "unexempt": "1200.00",
+      "value": "2200.00"
+     },
+     {
+      "assetId": "asset-electronics",
+      "description": "Two laptops, one television",
+      "exempt": "0.00",
+      "liens": "0.00",
+      "unexempt": "900.00",
+      "value": "900.00"
+     },
+     {
+      "assetId": "asset-clothes",
+      "description": "Everyday clothing",
+      "exempt": "0.00",
+      "liens": "0.00",
+      "unexempt": "400.00",
+      "value": "400.00"
+     },
+     {
+      "assetId": "asset-rings",
+      "description": "Wedding rings",
+      "exempt": "0.00",
+      "liens": "0.00",
+      "unexempt": "1800.00",
+      "value": "1800.00"
+     },
+     {
+      "assetId": "asset-cash",
+      "description": "Cash on hand",
+      "exempt": "0.00",
+      "liens": "0.00",
+      "unexempt": "150.00",
+      "value": "150.00"
+     },
+     {
+      "assetId": "asset-checking",
+      "description": null,
+      "exempt": "0.00",
+      "liens": "0.00",
+      "unexempt": "1250.00",
+      "value": "1250.00"
+     },
+     {
+      "assetId": "asset-biz-checking",
+      "description": null,
+      "exempt": "0.00",
+      "liens": "0.00",
+      "unexempt": "2100.00",
+      "value": "2100.00"
+     },
+     {
+      "assetId": "asset-401k",
+      "description": "401(k) retirement account",
+      "exempt": "48000.00",
+      "liens": "0.00",
+      "unexempt": "0.00",
+      "value": "48000.00"
+     },
+     {
+      "assetId": "asset-utility-deposit",
+      "description": null,
+      "exempt": "0.00",
+      "liens": "0.00",
+      "unexempt": "200.00",
+      "value": "200.00"
+     },
+     {
+      "assetId": "asset-tax-refund",
+      "description": "2025 federal income tax refund, return filed",
+      "exempt": "0.00",
+      "liens": "0.00",
+      "unexempt": "1100.00",
+      "value": "1100.00"
+     },
+     {
+      "assetId": "asset-term-life",
+      "description": "Term life policy, Prudential",
+      "exempt": "0.00",
+      "liens": "0.00",
+      "unexempt": "0.00",
+      "value": "0.00"
+     },
+     {
+      "assetId": "asset-workbench",
+      "description": "Workbench, test rigs, and hand tools",
+      "exempt": "0.00",
+      "liens": "0.00",
+      "unexempt": "750.00",
+      "value": "750.00"
+     },
+     {
+      "assetId": "asset-parts",
+      "description": "Replacement engine parts inventory",
+      "exempt": "0.00",
+      "liens": "0.00",
+      "unexempt": "1200.00",
+      "value": "1200.00"
+     },
+     {
+      "assetId": "asset-customer-list",
+      "description": "Walk-in repair customers' names and phone numbers",
+      "exempt": "0.00",
+      "liens": "0.00",
+      "unexempt": "0.00",
+      "value": "0.00"
+     }
+    ],
+    "available": "9145.00",
+    "exemptionsTotal": "95600.00",
+    "liensTotal": "202400.00",
+    "otherCosts": "0.00",
+    "otherCostsSource": "none typed",
+    "percentage": "39.33",
+    "pool": [
+     {
+      "amount": "8200.00",
+      "claimId": "claim-visa",
+      "label": "Meridian Bank Card Services (…4412)",
+      "source": "claim claim-visa: nonpriority unsecured amount"
+     },
+     {
+      "amount": "2600.00",
+      "claimId": "claim-hospital",
+      "label": "Bayside General Hospital (…0072)",
+      "source": "claim claim-hospital: nonpriority unsecured amount"
+     },
+     {
+      "amount": "12000.00",
+      "claimId": "claim-student",
+      "label": "Great Plains Student Servicing (…5510)",
+      "source": "claim claim-student: nonpriority unsecured amount"
+     },
+     {
+      "amount": "450.00",
+      "claimId": "claim-irs",
+      "label": "Internal Revenue Service",
+      "source": "claim claim-irs: nonpriority part of a priority claim"
+     }
+    ],
+    "poolTotal": "23250.00",
+    "priorityTotal": "3200.00",
+    "propertyTotal": "312550.00",
+    "trusteeCommission": "2205.00",
+    "trusteeCommissionRule": "11 U.S.C. § 326(a): 25% of the first $5,000, 10% of the next $45,000, 5% of the next $950,000, 3% above $1,000,000",
+    "unexemptTotal": "14550.00"
+   },
+   "planPresent": false,
+   "problems": [
+    "The plan has no term: type one, or complete the means test so the commitment period (B122C-1 line 21) can supply it.",
+    "There is no plan yet: choose a monthly payment."
+   ],
+   "trusteePercentage": null,
+   "unsecured": {
+    "percentage": "0.00",
+    "pool": [
+     {
+      "amount": "8200.00",
+      "claimId": "claim-visa",
+      "label": "Meridian Bank Card Services (…4412)",
+      "source": "claim claim-visa: nonpriority unsecured amount"
+     },
+     {
+      "amount": "2600.00",
+      "claimId": "claim-hospital",
+      "label": "Bayside General Hospital (…0072)",
+      "source": "claim claim-hospital: nonpriority unsecured amount"
+     },
+     {
+      "amount": "12000.00",
+      "claimId": "claim-student",
+      "label": "Great Plains Student Servicing (…5510)",
+      "source": "claim claim-student: nonpriority unsecured amount"
+     },
+     {
+      "amount": "450.00",
+      "claimId": "claim-irs",
+      "label": "Internal Revenue Service",
+      "source": "claim claim-irs: nonpriority part of a priority claim"
+     }
+    ],
+    "poolTotal": "23250.00",
+    "target": "23250.00",
+    "targetSource": "whatever remains, up to the full unsecured pool (a pot plan)"
+   },
+   "warnings": [
+    "This is a Chapter 7 case; a plan is proposed only under Chapter 13.",
+    "Walk-in repair customers' names and phone numbers has no value on Schedule A/B, so the liquidation test counts it at $0."
+   ]
+  }
+ },
+ "standards": {
+  "value": {
+   "as_of": "2026-10-01",
+   "county": "Hillsborough",
+   "household_size": 3,
+   "housing_mortgage_rent": "1833.00",
+   "housing_non_mortgage": "733.00",
+   "jurisdiction_source": "Debtor 1's residence address, plus 1 dependent(s) recorded as living with the debtor",
+   "local_release_id": "ust/irs-local-standards@2026-07-15",
+   "national_allowance": "1857.00",
+   "national_release_id": "ust/irs-national-standards@2026-07-15",
+   "oop_healthcare_65_and_older": "163.00",
+   "oop_healthcare_under_65": "90.00",
+   "problems": [],
+   "state": "FL",
+   "transportation_operating_one_car": "320.00",
+   "transportation_operating_two_cars": "640.00",
+   "transportation_ownership_one_car": "703.00",
+   "transportation_ownership_two_cars": "1406.00",
+   "transportation_public_national": "220.00"
+  }
+ }
+}

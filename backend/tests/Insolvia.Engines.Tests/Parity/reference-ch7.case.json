@@ -1,0 +1,1928 @@
+{
+ "assets": [
+  [
+   "asset-house",
+   {
+    "category": "real_property",
+    "community_property": false,
+    "county": "Hillsborough",
+    "description": "12 Byron Court, Tampa, FL 33601",
+    "detail": "Two-bedroom bungalow; the family homestead",
+    "includes_personal_information": null,
+    "make": null,
+    "mileage": null,
+    "model": null,
+    "ownership_interest": "both",
+    "ownership_interest_description": "Fee simple, tenancy by the entireties",
+    "property_types": [
+     "single_family_home"
+    ],
+    "value_entire": "265000.00",
+    "value_portion_owned": "240000.00",
+    "year": null
+   }
+  ],
+  [
+   "asset-civic",
+   {
+    "category": "vehicle",
+    "community_property": null,
+    "county": null,
+    "description": "2016 Honda Civic LX",
+    "detail": "One owner; always garaged",
+    "includes_personal_information": null,
+    "make": "Honda",
+    "mileage": 92000,
+    "model": "Civic LX",
+    "ownership_interest": "debtor_1",
+    "ownership_interest_description": null,
+    "property_types": [],
+    "value_entire": "9000.00",
+    "value_portion_owned": "9000.00",
+    "year": 2016
+   }
+  ],
+  [
+   "asset-pontoon",
+   {
+    "category": "watercraft_aircraft_or_recreational_vehicle",
+    "community_property": null,
+    "county": null,
+    "description": "2005 Sun Tracker pontoon boat",
+    "detail": "Trailer included; engine needs work",
+    "includes_personal_information": null,
+    "make": "Sun Tracker",
+    "mileage": null,
+    "model": "Pontoon boat",
+    "ownership_interest": "both",
+    "ownership_interest_description": null,
+    "property_types": [],
+    "value_entire": "3500.00",
+    "value_portion_owned": "3500.00",
+    "year": 2005
+   }
+  ],
+  [
+   "asset-household",
+   {
+    "category": "household_goods",
+    "community_property": null,
+    "county": null,
+    "description": "Used furniture and kitchen appliances",
+    "detail": null,
+    "includes_personal_information": null,
+    "make": null,
+    "mileage": null,
+    "model": null,
+    "ownership_interest": "both",
+    "ownership_interest_description": null,
+    "property_types": [],
+    "value_entire": "2200.00",
+    "value_portion_owned": "2200.00",
+    "year": null
+   }
+  ],
+  [
+   "asset-electronics",
+   {
+    "category": "electronics",
+    "community_property": null,
+    "county": null,
+    "description": "Two laptops, one television",
+    "detail": null,
+    "includes_personal_information": null,
+    "make": null,
+    "mileage": null,
+    "model": null,
+    "ownership_interest": "both",
+    "ownership_interest_description": null,
+    "property_types": [],
+    "value_entire": "900.00",
+    "value_portion_owned": "900.00",
+    "year": null
+   }
+  ],
+  [
+   "asset-clothes",
+   {
+    "category": "clothes",
+    "community_property": null,
+    "county": null,
+    "description": "Everyday clothing",
+    "detail": null,
+    "includes_personal_information": null,
+    "make": null,
+    "mileage": null,
+    "model": null,
+    "ownership_interest": "both",
+    "ownership_interest_description": null,
+    "property_types": [],
+    "value_entire": "400.00",
+    "value_portion_owned": "400.00",
+    "year": null
+   }
+  ],
+  [
+   "asset-rings",
+   {
+    "category": "jewelry",
+    "community_property": null,
+    "county": null,
+    "description": "Wedding rings",
+    "detail": null,
+    "includes_personal_information": null,
+    "make": null,
+    "mileage": null,
+    "model": null,
+    "ownership_interest": "both",
+    "ownership_interest_description": null,
+    "property_types": [],
+    "value_entire": "1800.00",
+    "value_portion_owned": "1800.00",
+    "year": null
+   }
+  ],
+  [
+   "asset-cash",
+   {
+    "category": "cash",
+    "community_property": null,
+    "county": null,
+    "description": "Cash on hand",
+    "detail": null,
+    "includes_personal_information": null,
+    "make": null,
+    "mileage": null,
+    "model": null,
+    "ownership_interest": "both",
+    "ownership_interest_description": null,
+    "property_types": [],
+    "value_entire": null,
+    "value_portion_owned": "150.00",
+    "year": null
+   }
+  ],
+  [
+   "asset-checking",
+   {
+    "category": "deposits_of_money",
+    "community_property": null,
+    "county": null,
+    "description": null,
+    "detail": "Checking account, Suncoast Credit Union",
+    "includes_personal_information": null,
+    "make": null,
+    "mileage": null,
+    "model": null,
+    "ownership_interest": "both",
+    "ownership_interest_description": null,
+    "property_types": [],
+    "value_entire": null,
+    "value_portion_owned": "1250.00",
+    "year": null
+   }
+  ],
+  [
+   "asset-biz-checking",
+   {
+    "category": "deposits_of_money",
+    "community_property": null,
+    "county": null,
+    "description": null,
+    "detail": "Business checking account, Wells Fargo",
+    "includes_personal_information": null,
+    "make": null,
+    "mileage": null,
+    "model": null,
+    "ownership_interest": "debtor_1",
+    "ownership_interest_description": null,
+    "property_types": [],
+    "value_entire": null,
+    "value_portion_owned": "2100.00",
+    "year": null
+   }
+  ],
+  [
+   "asset-401k",
+   {
+    "category": "retirement_accounts",
+    "community_property": null,
+    "county": null,
+    "description": "401(k) retirement account",
+    "detail": "401(k), Fidelity — Menabrea Machines Inc",
+    "includes_personal_information": null,
+    "make": null,
+    "mileage": null,
+    "model": null,
+    "ownership_interest": "debtor_1",
+    "ownership_interest_description": null,
+    "property_types": [],
+    "value_entire": null,
+    "value_portion_owned": "48000.00",
+    "year": null
+   }
+  ],
+  [
+   "asset-utility-deposit",
+   {
+    "category": "security_deposits_and_prepayments",
+    "community_property": null,
+    "county": null,
+    "description": null,
+    "detail": "Utility deposit, Tampa Electric",
+    "includes_personal_information": null,
+    "make": null,
+    "mileage": null,
+    "model": null,
+    "ownership_interest": "both",
+    "ownership_interest_description": null,
+    "property_types": [],
+    "value_entire": null,
+    "value_portion_owned": "200.00",
+    "year": null
+   }
+  ],
+  [
+   "asset-tax-refund",
+   {
+    "category": "money_owed_to_you",
+    "community_property": null,
+    "county": null,
+    "description": "2025 federal income tax refund, return filed",
+    "detail": "Federal",
+    "includes_personal_information": null,
+    "make": null,
+    "mileage": null,
+    "model": null,
+    "ownership_interest": "both",
+    "ownership_interest_description": null,
+    "property_types": [],
+    "value_entire": null,
+    "value_portion_owned": "1100.00",
+    "year": null
+   }
+  ],
+  [
+   "asset-term-life",
+   {
+    "category": "insurance_policy_interests",
+    "community_property": null,
+    "county": null,
+    "description": "Term life policy, Prudential",
+    "detail": "Beneficiary: Ben Lovelace",
+    "includes_personal_information": null,
+    "make": null,
+    "mileage": null,
+    "model": null,
+    "ownership_interest": "debtor_1",
+    "ownership_interest_description": null,
+    "property_types": [],
+    "value_entire": null,
+    "value_portion_owned": "0.00",
+    "year": null
+   }
+  ],
+  [
+   "asset-workbench",
+   {
+    "category": "office_equipment",
+    "community_property": null,
+    "county": null,
+    "description": "Workbench, test rigs, and hand tools",
+    "detail": null,
+    "includes_personal_information": null,
+    "make": null,
+    "mileage": null,
+    "model": null,
+    "ownership_interest": "debtor_1",
+    "ownership_interest_description": null,
+    "property_types": [],
+    "value_entire": null,
+    "value_portion_owned": "750.00",
+    "year": null
+   }
+  ],
+  [
+   "asset-parts",
+   {
+    "category": "inventory",
+    "community_property": null,
+    "county": null,
+    "description": "Replacement engine parts inventory",
+    "detail": null,
+    "includes_personal_information": null,
+    "make": null,
+    "mileage": null,
+    "model": null,
+    "ownership_interest": "debtor_1",
+    "ownership_interest_description": null,
+    "property_types": [],
+    "value_entire": null,
+    "value_portion_owned": "1200.00",
+    "year": null
+   }
+  ],
+  [
+   "asset-customer-list",
+   {
+    "category": "customer_lists_and_intangibles",
+    "community_property": null,
+    "county": null,
+    "description": "Walk-in repair customers' names and phone numbers",
+    "detail": null,
+    "includes_personal_information": true,
+    "make": null,
+    "mileage": null,
+    "model": null,
+    "ownership_interest": "debtor_1",
+    "ownership_interest_description": null,
+    "property_types": [],
+    "value_entire": null,
+    "value_portion_owned": null,
+    "year": null
+   }
+  ]
+ ],
+ "case": {
+  "archived_at": null,
+  "archived_by": null,
+  "case_number": null,
+  "chapter": 7,
+  "constants_set_id": null,
+  "court": null,
+  "created_at": "2026-08-01T12:00:00Z",
+  "created_by": "subject-0001",
+  "deleted_at": null,
+  "deleted_by": null,
+  "district": "Middle District of Florida",
+  "division": null,
+  "exemption_set": null,
+  "filed_at": null,
+  "firm_id": "firm-0001",
+  "form_revisions": null,
+  "id": "case-reference-0001",
+  "judge": null,
+  "meeting_341_at": null,
+  "office_file_number": null,
+  "status": "intake",
+  "trustee": null,
+  "updated_at": "2026-09-01T12:00:00Z"
+ },
+ "claims": [
+  [
+   "claim-mortgage",
+   {
+    "account_last4": "3321",
+    "amount": "195000.00",
+    "asset_id": "asset-house",
+    "claim_class": "secured",
+    "collateral_description": "12 Byron Court, Tampa, FL 33601",
+    "collateral_value": "240000.00",
+    "community_debt": null,
+    "contingent": false,
+    "creditor_id": "cred-mortgage",
+    "date_incurred": "2019-06-01",
+    "disputed": false,
+    "intention": "retain_reaffirm",
+    "intention_explanation": null,
+    "lien_nature": [
+     "agreement"
+    ],
+    "lien_nature_other": null,
+    "lien_position": 1,
+    "nonpriority_amount": null,
+    "nonpriority_type": null,
+    "nonpriority_type_other": null,
+    "notice_parties": [
+     {
+      "account_last4": "3321",
+      "address": {
+       "city": "Tampa",
+       "county": null,
+       "line1": "101 Lender Way",
+       "line2": "Suite 4",
+       "postal_code": "33602",
+       "raw": null,
+       "state": "FL"
+      },
+      "id": "np-mortgage-servicer",
+      "name": "Gulf Coast Loan Servicing"
+     }
+    ],
+    "priority_amount": null,
+    "priority_type": null,
+    "priority_type_other": null,
+    "subject_to_offset": null,
+    "unliquidated": false,
+    "unsecured_amount_override": null,
+    "who_incurred": "both"
+   }
+  ],
+  [
+   "claim-auto",
+   {
+    "account_last4": "8890",
+    "amount": "7400.00",
+    "asset_id": "asset-civic",
+    "claim_class": "secured",
+    "collateral_description": null,
+    "collateral_value": null,
+    "community_debt": null,
+    "contingent": null,
+    "creditor_id": "cred-auto",
+    "date_incurred": "2023-04-15",
+    "disputed": null,
+    "intention": "retain_redeem",
+    "intention_explanation": null,
+    "lien_nature": [
+     "agreement"
+    ],
+    "lien_nature_other": null,
+    "lien_position": 1,
+    "nonpriority_amount": null,
+    "nonpriority_type": null,
+    "nonpriority_type_other": null,
+    "notice_parties": [],
+    "priority_amount": null,
+    "priority_type": null,
+    "priority_type_other": null,
+    "subject_to_offset": null,
+    "unliquidated": null,
+    "unsecured_amount_override": null,
+    "who_incurred": "debtor_1"
+   }
+  ],
+  [
+   "claim-irs",
+   {
+    "account_last4": null,
+    "amount": null,
+    "asset_id": null,
+    "claim_class": "priority_unsecured",
+    "collateral_description": null,
+    "collateral_value": null,
+    "community_debt": null,
+    "contingent": null,
+    "creditor_id": "cred-irs",
+    "date_incurred": "2025-04-15",
+    "disputed": null,
+    "intention": null,
+    "intention_explanation": null,
+    "lien_nature": [],
+    "lien_nature_other": null,
+    "lien_position": null,
+    "nonpriority_amount": "450.00",
+    "nonpriority_type": null,
+    "nonpriority_type_other": null,
+    "notice_parties": [],
+    "priority_amount": "3200.00",
+    "priority_type": "tax_and_government",
+    "priority_type_other": null,
+    "subject_to_offset": false,
+    "unliquidated": null,
+    "unsecured_amount_override": null,
+    "who_incurred": "both"
+   }
+  ],
+  [
+   "claim-visa",
+   {
+    "account_last4": "4412",
+    "amount": "8200.00",
+    "asset_id": null,
+    "claim_class": "nonpriority_unsecured",
+    "collateral_description": null,
+    "collateral_value": null,
+    "community_debt": null,
+    "contingent": null,
+    "creditor_id": "cred-visa",
+    "date_incurred": "2020-11-01",
+    "disputed": null,
+    "intention": null,
+    "intention_explanation": null,
+    "lien_nature": [],
+    "lien_nature_other": null,
+    "lien_position": null,
+    "nonpriority_amount": null,
+    "nonpriority_type": "other",
+    "nonpriority_type_other": "Credit card purchases",
+    "notice_parties": [
+     {
+      "account_last4": "4412",
+      "address": {
+       "city": "Wilmington",
+       "county": null,
+       "line1": "9 Collection Court",
+       "line2": null,
+       "postal_code": "19801",
+       "raw": null,
+       "state": "DE"
+      },
+      "id": "np-visa-collector",
+      "name": "Meridian Recovery Services"
+     }
+    ],
+    "priority_amount": null,
+    "priority_type": null,
+    "priority_type_other": null,
+    "subject_to_offset": false,
+    "unliquidated": null,
+    "unsecured_amount_override": null,
+    "who_incurred": "both"
+   }
+  ],
+  [
+   "claim-hospital",
+   {
+    "account_last4": "0072",
+    "amount": "2600.00",
+    "asset_id": null,
+    "claim_class": "nonpriority_unsecured",
+    "collateral_description": null,
+    "collateral_value": null,
+    "community_debt": null,
+    "contingent": null,
+    "creditor_id": "cred-hospital",
+    "date_incurred": "2026-02-10",
+    "disputed": true,
+    "intention": null,
+    "intention_explanation": null,
+    "lien_nature": [],
+    "lien_nature_other": null,
+    "lien_position": null,
+    "nonpriority_amount": null,
+    "nonpriority_type": "other",
+    "nonpriority_type_other": "Medical services",
+    "notice_parties": [],
+    "priority_amount": null,
+    "priority_type": null,
+    "priority_type_other": null,
+    "subject_to_offset": true,
+    "unliquidated": null,
+    "unsecured_amount_override": null,
+    "who_incurred": "debtor_2"
+   }
+  ],
+  [
+   "claim-student",
+   {
+    "account_last4": "5510",
+    "amount": "12000.00",
+    "asset_id": null,
+    "claim_class": "nonpriority_unsecured",
+    "collateral_description": null,
+    "collateral_value": null,
+    "community_debt": null,
+    "contingent": null,
+    "creditor_id": "cred-student",
+    "date_incurred": "2012-09-01",
+    "disputed": null,
+    "intention": null,
+    "intention_explanation": null,
+    "lien_nature": [],
+    "lien_nature_other": null,
+    "lien_position": null,
+    "nonpriority_amount": null,
+    "nonpriority_type": "student_loan",
+    "nonpriority_type_other": null,
+    "notice_parties": [],
+    "priority_amount": null,
+    "priority_type": null,
+    "priority_type_other": null,
+    "subject_to_offset": false,
+    "unliquidated": null,
+    "unsecured_amount_override": null,
+    "who_incurred": "debtor_1"
+   }
+  ]
+ ],
+ "codebtors": [
+  {
+   "address": {
+    "city": "Tampa",
+    "county": null,
+    "line1": "9 Garden Lane",
+    "line2": null,
+    "postal_code": "33603",
+    "raw": null,
+    "state": "FL"
+   },
+   "claim_ids": [
+    "claim-auto"
+   ],
+   "contract_lease_ids": [],
+   "name": "Margaret Lovelace"
+  },
+  {
+   "address": {
+    "city": "Tampa",
+    "county": null,
+    "line1": "41 Engine Row",
+    "line2": null,
+    "postal_code": "33605",
+    "raw": null,
+    "state": "FL"
+   },
+   "claim_ids": [
+    "claim-visa"
+   ],
+   "contract_lease_ids": [
+    "cl-storage"
+   ],
+   "name": "Charles Menabrea"
+  }
+ ],
+ "community_household_members": [],
+ "contract_leases": [
+  [
+   "cl-storage",
+   {
+    "counterparty_address": {
+     "city": "Tampa",
+     "county": null,
+     "line1": "77 Keeper Street",
+     "line2": null,
+     "postal_code": "33605",
+     "raw": null,
+     "state": "FL"
+    },
+    "counterparty_name": "StorSafe Tampa LLC",
+    "description": "Month-to-month storage unit lease, unit 214; debtor's interest: lessee",
+    "intention": null,
+    "list_on_statement_of_intention": null
+   }
+  ],
+  [
+   "cl-wireless",
+   {
+    "counterparty_address": {
+     "city": "Tampa",
+     "county": null,
+     "line1": "300 Signal Drive",
+     "line2": null,
+     "postal_code": "33607",
+     "raw": null,
+     "state": "FL"
+    },
+    "counterparty_name": "Gulf Wireless LLC",
+    "description": "Two-year wireless service agreement, 14 months remaining",
+    "intention": null,
+    "list_on_statement_of_intention": null
+   }
+  ],
+  [
+   "cl-rav4",
+   {
+    "counterparty_address": {
+     "city": "Orlando",
+     "county": null,
+     "line1": "500 Lease Lane",
+     "line2": null,
+     "postal_code": "32801",
+     "raw": null,
+     "state": "FL"
+    },
+    "counterparty_name": "Sunshine Auto Leasing LLC",
+    "description": "Lease of a 2024 Toyota RAV4, 22 months remaining; debtor's interest: lessee",
+    "intention": "assume",
+    "list_on_statement_of_intention": true
+   }
+  ]
+ ],
+ "creditors": [
+  [
+   "cred-mortgage",
+   {
+    "address": {
+     "city": "Tampa",
+     "county": null,
+     "line1": "100 Lender Way",
+     "line2": null,
+     "postal_code": "33602",
+     "raw": null,
+     "state": "FL"
+    },
+    "name": "Gulf Coast Home Loans"
+   }
+  ],
+  [
+   "cred-auto",
+   {
+    "address": {
+     "city": "Orlando",
+     "county": null,
+     "line1": "88 Motor Row",
+     "line2": null,
+     "postal_code": "32801",
+     "raw": null,
+     "state": "FL"
+    },
+    "name": "Drive Away Financial LLC"
+   }
+  ],
+  [
+   "cred-irs",
+   {
+    "address": {
+     "city": "Philadelphia",
+     "county": null,
+     "line1": "PO Box 7346",
+     "line2": null,
+     "postal_code": "19101",
+     "raw": null,
+     "state": "PA"
+    },
+    "name": "Internal Revenue Service"
+   }
+  ],
+  [
+   "cred-visa",
+   {
+    "address": {
+     "city": "Wilmington",
+     "county": null,
+     "line1": "1 Meridian Plaza",
+     "line2": null,
+     "postal_code": "19801",
+     "raw": null,
+     "state": "DE"
+    },
+    "name": "Meridian Bank Card Services"
+   }
+  ],
+  [
+   "cred-hospital",
+   {
+    "address": {
+     "city": "Tampa",
+     "county": null,
+     "line1": "2 Care Circle",
+     "line2": null,
+     "postal_code": "33606",
+     "raw": null,
+     "state": "FL"
+    },
+    "name": "Bayside General Hospital"
+   }
+  ],
+  [
+   "cred-student",
+   {
+    "address": {
+     "city": "Lincoln",
+     "county": null,
+     "line1": "500 Loan Loop",
+     "line2": null,
+     "postal_code": "68501",
+     "raw": null,
+     "state": "NE"
+    },
+    "name": "Great Plains Student Servicing"
+   }
+  ]
+ ],
+ "debtors": [
+  {
+   "body": {
+    "credit_counseling": {
+     "exemption_reason": null,
+     "status": "completed_with_certificate"
+    },
+    "email": "ada@example.com",
+    "employer_ids": [
+     "12-3456789"
+    ],
+    "mailing_address": {
+     "city": "Tampa",
+     "county": null,
+     "line1": "4501 Postal Way",
+     "line2": "PO Box 99",
+     "postal_code": "33602",
+     "raw": null,
+     "state": "FL"
+    },
+    "mobile": "(813) 555-0102",
+    "name": {
+     "given": "Ada",
+     "middle": "Quinn",
+     "suffix": null,
+     "surname": "Lovelace"
+    },
+    "other_names_used": [
+     {
+      "business_name": null,
+      "given": "Ada",
+      "id": "alias-1",
+      "middle": null,
+      "surname": "Byron"
+     },
+     {
+      "business_name": "Ada's Analytical Engines",
+      "given": null,
+      "id": "alias-2",
+      "middle": null,
+      "surname": null
+     }
+    ],
+    "phone": "(813) 555-0101",
+    "residence_address": {
+     "city": "Tampa",
+     "county": "Hillsborough",
+     "line1": "12 Byron Court",
+     "line2": "Apt 4",
+     "postal_code": "33601",
+     "raw": null,
+     "state": "FL"
+    },
+    "signed_at": "2026-08-30",
+    "venue": {
+     "basis": "lived_longest_180_days",
+     "explanation": null
+    }
+   },
+   "created_at": "2026-08-01T12:00:00Z",
+   "filing_role": "debtor_1",
+   "id": "debtor-0001",
+   "tax_id": {
+    "kind": "ssn",
+    "last_four": "4321",
+    "ref": "taxid-0001"
+   },
+   "updated_at": "2026-08-01T12:00:00Z"
+  },
+  {
+   "body": {
+    "credit_counseling": {
+     "exemption_reason": "disability",
+     "status": "not_required"
+    },
+    "email": null,
+    "employer_ids": [],
+    "mailing_address": {
+     "city": null,
+     "county": null,
+     "line1": null,
+     "line2": null,
+     "postal_code": null,
+     "raw": null,
+     "state": null
+    },
+    "mobile": null,
+    "name": {
+     "given": "Ben",
+     "middle": null,
+     "suffix": "Jr.",
+     "surname": "Lovelace"
+    },
+    "other_names_used": [],
+    "phone": null,
+    "residence_address": {
+     "city": "Tampa",
+     "county": "Hillsborough",
+     "line1": "12 Byron Court",
+     "line2": "Apt 4",
+     "postal_code": "33601",
+     "raw": null,
+     "state": "FL"
+    },
+    "signed_at": "2026-08-30",
+    "venue": {
+     "basis": "other",
+     "explanation": "Moved from Georgia in July; the greater part of the last 180 days was spent in this district."
+    }
+   },
+   "created_at": "2026-08-01T12:05:00Z",
+   "filing_role": "debtor_2",
+   "id": "debtor-0002",
+   "tax_id": {
+    "kind": "itin",
+    "last_four": "4322",
+    "ref": "taxid-0002"
+   },
+   "updated_at": "2026-08-01T12:05:00Z"
+  }
+ ],
+ "dependents": [
+  {
+   "age": 9,
+   "household_id": "hh-main",
+   "lives_with_debtor": true,
+   "relationship": "Daughter"
+  }
+ ],
+ "employments": [
+  [
+   "employment-0001",
+   {
+    "debtor_id": "debtor-0001",
+    "employed_since": "2019-02-14",
+    "employer_address": {
+     "city": "Tampa",
+     "county": null,
+     "line1": "200 Engine Row",
+     "line2": null,
+     "postal_code": "33605",
+     "raw": null,
+     "state": "FL"
+    },
+    "employer_name": "Menabrea Machines Inc",
+    "occupation": "Systems analyst",
+    "status": "employed"
+   }
+  ],
+  [
+   "employment-0002",
+   {
+    "debtor_id": "debtor-0002",
+    "employed_since": null,
+    "employer_address": {
+     "city": null,
+     "county": null,
+     "line1": null,
+     "line2": null,
+     "postal_code": null,
+     "raw": null,
+     "state": null
+    },
+    "employer_name": null,
+    "occupation": null,
+    "status": "not_employed"
+   }
+  ]
+ ],
+ "exemptions": [
+  {
+   "acquired_within_1215_days": false,
+   "amount": null,
+   "asset_id": "asset-house",
+   "claims_full_fmv": true,
+   "statute_citation": "Fla. Const. art. X, § 4(a)(1)"
+  },
+  {
+   "acquired_within_1215_days": null,
+   "amount": "5000.00",
+   "asset_id": "asset-civic",
+   "claims_full_fmv": false,
+   "statute_citation": "Fla. Stat. § 222.25(1)"
+  },
+  {
+   "acquired_within_1215_days": null,
+   "amount": "1000.00",
+   "asset_id": "asset-household",
+   "claims_full_fmv": false,
+   "statute_citation": "Fla. Const. art. X, § 4(a)(2)"
+  },
+  {
+   "acquired_within_1215_days": null,
+   "amount": null,
+   "asset_id": "asset-401k",
+   "claims_full_fmv": true,
+   "statute_citation": "Fla. Stat. § 222.21(2)"
+  }
+ ],
+ "expenses": [
+  {
+   "amount": "1480.00",
+   "category": "rent_or_home_ownership",
+   "household_id": "hh-main",
+   "specify_text": null
+  },
+  {
+   "amount": "120.00",
+   "category": "home_maintenance",
+   "household_id": "hh-main",
+   "specify_text": null
+  },
+  {
+   "amount": "210.00",
+   "category": "electricity_heat_gas",
+   "household_id": "hh-main",
+   "specify_text": null
+  },
+  {
+   "amount": "95.00",
+   "category": "water_sewer_garbage",
+   "household_id": "hh-main",
+   "specify_text": null
+  },
+  {
+   "amount": "140.00",
+   "category": "telephone_and_internet",
+   "household_id": "hh-main",
+   "specify_text": null
+  },
+  {
+   "amount": "850.00",
+   "category": "food_and_housekeeping",
+   "household_id": "hh-main",
+   "specify_text": null
+  },
+  {
+   "amount": "300.00",
+   "category": "childcare_and_education",
+   "household_id": "hh-main",
+   "specify_text": null
+  },
+  {
+   "amount": "120.00",
+   "category": "clothing_and_laundry",
+   "household_id": "hh-main",
+   "specify_text": null
+  },
+  {
+   "amount": "60.00",
+   "category": "personal_care",
+   "household_id": "hh-main",
+   "specify_text": null
+  },
+  {
+   "amount": "180.00",
+   "category": "medical_and_dental",
+   "household_id": "hh-main",
+   "specify_text": null
+  },
+  {
+   "amount": "240.00",
+   "category": "transportation",
+   "household_id": "hh-main",
+   "specify_text": null
+  },
+  {
+   "amount": "90.00",
+   "category": "entertainment_and_recreation",
+   "household_id": "hh-main",
+   "specify_text": null
+  },
+  {
+   "amount": "50.00",
+   "category": "charitable_contributions",
+   "household_id": "hh-main",
+   "specify_text": null
+  },
+  {
+   "amount": "45.00",
+   "category": "life_insurance",
+   "household_id": "hh-main",
+   "specify_text": null
+  },
+  {
+   "amount": "380.00",
+   "category": "health_insurance",
+   "household_id": "hh-main",
+   "specify_text": null
+  },
+  {
+   "amount": "165.00",
+   "category": "vehicle_insurance",
+   "household_id": "hh-main",
+   "specify_text": null
+  },
+  {
+   "amount": "150.00",
+   "category": "taxes",
+   "household_id": "hh-main",
+   "specify_text": "Self-employment tax estimate"
+  },
+  {
+   "amount": "260.00",
+   "category": "vehicle_installment_payments",
+   "household_id": "hh-main",
+   "specify_text": null
+  },
+  {
+   "amount": "55.00",
+   "category": "other_installment_payments",
+   "household_id": "hh-main",
+   "specify_text": "Financed laptop"
+  },
+  {
+   "amount": "70.00",
+   "category": "other",
+   "household_id": "hh-main",
+   "specify_text": "Dog food and veterinary care"
+  }
+ ],
+ "filing_professionals": [
+  {
+   "address": {
+    "city": "Tampa",
+    "county": null,
+    "line1": "1 Example Way",
+    "line2": null,
+    "postal_code": "33604",
+    "raw": null,
+    "state": "FL"
+   },
+   "bar_number": "112233",
+   "bar_state": "FL",
+   "compensation_agreed": "1500.00",
+   "compensation_received": "1000.00",
+   "compensation_shared": false,
+   "compensation_source_paid": "debtor",
+   "compensation_source_paid_other": null,
+   "compensation_source_to_be_paid": "other",
+   "compensation_source_to_be_paid_other": "Margaret Lovelace, Debtor 1's mother",
+   "email": "alex@example.com",
+   "firm_name": "Counsel & Counsel PA",
+   "name": {
+    "given": "Alex",
+    "middle": null,
+    "suffix": null,
+    "surname": "Counsel"
+   },
+   "phone": "(813) 555-0100",
+   "role": "attorney",
+   "services_excluded": "Representation in any adversary proceeding, appeal, or non-bankruptcy matter; motions to avoid liens; and defense of any motion to dismiss under section 707(b). Each is billed separately under a written agreement.",
+   "services_other": "Negotiation of the reaffirmation agreement with Gulf Coast Loan Servicing and the redemption of the Honda Civic.",
+   "signature_date": "2026-08-31"
+  }
+ ],
+ "households": [
+  [
+   "hh-main",
+   {
+    "change_expected": true,
+    "change_explanation": "Health insurance premiums increase in January.",
+    "expenses_include_others": true,
+    "separate_household": false,
+    "which_household": "main"
+   }
+  ]
+ ],
+ "income_summaries": [
+  {
+   "business_net_income": null,
+   "change_expected": true,
+   "change_explanation": "Overtime ends in November.",
+   "debtor_id": "debtor-0001",
+   "deduction_domestic_support": null,
+   "deduction_insurance": "120.50",
+   "deduction_mandatory_retirement": null,
+   "deduction_other": null,
+   "deduction_other_specify": null,
+   "deduction_retirement_loan_repayment": null,
+   "deduction_tax": "830.00",
+   "deduction_union_dues": null,
+   "deduction_voluntary_retirement": null,
+   "family_support": "400.00",
+   "household_contributions": "250.00",
+   "household_contributions_specify": "Adult son shares rent",
+   "interest_and_dividends": null,
+   "other_government_assistance": null,
+   "other_government_assistance_specify": null,
+   "other_monthly_income": null,
+   "other_monthly_income_specify": null,
+   "overtime": "250.00",
+   "pension_or_retirement": null,
+   "social_security": null,
+   "unemployment": null,
+   "wages": "5200.00"
+  },
+  {
+   "business_net_income": null,
+   "change_expected": null,
+   "change_explanation": null,
+   "debtor_id": "debtor-0002",
+   "deduction_domestic_support": null,
+   "deduction_insurance": null,
+   "deduction_mandatory_retirement": null,
+   "deduction_other": null,
+   "deduction_other_specify": null,
+   "deduction_retirement_loan_repayment": null,
+   "deduction_tax": null,
+   "deduction_union_dues": null,
+   "deduction_voluntary_retirement": null,
+   "family_support": null,
+   "household_contributions": null,
+   "household_contributions_specify": null,
+   "interest_and_dividends": null,
+   "other_government_assistance": null,
+   "other_government_assistance_specify": null,
+   "other_monthly_income": null,
+   "other_monthly_income_specify": null,
+   "overtime": null,
+   "pension_or_retirement": null,
+   "social_security": null,
+   "unemployment": null,
+   "wages": "3000.00"
+  }
+ ],
+ "means_test_inputs": [
+  {
+   "additional_food_clothing": "60.00",
+   "additional_public_transportation": null,
+   "ch13_eligible": true,
+   "ch13_projected_plan_payment": "650.00",
+   "charitable_contributions": "100.00",
+   "child_support_for_dependents": null,
+   "childcare": "450.00",
+   "commitment_period_marital_adjustment": null,
+   "court_ordered_payments": null,
+   "disability_insurance": null,
+   "disabled_veteran": null,
+   "education_for_employment_or_disability": null,
+   "education_under_18": "150.00",
+   "family_care_contributions": null,
+   "family_violence_protection": null,
+   "health_insurance": "520.00",
+   "health_savings_account": "60.00",
+   "healthcare_above_allowance": null,
+   "home_energy_excess": null,
+   "home_secured_monthly_total": "1480.00",
+   "housing_adjustment_amount": null,
+   "housing_adjustment_explanation": null,
+   "income_overrides": [],
+   "involuntary_deductions": "85.00",
+   "irs_family_size": null,
+   "irs_housing_family_size": null,
+   "marital_adjustments": [],
+   "marital_filing_status": null,
+   "median_household_size": null,
+   "non_consumer_debts": null,
+   "optional_telecom": "45.00",
+   "other_secured_payments": [
+    {
+     "bucket": null,
+     "claim_id": null,
+     "creditor_name": "Suncoast Equipment Finance",
+     "cure_total": null,
+     "id": "os-1",
+     "monthly_payment": "95.00",
+     "property_description": "Utility trailer"
+    }
+   ],
+   "people_65_or_older": 0,
+   "people_under_65": 3,
+   "priority_cure_total": "2100.00",
+   "qualified_retirement_deductions": null,
+   "reservist_national_guard": null,
+   "special_circumstances": [],
+   "taxes": "1620.00",
+   "term_life_insurance": "35.00",
+   "vehicle_1_loan_monthly": "415.00",
+   "vehicle_2_loan_monthly": null,
+   "vehicle_count": 1
+  }
+ ],
+ "other_income_records": [
+  {
+   "amount": "1300.00",
+   "category": "unemployment",
+   "debtor_id": "debtor-0002",
+   "description": null,
+   "expenses": null,
+   "payer": "Florida Reemployment Assistance",
+   "received_on": "2026-02-10"
+  },
+  {
+   "amount": "1300.00",
+   "category": "unemployment",
+   "debtor_id": "debtor-0002",
+   "description": null,
+   "expenses": null,
+   "payer": "Florida Reemployment Assistance",
+   "received_on": "2026-03-10"
+  },
+  {
+   "amount": "1300.00",
+   "category": "unemployment",
+   "debtor_id": "debtor-0002",
+   "description": null,
+   "expenses": null,
+   "payer": "Florida Reemployment Assistance",
+   "received_on": "2026-04-10"
+  },
+  {
+   "amount": "1300.00",
+   "category": "unemployment",
+   "debtor_id": "debtor-0002",
+   "description": null,
+   "expenses": null,
+   "payer": "Florida Reemployment Assistance",
+   "received_on": "2026-05-10"
+  },
+  {
+   "amount": "1300.00",
+   "category": "unemployment",
+   "debtor_id": "debtor-0002",
+   "description": null,
+   "expenses": null,
+   "payer": "Florida Reemployment Assistance",
+   "received_on": "2026-06-10"
+  },
+  {
+   "amount": "1300.00",
+   "category": "unemployment",
+   "debtor_id": "debtor-0002",
+   "description": null,
+   "expenses": null,
+   "payer": "Florida Reemployment Assistance",
+   "received_on": "2026-07-10"
+  },
+  {
+   "amount": "900.00",
+   "category": "social_security_act_benefit",
+   "debtor_id": "debtor-0002",
+   "description": null,
+   "expenses": null,
+   "payer": "Social Security Administration",
+   "received_on": "2026-05-20"
+  }
+ ],
+ "pay_period_records": [
+  {
+   "deductions": [
+    {
+     "amount": "1620.00",
+     "category": "tax",
+     "description": null,
+     "id": "ded-02-1"
+    },
+    {
+     "amount": "170.00",
+     "category": "insurance",
+     "description": null,
+     "id": "ded-02-2"
+    }
+   ],
+   "employment_id": "employment-0001",
+   "frequency": "monthly",
+   "gross": "7400.00",
+   "net": "5610.00",
+   "pay_date": "2026-02-27",
+   "period_end": "2026-02-28",
+   "period_start": "2026-02-01"
+  },
+  {
+   "deductions": [
+    {
+     "amount": "1620.00",
+     "category": "tax",
+     "description": null,
+     "id": "ded-03-1"
+    },
+    {
+     "amount": "170.00",
+     "category": "insurance",
+     "description": null,
+     "id": "ded-03-2"
+    }
+   ],
+   "employment_id": "employment-0001",
+   "frequency": "monthly",
+   "gross": "7400.00",
+   "net": "5610.00",
+   "pay_date": "2026-03-27",
+   "period_end": "2026-03-28",
+   "period_start": "2026-03-01"
+  },
+  {
+   "deductions": [
+    {
+     "amount": "1620.00",
+     "category": "tax",
+     "description": null,
+     "id": "ded-04-1"
+    },
+    {
+     "amount": "170.00",
+     "category": "insurance",
+     "description": null,
+     "id": "ded-04-2"
+    }
+   ],
+   "employment_id": "employment-0001",
+   "frequency": "monthly",
+   "gross": "7400.00",
+   "net": "5610.00",
+   "pay_date": "2026-04-27",
+   "period_end": "2026-04-28",
+   "period_start": "2026-04-01"
+  },
+  {
+   "deductions": [
+    {
+     "amount": "1620.00",
+     "category": "tax",
+     "description": null,
+     "id": "ded-05-1"
+    },
+    {
+     "amount": "170.00",
+     "category": "insurance",
+     "description": null,
+     "id": "ded-05-2"
+    }
+   ],
+   "employment_id": "employment-0001",
+   "frequency": "monthly",
+   "gross": "7400.00",
+   "net": "5610.00",
+   "pay_date": "2026-05-27",
+   "period_end": "2026-05-28",
+   "period_start": "2026-05-01"
+  },
+  {
+   "deductions": [
+    {
+     "amount": "1620.00",
+     "category": "tax",
+     "description": null,
+     "id": "ded-06-1"
+    },
+    {
+     "amount": "170.00",
+     "category": "insurance",
+     "description": null,
+     "id": "ded-06-2"
+    }
+   ],
+   "employment_id": "employment-0001",
+   "frequency": "monthly",
+   "gross": "7400.00",
+   "net": "5610.00",
+   "pay_date": "2026-06-27",
+   "period_end": "2026-06-28",
+   "period_start": "2026-06-01"
+  },
+  {
+   "deductions": [
+    {
+     "amount": "1620.00",
+     "category": "tax",
+     "description": null,
+     "id": "ded-07-1"
+    },
+    {
+     "amount": "170.00",
+     "category": "insurance",
+     "description": null,
+     "id": "ded-07-2"
+    }
+   ],
+   "employment_id": "employment-0001",
+   "frequency": "monthly",
+   "gross": "7400.00",
+   "net": "5610.00",
+   "pay_date": "2026-07-27",
+   "period_end": "2026-07-28",
+   "period_start": "2026-07-01"
+  }
+ ],
+ "petition": {
+  "ch7_funds_available_for_creditors": false,
+  "debt_character": "consumer",
+  "debt_character_other": null,
+  "estimated_assets": "100000001_500000000",
+  "estimated_creditors": "1_49",
+  "estimated_liabilities": "50001_100000",
+  "eviction_judgment_against_you": false,
+  "expected_filing_date": null,
+  "fee_handling": "installments",
+  "hazardous_property": {
+   "address": {
+    "city": "Tampa",
+    "county": null,
+    "line1": "12 Byron Court",
+    "line2": null,
+    "postal_code": "33601",
+    "raw": null,
+    "state": "FL"
+   },
+   "description": "Two corroding propane tanks behind the shed",
+   "why_immediate": "A slow leak was found in August"
+  },
+  "rents_residence": false,
+  "small_business_status": "not_filing_under_chapter_11"
+ },
+ "plans": [],
+ "prior_cases": [
+  {
+   "case_number": "19-01234",
+   "district": "Northern District of Georgia",
+   "filed_on": "2019-03-04"
+  }
+ ],
+ "related_cases": [
+  {
+   "case_number": "26-00042",
+   "debtor_name": "Analytical Engines LLC",
+   "district": "Middle District of Florida",
+   "filed_on": "2026-06-15",
+   "relationship": "Affiliate"
+  }
+ ],
+ "sofa_entries": [
+  {
+   "entry_type": "marital_status",
+   "payload": {
+    "status": "married"
+   }
+  },
+  {
+   "entry_type": "prior_address",
+   "payload": {
+    "address": {
+     "city": "Tampa",
+     "county": null,
+     "line1": "3 Difference Court",
+     "line2": null,
+     "postal_code": "33604",
+     "raw": null,
+     "state": "FL"
+    },
+    "from_date": "2023-01-01",
+    "to_date": "2024-06-30",
+    "which_debtor": "debtor_1"
+   }
+  },
+  {
+   "entry_type": "prior_address",
+   "payload": {
+    "address": {
+     "city": "Decatur",
+     "county": null,
+     "line1": "8 Peachtree Lane",
+     "line2": null,
+     "postal_code": "30030",
+     "raw": null,
+     "state": "GA"
+    },
+    "from_date": "2024-11-01",
+    "to_date": "2026-07-01",
+    "which_debtor": "debtor_2"
+   }
+  },
+  {
+   "entry_type": "income_by_period",
+   "payload": {
+    "description": null,
+    "gross_amount": "41600.00",
+    "kind": "wages_and_commissions",
+    "period_end": "2026-08-01",
+    "period_start": "2026-01-01",
+    "which_debtor": "debtor_1"
+   }
+  },
+  {
+   "entry_type": "income_by_period",
+   "payload": {
+    "description": null,
+    "gross_amount": "61000.00",
+    "kind": "wages_and_commissions",
+    "period_end": "2025-12-31",
+    "period_start": "2025-01-01",
+    "which_debtor": "debtor_1"
+   }
+  },
+  {
+   "entry_type": "income_by_period",
+   "payload": {
+    "description": "Ada's Analytical Engines",
+    "gross_amount": "4200.00",
+    "kind": "operating_a_business",
+    "period_end": "2025-12-31",
+    "period_start": "2025-01-01",
+    "which_debtor": "debtor_1"
+   }
+  },
+  {
+   "entry_type": "income_by_period",
+   "payload": {
+    "description": null,
+    "gross_amount": "58300.00",
+    "kind": "wages_and_commissions",
+    "period_end": "2024-12-31",
+    "period_start": "2024-01-01",
+    "which_debtor": "debtor_1"
+   }
+  },
+  {
+   "entry_type": "income_by_period",
+   "payload": {
+    "description": null,
+    "gross_amount": "24000.00",
+    "kind": "wages_and_commissions",
+    "period_end": "2026-08-01",
+    "period_start": "2026-01-01",
+    "which_debtor": "debtor_2"
+   }
+  },
+  {
+   "entry_type": "income_by_period",
+   "payload": {
+    "description": null,
+    "gross_amount": "35000.00",
+    "kind": "wages_and_commissions",
+    "period_end": "2025-12-31",
+    "period_start": "2025-01-01",
+    "which_debtor": "debtor_2"
+   }
+  },
+  {
+   "entry_type": "income_by_period",
+   "payload": {
+    "description": "Unemployment compensation",
+    "gross_amount": "3100.00",
+    "kind": "other",
+    "period_end": "2024-08-31",
+    "period_start": "2024-03-01",
+    "which_debtor": "debtor_1"
+   }
+  },
+  {
+   "entry_type": "creditor_payment",
+   "payload": {
+    "amount_still_owed": "195000.00",
+    "creditor": {
+     "address": {
+      "city": "Tampa",
+      "county": null,
+      "line1": "100 Lender Way",
+      "line2": null,
+      "postal_code": "33602",
+      "raw": null,
+      "state": "FL"
+     },
+     "name": "Gulf Coast Home Loans"
+    },
+    "dates": [
+     "2026-05-01",
+     "2026-06-01",
+     "2026-07-01"
+    ],
+    "payment_for": [
+     "mortgage"
+    ],
+    "payment_for_other": null,
+    "total_paid": "4440.00"
+   }
+  },
+  {
+   "entry_type": "insider_payment",
+   "payload": {
+    "amount_still_owed": "0.00",
+    "dates": [
+     "2025-12-20"
+    ],
+    "insider": {
+     "address": {
+      "city": "Tampa",
+      "county": null,
+      "line1": "9 Garden Lane",
+      "line2": null,
+      "postal_code": "33603",
+      "raw": null,
+      "state": "FL"
+     },
+     "name": "Margaret Lovelace"
+    },
+    "reason": "Repayment of a family loan",
+    "relationship": "Mother of Debtor 2",
+    "total_paid": "1200.00"
+   }
+  },
+  {
+   "entry_type": "lawsuit",
+   "payload": {
+    "case_number": "26-CC-1184",
+    "case_title": "Meridian Bank Card Services v. Lovelace",
+    "court": {
+     "address": {
+      "city": "Tampa",
+      "county": null,
+      "line1": "800 E Twiggs Street",
+      "line2": null,
+      "postal_code": "33602",
+      "raw": null,
+      "state": "FL"
+     },
+     "name": "Hillsborough County Court"
+    },
+    "nature_of_case": "Credit card collection",
+    "status": "pending"
+   }
+  },
+  {
+   "entry_type": "gift",
+   "payload": {
+    "dates": [
+     "2025-10-12"
+    ],
+    "description": "Wedding gift",
+    "recipient": {
+     "address": {
+      "city": "Atlanta",
+      "county": null,
+      "line1": "15 Loom Lane",
+      "line2": null,
+      "postal_code": "30301",
+      "raw": null,
+      "state": "GA"
+     },
+     "name": "Clara Byron"
+    },
+    "relationship": "Niece",
+    "value": "650.00"
+   }
+  },
+  {
+   "entry_type": "charitable_contribution",
+   "payload": {
+    "dates": [
+     "2025-11-30"
+    ],
+    "description": "Cash donations",
+    "organization": {
+     "address": {
+      "city": "Tampa",
+      "county": null,
+      "line1": "5 Harvest Road",
+      "line2": null,
+      "postal_code": "33610",
+      "raw": null,
+      "state": "FL"
+     },
+     "name": "Tampa Bay Food Bank"
+    },
+    "value": "700.00"
+   }
+  },
+  {
+   "entry_type": "loss",
+   "payload": {
+    "date": "2025-09-28",
+    "description": "Hurricane damage to the back fence",
+    "insurance_coverage": "Not covered; below the deductible",
+    "value": "1400.00"
+   }
+  },
+  {
+   "entry_type": "consultant_payment",
+   "payload": {
+    "amount": "1500.00",
+    "date": "2026-07-15",
+    "description": "Attorney fees for this bankruptcy case",
+    "email_or_website": "alex@example.com",
+    "person": {
+     "address": {
+      "city": "Tampa",
+      "county": null,
+      "line1": "1 Example Way",
+      "line2": null,
+      "postal_code": "33604",
+      "raw": null,
+      "state": "FL"
+     },
+     "name": "Counsel & Counsel PA"
+    },
+    "who_made_payment": null
+   }
+  },
+  {
+   "entry_type": "property_transfer",
+   "payload": {
+    "date": "2025-03-15",
+    "description": "Sold a spare engine lathe valued at about $800",
+    "relationship": "Friend",
+    "transferee": {
+     "address": {
+      "city": "Tampa",
+      "county": null,
+      "line1": "41 Engine Row",
+      "line2": null,
+      "postal_code": "33605",
+      "raw": null,
+      "state": "FL"
+     },
+     "name": "Charles Menabrea"
+    },
+    "value_received": "$500 cash"
+   }
+  },
+  {
+   "entry_type": "closed_account",
+   "payload": {
+    "account_last4": "2210",
+    "account_type": "checking",
+    "date_closed": "2026-01-15",
+    "institution": {
+     "address": {
+      "city": "Tampa",
+      "county": null,
+      "line1": "12 Bay Street",
+      "line2": null,
+      "postal_code": "33601",
+      "raw": null,
+      "state": "FL"
+     },
+     "name": "First Gulf Bank"
+    },
+    "last_balance": "25.00"
+   }
+  },
+  {
+   "entry_type": "storage_unit",
+   "payload": {
+    "description": "Business records and spare parts",
+    "facility": {
+     "address": {
+      "city": "Tampa",
+      "county": null,
+      "line1": "77 Keeper Street",
+      "line2": null,
+      "postal_code": "33605",
+      "raw": null,
+      "state": "FL"
+     },
+     "name": "StorSafe Tampa LLC"
+    },
+    "still_have": true,
+    "who_has_access": [
+     "Ada Lovelace"
+    ]
+   }
+  },
+  {
+   "entry_type": "held_for_another",
+   "payload": {
+    "description": "Loaned test equipment",
+    "location": "Workshop shelf at 12 Byron Court",
+    "owner": {
+     "address": {
+      "city": "Tampa",
+      "county": null,
+      "line1": "200 Engine Row",
+      "line2": null,
+      "postal_code": "33605",
+      "raw": null,
+      "state": "FL"
+     },
+     "name": "Menabrea Machines Inc"
+    },
+    "value": "900.00"
+   }
+  },
+  {
+   "entry_type": "business_connection",
+   "payload": {
+    "business": {
+     "address": {
+      "city": "Tampa",
+      "county": null,
+      "line1": "88 Difference Drive",
+      "line2": null,
+      "postal_code": "33603",
+      "raw": null,
+      "state": "FL"
+     },
+     "name": "Ada's Analytical Engines"
+    },
+    "connection": [
+     "sole_proprietor"
+    ],
+    "ein": "12-3456789",
+    "from_date": "2019-01-01",
+    "nature_of_business": "Repair and resale of analytical engines",
+    "to_date": null
+   }
+  },
+  {
+   "entry_type": "financial_statement_issued",
+   "payload": {
+    "date_issued": "2025-06-01",
+    "recipient": {
+     "address": {
+      "city": "Tampa",
+      "county": null,
+      "line1": "6801 Croom Road",
+      "line2": null,
+      "postal_code": "33607",
+      "raw": null,
+      "state": "FL"
+     },
+     "name": "Suncoast Credit Union"
+    }
+   }
+  }
+ ],
+ "sole_proprietorships": [
+  {
+   "address": {
+    "city": "Tampa",
+    "county": null,
+    "line1": "88 Difference Drive",
+    "line2": null,
+    "postal_code": "33603",
+    "raw": null,
+    "state": "FL"
+   },
+   "business_type": "none_of_the_above",
+   "name": "Ada's Analytical Engines"
+  }
+ ],
+ "tax_ids": {
+  "debtor_1": "987654321",
+  "debtor_2": "987654322"
+ }
+}

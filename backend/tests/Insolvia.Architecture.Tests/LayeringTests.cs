@@ -6,7 +6,13 @@ namespace Insolvia.Architecture.Tests;
 // layout). The rule, in one place:
 //
 //   Core              references nothing in the solution
-//   Engines, Forms    reference Core only (pure: no I/O, no AWS, no EF)
+//   Engines           references Core only (pure: no I/O, no AWS, no EF)
+//   Forms             references Core and Engines (pure) — the form
+//                     projections live in Engines, because the calculation
+//                     engines and the projections import each other (the
+//                     Chapter 13 plan reads Schedules I/J, B113 runs the
+//                     plan), and the PDF engine fills what they project;
+//                     an amendment to ADR 0028's layout made in 18.8 (#519)
 //   Data, Aws         reference Core only
 //   hosts             may reference any library; never another host
 //
@@ -22,7 +28,7 @@ public sealed class LayeringTests
     {
         ["Core"] = [],
         ["Engines"] = ["Core"],
-        ["Forms"] = ["Core"],
+        ["Forms"] = ["Core", "Engines"],
         ["Data"] = ["Core"],
         ["Aws"] = ["Core"],
     };

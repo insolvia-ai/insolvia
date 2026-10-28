@@ -1,0 +1,106 @@
+{
+ "assets": [],
+ "case": {
+  "chapter": 7,
+  "court": "flmb",
+  "created_at": "2026-09-01T12:00:00Z",
+  "created_by": "subject-fixture",
+  "district": "Middle District of Florida",
+  "division": "tampa",
+  "firm_id": "firm-fixture",
+  "id": "chapter-7-sample",
+  "status": "intake",
+  "updated_at": "2026-09-01T12:00:00Z"
+ },
+ "claims": [],
+ "codebtors": [],
+ "community_household_members": [],
+ "contract_leases": [],
+ "creditors": [
+  [
+   "creditors-1",
+   {
+    "address": {
+     "city": "Tampa",
+     "line1": "1 Example Plaza",
+     "postal_code": "33602",
+     "state": "FL"
+    },
+    "name": "Example Community Bank (fictitious)"
+   }
+  ],
+  [
+   "creditors-2",
+   {
+    "address": {
+     "city": "Orlando",
+     "line1": "PO Box 4100",
+     "postal_code": "32801",
+     "state": "FL"
+    },
+    "name": "Example Card Services (fictitious)"
+   }
+  ]
+ ],
+ "debtors": [
+  {
+   "body": {
+    "name": {
+     "given": "Sample",
+     "surname": "Debtor"
+    },
+    "residence_address": {
+     "city": "Tampa",
+     "county": "Hillsborough",
+     "line1": "123 Fixture Street",
+     "postal_code": "33602",
+     "state": "FL"
+    }
+   },
+   "created_at": "2026-09-01T12:00:00Z",
+   "filing_role": "debtor_1",
+   "id": "debtor-debtor_1",
+   "tax_id": {
+    "kind": "ssn",
+    "last_four": "4321",
+    "ref": "ref-debtor_1"
+   },
+   "updated_at": "2026-09-01T12:00:00Z"
+  }
+ ],
+ "dependents": [],
+ "employments": [],
+ "exemptions": [],
+ "expenses": [],
+ "filing_professionals": [],
+ "households": [],
+ "income_summaries": [],
+ "means_test_inputs": [
+  {
+   "people_65_or_older": 0,
+   "people_under_65": 1
+  }
+ ],
+ "other_income_records": [],
+ "pay_period_records": [],
+ "petition": {
+  "ch7_funds_available_for_creditors": false,
+  "debt_character": "consumer",
+  "estimated_assets": "0_50000",
+  "estimated_creditors": "1_49",
+  "estimated_liabilities": "0_50000",
+  "eviction_judgment_against_you": false,
+  "expected_filing_date": "2026-08-03",
+  "fee_handling": "full",
+  "rents_residence": true,
+  "small_business_status": "not_filing_under_chapter_11"
+ },
+ "plans": [],
+ "prior_cases": [],
+ "related_cases": [],
+ "sofa_entries": [],
+ "sole_proprietorships": [],
+ "tax_ids": {
+  "debtor_1": "987654321"
+ }
+}

@@ -1,0 +1,11 @@
+{
+  "series_id": "form/b108",
+  "effective_date": "2015-12-01",
+  "sequence": 1,
+  "source": {
+    "url": "https://www.uscourts.gov/sites/default/files/form_b108.pdf",
+    "published": null,
+    "sha256": "fe51d222d87f461b8695e3d9b7a061e768b2a75824511d167cfba736ca35e8fe"
+  },
+  "notes": "Official Form 108, Statement of Intention for Individuals Filing Under Chapter 7, printed revision 12/15 (current as of ingestion, 2026-09-23; the form page states effective December 1, 2015). template.pdf is the official fillable PDF vendored verbatim from uscourts.gov, fetched twice with identical digests (sha256 above; the loader re-hashes it); spec.json and acroform.json are the issue-351 field spec and AcroForm dump for this revision, copied from forms/ at ingestion — tests/test_form_templates.py refuses drift between the copies and forms/ while this is the current revision."
+}

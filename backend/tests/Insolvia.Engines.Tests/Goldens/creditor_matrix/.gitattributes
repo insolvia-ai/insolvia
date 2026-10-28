@@ -1,0 +1,3 @@
+# The matrix goldens are the exact bytes a clerk's system ingests: CRLF line
+# endings, blank lines, trailing newline. Never let git normalise them.
+*.txt -text
