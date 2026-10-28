@@ -25,10 +25,10 @@ public static class ServiceRoles
     public const string Filing = "filing";
 
     /// <summary>
-    /// The migrator's own login, reserved for the seeder (18.20). Schema
-    /// changes and role management run as the RDS master user, which alone
-    /// can create roles; this role holds no table privilege until the grant
-    /// table gives it one.
+    /// The seeder's role (18.20): a load runs with these grants alone, taken
+    /// with <c>SET ROLE</c> on the master's login (MigratorSettings). Schema
+    /// changes, role management and the pre-client purge run as the RDS
+    /// master user itself, which alone can create roles.
     /// </summary>
     public const string Migrator = "migrator";
 
@@ -113,6 +113,7 @@ public static class GrantTable
     // deletes, and INSERT only where its service creates.
     private const TablePrivileges ReadInsertUpdate = TablePrivileges.Select | TablePrivileges.Insert | TablePrivileges.Update;
     private const TablePrivileges ReadUpdate = TablePrivileges.Select | TablePrivileges.Update;
+    private const TablePrivileges SelectInsert = TablePrivileges.Select | TablePrivileges.Insert;
 
     /// <summary>The grants the migrator applies.</summary>
     public static IReadOnlyList<TableGrant> All { get; } =
@@ -125,9 +126,10 @@ public static class GrantTable
         new("firms", ServiceRoles.Api, ReadUpdate),
         new("firms", ServiceRoles.Mcp, TablePrivileges.Select),
 
-        // Firm users: the admin service provisions a firm's first admin, the
-        // API's firm administration adds, edits and detaches staff.
-        new("firm_users", ServiceRoles.Admin, TablePrivileges.ReadWrite),
+        // Firm users: the admin service provisions a firm's first admin (and
+        // only ever adds and reads — no admin route edits or removes a user);
+        // the API's firm administration adds, edits and detaches staff.
+        new("firm_users", ServiceRoles.Admin, SelectInsert),
         new("firm_users", ServiceRoles.Api, TablePrivileges.ReadWrite),
         new("firm_users", ServiceRoles.Mcp, TablePrivileges.Select),
 
@@ -263,6 +265,28 @@ public static class GrantTable
         // PutItem alone: the admin service can append an entry and never
         // read, amend or delete one. No other role touches it.
         new("admin_audit", ServiceRoles.Admin, TablePrivileges.Insert),
+
+        // ── The seeder (18.20) ──────────────────────────────────────
+        // The migrator Lambda seeds dev and staging AS THIS ROLE (SET ROLE on
+        // the master's login), so a load can do what seeds/README.md says it
+        // does and nothing more: read what exists, insert what is missing,
+        // never delete. UPDATE only where a store's write needs it: a pending
+        // document confirmed, a tax id sealed (an upsert), a portal binding
+        // written (an upsert, the claims locked FOR UPDATE), and the client
+        // row a case links locked FOR SHARE — Postgres demands UPDATE for any
+        // row lock. Migrations, roles and the purge stay the master's.
+        new("firms", ServiceRoles.Migrator, SelectInsert),
+        new("firm_users", ServiceRoles.Migrator, SelectInsert),
+        new("firm_clients", ServiceRoles.Migrator, ReadInsertUpdate),
+        new("cases", ServiceRoles.Migrator, SelectInsert),
+        new("case_assignments", ServiceRoles.Migrator, SelectInsert),
+        new("debtors", ServiceRoles.Migrator, SelectInsert),
+        new("case_entities", ServiceRoles.Migrator, SelectInsert),
+        new("documents", ServiceRoles.Migrator, ReadInsertUpdate),
+        new("tax_ids", ServiceRoles.Migrator, ReadInsertUpdate),
+        new("client_bindings", ServiceRoles.Migrator, ReadInsertUpdate),
+        new("case_client_bindings", ServiceRoles.Migrator, ReadInsertUpdate),
+        new("case_client_role_claims", ServiceRoles.Migrator, ReadInsertUpdate),
 
         // The access log: append-only for every service that writes it, and
         // no UPDATE, DELETE or TRUNCATE for anyone (ADR 0028 § Data).

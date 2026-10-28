@@ -75,11 +75,24 @@ public sealed record MigratorSettings
     /// (it rotates, so it is read per run, never cached in configuration) and
     /// requires TLS.
     /// </summary>
-    public async Task<NpgsqlDataSource> CreateDataSourceAsync(CancellationToken cancellationToken)
+    /// <param name="cancellationToken">Cancels the secret read.</param>
+    /// <param name="role">
+    /// A role every session takes at start (<c>-c role=…</c>, a <c>SET ROLE</c>
+    /// before the first statement): the seeder runs as <see cref="ServiceRoles.Migrator"/>
+    /// on the master's login, so its statements carry that role's grants and
+    /// no more. Null: the login's own privileges (migrations, roles, purge).
+    /// </param>
+    public async Task<NpgsqlDataSource> CreateDataSourceAsync(CancellationToken cancellationToken, string? role = null)
     {
         if (ConnectionString is not null)
         {
-            return InsolviaDataSource.Create(new DatabaseSettings { ConnectionString = ConnectionString, ApplicationName = "insolvia-migrator" });
+            var local = new NpgsqlConnectionStringBuilder(ConnectionString);
+            if (role is not null)
+            {
+                local.Options = $"-c role={role}";
+            }
+
+            return InsolviaDataSource.Create(new DatabaseSettings { ConnectionString = local.ConnectionString, ApplicationName = "insolvia-migrator" });
         }
 
         using var secrets = new AmazonSecretsManagerClient();
@@ -100,6 +113,11 @@ public sealed record MigratorSettings
             MaxPoolSize = 2,
             ApplicationName = "insolvia-migrator",
         };
+        if (role is not null)
+        {
+            builder.Options = $"-c role={role}";
+        }
+
         return InsolviaDataSource.Create(new DatabaseSettings { ConnectionString = builder.ConnectionString });
     }
 }
