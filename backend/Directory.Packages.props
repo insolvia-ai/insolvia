@@ -38,6 +38,12 @@
          On the same AWSSDK.Core (4.0.102.14) as AWSSDK.RDS above. -->
     <PackageVersion Include="AWSSDK.KeyManagementService" Version="4.0.101" />
   </ItemGroup>
+  <ItemGroup Label="AWS adapters">
+    <!-- The default credential chain the mailer client signs with (SigV4 to
+         the mailer's IAM-authorised API). The same version AWSSDK.RDS already
+         resolves transitively, so one image carries one copy. -->
+    <PackageVersion Include="AWSSDK.Core" Version="4.0.102.14" />
+  </ItemGroup>
   <ItemGroup Label="Identity">
     <!-- Token verification in Insolvia.Core: the signature check IS the domain
          rule (auth.py's one PyJWT exception, carried over). Fetching a key is
