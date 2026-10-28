@@ -560,6 +560,60 @@ namespace Insolvia.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Insolvia.Data.Waitlist.WaitlistEntryRow", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("text")
+                        .HasColumnName("id");
+
+                    b.Property<string>("CurrentSoftware")
+                        .HasColumnType("text")
+                        .HasColumnName("current_software");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("email");
+
+                    b.Property<string>("Firm")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("firm");
+
+                    b.Property<string>("Host")
+                        .HasColumnType("text")
+                        .HasColumnName("host");
+
+                    b.Property<string>("Message")
+                        .HasColumnType("text")
+                        .HasColumnName("message");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("name");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("SubmittedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("submitted_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_waitlist_entries");
+
+                    b.HasIndex("SubmittedAt", "Id")
+                        .HasDatabaseName("ix_waitlist_entries_submitted_at_id");
+
+                    b.ToTable("waitlist_entries", "insolvia", t =>
+                        {
+                            t.HasCheckConstraint("ck_waitlist_entries_status", "status IN ('new')");
+                        });
+                });
+
             modelBuilder.Entity("Insolvia.Data.Firms.FirmClientRow", b =>
                 {
                     b.HasOne("Insolvia.Data.Firms.FirmRow", null)

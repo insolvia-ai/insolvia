@@ -132,6 +132,11 @@ public static class GrantTable
         new("case_client_bindings", ServiceRoles.Api, ReadInsertUpdate),
         new("case_client_role_claims", ServiceRoles.Api, TablePrivileges.ReadWrite),
 
+        // The marketing waitlist (#525): the API only ever adds a submission —
+        // POST /v1/waitlist is public, so its role cannot read the list back,
+        // change a row or remove one.
+        new("waitlist_entries", ServiceRoles.Api, TablePrivileges.Insert),
+
         // The access log: append-only for every service that writes it, and
         // no UPDATE, DELETE or TRUNCATE for anyone (ADR 0028 § Data).
         TableGrant.AppendOnly("access_log", ServiceRoles.Api),
