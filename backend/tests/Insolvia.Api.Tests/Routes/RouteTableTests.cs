@@ -48,7 +48,7 @@ public sealed class RouteTableTests : IDisposable
         { "DELETE", "/v1/firm/document-checklist" },
     };
 
-    /// <summary>The case-side slice 18.15 part 1 maps (no analyses, forms, packets, jobs, extraction, approval or portal).</summary>
+    /// <summary>The case-side slice 18.15 maps: part 1's records and part 2's computed analyses (no summary, forms, packets, jobs, extraction, approval or portal).</summary>
     public static TheoryData<string, string> CaseSideRoutes => new()
     {
         { "POST", "/v1/cases" },
@@ -107,6 +107,13 @@ public sealed class RouteTableTests : IDisposable
         { "GET", "/v1/me/calendar.ics" },
         { "POST", "/v1/me/calendar-token" },
         { "DELETE", "/v1/me/calendar-token" },
+        { "GET", "/v1/cases/{caseId}/means-test" },
+        { "GET", "/v1/cases/{caseId}/exemption-analysis" },
+        { "GET", "/v1/cases/{caseId}/creditor-matrix" },
+        { "GET", "/v1/cases/{caseId}/liens" },
+        { "GET", "/v1/cases/{caseId}/standards" },
+        { "GET", "/v1/cases/{caseId}/plan-calculation" },
+        { "POST", "/v1/cases/{caseId}/plan-calculation" },
         { "POST", "/v1/cases/{caseId}/{collection}" },
         { "GET", "/v1/cases/{caseId}/{collection}" },
         { "GET", "/v1/cases/{caseId}/{collection}/{entityId}" },
