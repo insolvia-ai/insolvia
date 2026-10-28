@@ -31,7 +31,11 @@ internal sealed record CaseStores(
     IFilingStore Filings,
     ITaxIdStore TaxIds,
     IJobStore Jobs,
-    IPacketStore Packets);
+    IPacketStore Packets)
+{
+    /// <summary>The filing approvals (#530), over the same state.</summary>
+    public required IFilingApprovalStore Approvals { get; init; }
+}
 
 /// <summary>The memory twins — the oracle.</summary>
 internal sealed class MemoryCaseWorld
@@ -55,7 +59,10 @@ internal sealed class MemoryCaseWorld
             new MemoryFilingStore(cases),
             new MemoryTaxIdStore(),
             new MemoryJobStore(),
-            new MemoryPacketStore(cases));
+            new MemoryPacketStore(cases))
+        {
+            Approvals = new MemoryFilingApprovalStore(),
+        };
     }
 
     public CaseStores Connect() => _stores;
@@ -86,7 +93,10 @@ internal sealed class PostgresCaseWorld(PostgresFixture postgres) : IAsyncDispos
             new PostgresFilingStore(db),
             new PostgresTaxIdStore(db),
             new PostgresJobStore(db),
-            new PostgresPacketStore(db));
+            new PostgresPacketStore(db))
+        {
+            Approvals = new PostgresFilingApprovalStore(db),
+        };
     }
 
     public ValueTask DisposeAsync() => _harness.DisposeAsync();

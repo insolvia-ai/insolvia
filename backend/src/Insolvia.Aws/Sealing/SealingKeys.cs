@@ -1,7 +1,6 @@
 using System.Text.RegularExpressions;
-using Insolvia.Aws.Sealing;
 
-namespace Insolvia.Api.Configuration;
+namespace Insolvia.Aws.Sealing;
 
 /// <summary>
 /// The two KMS key aliases the deployed API seals under: the case key

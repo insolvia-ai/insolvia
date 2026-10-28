@@ -244,7 +244,19 @@ public static class RequestBodies
     /// <param name="context">The request.</param>
     /// <param name="maxBytes">The module's cap.</param>
     /// <returns>The object.</returns>
-    public static async Task<JsonObject> ReadObjectAsync(HttpContext context, int maxBytes)
+    public static async Task<JsonObject> ReadObjectAsync(HttpContext context, int maxBytes) =>
+        await ReadSilentAsync(context, maxBytes).ConfigureAwait(false) as JsonObject
+            ?? throw new ValidationException("request body must be a JSON object");
+
+    /// <summary>
+    /// Flask's <c>get_json(silent=True)</c> behind the cap: the parsed body,
+    /// or null for a body that is not JSON (a route whose domain function
+    /// refuses the shape itself, after its own earlier checks).
+    /// </summary>
+    /// <param name="context">The request.</param>
+    /// <param name="maxBytes">The module's cap.</param>
+    /// <returns>The body, or null.</returns>
+    public static async Task<JsonNode?> ReadSilentAsync(HttpContext context, int maxBytes)
     {
         ArgumentNullException.ThrowIfNull(context);
         var request = context.Request;
@@ -255,26 +267,23 @@ public static class RequestBodies
 
         if (!IsJson(request.ContentType))
         {
-            throw new ValidationException("request body must be a JSON object");
+            return null;
         }
 
         using var reader = new StreamReader(request.Body, Encoding.UTF8);
         var text = await reader.ReadToEndAsync(context.RequestAborted).ConfigureAwait(false);
-        JsonNode? parsed;
         try
         {
             // Python's json.loads keeps the LAST of a repeated key. A JsonNode
             // parsed with duplicates allowed only throws later, when first
             // read (a 500), so the tree is rebuilt here, last value winning.
             using var document = JsonDocument.Parse(text, new JsonDocumentOptions { AllowDuplicateProperties = true });
-            parsed = LastWins(document.RootElement);
+            return LastWins(document.RootElement);
         }
         catch (Exception error) when (error is JsonException or ArgumentException or InvalidOperationException)
         {
-            parsed = null;
+            return null;
         }
-
-        return parsed as JsonObject ?? throw new ValidationException("request body must be a JSON object");
     }
 
     private static JsonNode? LastWins(JsonElement element)

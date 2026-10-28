@@ -137,3 +137,7 @@ jobs:
       - name: Build worker Lambda image
         if: steps.filter.outputs.run == 'true'
         run: docker build --target worker-lambda -t insolvia-backend-worker-pr-check .
+
+      - name: Build filing worker Lambda image
+        if: steps.filter.outputs.run == 'true'
+        run: docker build --target filing-lambda -t insolvia-backend-filing-pr-check .

@@ -106,8 +106,13 @@ public static class B106C
         };
     }
 
-    private static decimal ClaimedAmount(ExemptionBody exemption, CaseFile caseFile) =>
-        exemption.ClaimsFullFmv == true ? Amount(caseFile.Asset(exemption.AssetId)?.ValuePortionOwned) : Amount(exemption.Amount);
+    /// <summary>What one claim exempts: the asset's owned value when it claims the full FMV, else its stated amount (Python's <c>_claimed_amount</c>; the Case Upload file's stat field 35 sums it).</summary>
+    public static decimal ClaimedAmount(ExemptionBody exemption, CaseFile caseFile)
+    {
+        ArgumentNullException.ThrowIfNull(exemption);
+        ArgumentNullException.ThrowIfNull(caseFile);
+        return exemption.ClaimsFullFmv == true ? Amount(caseFile.Asset(exemption.AssetId)?.ValuePortionOwned) : Amount(exemption.Amount);
+    }
 
     private static (bool OverCap, bool? Acquired) HomesteadAnswers(CaseFile caseFile)
     {

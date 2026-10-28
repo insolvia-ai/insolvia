@@ -164,6 +164,21 @@ public sealed class RouteTableTests : IDisposable
         { "GET", "/v1/cases/{caseId}/filing-set" },
     };
 
+    /// <summary>Electronic filing (18.19 / #530): the vault, the authorization, the approval and the resolution.</summary>
+    public static TheoryData<string, string> FilingRoutes => new()
+    {
+        { "GET", "/v1/me/filing-credentials" },
+        { "POST", "/v1/me/filing-credentials" },
+        { "DELETE", "/v1/me/filing-credentials/{credentialId}" },
+        { "GET", "/v1/me/filing-authorization" },
+        { "POST", "/v1/me/filing-authorization" },
+        { "DELETE", "/v1/me/filing-authorization" },
+        { "GET", "/v1/cases/{caseId}/filing-approval" },
+        { "POST", "/v1/cases/{caseId}/filing-approval" },
+        { "DELETE", "/v1/cases/{caseId}/filing-approval" },
+        { "POST", "/v1/cases/{caseId}/filings/{filingId}/resolution" },
+    };
+
     public void Dispose() => _world.Dispose();
 
     [Theory]
@@ -172,6 +187,7 @@ public sealed class RouteTableTests : IDisposable
     [MemberData(nameof(PortalStaffRoutes))]
     [MemberData(nameof(PipelineRoutes))]
     [MemberData(nameof(FormsRoutes))]
+    [MemberData(nameof(FilingRoutes))]
     public async Task Every_firm_side_route_is_a_staff_route_and_401s_without_a_token(string method, string template)
     {
         var path = System.Text.RegularExpressions.Regex.Replace(
@@ -204,7 +220,7 @@ public sealed class RouteTableTests : IDisposable
     public void The_route_table_is_exactly_the_firm_and_case_side_slices_plus_the_two_public_routes()
     {
         var mapped = Endpoints().Where(e => e.Name.Contains("/v1/", StringComparison.Ordinal)).Select(e => e.Name).Order(StringComparer.Ordinal);
-        var expected = FirmSideRoutes.Concat(CaseSideRoutes).Concat(PortalStaffRoutes).Concat(PortalClientRoutes).Concat(PipelineRoutes).Concat(FormsRoutes).Select(row => $"{row.Data.Item1} {row.Data.Item2}").Concat(Public).Order(StringComparer.Ordinal);
+        var expected = FirmSideRoutes.Concat(CaseSideRoutes).Concat(PortalStaffRoutes).Concat(PortalClientRoutes).Concat(PipelineRoutes).Concat(FormsRoutes).Concat(FilingRoutes).Select(row => $"{row.Data.Item1} {row.Data.Item2}").Concat(Public).Order(StringComparer.Ordinal);
 
         Assert.Equal(expected, mapped);
         Assert.All(Endpoints().Where(e => Public.Contains(e.Name)), e => Assert.Null(e.Principal));

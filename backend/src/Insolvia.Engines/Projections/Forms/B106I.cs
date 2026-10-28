@@ -247,8 +247,10 @@ public static class B106I
         return values;
     }
 
-    private static string ColumnWidget(FormRelease release, string fieldId, string digit)
+    /// <summary>The one PDF name of <paramref name="fieldId"/>'s debtor-<paramref name="digit"/> column (Python's <c>_column_widget</c>; the Case Upload file reads its line 2 and line 6 columns through it).</summary>
+    public static string ColumnWidget(FormRelease release, string fieldId, string digit)
     {
+        ArgumentNullException.ThrowIfNull(release);
         var pattern = new Regex($"[Dd]ebtor {digit}a?$", RegexOptions.CultureInvariant);
         var matches = release.Field(fieldId).PdfNames.Where(name => pattern.IsMatch(name)).ToList();
         if (matches.Count != 1)

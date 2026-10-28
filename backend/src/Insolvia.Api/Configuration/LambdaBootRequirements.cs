@@ -15,7 +15,7 @@ namespace Insolvia.Api.Configuration;
 /// DynamoDB tables; this host's stores are Postgres, whose connection
 /// settings Insolvia.Data validates (ADR 0028). The two that still name
 /// something this backend will use — the Cognito pool and the document
-/// bucket — are kept. The KMS key aliases are <see cref="SealingKeys"/>'
+/// bucket — are kept. The KMS key aliases are <see cref="Aws.Sealing.SealingKeys"/>'
 /// (resolved at composition, so the boot refuses without them too).
 /// </remarks>
 public static class LambdaBootRequirements
