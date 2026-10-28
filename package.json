@@ -25,13 +25,20 @@
     "apps/insolvia_marketing can resolve from this root's node_modules and pass",
     "CI, then fail in a clean install. It keeps its own package-lock.json and",
     "its own CI job installs from it, which is what catches this \u2014 do not",
-    "consolidate it here."
+    "consolidate it here.",
+    "",
+    "contract/ IS a member, and has to be: it is the backend's contract suite",
+    "(ADR 0028), and it imports @insolvia-ai/api-client by package name so the",
+    "client it proves is the shipped one, resolved through the export map. It",
+    "has no third-party dependencies of its own (vitest and typescript come",
+    "from here), so membership puts nothing new on this lockfile."
   ],
   "engines": {
     "node": ">=24"
   },
   "workspaces": [
     "apps/insolvia_app",
+    "contract",
     "packages/insolvia_api_client"
   ],
   "scripts": {
@@ -71,8 +78,8 @@
     ],
     "lint:tool": "cd tool && eslint .",
     "typecheck:tool": "tsc -p tool/tsconfig.json",
-    "format": "prettier --check apps/insolvia_app packages/insolvia_api_client tool",
-    "format:write": "prettier --write apps/insolvia_app packages/insolvia_api_client tool",
+    "format": "prettier --check apps/insolvia_app contract packages/insolvia_api_client tool",
+    "format:write": "prettier --write apps/insolvia_app contract packages/insolvia_api_client tool",
     "//app": [
       "The app's own scripts (`build`, `web`, `lint`, `typecheck`, `test`) live in",
       "apps/insolvia_app/package.json and are a contract with app-*.yml. These two",
