@@ -23,8 +23,8 @@ namespace Insolvia.Api.Routes;
 /// Attendees must be members of the caller's firm.
 /// </summary>
 /// <remarks>
-/// Not here yet: <c>regenerate_deadlines</c>, the deadline engine's writer
-/// (Insolvia.Engines, 18.8). Nothing in this slice generates an event.
+/// The generated events are written by the case PATCH's hook
+/// (<see cref="Calendar.CaseDeadlines"/>), never by these routes.
 /// </remarks>
 public sealed class EventRoutes : IEndpointModule
 {

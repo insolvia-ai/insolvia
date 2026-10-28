@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Insolvia.Api.Auth;
+using Insolvia.Api.Calendar;
 using Insolvia.Api.Cases;
 using Insolvia.Api.Hosting;
 using Insolvia.Api.Http;
@@ -10,7 +11,9 @@ using Insolvia.Core.Courts;
 using Insolvia.Core.Debtors;
 using Insolvia.Core.FirmClients;
 using Insolvia.Core.Firms;
+using Insolvia.Core.Petitions;
 using Insolvia.Core.Ports;
+using Insolvia.Engines.Exemptions;
 
 namespace Insolvia.Api.Routes;
 
@@ -31,12 +34,12 @@ namespace Insolvia.Api.Routes;
 /// a 409 (ADR 0027 row 3, #509). Its <c>filed_at</c> stays EDITABLE, as in
 /// Python: a mistyped petition date must be correctable, and the filed event
 /// keeps the date it was recorded with (a correction is not a court event).</para>
-/// <para><b>Not here yet</b>, each waiting on an engine (18.8): the 106C
-/// opt-out refusal (<c>_refuse_forbidden_election</c>, which needs the
-/// exemption registry) and the deadline hook (<c>regenerate_deadlines</c>,
-/// which needs the deadline rules and legal holidays). Both run after the
-/// parse in Python; until the engines land an opt-out state's federal
-/// election is stored, and a date change regenerates nothing.</para>
+/// <para><b>The engines' two hooks</b> (Insolvia.Engines): the 106C opt-out
+/// refusal before the write, and the deadline regeneration after it
+/// (<see cref="CaseDeadlines"/>). A conversion does NOT regenerate: Rule
+/// 1019's reset deadlines count from the conversion date, an anchor the
+/// rule table does not have yet (#509), and regenerating from the petition
+/// date under the new chapter would write dates that are wrong.</para>
 /// </remarks>
 public sealed class CaseRoutes : IEndpointModule
 {
@@ -187,6 +190,8 @@ public sealed class CaseRoutes : IEndpointModule
                 throw new ConflictException("A filed case's chapter changes only by a conversion — record the conversion instead.");
             }
 
+            await RefuseForbiddenElectionAsync(context, caseId, changes, cancellationToken);
+
             // Refuses a move off the map (409) or a filing without its docket facts (400).
             var changed = CaseRules.ApplyChanges(existing, changes, context.Clock());
             var move = CaseLifecycle.StatusMove(existing, changed, await store.LifecycleAsync(caseId, cancellationToken), accessor.Subject, changes.EffectiveOn);
@@ -201,8 +206,41 @@ public sealed class CaseRoutes : IEndpointModule
             throw new NotFoundException(CaseRouteSupport.CaseNotFound);
         }
 
+        // The deadline engine's hook: a filed date, a § 341 date or a chapter
+        // change rewrites the generated events — after the case write, so a
+        // failure leaves the case right and the calendar a request behind.
+        if (changes.TouchesDeadlineAnchors)
+        {
+            await CaseDeadlines.RegenerateAsync(context, updated, accessor.Subject, cancellationToken);
+        }
+
         context.Log(Logger, "case updated", ("case_id", updated.Id));
         return FlaskJson.Result(CaseViews.Case(updated));
+    }
+
+    // 106C line 1's opt-out rule at the write (#346): an opted-out state's
+    // debtor cannot elect § 522(d). The state is Debtor 1's residence; the
+    // registry resolves as of the expected filing date, else today. A case
+    // that cannot yet say its state is not refused.
+    private static async Task RefuseForbiddenElectionAsync(HttpContext context, string caseId, CaseChanges changes, CancellationToken cancellationToken)
+    {
+        if (changes.ExemptionSet is not { } election)
+        {
+            return;
+        }
+
+        var debtors = await context.Port<IDebtorStore>().ListForCaseAsync(caseId, cancellationToken);
+        var state = debtors.FirstOrDefault(debtor => debtor.FilingRole == FilingRole.Debtor1)?.Body.ResidenceAddress.State;
+        var petitions = await context.Port<ICaseEntityStore>().ListTypedAsync(caseId, PetitionRules.Petition, cancellationToken);
+        var (asOf, _) = ExemptionAnalyzer.ResolutionDate(petitions.Count > 0 ? petitions[0].Body : null, context.Today());
+        var refusal = ExemptionAnalyzer.ElectionRefusal(
+            election.ToWire(),
+            state is null || PyText.Strip(state).Length == 0 ? null : PyText.Strip(state).ToUpperInvariant(),
+            asOf);
+        if (refusal is not null)
+        {
+            throw new FieldValidationException(new Dictionary<string, string> { ["exemption_set"] = refusal });
+        }
     }
 
     // Subjects, not names — the directory turns one into a person.

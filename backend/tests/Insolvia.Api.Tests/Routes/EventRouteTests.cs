@@ -2,7 +2,6 @@ using Insolvia.Api.Calendar;
 using Insolvia.Api.Tests.Support;
 using Insolvia.Core.Events;
 using Insolvia.Core.Firms;
-using Insolvia.Core.Ports;
 using static Insolvia.Api.Tests.Support.CaseWorld;
 
 namespace Insolvia.Api.Tests.Routes;
@@ -11,11 +10,8 @@ namespace Insolvia.Api.Tests.Routes;
 /// test_event_routes.py: events at case and firm scope, the calendar window,
 /// and the ICS feed with its token. The cast: Alice admin; Dana sees every
 /// case with <c>events: view_only</c>; Bob linked-only; Greg with events hidden;
-/// Carol the other firm. The deadline engine's five tests (a filed date
-/// populating deadlines, the § 341 date regenerating, clearing, the generated
-/// deadline from a rule) wait for Insolvia.Engines (18.8); the "generated
-/// cannot be edited or deleted" rule is tested here on a generated event
-/// written straight to the store.
+/// Carol the other firm. The deadlines come from Insolvia.Engines' rule
+/// table through the case PATCH's hook.
 /// </summary>
 public sealed class EventRouteTests : IAsyncLifetime, IDisposable
 {
@@ -151,22 +147,66 @@ public sealed class EventRouteTests : IAsyncLifetime, IDisposable
         Assert.Contains("meeting_341_at", (await _world.Patch($"/v1/cases/{caseId}", """{"filed_at": "2026-03-02", "meeting_341_at": "2026-03-01"}""")).FieldErrors);
     }
 
+    // ── The deadline engine's hook (14.6 / #358) ───────────────────
+
+    [Fact]
+    public async Task Setting_a_filed_date_populates_the_deadlines_for_the_cases_assignees()
+    {
+        var caseId = await _world.OpenCaseIdAsync();
+        Assert.Empty(await GeneratedAsync(caseId));
+
+        var body = await _world.Patch($"/v1/cases/{caseId}", """{"filed_at": "2026-03-02"}""");
+
+        Assert.Equal("2026-03-02", body.Str("filedAt"));
+        var rules = await GeneratedAsync(caseId);
+        var schedules = rules["frbp-1007c1-schedules"];
+        Assert.Equal(("2026-03-16", "Fed. R. Bankr. P. 1007(c)(1)", $"[\"{Alice}\"]"), (schedules.Str("start"), schedules.Str("rule_citation"), schedules["attendees"]!.ToJsonString()));
+        Assert.Contains("frbp-2003a1a-341-window", rules.Keys);
+        Assert.DoesNotContain("frbp-4004a-discharge-objection", rules.Keys);
+    }
+
+    [Fact]
+    public async Task Setting_the_341_date_regenerates_and_keeps_a_dismissal()
+    {
+        var caseId = await _world.OpenCaseIdAsync();
+        await _world.Patch($"/v1/cases/{caseId}", """{"filed_at": "2026-03-02"}""");
+        var schedules = (await GeneratedAsync(caseId))["frbp-1007c1-schedules"];
+        Assert.True((await _world.Patch($"/v1/cases/{caseId}/events/{schedules.Str("id")}", """{"dismissed": true}""")).Object["dismissed"]!.GetValue<bool>());
+
+        await _world.Patch($"/v1/cases/{caseId}", """{"meeting_341_at": "2026-04-07"}""");
+
+        var rules = await GeneratedAsync(caseId);
+        Assert.DoesNotContain("frbp-2003a1a-341-window", rules.Keys);
+        Assert.Equal("2026-04-07", rules["usc-341a-meeting"].Str("start"));
+        Assert.Equal("2026-06-08", rules["frbp-4004a-discharge-objection"].Str("start"));
+        Assert.Equal(schedules.Str("id"), rules["frbp-1007c1-schedules"].Str("id"));
+        Assert.True(rules["frbp-1007c1-schedules"]["dismissed"]!.GetValue<bool>());
+    }
+
+    [Fact]
+    public async Task Clearing_the_filed_date_removes_every_generated_event_and_keeps_the_hand_made()
+    {
+        var caseId = await _world.OpenCaseIdAsync();
+        await _world.Patch($"/v1/cases/{caseId}", """{"filed_at": "2026-03-02", "meeting_341_at": "2026-04-07"}""");
+        await Add(caseId);
+
+        var body = await _world.Patch($"/v1/cases/{caseId}", """{"filed_at": null}""");
+
+        Assert.False(body.Object.ContainsKey("filedAt"));
+        Assert.Equal([false], (await _world.Get($"/v1/cases/{caseId}/events")).Object["events"]!.AsArray().Select(e => e!["generated"]!.GetValue<bool>()));
+    }
+
     [Fact]
     public async Task A_generated_deadline_cannot_be_edited_or_deleted_only_dismissed()
     {
         var caseId = await _world.OpenCaseIdAsync();
-        var deadline = new CalendarEvent(Guid.NewGuid().ToString(), Insolvia.Api.Tests.Support.Ids.FirmA, caseId, "Schedules, statements and other documents due", "2026-03-16", "2026-03-16", AllDay: true, "deadline-engine", FirmWorld.Seeded, FirmWorld.Seeded)
-        {
-            RuleId = "frbp-1007c1-schedules",
-            RuleCitation = "Fed. R. Bankr. P. 1007(c)(1)",
-        };
-        await _world.Service<ICalendarEventStore>().CreateAsync(deadline, HttpAssert.Ct);
-        var url = $"/v1/cases/{caseId}/events/{deadline.Id}";
+        await _world.Patch($"/v1/cases/{caseId}", """{"filed_at": "2026-03-02"}""");
+        var url = $"/v1/cases/{caseId}/events/{(await GeneratedAsync(caseId))["frbp-1007c1-schedules"].Str("id")}";
 
         Assert.Equal(400, (await _world.Put(url, """{"title": "Moved", "start": "2026-12-25"}""")).Status);
         Assert.Equal(400, (await _world.Delete(url)).Status);
-        var dismissed = await _world.Patch(url, """{"dismissed": true}""");
-        Assert.Equal(("2026-03-16", true, "frbp-1007c1-schedules"), (dismissed.Str("start"), dismissed.Object["generated"]!.GetValue<bool>(), dismissed.Str("rule_id")));
+        Assert.Equal("2026-03-16", (await GeneratedAsync(caseId))["frbp-1007c1-schedules"].Str("start"));
+        Assert.True((await _world.Patch(url, """{"dismissed": true}""")).Object["dismissed"]!.GetValue<bool>());
     }
 
     // ── The calendar ────────────────────────────────────────────────
@@ -177,6 +217,7 @@ public sealed class EventRouteTests : IAsyncLifetime, IDisposable
         var first = await _world.OpenCaseIdAsync();
         var second = await _world.OpenCaseIdAsync();
         await Add(first, """{"title": "Meeting of creditors", "start": "2026-03-25T14:00:00Z"}""");
+        await _world.Patch($"/v1/cases/{second}", """{"filed_at": "2026-03-02"}""");
         await Add(second, """{"title": "Client call", "start": "2026-03-10T15:00:00Z"}""");
         await Add(second, """{"title": "In May", "start": "2026-05-04"}""");
         await _world.Post("/v1/firm/events", """{"title": "Office closed", "start": "2026-03-20"}""");
@@ -184,9 +225,13 @@ public sealed class EventRouteTests : IAsyncLifetime, IDisposable
         var march = (await _world.Get("/v1/calendar?from=2026-03-01&to=2026-03-31", Dana)).Object;
 
         Assert.Equal(("2026-03-01", "2026-03-31"), (march.Str("from"), march.Str("to")));
-        Assert.Equal(["Client call", "Office closed", "Meeting of creditors"], march["events"]!.AsArray().Select(e => e!.AsObject().Str("title")));
+        var titles = march["events"]!.AsArray().Select(e => e!.AsObject().Str("title")).ToList();
+        Assert.Contains("Schedules, statements and other documents due", titles);
+        Assert.DoesNotContain("Proofs of claim due (non-governmental creditors)", titles);
+        Assert.Equal(["Client call", "Office closed", "Meeting of creditors"], titles.Where(t => t is "Client call" or "Office closed" or "Meeting of creditors"));
         var onlySecond = (await _world.Get($"/v1/calendar?from=2026-03-01&to=2026-03-31&case_id={second}")).Object["events"]!.AsArray();
-        Assert.Equal(["Client call"], onlySecond.Select(e => e!.AsObject().Str("title")));
+        Assert.Contains("Client call", onlySecond.Select(e => e!.AsObject().Str("title")));
+        Assert.DoesNotContain("Meeting of creditors", onlySecond.Select(e => e!.AsObject().Str("title")));
     }
 
     [Fact]
@@ -297,6 +342,12 @@ public sealed class EventRouteTests : IAsyncLifetime, IDisposable
 
         Assert.Equal(401, (await _world.Get($"/v1/me/calendar.ics?token={token}", null)).Status);
     }
+
+    private async Task<Dictionary<string, System.Text.Json.Nodes.JsonObject>> GeneratedAsync(string caseId) =>
+        (await _world.Get($"/v1/cases/{caseId}/events")).Object["events"]!.AsArray()
+            .Select(e => e!.AsObject())
+            .Where(e => e["generated"]!.GetValue<bool>())
+            .ToDictionary(e => e.Str("rule_id")!, StringComparer.Ordinal);
 
     private Task<Answer> Add(string caseId, string body = Hearing, string subject = Alice) =>
         _world.Post($"/v1/cases/{caseId}/events", body, subject);
@@ -419,6 +470,51 @@ public sealed class CalendarRulesTests
         Assert.All(ics.Split("\r\n"), line => Assert.True(line.Length <= 75, line));
         Assert.Contains("\r\n x", ics, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void Reconcile_creates_replaces_deletes_and_keeps_dismissals()
+    {
+        var filed = Filed(new DateOnly(2026, 3, 2));
+        var first = CaseDeadlines.Reconcile(filed, Generate(filed), [], [Alice], Alice);
+        Assert.Empty(first.Put);
+        Assert.Empty(first.Delete);
+        Assert.All(first.Create, e => Assert.True(e.RuleId is not null && e.AllDay && e.Attendees.SequenceEqual([Alice])));
+        var window = first.Create.Single(e => e.RuleId == "frbp-2003a1a-341-window");
+        var schedules = first.Create.Single(e => e.RuleId == "frbp-1007c1-schedules");
+        var dismissed = CalendarRules.SetDismissed(schedules, dismissed: true);
+        var stored = first.Create.Select(e => e.Id == schedules.Id ? dismissed : e).ToList();
+
+        // The meeting is set: the window goes, the 341-anchored rules arrive,
+        // the dismissed schedules deadline is untouched.
+        var later = filed with { Meeting341At = new DateOnly(2026, 4, 7) };
+        var second = CaseDeadlines.Reconcile(later, Generate(later), stored, [Alice], Alice);
+        Assert.Equal([window.Id], second.Delete.Select(e => e.Id));
+        Assert.Contains("usc-341a-meeting", second.Create.Select(e => e.RuleId));
+        Assert.Contains("frbp-4004a-discharge-objection", second.Create.Select(e => e.RuleId));
+        Assert.Empty(second.Put);
+
+        // The petition date moves a week: rewritten in place, dismissal kept.
+        var moved = later with { FiledAt = new DateOnly(2026, 3, 9) };
+        var all = stored.Concat(second.Create).Where(e => e.Id != window.Id).ToList();
+        var third = CaseDeadlines.Reconcile(moved, Generate(moved), all, [], Alice);
+        var rewritten = third.Put.Single(e => e.Id == schedules.Id);
+        Assert.True(rewritten.Dismissed);
+        Assert.Equal("2026-03-23", rewritten.Start);
+        Assert.Empty(third.Create);
+        Assert.Empty(third.Delete);
+
+        // A hand-made event is never in any plan.
+        var plain = CalendarRules.Create(Parse("""{"title": "Hearing", "start": "2026-03-02"}"""), new EventScope(Firm, moved.Id), Alice);
+        var fourth = CaseDeadlines.Reconcile(moved, Generate(moved), [.. all, plain], [], Alice);
+        Assert.DoesNotContain(plain, fourth.Delete);
+        Assert.DoesNotContain(plain, fourth.Put);
+    }
+
+    private static Insolvia.Core.Cases.Case Filed(DateOnly filedAt) =>
+        new("00000000-0000-4000-8000-0000000ca5e1", Firm, Alice, 7, "Middle District of Florida", Insolvia.Core.Cases.CaseStatus.Filed, FirmWorld.Seeded, FirmWorld.Seeded) { FiledAt = filedAt };
+
+    private static IReadOnlyList<Insolvia.Engines.Deadlines.GeneratedDeadline> Generate(Insolvia.Core.Cases.Case target) =>
+        Insolvia.Engines.Deadlines.DeadlineEngine.Generate(target, Insolvia.Engines.Deadlines.DeadlineRules.Resolve(target.FiledAt!.Value), Insolvia.Engines.Deadlines.LegalHolidays.Resolve(target.FiledAt!.Value));
 
     private static EventDraft Parse(string body) => CalendarRules.Parse(System.Text.Json.Nodes.JsonNode.Parse(body)!.AsObject());
 }

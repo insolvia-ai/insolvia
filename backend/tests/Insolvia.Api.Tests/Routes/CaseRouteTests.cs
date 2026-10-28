@@ -388,6 +388,23 @@ public sealed class CaseRouteTests : IAsyncLifetime, IDisposable
     }
 
     [Fact]
+    public async Task An_opt_out_state_refuses_the_federal_election_and_an_election_state_accepts_it()
+    {
+        var florida = await _world.OpenCaseIdAsync();
+        await PutDebtor1InAsync(florida, "FL");
+        var refused = await _world.Patch($"/v1/cases/{florida}", """{"exemption_set": "federal"}""");
+        Assert.Equal(400, refused.Status);
+        Assert.Contains("opted out", refused.Object["fields"]!["exemption_set"]!.GetValue<string>(), StringComparison.Ordinal);
+        Assert.Null((await _world.StoredAsync(florida))!.ExemptionSet);
+
+        var texas = await _world.OpenCaseIdAsync();
+        await PutDebtor1InAsync(texas, " tx ");
+        var accepted = await _world.Patch($"/v1/cases/{texas}", """{"exemption_set": "federal"}""");
+        Assert.True(accepted.Status == 200, accepted.Body);
+        Assert.Equal("federal", accepted.Str("exemptionSet"));
+    }
+
+    [Fact]
     public async Task A_case_with_no_debtor_state_yet_accepts_either_election()
     {
         var caseId = await _world.OpenCaseIdAsync();
@@ -644,6 +661,13 @@ public sealed class CaseRouteTests : IAsyncLifetime, IDisposable
         Assert.Contains(flmb["divisions"]!.AsArray(), division => division!.AsObject().Str("code") == "tampa");
         Assert.Equal(403, (await _world.Get("/v1/courts", Frank)).Status);
         Assert.Equal(401, (await _world.Get("/v1/courts", null)).Status);
+    }
+
+    // 200: Debtor 1 exists from the moment the case is opened for its client.
+    private async Task PutDebtor1InAsync(string caseId, string state)
+    {
+        var answer = await _world.Put($"/v1/cases/{caseId}/debtors/debtor_1", """{"residence_address": {"state": """ + $"\"{state}\"" + """}, "provenance": {"residence_address.state": {"source": "staff_typed"}}}""");
+        Assert.True(answer.Status == 200, answer.Body);
     }
 
     private (AccessAction, AccessOutcome, string) Last()
