@@ -210,19 +210,6 @@ public sealed class FirmRouteTests : IAsyncLifetime, IDisposable
         Assert.Equal("Example & Partners", (await _world.FirmAsync())!.Name);
     }
 
-    [Fact]
-    public async Task A_rename_with_no_court_registry_composed_still_works_and_a_court_is_a_500()
-    {
-        // Until the case half composes the registry (18.7): a rename never asks it.
-        using var world = new FirmWorld(services: services => services.RemoveAll<ICourtRegistry>());
-        await (await world.WithFirmsAsync()).WithAsync(FirmWorld.Member(Ids.Alice, isAdmin: true));
-
-        Assert.Equal(200, (await world.Patch("/v1/firm", """{"name": "Renamed"}""", Ids.Alice)).Status);
-        var court = await world.Patch("/v1/firm", """{"defaultCourt": "flmb", "defaultDivision": "tampa"}""", Ids.Alice);
-        Assert.Equal(500, court.Status);
-        Assert.Equal("""{"error":"InternalError","message":"request failed"}""", court.Body);
-    }
-
     // ── The directory ────────────────────────────────────────────────
 
     [Fact]

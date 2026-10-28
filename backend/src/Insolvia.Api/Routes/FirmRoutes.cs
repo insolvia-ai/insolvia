@@ -47,7 +47,7 @@ public sealed class FirmRoutes : IEndpointModule
     {
         var store = context.FirmStore();
         var accessor = await context.CurrentAccessorAsync();
-        var courts = context.RequestServices.GetService<ICourtRegistry>() ?? UncomposedCourtRegistry.Instance;
+        var courts = context.RequestServices.GetRequiredService<ICourtRegistry>();
         var changes = FirmParser.ParseFirmUpdate(await context.BodyAsync(MaxRequestBytes), courts);
 
         var updated = FirmLifecycle.ApplyFirmChanges(accessor.Firm, changes, context.Clock());
@@ -138,18 +138,4 @@ public sealed class FirmRoutes : IEndpointModule
             throw new ConflictException("a firm must keep at least one active administrator; appoint another before changing this one");
         }
     }
-}
-
-/// <summary>
-/// The court registry until one is composed: the registry is the case half's
-/// (18.7, Core). A PATCH that names no court never asks it; one that does is
-/// a 500 that says why, never a 400 blaming a court code that may be valid.
-/// </summary>
-internal sealed class UncomposedCourtRegistry : ICourtRegistry
-{
-    public static readonly UncomposedCourtRegistry Instance = new();
-
-    public bool HasDistrict(string courtCode) => throw new InvalidOperationException("court registry is not composed");
-
-    public bool HasDivision(string courtCode, string divisionCode) => throw new InvalidOperationException("court registry is not composed");
 }

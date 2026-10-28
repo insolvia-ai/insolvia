@@ -156,20 +156,6 @@ internal sealed record Answer(int Status, string Body, HttpResponseMessage Respo
     public string? Str(string key) => Object[key]?.GetValue<string>();
 }
 
-/// <summary>The court registry the firm-defaults tests validate against (the Core tests' fake).</summary>
-internal sealed class FakeCourtRegistry : ICourtRegistry
-{
-    private static readonly Dictionary<string, string[]> Districts = new(StringComparer.Ordinal)
-    {
-        ["flmb"] = ["fort_myers", "jacksonville", "orlando", "tampa"],
-    };
-
-    public bool HasDistrict(string courtCode) => Districts.ContainsKey(courtCode);
-
-    public bool HasDivision(string courtCode, string divisionCode) =>
-        Districts.TryGetValue(courtCode, out var divisions) && divisions.Contains(divisionCode, StringComparer.Ordinal);
-}
-
 /// <summary>
 /// The debtor store's client links, in memory (the Core merge tests' fake):
 /// what the Python merge route tests reached by opening real cases, which

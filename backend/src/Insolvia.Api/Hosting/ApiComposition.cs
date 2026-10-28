@@ -5,6 +5,7 @@ using Insolvia.Api.Mail;
 using Insolvia.Api.Routes;
 using Insolvia.Aws.Jwks;
 using Insolvia.Aws.Mailer;
+using Insolvia.Core.Courts;
 using Insolvia.Core.Memory;
 using Insolvia.Core.Ports;
 using Insolvia.Data;
@@ -58,6 +59,10 @@ public static class ApiComposition
         builder.Services.AddSingleton(services => services.GetRequiredService<ApiConfig>().Environment);
         builder.Services.AddSingleton(TimeProvider.System);
 
+        // The court registry ships inside Insolvia.Core (ADR 0014) and is the
+        // same everywhere: a firm's default court is validated against it.
+        builder.Services.AddSingleton<ICourtRegistry>(CourtRegistry.Shipped);
+
         var config = ApiConfig.Load(name => configuration[name]);
         if (isLambda)
         {
@@ -77,7 +82,6 @@ public static class ApiComposition
             // that need them answer the 500 that names the gap — never a
             // memory twin that would accept a write and lose it:
             //   IUserDirectory (Cognito AdminCreateUser) — POST /v1/firm/users;
-            //   ICourtRegistry (the case half, 18.7) — PATCH /v1/firm naming a court;
             //   IDebtorClientLinks (the debtor store, 18.11) — the client merge.
         }
 

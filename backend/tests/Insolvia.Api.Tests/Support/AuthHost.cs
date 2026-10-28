@@ -88,8 +88,6 @@ internal sealed class AuthHost : IDisposable
         services.AddSingleton<IMailer>(Mailer);
         services.RemoveAll<IWaitlistStore>();
         services.AddSingleton<IWaitlistStore>(Waitlist);
-        services.RemoveAll<ICourtRegistry>();
-        services.AddSingleton<ICourtRegistry>(Courts);
         services.RemoveAll<IDebtorClientLinks>();
         services.AddSingleton<IDebtorClientLinks>(DebtorLinks);
 
@@ -111,8 +109,6 @@ internal sealed class AuthHost : IDisposable
     public MemoryMailer Mailer { get; } = new();
 
     public MemoryWaitlistStore Waitlist { get; } = new();
-
-    public FakeCourtRegistry Courts { get; } = new();
 
     public FakeDebtorClientLinks DebtorLinks { get; } = new();
 
