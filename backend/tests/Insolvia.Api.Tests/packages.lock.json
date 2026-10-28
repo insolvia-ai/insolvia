@@ -579,6 +579,7 @@
       "insolvia.aws": {
         "type": "Project",
         "dependencies": {
+          "AWSSDK.KeyManagementService": "[4.0.101, )",
           "Insolvia.Core": "[1.0.0, )"
         }
       },
@@ -644,6 +645,15 @@
         "contentHash": "QsHygaMyxQdgh5NPs5GGyBjK6mqQr5nv8rpqlrWC5+e1k7sVx+2xwDHv493S5IMw461S/PyHfjkUDjIQU5ArSA==",
         "dependencies": {
           "Amazon.Lambda.Core": "3.3.0"
+        }
+      },
+      "AWSSDK.KeyManagementService": {
+        "type": "CentralTransitive",
+        "requested": "[4.0.101, )",
+        "resolved": "4.0.101",
+        "contentHash": "gxbt9QeDTO1wXqTyO8Zdd3cZOndwxzu4E/7BOorKE/UUhK5bI0Tzdr/lHXj3UmgxazTdW1zH9kkslpqE8wf9GQ==",
+        "dependencies": {
+          "AWSSDK.Core": "[4.0.102.14, 5.0.0)"
         }
       },
       "AWSSDK.RDS": {
