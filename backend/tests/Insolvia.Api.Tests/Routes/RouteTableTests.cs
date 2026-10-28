@@ -156,6 +156,14 @@ public sealed class RouteTableTests : IDisposable
         { "POST", "/v1/cases/{caseId}/extraction/candidates/{candidateId}/review" },
     };
 
+    /// <summary>The forms slice 18.15c maps: the hub, the single-form preview, the filing set.</summary>
+    public static TheoryData<string, string> FormsRoutes => new()
+    {
+        { "GET", "/v1/cases/{caseId}/forms" },
+        { "GET", "/v1/cases/{caseId}/forms/{form}/preview" },
+        { "GET", "/v1/cases/{caseId}/filing-set" },
+    };
+
     public void Dispose() => _world.Dispose();
 
     [Theory]
@@ -163,6 +171,7 @@ public sealed class RouteTableTests : IDisposable
     [MemberData(nameof(CaseSideRoutes))]
     [MemberData(nameof(PortalStaffRoutes))]
     [MemberData(nameof(PipelineRoutes))]
+    [MemberData(nameof(FormsRoutes))]
     public async Task Every_firm_side_route_is_a_staff_route_and_401s_without_a_token(string method, string template)
     {
         var path = System.Text.RegularExpressions.Regex.Replace(
@@ -195,7 +204,7 @@ public sealed class RouteTableTests : IDisposable
     public void The_route_table_is_exactly_the_firm_and_case_side_slices_plus_the_two_public_routes()
     {
         var mapped = Endpoints().Where(e => e.Name.Contains("/v1/", StringComparison.Ordinal)).Select(e => e.Name).Order(StringComparer.Ordinal);
-        var expected = FirmSideRoutes.Concat(CaseSideRoutes).Concat(PortalStaffRoutes).Concat(PortalClientRoutes).Concat(PipelineRoutes).Select(row => $"{row.Data.Item1} {row.Data.Item2}").Concat(Public).Order(StringComparer.Ordinal);
+        var expected = FirmSideRoutes.Concat(CaseSideRoutes).Concat(PortalStaffRoutes).Concat(PortalClientRoutes).Concat(PipelineRoutes).Concat(FormsRoutes).Select(row => $"{row.Data.Item1} {row.Data.Item2}").Concat(Public).Order(StringComparer.Ordinal);
 
         Assert.Equal(expected, mapped);
         Assert.All(Endpoints().Where(e => Public.Contains(e.Name)), e => Assert.Null(e.Principal));

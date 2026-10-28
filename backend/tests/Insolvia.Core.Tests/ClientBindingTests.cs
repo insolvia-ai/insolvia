@@ -241,7 +241,7 @@ public sealed class AccessLogTests
 
                 // Python wrote these without listing them in ACTIONS (18.17).
                 "packet.read", "packet.download", "packet.assemble", "petition.review", "document.extract",
-                "extraction.read", "extraction.review",
+                "extraction.read", "extraction.review", "form_preview.render",
             ],
             Wire.Names<AccessAction>());
         Assert.Equal(["allowed", "denied"], Wire.Names<AccessOutcome>());
