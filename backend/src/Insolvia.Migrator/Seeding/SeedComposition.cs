@@ -3,6 +3,7 @@ using Amazon.KeyManagementService;
 using Amazon.S3;
 using Insolvia.Aws.Documents;
 using Insolvia.Aws.Sealing;
+using Insolvia.Core.Local;
 using Insolvia.Core.Ports;
 using Insolvia.Data;
 using Insolvia.Data.Cases;

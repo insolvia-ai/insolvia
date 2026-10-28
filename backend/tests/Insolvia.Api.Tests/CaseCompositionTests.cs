@@ -1,4 +1,5 @@
 using Insolvia.Api.Configuration;
+using Insolvia.Core.Local;
 using Insolvia.Core.Memory;
 using Insolvia.Core.Ports;
 using Insolvia.Data.Cases;
@@ -53,6 +54,47 @@ public sealed class CaseCompositionTests(WebApplicationFactory<Program> factory)
 
         using var another = lambda.Services.CreateScope();
         Assert.NotSame(services.GetRequiredService<ICaseStore>(), another.ServiceProvider.GetRequiredService<ICaseStore>());
+    }
+
+    [Fact]
+    public void Outside_lambda_a_named_database_composes_the_postgres_stores_with_the_local_twins_beside_them()
+    {
+        using var local = factory.WithWebHostBuilder(host =>
+        {
+            host.UseSetting("INSOLVIA_DB_CONNECTION_STRING", "Host=127.0.0.1;Port=1;Database=insolvia;Username=api;Password=unused");
+            host.UseSetting("INSOLVIA_LOCAL_BLOB_DIR", Path.Combine(Path.GetTempPath(), "insolvia-composition-test"));
+            host.UseSetting("INSOLVIA_LOCAL_BLOB_URL", "http://127.0.0.1:18060");
+        });
+        using var scope = local.Services.CreateScope();
+        var services = scope.ServiceProvider;
+
+        Assert.IsType<PostgresCaseStore>(services.GetRequiredService<ICaseStore>());
+        Assert.IsType<PostgresFilingStore>(services.GetRequiredService<IFilingStore>());
+        Assert.IsType<PostgresTaxIdStore>(services.GetRequiredService<ITaxIdStore>());
+        Assert.IsType<Insolvia.Data.Firms.PostgresFirmStore>(services.GetRequiredService<IFirmStore>());
+
+        // No pool, no KMS, no bucket on a laptop: the local twins.
+        Assert.IsType<MemoryUserDirectory>(services.GetRequiredService<IUserDirectory>());
+        Assert.IsType<Insolvia.Aws.Sealing.LocalTaxIdCipher>(services.GetRequiredService<ITaxIdCipher>());
+        Assert.IsType<DirectoryDocumentBlobStore>(services.GetRequiredService<IDocumentBlobStore>());
+    }
+
+    [Fact]
+    public void Inside_lambda_the_local_blob_pair_is_ignored()
+    {
+        using var lambda = factory.WithWebHostBuilder(host =>
+        {
+            foreach (var (name, value) in Lambda)
+            {
+                host.UseSetting(name, value);
+            }
+
+            host.UseSetting("INSOLVIA_ENV", "local");
+            host.UseSetting("INSOLVIA_LOCAL_BLOB_DIR", Path.Combine(Path.GetTempPath(), "insolvia-composition-test"));
+            host.UseSetting("INSOLVIA_LOCAL_BLOB_URL", "http://127.0.0.1:18060");
+        });
+
+        Assert.IsType<Insolvia.Aws.Documents.S3DocumentBlobStore>(lambda.Services.GetRequiredService<IDocumentBlobStore>());
     }
 
     [Fact]

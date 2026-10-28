@@ -38,6 +38,18 @@ public sealed class SeedIdTests
     }
 
     [Fact]
+    public void The_contract_stacks_accounts_are_the_subjects_the_local_seed_derives()
+    {
+        // contract/stack/stack.json tells the suite whom to sign for; the .NET
+        // contract stack seeds through LocalSeedAccounts, so the two must agree.
+        var stack = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(Path.Combine(Repository.Seeds, "..", "contract", "stack", "stack.json")))!;
+        var accounts = stack["accounts"]!.AsObject();
+
+        Assert.NotEmpty(accounts);
+        Assert.All(accounts, account => Assert.Equal(LocalSeedAccounts.SubjectFor(account.Key), account.Value!.GetValue<string>()));
+    }
+
+    [Fact]
     public void A_derived_id_is_a_version_5_uuid_the_object_key_rule_accepts()
     {
         var id = SeedIds.Derive("anything");

@@ -32,6 +32,24 @@ public sealed class ConfigTests(WebApplicationFactory<Program> factory) : IClass
         Assert.Equal(environment, Load(("INSOLVIA_ENV", environment)).Environment.Name);
 
     [Fact]
+    public void The_local_blob_pair_is_read_locally_and_ignored_elsewhere()
+    {
+        (string, string?)[] pair = [("INSOLVIA_LOCAL_BLOB_DIR", "/tmp/blobs"), ("INSOLVIA_LOCAL_BLOB_URL", "http://127.0.0.1:18060")];
+
+        Assert.Equal(new LocalBlobSettings("/tmp/blobs", new Uri("http://127.0.0.1:18060")), Load(pair).LocalBlobs);
+        Assert.Null(Load([.. pair, ("INSOLVIA_ENV", "staging")]).LocalBlobs);
+        Assert.Null(Load([.. pair, ("INSOLVIA_ENV", "production")]).LocalBlobs);
+        Assert.Null(Load().LocalBlobs);
+    }
+
+    [Theory]
+    [InlineData("/tmp/blobs", null)]
+    [InlineData(null, "http://127.0.0.1:18060")]
+    [InlineData("/tmp/blobs", "file:///tmp/blobs")]
+    public void The_local_blob_pair_is_both_or_neither_and_an_http_url(string? directory, string? url) =>
+        Assert.Throws<ArgumentException>(() => Load(("INSOLVIA_LOCAL_BLOB_DIR", directory), ("INSOLVIA_LOCAL_BLOB_URL", url)));
+
+    [Fact]
     public void An_unknown_environment_is_rejected() =>
         Assert.Contains("INSOLVIA_ENV", Assert.Throws<ArgumentException>(() => Load(("INSOLVIA_ENV", "prod"))).Message, StringComparison.Ordinal);
 

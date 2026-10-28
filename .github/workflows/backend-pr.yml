@@ -49,6 +49,8 @@ jobs:
             # The seeder's tests load the committed fixtures, and the
             # migrator images carry them.
             seeds/**
+            # SeedIdTests pins its accounts to the subjects the seed derives.
+            contract/stack/stack.json
             .github/workflows/backend-pr.yml
             .github/actions/changed-paths/action.yml
 

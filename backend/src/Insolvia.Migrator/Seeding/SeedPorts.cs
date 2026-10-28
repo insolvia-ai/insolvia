@@ -1,5 +1,4 @@
 using System.Security.Cryptography;
-using Insolvia.Core.Documents;
 using Insolvia.Core.Ports;
 
 namespace Insolvia.Migrator.Seeding;
@@ -135,73 +134,5 @@ public sealed class DirectoryFixtureObjects(string fixturesRoot, IDocumentBlobSt
         return path.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.Ordinal)
             ? path
             : throw new SeedRefusedException($"fixture object {key} is outside {fixturesRoot}");
-    }
-}
-
-/// <summary>
-/// A document store over a local directory — what a laptop's compose
-/// database's documents point at when no case-documents bucket is named. The
-/// seeder writes and stats through it; it mints no URLs (there is no bucket to
-/// sign for), so an API composed over it could not serve a download.
-/// </summary>
-/// <param name="root">The directory; created on first write.</param>
-public sealed class DirectoryDocumentBlobStore(string root) : IDocumentBlobStore
-{
-    /// <inheritdoc />
-    public Task<string> UploadUrlAsync(string storageRef, string contentType, long byteSize, int expiresIn, CancellationToken cancellationToken = default) =>
-        throw new NotSupportedException("a local document directory mints no upload URLs");
-
-    /// <inheritdoc />
-    public Task<string> DownloadUrlAsync(string storageRef, int expiresIn, CancellationToken cancellationToken = default) =>
-        throw new NotSupportedException("a local document directory mints no download URLs");
-
-    /// <inheritdoc />
-    public Task<StoredBlob?> StatAsync(string storageRef, CancellationToken cancellationToken = default)
-    {
-        var path = Resolve(storageRef);
-        if (!File.Exists(path))
-        {
-            return Task.FromResult<StoredBlob?>(null);
-        }
-
-        // S3's single-part etag is the MD5 of the bytes; the same here.
-#pragma warning disable CA5351 // An etag, not a security boundary.
-        var etag = Convert.ToHexStringLower(MD5.HashData(File.ReadAllBytes(path)));
-#pragma warning restore CA5351
-        return Task.FromResult<StoredBlob?>(new StoredBlob(new FileInfo(path).Length, etag));
-    }
-
-    /// <inheritdoc />
-    public Task ClearUploadTagAsync(string storageRef, CancellationToken cancellationToken = default) => Task.CompletedTask;
-
-    /// <inheritdoc />
-    public Task DeleteAsync(string storageRef, CancellationToken cancellationToken = default)
-    {
-        File.Delete(Resolve(storageRef));
-        return Task.CompletedTask;
-    }
-
-    /// <inheritdoc />
-    public async Task PutBytesAsync(string storageRef, ReadOnlyMemory<byte> content, string contentType, CancellationToken cancellationToken = default)
-    {
-        var path = Resolve(storageRef);
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        await File.WriteAllBytesAsync(path, content, cancellationToken).ConfigureAwait(false);
-    }
-
-    /// <inheritdoc />
-    public async Task<byte[]?> GetBytesAsync(string storageRef, CancellationToken cancellationToken = default)
-    {
-        var path = Resolve(storageRef);
-        return File.Exists(path) ? await File.ReadAllBytesAsync(path, cancellationToken).ConfigureAwait(false) : null;
-    }
-
-    private string Resolve(string storageRef)
-    {
-        var full = Path.GetFullPath(root);
-        var path = Path.GetFullPath(Path.Combine(full, storageRef));
-        return path.StartsWith(full + Path.DirectorySeparatorChar, StringComparison.Ordinal)
-            ? path
-            : throw new ArgumentException($"storage ref {storageRef} is outside the document directory", nameof(storageRef));
     }
 }

@@ -72,8 +72,9 @@ services:
     environment:
       INSOLVIA_ENV: ${INSOLVIA_ENV:-local}
       # The API connects as its own role, `api`, never as the superuser — the
-      # same least privilege it has on Aurora through IAM. Read by nothing
-      # yet: the stores arrive with 18.10.
+      # same least privilege it has on Aurora through IAM. Setting it composes
+      # the Postgres stores (ApiComposition); the user directory, sealing keys
+      # and blob store stay local twins.
       INSOLVIA_DB_CONNECTION_STRING: Host=postgres;Port=5432;Database=insolvia;Username=api;Password=insolvia-local-only
     ports:
       - '127.0.0.1:8080:8080'

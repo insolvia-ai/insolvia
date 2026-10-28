@@ -1,3 +1,4 @@
+using Insolvia.Core.Local;
 using Insolvia.Data.Tests;
 using Insolvia.Migrator.Seeding;
 using Npgsql;
@@ -49,7 +50,10 @@ public sealed class SeedPostgresTests(PostgresFixture postgres) : IDisposable
         Assert.Equal(counts, await CountsAsync(connectionString));
         Assert.Equal(2L, counts["cases"]);
         Assert.Equal(2L, counts["documents"]);
-        Assert.Equal(2, Directory.GetFiles(_documents, "*", SearchOption.AllDirectories).Length);
+        // The two objects, each with its content-type sidecar (DirectoryDocumentBlobStore).
+        var files = Directory.GetFiles(_documents, "*", SearchOption.AllDirectories);
+        Assert.Equal(2, files.Count(path => !path.EndsWith(DirectoryDocumentBlobStore.ContentTypeSuffix, StringComparison.Ordinal)));
+        Assert.Equal(2, files.Count(path => path.EndsWith(DirectoryDocumentBlobStore.ContentTypeSuffix, StringComparison.Ordinal)));
     }
 
     [Fact]
