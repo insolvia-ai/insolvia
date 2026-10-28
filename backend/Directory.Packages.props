@@ -12,6 +12,14 @@
     <!-- ASP.NET Core on Lambda behind an HTTP API (payload format 2.0). -->
     <PackageVersion Include="Amazon.Lambda.AspNetCoreServer.Hosting" Version="2.2.1" />
   </ItemGroup>
+  <ItemGroup Label="MCP">
+    <!-- The official C# MCP SDK (18.21; research 2026-10-27): the 2026-07-28
+         stateless Streamable HTTP transport, version negotiation and the
+         legacy initialize bridge. Insolvia.Mcp owns the shims it lacks (JSON
+         responses, Host/Origin checks). Pinned exact with the Python side's
+         mcp==2.1.1 in mind: one protocol stack per service. -->
+    <PackageVersion Include="ModelContextProtocol.AspNetCore" Version="2.3.0" />
+  </ItemGroup>
   <ItemGroup Label="Lambda (non-HTTP hosts)">
     <!-- A one-shot host (the migrator) runs its own handler under the Lambda
          runtime client. Same versions the API's hosting package resolves, so

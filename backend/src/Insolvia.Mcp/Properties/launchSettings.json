@@ -1,0 +1,13 @@
+{
+  "profiles": {
+    "Insolvia.Mcp": {
+      "commandName": "Project",
+      "launchBrowser": false,
+      "applicationUrl": "http://127.0.0.1:8788",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "INSOLVIA_ENV": "local"
+      }
+    }
+  }
+}

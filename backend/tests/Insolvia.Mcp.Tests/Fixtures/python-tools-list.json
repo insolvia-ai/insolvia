@@ -1,0 +1,520 @@
+{
+  "//": "tools/list as services/mcp (mcp==2.1.1) served it on 2026-10-28, captured in-process from create_asgi_app. ToolListingTests holds the .NET listing to it.",
+  "tools": [
+    {
+      "annotations": {
+        "readOnlyHint": true
+      },
+      "description": "The caller's firm, display name, and per-feature permissions — or the fact that they have no firm. The /v1/me of this surface.",
+      "inputSchema": {
+        "properties": {},
+        "title": "whoami_toolArguments",
+        "type": "object"
+      },
+      "name": "whoami",
+      "outputSchema": {
+        "$defs": {
+          "FirmSummary": {
+            "properties": {
+              "id": {
+                "title": "Id",
+                "type": "string"
+              },
+              "name": {
+                "title": "Name",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ],
+            "title": "FirmSummary",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "accessAllCases": {
+            "title": "Accessallcases",
+            "type": "boolean"
+          },
+          "displayName": {
+            "title": "Displayname",
+            "type": "string"
+          },
+          "firm": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/FirmSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "isAdmin": {
+            "title": "Isadmin",
+            "type": "boolean"
+          },
+          "permissions": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Permissions",
+            "type": "object"
+          }
+        },
+        "required": [
+          "firm",
+          "displayName",
+          "isAdmin",
+          "accessAllCases",
+          "permissions"
+        ],
+        "title": "WhoamiResult",
+        "type": "object"
+      },
+      "title": "Who am I"
+    },
+    {
+      "annotations": {
+        "readOnlyHint": true
+      },
+      "description": "The cases the caller may see, newest first, paginated; archived and deleted cases are not listed. Optional status filter: intake, ready_to_file, filed, discharged, dismissed, or closed.",
+      "inputSchema": {
+        "properties": {
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Cursor"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Limit"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          }
+        },
+        "title": "list_cases_toolArguments",
+        "type": "object"
+      },
+      "name": "list_cases",
+      "outputSchema": {
+        "properties": {
+          "cases": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Cases",
+            "type": "array"
+          },
+          "nextCursor": {
+            "title": "Nextcursor",
+            "type": "string"
+          }
+        },
+        "required": [
+          "cases"
+        ],
+        "title": "ListCasesResult",
+        "type": "object"
+      },
+      "title": "List cases"
+    },
+    {
+      "annotations": {
+        "readOnlyHint": true
+      },
+      "description": "One case plus per-entity-type record counts.",
+      "inputSchema": {
+        "properties": {
+          "caseId": {
+            "title": "Caseid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "caseId"
+        ],
+        "title": "get_case_toolArguments",
+        "type": "object"
+      },
+      "name": "get_case",
+      "outputSchema": {
+        "properties": {
+          "case": {
+            "additionalProperties": true,
+            "title": "Case",
+            "type": "object"
+          },
+          "recordCounts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Recordcounts",
+            "type": "object"
+          }
+        },
+        "required": [
+          "case",
+          "recordCounts"
+        ],
+        "title": "GetCaseResult",
+        "type": "object"
+      },
+      "title": "Get case"
+    },
+    {
+      "annotations": {
+        "readOnlyHint": true
+      },
+      "description": "One entity type's records within one case, paginated. entityType: One of: creditors, claims, assets, employments, pay_period_records, other_income_records, income_summaries, households, expenses, dependents, codebtors, sofa_entries, petitions, prior_cases, related_cases, sole_proprietorships, filing_professionals, exemptions, contract_leases, community_household_members, means_test_inputs, plans, debtors, documents, clients. `clients` are the firm's client records this case's debtors are linked to (recordId is the client id; read-only, tax id last four only).",
+      "inputSchema": {
+        "properties": {
+          "caseId": {
+            "title": "Caseid",
+            "type": "string"
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Cursor"
+          },
+          "entityType": {
+            "title": "Entitytype",
+            "type": "string"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Limit"
+          }
+        },
+        "required": [
+          "caseId",
+          "entityType"
+        ],
+        "title": "list_case_records_toolArguments",
+        "type": "object"
+      },
+      "name": "list_case_records",
+      "outputSchema": {
+        "properties": {
+          "nextCursor": {
+            "title": "Nextcursor",
+            "type": "string"
+          },
+          "records": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Records",
+            "type": "array"
+          }
+        },
+        "required": [
+          "records"
+        ],
+        "title": "ListCaseRecordsResult",
+        "type": "object"
+      },
+      "title": "List case records"
+    },
+    {
+      "annotations": {
+        "readOnlyHint": true
+      },
+      "description": "One record by id. entityType: One of: creditors, claims, assets, employments, pay_period_records, other_income_records, income_summaries, households, expenses, dependents, codebtors, sofa_entries, petitions, prior_cases, related_cases, sole_proprietorships, filing_professionals, exemptions, contract_leases, community_household_members, means_test_inputs, plans, debtors, documents, clients. `clients` are the firm's client records this case's debtors are linked to (recordId is the client id; read-only, tax id last four only).",
+      "inputSchema": {
+        "properties": {
+          "caseId": {
+            "title": "Caseid",
+            "type": "string"
+          },
+          "entityType": {
+            "title": "Entitytype",
+            "type": "string"
+          },
+          "recordId": {
+            "title": "Recordid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "caseId",
+          "entityType",
+          "recordId"
+        ],
+        "title": "get_case_record_toolArguments",
+        "type": "object"
+      },
+      "name": "get_case_record",
+      "outputSchema": {
+        "properties": {
+          "record": {
+            "additionalProperties": true,
+            "title": "Record",
+            "type": "object"
+          }
+        },
+        "required": [
+          "record"
+        ],
+        "title": "GetCaseRecordResult",
+        "type": "object"
+      },
+      "title": "Get case record"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Write a batch of CANDIDATE records for human review — nothing becomes case data until a person accepts it in the app. 1-25 proposals per call, each {entityType, payload, externalRef?, note?}; payload mirrors the target entity's wire shape. Proposable entity types: creditors, claims, assets, employments, pay_period_records, other_income_records, income_summaries, households, expenses, dependents, codebtors, sofa_entries, petitions, prior_cases, related_cases, sole_proprietorships, filing_professionals, exemptions, contract_leases, community_household_members, means_test_inputs, plans, debtors.",
+      "inputSchema": {
+        "properties": {
+          "caseId": {
+            "title": "Caseid",
+            "type": "string"
+          },
+          "proposals": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Proposals",
+            "type": "array"
+          }
+        },
+        "required": [
+          "caseId",
+          "proposals"
+        ],
+        "title": "propose_case_records_toolArguments",
+        "type": "object"
+      },
+      "name": "propose_case_records",
+      "outputSchema": {
+        "$defs": {
+          "ProposedCandidate": {
+            "properties": {
+              "candidateId": {
+                "title": "Candidateid",
+                "type": "string"
+              },
+              "entityType": {
+                "title": "Entitytype",
+                "type": "string"
+              },
+              "status": {
+                "title": "Status",
+                "type": "string"
+              }
+            },
+            "required": [
+              "candidateId",
+              "entityType",
+              "status"
+            ],
+            "title": "ProposedCandidate",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "candidates": {
+            "items": {
+              "$ref": "#/$defs/ProposedCandidate"
+            },
+            "title": "Candidates",
+            "type": "array"
+          }
+        },
+        "required": [
+          "candidates"
+        ],
+        "title": "ProposeCaseRecordsResult",
+        "type": "object"
+      },
+      "title": "Propose case records"
+    },
+    {
+      "annotations": {
+        "readOnlyHint": true
+      },
+      "description": "The review status of this surface's candidates: pending, accepted, corrected (with the human's correctedPayload), rejected, or withdrawn — plus the resulting record id once accepted. Poll this; review happens in the app, often hours after the proposing session ends.",
+      "inputSchema": {
+        "properties": {
+          "candidateIds": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Candidateids"
+          },
+          "caseId": {
+            "title": "Caseid",
+            "type": "string"
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Cursor"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Limit"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          }
+        },
+        "required": [
+          "caseId"
+        ],
+        "title": "check_proposals_toolArguments",
+        "type": "object"
+      },
+      "name": "check_proposals",
+      "outputSchema": {
+        "properties": {
+          "candidates": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Candidates",
+            "type": "array"
+          },
+          "nextCursor": {
+            "title": "Nextcursor",
+            "type": "string"
+          }
+        },
+        "required": [
+          "candidates"
+        ],
+        "title": "CheckProposalsResult",
+        "type": "object"
+      },
+      "title": "Check proposals"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Retract the caller's own still-pending candidate so it does not sit in a reviewer's queue. Only the proposer may withdraw, and only while pending.",
+      "inputSchema": {
+        "properties": {
+          "candidateId": {
+            "title": "Candidateid",
+            "type": "string"
+          },
+          "caseId": {
+            "title": "Caseid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "caseId",
+          "candidateId"
+        ],
+        "title": "withdraw_proposal_toolArguments",
+        "type": "object"
+      },
+      "name": "withdraw_proposal",
+      "outputSchema": {
+        "properties": {
+          "candidateId": {
+            "title": "Candidateid",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "candidateId",
+          "status"
+        ],
+        "title": "WithdrawProposalResult",
+        "type": "object"
+      },
+      "title": "Withdraw proposal"
+    }
+  ]
+}
