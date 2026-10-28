@@ -1,0 +1,11 @@
+{
+  "series_id": "exemptions/tx",
+  "effective_date": "2015-09-01",
+  "sequence": 1,
+  "source": {
+    "url": "https://statutes.capitol.texas.gov/Docs/PR/htm/PR.42.htm",
+    "published": null,
+    "sha256": null
+  },
+  "notes": "Baseline snapshot of the Texas scheme, dated to its most recent dollar amendment: Acts 2015, ch. 793 (H.B. 2706) setting the § 42.001 aggregate at $50,000/$100,000, eff. 2015-09-01. The official statute pages are script-rendered; figures verified against two independent mirrors (per-entry sources) — re-verify against the official text before first filing. Synthesized from multiple sections; no single artifact to hash. Verified current as of 2026-09-01."
+}

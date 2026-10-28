@@ -1,0 +1,11 @@
+{
+  "series_id": "form/b106c",
+  "effective_date": "2025-04-01",
+  "sequence": 1,
+  "source": {
+    "url": "https://www.uscourts.gov/sites/default/files/2025-04/b_106c_0425-form.pdf",
+    "published": null,
+    "sha256": "913519a5c94e449d98e57dc5b5fef00be0c096725b51d404d75694710d4e2a88"
+  },
+  "notes": "Official Form 106C, Schedule C: The Property You Claim as Exempt, printed revision 04/25 (current as of ingestion). template.pdf is the official fillable PDF vendored verbatim from uscourts.gov (sha256 above; the loader re-hashes it); spec.json and acroform.json are the issue-92 field spec and AcroForm dump for this revision, copied from forms/ at ingestion \u2014 tests/test_form_templates.py refuses drift between the copies and forms/ while this is the current revision. Carries the April 2025 \u00a7104(b) dollar adjustments (the $214,000 homestead question; next adjustment 2028-04-01 \u2014 ingest it as the next release of this series before that date)."
+}

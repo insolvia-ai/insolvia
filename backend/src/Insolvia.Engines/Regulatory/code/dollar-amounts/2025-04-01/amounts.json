@@ -1,0 +1,249 @@
+{
+  "amounts": [
+    {
+      "amount_id": "means-test-presumption-floor-60mo",
+      "citation": "11 U.S.C. § 707(b)(2)(A)(i)(I)",
+      "description": "Presumption-of-abuse floor: no presumption arises when 60-month disposable income is below this (B122A-2 line 40, first box).",
+      "amount": "10275.00",
+      "verification": "primary_corroborated",
+      "sources": [
+        {
+          "title": "Federal Register, Adjustment of Certain Dollar Amounts, 90 FR 8941",
+          "url": "https://www.govinfo.gov/content/pkg/FR-2025-02-04/html/2025-02207.htm",
+          "accessed": "2026-09-04"
+        },
+        {
+          "title": "Official Form 122A-2 (rev. 04/25), line 40 printed figure",
+          "url": "https://www.uscourts.gov/sites/default/files/2025-04/b_122a-2_0425-form.pdf",
+          "accessed": "2026-09-04"
+        },
+        {
+          "title": "11 U.S.C. § 707 amendment notes (Cornell LII)",
+          "url": "https://www.law.cornell.edu/uscode/text/11/707",
+          "accessed": "2026-09-04"
+        }
+      ],
+      "figure_since": "2025-04-01",
+      "next_adjustment": "2028-04-01",
+      "notes": ""
+    },
+    {
+      "amount_id": "means-test-presumption-ceiling-60mo",
+      "citation": "11 U.S.C. § 707(b)(2)(A)(i)(II)",
+      "description": "Presumption-of-abuse ceiling: the presumption arises regardless of unsecured debt when 60-month disposable income is above this (B122A-2 line 40, second box).",
+      "amount": "17150.00",
+      "verification": "primary_corroborated",
+      "sources": [
+        {
+          "title": "Federal Register, Adjustment of Certain Dollar Amounts, 90 FR 8941",
+          "url": "https://www.govinfo.gov/content/pkg/FR-2025-02-04/html/2025-02207.htm",
+          "accessed": "2026-09-04"
+        },
+        {
+          "title": "Official Form 122A-2 (rev. 04/25), line 40 printed figure",
+          "url": "https://www.uscourts.gov/sites/default/files/2025-04/b_122a-2_0425-form.pdf",
+          "accessed": "2026-09-04"
+        },
+        {
+          "title": "11 U.S.C. § 707 amendment notes (Cornell LII)",
+          "url": "https://www.law.cornell.edu/uscode/text/11/707",
+          "accessed": "2026-09-04"
+        }
+      ],
+      "figure_since": "2025-04-01",
+      "next_adjustment": "2028-04-01",
+      "notes": "Between floor and ceiling, the presumption arises when 60-month disposable income is at least 25% of nonpriority unsecured claims (§ 707(b)(2)(A)(i); B122A-2 line 41)."
+    },
+    {
+      "amount_id": "means-test-education-annual-cap-per-child",
+      "citation": "11 U.S.C. § 707(b)(2)(A)(ii)(IV)",
+      "description": "Annual cap per child under 18 on public or private elementary/secondary school expenses (B122A-2 line 29 prints it divided by 12: $214.58 monthly).",
+      "amount": "2575.00",
+      "verification": "primary_corroborated",
+      "sources": [
+        {
+          "title": "Federal Register, Adjustment of Certain Dollar Amounts, 90 FR 8941",
+          "url": "https://www.govinfo.gov/content/pkg/FR-2025-02-04/html/2025-02207.htm",
+          "accessed": "2026-09-04"
+        },
+        {
+          "title": "Official Form 122A-2 (rev. 04/25), line 29 printed monthly cap",
+          "url": "https://www.uscourts.gov/sites/default/files/2025-04/b_122a-2_0425-form.pdf",
+          "accessed": "2026-09-04"
+        },
+        {
+          "title": "11 U.S.C. § 707 amendment notes (Cornell LII)",
+          "url": "https://www.law.cornell.edu/uscode/text/11/707",
+          "accessed": "2026-09-04"
+        }
+      ],
+      "figure_since": "2025-04-01",
+      "next_adjustment": "2028-04-01",
+      "notes": ""
+    },
+    {
+      "amount_id": "special-circumstances-presumption-floor-60mo",
+      "citation": "11 U.S.C. § 707(b)(2)(B)(iv)(I)",
+      "description": "Rebuttal threshold: special-circumstances adjustments must bring 60-month disposable income below the § 707(b)(2)(A)(i) trigger; this is its floor figure.",
+      "amount": "10275.00",
+      "verification": "primary_corroborated",
+      "sources": [
+        {
+          "title": "Federal Register, Adjustment of Certain Dollar Amounts, 90 FR 8941",
+          "url": "https://www.govinfo.gov/content/pkg/FR-2025-02-04/html/2025-02207.htm",
+          "accessed": "2026-09-04"
+        },
+        {
+          "title": "11 U.S.C. § 707 amendment notes (Cornell LII)",
+          "url": "https://www.law.cornell.edu/uscode/text/11/707",
+          "accessed": "2026-09-04"
+        }
+      ],
+      "figure_since": "2025-04-01",
+      "next_adjustment": "2028-04-01",
+      "notes": ""
+    },
+    {
+      "amount_id": "special-circumstances-presumption-ceiling-60mo",
+      "citation": "11 U.S.C. § 707(b)(2)(B)(iv)(II)",
+      "description": "Rebuttal threshold ceiling, paired with special-circumstances-presumption-floor-60mo.",
+      "amount": "17150.00",
+      "verification": "primary_corroborated",
+      "sources": [
+        {
+          "title": "Federal Register, Adjustment of Certain Dollar Amounts, 90 FR 8941",
+          "url": "https://www.govinfo.gov/content/pkg/FR-2025-02-04/html/2025-02207.htm",
+          "accessed": "2026-09-04"
+        },
+        {
+          "title": "11 U.S.C. § 707 amendment notes (Cornell LII)",
+          "url": "https://www.law.cornell.edu/uscode/text/11/707",
+          "accessed": "2026-09-04"
+        }
+      ],
+      "figure_since": "2025-04-01",
+      "next_adjustment": "2028-04-01",
+      "notes": ""
+    },
+    {
+      "amount_id": "median-addon-per-person-motion-standing",
+      "citation": "11 U.S.C. § 707(b)(6)(C)",
+      "description": "Monthly amount added to the four-person median, per household member above four, when deciding who may move to dismiss under § 707(b).",
+      "amount": "925.00",
+      "verification": "primary_corroborated",
+      "sources": [
+        {
+          "title": "Federal Register, Adjustment of Certain Dollar Amounts, 90 FR 8941",
+          "url": "https://www.govinfo.gov/content/pkg/FR-2025-02-04/html/2025-02207.htm",
+          "accessed": "2026-09-04"
+        },
+        {
+          "title": "11 U.S.C. § 707 amendment notes (Cornell LII)",
+          "url": "https://www.law.cornell.edu/uscode/text/11/707",
+          "accessed": "2026-09-04"
+        }
+      ],
+      "figure_since": "2025-04-01",
+      "next_adjustment": "2028-04-01",
+      "notes": ""
+    },
+    {
+      "amount_id": "median-addon-per-person-safe-harbor",
+      "citation": "11 U.S.C. § 707(b)(7)(A)(iii)",
+      "description": "Monthly amount added to the four-person median, per household member above four, in the safe-harbor median comparison the means test keys off (B122A-1 line 13 uses the UST table, whose excess-person addition is 12x this figure).",
+      "amount": "925.00",
+      "verification": "primary_corroborated",
+      "sources": [
+        {
+          "title": "Federal Register, Adjustment of Certain Dollar Amounts, 90 FR 8941",
+          "url": "https://www.govinfo.gov/content/pkg/FR-2025-02-04/html/2025-02207.htm",
+          "accessed": "2026-09-04"
+        },
+        {
+          "title": "11 U.S.C. § 707 amendment notes (Cornell LII)",
+          "url": "https://www.law.cornell.edu/uscode/text/11/707",
+          "accessed": "2026-09-04"
+        },
+        {
+          "title": "UST median family income table (excess-person addition $11,100 = 12 x $925)",
+          "url": "https://www.justice.gov/ust/eo/bapcpa/20260401/bci_data/median_income_table.htm",
+          "accessed": "2026-09-04"
+        }
+      ],
+      "figure_since": "2025-04-01",
+      "next_adjustment": "2028-04-01",
+      "notes": ""
+    },
+    {
+      "amount_id": "attorney-sanctions-small-case-cap",
+      "citation": "11 U.S.C. § 707(b)(5)(B)",
+      "description": "Small-case safe harbor from § 707(b)(5) sanctions: applies where the debtor's assets are below this figure.",
+      "amount": "1725.00",
+      "verification": "primary_corroborated",
+      "sources": [
+        {
+          "title": "Federal Register, Adjustment of Certain Dollar Amounts, 90 FR 8941",
+          "url": "https://www.govinfo.gov/content/pkg/FR-2025-02-04/html/2025-02207.htm",
+          "accessed": "2026-09-04"
+        },
+        {
+          "title": "11 U.S.C. § 707 amendment notes (Cornell LII)",
+          "url": "https://www.law.cornell.edu/uscode/text/11/707",
+          "accessed": "2026-09-04"
+        }
+      ],
+      "figure_since": "2025-04-01",
+      "next_adjustment": "2028-04-01",
+      "notes": ""
+    },
+    {
+      "amount_id": "sofa-payment-floor-business",
+      "citation": "11 U.S.C. § 547(c)(9)",
+      "description": "B107 question 6 reporting floor where debts are NOT primarily consumer debts: payments to a single creditor totaling this amount or more within 90 days before filing.",
+      "amount": "8575.00",
+      "verification": "primary_corroborated",
+      "sources": [
+        {
+          "title": "Federal Register, Adjustment of Certain Dollar Amounts, 90 FR 8941",
+          "url": "https://www.govinfo.gov/content/pkg/FR-2025-02-04/html/2025-02207.htm",
+          "accessed": "2026-09-04"
+        },
+        {
+          "title": "Official Form 107 (rev. 04/25), question 6 printed figure",
+          "url": "https://www.uscourts.gov/sites/default/files/2025-04/b_107_0425-form.pdf",
+          "accessed": "2026-09-04"
+        },
+        {
+          "title": "11 U.S.C. § 547 amendment notes (Cornell LII)",
+          "url": "https://www.law.cornell.edu/uscode/text/11/547",
+          "accessed": "2026-09-04"
+        }
+      ],
+      "figure_since": "2025-04-01",
+      "next_adjustment": "2028-04-01",
+      "notes": ""
+    },
+    {
+      "amount_id": "sofa-payment-floor-consumer",
+      "citation": "11 U.S.C. § 547(c)(8)",
+      "description": "B107 question 6 reporting floor where debts ARE primarily consumer debts: payments to a single creditor totaling $600 or more within 90 days before filing.",
+      "amount": "600.00",
+      "verification": "primary_corroborated",
+      "sources": [
+        {
+          "title": "11 U.S.C. § 547(c)(8) (Cornell LII; $600 is statutory text, not § 104-adjusted)",
+          "url": "https://www.law.cornell.edu/uscode/text/11/547",
+          "accessed": "2026-09-04"
+        },
+        {
+          "title": "Official Form 107 (rev. 04/25), question 6 printed figure",
+          "url": "https://www.uscourts.gov/sites/default/files/2025-04/b_107_0425-form.pdf",
+          "accessed": "2026-09-04"
+        }
+      ],
+      "figure_since": null,
+      "next_adjustment": null,
+      "notes": "Not in the § 104(b) adjustment list — the figure is fixed in the statute's text. figure_since is null because the enactment date was not separately verified."
+    }
+  ]
+}

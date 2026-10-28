@@ -1,0 +1,11 @@
+{
+  "series_id": "ust/irs-local-standards",
+  "effective_date": "2026-07-15",
+  "sequence": 1,
+  "source": {
+    "url": "https://www.justice.gov/ust/eo/bapcpa/20260715/bci_data/docs/housing_util_standards_FIPS.xlsx",
+    "published": null,
+    "sha256": "8b6954b45b1036da3ef6f98459c9775e53c69991f1aede155e73ad0a30942dfd"
+  },
+  "notes": "IRS Local Standards (housing/utilities by county + transportation) as republished by the UST for cases filed on or after 2026-07-15, scoped to the launch states FL/GA/TX (ADR 0017). Transportation XLSX: https://www.justice.gov/ust/eo/bapcpa/20260715/bci_data/docs/transportation_standards.xlsx (sha256 7ac3eeb757045aad7a314a9645099391d4e59bfc6b2251c383cf308b69cc3a45). Converted mechanically; spot-check the diff against the UST's HTML tables before merging."
+}

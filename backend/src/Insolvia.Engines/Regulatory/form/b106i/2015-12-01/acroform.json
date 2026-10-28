@@ -1,0 +1,812 @@
+{
+ "form": "b106i",
+ "official_number": "106I",
+ "title": "Schedule I: Your Income",
+ "revision": "12/15",
+ "effective_date": "2015-12-01",
+ "source": {
+  "page_url": "https://www.uscourts.gov/forms-rules/forms/schedule-i-your-income-individuals",
+  "pdf_url": "https://www.uscourts.gov/sites/default/files/form_b106i.pdf",
+  "pdf_sha256": "d0fbca7a9593220b3b7257844dfc0678d8628bcd818f522840325f6596945a2e",
+  "retrieved": "2026-09-01"
+ },
+ "pages": 2,
+ "field_count": 85,
+ "fields": [
+  {
+   "name": "Debtor 2",
+   "kind": "text",
+   "tooltip": "Debtor 2",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Check 1",
+   "kind": "checkbox",
+   "tooltip": "select appropriate",
+   "pages": [
+    1
+   ],
+   "states": [
+    "amended",
+    "supplemental"
+   ]
+  },
+  {
+   "name": "Check emploment status Debtor 1",
+   "kind": "checkbox",
+   "tooltip": "select appropriate",
+   "pages": [
+    1
+   ],
+   "states": [
+    "employed",
+    "unemployed"
+   ]
+  },
+  {
+   "name": "Check emploment status Debtor 2",
+   "kind": "checkbox",
+   "tooltip": "select appropriate",
+   "pages": [
+    1
+   ],
+   "states": [
+    "employed",
+    "unemployed"
+   ]
+  },
+  {
+   "name": "Occupation Debtor 1",
+   "kind": "text",
+   "tooltip": "Occupation",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Time employed Debtor 1",
+   "kind": "text",
+   "tooltip": "list how long you have been employed here",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Employers Name Debtor 1",
+   "kind": "text",
+   "tooltip": "Name of your Employer",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Employers Street1 Debtor 1",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Employers Street2 Debtor 1",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Employers Street3 Debtor 1",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Employers City Debtor 1",
+   "kind": "text",
+   "tooltip": "City",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Employers State Debtor 1",
+   "kind": "text",
+   "tooltip": "State",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Employers Zip debtor 1",
+   "kind": "text",
+   "tooltip": "ZIP Code",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Occupation Debtor 2",
+   "kind": "text",
+   "tooltip": "Occupation",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Employers Name Debtor 2",
+   "kind": "text",
+   "tooltip": "Name of your Employer",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Employers Street1 Debtor 2",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Employers Street2 Debtor 2",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Employers Street3 Debtor 2",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Employers City Debtor 2",
+   "kind": "text",
+   "tooltip": "City",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Employers State Debtor 2",
+   "kind": "text",
+   "tooltip": "State",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Employers Zip debtor 2",
+   "kind": "text",
+   "tooltip": "ZIP Code",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Supplemental income date",
+   "kind": "text",
+   "tooltip": "Date (format mm/dd/yyyy)",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Amount 2 Debtor 1",
+   "kind": "text",
+   "tooltip": null,
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Amount 4 Debtor 1",
+   "kind": "text",
+   "tooltip": null,
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Amount 3 Debtor 1",
+   "kind": "text",
+   "tooltip": null,
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Amount 2 Debtor 2",
+   "kind": "text",
+   "tooltip": null,
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Amount 3 Debtor 2",
+   "kind": "text",
+   "tooltip": null,
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Amount 5a Debtor 1",
+   "kind": "text",
+   "tooltip": null,
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Amount 5b Debtor 1",
+   "kind": "text",
+   "tooltip": null,
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Amount 5c Debtor 1",
+   "kind": "text",
+   "tooltip": null,
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Amount 5d Debtor 1",
+   "kind": "text",
+   "tooltip": null,
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Amount 5e Debtor 1",
+   "kind": "text",
+   "tooltip": null,
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Amount 5f Debtor 1",
+   "kind": "text",
+   "tooltip": null,
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Amount 5g Debtor 1",
+   "kind": "text",
+   "tooltip": null,
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Amount 5h Debtor 1",
+   "kind": "text",
+   "tooltip": null,
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Amount 6 Debtor 1",
+   "kind": "text",
+   "tooltip": null,
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Amount 5a Debtor 2",
+   "kind": "text",
+   "tooltip": null,
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Amount 5b Debtor 2",
+   "kind": "text",
+   "tooltip": null,
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Amount 5c Debtor 2",
+   "kind": "text",
+   "tooltip": null,
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Amount 5d Debtor 2",
+   "kind": "text",
+   "tooltip": null,
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Amount 5e Debtor 2",
+   "kind": "text",
+   "tooltip": null,
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Amount 5f Debtor 2",
+   "kind": "text",
+   "tooltip": null,
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Amount 5g Debtor 2",
+   "kind": "text",
+   "tooltip": null,
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Amount 5h Debtor 2",
+   "kind": "text",
+   "tooltip": null,
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Amount 6 Debtor 2",
+   "kind": "text",
+   "tooltip": null,
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Amount 7 Debtor 2",
+   "kind": "text",
+   "tooltip": null,
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Amount 7 Debtor 1",
+   "kind": "text",
+   "tooltip": null,
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Amount 10 Debtor 1",
+   "kind": "text",
+   "tooltip": null,
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Amount 8a Debtor 1",
+   "kind": "text",
+   "tooltip": null,
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Amount 8b Debtor 1",
+   "kind": "text",
+   "tooltip": null,
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Amount 8c Debtor 1",
+   "kind": "text",
+   "tooltip": null,
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Amount 8d Debtor 1",
+   "kind": "text",
+   "tooltip": null,
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Amount 8e Debtor 1",
+   "kind": "text",
+   "tooltip": null,
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Amount 8f Debtor 1",
+   "kind": "text",
+   "tooltip": null,
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Amount 8g Debtor 1",
+   "kind": "text",
+   "tooltip": null,
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Amount 8h Debtor 1",
+   "kind": "text",
+   "tooltip": null,
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Amount 9 Debtor 1",
+   "kind": "text",
+   "tooltip": null,
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Amount 8a Debtor 2",
+   "kind": "text",
+   "tooltip": null,
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Amount 8b Debtor 2",
+   "kind": "text",
+   "tooltip": null,
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Amount 8c Debtor 2",
+   "kind": "text",
+   "tooltip": null,
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Amount 8d Debtor 2",
+   "kind": "text",
+   "tooltip": null,
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Amount 8e Debtor 2",
+   "kind": "text",
+   "tooltip": null,
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Amount 8f Debtor 2",
+   "kind": "text",
+   "tooltip": null,
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Amount 8g Debtor 2",
+   "kind": "text",
+   "tooltip": null,
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Amount 8h Debtor 2",
+   "kind": "text",
+   "tooltip": null,
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Amount 9 Debtor 2",
+   "kind": "text",
+   "tooltip": null,
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Amount 10",
+   "kind": "text",
+   "tooltip": null,
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Amount 11",
+   "kind": "text",
+   "tooltip": null,
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Debtor 1",
+   "kind": "text",
+   "tooltip": "Debtor 1",
+   "pages": [
+    1,
+    2
+   ]
+  },
+  {
+   "name": "Case number",
+   "kind": "text",
+   "tooltip": "Case number",
+   "pages": [
+    1,
+    2
+   ]
+  },
+  {
+   "name": "Button.Print1",
+   "kind": "pushbutton",
+   "tooltip": "Opens Print Menu",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Button.Reset",
+   "kind": "pushbutton",
+   "tooltip": "Resets the entire form",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Button.SaveAs",
+   "kind": "pushbutton",
+   "tooltip": "Allows you to give the file a new name when saving",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "attach",
+   "kind": "pushbutton",
+   "tooltip": "Attach a file",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Other deductions 5h",
+   "kind": "text",
+   "tooltip": "Specify",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Other income 8h",
+   "kind": "text",
+   "tooltip": "Specify",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Assistance 8f",
+   "kind": "text",
+   "tooltip": "Specify",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Increase/Decrease 13",
+   "kind": "text",
+   "tooltip": "Explain",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Check increase",
+   "kind": "checkbox",
+   "tooltip": "select appropriate",
+   "pages": [
+    2
+   ],
+   "states": [
+    "no",
+    "yes"
+   ]
+  },
+  {
+   "name": "Amount 4 Debtor 2",
+   "kind": "text",
+   "tooltip": null,
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Amount 4 Debtor 1a",
+   "kind": "text",
+   "tooltip": null,
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Amount 4 Debtor 2a",
+   "kind": "text",
+   "tooltip": null,
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Bankruptcy District Information",
+   "kind": "choice",
+   "tooltip": "District Information",
+   "pages": [
+    1
+   ],
+   "options": [
+    " ",
+    "__________ District of __________",
+    "Middle District of Alabama",
+    "Northern District of Alabama",
+    "Southern District of Alabama",
+    "District of Alaska",
+    "District of Arizona",
+    "Eastern and Western District of Arkansas",
+    "Central District of California",
+    "Eastern District of California",
+    "Northern District of California",
+    "Southern District of California",
+    "District of Colorado",
+    "District of Connecticut",
+    "District of Columbia",
+    "District of Delaware",
+    "Middle District of Florida",
+    "Northern District of Florida",
+    "Southern District of Florida",
+    "Middle District of Georgia",
+    "Northern District of Georgia ",
+    "Southern District of Georgia ",
+    "District of Guam",
+    "District of Hawaii",
+    "District of Idaho",
+    "Central District of Illinois",
+    "Northern District of Illinois",
+    "Southern District of Illinois",
+    "Northern District of Indiana",
+    "Southern District of Indiana",
+    "Northern District of Iowa",
+    "Southern District of Iowa",
+    "District of Kansas",
+    "Eastern District of Kentucky",
+    "Western District of Kentucky",
+    "Eastern District of Louisiana",
+    "Middle District of Louisiana",
+    "Western District of Louisiana",
+    "District of Maine",
+    "District of Maryland",
+    "District of Massachusetts",
+    "District of Montana",
+    "Eastern District of Michigan",
+    "Western District of Michigan",
+    "District of Minnesota",
+    "Northern District of Mississippi",
+    "Southern District of Mississippi",
+    "Eastern District of Missouri",
+    "Western District of Missouri",
+    "District of Nebraska",
+    "District of Nevada",
+    "District of New Hampshire",
+    "District of New Jersey",
+    "District of New Mexico",
+    "Eastern District of New York",
+    "Northern District of New York",
+    "Southern District of New York",
+    "Western District of New York",
+    "Eastern District of North Carolina",
+    "Middle District of North Carolina",
+    "Western District of North Carolina",
+    "District of North Dakota",
+    "District of Northern Mariana Islands",
+    "Northern District of Ohio",
+    "Southern District of Ohio",
+    "Eastern District of Oklahoma",
+    "Northern District of Oklahoma",
+    "Western District of Oklahoma",
+    "District of Oregon",
+    "Eastern District of Pennsylvania",
+    "Middle District of Pennsylvania",
+    "Western District of Pennsylvania",
+    "District of Puerto Rico",
+    "District of Rhode Island",
+    "District of South Carolina",
+    "District of South Dakota",
+    "Eastern District of Tennessee",
+    "Middle District of Tennessee",
+    "Western District of Tennessee",
+    "Eastern District of Texas",
+    "Northern District of Texas",
+    "Southern District of Texas",
+    "Western District of Texas",
+    "District of Utah",
+    "District of Vermont",
+    "District of Virgin Islands",
+    "Eastern District of Virginia",
+    "Western District of Virginia",
+    "Eastern District of Washington",
+    "Western District of Washington",
+    "Northern District of West Virginia",
+    "Southern District of West Virginia",
+    "Eastern District of Wisconsin",
+    "Western District of Wisconsin",
+    "District of Wyoming"
+   ]
+  },
+  {
+   "name": "Amount 10 Debtor 2",
+   "kind": "text",
+   "tooltip": null,
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Amount 12",
+   "kind": "text",
+   "tooltip": null,
+   "pages": [
+    2
+   ]
+  }
+ ]
+}

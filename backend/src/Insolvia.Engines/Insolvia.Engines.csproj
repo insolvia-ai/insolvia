@@ -1,6 +1,22 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- Pure calculation engines: means test, CMI, exemptions, plan, deadlines. References Core only. -->
+  <!-- Pure calculation engines and the form projections: means test, CMI,
+       exemptions, liens, the Chapter 13 plan, deadlines, the creditor matrix,
+       and the per-form field-value maps the PDF engine (Insolvia.Forms) fills.
+       References Core only. -->
   <ItemGroup>
     <ProjectReference Include="../Insolvia.Core/Insolvia.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Insolvia.Engines.Tests" />
+  </ItemGroup>
+  <!-- Regulatory files ship in the artifact (ADR 0014): the dollar amounts,
+       UST/IRS/Census series, exemption schemes, legal holidays, deadline
+       rules, and each form release's spec, AcroForm dump and manifest (the
+       template PDFs ship with Insolvia.Forms). Copied byte for byte from
+       services/api/src/insolvia_api/regulatory, which is frozen (ADR 0028);
+       RegulatoryFilesTests pins every copy's sha256 to the original until
+       18.23 deletes the Python. Logical names keep the paths under the folder. -->
+  <ItemGroup>
+    <EmbeddedResource Include="Regulatory/**/*.json" LogicalName="Insolvia.Engines.Regulatory/%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>
 </Project>

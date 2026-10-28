@@ -1,0 +1,11 @@
+{
+  "series_id": "exemptions/ga",
+  "effective_date": "2026-07-01",
+  "sequence": 1,
+  "source": {
+    "url": "https://gov.georgia.gov/document/2026-signed-legislation/hb-1024/download",
+    "published": "2026-05-11",
+    "sha256": "e49ea2d1839588dba2a61a1e873ff7ae1806469e7643254d602b1b18bd22e0be"
+  },
+  "notes": "The Georgia scheme as amended by H.B. 1024 (Act 480, signed 2026-05-11, eff. 2026-07-01): homestead $50,000.00 / $100,000.00 (primary residence of both spouses), annual inflation indexing from 2031-07-01 — a scheduled maintenance event. Only (a)(1) changed; every other figure verified against the pre-amendment text. The superseded figures ($21,500.00 / $43,000.00) are deliberately not a release: no case this product prepares can file before 2026-07-01. Verified current as of 2026-09-01."
+}

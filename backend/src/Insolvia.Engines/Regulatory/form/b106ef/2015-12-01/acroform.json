@@ -1,0 +1,3140 @@
+{
+ "form": "b106ef",
+ "official_number": "106E/F",
+ "title": "Schedule E/F: Creditors Who Have Unsecured Claims",
+ "revision": "12/15",
+ "effective_date": "2015-12-01",
+ "source": {
+  "page_url": "https://www.uscourts.gov/forms-rules/forms/schedule-e-f-creditors-who-have-unsecured-claims-individuals",
+  "pdf_url": "https://www.uscourts.gov/sites/default/files/form_b106ef.pdf",
+  "pdf_sha256": "a0a30542194b2b4ae3ded124b04b90c43df97df5062bf25690f5d3555060e0d6",
+  "retrieved": "2026-09-01"
+ },
+ "pages": 6,
+ "field_count": 323,
+ "fields": [
+  {
+   "name": "Check if this claim relates to a_2",
+   "kind": "checkbox",
+   "tooltip": "Check if this claim relates to a",
+   "pages": [
+    1
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Debtor 2",
+   "kind": "text",
+   "tooltip": "Debtor 2",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "check1",
+   "kind": "checkbox",
+   "tooltip": "Any creditors clims secured by property",
+   "pages": [
+    1
+   ],
+   "states": [
+    "no",
+    "yes"
+   ]
+  },
+  {
+   "name": "Creditors Name",
+   "kind": "text",
+   "tooltip": "Creditor\u2019s Name",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Street",
+   "kind": "text",
+   "tooltip": "Street",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "1",
+   "kind": "text",
+   "tooltip": "[1]",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Contingent",
+   "kind": "checkbox",
+   "tooltip": "Contingent",
+   "pages": [
+    1
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "2",
+   "kind": "text",
+   "tooltip": "[2]",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "3",
+   "kind": "text",
+   "tooltip": "[3]",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "4",
+   "kind": "text",
+   "tooltip": "[4]",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Unliquidated",
+   "kind": "checkbox",
+   "tooltip": "Unliquidated",
+   "pages": [
+    1
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Disputed",
+   "kind": "checkbox",
+   "tooltip": "Disputed",
+   "pages": [
+    1
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Check if this claim relates to a",
+   "kind": "checkbox",
+   "tooltip": "Check if this claim relates to a",
+   "pages": [
+    1
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Date debt was incurred",
+   "kind": "text",
+   "tooltip": "Date debt was incurred",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "account number",
+   "kind": "text",
+   "tooltip": "Last 4 digits of account number",
+   "pages": [
+    1
+   ],
+   "max_len": 4
+  },
+  {
+   "name": "Creditors Name_2",
+   "kind": "text",
+   "tooltip": "Creditor\u2019s Name",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Street_2",
+   "kind": "text",
+   "tooltip": "Street",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "1_2",
+   "kind": "text",
+   "tooltip": "[1]",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Contingent_2",
+   "kind": "checkbox",
+   "tooltip": "Contingent",
+   "pages": [
+    1
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "2_2",
+   "kind": "text",
+   "tooltip": "[2]",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "3_2",
+   "kind": "text",
+   "tooltip": "[3]",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "4_2",
+   "kind": "text",
+   "tooltip": "[4]",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Unliquidated_2",
+   "kind": "checkbox",
+   "tooltip": "Unliquidated",
+   "pages": [
+    1
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Disputed_2",
+   "kind": "checkbox",
+   "tooltip": "Disputed",
+   "pages": [
+    1
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "fill_27.0",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "fill_27.1.0",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "fill_27.1.1",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "fill_27.1.3",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    3
+   ]
+  },
+  {
+   "name": "fill_27.1.2",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    3
+   ]
+  },
+  {
+   "name": "fill_27.1.4",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    4
+   ]
+  },
+  {
+   "name": "fill_27.1.5",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    4
+   ]
+  },
+  {
+   "name": "fill_27.1.6",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "fill_27.1.7",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    5,
+    6
+   ]
+  },
+  {
+   "name": "fill_27.1.8",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    6
+   ]
+  },
+  {
+   "name": "Check if this is an",
+   "kind": "checkbox",
+   "tooltip": "Check if this is an",
+   "pages": [
+    1
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "undefined",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "undefined_2",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "undefined_3",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "undefined_5",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "undefined_6",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "undefined_7",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Date debt was incurred_2",
+   "kind": "text",
+   "tooltip": "Date debt was incurred",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "account number 2",
+   "kind": "text",
+   "tooltip": "Last 4 digits of account number",
+   "pages": [
+    1
+   ],
+   "max_len": 4
+  },
+  {
+   "name": "Debtor 1",
+   "kind": "text",
+   "tooltip": "Debtor 1",
+   "pages": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+   ]
+  },
+  {
+   "name": "Case number",
+   "kind": "text",
+   "tooltip": "Case number",
+   "pages": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+   ]
+  },
+  {
+   "name": "Creditors Name_3",
+   "kind": "text",
+   "tooltip": "Creditor\u2019s Name",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "undefined_10",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "undefined_13",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "undefined_15",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Street_3",
+   "kind": "text",
+   "tooltip": "Street",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "1_3",
+   "kind": "text",
+   "tooltip": "[1]",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "2_3",
+   "kind": "text",
+   "tooltip": "[2]",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "3_3",
+   "kind": "text",
+   "tooltip": "[3]",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "4_3",
+   "kind": "text",
+   "tooltip": "[4]",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Contingent_3",
+   "kind": "checkbox",
+   "tooltip": "Contingent",
+   "pages": [
+    2
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Unliquidated_3",
+   "kind": "checkbox",
+   "tooltip": "Unliquidated",
+   "pages": [
+    2
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Disputed_3",
+   "kind": "checkbox",
+   "tooltip": "Disputed",
+   "pages": [
+    2
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Date debt was incurred_3",
+   "kind": "text",
+   "tooltip": "Date debt was incurred",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "account number 3",
+   "kind": "text",
+   "tooltip": "Last 4 digits of account number",
+   "pages": [
+    2
+   ],
+   "max_len": 4
+  },
+  {
+   "name": "Creditors Name_4",
+   "kind": "text",
+   "tooltip": "Creditor\u2019s Name",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "undefined_14",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "undefined_17",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "undefined_18",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Street_4",
+   "kind": "text",
+   "tooltip": "Street",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "1_4",
+   "kind": "text",
+   "tooltip": "[1]",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "2_4",
+   "kind": "text",
+   "tooltip": "[2]",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "3_4",
+   "kind": "text",
+   "tooltip": "[3]",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "4_4",
+   "kind": "text",
+   "tooltip": "[4]",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Contingent_4",
+   "kind": "checkbox",
+   "tooltip": "Contingent",
+   "pages": [
+    2
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Unliquidated_4",
+   "kind": "checkbox",
+   "tooltip": "Unliquidated",
+   "pages": [
+    2
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Disputed_4",
+   "kind": "checkbox",
+   "tooltip": "Disputed",
+   "pages": [
+    2
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Date debt was incurred_4",
+   "kind": "text",
+   "tooltip": "Date debt was incurred",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "account number 4",
+   "kind": "text",
+   "tooltip": "Last 4 digits of account number",
+   "pages": [
+    2
+   ],
+   "max_len": 4
+  },
+  {
+   "name": "undefined_20",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "undefined_22",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "undefined_12",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Check if this claim relates to a_3",
+   "kind": "checkbox",
+   "tooltip": "Check if this claim relates to a",
+   "pages": [
+    2
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Check if this claim relates to a_4",
+   "kind": "checkbox",
+   "tooltip": "Check if this claim relates to a",
+   "pages": [
+    2
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "undefined_19",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "check2",
+   "kind": "checkbox",
+   "tooltip": "Is the claim subject to offset",
+   "pages": [
+    1
+   ],
+   "states": [
+    "no",
+    "yes"
+   ]
+  },
+  {
+   "name": "check3",
+   "kind": "checkbox",
+   "tooltip": "Is the claim subject to offset",
+   "pages": [
+    1
+   ],
+   "states": [
+    "no",
+    "yes"
+   ]
+  },
+  {
+   "name": "check4",
+   "kind": "checkbox",
+   "tooltip": "Is the claim subject to offset",
+   "pages": [
+    2
+   ],
+   "states": [
+    "no",
+    "yes"
+   ]
+  },
+  {
+   "name": "check5",
+   "kind": "checkbox",
+   "tooltip": "Is the claim subject to offset",
+   "pages": [
+    2
+   ],
+   "states": [
+    "no",
+    "yes"
+   ]
+  },
+  {
+   "name": "check6",
+   "kind": "checkbox",
+   "tooltip": "Is the claim subject to offset",
+   "pages": [
+    2
+   ],
+   "states": [
+    "no",
+    "yes"
+   ]
+  },
+  {
+   "name": "check7",
+   "kind": "checkbox",
+   "tooltip": "Any creditors have non priority unsecured claims agains you",
+   "pages": [
+    3
+   ],
+   "states": [
+    "no",
+    "yes"
+   ]
+  },
+  {
+   "name": "Contingent_5",
+   "kind": "checkbox",
+   "tooltip": "Contingent",
+   "pages": [
+    2
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Unliquidated_5",
+   "kind": "checkbox",
+   "tooltip": "Unliquidated",
+   "pages": [
+    2
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Disputed_5",
+   "kind": "checkbox",
+   "tooltip": "Disputed",
+   "pages": [
+    2
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Date debt was incurred_5",
+   "kind": "text",
+   "tooltip": "Date debt was incurred",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "undefined_25",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "check 6",
+   "kind": "checkbox",
+   "tooltip": "Who incurred debt",
+   "pages": [
+    3
+   ],
+   "states": [
+    "On",
+    "debtor 1",
+    "debtor 1 and 2",
+    "debtor 2"
+   ]
+  },
+  {
+   "name": "check 1",
+   "kind": "checkbox",
+   "tooltip": "Who owes the debt",
+   "pages": [
+    1
+   ],
+   "states": [
+    "Debtor 1 and 2",
+    "One of debtors and another",
+    "debtor 1",
+    "debtor 2"
+   ]
+  },
+  {
+   "name": "check 2",
+   "kind": "checkbox",
+   "tooltip": "Who owes the debt",
+   "pages": [
+    1
+   ],
+   "states": [
+    "One of debtors and another",
+    "debtor 1",
+    "debtor 1 and 2",
+    "debtor 2"
+   ]
+  },
+  {
+   "name": "check 3",
+   "kind": "checkbox",
+   "tooltip": "Who owes the debt",
+   "pages": [
+    2
+   ],
+   "states": [
+    "Debtor 1 and 2",
+    "One of debtors and another",
+    "debtor 1",
+    "debtor 2"
+   ]
+  },
+  {
+   "name": "check 4",
+   "kind": "checkbox",
+   "tooltip": "Who owes the debt",
+   "pages": [
+    2
+   ],
+   "states": [
+    "On",
+    "debtor 1",
+    "debtor 1 and 2",
+    "debtor 2"
+   ]
+  },
+  {
+   "name": "check 5",
+   "kind": "checkbox",
+   "tooltip": "Who incurred debt",
+   "pages": [
+    2
+   ],
+   "states": [
+    "debtor 1",
+    "debtor 1 and 2",
+    "debtor 2",
+    "one of debtors and another"
+   ]
+  },
+  {
+   "name": "City 4.1",
+   "kind": "text",
+   "tooltip": "City",
+   "pages": [
+    3
+   ]
+  },
+  {
+   "name": "City 4.2",
+   "kind": "text",
+   "tooltip": "City",
+   "pages": [
+    3
+   ]
+  },
+  {
+   "name": "City 4.3",
+   "kind": "text",
+   "tooltip": "City",
+   "pages": [
+    3
+   ]
+  },
+  {
+   "name": "City 4.4",
+   "kind": "text",
+   "tooltip": "City",
+   "pages": [
+    4
+   ]
+  },
+  {
+   "name": "City 4.5",
+   "kind": "text",
+   "tooltip": "City",
+   "pages": [
+    4
+   ]
+  },
+  {
+   "name": "City 4.6",
+   "kind": "text",
+   "tooltip": "City",
+   "pages": [
+    4
+   ]
+  },
+  {
+   "name": "State 4.1",
+   "kind": "text",
+   "tooltip": "State",
+   "pages": [
+    3
+   ]
+  },
+  {
+   "name": "State 4.2",
+   "kind": "text",
+   "tooltip": "State",
+   "pages": [
+    3
+   ]
+  },
+  {
+   "name": "State 4.3",
+   "kind": "text",
+   "tooltip": "State",
+   "pages": [
+    3
+   ]
+  },
+  {
+   "name": "State 4.4",
+   "kind": "text",
+   "tooltip": "State",
+   "pages": [
+    4
+   ]
+  },
+  {
+   "name": "State 4.5",
+   "kind": "text",
+   "tooltip": "State",
+   "pages": [
+    4
+   ]
+  },
+  {
+   "name": "State 4.6",
+   "kind": "text",
+   "tooltip": "State",
+   "pages": [
+    4
+   ]
+  },
+  {
+   "name": "Zip 4.1",
+   "kind": "text",
+   "tooltip": "ZIP code",
+   "pages": [
+    3
+   ]
+  },
+  {
+   "name": "Zip 4.2",
+   "kind": "text",
+   "tooltip": "ZIP code",
+   "pages": [
+    3
+   ]
+  },
+  {
+   "name": "Zip 4.3",
+   "kind": "text",
+   "tooltip": "ZIP code",
+   "pages": [
+    3
+   ]
+  },
+  {
+   "name": "Zip 4.4",
+   "kind": "text",
+   "tooltip": "ZIP code",
+   "pages": [
+    4
+   ]
+  },
+  {
+   "name": "Zip 4.5",
+   "kind": "text",
+   "tooltip": "ZIP code",
+   "pages": [
+    4
+   ]
+  },
+  {
+   "name": "Zip 4.6",
+   "kind": "text",
+   "tooltip": "ZIP code",
+   "pages": [
+    4
+   ]
+  },
+  {
+   "name": "Check if this claim relates to a_5",
+   "kind": "checkbox",
+   "tooltip": "Check if this claim relates to a",
+   "pages": [
+    2
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "check8",
+   "kind": "checkbox",
+   "tooltip": "Is the claim subject to offset",
+   "pages": [
+    3
+   ],
+   "states": [
+    "no",
+    "yes"
+   ]
+  },
+  {
+   "name": "Creditors Name_6",
+   "kind": "text",
+   "tooltip": "Nonpriority Creditor\u2019s Name",
+   "pages": [
+    3
+   ]
+  },
+  {
+   "name": "Street_6",
+   "kind": "text",
+   "tooltip": "Street",
+   "pages": [
+    3
+   ]
+  },
+  {
+   "name": "Check if this claim relates to a_6",
+   "kind": "checkbox",
+   "tooltip": "Check if this claim relates to a",
+   "pages": [
+    3
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "account number 6",
+   "kind": "text",
+   "tooltip": "Last 4 digits of account number",
+   "pages": [
+    3
+   ],
+   "max_len": 4
+  },
+  {
+   "name": "Date debt was incurred_6",
+   "kind": "text",
+   "tooltip": "Date debt was incurred",
+   "pages": [
+    3
+   ]
+  },
+  {
+   "name": "Contingent_6",
+   "kind": "checkbox",
+   "tooltip": "Contingent",
+   "pages": [
+    3
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Unliquidated_6",
+   "kind": "checkbox",
+   "tooltip": "Unliquidated",
+   "pages": [
+    3
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Disputed_6",
+   "kind": "checkbox",
+   "tooltip": "Disputed",
+   "pages": [
+    3
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "check 7",
+   "kind": "checkbox",
+   "tooltip": "Who incurred debt",
+   "pages": [
+    3
+   ],
+   "states": [
+    "On",
+    "debtor 1",
+    "debtor 1 and 2",
+    "debtor 2"
+   ]
+  },
+  {
+   "name": "check9",
+   "kind": "checkbox",
+   "tooltip": "Is the claim subject to offset",
+   "pages": [
+    3
+   ],
+   "states": [
+    "no",
+    "yes"
+   ]
+  },
+  {
+   "name": "Total_26",
+   "kind": "text",
+   "tooltip": "Total claim",
+   "pages": [
+    3
+   ]
+  },
+  {
+   "name": "Creditors Name_7",
+   "kind": "text",
+   "tooltip": "Nonpriority Creditor\u2019s Name",
+   "pages": [
+    3
+   ]
+  },
+  {
+   "name": "Street_7",
+   "kind": "text",
+   "tooltip": "Street",
+   "pages": [
+    3
+   ]
+  },
+  {
+   "name": "Check if this claim relates to a_7",
+   "kind": "checkbox",
+   "tooltip": "Check if this claim relates to a",
+   "pages": [
+    3
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "account number 7",
+   "kind": "text",
+   "tooltip": "Last 4 digits of account number",
+   "pages": [
+    3
+   ],
+   "max_len": 4
+  },
+  {
+   "name": "Date debt was incurred_7",
+   "kind": "text",
+   "tooltip": "Date debt was incurred",
+   "pages": [
+    3
+   ]
+  },
+  {
+   "name": "Contingent_7",
+   "kind": "checkbox",
+   "tooltip": "Contingent",
+   "pages": [
+    3
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Unliquidated_7",
+   "kind": "checkbox",
+   "tooltip": "Unliquidated",
+   "pages": [
+    3
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Disputed_7",
+   "kind": "checkbox",
+   "tooltip": "Disputed",
+   "pages": [
+    3
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Total_27",
+   "kind": "text",
+   "tooltip": "Total claim",
+   "pages": [
+    3
+   ]
+  },
+  {
+   "name": "check 8",
+   "kind": "checkbox",
+   "tooltip": "Who incurred debt",
+   "pages": [
+    3
+   ],
+   "states": [
+    "debtor 1",
+    "debtor 1 and 2",
+    "debtor 2",
+    "one of debtors and another"
+   ]
+  },
+  {
+   "name": "check10",
+   "kind": "checkbox",
+   "tooltip": "Is the claim subject to offset",
+   "pages": [
+    3
+   ],
+   "states": [
+    "no",
+    "yes"
+   ]
+  },
+  {
+   "name": "Creditors Name_8",
+   "kind": "text",
+   "tooltip": "Nonpriority Creditor\u2019s Name",
+   "pages": [
+    3
+   ]
+  },
+  {
+   "name": "Street_8",
+   "kind": "text",
+   "tooltip": "Street",
+   "pages": [
+    3
+   ]
+  },
+  {
+   "name": "Check if this claim relates to a_8",
+   "kind": "checkbox",
+   "tooltip": "Check if this claim relates to a",
+   "pages": [
+    3
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "account number 8",
+   "kind": "text",
+   "tooltip": "Last 4 digits of account number",
+   "pages": [
+    3
+   ],
+   "max_len": 4
+  },
+  {
+   "name": "Date debt was incurred_8",
+   "kind": "text",
+   "tooltip": "Date debt was incurred",
+   "pages": [
+    3
+   ]
+  },
+  {
+   "name": "Contingent_8",
+   "kind": "checkbox",
+   "tooltip": "Contingent",
+   "pages": [
+    3
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Unliquidated_8",
+   "kind": "checkbox",
+   "tooltip": "Unliquidated",
+   "pages": [
+    3
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Disputed_8",
+   "kind": "checkbox",
+   "tooltip": "Disputed",
+   "pages": [
+    3
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Total_28",
+   "kind": "text",
+   "tooltip": "Total claim",
+   "pages": [
+    3
+   ]
+  },
+  {
+   "name": "check 9",
+   "kind": "checkbox",
+   "tooltip": "Who incurred debt",
+   "pages": [
+    4
+   ],
+   "states": [
+    "On",
+    "debtor 1",
+    "debtor 1 and 2",
+    "debtor 2"
+   ]
+  },
+  {
+   "name": "check11",
+   "kind": "checkbox",
+   "tooltip": "Is the claim subject to offset",
+   "pages": [
+    4
+   ],
+   "states": [
+    "no",
+    "yes"
+   ]
+  },
+  {
+   "name": "Other unsecurecured claim 2.1",
+   "kind": "text",
+   "tooltip": "specify",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Other unsecurecured claim 2.2",
+   "kind": "text",
+   "tooltip": "specify",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Other unsecurecured claim 2.3",
+   "kind": "text",
+   "tooltip": "specify",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Other unsecurecured claim 2.4",
+   "kind": "text",
+   "tooltip": "specify",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Other unsecurecured claim 2.5",
+   "kind": "text",
+   "tooltip": "specify",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Domestic support obligations",
+   "kind": "checkbox",
+   "tooltip": "Domestic support obligations",
+   "pages": [
+    1
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Taxes and ceratin other debts you owe the government",
+   "kind": "checkbox",
+   "tooltip": "Taxes and ceratin other debts you owe the government",
+   "pages": [
+    1
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Claims for death or personal injury while intoxicated",
+   "kind": "checkbox",
+   "tooltip": "Claims for death or personal injury while intoxicated",
+   "pages": [
+    1
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Other",
+   "kind": "checkbox",
+   "tooltip": "Other (specify)",
+   "pages": [
+    1
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Domestic support obligations_2",
+   "kind": "checkbox",
+   "tooltip": "Domestic support obligations",
+   "pages": [
+    1
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Claims for death or personal injury while intoxicated_2",
+   "kind": "checkbox",
+   "tooltip": "Claims for death or personal injury while intoxicated",
+   "pages": [
+    1
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Other_2",
+   "kind": "checkbox",
+   "tooltip": "Other (specify)",
+   "pages": [
+    1
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Taxes and ceratin other debts you owe the government_2",
+   "kind": "checkbox",
+   "tooltip": "Taxes and ceratin other debts you owe the government",
+   "pages": [
+    1
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Domestic support obligations_3",
+   "kind": "checkbox",
+   "tooltip": "Domestic support obligations",
+   "pages": [
+    2
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Claims for death or personal injury while intoxicated_3",
+   "kind": "checkbox",
+   "tooltip": "Claims for death or personal injury while intoxicated",
+   "pages": [
+    2
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Other_3",
+   "kind": "checkbox",
+   "tooltip": "Other (specify)",
+   "pages": [
+    2
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Domestic support obligations_4",
+   "kind": "checkbox",
+   "tooltip": "Domestic support obligations",
+   "pages": [
+    2
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Claims for death or personal injury while intoxicated_4",
+   "kind": "checkbox",
+   "tooltip": "Claims for death or personal injury while intoxicated",
+   "pages": [
+    2
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Other_4",
+   "kind": "checkbox",
+   "tooltip": "Other (specify)",
+   "pages": [
+    2
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Taxes and ceratin other debts you owe the government_4",
+   "kind": "checkbox",
+   "tooltip": "Taxes and ceratin other debts you owe the government",
+   "pages": [
+    2
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Domestic support obligations_5",
+   "kind": "checkbox",
+   "tooltip": "Domestic support obligations",
+   "pages": [
+    2
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Taxes and ceratin other debts you owe the government_5",
+   "kind": "checkbox",
+   "tooltip": "Taxes and ceratin other debts you owe the government",
+   "pages": [
+    2
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Claims for death or personal injury while intoxicated_5",
+   "kind": "checkbox",
+   "tooltip": "Claims for death or personal injury while intoxicated",
+   "pages": [
+    2
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Other_5",
+   "kind": "checkbox",
+   "tooltip": "Other (specify)",
+   "pages": [
+    2
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Student loans_6",
+   "kind": "checkbox",
+   "tooltip": "Student loans",
+   "pages": [
+    3
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Obligations arising out of divorce_6",
+   "kind": "checkbox",
+   "tooltip": "Obligations arising from divorce/separation",
+   "pages": [
+    3
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Debts in pension plans_6",
+   "kind": "checkbox",
+   "tooltip": "Debts to pension plans or profit sharing and other similar debts",
+   "pages": [
+    3
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Other_6",
+   "kind": "checkbox",
+   "tooltip": "Other (specify)",
+   "pages": [
+    3
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Other unsecurecured claim 4.1",
+   "kind": "text",
+   "tooltip": "specify",
+   "pages": [
+    3
+   ]
+  },
+  {
+   "name": "Other unsecurecured claim 4.2",
+   "kind": "text",
+   "tooltip": "specify",
+   "pages": [
+    3
+   ]
+  },
+  {
+   "name": "Other unsecurecured claim 4.3",
+   "kind": "text",
+   "tooltip": "specify",
+   "pages": [
+    3
+   ]
+  },
+  {
+   "name": "Other unsecurecured claim 4.4",
+   "kind": "text",
+   "tooltip": "specify",
+   "pages": [
+    4
+   ]
+  },
+  {
+   "name": "Other unsecurecured claim 4.5",
+   "kind": "text",
+   "tooltip": "specify",
+   "pages": [
+    4
+   ]
+  },
+  {
+   "name": "Other unsecurecured claim 4.6",
+   "kind": "text",
+   "tooltip": "specify",
+   "pages": [
+    4
+   ]
+  },
+  {
+   "name": "Student loans_7",
+   "kind": "checkbox",
+   "tooltip": "Student loans",
+   "pages": [
+    3
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Obligations arising out of divorce_7",
+   "kind": "checkbox",
+   "tooltip": "Obligations arising from divorce/separation",
+   "pages": [
+    3
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Debts in pension plans_7",
+   "kind": "checkbox",
+   "tooltip": "Debts to pension plans or profit sharing and other similar debts",
+   "pages": [
+    3
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Other_7",
+   "kind": "checkbox",
+   "tooltip": "Other (specify)",
+   "pages": [
+    3
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Student loans_8",
+   "kind": "checkbox",
+   "tooltip": "Student loans",
+   "pages": [
+    3
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Obligations arising out of divorce_8",
+   "kind": "checkbox",
+   "tooltip": "Obligations arising from divorce/separation",
+   "pages": [
+    3
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Debts in pension plans_8",
+   "kind": "checkbox",
+   "tooltip": "Debts to pension plans or profit sharing and other similar debts",
+   "pages": [
+    3
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Other_8",
+   "kind": "checkbox",
+   "tooltip": "Other (specify)",
+   "pages": [
+    3
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Creditors Name_9",
+   "kind": "text",
+   "tooltip": "Nonpriority Creditor\u2019s Name",
+   "pages": [
+    4
+   ]
+  },
+  {
+   "name": "Total_29",
+   "kind": "text",
+   "tooltip": "Total claim",
+   "pages": [
+    4
+   ]
+  },
+  {
+   "name": "account number 9",
+   "kind": "text",
+   "tooltip": "Last 4 digits of account number",
+   "pages": [
+    4
+   ],
+   "max_len": 4
+  },
+  {
+   "name": "Street_9",
+   "kind": "text",
+   "tooltip": "Street",
+   "pages": [
+    4
+   ]
+  },
+  {
+   "name": "Date debt was incurred_9",
+   "kind": "text",
+   "tooltip": "Date debt was incurred",
+   "pages": [
+    4
+   ]
+  },
+  {
+   "name": "Contingent_9",
+   "kind": "checkbox",
+   "tooltip": "Contingent",
+   "pages": [
+    4
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Unliquidated_9",
+   "kind": "checkbox",
+   "tooltip": "Unliquidated",
+   "pages": [
+    4
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Disputed_9",
+   "kind": "checkbox",
+   "tooltip": "Disputed",
+   "pages": [
+    4
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Check if this claim relates to a_9",
+   "kind": "checkbox",
+   "tooltip": "Check if this claim relates to a",
+   "pages": [
+    4
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Student loans_9",
+   "kind": "checkbox",
+   "tooltip": "Student loans",
+   "pages": [
+    4
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Obligations arising out of divorce_9",
+   "kind": "checkbox",
+   "tooltip": "Obligations arising from divorce/separation",
+   "pages": [
+    4
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Debts in pension plans_9",
+   "kind": "checkbox",
+   "tooltip": "Debts to pension plans or profit sharing and other similar debts",
+   "pages": [
+    4
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Other_9",
+   "kind": "checkbox",
+   "tooltip": "Other (specify)",
+   "pages": [
+    4
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "check 10",
+   "kind": "checkbox",
+   "tooltip": "Who incurred debt",
+   "pages": [
+    4
+   ],
+   "states": [
+    "On",
+    "debtor 1",
+    "debtor 1 and 2",
+    "debtor 2"
+   ]
+  },
+  {
+   "name": "check12",
+   "kind": "checkbox",
+   "tooltip": "Is the claim subject to offset",
+   "pages": [
+    4
+   ],
+   "states": [
+    "no",
+    "yes"
+   ]
+  },
+  {
+   "name": "undefined_4.4",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    4
+   ]
+  },
+  {
+   "name": "undefined_4.5",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    4
+   ]
+  },
+  {
+   "name": "undefined_4.6",
+   "kind": "text",
+   "tooltip": "undefined",
+   "pages": [
+    4
+   ]
+  },
+  {
+   "name": "Creditors Name_10",
+   "kind": "text",
+   "tooltip": "Nonpriority Creditor\u2019s Name",
+   "pages": [
+    4
+   ]
+  },
+  {
+   "name": "Street_10",
+   "kind": "text",
+   "tooltip": "Street",
+   "pages": [
+    4
+   ]
+  },
+  {
+   "name": "Check if this claim relates to a_10",
+   "kind": "checkbox",
+   "tooltip": "Check if this claim relates to a",
+   "pages": [
+    4
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Total_30",
+   "kind": "text",
+   "tooltip": "Total claim",
+   "pages": [
+    4
+   ]
+  },
+  {
+   "name": "account number 10",
+   "kind": "text",
+   "tooltip": "Last 4 digits of account number",
+   "pages": [
+    4
+   ],
+   "max_len": 4
+  },
+  {
+   "name": "Date debt was incurred_10",
+   "kind": "text",
+   "tooltip": "Date debt was incurred",
+   "pages": [
+    4
+   ]
+  },
+  {
+   "name": "Contingent_10",
+   "kind": "checkbox",
+   "tooltip": "Contingent",
+   "pages": [
+    4
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Unliquidated_10",
+   "kind": "checkbox",
+   "tooltip": "Unliquidated",
+   "pages": [
+    4
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Disputed_10",
+   "kind": "checkbox",
+   "tooltip": "Disputed",
+   "pages": [
+    4
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Student loans_10",
+   "kind": "checkbox",
+   "tooltip": "Student loans",
+   "pages": [
+    4
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Obligations arising out of divorce_10",
+   "kind": "checkbox",
+   "tooltip": "Obligations arising from divorce/separation",
+   "pages": [
+    4
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Debts in pension plans_10",
+   "kind": "checkbox",
+   "tooltip": "Debts to pension plans or profit sharing and other similar debts",
+   "pages": [
+    4
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Other_10",
+   "kind": "checkbox",
+   "tooltip": "Other (specify)",
+   "pages": [
+    4
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Date debt was incurred_11",
+   "kind": "text",
+   "tooltip": "Date debt was incurred",
+   "pages": [
+    4
+   ]
+  },
+  {
+   "name": "check 11",
+   "kind": "checkbox",
+   "tooltip": "Who incurred debt",
+   "pages": [
+    4
+   ],
+   "states": [
+    "On",
+    "debtor 1",
+    "debtor 1 and 2",
+    "debtor 2"
+   ]
+  },
+  {
+   "name": "Check if this claim relates to a_11",
+   "kind": "checkbox",
+   "tooltip": "Check if this claim relates to a",
+   "pages": [
+    4
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "check13",
+   "kind": "checkbox",
+   "tooltip": "Is the claim subject to offset",
+   "pages": [
+    4
+   ],
+   "states": [
+    "no",
+    "yes"
+   ]
+  },
+  {
+   "name": "Contingent_11",
+   "kind": "checkbox",
+   "tooltip": "Contingent",
+   "pages": [
+    4
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Unliquidated_11",
+   "kind": "checkbox",
+   "tooltip": "Unliquidated",
+   "pages": [
+    4
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Disputed_11",
+   "kind": "checkbox",
+   "tooltip": "Disputed",
+   "pages": [
+    4
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Student loans_11",
+   "kind": "checkbox",
+   "tooltip": "Student loans",
+   "pages": [
+    4
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Obligations arising out of divorce_11",
+   "kind": "checkbox",
+   "tooltip": "Obligations arising from divorce/separation",
+   "pages": [
+    4
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Debts in pension plans_11",
+   "kind": "checkbox",
+   "tooltip": "Debts to pension plans or profit sharing and other similar debts",
+   "pages": [
+    4
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Other_11",
+   "kind": "checkbox",
+   "tooltip": "Other (specify)",
+   "pages": [
+    4
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Creditors Name_5",
+   "kind": "text",
+   "tooltip": "Creditor\u2019s Name",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "4_5",
+   "kind": "text",
+   "tooltip": "[4]",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Street_5",
+   "kind": "text",
+   "tooltip": "Street",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "1_5",
+   "kind": "text",
+   "tooltip": "[1]",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "2_5",
+   "kind": "text",
+   "tooltip": "[2]",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "3_5",
+   "kind": "text",
+   "tooltip": "[3]",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "account number 5",
+   "kind": "text",
+   "tooltip": "Last 4 digits of account number",
+   "pages": [
+    2
+   ],
+   "max_len": 4
+  },
+  {
+   "name": "Creditors Name_11",
+   "kind": "text",
+   "tooltip": "Nonpriority Creditor\u2019s Name",
+   "pages": [
+    4
+   ]
+  },
+  {
+   "name": "Street_11",
+   "kind": "text",
+   "tooltip": "Street",
+   "pages": [
+    4
+   ]
+  },
+  {
+   "name": "City 5.1",
+   "kind": "text",
+   "tooltip": "City",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "City 5.2",
+   "kind": "text",
+   "tooltip": "City",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "City 5.3",
+   "kind": "text",
+   "tooltip": "City",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "City 5.4",
+   "kind": "text",
+   "tooltip": "City",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "City 5.5",
+   "kind": "text",
+   "tooltip": "City",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "City 5.6",
+   "kind": "text",
+   "tooltip": "City",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "City 5.7",
+   "kind": "text",
+   "tooltip": "City",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "State 5.1",
+   "kind": "text",
+   "tooltip": "State",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "State 5.2",
+   "kind": "text",
+   "tooltip": "State",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "State 5.3",
+   "kind": "text",
+   "tooltip": "State",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "State 5.4",
+   "kind": "text",
+   "tooltip": "State",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "State 5.5",
+   "kind": "text",
+   "tooltip": "State",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "State 5.6",
+   "kind": "text",
+   "tooltip": "State",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "State 5.7",
+   "kind": "text",
+   "tooltip": "State",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "Zip 5.1",
+   "kind": "text",
+   "tooltip": "Zip Code",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "Zip 5.2",
+   "kind": "text",
+   "tooltip": "Zip Code",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "Zip 5.3",
+   "kind": "text",
+   "tooltip": "Zip Code",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "Zip 5.4",
+   "kind": "text",
+   "tooltip": "Zip Code",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "Zip 5.5",
+   "kind": "text",
+   "tooltip": "Zip Code",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "Zip 5.6",
+   "kind": "text",
+   "tooltip": "Zip Code",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "Zip 5.7",
+   "kind": "text",
+   "tooltip": "Zip Code",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "check14",
+   "kind": "checkbox",
+   "tooltip": "How did you list original creditor?",
+   "pages": [
+    5
+   ],
+   "states": [
+    "Part 1",
+    "yes"
+   ]
+  },
+  {
+   "name": "Referenced line 5.1",
+   "kind": "text",
+   "tooltip": "specify",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "Referenced line 5.2",
+   "kind": "text",
+   "tooltip": "specify",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "Referenced line 5.3",
+   "kind": "text",
+   "tooltip": "specify",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "Referenced line 5.4",
+   "kind": "text",
+   "tooltip": "specify",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "Referenced line 5.5",
+   "kind": "text",
+   "tooltip": "specify",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "Referenced line 5.6",
+   "kind": "text",
+   "tooltip": "specify",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "Referenced line 5.7",
+   "kind": "text",
+   "tooltip": "specify",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "check15",
+   "kind": "checkbox",
+   "tooltip": "How did you list original creditor?",
+   "pages": [
+    5
+   ],
+   "states": [
+    "Part 1",
+    "yes"
+   ]
+  },
+  {
+   "name": "account number 11",
+   "kind": "text",
+   "tooltip": "Last 4 digits of account number",
+   "pages": [
+    4
+   ],
+   "max_len": 4
+  },
+  {
+   "name": "check16",
+   "kind": "checkbox",
+   "tooltip": "How did you list original creditor?",
+   "pages": [
+    5
+   ],
+   "states": [
+    "Part 1",
+    "yes"
+   ]
+  },
+  {
+   "name": "check17",
+   "kind": "checkbox",
+   "tooltip": "How did you list original creditor?",
+   "pages": [
+    5
+   ],
+   "states": [
+    "Part 1",
+    "yes"
+   ]
+  },
+  {
+   "name": "check18",
+   "kind": "checkbox",
+   "tooltip": "How did you list original creditor?",
+   "pages": [
+    5
+   ],
+   "states": [
+    "Part 1",
+    "yes"
+   ]
+  },
+  {
+   "name": "check19",
+   "kind": "checkbox",
+   "tooltip": "How did you list original creditor?",
+   "pages": [
+    5
+   ],
+   "states": [
+    "Part 1",
+    "yes"
+   ]
+  },
+  {
+   "name": "check20",
+   "kind": "checkbox",
+   "tooltip": "How did you list original creditor?",
+   "pages": [
+    5
+   ],
+   "states": [
+    "Part 1",
+    "yes"
+   ]
+  },
+  {
+   "name": "Total_31",
+   "kind": "text",
+   "tooltip": "Total claim",
+   "pages": [
+    4
+   ]
+  },
+  {
+   "name": "Total_6a",
+   "kind": "text",
+   "tooltip": "Total claim",
+   "pages": [
+    6
+   ]
+  },
+  {
+   "name": "Total_6b",
+   "kind": "text",
+   "tooltip": "Total claim",
+   "pages": [
+    6
+   ]
+  },
+  {
+   "name": "Total_6c",
+   "kind": "text",
+   "tooltip": "Total claim",
+   "pages": [
+    6
+   ]
+  },
+  {
+   "name": "Total_6d",
+   "kind": "text",
+   "tooltip": "Total claim",
+   "pages": [
+    6
+   ]
+  },
+  {
+   "name": "Total_6e",
+   "kind": "text",
+   "tooltip": "Total claim",
+   "pages": [
+    6
+   ]
+  },
+  {
+   "name": "Total_6f",
+   "kind": "text",
+   "tooltip": "Total claim",
+   "pages": [
+    6
+   ]
+  },
+  {
+   "name": "Total_6g",
+   "kind": "text",
+   "tooltip": "Total claim",
+   "pages": [
+    6
+   ]
+  },
+  {
+   "name": "Total_6h",
+   "kind": "text",
+   "tooltip": "Total claim",
+   "pages": [
+    6
+   ]
+  },
+  {
+   "name": "Total_6i",
+   "kind": "text",
+   "tooltip": "Total claim",
+   "pages": [
+    6
+   ]
+  },
+  {
+   "name": "Button.Print1",
+   "kind": "pushbutton",
+   "tooltip": "Opens Print Menu",
+   "pages": [
+    6
+   ]
+  },
+  {
+   "name": "Button.Reset",
+   "kind": "pushbutton",
+   "tooltip": "Resets the entire form",
+   "pages": [
+    6
+   ]
+  },
+  {
+   "name": "Button.SaveAs",
+   "kind": "pushbutton",
+   "tooltip": "Allows you to give the file a new name when saving",
+   "pages": [
+    6
+   ]
+  },
+  {
+   "name": "attach",
+   "kind": "pushbutton",
+   "tooltip": "Attach a file",
+   "pages": [
+    6
+   ]
+  },
+  {
+   "name": "Total_6j",
+   "kind": "text",
+   "tooltip": "Total claim",
+   "pages": [
+    6
+   ]
+  },
+  {
+   "name": "Bankruptcy District Information",
+   "kind": "choice",
+   "tooltip": "District Information",
+   "pages": [
+    1
+   ],
+   "options": [
+    " ",
+    "__________ District of __________",
+    "Middle District of Alabama",
+    "Northern District of Alabama",
+    "Southern District of Alabama",
+    "District of Alaska",
+    "District of Arizona",
+    "Eastern and Western District of Arkansas",
+    "Central District of California",
+    "Eastern District of California",
+    "Northern District of California",
+    "Southern District of California",
+    "District of Colorado",
+    "District of Connecticut",
+    "District of Columbia",
+    "District of Delaware",
+    "Middle District of Florida",
+    "Northern District of Florida",
+    "Southern District of Florida",
+    "Middle District of Georgia",
+    "Northern District of Georgia ",
+    "Southern District of Georgia ",
+    "District of Guam",
+    "District of Hawaii",
+    "District of Idaho",
+    "Central District of Illinois",
+    "Northern District of Illinois",
+    "Southern District of Illinois",
+    "Northern District of Indiana",
+    "Southern District of Indiana",
+    "Northern District of Iowa",
+    "Southern District of Iowa",
+    "District of Kansas",
+    "Eastern District of Kentucky",
+    "Western District of Kentucky",
+    "Eastern District of Louisiana",
+    "Middle District of Louisiana",
+    "Western District of Louisiana",
+    "District of Maine",
+    "District of Maryland",
+    "District of Massachusetts",
+    "District of Montana",
+    "Eastern District of Michigan",
+    "Western District of Michigan",
+    "District of Minnesota",
+    "Northern District of Mississippi",
+    "Southern District of Mississippi",
+    "Eastern District of Missouri",
+    "Western District of Missouri",
+    "District of Nebraska",
+    "District of Nevada",
+    "District of New Hampshire",
+    "District of New Jersey",
+    "District of New Mexico",
+    "Eastern District of New York",
+    "Northern District of New York",
+    "Southern District of New York",
+    "Western District of New York",
+    "Eastern District of North Carolina",
+    "Middle District of North Carolina",
+    "Western District of North Carolina",
+    "District of North Dakota",
+    "District of Northern Mariana Islands",
+    "Northern District of Ohio",
+    "Southern District of Ohio",
+    "Eastern District of Oklahoma",
+    "Northern District of Oklahoma",
+    "Western District of Oklahoma",
+    "District of Oregon",
+    "Eastern District of Pennsylvania",
+    "Middle District of Pennsylvania",
+    "Western District of Pennsylvania",
+    "District of Puerto Rico",
+    "District of Rhode Island",
+    "District of South Carolina",
+    "District of South Dakota",
+    "Eastern District of Tennessee",
+    "Middle District of Tennessee",
+    "Western District of Tennessee",
+    "Eastern District of Texas",
+    "Northern District of Texas",
+    "Southern District of Texas",
+    "Western District of Texas",
+    "District of Utah",
+    "District of Vermont",
+    "District of Virgin Islands",
+    "Eastern District of Virginia",
+    "Western District of Virginia",
+    "Eastern District of Washington",
+    "Western District of Washington",
+    "Northern District of West Virginia",
+    "Southern District of West Virginia",
+    "Eastern District of Wisconsin",
+    "Western District of Wisconsin",
+    "District of Wyoming"
+   ]
+  },
+  {
+   "name": "Creditors Name_12",
+   "kind": "text",
+   "tooltip": "Nonpriority Creditor\u2019s Name",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "Street_12",
+   "kind": "text",
+   "tooltip": "Street",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "Street2_12",
+   "kind": "text",
+   "tooltip": "Street",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "Creditors Name_13",
+   "kind": "text",
+   "tooltip": "Nonpriority Creditor\u2019s Name",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "Street_13",
+   "kind": "text",
+   "tooltip": "Street",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "Street2_13",
+   "kind": "text",
+   "tooltip": "Street",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "Creditors Name_14",
+   "kind": "text",
+   "tooltip": "Nonpriority Creditor\u2019s Name",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "Street_14",
+   "kind": "text",
+   "tooltip": "Street",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "Street2_14",
+   "kind": "text",
+   "tooltip": "Street",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "Creditors Name_15",
+   "kind": "text",
+   "tooltip": "Nonpriority Creditor\u2019s Name",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "Street_15",
+   "kind": "text",
+   "tooltip": "Street",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "Creditors Name_16",
+   "kind": "text",
+   "tooltip": "Nonpriority Creditor\u2019s Name",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "Street_16",
+   "kind": "text",
+   "tooltip": "Street",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "Street2_16",
+   "kind": "text",
+   "tooltip": "Street",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "Creditors Name_17",
+   "kind": "text",
+   "tooltip": "Nonpriority Creditor\u2019s Name",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "Street_17",
+   "kind": "text",
+   "tooltip": "Street",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "Street2_17",
+   "kind": "text",
+   "tooltip": "Street",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "Creditors Name_18",
+   "kind": "text",
+   "tooltip": "Nonpriority Creditor\u2019s Name",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "Street_18",
+   "kind": "text",
+   "tooltip": "Street",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "account number 12",
+   "kind": "text",
+   "tooltip": "Last 4 digits of account number",
+   "pages": [
+    5
+   ],
+   "max_len": 4
+  },
+  {
+   "name": "account number 14",
+   "kind": "text",
+   "tooltip": "Last 4 digits of account number",
+   "pages": [
+    5
+   ],
+   "max_len": 4
+  },
+  {
+   "name": "account number 15",
+   "kind": "text",
+   "tooltip": "Last 4 digits of account number",
+   "pages": [
+    5
+   ],
+   "max_len": 4
+  },
+  {
+   "name": "account number 16",
+   "kind": "text",
+   "tooltip": "Last 4 digits of account number",
+   "pages": [
+    5
+   ],
+   "max_len": 4
+  },
+  {
+   "name": "account number 17",
+   "kind": "text",
+   "tooltip": "Last 4 digits of account number",
+   "pages": [
+    5
+   ],
+   "max_len": 4
+  },
+  {
+   "name": "account number 18",
+   "kind": "text",
+   "tooltip": "Last 4 digits of account number",
+   "pages": [
+    5
+   ],
+   "max_len": 4
+  },
+  {
+   "name": "account number 13",
+   "kind": "text",
+   "tooltip": "Last 4 digits of account number",
+   "pages": [
+    5
+   ],
+   "max_len": 4
+  },
+  {
+   "name": "Street2_15",
+   "kind": "text",
+   "tooltip": "Street",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "Street2_18",
+   "kind": "text",
+   "tooltip": "Street",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "Taxes and ceratin other debts you owe the government_3",
+   "kind": "checkbox",
+   "tooltip": "Taxes and ceratin other debts you owe the government",
+   "pages": [
+    2
+   ],
+   "states": [
+    "On"
+   ]
+  }
+ ]
+}

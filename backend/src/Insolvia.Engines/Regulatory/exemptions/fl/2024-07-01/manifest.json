@@ -1,0 +1,11 @@
+{
+  "series_id": "exemptions/fl",
+  "effective_date": "2024-07-01",
+  "sequence": 1,
+  "source": {
+    "url": "https://www.flsenate.gov/Laws/Statutes/2025/222.25",
+    "published": null,
+    "sha256": null
+  },
+  "notes": "Baseline snapshot of the Florida scheme, dated to its most recent amendment: Laws of Fla. ch. 2024-110 raising the motor-vehicle exemption to $5,000.00, eff. 2024-07-01. Synthesized from multiple statute sections (per-entry sources in the payload), so there is no single upstream artifact to hash. Verified current as of 2026-09-01; resolution before the effective date correctly refuses — this snapshot does not describe earlier law."
+}

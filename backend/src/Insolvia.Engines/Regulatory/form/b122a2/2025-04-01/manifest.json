@@ -1,0 +1,11 @@
+{
+  "series_id": "form/b122a2",
+  "effective_date": "2025-04-01",
+  "sequence": 1,
+  "source": {
+    "url": "https://www.uscourts.gov/sites/default/files/2025-04/b_122a-2_0425-form.pdf",
+    "published": null,
+    "sha256": "66881436f178c51443eabb6dd38c52d069f84de8f84f20df7419acd4f3fc14a0"
+  },
+  "notes": "Official Form 122A-2, Chapter 7 Means Test Calculation, printed revision 04/25 (current as of ingestion; the April 2025 reissue carries the § 104 dollar figures code/dollar-amounts@2025-04-01 records — $10,275 / $17,150 / $214.58). template.pdf is the official fillable PDF vendored verbatim from uscourts.gov (sha256 above; the loader re-hashes it); spec.json and acroform.json are the issue-102 field spec and AcroForm dump for this revision, copied from forms/ at ingestion — tests/test_form_templates.py refuses drift between the copies and forms/ while this is the current revision. Known defects carried from the spec: most right-margin 'copy here' boxes carry no widgets, line 39b has no widget at all, and three shared widgets each fill two printed boxes (line 4 = 39a, line 9b's total = 33a, lines 13b/13e's totals = 33b/33c)."
+}
