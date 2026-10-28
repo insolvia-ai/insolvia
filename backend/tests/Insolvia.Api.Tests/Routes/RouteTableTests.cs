@@ -114,11 +114,35 @@ public sealed class RouteTableTests : IDisposable
         { "DELETE", "/v1/cases/{caseId}/{collection}/{entityId}" },
     };
 
+    /// <summary>The portal's staff half (18.18): the firm's invitation routes, on the case.</summary>
+    public static TheoryData<string, string> PortalStaffRoutes => new()
+    {
+        { "GET", "/v1/cases/{caseId}/portal/clients" },
+        { "POST", "/v1/cases/{caseId}/portal/invitation" },
+        { "POST", "/v1/cases/{caseId}/portal/clients/{subject}/resend" },
+        { "DELETE", "/v1/cases/{caseId}/portal/clients/{subject}" },
+    };
+
+    /// <summary>The portal's client half (18.18): the only routes that admit a portal token.</summary>
+    public static TheoryData<string, string> PortalClientRoutes => new()
+    {
+        { "GET", "/v1/portal/me" },
+        { "GET", "/v1/portal/questionnaire" },
+        { "GET", "/v1/portal/answers" },
+        { "POST", "/v1/portal/answers" },
+        { "PUT", "/v1/portal/answers/{answerId}" },
+        { "DELETE", "/v1/portal/answers/{answerId}" },
+        { "GET", "/v1/portal/document-requests" },
+        { "POST", "/v1/portal/documents" },
+        { "POST", "/v1/portal/documents/{documentId}/complete" },
+    };
+
     public void Dispose() => _world.Dispose();
 
     [Theory]
     [MemberData(nameof(FirmSideRoutes))]
     [MemberData(nameof(CaseSideRoutes))]
+    [MemberData(nameof(PortalStaffRoutes))]
     public async Task Every_firm_side_route_is_a_staff_route_and_401s_without_a_token(string method, string template)
     {
         var path = System.Text.RegularExpressions.Regex.Replace(
@@ -134,11 +158,24 @@ public sealed class RouteTableTests : IDisposable
         Assert.Equal(PrincipalClass.Staff, endpoint.Principal);
     }
 
+    [Theory]
+    [MemberData(nameof(PortalClientRoutes))]
+    public async Task Every_portal_route_is_a_client_route_and_401s_without_a_token(string method, string template)
+    {
+        var path = System.Text.RegularExpressions.Regex.Replace(template, "\\{[A-Za-z]+\\}", "c-1");
+
+        var answer = await _world.SendAsync(new HttpMethod(method), path, json: "{}");
+
+        Assert.Equal(401, answer.Status);
+        Assert.Equal(ErrorBodies.Unauthorized, answer.Body);
+        Assert.Equal(PrincipalClass.Client, Endpoints().Single(e => e.Name == $"{method} {template}").Principal);
+    }
+
     [Fact]
     public void The_route_table_is_exactly_the_firm_and_case_side_slices_plus_the_two_public_routes()
     {
         var mapped = Endpoints().Where(e => e.Name.Contains("/v1/", StringComparison.Ordinal)).Select(e => e.Name).Order(StringComparer.Ordinal);
-        var expected = FirmSideRoutes.Concat(CaseSideRoutes).Select(row => $"{row.Data.Item1} {row.Data.Item2}").Concat(Public).Order(StringComparer.Ordinal);
+        var expected = FirmSideRoutes.Concat(CaseSideRoutes).Concat(PortalStaffRoutes).Concat(PortalClientRoutes).Select(row => $"{row.Data.Item1} {row.Data.Item2}").Concat(Public).Order(StringComparer.Ordinal);
 
         Assert.Equal(expected, mapped);
         Assert.All(Endpoints().Where(e => Public.Contains(e.Name)), e => Assert.Null(e.Principal));

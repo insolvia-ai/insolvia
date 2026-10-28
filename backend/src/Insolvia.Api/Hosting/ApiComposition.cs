@@ -90,7 +90,9 @@ public static class ApiComposition
             // Not composed until its adapter is ported, so the route that
             // needs it answers the 500 that names the gap — never a memory
             // twin that would accept a write and lose it:
-            //   IUserDirectory (Cognito AdminCreateUser) — POST /v1/firm/users.
+            //   IUserDirectory (Cognito AdminCreateUser) — POST /v1/firm/users
+            //   and the portal invitation's POST …/portal/invitation and
+            //   …/resend (18.20 brings the adapter; 18.22 wires it here).
 
             // The case side (18.11): every store over the request's one
             // context, so a route's writes share its connection. Cursors are
@@ -230,6 +232,12 @@ public static class ApiComposition
         builder.Services.AddSingleton<IEndpointModule, EventRoutes>();
         builder.Services.AddSingleton<IEndpointModule, CalendarRoutes>();
         builder.Services.AddSingleton<IEndpointModule, CaseEntityRoutes>();
+
+        // The portal (18.18): the firm's invitation routes, then the client's
+        // own — the only routes RequireClient admits.
+        builder.Services.AddSingleton<IEndpointModule, PortalInvitationRoutes>();
+        builder.Services.AddSingleton<IEndpointModule, PortalRoutes>();
+        builder.Services.AddSingleton<IEndpointModule, PortalDocumentRoutes>();
 
         return builder;
     }
