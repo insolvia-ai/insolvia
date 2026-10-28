@@ -1,0 +1,265 @@
+{
+  "_comment": "Sealed by insolvia_core (Python) with TEST CONSTANT keys - synthetic data only. Regenerate: python sealed_envelopes.py generate",
+  "test_data_key": "iZ9+EKZKRe/tV5Vs75lYk+LP82L0z+/F9c1VrZsNo5w=",
+  "stub_kms_wrapping_key": "U3sLAbnXz9zQxr70JVMstLZW8krXSz8irnoSVTZtnd0=",
+  "cases": [
+    {
+      "name": "kms-tax-id-ssa-block",
+      "kind": "kms_tax_id",
+      "key_id": "alias/insolvia-test-cases",
+      "context": {
+        "purpose": "debtor-tax-id",
+        "firm_id": "00000000-0000-4000-8000-0000000f1a01",
+        "tax_id_ref": "00000000-0000-4000-8000-0000000000e1"
+      },
+      "plaintext": "987654320",
+      "aad": "{\"firm_id\":\"00000000-0000-4000-8000-0000000f1a01\",\"purpose\":\"debtor-tax-id\",\"tax_id_ref\":\"00000000-0000-4000-8000-0000000000e1\"}",
+      "envelope": {
+        "scheme": "kms-aes256-gcm/1",
+        "ciphertext": "Sa0HSXBLN8byGTrWl07jBXeBDezTPowAkA==",
+        "nonce": "6us357EBEX4X9N2U",
+        "wrapped_key": "ZojUUcCNIdvyiY1NWcNheBriXSwU3I1aIG/XOEaPscAHNA2t07xCZINB4sCKnPhuiS2pJ/Pgd3JlYO06"
+      },
+      "generate_data_key_request": {
+        "KeyId": "alias/insolvia-test-cases",
+        "KeySpec": "AES_256",
+        "EncryptionContext": {
+          "purpose": "debtor-tax-id",
+          "firm_id": "00000000-0000-4000-8000-0000000f1a01",
+          "tax_id_ref": "00000000-0000-4000-8000-0000000000e1"
+        }
+      }
+    },
+    {
+      "name": "kms-tax-id-9xx-area",
+      "kind": "kms_tax_id",
+      "key_id": "alias/insolvia-test-cases",
+      "context": {
+        "purpose": "debtor-tax-id",
+        "firm_id": "00000000-0000-4000-8000-0000000f1a01",
+        "tax_id_ref": "00000000-0000-4000-8000-0000000000e2"
+      },
+      "plaintext": "900000001",
+      "aad": "{\"firm_id\":\"00000000-0000-4000-8000-0000000f1a01\",\"purpose\":\"debtor-tax-id\",\"tax_id_ref\":\"00000000-0000-4000-8000-0000000000e2\"}",
+      "envelope": {
+        "scheme": "kms-aes256-gcm/1",
+        "ciphertext": "hwR9oBDF1XyagK1W7+CojKTscdYLO9TKxg==",
+        "nonce": "JA626P4lXleapgsp",
+        "wrapped_key": "mHAy6V2bdbFXo+up8eRiQtxfzDxG0Ft+SA/L4IYZNp4WR9Q7k4rqCb/9mBcHlNWllikHoDuvWksayyl7"
+      },
+      "generate_data_key_request": {
+        "KeyId": "alias/insolvia-test-cases",
+        "KeySpec": "AES_256",
+        "EncryptionContext": {
+          "purpose": "debtor-tax-id",
+          "firm_id": "00000000-0000-4000-8000-0000000f1a01",
+          "tax_id_ref": "00000000-0000-4000-8000-0000000000e2"
+        }
+      }
+    },
+    {
+      "name": "kms-tax-id-itin-shaped",
+      "kind": "kms_tax_id",
+      "key_id": "alias/insolvia-test-cases",
+      "context": {
+        "purpose": "debtor-tax-id",
+        "firm_id": "00000000-0000-4000-8000-0000000f1a01",
+        "tax_id_ref": "00000000-0000-4000-8000-0000000000e3"
+      },
+      "plaintext": "900700001",
+      "aad": "{\"firm_id\":\"00000000-0000-4000-8000-0000000f1a01\",\"purpose\":\"debtor-tax-id\",\"tax_id_ref\":\"00000000-0000-4000-8000-0000000000e3\"}",
+      "envelope": {
+        "scheme": "kms-aes256-gcm/1",
+        "ciphertext": "ajiv1vEh4CIgh19LlNvkjlrye+YxRimfRg==",
+        "nonce": "QOefGe2dJ1MrMIA+",
+        "wrapped_key": "V+f3aKYW79Vd4sZn7kw0jYVo04HH4aOV5OH6O0AVl6lYTBAQhCOtFq4LrVga54NVFtb2GL2ydSTnHqKO"
+      },
+      "generate_data_key_request": {
+        "KeyId": "alias/insolvia-test-cases",
+        "KeySpec": "AES_256",
+        "EncryptionContext": {
+          "purpose": "debtor-tax-id",
+          "firm_id": "00000000-0000-4000-8000-0000000f1a01",
+          "tax_id_ref": "00000000-0000-4000-8000-0000000000e3"
+        }
+      }
+    },
+    {
+      "name": "kms-credential",
+      "kind": "kms_credential",
+      "key_id": "alias/insolvia-test-filing-credentials",
+      "context": {
+        "purpose": "filing-credential",
+        "firm_id": "00000000-0000-4000-8000-0000000f1a01",
+        "attorney_id": "00000000-0000-4000-8000-00000000a771",
+        "credential_id": "00000000-0000-4000-8000-0000000000c1"
+      },
+      "plaintext": "{\"password\":\"FAKE-ECF-PASSWORD-fixture-1\",\"totp_seed\":\"JBSWY3DPEHPK3PXP\"}",
+      "aad": "{\"attorney_id\":\"00000000-0000-4000-8000-00000000a771\",\"credential_id\":\"00000000-0000-4000-8000-0000000000c1\",\"firm_id\":\"00000000-0000-4000-8000-0000000f1a01\",\"purpose\":\"filing-credential\"}",
+      "envelope": {
+        "scheme": "kms-aes256-gcm/1",
+        "ciphertext": "duCqNMyzMWvmoteMy1UNjViVia8qmA5UDPa3xxrBEeVTEh/sWc578UXK8OUK185qaNWth0a0pr2Jn7YAAjJSeuSEaiftkHC37IlWnZQ3/PUv4SGEf15RSa4=",
+        "nonce": "NIBc9jzFx3t5HRLA",
+        "wrapped_key": "KmmYzv7+R7ofVhk418AqMj64d2ylUKaUBYLK+sVCQ85p5k77rRU+0KWljlbovu2clpfNYur5eoBVhOdw"
+      },
+      "generate_data_key_request": {
+        "KeyId": "alias/insolvia-test-filing-credentials",
+        "KeySpec": "AES_256",
+        "EncryptionContext": {
+          "purpose": "filing-credential",
+          "firm_id": "00000000-0000-4000-8000-0000000f1a01",
+          "attorney_id": "00000000-0000-4000-8000-00000000a771",
+          "credential_id": "00000000-0000-4000-8000-0000000000c1"
+        }
+      }
+    },
+    {
+      "name": "kms-credential-escaped-password",
+      "kind": "kms_credential",
+      "key_id": "alias/insolvia-test-filing-credentials",
+      "context": {
+        "purpose": "filing-credential",
+        "firm_id": "00000000-0000-4000-8000-0000000f1a01",
+        "attorney_id": "00000000-0000-4000-8000-00000000a771",
+        "credential_id": "00000000-0000-4000-8000-0000000000c2"
+      },
+      "plaintext": "{\"password\":\"FAKE \\\"quoted\\\" \\\\ pass\\u00e9\",\"totp_seed\":\"GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ\"}",
+      "aad": "{\"attorney_id\":\"00000000-0000-4000-8000-00000000a771\",\"credential_id\":\"00000000-0000-4000-8000-0000000000c2\",\"firm_id\":\"00000000-0000-4000-8000-0000000f1a01\",\"purpose\":\"filing-credential\"}",
+      "envelope": {
+        "scheme": "kms-aes256-gcm/1",
+        "ciphertext": "XEH5oPb6G45uqmzQ+ahhULHqsjGrJuzv8wsBBjFoAQ91978N6Z3h8l1WlLikLnyAKIUH4Dk2kmUnnfIK72PWOhnRbGvuUR0thc9tRmgbVr3JrkZgtua72gIb+LpaebF8OxVKstTo8kkC86w=",
+        "nonce": "E75p51ouA2sUdhA7",
+        "wrapped_key": "Yhd237J+k9kc0DVL9lOJfffHlA/+wmySzIbLxAFxATOPwsztSDt/fU8sOCggyhr6CTGSQ7L4pFQe6j6o"
+      },
+      "generate_data_key_request": {
+        "KeyId": "alias/insolvia-test-filing-credentials",
+        "KeySpec": "AES_256",
+        "EncryptionContext": {
+          "purpose": "filing-credential",
+          "firm_id": "00000000-0000-4000-8000-0000000f1a01",
+          "attorney_id": "00000000-0000-4000-8000-00000000a771",
+          "credential_id": "00000000-0000-4000-8000-0000000000c2"
+        }
+      }
+    },
+    {
+      "name": "local-tax-id",
+      "kind": "local_tax_id",
+      "context": {
+        "purpose": "debtor-tax-id",
+        "firm_id": "00000000-0000-4000-8000-0000000f1a01",
+        "tax_id_ref": "00000000-0000-4000-8000-0000000000e4"
+      },
+      "plaintext": "987654329",
+      "aad": "{\"firm_id\":\"00000000-0000-4000-8000-0000000f1a01\",\"purpose\":\"debtor-tax-id\",\"tax_id_ref\":\"00000000-0000-4000-8000-0000000000e4\"}",
+      "envelope": {
+        "scheme": "kms-aes256-gcm/1",
+        "ciphertext": "uEcCNQflR+Yn/d+Xrx0+/kAwPNrIxVOniQ==",
+        "nonce": "BQ6LEDZGhFoD+Q/1",
+        "wrapped_key": "Uvv4ZHv0tvgnyUU/Xd2rELNR0o0yHzSJQK5k9NJBHeIOeK3ODYjNd0zB/U1upXLpGD82TAa7VUn11TXM"
+      }
+    },
+    {
+      "name": "local-credential",
+      "kind": "local_credential",
+      "context": {
+        "purpose": "filing-credential",
+        "firm_id": "00000000-0000-4000-8000-0000000f1a01",
+        "attorney_id": "00000000-0000-4000-8000-00000000a771",
+        "credential_id": "00000000-0000-4000-8000-0000000000c3"
+      },
+      "plaintext": "{\"password\":\"FAKE-ECF-PASSWORD-fixture-2\",\"totp_seed\":\"JBSWY3DPEHPK3PXP\"}",
+      "aad": "{\"attorney_id\":\"00000000-0000-4000-8000-00000000a771\",\"credential_id\":\"00000000-0000-4000-8000-0000000000c3\",\"firm_id\":\"00000000-0000-4000-8000-0000000f1a01\",\"purpose\":\"filing-credential\"}",
+      "envelope": {
+        "scheme": "kms-aes256-gcm/1",
+        "ciphertext": "1BCRLWoz/epxC5BXaM+r8mGxUwQ886Eqlj6HbB/eOQpR6CRIcTNqhjCIhbomkW34EIkQOivbxsfp+gBNV0oDjsJwTiXgXzA2hncFk98XwG2SLnwGIZKjvsI=",
+        "nonce": "eHqXT1mh7W1mZ4dW",
+        "wrapped_key": "mf+z1rWoQf2mMPlDblKoNsqnsFr69zZFVmegr+UqtzJK4AsTG201PPGC2I0t9rtXIaKwmRWXy9oW3yBG"
+      }
+    },
+    {
+      "name": "envelope-unsorted-ascii",
+      "kind": "envelope",
+      "context": {
+        "tax_id_ref": "r-1",
+        "purpose": "debtor-tax-id",
+        "firm_id": "00000000-0000-4000-8000-0000000f1a01"
+      },
+      "plaintext": "987654321",
+      "aad": "{\"firm_id\":\"00000000-0000-4000-8000-0000000f1a01\",\"purpose\":\"debtor-tax-id\",\"tax_id_ref\":\"r-1\"}",
+      "fixed_nonce": "O+yo+yQJp8QlDJjl",
+      "envelope": {
+        "scheme": "kms-aes256-gcm/1",
+        "ciphertext": "zg7BV3IJU7e1Rbqn95K0qODF8u79l7vAeQ==",
+        "nonce": "O+yo+yQJp8QlDJjl",
+        "wrapped_key": "c3R1Yi13cmFwcGVkLWtleQ=="
+      }
+    },
+    {
+      "name": "envelope-escapes",
+      "kind": "envelope",
+      "context": {
+        "purpose": "debtor-tax-id",
+        "firm_id": "caf\u00e9 \ud83d\ude00 \u2603",
+        "tax_id_ref": "q\"b\\s/n\nt\tc\u0001d\u007fe\u0085"
+      },
+      "plaintext": "Zo\u00eb \u2603 \ud83d\ude00",
+      "aad": "{\"firm_id\":\"caf\\u00e9 \\ud83d\\ude00 \\u2603\",\"purpose\":\"debtor-tax-id\",\"tax_id_ref\":\"q\\\"b\\\\s/n\\nt\\tc\\u0001d\\u007fe\\u0085\"}",
+      "fixed_nonce": "HKNpB1RIPJBjtF4G",
+      "envelope": {
+        "scheme": "kms-aes256-gcm/1",
+        "ciphertext": "oBCKukx4UXA5Xsd5xbfrwvm362q7yHSIaFwb+hM=",
+        "nonce": "HKNpB1RIPJBjtF4G",
+        "wrapped_key": "c3R1Yi13cmFwcGVkLWtleQ=="
+      }
+    },
+    {
+      "name": "envelope-code-point-order",
+      "kind": "envelope",
+      "context": {
+        "\ud83d\ude00": "astral",
+        "\ue000": "private-use",
+        "a": "ascii"
+      },
+      "plaintext": "900000002",
+      "aad": "{\"a\":\"ascii\",\"\\ue000\":\"private-use\",\"\\ud83d\\ude00\":\"astral\"}",
+      "fixed_nonce": "a2H0k3a9r3VZmzAK",
+      "envelope": {
+        "scheme": "kms-aes256-gcm/1",
+        "ciphertext": "nPtdTkbxGSCpI1FcQLaqssIT/cmX7BiYjA==",
+        "nonce": "a2H0k3a9r3VZmzAK",
+        "wrapped_key": "c3R1Yi13cmFwcGVkLWtleQ=="
+      }
+    },
+    {
+      "name": "envelope-empty-context",
+      "kind": "envelope",
+      "context": {},
+      "plaintext": "900000003",
+      "aad": "{}",
+      "fixed_nonce": "cIBBd5neEtYj74AD",
+      "envelope": {
+        "scheme": "kms-aes256-gcm/1",
+        "ciphertext": "8ZHrcijx5qbf2iqRc90E0wwx3newWCyscQ==",
+        "nonce": "cIBBd5neEtYj74AD",
+        "wrapped_key": "c3R1Yi13cmFwcGVkLWtleQ=="
+      }
+    },
+    {
+      "name": "envelope-empty-plaintext",
+      "kind": "envelope",
+      "context": {
+        "purpose": "debtor-tax-id"
+      },
+      "plaintext": "",
+      "aad": "{\"purpose\":\"debtor-tax-id\"}",
+      "fixed_nonce": "YUhhWGTINDpehNms",
+      "envelope": {
+        "scheme": "kms-aes256-gcm/1",
+        "ciphertext": "YnX8ShAwA0g+PDEqM9eLpg==",
+        "nonce": "YUhhWGTINDpehNms",
+        "wrapped_key": "c3R1Yi13cmFwcGVkLWtleQ=="
+      }
+    }
+  ]
+}

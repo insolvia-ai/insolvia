@@ -2,6 +2,20 @@
   "version": 2,
   "dependencies": {
     "net10.0": {
+      "AWSSDK.KeyManagementService": {
+        "type": "Direct",
+        "requested": "[4.0.101, )",
+        "resolved": "4.0.101",
+        "contentHash": "gxbt9QeDTO1wXqTyO8Zdd3cZOndwxzu4E/7BOorKE/UUhK5bI0Tzdr/lHXj3UmgxazTdW1zH9kkslpqE8wf9GQ==",
+        "dependencies": {
+          "AWSSDK.Core": "[4.0.102.14, 5.0.0)"
+        }
+      },
+      "AWSSDK.Core": {
+        "type": "Transitive",
+        "resolved": "4.0.102.14",
+        "contentHash": "pRYOOIyj40UdQ6G9iq8AOU30sFPqWS/umM/sFTmAl4n1S6AVbVa67DJpJTxD+9qJFqweHPcyVW7Qb4BbUBLJdg=="
+      },
       "Microsoft.Extensions.DependencyInjection.Abstractions": {
         "type": "Transitive",
         "resolved": "8.0.0",

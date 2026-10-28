@@ -27,6 +27,11 @@
           "xunit.v3.mtp-v1": "[3.2.2]"
         }
       },
+      "AWSSDK.Core": {
+        "type": "Transitive",
+        "resolved": "4.0.102.14",
+        "contentHash": "pRYOOIyj40UdQ6G9iq8AOU30sFPqWS/umM/sFTmAl4n1S6AVbVa67DJpJTxD+9qJFqweHPcyVW7Qb4BbUBLJdg=="
+      },
       "Microsoft.ApplicationInsights": {
         "type": "Transitive",
         "resolved": "2.23.0",
@@ -195,6 +200,7 @@
       "insolvia.aws": {
         "type": "Project",
         "dependencies": {
+          "AWSSDK.KeyManagementService": "[4.0.101, )",
           "Insolvia.Core": "[1.0.0, )"
         }
       },
@@ -202,6 +208,15 @@
         "type": "Project",
         "dependencies": {
           "Microsoft.IdentityModel.JsonWebTokens": "[8.14.0, )"
+        }
+      },
+      "AWSSDK.KeyManagementService": {
+        "type": "CentralTransitive",
+        "requested": "[4.0.101, )",
+        "resolved": "4.0.101",
+        "contentHash": "gxbt9QeDTO1wXqTyO8Zdd3cZOndwxzu4E/7BOorKE/UUhK5bI0Tzdr/lHXj3UmgxazTdW1zH9kkslpqE8wf9GQ==",
+        "dependencies": {
+          "AWSSDK.Core": "[4.0.102.14, 5.0.0)"
         }
       },
       "Microsoft.IdentityModel.JsonWebTokens": {

@@ -33,6 +33,11 @@
     <PackageVersion Include="AWSSDK.RDS" Version="4.0.107.2" />
     <PackageVersion Include="AWSSDK.SecretsManager" Version="4.0.100.22" />
   </ItemGroup>
+  <ItemGroup Label="Sealed data">
+    <!-- The tax-id cipher and the credential vault: GenerateDataKey / Decrypt.
+         On the same AWSSDK.Core (4.0.102.14) as AWSSDK.RDS above. -->
+    <PackageVersion Include="AWSSDK.KeyManagementService" Version="4.0.101" />
+  </ItemGroup>
   <ItemGroup Label="Identity">
     <!-- Token verification in Insolvia.Core: the signature check IS the domain
          rule (auth.py's one PyJWT exception, carried over). Fetching a key is

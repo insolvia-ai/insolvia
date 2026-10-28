@@ -1,6 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- Unit tests for Insolvia.Aws. Empty until its first ported module. -->
+  <!-- Unit tests for Insolvia.Aws. -->
   <ItemGroup>
     <ProjectReference Include="../../src/Insolvia.Aws/Insolvia.Aws.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The cross-language sealed-data fixtures (Fixtures/sealed_envelopes.py writes and checks them). -->
+    <None Include="Fixtures/*.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

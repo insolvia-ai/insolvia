@@ -3,4 +3,12 @@
   <ItemGroup>
     <ProjectReference Include="../Insolvia.Core/Insolvia.Core.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="AWSSDK.KeyManagementService" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The byte-identity test against Python seals with a fixed nonce, which
+         is internal on purpose: a caller-chosen nonce is a GCM footgun. -->
+    <InternalsVisibleTo Include="Insolvia.Aws.Tests" />
+  </ItemGroup>
 </Project>
