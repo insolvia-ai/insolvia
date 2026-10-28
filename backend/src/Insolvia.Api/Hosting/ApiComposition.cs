@@ -1,3 +1,5 @@
+using Amazon;
+using Amazon.KeyManagementService;
 using Insolvia.Api.Configuration;
 using Insolvia.Api.Http;
 using Insolvia.Api.Logging;
@@ -5,6 +7,7 @@ using Insolvia.Api.Mail;
 using Insolvia.Api.Routes;
 using Insolvia.Aws.Jwks;
 using Insolvia.Aws.Mailer;
+using Insolvia.Aws.Sealing;
 using Insolvia.Core.Courts;
 using Insolvia.Core.Memory;
 using Insolvia.Core.Ports;
@@ -15,6 +18,7 @@ using Insolvia.Data.Connections;
 using Insolvia.Data.Firms;
 using Insolvia.Data.Pagination;
 using Insolvia.Data.Portal;
+using Insolvia.Data.Vault;
 using Insolvia.Data.Waitlist;
 using Microsoft.Extensions.Logging.Console;
 
@@ -102,6 +106,24 @@ public static class ApiComposition
             builder.Services.AddScoped<IDocumentRequestStore>(services => new PostgresDocumentRequestStore(services.GetRequiredService<InsolviaDbContext>()));
             builder.Services.AddScoped<IFilingStore>(services => new PostgresFilingStore(services.GetRequiredService<InsolviaDbContext>()));
             builder.Services.AddScoped<ITaxIdStore>(services => new PostgresTaxIdStore(services.GetRequiredService<InsolviaDbContext>()));
+
+            // Sealed data (18.12). The vault's stores, over the same context:
+            // the API's role may INSERT and DELETE a credential and SELECT
+            // its metadata columns only (GrantTable), which is all these
+            // stores ask of it. KMS: the tax-id cipher seals AND opens under
+            // the case key; the vault gets a SEALER and nothing else — no
+            // IFilingCredentialOpener exists in this container (a test pins
+            // it), and the vault key's policy refuses this role Decrypt
+            // regardless. Aliases resolve at composition, so a Lambda that
+            // cannot name its keys never takes a request (SealingKeys).
+            var keys = SealingKeys.Load(name => configuration[name]);
+            builder.Services.AddScoped<IFilingCredentialStore>(services => new PostgresFilingCredentialStore(services.GetRequiredService<InsolviaDbContext>()));
+            builder.Services.AddScoped<IFilingAuthorizationStore>(services => new PostgresFilingAuthorizationStore(services.GetRequiredService<InsolviaDbContext>()));
+            builder.Services.AddSingleton<IAmazonKeyManagementService>(_ => configuration["AWS_REGION"] is { Length: > 0 } region
+                ? new AmazonKeyManagementServiceClient(RegionEndpoint.GetBySystemName(region))
+                : new AmazonKeyManagementServiceClient());
+            builder.Services.AddSingleton<ITaxIdCipher>(services => new KmsTaxIdCipher(services.GetRequiredService<IAmazonKeyManagementService>(), keys.CaseKeyAlias));
+            builder.Services.AddSingleton<IFilingCredentialSealer>(services => new KmsFilingCredentialSealer(services.GetRequiredService<IAmazonKeyManagementService>(), keys.FilingKeyAlias));
         }
 
         // Constructed once, at start, so its key cache lives as long as the
@@ -157,6 +179,15 @@ public static class ApiComposition
             builder.Services.AddSingleton<ICaseTaskStore, MemoryCaseTaskStore>();
             builder.Services.AddSingleton<IDocumentRequestStore, MemoryDocumentRequestStore>();
             builder.Services.AddSingleton<ITaxIdStore, MemoryTaxIdStore>();
+
+            // The vault's twins and the deterministic local key — never
+            // composed beside a real table. Still a SEALER only: the
+            // development host is no more allowed to open a credential than
+            // the deployed one.
+            builder.Services.AddSingleton<IFilingCredentialStore, MemoryFilingCredentialStore>();
+            builder.Services.AddSingleton<IFilingAuthorizationStore, MemoryFilingAuthorizationStore>();
+            builder.Services.AddSingleton<ITaxIdCipher>(_ => new LocalTaxIdCipher());
+            builder.Services.AddSingleton<IFilingCredentialSealer, LocalFilingCredentialSealer>();
         }
 
         // The firm-side routes (18.14), mapped after /health in this order.

@@ -20,6 +20,8 @@ public sealed class CaseCompositionTests(WebApplicationFactory<Program> factory)
         ("AUTH_CLIENT_ID", "exampleappclientid000000"),
         ("AUTH_USER_POOL_ID", "us-east-1_EXAMPLE00"),
         ("CASE_DOCUMENT_BUCKET", "insolvia-staging-case-documents-us-east-1"),
+        ("CASE_TABLE_NAME", "insolvia-staging-cases"),
+        ("AWS_REGION", "us-east-1"),
 
         // Never connected to: composing a store opens nothing.
         ("INSOLVIA_DB_CONNECTION_STRING", "Host=127.0.0.1;Port=1;Database=insolvia;Username=api;Password=unused"),
