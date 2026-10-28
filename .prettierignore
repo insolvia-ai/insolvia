@@ -4,6 +4,11 @@ node_modules/
 dist/
 build/
 
+# The contract stack's Python environment (contract/scripts/dev-test.sh builds
+# it; gitignored by the global `.venv/` rule). Its site-packages ship JS and
+# JSON nobody here wrote.
+.venv/
+
 # Expo-generated, gitignored, and self-labelled "should not be edited". Prettier
 # does not read .gitignore, so without these the format check trips on a file no
 # human wrote and cannot fix by hand.

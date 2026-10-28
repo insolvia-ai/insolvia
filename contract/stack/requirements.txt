@@ -1,0 +1,17 @@
+# The Python contract stack's environment: the three services' runtime
+# dependencies in ONE venv, because contract_stack.py composes all three in
+# one process over one set of in-memory stores (its docstring says why).
+#
+# Paths resolve against the CURRENT WORKING DIRECTORY, exactly as the
+# services' own requirements files do — contract/scripts/dev-test.sh runs pip
+# from contract/stack/, which sits at the same depth as services/<name>/, so
+# the API file's `../../packages/insolvia_core` lands on the shared package.
+#
+# Not the API's requirements-worker.txt: the stack runs no worker and needs
+# no Anthropic SDK. Not services/mcp's requirements.txt either: it pins a
+# different Mangum than the API's, and nothing here runs on Lambda — the MCP
+# SDK (and the uvicorn its dev server already uses) is all the stack needs
+# from it.
+-r ../../services/api/requirements.txt
+mcp==2.1.1
+uvicorn

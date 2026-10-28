@@ -53,6 +53,7 @@ backend/    the .NET 10 + Postgres rewrite of services/ and insolvia_core (ADR 0
 forms/      official-form field specs (B101, B106*, B107) — data + checker, no build
 seeds/      who exists per environment (dev.json, staging.json) · fixtures/<version>/ — what a seeded case contains
 e2e/        Playwright against deployed environments: flows (signed in; dev, staging) · smoke (no credentials; also prod)
+contract/   the backend's HTTP contract suite (Vitest, by base URL, through the shipped api-client) + the offline Python stack it runs against — ADR 0028's oracle
 infra/      Terraform: staging · prod · dev (shared, ci-trust, account-access are in insolvia-services)
 brand/      colors.json · fonts.json · radii.json — Insolvia's palette, typefaces and corners, the ONE place each is written down
 tool/       brand-palette.ts · render-brand-theme.ts · render-brand-marks.ts
@@ -106,6 +107,7 @@ before you touch anything:
 | adding a new package/app/service | `insolvia-new-package` skill |
 | **opening a PR / writing or editing its description** | `pr` skill (mattpocock) — Summary / Evidence / Merge Danger. Repo-specific facts still apply: title `<area>: <phrase>`, `Closes #N` vs `Refs #N`, and say what the change does on local, staging and prod |
 | **writing or changing any test**, or asked to "improve coverage" | `insolvia-testing` skill — the shape differs by area on purpose · [ADR 0008](docs/adr/0008-testing-shape-follows-the-code-it-tests.md); **which tier** (unit / integration / e2e flows / e2e smoke) and which environment runs it · [ADR 0021](docs/adr/0021-test-tiers-and-seed-fixtures.md) |
+| **changing any backend route's behaviour or response**, or adding an `InsolviaApiClient` method | [`contract/CLAUDE.md`](contract/CLAUDE.md) — `contract/scripts/dev-test.sh` runs the wire-level suite offline; its coverage gate fails on a client method nothing calls |
 | **seeding an environment**, adding a test user or a fixture case, or wondering why a signed-in test user 403s | [`seeds/README.md`](seeds/README.md) — `seeds/<env>.json` is who exists, `seeds/fixtures/<version>/` is what a case contains; `scripts/dev-aws-seed.sh` (dev), `.github/actions/seed-staging` (staging), `scripts/dev-fixture.sh` (publish / capture a version). Prod is refused by the loader |
 | **building or changing any UI** in the app, admin portal, or marketing — picking a component, calling it, wondering whether the package already has one | `design-system-catalogue` skill **first**, before writing the screen. The package ships 43 components; the habit to break is hand-rolling one it already owns |
 | a component **renders unstyled**, resolves to the wrong leaf, or `react-native` turns up in the marketing bundle | `design-system-platforms` skill — the `.web`/`.native` split, and why this app renders `.native` on web too |
