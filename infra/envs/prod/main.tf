@@ -594,3 +594,64 @@ module "audit_trail" {
   retention_days = 365
   tags           = local.common_tags
 }
+
+# ── Network and database (ADR 0028, plan 18.5) ──────────────────
+# The VPC and the Aurora cluster the .NET backend will use. ATTACHED TO NO
+# LAMBDA YET: the switch PR (18.22) puts the functions in the VPC and the
+# migrator creates the schema, so until then these are additive and idle.
+# Declared after everything else on purpose — nothing else references them.
+#
+# modules/network: two AZs of private subnets, one fck-nat instance for egress,
+# free S3 and DynamoDB gateway endpoints. modules/aurora: Serverless v2
+# PostgreSQL 17 under its own key, 5432 admitted from the Lambda security group
+# only. Prod's minimum capacity is ALSO 0 per the ADR, so it pauses when idle and the first request after a pause takes ~15 seconds to resume. REVISIT AT LAUNCH (ADR 0028 § Data): raise min_capacity to at least 0.5, which turns auto-pause off, before the first real firm. Everything else inverts staging: deletion protection and a final snapshot on, 14 days of PITR, the 30-day key window, and modifications wait for the maintenance window.
+module "network" {
+  source = "../../modules/network"
+
+  project     = "insolvia"
+  environment = local.environment
+  vpc_cidr    = "10.20.0.0/16"
+  tags        = local.common_tags
+}
+
+module "aurora" {
+  source = "../../modules/aurora"
+
+  project                     = "insolvia"
+  environment                 = local.environment
+  vpc_id                      = module.network.vpc_id
+  subnet_ids                  = module.network.private_subnet_ids
+  lambda_security_group_id    = module.network.lambda_security_group_id
+  min_capacity                = 0
+  max_capacity                = 8
+  seconds_until_auto_pause    = 900
+  backup_retention_days       = 14
+  deletion_protection         = true
+  key_deletion_window_in_days = 30
+  apply_immediately           = false
+  tags                        = local.common_tags
+}
+
+# The database's SSM contract, /insolvia/<env>/db/*, in the convention the
+# /api/* parameters above follow: written at env level, derived by a service's
+# deploy step into its environment (last segment, upper-cased, hyphens to
+# underscores — DB_ENDPOINT, DB_CLUSTER_RESOURCE_ID, …). None of these is a
+# secret: the master credential is only ARN-referenced, and its value lives in
+# the RDS-managed secret that only the migrator may read.
+#
+# cluster-resource-id is what an rds-db:connect ARN names, which is why it is
+# published rather than the identifier.
+resource "aws_ssm_parameter" "db" {
+  for_each = {
+    "endpoint"            = module.aurora.endpoint
+    "port"                = tostring(module.aurora.port)
+    "database-name"       = module.aurora.database_name
+    "cluster-resource-id" = module.aurora.cluster_resource_id
+    "master-secret-arn"   = module.aurora.master_secret_arn
+  }
+
+  name  = "/insolvia/${local.environment}/db/${each.key}"
+  type  = "String"
+  value = each.value
+  tags  = local.common_tags
+}

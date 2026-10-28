@@ -5,7 +5,7 @@ Terraform for this repo's AWS infrastructure — the product's environments. See
 model.
 
 ```
-modules/                 web_hosting, marketing_site, auth, api_service, case_store, …
+modules/                 web_hosting, marketing_site, auth, api_service, case_store, network, aurora, …
 envs/staging/            staging-app / staging-www + the service stacks
 envs/prod/               app / www + the service stacks (owns the apex)
 envs/dev/                per developer machine (scripts/dev-aws-*)
