@@ -1,0 +1,7 @@
+<!--
+  The spikes are throwaway probes (ADR 0028 § Libraries), each with its own
+  .csproj outside Insolvia.slnx. This file stops MSBuild walking up to
+  backend/Directory.Build.props: the product's warnings-as-errors, analyzers
+  and lock-file rules are not imposed on code that exists to be deleted.
+-->
+<Project />
