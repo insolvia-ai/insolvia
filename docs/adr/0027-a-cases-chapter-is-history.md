@@ -64,7 +64,7 @@ provenance      manual | court_notice (+ the candidate it was accepted from) | f
 -- by kind --
 status          fromStatus, toStatus, chapter (on the filed event: the petition chapter), filingId?
 conversion      fromChapter, toChapter
-confirmation*   (plan version: added by #490)
+confirmation*   planVersionId (the plan version ruled on: § 2026-10-27)
 ```
 
 - **The case item keeps `status` and `chapter` as the current values**,
@@ -216,7 +216,8 @@ deadlines (Rule 1019).
 - **The deadline engine gains a second anchor** (the conversion date) beside
   `filed_at` and `meeting_341_at`.
 - **"Is this case confirmed" is a read, not a field**: the latest
-  confirmation event within the current chapter.
+  `confirmation` (outcome confirmed) event within the current chapter. A
+  later denial of a modification does not undo it (§ 2026-10-27).
 - **#490** links a confirmation event to the plan version it ruled on;
   **#493** lifts the Chapter 11 refusal and builds its shapes; **#494**
   decides the hardship discharge and uses the history for post-filing work.
@@ -235,3 +236,32 @@ stack — nothing in it needs staging. *Staging*: reseeded by
 `.github/actions/seed-staging`. *Prod*: holds no real data yet, so it is
 wiped and reseeded, not backfilled, and the destructive step is confirmed
 with the maintainer before it runs.
+
+## Amendments
+
+### 2026-10-27 — confirmations name a plan version (maintainer)
+
+Decided on [#490](https://github.com/insolvia-ai/insolvia/issues/490), which
+specifies Chapter 13 plan versions; the full spec is its resolution comment.
+The terms are `GLOSSARY.md`'s: **plan version**, **plan amendment**, **plan
+modification**, **confirmed plan**, **Chapter 13 period**.
+
+- **`confirmation` and `confirmation_denied` carry `planVersionId`**, required
+  on both. It names a filed, unwithdrawn plan version from the current
+  Chapter 13 period, filed on or before the event's `effectiveOn`; anything
+  else is a 422.
+- **The confirmed plan is the version named by the latest `confirmation`
+  event in the period**, not the latest event of either kind. A § 1329
+  modification that is denied leaves the confirmed plan binding; reading the
+  latest event of either kind would have made a confirmed case look
+  unconfirmed.
+- **A Chapter 13 period** runs from the petition (when the petition chapter is
+  13) or from the latest conversion into 13, until the next conversion out.
+  Like every period here it is derived from the events, never stored, and a
+  version's kind (original, § 1323 amendment, § 1329 modification), its state
+  and "the confirmed plan" are all read within it.
+- **Nothing about a plan's status is stored** on the plan or the case: the
+  events stay the one owner of what the court ruled.
+- **Row 3 grows**: `POST …/confirmations` takes `planVersionId`, and the MCP
+  candidate kinds for a plan version's filing and withdrawal ship with it. It
+  is built after the plan versions themselves.
