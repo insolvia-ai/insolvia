@@ -178,17 +178,30 @@ loses its tables and keeps its bucket, queues and key.
 
 - **PDF engine:**
   - The engine fills AcroForms and draws overlays and appearance streams.
-    The candidate is **PDFsharp 6** (MIT). **iText is rejected** (AGPL or
-    commercial).
-  - Byte-identical output to pypdf is impossible, so the goldens are
-    deliberately re-baselined. Parity is proven by **field-level
-    equivalence**: read back every field value and widget state from the
-    Python and .NET outputs and compare them, plus a rendered-page visual
-    diff.
+    It is **PDFsharp 6.2.4, pinned exactly.** That is the last MIT
+    release: 6.5.0 and later are AGPL-3.0-only or commercial (amended
+    2026-10-27, spike 18.3), the same licence terms that rule out
+    **iText**. Upgrading past 6.2.4 is therefore a licensing decision, not
+    a dependency bump. PDFsharp 6.2.4 pulls in
+    `System.Security.Cryptography.Pkcs` 8.0.1, which has a high-severity
+    advisory, so it is referenced directly at a fixed version.
+  - PDFsharp is used **only as a PDF object model**. The appearance
+    streams come from a port of pypdf's generator. On all 22 forms, spike
+    18.3 ([research note](../research/dotnet-pdf-engine-2026-10-27.md))
+    measured:
+    - every field and widget state equal;
+    - **every text appearance stream byte-equal**;
+    - **0.0000 % rendered-pixel difference**.
+  - Whole files still aren't byte-identical (object order, `/ID`). So:
+    - The sha256 goldens are re-baselined, as accepted.
+    - Parity is gated by **field-level and appearance-level equivalence**
+      plus the rendered-page diff, using the spike's `compare.py`, kept in
+      CI until the cut-over.
+    - Two pypdf quirks are reproduced on purpose, and 18.16 decides
+      whether to keep or correct each: a button parent's `/V` written as a
+      string, and shared appearance streams overwritten by the last widget.
   - The filing-set digest is defined over the .NET output from the
     cut-over on. There are no live approvals to invalidate.
-  - Spike 18.3 must prove B101, a flat overlay form (B2010) and the
-    radio/shared-widget quirks before the forms port (18.16) starts.
 - **MCP:** the official C# `ModelContextProtocol` SDK, if spike 18.4
   proves it serves the protocol revision the Python server pins today:
   stateless Streamable HTTP, JSON responses, RFC 9728 protected-resource
@@ -312,8 +325,8 @@ issue.
 | 18.5 | **Network and Aurora Terraform**, not wired to any Lambda, plus the insolvia-services prerequisites | the prerequisites | `Terraform validate` is green; the staging plan is additive only |
 | 18.6 | **Core domain I:** firms, auth, access, errors, provenance, clients, ports | 18.1 | Their Python unit tests are ported and green |
 | 18.7 | **Core domain II:** cases, debtors, entities, documents, candidates, tasks, requests, filings | 18.6 | The same |
-| 18.8 | **Engines:** means test, CMI, exemptions, plan, deadlines, holidays, UST data | 18.1 | Their tests are ported and green with Decimal parity |
-| 18.9 | **Data foundation:** EF Core, migrations, lock/cursor helpers, Testcontainers, the migrator | 18.6 | The migrator is idempotent; the helper tests pass against a real Postgres |
+| 18.8 | **Engines:** means test, CMI, exemptions, plan, deadlines, holidays, UST data | 18.7 — the engines read the case domain's types (debtors, income, claims, plans, assets) | Their tests are ported and green with Decimal parity |
+| 18.9 | **Data foundation:** EF Core, migrations, lock/cursor helpers, Testcontainers, the migrator — infrastructure only, no domain tables | 18.1 | The migrator is idempotent; the helper tests pass against a real Postgres |
 | 18.10 | **Firm stores** (firm, users, clients, library, checklist, questionnaire, bindings) | 18.7, 18.9 | The ported memory-twin conformance tests pass against Postgres |
 | 18.11 | **Case stores** (case, history, lists, entities, debtors, candidates, tasks, documents, events, jobs) | 18.7, 18.9 | The same |
 | 18.12 | **Sealed data:** KMS envelope, tax ids, vault, access log, audit, database roles and grants | 18.10, 18.11 | An envelope sealed by Python opens in .NET and vice versa; the grants test passes |
@@ -334,4 +347,6 @@ issue.
 Both calls that were left open were accepted as written on 2026-10-27:
 1. **Python takes fixes only.** The backend halves of #501, #503, #506, #507
    and #509 are built in `backend/`.
-2. **The PDFs are re-baselined, not byte-matched.**
+2. **The PDFs are re-baselined, not byte-matched.** Spike 18.3 then
+   showed the fill reproduced field for field and pixel for pixel, so the
+   re-baseline covers only the whole-file hashes.
