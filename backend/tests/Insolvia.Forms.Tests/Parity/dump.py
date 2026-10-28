@@ -32,6 +32,7 @@ PYTHONPATH=services/api/src:packages/insolvia_core/src (Parity/run.sh does).
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 import sys
@@ -51,13 +52,21 @@ from insolvia_api.core.packet_assembly import (
     packet_zip,
     problem_json,
 )
+from insolvia_api.core.filing_approval import _fee, basis_document, canonical_bytes, digest_of
+from insolvia_api.core.filing_set import build_filing_set
+from insolvia_api.core.packets import Packet, packet_part_item
+from insolvia_api.core.pdf_measure import measure_parts
+from insolvia_core import courts
 from insolvia_core.case_entities import CaseEntity
 
 REPO = Path(__file__).resolve().parents[4]
 PARITY_CASES = REPO / "backend/tests/Insolvia.Engines.Tests/Parity"
 PRINTED_AT = datetime(2026, 10, 27, 12, 0, tzinfo=UTC)
 AS_OF = date(2026, 10, 1)
-ENTITY_TIME = "2026-09-01T12:00:00Z"
+# The stored timestamp format (millisecond UTC, a literal Z): what the
+# approval digest's document carries for every record.
+ENTITY_TIME = "2026-09-01T12:00:00.000Z"
+DIGEST_PACKET_ID = "00000000-0000-4000-8000-000000000001"
 CASE_FILES = ("reference-ch7", "reference-ch13", "chapter-7-sample", "chapter-13-sample")
 
 
@@ -174,7 +183,7 @@ def case_data(name: str, generate) -> CaseData:
 
     kwargs: dict[str, Any] = {
         "case": case_file.case,
-        "debtors": case_file.debtors,
+        "debtors": tuple(replace(d, updated_at=ENTITY_TIME) for d in case_file.debtors),
         "tax_ids": dict(case_file.tax_ids),
         "petitions": wrap("petitions", [case_file.petition] if case_file.petition else [], False),
     }
@@ -193,6 +202,51 @@ def amended(data: CaseData) -> CaseData:
     )
     claims = tuple(replace(e, amended=(e.id == first)) for e in data.claims)
     return replace(data, case=case, assets=assets, claims=claims)
+
+
+def digest_case(data: CaseData, outcome: AssembledPacket, content: bytes, measured, options: OutputOptions, target: Path) -> dict[str, str]:
+    """The approval digest over THIS packet (pypdf's measured parts). The
+    .NET half reads packet.json back, builds the same record, and must give
+    the same canonical document, byte for byte — the digest's definition,
+    proven identical; from cut-over on it is taken over the .NET bytes."""
+    packet = Packet(
+        id=DIGEST_PACKET_ID,
+        case_id=data.case.id,
+        job_id="job-parity",
+        file_name=f"chapter{data.case.chapter}-packet.zip",
+        content_type="application/zip",
+        byte_size=len(content),
+        sha256=hashlib.sha256(content).hexdigest(),
+        storage_ref="cases/parity",
+        form_revisions=dict(outcome.form_revisions),
+        constants_set_id=outcome.constants_set_id,
+        creditor_count=outcome.creditor_count,
+        created_by="subject-parity",
+        created_at="2026-10-01T09:30:00.000Z",
+        options=options,
+        parts=measured,
+    )
+    record = {
+        "id": packet.id,
+        "caseId": packet.case_id,
+        "jobId": packet.job_id,
+        "fileName": packet.file_name,
+        "byteSize": packet.byte_size,
+        "sha256": packet.sha256,
+        "formRevisions": dict(packet.form_revisions),
+        "constantsSetId": packet.constants_set_id,
+        "creditorCount": packet.creditor_count,
+        "createdBy": packet.created_by,
+        "createdAt": packet.created_at,
+        "options": output_options_json(options),
+        "parts": [packet_part_item(part) for part in measured],
+    }
+    (target / "packet.json").write_text(json.dumps(record, indent=1) + "\n", encoding="utf-8")
+    release = courts.resolve(AS_OF)
+    filing_set = build_filing_set(data, packets=[packet], release=release, as_of=AS_OF)
+    district = release.district(data.case.court) if data.case.court else None
+    document = basis_document(data, filing_set, _fee(district))
+    return {"canonical": canonical_bytes(document).decode("utf-8"), "sha256": digest_of(document)}
 
 
 def packet_cases() -> list[tuple[str, str, OutputOptions, bool]]:
@@ -240,8 +294,22 @@ def main() -> None:
         if isinstance(outcome, AssembledPacket):
             for name, content in outcome.parts:
                 (target / name).write_bytes(content)
-            (target / "packet.zip").write_bytes(packet_zip(outcome.parts))
-            summary = {"parts": [name for name, _ in outcome.parts], "formRevisions": dict(outcome.form_revisions), "constantsSetId": outcome.constants_set_id, "creditorCount": outcome.creditor_count}
+            content = packet_zip(outcome.parts)
+            (target / "packet.zip").write_bytes(content)
+            measured = measure_parts(outcome.parts)
+            summary = {
+                "parts": [name for name, _ in outcome.parts],
+                "formRevisions": dict(outcome.form_revisions),
+                "constantsSetId": outcome.constants_set_id,
+                "creditorCount": outcome.creditor_count,
+                # What the parts measure, less their own size and digest (the
+                # serialisers differ; the pages must not).
+                "measured": [
+                    {k: v for k, v in packet_part_item(part).items() if k not in ("byteSize", "sha256")}
+                    for part in measured
+                ],
+                "digest": digest_case(data, outcome, content, measured, options, target),
+            }
         else:
             summary = {"problems": [problem_json(p) for p in outcome]}
         (target / "outcome.json").write_text(json.dumps(summary, indent=1, sort_keys=True) + "\n", encoding="utf-8")
