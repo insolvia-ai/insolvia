@@ -8,7 +8,7 @@
 # never services/*/scripts/dev-setup.sh, which touches AWS):
 #
 #   python3.12 -m venv /tmp/parity-venv
-#   (cd services/api && /tmp/parity-venv/bin/pip install -r requirements.txt pypdfium2==5.14.0 pillow)
+#   (cd services/api && /tmp/parity-venv/bin/pip install -r requirements.txt -r ../../backend/tests/Insolvia.Forms.Tests/Parity/requirements.txt)
 #   PYTHON=/tmp/parity-venv/bin/python backend/tests/Insolvia.Forms.Tests/Parity/run.sh
 #
 # Writes the renders and report.json under the out dir (default: a fresh

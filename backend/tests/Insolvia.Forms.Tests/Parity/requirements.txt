@@ -4,3 +4,6 @@
 # the pixel comparison without either engine changing.
 pypdfium2==5.14.0
 pillow==13.0.0
+# compare.py reuses the goldens' own reader from services/api's
+# test_form_fill.py, which imports pytest at module level.
+pytest==8.4.2
