@@ -1,0 +1,133 @@
+{
+  "code": "flnb",
+  "court_id": "FLNBK",
+  "name": "Northern District of Florida",
+  "state": "FL",
+  "circuit": 11,
+  "website": "https://www.flnb.uscourts.gov/",
+  "divisions": [
+    {
+      "code": "gainesville",
+      "name": "Gainesville Division",
+      "office_code": { "value": "1", "status": "verified", "source": "S41", "verified_at": "2026-09-24", "note": "Online Filing page, Case Numbering: divisional codes after 2003-11-10 are Gainesville = 1, Pensacola = 3, Tallahassee = 4, Panama City = 5; case numbers are seven digits with a dash after the first two." },
+      "courthouse": { "value": { "name": "United States Courthouse", "line1": "401 SE First Ave.", "line2": null, "city": "Gainesville", "state": "FL", "postal_code": "32601" }, "status": "verified", "source": "S49", "verified_at": "2026-09-24", "note": "Hearings only. The page says bankruptcy filings are not accepted in person or by mail at Gainesville; the mailing address for all filings is the Tallahassee office, 110 East Park Avenue, Suite 100, Tallahassee, FL 32301." },
+      "counties": [
+        { "name": "Alachua", "fips": "12001" },
+        { "name": "Dixie", "fips": "12029" },
+        { "name": "Gilchrist", "fips": "12041" },
+        { "name": "Lafayette", "fips": "12067" },
+        { "name": "Levy", "fips": "12075" }
+      ],
+      "counties_source": "S45"
+    },
+    {
+      "code": "panama-city",
+      "name": "Panama City Division",
+      "office_code": { "value": "5", "status": "verified", "source": "S41", "verified_at": "2026-09-24", "note": null },
+      "courthouse": { "value": { "name": "U.S. Bankruptcy Court", "line1": "110 East Park Avenue", "line2": "Suite 100", "city": "Tallahassee", "state": "FL", "postal_code": "32301" }, "status": "verified", "source": "S50", "verified_at": "2026-09-24", "note": "The Panama City courthouse is closed indefinitely (Hurricane Michael, November 2018); the division page gives the Tallahassee address and says all hearings are held in Tallahassee. No Panama City street address is published." },
+      "counties": [
+        { "name": "Bay", "fips": "12005" },
+        { "name": "Calhoun", "fips": "12013" },
+        { "name": "Gulf", "fips": "12045" },
+        { "name": "Holmes", "fips": "12059" },
+        { "name": "Jackson", "fips": "12063" },
+        { "name": "Washington", "fips": "12133" }
+      ],
+      "counties_source": "S45"
+    },
+    {
+      "code": "pensacola",
+      "name": "Pensacola Division",
+      "office_code": { "value": "3", "status": "verified", "source": "S41", "verified_at": "2026-09-24", "note": null },
+      "courthouse": { "value": { "name": "Winston E. Arnow Federal Building", "line1": "100 N. Palafox St.", "line2": null, "city": "Pensacola", "state": "FL", "postal_code": "32502" }, "status": "verified", "source": "S48", "verified_at": "2026-09-24", "note": "One of the two staffed divisional offices (Tallahassee and Pensacola) per the Administrative Procedures IV.A.2 [S44]." },
+      "counties": [
+        { "name": "Escambia", "fips": "12033" },
+        { "name": "Okaloosa", "fips": "12091" },
+        { "name": "Santa Rosa", "fips": "12113" },
+        { "name": "Walton", "fips": "12131" }
+      ],
+      "counties_source": "S45"
+    },
+    {
+      "code": "tallahassee",
+      "name": "Tallahassee Division",
+      "office_code": { "value": "4", "status": "verified", "source": "S41", "verified_at": "2026-09-24", "note": null },
+      "courthouse": { "value": { "name": "United States Bankruptcy Courthouse", "line1": "110 East Park Avenue", "line2": "Suite 100", "city": "Tallahassee", "state": "FL", "postal_code": "32301" }, "status": "verified", "source": "S47", "verified_at": "2026-09-24", "note": "Main office; the homepage says all mail goes to Tallahassee [S40]." },
+      "counties": [
+        { "name": "Franklin", "fips": "12037" },
+        { "name": "Gadsden", "fips": "12039" },
+        { "name": "Jefferson", "fips": "12065" },
+        { "name": "Leon", "fips": "12073" },
+        { "name": "Liberty", "fips": "12077" },
+        { "name": "Madison", "fips": "12079" },
+        { "name": "Taylor", "fips": "12123" },
+        { "name": "Wakulla", "fips": "12129" }
+      ],
+      "counties_source": "S45"
+    }
+  ],
+  "cmecf": {
+    "live_url": { "value": "https://ecf.flnb.uscourts.gov/", "status": "verified", "source": "S40", "verified_at": "2026-09-24", "note": "Also the login_url in the PACER lookup [S34]." },
+    "training_url": { "value": null, "status": "unverified", "source": "S31", "verified_at": null, "note": "The ECF Training page [S31] names no training database; it says online NextGen training resources are on the PACER website at https://pacer.uscourts.gov/help. ADR 0024 (S31) also cites PACER's training-environment registration at https://train-pacer.psc.uscourts.gov/pscof/registration.jsf, which was not confirmed on a court page today." },
+    "help_desk": { "value": "CMECF_HelpDesk@flnb.uscourts.gov; (850) 521-5001 (9:00 a.m. to 4:00 p.m. ET); (866) 639-4615 (4:00 p.m. to 5:00 p.m. ET)", "status": "verified", "source": "S42", "verified_at": "2026-09-24", "note": "The PACER lookup [S34] lists a different help-desk number, 888-765-1752, and the ECF Training page [S31] lists toll-free (866) 765-1752; the court's own HelpDesk page is used here." },
+    "release": { "value": "1.9", "status": "verified", "source": "S34", "verified_at": "2026-09-24", "note": "PACER lookup software_version 'NextGen CM/ECF Release 1.9'; lookup last_updated 'Thu, 24 Sep 2026 06:10:04 -0400'. The lookup's merge_doc_size for this court is '1' (unit not stated)." }
+  },
+  "pdf": {
+    "max_bytes": { "value": 36700160, "status": "verified", "source": "S15", "verified_at": "2026-09-24", "note": "'PDF files may not exceed 35 MB. If your file size exceeds this maximum, you must break your document into multiple files, each not exceeding 35 MB.'" },
+    "text_searchable_required": { "value": null, "status": "unverified", "source": null, "verified_at": null, "note": "Neither the Document Format Requirements FAQ [S15] nor the Administrative Procedures [S44] state a text-searchable requirement." },
+    "flatten_required": { "value": true, "status": "verified", "source": "S44", "verified_at": "2026-09-24", "note": "Administrative Procedures III.A.1: documents are to be converted to PDF, 'flattened (a process used to merge previously separated contents of a .pdf document into a single layer), and filed directly on the System'." },
+    "pdf_a_required": { "value": false, "status": "verified", "source": "S15", "verified_at": "2026-09-24", "note": "'Currently, the U.S. Bankruptcy Court for the Northern District of Florida does not require PDF/A format.'" }
+  },
+  "matrix": {
+    "max_line_chars": { "value": 40, "status": "verified", "source": "S52", "verified_at": "2026-09-24", "note": "'Each line must contain no more than 40 characters, including spaces.'" },
+    "max_creditor_lines": { "value": 5, "status": "verified", "source": "S52", "verified_at": "2026-09-24", "note": "Addresses must not exceed 5 lines." },
+    "blank_lines_between": { "value": 1, "status": "verified", "source": "S52", "verified_at": "2026-09-24", "note": "'Separate each item on the list by one blank line.'" },
+    "pad_to_lines": { "value": null, "status": "verified", "source": "S52", "verified_at": "2026-09-24", "note": "No fixed block size is stated." },
+    "name_line_chars": { "value": null, "status": "verified", "source": "S52", "verified_at": "2026-09-24", "note": "No separate name-line width; the 40-character limit applies to every line." },
+    "comma_after_city": { "value": true, "status": "verified", "source": "S52", "verified_at": "2026-09-24", "note": "The page's correct-format example is 'Baltimore, MD 20984'." },
+    "case_number_header_when_separate": { "value": false, "status": "verified", "source": "S52", "verified_at": "2026-09-24", "note": "'Do not include page numbers, headers, or footers.' File saved as text (.txt) named for the debtor's last name (e.g., Smith.txt). The Administrative Procedures [S44] III.A.1 accept matrices 'created via third party filing software' in an alternate format, e.g. .scn." },
+    "certification_required": { "value": null, "status": "unverified", "source": "S54", "verified_at": null, "note": "Local Form LF-36 'Verification of Creditor Mailing Matrix' (10/25) exists and is signed by the debtor(s) under penalty of perjury, but neither the matrix instructions [S52] nor Local Rule 1007-1(A) [S45] states when it must be filed. LR 1007-1(A)(1) requires only a 'List of creditors submitted in the format specified by the Clerk'." }
+  },
+  "opening": {
+    "signature_instrument": { "value": { "kind": "s_signature_with_wet_ink_retained", "title": "Administrative Procedures III.C (signatures) and III.L (retention)", "wet_ink_required": true, "retention": "4 years", "own_docket_event": false, "form_url": null }, "status": "verified", "source": "S44", "verified_at": "2026-09-24", "note": "III.C.1: the PDF must contain 'either a scanned image of any original signature(s) or the text \"/s/ user name\" where an original signature should occur'. III.L.1.a: petitions, lists, schedules, statements and other verified papers 'must be retained with the original signatures by the attorney ... for four years after the closing of the case'. No court declaration form was found on any page; ADR 0024's 'court declaration' row was not confirmed." },
+    "ssn_statement": { "value": "own_event", "status": "verified", "source": "S45", "verified_at": "2026-09-24", "note": "LR 1007-1(A) lists, among documents 'filed at the same time as, but separately from, the petition', '(5) For individual debtors, a statement of social security number' (Official Form B121 per the 2023 advisory note). The 2021 Administrative Procedures [S44] IV.D.1 add that for e-filed petitions the debtor's petition signature applies to the SSN as e-filed and attorneys 'shall not file or submit any additional statements or verifications of the debtor's SSN'; III.L.1.b requires the filer to retain an originally executed Form 121 for four years after closing." },
+    "local_forms": [
+      { "id": "LF-36-M", "title": "Matrix/List of Creditors", "url": "https://www.flnb.uscourts.gov/sites/flnb/files/forms/lf36-m.pdf", "when_required": "The list of creditors 'in the format specified by the Clerk' required with every petition (LR 1007-1(A)(1)); the PDF is a one-line caption form (case number, debtor name) — the text-file format is on the Mailing Matrix page [S52]", "source": "S53" },
+      { "id": "LF-36", "title": "Verification of Creditor Mailing Matrix", "url": "https://www.flnb.uscourts.gov/sites/flnb/files/forms/lf36.pdf", "when_required": "Not stated on any page read; the form (10/25) verifies the matrix 'attached or previously filed in this case'", "source": "S51" },
+      { "id": "LF-16", "title": "Statement of No Employment Income", "url": "https://www.flnb.uscourts.gov/sites/flnb/files/forms/lf16.pdf", "when_required": "With the petition if the debtor was not employed during the 60 days before the petition date and has no payment advices (LR 1007-1(A)(3))", "source": "S53" },
+      { "id": "LF-18", "title": "Motion for Determination and Waiver of Debtor's Duty to Comply with the Credit Counseling Requirement Under 11 U.S.C. Section 109(h)(4)", "url": "https://www.flnb.uscourts.gov/sites/flnb/files/forms/lf18.pdf", "when_required": "Only when seeking the § 109(h)(4) credit-counseling waiver (LR 1007-1(A)(2)(d))", "source": "S53" },
+      { "id": "LF-2", "title": "Corporate Ownership Statement", "url": "https://www.flnb.uscourts.gov/sites/flnb/files/forms/lf2.pdf", "when_required": "Corporate debtors only (LR 1007-1(A)(4)); not for an individual Chapter 7", "source": "S53" }
+    ],
+    "fee_rule": { "value": { "deadline": "At the time of filing; online accounts must be settled by midnight Eastern Time on the day of filing", "note": "Administrative Procedures III.E: 'All fees are due at the time of filing on the System. System Participants must settle their online accounts for any outstanding fees by midnight Eastern Time on the day of filing. If fees are not received in a timely manner, steps will be taken to either strike the pleading or dismiss the case'. LR 5081-1 [S45]: fees in the form specified by the Clerk. Nothing read says whether Case Upload may be used with installments." }, "status": "verified", "source": "S44", "verified_at": "2026-09-24", "note": null }
+  },
+  "case_upload": { "status": "unverified", "kind": null, "verified_at": null, "note": "No FLNB page read mentions Case Upload; the Administrative Procedures [S44] only accept software-produced matrices in an alternate format (e.g. .scn). Verify in a training-database session." },
+  "registration": {
+    "training_required": { "value": null, "status": "unverified", "source": "S43", "verified_at": null, "note": "Registration Requirements [S43] and the Online Filing access section [S41] require admission to the N.D. Fla. district court, an upgraded PACER account and a court CM/ECF account, and say nothing about training. The ECF Training page [S31] only 'suggests' that new filers open cases during business hours and points to PACER's online training. No page states training is required or not required." },
+    "notes": "Attorneys must be admitted to practice in the Northern District of Florida; admission is verified with the district court before a login is approved; credentials are sent only by email [S43]. Filing Agents get their own PACER account linked by the attorney (Administrative Procedures II.A [S44]). LR 5005-1 (Electronic Filing) was removed in 2023 in favour of Standing Order #11 and the Administrative Procedures [S45, S44]. The Administrative Procedures are the 'Fourteenth Amended' version, revised 2021-12-04, effective 2021-12-06."
+  },
+  "sources": [
+    { "id": "S15", "title": "FLNB, Document Format Requirements (FAQ)", "url": "https://www.flnb.uscourts.gov/faqs/document-format-requirements", "read": "2026-09-24" },
+    { "id": "S31", "title": "FLNB, ECF Training", "url": "https://www.flnb.uscourts.gov/ecf-training", "read": "2026-09-24" },
+    { "id": "S34", "title": "PACER, Court CM/ECF Lookup data (last_updated 2026-09-24 06:10:04 -0400)", "url": "https://pacer.uscourts.gov/file-case/court-cmecf-lookup/data.json", "read": "2026-09-24" },
+    { "id": "S40", "title": "FLNB, home page", "url": "https://www.flnb.uscourts.gov/", "read": "2026-09-24" },
+    { "id": "S41", "title": "FLNB, Online Filing (Case Numbering; Applications for Access to CM/ECF)", "url": "https://www.flnb.uscourts.gov/online-filing", "read": "2026-09-24" },
+    { "id": "S42", "title": "FLNB, ECF HelpDesk", "url": "https://www.flnb.uscourts.gov/ecf-helpdesk", "read": "2026-09-24" },
+    { "id": "S43", "title": "FLNB, Registration Requirements (FAQ)", "url": "https://www.flnb.uscourts.gov/faqs/registration-requirements", "read": "2026-09-24" },
+    { "id": "S44", "title": "FLNB, Fourteenth Amended Administrative Procedures for Filing, Signing, and Verifying Pleadings and Papers by Electronic Means (eff. 2021-12-06)", "url": "https://www.flnb.uscourts.gov/sites/flnb/files/admin_procedures.pdf", "read": "2026-09-24" },
+    { "id": "S45", "title": "FLNB, Local Rules (eff. 2024-02-26) — LR 1014-1 (divisions), 1007-1, 5005-1 [removed], 5081-1, 9004-1", "url": "https://www.flnb.uscourts.gov/sites/flnb/files/local_rules_02-26-2024.pdf", "read": "2026-09-24" },
+    { "id": "S46", "title": "FLNB, Court Locations", "url": "https://www.flnb.uscourts.gov/court-info/court-locations", "read": "2026-09-24" },
+    { "id": "S47", "title": "FLNB, Tallahassee Division", "url": "https://www.flnb.uscourts.gov/locations/tallahassee", "read": "2026-09-24" },
+    { "id": "S48", "title": "FLNB, Pensacola Division", "url": "https://www.flnb.uscourts.gov/locations/pensacola", "read": "2026-09-24" },
+    { "id": "S49", "title": "FLNB, Gainesville Division", "url": "https://www.flnb.uscourts.gov/locations/gainesville", "read": "2026-09-24" },
+    { "id": "S50", "title": "FLNB, Panama City Division", "url": "https://www.flnb.uscourts.gov/locations/panama-city", "read": "2026-09-24" },
+    { "id": "S51", "title": "FLNB, Forms (Local and Sample Forms; Instructional Documents)", "url": "https://www.flnb.uscourts.gov/forms", "read": "2026-09-24" },
+    { "id": "S52", "title": "FLNB, Instructions for Creating a List of Creditors (Mailing Matrix)", "url": "https://www.flnb.uscourts.gov/mailing-matrix", "read": "2026-09-24" },
+    { "id": "S53", "title": "FLNB, Local Rules Links (forms referenced by each rule)", "url": "https://www.flnb.uscourts.gov/local-rules-links", "read": "2026-09-24" },
+    { "id": "S54", "title": "FLNB, Local Form 36, Verification of Creditor Mailing Matrix (10/25)", "url": "https://www.flnb.uscourts.gov/sites/flnb/files/forms/lf36.pdf", "read": "2026-09-24" },
+    { "id": "S55", "title": "FLNB, Local Form 36-M, Matrix/List of Creditors", "url": "https://www.flnb.uscourts.gov/sites/flnb/files/forms/lf36-m.pdf", "read": "2026-09-24" },
+    { "id": "S56", "title": "FLNB, Local Rules (index page)", "url": "https://www.flnb.uscourts.gov/local-rules", "read": "2026-09-24" },
+    { "id": "S57", "title": "FLNB, Rule 5005-1 (web page; removed 2023)", "url": "https://www.flnb.uscourts.gov/rules/rule-5005-1", "read": "2026-09-24" },
+    { "id": "S58", "title": "FLNB, Rule 1007-1 (web page)", "url": "https://www.flnb.uscourts.gov/rules/rule-1007-1", "read": "2026-09-24" }
+  ],
+  "notes": "Divisions: Florida has no statutory divisions; FLNB's own Local Rule 1014-1(A) [S45] assigns the 23 statutory counties (28 U.S.C. § 89(a)) to four divisions, and the four location pages [S47–S50] list the same counties. Every statutory county appears in exactly one division. The counties rule is LR 1014-1, not 1071-1. Office codes are from the court's Case Numbering section [S41]; they differ from the divisions' alphabetical order (Gainesville 1, Pensacola 3, Tallahassee 4, Panama City 5). Failed URLs: https://www.flnb.uscourts.gov/faqs (HTTP 404 — the FAQ pages exist only under /faqs/<slug>); direct curl downloads of any *.uscourts.gov PDF returned HTTP 404 (bot filtering) — the PDFs were fetched through the WebFetch tool and text-extracted locally with pypdf instead. The PACER lookup data.json was truncated by WebFetch; it was downloaded whole with curl (HTTP 200) and parsed. Both the LF-36-M form PDF and the LF-36 form PDF are fillable forms with no format instructions; the matrix format lives on the Mailing Matrix page [S52]. PDF size/flatten figures verified today; carry with verified_at, not as constants."
+}

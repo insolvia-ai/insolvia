@@ -172,13 +172,21 @@ public sealed class FirmClientTests
     }
 
     [Fact]
-    public void The_identity_fields_parse_with_the_debtors_own_alias_parser()
+    public void The_identity_fields_are_ones_a_debtor_accepts()
     {
-        // Python checked the copied fields against `parse_debtor` itself; the
-        // debtor parser is 18.7's, and until then the shared pieces it reuses
-        // (name, address, alias rows) are the very functions parsed here.
-        var draft = FirmClientRules.Parse(Body.Of(Full));
-        Assert.Equal(Debtors.OtherNames.Parse(Body.Value("""[{"id": "alias-1", "surname": "Sample"}]"""), new Dictionary<string, string>()), draft.OtherNamesUsed);
+        // ADR 0022 copies a client's identity onto a debtor; a value the
+        // client record accepts must be one the debtor's own parser accepts.
+        var full = Body.Of(Full);
+        var copied = new JsonObject();
+        foreach (var key in FirmClients.ClientCopies.CopiedFields)
+        {
+            if (full[key] is { } value)
+            {
+                copied[key] = value.DeepClone();
+            }
+        }
+
+        _ = Debtors.DebtorRules.Parse(copied, enforceProvenance: false);
     }
 
     // ── The feature ─────────────────────────────────────────────────

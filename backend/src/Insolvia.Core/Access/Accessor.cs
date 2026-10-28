@@ -1,3 +1,4 @@
+using Insolvia.Core.Cases;
 using Insolvia.Core.Clients;
 using Insolvia.Core.Firms;
 
@@ -63,9 +64,8 @@ public static class CaseAccess
     /// as the case; passing true without reading it is the way to break this.
     /// </summary>
     /// <remarks>
-    /// Python's <c>may_see_case</c> took the <c>Case</c>; the case record is
-    /// the case half's (18.7), so this takes the two facts of it the rule
-    /// reads. 18.7 adds the <c>Case</c>-taking overload that forwards here.
+    /// The two facts of the case the rule reads; <see cref="MaySeeCase(Accessor, Case, bool)"/>
+    /// is the overload a store holding the case calls.
     /// </remarks>
     public static bool MaySeeCase(Accessor accessor, string caseFirmId, bool caseDeleted, bool assigned)
     {
@@ -81,5 +81,15 @@ public static class CaseAccess
         }
 
         return accessor.SeesEveryCase || assigned;
+    }
+
+    /// <summary>
+    /// Python's <c>may_see_case(accessor, case, assigned=...)</c>: the rule
+    /// above, over the case's firm and its deletion stamp.
+    /// </summary>
+    public static bool MaySeeCase(Accessor accessor, Case target, bool assigned)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        return MaySeeCase(accessor, target.FirmId, target.Deleted, assigned);
     }
 }

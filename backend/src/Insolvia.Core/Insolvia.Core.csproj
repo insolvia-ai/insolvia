@@ -6,4 +6,13 @@
   <ItemGroup>
     <InternalsVisibleTo Include="Insolvia.Core.Tests" />
   </ItemGroup>
+  <!-- Regulatory files ship in the artifact (ADR 0014): the court registry the
+       case domain validates a court against, and the filing-authorization text
+       an attorney signs. Copied from packages/insolvia_core, which is frozen
+       (ADR 0028); CourtRegistryTests pins the copy to the original until 18.23
+       deletes the Python. Logical names keep the paths under the folder. -->
+  <ItemGroup>
+    <EmbeddedResource Include="Regulatory/**/*.json" LogicalName="Insolvia.Core.Regulatory/%(RecursiveDir)%(Filename)%(Extension)" />
+    <EmbeddedResource Include="Agreements/**/*.txt" LogicalName="Insolvia.Core.Agreements/%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
 </Project>

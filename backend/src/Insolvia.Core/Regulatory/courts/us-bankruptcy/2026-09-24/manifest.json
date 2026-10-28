@@ -1,0 +1,11 @@
+{
+  "series_id": "courts/us-bankruptcy",
+  "effective_date": "2026-09-24",
+  "sequence": 1,
+  "source": {
+    "url": "https://pacer.uscourts.gov/file-case/court-cmecf-lookup/data.json",
+    "published": null,
+    "sha256": null
+  },
+  "notes": "The first release of the court registry (issue #360, specified by ADR 0024): the ten launch districts of ADR 0017 — FLNB, FLMB, FLSB, TXNB, TXSB, TXEB, TXWB, GANB, GAMB, GASB — one record per district under districts/. Identity comes from PACER's court lookup; each division's counties from the district's venue statute (28 U.S.C. §§ 89, 90, 124) or, where the bankruptcy court draws its own divisions (Florida, by local rule), from the court's page; county FIPS codes from the Census Bureau's 2020 national county file. Every other fact is wrapped with the page it was read from and the date; a fact the pages did not confirm is stored as unverified rather than guessed, and the record's notes name the pages that could not be reached. Case Upload is unverified everywhere until a training-database session proves a package per court (ADR 0024, PR 5). Effective on the date it was compiled: a court's identity has no effective date of its own, and the release's date is when these pages were read."
+}
