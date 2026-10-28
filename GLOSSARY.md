@@ -47,6 +47,28 @@ _Avoid_: original chapter, filing chapter
 The chapter a case is in now: before filing, the one being prepared; after filing, the petition chapter or the latest conversion's.
 _Avoid_: case chapter (when the petition chapter is meant)
 
+### Chapter 13 plans
+
+**Plan version**:
+One Chapter 13 plan as a whole document: a draft while it is being prepared, then fixed once it is filed with the court. A case's plans are an ordered series of versions.
+_Avoid_: plan record (for a filed plan), revision
+
+**Plan amendment**:
+A plan version filed to replace a proposed plan before the court has confirmed one (§ 1323).
+_Avoid_: amended schedule (Rule 1009 is for schedules, not plans)
+
+**Plan modification**:
+A plan version filed to change a confirmed plan (§ 1329).
+_Avoid_: plan amendment (after confirmation)
+
+**Confirmed plan**:
+The plan version the court's latest confirmation in the current Chapter 13 period approved. It binds the debtor and creditors until a modification is confirmed.
+_Avoid_: active plan, current plan
+
+**Chapter 13 period**:
+The stretch of a filed case spent in Chapter 13, from its petition or a conversion into 13 until a conversion out. Plan versions and confirmations count only within their period.
+_Avoid_: Chapter 13 phase
+
 ### Firms and staff
 
 **Firm user**:
