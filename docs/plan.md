@@ -221,9 +221,9 @@ milestone (10.1).
 The backend (`services/*`, `insolvia_core`) is rewritten in C# on .NET 10,
 and DynamoDB is replaced by Aurora Serverless v2 PostgreSQL in a VPC. It is
 built in `backend/` and cut over once. [ADR 0028](adr/0028-backend-moves-to-dotnet-and-postgres.md)
-owns the decision and the **18.1–18.23 build breakdown**. Once 0028 is
-accepted, the Python backend takes fixes only, and the items in § Next below
-that need new backend code are built in `backend/`.
+owns the decision and the **18.1–18.23 build breakdown**. Accepted
+2026-10-27: the Python backend takes fixes only, and the items in § Next
+below that need new backend code are built in `backend/`.
 
 ## Next — the build order (as of 2026-10-13)
 

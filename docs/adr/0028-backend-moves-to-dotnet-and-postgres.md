@@ -1,10 +1,11 @@
 # ADR 0028 — The backend moves to .NET and PostgreSQL
 
-- **Status:** Proposed 2026-10-27. Scope, cut-over and hosting were decided
-  with the maintainer in chat on 2026-10-27 (backend only; one big-bang
-  cut-over; Aurora Serverless v2 in a VPC with a NAT instance). The rest
-  was delegated, and this ADR makes those calls; see **Open for the
-  maintainer** at the end.
+- **Status:** Accepted 2026-10-27
+  ([#511](https://github.com/insolvia-ai/insolvia/issues/511)). The
+  maintainer decided scope, cut-over and hosting in chat (backend only; one
+  big-bang cut-over; Aurora Serverless v2 in a VPC with a NAT instance), and
+  accepted the delegated calls as written, including the Python freeze and
+  re-baselining the PDFs. Not built: the build breakdown below is the work.
 - **Date:** 2026-10-27
 - **Supersedes:** plan decision **D6** ("Python + Flask + Mangum on Lambda")
   and [ADR 0012](0012-shared-python-domain-package.md). The
@@ -328,11 +329,9 @@ issue.
 | 18.22 | **The switch:** CI, VPC wiring, migrator before alias, seeding, ruleset, docs; wipe and reseed staging, then prod | everything | A staging release is green end to end (contract, integration, e2e flows); prod is promoted by digest |
 | 18.23 | **Delete the Python** backend and its CI | 18.22 in prod | No `services/` or `insolvia_core` left; the docs are swept |
 
-## Open for the maintainer
+## Accepted with
 
-Each item is decided above and needs only a yes, or an edit before merging:
-
-1. **Freeze Python to fixes** (§ Python in the meantime). The alternative is
-   to keep building features in Python and mirror each one. That doubles
-   the work for as long as the rewrite runs.
-2. **PDF output is re-baselined, not byte-matched** (§ Libraries).
+Both calls that were left open were accepted as written on 2026-10-27:
+1. **Python takes fixes only.** The backend halves of #501, #503, #506, #507
+   and #509 are built in `backend/`.
+2. **The PDFs are re-baselined, not byte-matched.**
