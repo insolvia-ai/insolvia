@@ -1,10 +1,12 @@
 using Amazon;
 using Amazon.KeyManagementService;
+using Amazon.S3;
 using Insolvia.Api.Configuration;
 using Insolvia.Api.Http;
 using Insolvia.Api.Logging;
 using Insolvia.Api.Mail;
 using Insolvia.Api.Routes;
+using Insolvia.Aws.Documents;
 using Insolvia.Aws.Jwks;
 using Insolvia.Aws.Mailer;
 using Insolvia.Aws.Sealing;
@@ -13,6 +15,7 @@ using Insolvia.Core.Memory;
 using Insolvia.Core.Ports;
 using Insolvia.Data;
 using Insolvia.Data.AccessLogging;
+using Insolvia.Data.Calendar;
 using Insolvia.Data.Cases;
 using Insolvia.Data.Connections;
 using Insolvia.Data.Firms;
@@ -124,6 +127,15 @@ public static class ApiComposition
                 : new AmazonKeyManagementServiceClient());
             builder.Services.AddSingleton<ITaxIdCipher>(services => new KmsTaxIdCipher(services.GetRequiredService<IAmazonKeyManagementService>(), keys.CaseKeyAlias));
             builder.Services.AddSingleton<IFilingCredentialSealer>(services => new KmsFilingCredentialSealer(services.GetRequiredService<IAmazonKeyManagementService>(), keys.FilingKeyAlias));
+
+            // The calendar (14.6 / #358).
+            builder.Services.AddScoped<ICalendarEventStore>(services => new PostgresCalendarEventStore(services.GetRequiredService<InsolviaDbContext>()));
+            builder.Services.AddScoped<ICalendarTokenStore>(services => new PostgresCalendarTokenStore(services.GetRequiredService<InsolviaDbContext>()));
+
+            // The bytes: the case-document bucket, which LambdaBootRequirements
+            // already refuses to boot without. One client per process.
+            var bucket = config.CaseDocumentBucket!;
+            builder.Services.AddSingleton<IDocumentBlobStore>(_ => new S3DocumentBlobStore(new AmazonS3Client(S3DocumentBlobStore.ClientConfig()), bucket));
         }
 
         // Constructed once, at start, so its key cache lives as long as the
@@ -188,6 +200,12 @@ public static class ApiComposition
             builder.Services.AddSingleton<IFilingAuthorizationStore, MemoryFilingAuthorizationStore>();
             builder.Services.AddSingleton<ITaxIdCipher>(_ => new LocalTaxIdCipher());
             builder.Services.AddSingleton<IFilingCredentialSealer, LocalFilingCredentialSealer>();
+            builder.Services.AddSingleton<ICalendarEventStore, MemoryCalendarEventStore>();
+            builder.Services.AddSingleton<ICalendarTokenStore, MemoryCalendarTokenStore>();
+
+            // No local object store: the memory twin mints memory+s3:// URLs no
+            // client can fetch.
+            builder.Services.AddSingleton<IDocumentBlobStore, MemoryDocumentBlobStore>();
         }
 
         // The firm-side routes (18.14), mapped after /health in this order.
@@ -199,6 +217,19 @@ public static class ApiComposition
         builder.Services.AddSingleton<IEndpointModule, DocumentChecklistRoutes>();
         builder.Services.AddSingleton<IEndpointModule, WaitlistRoutes>();
         builder.Services.AddSingleton<IEndpointModule, UnsubscribeRoutes>();
+
+        // The case routes (18.15, part 1). Order does not decide routing —
+        // a literal segment beats {collection} by template precedence.
+        builder.Services.AddSingleton<IEndpointModule, CaseRoutes>();
+        builder.Services.AddSingleton<IEndpointModule, CaseLifecycleRoutes>();
+        builder.Services.AddSingleton<IEndpointModule, DebtorRoutes>();
+        builder.Services.AddSingleton<IEndpointModule, NoteRoutes>();
+        builder.Services.AddSingleton<IEndpointModule, DocumentRoutes>();
+        builder.Services.AddSingleton<IEndpointModule, DocumentRequestRoutes>();
+        builder.Services.AddSingleton<IEndpointModule, TaskRoutes>();
+        builder.Services.AddSingleton<IEndpointModule, EventRoutes>();
+        builder.Services.AddSingleton<IEndpointModule, CalendarRoutes>();
+        builder.Services.AddSingleton<IEndpointModule, CaseEntityRoutes>();
 
         return builder;
     }
