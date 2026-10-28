@@ -275,8 +275,10 @@ issue.
 
 - **Account prerequisites land in insolvia-services first:**
   - ECR repositories for the new images;
-  - the deploy role's EC2, RDS, Secrets Manager and `rds-db:connect`
-    actions;
+  - the deploy role's EC2, RDS, Secrets Manager and KMS actions, plus
+    `alias/insolvia-*-db` added to its case-data Decrypt deny. It needs no
+    `rds-db:connect`: Terraform never connects to the database, and only
+    the migrator's own role does;
   - a human apply of `ci-trust`
     (`insolvia-deploy-role-permissions` skill). Its PR and release come
     before 18.5 can plan.
@@ -295,9 +297,13 @@ issue.
   - the services' `CLAUDE.md` files, replaced by `backend/CLAUDE.md`;
   - the `insolvia-scripts`, `insolvia-testing` and `insolvia-deploy`
     skills.
-- **Cost:** two NAT instances (about $6/month), Aurora storage and
-  auto-paused ACUs (a few dollars a month per quiet environment), no
-  NAT gateways.
+- **Cost:** about $9–10 a month per idle environment. That is the NAT
+  instance with its Elastic IP and disk (about $7.40 — the stable egress
+  address is there for CM/ECF allow-listing), the database key ($1), the
+  RDS-managed secret ($0.40), and storage. ACU-hours are added while the
+  database is awake, capped at 2 ACU for staging and 8 for prod. There are
+  no NAT gateways and no RDS Proxy: a proxy would hold connections open and
+  stop the database from pausing.
 - **Risk:** the port's volume, not its technology. The forms engine is the
   one place where technology is the risk, which is why its spike gates it.
 
