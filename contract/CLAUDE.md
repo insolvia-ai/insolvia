@@ -1,9 +1,9 @@
 # contract — agent rules
 
 The backend's HTTP contract suite (ADR 0028, plan 18.2). Human docs:
-[`README.md`](README.md). Run: `contract/scripts/dev-test.sh`. Not wired to CI
-yet — a runner needs Python and Node both; when it is, the job runs exactly
-that script.
+[`README.md`](README.md). Run: `contract/scripts/dev-test.sh` (Python, the
+default) or `--target dotnet` (the .NET hosts on Postgres — ADR 0028's
+acceptance gate). CI: `Contract (.NET)` runs exactly the latter.
 
 - **It is the oracle for the .NET rewrite.** Every test must pass against the
   Python stack today and the .NET stack later, unchanged. So assert the
@@ -40,6 +40,14 @@ that script.
   process. It must not change route behaviour: it only chooses adapters, as
   the services' own `development_server.py` files do. `LocalBlobStore` is the
   one adapter it adds (an S3 stand-in, so presigned PUTs work).
+- **The .NET stack is composed by `scripts/dev-test.sh --target dotnet`**,
+  from the hosts' own configuration surfaces — no host code knows the suite
+  exists. Seeded ids are not shared between stacks (Python derives from table
+  names, .NET from the environment), so a test finds fixture records through
+  the API (`support/fixtures.ts`), never by id; the people's subjects are the
+  one exception, and `stack/stack.json` lists the ones the migrator derives.
+  `scripts/aux-server.ts` is the .NET side's JWKS and S3 stand-in, sharing
+  `backend/src/Insolvia.Core/Local/DirectoryDocumentBlobStore.cs`'s layout.
 - **TypeScript rules are the workspace's**: no build step, `.ts` relative
   imports, `erasableSyntaxOnly`. Gate: `npm run lint`, `npm run typecheck`,
   `npm run format` from the root all cover this directory.

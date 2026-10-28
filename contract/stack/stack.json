@@ -12,7 +12,13 @@
     "",
     "accounts maps every person seeds/dev.json names to the subject the",
     "stack's user directory answers for them — the `sub` the suite signs into",
-    "a token. Addresses end in .test (RFC 2606): nobody's mailbox."
+    "a token. Addresses end in .test (RFC 2606): nobody's mailbox.",
+    "",
+    "The subjects are the ones the .NET migrator's local seed DERIVES when no",
+    "pool is named (LocalSeedAccounts: uuid5 over the seed namespace and",
+    "`local-account/<email>`), so both stacks seed the same people without",
+    "a directory of their own: the Python stack loads them from here, the",
+    ".NET one computes them, and the suite signs for either."
   ],
   "issuerPath": "contract-pool",
   "clientIds": {
@@ -23,7 +29,7 @@
   },
   "workspaceDomain": "insolvia.ai",
   "accounts": {
-    "dev@insolvia.test": "00000000-c0de-4000-8000-000000000001",
-    "dev-client@insolvia.test": "00000000-c0de-4000-8000-000000000002"
+    "dev@insolvia.test": "a035a66c-67ed-5d1c-bf27-3a8b3405d7a3",
+    "dev-client@insolvia.test": "7ef44733-b6ea-502a-82cb-f5ce88074d92"
   }
 }
