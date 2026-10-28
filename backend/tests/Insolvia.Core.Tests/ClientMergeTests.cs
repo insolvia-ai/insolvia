@@ -6,70 +6,51 @@ using Insolvia.Core.Ports;
 namespace Insolvia.Core.Tests;
 
 /// <summary>
-/// The debtor store's merge-facing half, in memory — what Python's
-/// <c>MemoryDebtorStore</c> answered for <c>roles_for_client</c> and
-/// <c>repoint_client</c>, with the same two conditions checked in one step.
-/// The full debtor store (and its memory twin) is 18.7's; it implements
-/// <see cref="IDebtorClientLinks"/> and this fake goes.
+/// The real <see cref="MemoryDebtorStore"/> (18.7), with the two affordances
+/// the merge suite needs: seeding a case's debtors by client, and a hook that
+/// runs inside a repoint, before its conditions are checked — a write racing
+/// the merge.
 /// </summary>
-internal sealed class FakeDebtorLinks : IDebtorClientLinks
+internal sealed class RacingDebtorStore : IDebtorClientLinks
 {
-    private readonly Dictionary<(string CaseId, FilingRole Role), string?> _links = [];
+    private readonly MemoryDebtorStore _inner = new();
     private int _cases;
 
-    /// <summary>Runs inside a repoint, before its conditions are checked — a write racing the merge.</summary>
-    public Action<string, FilingRole>? BeforeRepoint { get; set; }
+    /// <summary>Runs inside a repoint, before its conditions are checked.</summary>
+    public Func<string, FilingRole, Task>? BeforeRepoint { get; set; }
 
-    public string CaseFor(params string[] clientIds)
+    public async Task<string> CaseForAsync(params string[] clientIds)
     {
         var caseId = $"case-{++_cases}";
         FilingRole[] roles = [FilingRole.Debtor1, FilingRole.Debtor2];
         for (var index = 0; index < clientIds.Length; index++)
         {
-            _links[(caseId, roles[index])] = clientIds[index];
+            await LinkAsync(caseId, roles[index], clientIds[index]);
         }
 
         return caseId;
     }
 
-    public void Link(string caseId, FilingRole role, string? clientId) => _links[(caseId, role)] = clientId;
+    public Task LinkAsync(string caseId, FilingRole role, string clientId) =>
+        _inner.PutAsync(DebtorRules.Create(DebtorRules.Parse([]), caseId, role, clientId: clientId, caseCreatedAt: DateTimeOffset.UnixEpoch.AddDays(_cases)));
 
-    public string? ClientOf(string caseId, FilingRole role) => _links.GetValueOrDefault((caseId, role));
+    public async Task<string?> ClientOfAsync(string caseId, FilingRole role) => (await _inner.GetAsync(caseId, role))?.ClientId;
 
-    public Task<IReadOnlyList<(string CaseId, FilingRole FilingRole)>> RolesForClientAsync(string clientId, CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<(string CaseId, FilingRole FilingRole)>> RolesForClientAsync(string clientId, CancellationToken cancellationToken = default) =>
+        _inner.RolesForClientAsync(clientId, cancellationToken);
+
+    public async Task<RepointOutcome> RepointClientAsync(string caseId, FilingRole filingRole, string fromClientId, string toClientId, CancellationToken cancellationToken = default)
     {
-        IReadOnlyList<(string, FilingRole)> roles = [.. _links
-            .Where(pair => pair.Value == clientId)
-            .Select(pair => pair.Key)
-            .OrderBy(key => key.CaseId, StringComparer.Ordinal)
-            .ThenBy(key => key.Role)];
-        return Task.FromResult(roles);
-    }
-
-    public Task<RepointOutcome> RepointClientAsync(string caseId, FilingRole filingRole, string fromClientId, string toClientId, CancellationToken cancellationToken = default)
-    {
-        BeforeRepoint?.Invoke(caseId, filingRole);
-        if (_links.GetValueOrDefault((caseId, filingRole)) != fromClientId)
+        if (BeforeRepoint is not null)
         {
-            return Task.FromResult(RepointOutcome.Absent);
+            await BeforeRepoint(caseId, filingRole);
         }
 
-        if (_links.Any(pair => pair.Key.CaseId == caseId && pair.Key.Role != filingRole && pair.Value == toClientId))
-        {
-            return Task.FromResult(RepointOutcome.ClientTaken);
-        }
-
-        _links[(caseId, filingRole)] = toClientId;
-        return Task.FromResult(RepointOutcome.Written);
+        return await _inner.RepointClientAsync(caseId, filingRole, fromClientId, toClientId, cancellationToken);
     }
 
-    public Task<IReadOnlyList<DebtorClientLink>> ClientLinksForCaseAsync(string caseId, CancellationToken cancellationToken = default)
-    {
-        IReadOnlyList<DebtorClientLink> links = [.. _links
-            .Where(pair => pair.Key.CaseId == caseId)
-            .Select(pair => new DebtorClientLink(caseId, pair.Key.Role, pair.Value))];
-        return Task.FromResult(links);
-    }
+    public Task<IReadOnlyList<DebtorClientLink>> ClientLinksForCaseAsync(string caseId, CancellationToken cancellationToken = default) =>
+        _inner.ClientLinksForCaseAsync(caseId, cancellationToken);
 }
 
 /// <summary>A firm store whose merge finish can be made to race itself.</summary>
@@ -153,7 +134,7 @@ internal sealed class RacingFirmStore(MemoryFirmStore inner) : IFirmStore
 public sealed class ClientMergeTests
 {
     private readonly MemoryFirmStore _firms = new();
-    private readonly FakeDebtorLinks _debtors = new();
+    private readonly RacingDebtorStore _debtors = new();
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
@@ -179,8 +160,8 @@ public sealed class ClientMergeTests
     {
         var keep = await Client("Jordan");
         var dupe = await Client("Jordan", "Exampel");
-        var first = _debtors.CaseFor(dupe.Id);
-        var second = _debtors.CaseFor(dupe.Id);
+        var first = await _debtors.CaseForAsync(dupe.Id);
+        var second = await _debtors.CaseForAsync(dupe.Id);
 
         await Merge(dupe, keep);
 
@@ -276,8 +257,8 @@ public sealed class ClientMergeTests
     {
         var keep = await Client("Jordan");
         var dupe = await Client("Jordy");
-        var joint = _debtors.CaseFor(keep.Id, dupe.Id);
-        var alone = _debtors.CaseFor(dupe.Id);
+        var joint = await _debtors.CaseForAsync(keep.Id, dupe.Id);
+        var alone = await _debtors.CaseForAsync(dupe.Id);
 
         var refused = await Assert.ThrowsAsync<ConflictException>(() => Merge(dupe, keep));
         Assert.Contains("both debtors", refused.Message, StringComparison.Ordinal);
@@ -292,8 +273,8 @@ public sealed class ClientMergeTests
     {
         var keep = await Client("Jordan");
         var dupe = await Client("Jordy");
-        var caseId = _debtors.CaseFor(dupe.Id);
-        _debtors.BeforeRepoint = (repointCase, _) => _debtors.Link(repointCase, FilingRole.Debtor2, keep.Id);
+        var caseId = await _debtors.CaseForAsync(dupe.Id);
+        _debtors.BeforeRepoint = (repointCase, _) => _debtors.LinkAsync(repointCase, FilingRole.Debtor2, keep.Id);
 
         var refused = await Assert.ThrowsAsync<ConflictException>(() => Merge(dupe, keep));
         Assert.Contains("both debtors", refused.Message, StringComparison.Ordinal);
@@ -301,7 +282,7 @@ public sealed class ClientMergeTests
         Assert.Equal(FirmClientStatus.Active, (await Get(dupe)).Status);
         Assert.Null((await Get(dupe)).MergingInto);
         Assert.Null((await Get(keep)).MergingFrom);
-        Assert.Equal(dupe.Id, _debtors.ClientOf(caseId, FilingRole.Debtor1));
+        Assert.Equal(dupe.Id, await _debtors.ClientOfAsync(caseId, FilingRole.Debtor1));
     }
 
     // ── Merges into and out of the same client at once ──────────────
@@ -329,13 +310,13 @@ public sealed class ClientMergeTests
     {
         var keep = await Client("Jordan");
         var dupe = await Client("Jordy");
-        var caseId = _debtors.CaseFor(dupe.Id);
+        var caseId = await _debtors.CaseForAsync(dupe.Id);
         await _firms.ClaimClientMergeAsync(Ids.Firm, dupe.Id, keep.Id, Ct);
 
         await Merge(dupe, keep);
 
         Assert.Equal(keep.Id, (await Get(dupe)).MergedInto);
-        Assert.Equal(keep.Id, _debtors.ClientOf(caseId, FilingRole.Debtor1));
+        Assert.Equal(keep.Id, await _debtors.ClientOfAsync(caseId, FilingRole.Debtor1));
     }
 
     [Fact]
