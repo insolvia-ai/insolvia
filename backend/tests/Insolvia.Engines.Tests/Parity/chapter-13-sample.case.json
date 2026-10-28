@@ -1,0 +1,1421 @@
+{
+ "assets": [
+  [
+   "assets-1",
+   {
+    "category": "real_property",
+    "community_property": false,
+    "county": "Hillsborough",
+    "description": "12 Fixture Court, Tampa, FL 33601",
+    "detail": "Two-bedroom bungalow; the family homestead",
+    "ownership_interest": "both",
+    "ownership_interest_description": "Fee simple, tenancy by the entireties",
+    "property_types": [
+     "single_family_home"
+    ],
+    "value_entire": "265000.00",
+    "value_portion_owned": "240000.00"
+   }
+  ],
+  [
+   "assets-2",
+   {
+    "category": "vehicle",
+    "description": "2016 Honda Civic LX",
+    "detail": "One owner; always garaged",
+    "make": "Honda",
+    "mileage": 92000,
+    "model": "Civic LX",
+    "ownership_interest": "debtor_1",
+    "value_entire": "9000.00",
+    "value_portion_owned": "9000.00",
+    "year": 2016
+   }
+  ],
+  [
+   "assets-3",
+   {
+    "category": "household_goods",
+    "description": "Used furniture and kitchen appliances",
+    "ownership_interest": "both",
+    "value_entire": "2200.00",
+    "value_portion_owned": "2200.00"
+   }
+  ],
+  [
+   "assets-4",
+   {
+    "category": "retirement_accounts",
+    "description": "401(k) retirement account",
+    "detail": "401(k), Example Retirement Services — Placeholder Machines Inc",
+    "ownership_interest": "debtor_1",
+    "value_portion_owned": "48000.00"
+   }
+  ],
+  [
+   "assets-5",
+   {
+    "category": "watercraft_aircraft_or_recreational_vehicle",
+    "description": "2005 Sun Tracker pontoon boat",
+    "detail": "Trailer included; engine needs work",
+    "make": "Sun Tracker",
+    "model": "Pontoon boat",
+    "ownership_interest": "both",
+    "value_entire": "3500.00",
+    "value_portion_owned": "3500.00",
+    "year": 2005
+   }
+  ],
+  [
+   "assets-6",
+   {
+    "category": "electronics",
+    "description": "Two laptops, one television",
+    "ownership_interest": "both",
+    "value_entire": "900.00",
+    "value_portion_owned": "900.00"
+   }
+  ],
+  [
+   "assets-7",
+   {
+    "category": "clothes",
+    "description": "Everyday clothing",
+    "ownership_interest": "both",
+    "value_entire": "400.00",
+    "value_portion_owned": "400.00"
+   }
+  ],
+  [
+   "assets-8",
+   {
+    "category": "jewelry",
+    "description": "Wedding rings",
+    "ownership_interest": "both",
+    "value_entire": "1800.00",
+    "value_portion_owned": "1800.00"
+   }
+  ],
+  [
+   "assets-9",
+   {
+    "category": "cash",
+    "description": "Cash on hand",
+    "ownership_interest": "both",
+    "value_portion_owned": "150.00"
+   }
+  ],
+  [
+   "assets-10",
+   {
+    "category": "deposits_of_money",
+    "detail": "Checking account, Example Community Credit Union",
+    "ownership_interest": "both",
+    "value_portion_owned": "1250.00"
+   }
+  ],
+  [
+   "assets-11",
+   {
+    "category": "deposits_of_money",
+    "detail": "Business checking account, Example National Bank",
+    "ownership_interest": "debtor_1",
+    "value_portion_owned": "2100.00"
+   }
+  ],
+  [
+   "assets-12",
+   {
+    "category": "security_deposits_and_prepayments",
+    "detail": "Utility deposit, Example Electric Co.",
+    "ownership_interest": "both",
+    "value_portion_owned": "200.00"
+   }
+  ],
+  [
+   "assets-13",
+   {
+    "category": "money_owed_to_you",
+    "description": "2025 federal income tax refund, return filed",
+    "detail": "Federal",
+    "ownership_interest": "both",
+    "value_portion_owned": "1100.00"
+   }
+  ],
+  [
+   "assets-14",
+   {
+    "category": "insurance_policy_interests",
+    "description": "Term life policy, Example Life",
+    "detail": "Beneficiary: Blake Sampleton",
+    "ownership_interest": "debtor_1",
+    "value_portion_owned": "0.00"
+   }
+  ],
+  [
+   "assets-15",
+   {
+    "category": "office_equipment",
+    "description": "Workbench, test rigs, and hand tools",
+    "ownership_interest": "debtor_1",
+    "value_portion_owned": "750.00"
+   }
+  ],
+  [
+   "assets-16",
+   {
+    "category": "inventory",
+    "description": "Replacement engine parts inventory",
+    "ownership_interest": "debtor_1",
+    "value_portion_owned": "1200.00"
+   }
+  ],
+  [
+   "assets-17",
+   {
+    "category": "customer_lists_and_intangibles",
+    "description": "Walk-in repair customers' names and phone numbers",
+    "includes_personal_information": true,
+    "ownership_interest": "debtor_1"
+   }
+  ]
+ ],
+ "case": {
+  "chapter": 13,
+  "court": "flmb",
+  "created_at": "2026-09-01T12:00:00Z",
+  "created_by": "subject-fixture",
+  "district": "Middle District of Florida",
+  "division": "tampa",
+  "firm_id": "firm-fixture",
+  "id": "chapter-13-sample",
+  "status": "intake",
+  "updated_at": "2026-09-01T12:00:00Z"
+ },
+ "claims": [
+  [
+   "claims-1",
+   {
+    "account_last4": "3321",
+    "amount": "195000.00",
+    "asset_id": "assets-1",
+    "claim_class": "secured",
+    "collateral_description": "12 Fixture Court, Tampa, FL 33601",
+    "collateral_value": "240000.00",
+    "contingent": false,
+    "creditor_id": "creditors-1",
+    "date_incurred": "2019-06-01",
+    "disputed": false,
+    "intention": "retain_reaffirm",
+    "lien_nature": [
+     "agreement"
+    ],
+    "lien_position": 1,
+    "notice_parties": [
+     {
+      "account_last4": "3321",
+      "address": {
+       "city": "Tampa",
+       "line1": "101 Lender Way",
+       "line2": "Suite 4",
+       "postal_code": "33602",
+       "state": "FL"
+      },
+      "id": "np-mortgage-servicer",
+      "name": "Fixture Loan Servicing"
+     }
+    ],
+    "unliquidated": false,
+    "who_incurred": "both"
+   }
+  ],
+  [
+   "claims-2",
+   {
+    "account_last4": "8890",
+    "amount": "7400.00",
+    "asset_id": "assets-2",
+    "claim_class": "secured",
+    "creditor_id": "creditors-2",
+    "date_incurred": "2023-04-15",
+    "intention": "retain_redeem",
+    "lien_nature": [
+     "agreement"
+    ],
+    "lien_position": 1,
+    "who_incurred": "debtor_1"
+   }
+  ],
+  [
+   "claims-3",
+   {
+    "account_last4": "4412",
+    "amount": "8200.00",
+    "claim_class": "nonpriority_unsecured",
+    "creditor_id": "creditors-4",
+    "date_incurred": "2020-11-01",
+    "nonpriority_type": "other",
+    "nonpriority_type_other": "Credit card purchases",
+    "notice_parties": [
+     {
+      "account_last4": "4412",
+      "address": {
+       "city": "Wilmington",
+       "line1": "9 Collection Court",
+       "postal_code": "19801",
+       "state": "DE"
+      },
+      "id": "np-visa-collector",
+      "name": "Specimen Recovery Services"
+     }
+    ],
+    "subject_to_offset": false,
+    "who_incurred": "both"
+   }
+  ],
+  [
+   "claims-4",
+   {
+    "claim_class": "priority_unsecured",
+    "creditor_id": "creditors-3",
+    "date_incurred": "2025-04-15",
+    "nonpriority_amount": "450.00",
+    "priority_amount": "3200.00",
+    "priority_type": "tax_and_government",
+    "subject_to_offset": false,
+    "who_incurred": "both"
+   }
+  ],
+  [
+   "claims-5",
+   {
+    "account_last4": "0072",
+    "amount": "2600.00",
+    "claim_class": "nonpriority_unsecured",
+    "creditor_id": "creditors-5",
+    "date_incurred": "2026-02-10",
+    "disputed": true,
+    "nonpriority_type": "other",
+    "nonpriority_type_other": "Medical services",
+    "subject_to_offset": true,
+    "who_incurred": "debtor_2"
+   }
+  ],
+  [
+   "claims-6",
+   {
+    "account_last4": "5510",
+    "amount": "12000.00",
+    "claim_class": "nonpriority_unsecured",
+    "creditor_id": "creditors-6",
+    "date_incurred": "2012-09-01",
+    "nonpriority_type": "student_loan",
+    "subject_to_offset": false,
+    "who_incurred": "debtor_1"
+   }
+  ]
+ ],
+ "codebtors": [
+  {
+   "address": {
+    "city": "Tampa",
+    "line1": "9 Garden Lane",
+    "postal_code": "33603",
+    "state": "FL"
+   },
+   "claim_ids": [
+    "claims-2"
+   ],
+   "name": "Morgan Sampleton"
+  },
+  {
+   "address": {
+    "city": "Tampa",
+    "line1": "41 Engine Row",
+    "postal_code": "33605",
+    "state": "FL"
+   },
+   "claim_ids": [
+    "claims-3"
+   ],
+   "contract_lease_ids": [
+    "contract_leases-1"
+   ],
+   "name": "Casey Placeholder"
+  }
+ ],
+ "community_household_members": [],
+ "contract_leases": [
+  [
+   "contract_leases-1",
+   {
+    "counterparty_address": {
+     "city": "Tampa",
+     "line1": "77 Keeper Street",
+     "postal_code": "33605",
+     "state": "FL"
+    },
+    "counterparty_name": "Example Storage LLC",
+    "description": "Month-to-month storage unit lease, unit 214; debtor's interest: lessee",
+    "intention": "reject"
+   }
+  ],
+  [
+   "contract_leases-2",
+   {
+    "counterparty_address": {
+     "city": "Tampa",
+     "line1": "300 Signal Drive",
+     "postal_code": "33607",
+     "state": "FL"
+    },
+    "counterparty_name": "Example Wireless LLC",
+    "description": "Two-year wireless service agreement, 14 months remaining",
+    "intention": "reject"
+   }
+  ],
+  [
+   "contract_leases-3",
+   {
+    "counterparty_address": {
+     "city": "Orlando",
+     "line1": "500 Lease Lane",
+     "postal_code": "32801",
+     "state": "FL"
+    },
+    "counterparty_name": "Example Auto Leasing LLC",
+    "description": "Lease of a 2024 Toyota RAV4, 22 months remaining; debtor's interest: lessee",
+    "intention": "assume",
+    "list_on_statement_of_intention": true
+   }
+  ]
+ ],
+ "creditors": [
+  [
+   "creditors-1",
+   {
+    "address": {
+     "city": "Tampa",
+     "line1": "100 Lender Way",
+     "postal_code": "33602",
+     "state": "FL"
+    },
+    "name": "Fixture Home Loans"
+   }
+  ],
+  [
+   "creditors-2",
+   {
+    "address": {
+     "city": "Orlando",
+     "line1": "88 Motor Row",
+     "postal_code": "32801",
+     "state": "FL"
+    },
+    "name": "Example Auto Finance LLC"
+   }
+  ],
+  [
+   "creditors-3",
+   {
+    "address": {
+     "city": "Philadelphia",
+     "line1": "PO Box 7346",
+     "postal_code": "19101",
+     "state": "PA"
+    },
+    "name": "Internal Revenue Service"
+   }
+  ],
+  [
+   "creditors-4",
+   {
+    "address": {
+     "city": "Wilmington",
+     "line1": "1 Specimen Plaza",
+     "postal_code": "19801",
+     "state": "DE"
+    },
+    "name": "Specimen Card Services"
+   }
+  ],
+  [
+   "creditors-5",
+   {
+    "address": {
+     "city": "Tampa",
+     "line1": "2 Care Circle",
+     "postal_code": "33606",
+     "state": "FL"
+    },
+    "name": "Example General Hospital"
+   }
+  ],
+  [
+   "creditors-6",
+   {
+    "address": {
+     "city": "Lincoln",
+     "line1": "500 Loan Loop",
+     "postal_code": "68501",
+     "state": "NE"
+    },
+    "name": "Example Student Servicing"
+   }
+  ]
+ ],
+ "debtors": [
+  {
+   "body": {
+    "credit_counseling": {
+     "status": "completed_with_certificate"
+    },
+    "email": "debtor-one@example.test",
+    "employer_ids": [
+     "12-3456789"
+    ],
+    "mailing_address": {
+     "city": "Tampa",
+     "line1": "4501 Postal Way",
+     "line2": "PO Box 99",
+     "postal_code": "33602",
+     "state": "FL"
+    },
+    "mobile": "(813) 555-0102",
+    "name": {
+     "given": "Avery",
+     "middle": "Quinn",
+     "surname": "Sampleton"
+    },
+    "other_names_used": [
+     {
+      "given": "Avery",
+      "id": "alias-1",
+      "surname": "Example"
+     },
+     {
+      "business_name": "Avery's Fixture Repair",
+      "id": "alias-2"
+     }
+    ],
+    "phone": "(813) 555-0101",
+    "residence_address": {
+     "city": "Tampa",
+     "county": "Hillsborough",
+     "line1": "12 Fixture Court",
+     "line2": "Apt 4",
+     "postal_code": "33601",
+     "state": "FL"
+    },
+    "signed_at": "2026-08-30",
+    "venue": {
+     "basis": "lived_longest_180_days"
+    }
+   },
+   "created_at": "2026-09-01T12:00:00Z",
+   "filing_role": "debtor_1",
+   "id": "debtor-debtor_1",
+   "tax_id": {
+    "kind": "ssn",
+    "last_four": "4322",
+    "ref": "ref-debtor_1"
+   },
+   "updated_at": "2026-09-01T12:00:00Z"
+  },
+  {
+   "body": {
+    "credit_counseling": {
+     "exemption_reason": "disability",
+     "status": "not_required"
+    },
+    "name": {
+     "given": "Blake",
+     "suffix": "Jr.",
+     "surname": "Sampleton"
+    },
+    "residence_address": {
+     "city": "Tampa",
+     "county": "Hillsborough",
+     "line1": "12 Fixture Court",
+     "line2": "Apt 4",
+     "postal_code": "33601",
+     "state": "FL"
+    },
+    "signed_at": "2026-08-30",
+    "venue": {
+     "basis": "other",
+     "explanation": "Moved from Georgia in July; the greater part of the last 180 days was spent in this district."
+    }
+   },
+   "created_at": "2026-09-01T12:00:00Z",
+   "filing_role": "debtor_2",
+   "id": "debtor-debtor_2",
+   "tax_id": {
+    "kind": "ssn",
+    "last_four": "4323",
+    "ref": "ref-debtor_2"
+   },
+   "updated_at": "2026-09-01T12:00:00Z"
+  }
+ ],
+ "dependents": [
+  {
+   "age": 9,
+   "household_id": "households-1",
+   "lives_with_debtor": true,
+   "relationship": "Daughter"
+  }
+ ],
+ "employments": [
+  [
+   "employments-1",
+   {
+    "debtor_id": "debtor-debtor_1",
+    "employed_since": "2019-02-14",
+    "employer_address": {
+     "city": "Tampa",
+     "line1": "200 Engine Row",
+     "postal_code": "33605",
+     "state": "FL"
+    },
+    "employer_name": "Placeholder Machines Inc",
+    "occupation": "Systems analyst",
+    "status": "employed"
+   }
+  ],
+  [
+   "employments-2",
+   {
+    "debtor_id": "debtor-debtor_2",
+    "status": "not_employed"
+   }
+  ]
+ ],
+ "exemptions": [
+  {
+   "acquired_within_1215_days": false,
+   "asset_id": "assets-1",
+   "claims_full_fmv": true,
+   "statute_citation": "Fla. Const. art. X, § 4(a)(1)"
+  },
+  {
+   "amount": "5000.00",
+   "asset_id": "assets-2",
+   "claims_full_fmv": false,
+   "statute_citation": "Fla. Stat. § 222.25(1)"
+  },
+  {
+   "amount": "1000.00",
+   "asset_id": "assets-3",
+   "claims_full_fmv": false,
+   "statute_citation": "Fla. Const. art. X, § 4(a)(2)"
+  },
+  {
+   "asset_id": "assets-4",
+   "claims_full_fmv": true,
+   "statute_citation": "Fla. Stat. § 222.21(2)"
+  }
+ ],
+ "expenses": [
+  {
+   "amount": "1480.00",
+   "category": "rent_or_home_ownership",
+   "household_id": "households-1"
+  },
+  {
+   "amount": "120.00",
+   "category": "home_maintenance",
+   "household_id": "households-1"
+  },
+  {
+   "amount": "210.00",
+   "category": "electricity_heat_gas",
+   "household_id": "households-1"
+  },
+  {
+   "amount": "95.00",
+   "category": "water_sewer_garbage",
+   "household_id": "households-1"
+  },
+  {
+   "amount": "140.00",
+   "category": "telephone_and_internet",
+   "household_id": "households-1"
+  },
+  {
+   "amount": "850.00",
+   "category": "food_and_housekeeping",
+   "household_id": "households-1"
+  },
+  {
+   "amount": "300.00",
+   "category": "childcare_and_education",
+   "household_id": "households-1"
+  },
+  {
+   "amount": "120.00",
+   "category": "clothing_and_laundry",
+   "household_id": "households-1"
+  },
+  {
+   "amount": "60.00",
+   "category": "personal_care",
+   "household_id": "households-1"
+  },
+  {
+   "amount": "180.00",
+   "category": "medical_and_dental",
+   "household_id": "households-1"
+  },
+  {
+   "amount": "240.00",
+   "category": "transportation",
+   "household_id": "households-1"
+  },
+  {
+   "amount": "90.00",
+   "category": "entertainment_and_recreation",
+   "household_id": "households-1"
+  },
+  {
+   "amount": "50.00",
+   "category": "charitable_contributions",
+   "household_id": "households-1"
+  },
+  {
+   "amount": "45.00",
+   "category": "life_insurance",
+   "household_id": "households-1"
+  },
+  {
+   "amount": "380.00",
+   "category": "health_insurance",
+   "household_id": "households-1"
+  },
+  {
+   "amount": "165.00",
+   "category": "vehicle_insurance",
+   "household_id": "households-1"
+  },
+  {
+   "amount": "150.00",
+   "category": "taxes",
+   "household_id": "households-1",
+   "specify_text": "Self-employment tax estimate"
+  },
+  {
+   "amount": "260.00",
+   "category": "vehicle_installment_payments",
+   "household_id": "households-1"
+  },
+  {
+   "amount": "55.00",
+   "category": "other_installment_payments",
+   "household_id": "households-1",
+   "specify_text": "Financed laptop"
+  },
+  {
+   "amount": "70.00",
+   "category": "other",
+   "household_id": "households-1",
+   "specify_text": "Dog food and veterinary care"
+  }
+ ],
+ "filing_professionals": [
+  {
+   "address": {
+    "city": "Tampa",
+    "line1": "1 Example Way",
+    "postal_code": "33604",
+    "state": "FL"
+   },
+   "bar_number": "112233",
+   "bar_state": "FL",
+   "compensation_agreed": "1500.00",
+   "compensation_received": "1000.00",
+   "compensation_shared": false,
+   "compensation_source_paid": "debtor",
+   "compensation_source_to_be_paid": "other",
+   "compensation_source_to_be_paid_other": "Morgan Sampleton, Debtor 1's mother",
+   "email": "counsel@example.test",
+   "firm_name": "Counsel & Counsel PA",
+   "name": {
+    "given": "Alex",
+    "surname": "Counsel"
+   },
+   "phone": "(813) 555-0100",
+   "role": "attorney",
+   "services_excluded": "Representation in any adversary proceeding, appeal, or non-bankruptcy matter; motions to avoid liens; and defense of any motion to dismiss under section 707(b). Each is billed separately under a written agreement.",
+   "services_other": "Negotiation of the reaffirmation agreement with Fixture Loan Servicing and the redemption of the Honda Civic.",
+   "signature_date": "2026-08-31"
+  }
+ ],
+ "households": [
+  [
+   "households-1",
+   {
+    "change_expected": true,
+    "change_explanation": "Health insurance premiums increase in January.",
+    "expenses_include_others": true,
+    "separate_household": false,
+    "which_household": "main"
+   }
+  ]
+ ],
+ "income_summaries": [
+  {
+   "change_expected": true,
+   "change_explanation": "Overtime ends in November.",
+   "debtor_id": "debtor-debtor_1",
+   "deduction_insurance": "120.50",
+   "deduction_tax": "830.00",
+   "family_support": "400.00",
+   "household_contributions": "250.00",
+   "household_contributions_specify": "Adult son shares rent",
+   "overtime": "250.00",
+   "wages": "5200.00"
+  },
+  {
+   "debtor_id": "debtor-debtor_2",
+   "wages": "3000.00"
+  }
+ ],
+ "means_test_inputs": [
+  {
+   "additional_food_clothing": "60.00",
+   "ch13_eligible": true,
+   "ch13_projected_plan_payment": "650.00",
+   "charitable_contributions": "100.00",
+   "child_support_for_dependents": "300.00",
+   "childcare": "450.00",
+   "education_under_18": "150.00",
+   "health_insurance": "520.00",
+   "health_savings_account": "60.00",
+   "home_secured_monthly_total": "1480.00",
+   "involuntary_deductions": "85.00",
+   "optional_telecom": "45.00",
+   "other_secured_payments": [
+    {
+     "creditor_name": "Example Equipment Finance",
+     "id": "os-1",
+     "monthly_payment": "95.00",
+     "property_description": "Utility trailer"
+    }
+   ],
+   "people_65_or_older": 0,
+   "people_under_65": 3,
+   "priority_cure_total": "2100.00",
+   "qualified_retirement_deductions": "210.00",
+   "special_circumstances": [
+    {
+     "amount": "180.00",
+     "description": "Dialysis travel",
+     "id": "sc-1"
+    }
+   ],
+   "taxes": "1620.00",
+   "term_life_insurance": "35.00",
+   "vehicle_1_loan_monthly": "415.00",
+   "vehicle_count": 1
+  }
+ ],
+ "other_income_records": [
+  {
+   "amount": "1300.00",
+   "category": "unemployment",
+   "debtor_id": "debtor-debtor_2",
+   "payer": "Florida Reemployment Assistance",
+   "received_on": "2026-02-10"
+  },
+  {
+   "amount": "1300.00",
+   "category": "unemployment",
+   "debtor_id": "debtor-debtor_2",
+   "payer": "Florida Reemployment Assistance",
+   "received_on": "2026-03-10"
+  },
+  {
+   "amount": "1300.00",
+   "category": "unemployment",
+   "debtor_id": "debtor-debtor_2",
+   "payer": "Florida Reemployment Assistance",
+   "received_on": "2026-04-10"
+  },
+  {
+   "amount": "1300.00",
+   "category": "unemployment",
+   "debtor_id": "debtor-debtor_2",
+   "payer": "Florida Reemployment Assistance",
+   "received_on": "2026-05-10"
+  },
+  {
+   "amount": "1300.00",
+   "category": "unemployment",
+   "debtor_id": "debtor-debtor_2",
+   "payer": "Florida Reemployment Assistance",
+   "received_on": "2026-06-10"
+  },
+  {
+   "amount": "1300.00",
+   "category": "unemployment",
+   "debtor_id": "debtor-debtor_2",
+   "payer": "Florida Reemployment Assistance",
+   "received_on": "2026-07-10"
+  },
+  {
+   "amount": "900.00",
+   "category": "social_security_act_benefit",
+   "debtor_id": "debtor-debtor_2",
+   "payer": "Social Security Administration",
+   "received_on": "2026-05-20"
+  }
+ ],
+ "pay_period_records": [
+  {
+   "deductions": [
+    {
+     "amount": "1620.00",
+     "category": "tax",
+     "id": "ded-02-1"
+    },
+    {
+     "amount": "170.00",
+     "category": "insurance",
+     "id": "ded-02-2"
+    }
+   ],
+   "employment_id": "employments-1",
+   "frequency": "monthly",
+   "gross": "7400.00",
+   "net": "5610.00",
+   "pay_date": "2026-02-27",
+   "period_end": "2026-02-28",
+   "period_start": "2026-02-01"
+  },
+  {
+   "deductions": [
+    {
+     "amount": "1620.00",
+     "category": "tax",
+     "id": "ded-03-1"
+    },
+    {
+     "amount": "170.00",
+     "category": "insurance",
+     "id": "ded-03-2"
+    }
+   ],
+   "employment_id": "employments-1",
+   "frequency": "monthly",
+   "gross": "7400.00",
+   "net": "5610.00",
+   "pay_date": "2026-03-27",
+   "period_end": "2026-03-28",
+   "period_start": "2026-03-01"
+  },
+  {
+   "deductions": [
+    {
+     "amount": "1620.00",
+     "category": "tax",
+     "id": "ded-04-1"
+    },
+    {
+     "amount": "170.00",
+     "category": "insurance",
+     "id": "ded-04-2"
+    }
+   ],
+   "employment_id": "employments-1",
+   "frequency": "monthly",
+   "gross": "7400.00",
+   "net": "5610.00",
+   "pay_date": "2026-04-27",
+   "period_end": "2026-04-28",
+   "period_start": "2026-04-01"
+  },
+  {
+   "deductions": [
+    {
+     "amount": "1620.00",
+     "category": "tax",
+     "id": "ded-05-1"
+    },
+    {
+     "amount": "170.00",
+     "category": "insurance",
+     "id": "ded-05-2"
+    }
+   ],
+   "employment_id": "employments-1",
+   "frequency": "monthly",
+   "gross": "7400.00",
+   "net": "5610.00",
+   "pay_date": "2026-05-27",
+   "period_end": "2026-05-28",
+   "period_start": "2026-05-01"
+  },
+  {
+   "deductions": [
+    {
+     "amount": "1620.00",
+     "category": "tax",
+     "id": "ded-06-1"
+    },
+    {
+     "amount": "170.00",
+     "category": "insurance",
+     "id": "ded-06-2"
+    }
+   ],
+   "employment_id": "employments-1",
+   "frequency": "monthly",
+   "gross": "7400.00",
+   "net": "5610.00",
+   "pay_date": "2026-06-27",
+   "period_end": "2026-06-28",
+   "period_start": "2026-06-01"
+  },
+  {
+   "deductions": [
+    {
+     "amount": "1620.00",
+     "category": "tax",
+     "id": "ded-07-1"
+    },
+    {
+     "amount": "170.00",
+     "category": "insurance",
+     "id": "ded-07-2"
+    }
+   ],
+   "employment_id": "employments-1",
+   "frequency": "monthly",
+   "gross": "7400.00",
+   "net": "5610.00",
+   "pay_date": "2026-07-27",
+   "period_end": "2026-07-28",
+   "period_start": "2026-07-01"
+  }
+ ],
+ "petition": {
+  "ch7_funds_available_for_creditors": false,
+  "debt_character": "consumer",
+  "estimated_assets": "100000001_500000000",
+  "estimated_creditors": "1_49",
+  "estimated_liabilities": "50001_100000",
+  "eviction_judgment_against_you": false,
+  "expected_filing_date": "2026-08-03",
+  "fee_handling": "installments",
+  "hazardous_property": {
+   "address": {
+    "city": "Tampa",
+    "line1": "12 Fixture Court",
+    "postal_code": "33601",
+    "state": "FL"
+   },
+   "description": "Two corroding propane tanks behind the shed",
+   "why_immediate": "A slow leak was found in August"
+  },
+  "rents_residence": false,
+  "small_business_status": "not_filing_under_chapter_11"
+ },
+ "plans": [
+  {
+   "attorney_fees": "3500.00",
+   "monthly_payment": "500.00",
+   "payment_source": "fixed",
+   "secured_treatments": [
+    {
+     "claim_id": "claims-1",
+     "id": "t-home",
+     "treatment": "cure_and_maintain"
+    },
+    {
+     "claim_id": "claims-2",
+     "id": "t-car",
+     "interest_rate": "7.00",
+     "treatment": "cramdown"
+    }
+   ],
+   "trustee_percentage": "10.00",
+   "unsecured_treatment": "pot"
+  }
+ ],
+ "prior_cases": [
+  {
+   "case_number": "19-01234",
+   "district": "Northern District of Georgia",
+   "filed_on": "2019-03-04"
+  }
+ ],
+ "related_cases": [
+  {
+   "case_number": "26-00042",
+   "debtor_name": "Fixture Repair Holdings LLC",
+   "district": "Middle District of Florida",
+   "filed_on": "2026-06-15",
+   "relationship": "Affiliate"
+  }
+ ],
+ "sofa_entries": [
+  {
+   "entry_type": "marital_status",
+   "payload": {
+    "status": "married"
+   }
+  },
+  {
+   "entry_type": "prior_address",
+   "payload": {
+    "address": {
+     "city": "Tampa",
+     "line1": "3 Difference Court",
+     "postal_code": "33604",
+     "state": "FL"
+    },
+    "from_date": "2023-01-01",
+    "to_date": "2024-06-30",
+    "which_debtor": "debtor_1"
+   }
+  },
+  {
+   "entry_type": "prior_address",
+   "payload": {
+    "address": {
+     "city": "Decatur",
+     "line1": "8 Peachtree Lane",
+     "postal_code": "30030",
+     "state": "GA"
+    },
+    "from_date": "2024-11-01",
+    "to_date": "2026-07-01",
+    "which_debtor": "debtor_2"
+   }
+  },
+  {
+   "entry_type": "income_by_period",
+   "payload": {
+    "gross_amount": "41600.00",
+    "kind": "wages_and_commissions",
+    "period_end": "2026-08-01",
+    "period_start": "2026-01-01",
+    "which_debtor": "debtor_1"
+   }
+  },
+  {
+   "entry_type": "income_by_period",
+   "payload": {
+    "gross_amount": "61000.00",
+    "kind": "wages_and_commissions",
+    "period_end": "2025-12-31",
+    "period_start": "2025-01-01",
+    "which_debtor": "debtor_1"
+   }
+  },
+  {
+   "entry_type": "income_by_period",
+   "payload": {
+    "description": "Avery's Fixture Repair",
+    "gross_amount": "4200.00",
+    "kind": "operating_a_business",
+    "period_end": "2025-12-31",
+    "period_start": "2025-01-01",
+    "which_debtor": "debtor_1"
+   }
+  },
+  {
+   "entry_type": "income_by_period",
+   "payload": {
+    "gross_amount": "58300.00",
+    "kind": "wages_and_commissions",
+    "period_end": "2024-12-31",
+    "period_start": "2024-01-01",
+    "which_debtor": "debtor_1"
+   }
+  },
+  {
+   "entry_type": "income_by_period",
+   "payload": {
+    "gross_amount": "24000.00",
+    "kind": "wages_and_commissions",
+    "period_end": "2026-08-01",
+    "period_start": "2026-01-01",
+    "which_debtor": "debtor_2"
+   }
+  },
+  {
+   "entry_type": "income_by_period",
+   "payload": {
+    "gross_amount": "35000.00",
+    "kind": "wages_and_commissions",
+    "period_end": "2025-12-31",
+    "period_start": "2025-01-01",
+    "which_debtor": "debtor_2"
+   }
+  },
+  {
+   "entry_type": "income_by_period",
+   "payload": {
+    "description": "Unemployment compensation",
+    "gross_amount": "3100.00",
+    "kind": "other",
+    "period_end": "2024-08-31",
+    "period_start": "2024-03-01",
+    "which_debtor": "debtor_1"
+   }
+  },
+  {
+   "entry_type": "creditor_payment",
+   "payload": {
+    "amount_still_owed": "195000.00",
+    "creditor": {
+     "address": {
+      "city": "Tampa",
+      "line1": "100 Lender Way",
+      "postal_code": "33602",
+      "state": "FL"
+     },
+     "name": "Fixture Home Loans"
+    },
+    "dates": [
+     "2026-05-01",
+     "2026-06-01",
+     "2026-07-01"
+    ],
+    "payment_for": [
+     "mortgage"
+    ],
+    "total_paid": "4440.00"
+   }
+  },
+  {
+   "entry_type": "insider_payment",
+   "payload": {
+    "amount_still_owed": "0.00",
+    "dates": [
+     "2025-12-20"
+    ],
+    "insider": {
+     "address": {
+      "city": "Tampa",
+      "line1": "9 Garden Lane",
+      "postal_code": "33603",
+      "state": "FL"
+     },
+     "name": "Morgan Sampleton"
+    },
+    "reason": "Repayment of a family loan",
+    "relationship": "Mother of Debtor 2",
+    "total_paid": "1200.00"
+   }
+  },
+  {
+   "entry_type": "lawsuit",
+   "payload": {
+    "case_number": "26-CC-1184",
+    "case_title": "Specimen Card Services v. Sampleton",
+    "court": {
+     "address": {
+      "city": "Tampa",
+      "line1": "800 Example Street",
+      "postal_code": "33602",
+      "state": "FL"
+     },
+     "name": "Hillsborough County Court"
+    },
+    "nature_of_case": "Credit card collection",
+    "status": "pending"
+   }
+  },
+  {
+   "entry_type": "gift",
+   "payload": {
+    "dates": [
+     "2025-10-12"
+    ],
+    "description": "Wedding gift",
+    "recipient": {
+     "address": {
+      "city": "Atlanta",
+      "line1": "15 Loom Lane",
+      "postal_code": "30301",
+      "state": "GA"
+     },
+     "name": "Riley Example"
+    },
+    "relationship": "Niece",
+    "value": "650.00"
+   }
+  },
+  {
+   "entry_type": "charitable_contribution",
+   "payload": {
+    "dates": [
+     "2025-11-30"
+    ],
+    "description": "Cash donations",
+    "organization": {
+     "address": {
+      "city": "Tampa",
+      "line1": "5 Harvest Road",
+      "postal_code": "33610",
+      "state": "FL"
+     },
+     "name": "Example Food Bank"
+    },
+    "value": "700.00"
+   }
+  },
+  {
+   "entry_type": "loss",
+   "payload": {
+    "date": "2025-09-28",
+    "description": "Hurricane damage to the back fence",
+    "insurance_coverage": "Not covered; below the deductible",
+    "value": "1400.00"
+   }
+  },
+  {
+   "entry_type": "consultant_payment",
+   "payload": {
+    "amount": "1500.00",
+    "date": "2026-07-15",
+    "description": "Attorney fees for this bankruptcy case",
+    "email_or_website": "counsel@example.test",
+    "person": {
+     "address": {
+      "city": "Tampa",
+      "line1": "1 Example Way",
+      "postal_code": "33604",
+      "state": "FL"
+     },
+     "name": "Counsel & Counsel PA"
+    }
+   }
+  },
+  {
+   "entry_type": "property_transfer",
+   "payload": {
+    "date": "2025-03-15",
+    "description": "Sold a spare engine lathe valued at about $800",
+    "relationship": "Friend",
+    "transferee": {
+     "address": {
+      "city": "Tampa",
+      "line1": "41 Engine Row",
+      "postal_code": "33605",
+      "state": "FL"
+     },
+     "name": "Casey Placeholder"
+    },
+    "value_received": "$500 cash"
+   }
+  },
+  {
+   "entry_type": "closed_account",
+   "payload": {
+    "account_last4": "2210",
+    "account_type": "checking",
+    "date_closed": "2026-01-15",
+    "institution": {
+     "address": {
+      "city": "Tampa",
+      "line1": "12 Bay Street",
+      "postal_code": "33601",
+      "state": "FL"
+     },
+     "name": "First Fixture Bank"
+    },
+    "last_balance": "25.00"
+   }
+  },
+  {
+   "entry_type": "storage_unit",
+   "payload": {
+    "description": "Business records and spare parts",
+    "facility": {
+     "address": {
+      "city": "Tampa",
+      "line1": "77 Keeper Street",
+      "postal_code": "33605",
+      "state": "FL"
+     },
+     "name": "Example Storage LLC"
+    },
+    "still_have": true,
+    "who_has_access": [
+     "Avery Sampleton"
+    ]
+   }
+  },
+  {
+   "entry_type": "held_for_another",
+   "payload": {
+    "description": "Loaned test equipment",
+    "location": "Workshop shelf at 12 Fixture Court",
+    "owner": {
+     "address": {
+      "city": "Tampa",
+      "line1": "200 Engine Row",
+      "postal_code": "33605",
+      "state": "FL"
+     },
+     "name": "Placeholder Machines Inc"
+    },
+    "value": "900.00"
+   }
+  },
+  {
+   "entry_type": "business_connection",
+   "payload": {
+    "business": {
+     "address": {
+      "city": "Tampa",
+      "line1": "88 Difference Drive",
+      "postal_code": "33603",
+      "state": "FL"
+     },
+     "name": "Avery's Fixture Repair"
+    },
+    "connection": [
+     "sole_proprietor"
+    ],
+    "ein": "12-3456789",
+    "from_date": "2019-01-01",
+    "nature_of_business": "Repair and resale of sample machines"
+   }
+  },
+  {
+   "entry_type": "financial_statement_issued",
+   "payload": {
+    "date_issued": "2025-06-01",
+    "recipient": {
+     "address": {
+      "city": "Tampa",
+      "line1": "6801 Fixture Road",
+      "postal_code": "33607",
+      "state": "FL"
+     },
+     "name": "Example Community Credit Union"
+    }
+   }
+  }
+ ],
+ "sole_proprietorships": [
+  {
+   "address": {
+    "city": "Tampa",
+    "line1": "88 Difference Drive",
+    "postal_code": "33603",
+    "state": "FL"
+   },
+   "business_type": "none_of_the_above",
+   "name": "Avery's Fixture Repair"
+  }
+ ],
+ "tax_ids": {
+  "debtor_1": "987654322",
+  "debtor_2": "987654323"
+ }
+}
