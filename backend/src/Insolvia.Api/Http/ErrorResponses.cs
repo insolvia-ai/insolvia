@@ -1,5 +1,4 @@
-using System.Text;
-using System.Text.Json;
+using System.Text.Json.Nodes;
 using Insolvia.Core;
 using Insolvia.Core.Auth;
 
@@ -42,16 +41,10 @@ public static class ErrorResponses
     public static (int Status, string Body)? ForApiException(Exception error) => error switch
     {
         // The shape the marketing action surfaces per-field: {error, fields}.
-        FieldValidationException fields => (400, Json(writer =>
+        FieldValidationException fields => (400, FlaskJson.Serialize(new JsonObject
         {
-            writer.WriteString("error", "ValidationError");
-            writer.WriteStartObject("fields");
-            foreach (var (key, value) in fields.Fields.OrderBy(pair => pair.Key, StringComparer.Ordinal))
-            {
-                writer.WriteString(key, value);
-            }
-
-            writer.WriteEndObject();
+            ["error"] = "ValidationError",
+            ["fields"] = new JsonObject([.. fields.Fields.Select(pair => KeyValuePair.Create(pair.Key, (JsonNode?)pair.Value))]),
         })),
         ValidationException validation => (400, ErrorJson("ValidationError", validation)),
         ConflictException conflict => (409, ErrorJson("ConflictError", conflict)),
@@ -123,23 +116,9 @@ public static class ErrorResponses
         return name.EndsWith("Exception", StringComparison.Ordinal) ? name[..^"Exception".Length] + "Error" : name;
     }
 
-    // Flask's jsonify sorts keys; "error" < "fields" < "message" already.
-    private static string ErrorJson(string code, Exception error) => Json(writer =>
-    {
-        writer.WriteString("error", code);
-        writer.WriteString("message", PythonMessage(error));
-    });
-
-    private static string Json(Action<Utf8JsonWriter> write)
-    {
-        using var buffer = new MemoryStream();
-        using (var writer = new Utf8JsonWriter(buffer))
-        {
-            writer.WriteStartObject();
-            write(writer);
-            writer.WriteEndObject();
-        }
-
-        return Encoding.UTF8.GetString(buffer.ToArray());
-    }
+    // Flask's jsonify: sorted keys, and ensure_ascii — "doesn't" keeps its
+    // apostrophe and an em dash is \u2014, where Utf8JsonWriter's default
+    // encoder would write \u0027 and the raw character.
+    private static string ErrorJson(string code, Exception error) =>
+        FlaskJson.Serialize(new JsonObject { ["error"] = code, ["message"] = PythonMessage(error) });
 }

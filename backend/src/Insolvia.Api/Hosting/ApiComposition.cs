@@ -1,7 +1,11 @@
 using Insolvia.Api.Configuration;
 using Insolvia.Api.Http;
 using Insolvia.Api.Logging;
+using Insolvia.Api.Mail;
+using Insolvia.Api.Routes;
 using Insolvia.Aws.Jwks;
+using Insolvia.Aws.Mailer;
+using Insolvia.Core.Courts;
 using Insolvia.Core.Memory;
 using Insolvia.Core.Ports;
 using Insolvia.Data;
@@ -9,6 +13,7 @@ using Insolvia.Data.AccessLogging;
 using Insolvia.Data.Connections;
 using Insolvia.Data.Firms;
 using Insolvia.Data.Portal;
+using Insolvia.Data.Waitlist;
 using Microsoft.Extensions.Logging.Console;
 
 namespace Insolvia.Api.Hosting;
@@ -54,6 +59,10 @@ public static class ApiComposition
         builder.Services.AddSingleton(services => services.GetRequiredService<ApiConfig>().Environment);
         builder.Services.AddSingleton(TimeProvider.System);
 
+        // The court registry ships inside Insolvia.Core (ADR 0014) and is the
+        // same everywhere: a firm's default court is validated against it.
+        builder.Services.AddSingleton<ICourtRegistry>(CourtRegistry.Shipped);
+
         var config = ApiConfig.Load(name => configuration[name]);
         if (isLambda)
         {
@@ -67,6 +76,13 @@ public static class ApiComposition
                 services.GetRequiredService<TimeProvider>()));
             builder.Services.AddScoped<IClientBindingStore>(services => new PostgresClientBindingStore(services.GetRequiredService<InsolviaDbContext>()));
             builder.Services.AddScoped<IAccessLog>(services => new PostgresAccessLog(services.GetRequiredService<InsolviaDbContext>()));
+            builder.Services.AddScoped<IWaitlistStore>(services => new PostgresWaitlistStore(services.GetRequiredService<InsolviaDbContext>()));
+
+            // Not composed until their adapters are ported, so the routes
+            // that need them answer the 500 that names the gap — never a
+            // memory twin that would accept a write and lose it:
+            //   IUserDirectory (Cognito AdminCreateUser) — POST /v1/firm/users;
+            //   IDebtorClientLinks (the debtor store, 18.11) — the client merge.
         }
 
         // Constructed once, at start, so its key cache lives as long as the
@@ -82,12 +98,40 @@ public static class ApiComposition
                 clock: services.GetRequiredService<TimeProvider>()));
         }
 
+        // The mailer's own fallback shape (api_lambda.py and the development
+        // server alike): with MAILER_API_URL, the SigV4 client — pointed at the
+        // mailer's local stack on a laptop; without it, the in-memory one that
+        // records and sends nothing.
+        if (config.MailerApiUrl is not null)
+        {
+            var mailerUrl = config.MailerApiUrl;
+            builder.Services.AddSingleton<IMailer>(_ => new SigV4Mailer(SigV4MailerClient.FromEnvironment(new HttpClient(), mailerUrl, name => configuration[name])));
+        }
+        else
+        {
+            builder.Services.AddSingleton<IMailer, MemoryMailer>();
+        }
+
         if (!isLambda)
         {
             builder.Services.AddSingleton<IFirmStore>(services => new MemoryFirmStore(services.GetRequiredService<TimeProvider>()));
             builder.Services.AddSingleton<IClientBindingStore, MemoryClientBindingStore>();
             builder.Services.AddSingleton<IAccessLog, MemoryAccessLog>();
+            builder.Services.AddSingleton<IWaitlistStore, MemoryWaitlistStore>();
+
+            // Mints a subject where Cognito would; sends no invitation.
+            builder.Services.AddSingleton<IUserDirectory, MemoryUserDirectory>();
         }
+
+        // The firm-side routes (18.14), mapped after /health in this order.
+        builder.Services.AddSingleton<IEndpointModule, MeRoutes>();
+        builder.Services.AddSingleton<IEndpointModule, FirmRoutes>();
+        builder.Services.AddSingleton<IEndpointModule, FirmClientRoutes>();
+        builder.Services.AddSingleton<IEndpointModule, LibraryCreditorRoutes>();
+        builder.Services.AddSingleton<IEndpointModule, FirmQuestionnaireRoutes>();
+        builder.Services.AddSingleton<IEndpointModule, DocumentChecklistRoutes>();
+        builder.Services.AddSingleton<IEndpointModule, WaitlistRoutes>();
+        builder.Services.AddSingleton<IEndpointModule, UnsubscribeRoutes>();
 
         return builder;
     }

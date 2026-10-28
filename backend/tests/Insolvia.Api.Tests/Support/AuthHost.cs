@@ -1,11 +1,13 @@
 using System.Collections.Concurrent;
 using Insolvia.Api.Auth;
 using Insolvia.Api.Hosting;
+using Insolvia.Api.Mail;
 using Insolvia.Core;
 using Insolvia.Core.Clients;
 using Insolvia.Core.Firms;
 using Insolvia.Core.Memory;
 using Insolvia.Core.Ports;
+using Insolvia.Data.Waitlist;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -29,7 +31,8 @@ internal sealed class AuthHost : IDisposable
         IReadOnlyDictionary<string, string?>? settings = null,
         bool composeJwks = true,
         bool composeFirmStore = true,
-        Action<IEndpointRouteBuilder>? extraRoutes = null)
+        Action<IEndpointRouteBuilder>? extraRoutes = null,
+        Action<IServiceCollection>? services = null)
     {
         var effective = new Dictionary<string, string?>(StringComparer.Ordinal)
         {
@@ -50,28 +53,47 @@ internal sealed class AuthHost : IDisposable
                 host.UseSetting(key, value);
             }
 
-            host.ConfigureTestServices(services =>
-            {
-                services.RemoveAll<IJwksProvider>();
-                if (composeJwks)
-                {
-                    services.AddSingleton<IJwksProvider>(new StaticJwksProvider(new Dictionary<string, Microsoft.IdentityModel.Tokens.SecurityKey> { [Tokens.Kid] = Tokens.PublicKey }));
-                }
-
-                services.RemoveAll<IFirmStore>();
-                if (composeFirmStore)
-                {
-                    services.AddSingleton<IFirmStore>(Firms);
-                }
-
-                services.RemoveAll<IClientBindingStore>();
-                services.AddSingleton<IClientBindingStore>(Bindings);
-                services.RemoveAll<IAccessLog>();
-                services.AddSingleton<IAccessLog>(AccessLog);
-                services.AddSingleton<ILoggerProvider>(Logs);
-                services.AddSingleton<IEndpointModule>(new ProbeRoutes(extraRoutes));
-            });
+            host.ConfigureTestServices(collection => Compose(collection, composeJwks, composeFirmStore, extraRoutes, services));
         });
+    }
+
+    private void Compose(
+        IServiceCollection services,
+        bool composeJwks,
+        bool composeFirmStore,
+        Action<IEndpointRouteBuilder>? extraRoutes,
+        Action<IServiceCollection>? configure)
+    {
+        services.RemoveAll<IJwksProvider>();
+        if (composeJwks)
+        {
+            services.AddSingleton<IJwksProvider>(new StaticJwksProvider(new Dictionary<string, Microsoft.IdentityModel.Tokens.SecurityKey> { [Tokens.Kid] = Tokens.PublicKey }));
+        }
+
+        services.RemoveAll<IFirmStore>();
+        if (composeFirmStore)
+        {
+            services.AddSingleton<IFirmStore>(Firms);
+        }
+
+        services.RemoveAll<IClientBindingStore>();
+        services.AddSingleton<IClientBindingStore>(Bindings);
+        services.RemoveAll<IAccessLog>();
+        services.AddSingleton<IAccessLog>(AccessLog);
+
+        // The firm-side routes' ports (18.14): the Python fixtures' memory adapters.
+        services.RemoveAll<IUserDirectory>();
+        services.AddSingleton<IUserDirectory>(Directory);
+        services.RemoveAll<IMailer>();
+        services.AddSingleton<IMailer>(Mailer);
+        services.RemoveAll<IWaitlistStore>();
+        services.AddSingleton<IWaitlistStore>(Waitlist);
+        services.RemoveAll<IDebtorClientLinks>();
+        services.AddSingleton<IDebtorClientLinks>(DebtorLinks);
+
+        services.AddSingleton<ILoggerProvider>(Logs);
+        services.AddSingleton<IEndpointModule>(new ProbeRoutes(extraRoutes));
+        configure?.Invoke(services);
     }
 
     public MemoryFirmStore Firms { get; } = new();
@@ -81,6 +103,14 @@ internal sealed class AuthHost : IDisposable
     public MemoryAccessLog AccessLog { get; } = new();
 
     public LogCapture Logs { get; } = new();
+
+    public MemoryUserDirectory Directory { get; } = new();
+
+    public MemoryMailer Mailer { get; } = new();
+
+    public MemoryWaitlistStore Waitlist { get; } = new();
+
+    public FakeDebtorClientLinks DebtorLinks { get; } = new();
 
     public IServiceProvider Services => _factory.Services;
 

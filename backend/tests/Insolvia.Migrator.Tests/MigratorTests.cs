@@ -163,6 +163,31 @@ public sealed class MigratorTests(PostgresFixture postgres)
     }
 
     [Fact]
+    public async Task The_waitlist_takes_the_apis_inserts_and_gives_nothing_back()
+    {
+        // POST /v1/waitlist is public: the role behind it may add a row and
+        // may not read the list, change a row, or remove one.
+        var connectionString = await postgres.CreateDatabaseAsync();
+        await RunAsync(connectionString, GrantTable.All);
+
+        await ExecuteAsync(
+            As(connectionString, ServiceRoles.Api),
+            "INSERT INTO insolvia.waitlist_entries (id, submitted_at, status, name, firm, email) "
+            + "VALUES ('entry-1', now(), 'new', 'Ada Example', 'Example LLP', 'ada@example.test')");
+        Assert.Equal(1L, await ScalarAsync<long>(connectionString, "SELECT count(*) FROM insolvia.waitlist_entries"));
+
+        foreach (var privilege in new[] { "SELECT", "UPDATE", "DELETE", "TRUNCATE" })
+        {
+            Assert.False(await HasPrivilegeAsync(connectionString, ServiceRoles.Api, "waitlist_entries", privilege));
+        }
+
+        foreach (var role in ServiceRoles.All.Where(role => role != ServiceRoles.Api))
+        {
+            Assert.False(await HasPrivilegeAsync(connectionString, role, "waitlist_entries", "INSERT"));
+        }
+    }
+
+    [Fact]
     public async Task A_grant_naming_a_missing_table_or_an_unknown_role_fails_the_run()
     {
         var connectionString = await postgres.CreateDatabaseAsync();
