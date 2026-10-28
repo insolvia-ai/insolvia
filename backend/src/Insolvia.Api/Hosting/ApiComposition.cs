@@ -270,6 +270,10 @@ public static class ApiComposition
         builder.Services.AddSingleton<IEndpointModule, CaseSummaryRoutes>();
         builder.Services.AddSingleton<IEndpointModule, ExtractionReviewRoutes>();
 
+        // The forms hub, the single-form preview and the filing set (18.15c).
+        builder.Services.AddSingleton<IEndpointModule, FormsHubRoutes>();
+        builder.Services.AddSingleton<IEndpointModule, FilingSetRoutes>();
+
         return builder;
     }
 

@@ -165,6 +165,10 @@ public enum AccessAction
     /// <summary>A candidate was accepted or rejected.</summary>
     [JsonStringEnumMemberName("extraction.review")]
     ExtractionReview,
+
+    /// <summary>One form was rendered for preview (the forms hub, 18.15c) — beside, never instead of, B121's <c>taxid.read</c> rows.</summary>
+    [JsonStringEnumMemberName("form_preview.render")]
+    FormPreviewRender,
 }
 
 /// <summary>Whether the caller got the data. A denied read is the interesting row: it is what probing looks like.</summary>
