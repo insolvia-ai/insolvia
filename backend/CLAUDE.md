@@ -11,7 +11,8 @@ brings its Python tests across, translated, not rewritten.
 | Project | May reference |
 |---|---|
 | `Insolvia.Core` — domain + ports | nothing in the solution |
-| `Insolvia.Engines`, `Insolvia.Forms` — pure | `Core` |
+| `Insolvia.Engines` — pure: calculation engines and form projections | `Core` |
+| `Insolvia.Forms` — pure: the PDF engine, which fills what Engines projects | `Core`, `Engines` |
 | `Insolvia.Data` (EF Core, Postgres), `Insolvia.Aws` (SDK adapters) | `Core` |
 | hosts: `Api`, `Worker`, `Admin`, `Mcp`, `Filing`, `Migrator` | any library above; **never another host** |
 
