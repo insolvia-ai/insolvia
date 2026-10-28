@@ -1,6 +1,27 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- Unit tests for Insolvia.Filing. Empty until its first ported module. -->
+  <!-- Unit tests for Insolvia.Filing, translated from services/filing's
+       tests/unit: TOTP, the fence, screens, the hand-back catalogue, the
+       config, and the whole worker against the fake CM/ECF (FakeCourt/,
+       Kestrel on 127.0.0.1 — a fixture, never in src/). The end-to-end run
+       approves through the REAL Insolvia.Api in-process (memory stores), so
+       the approval the worker consumes is the API's own, as services/filing's
+       suite imports services/api's world. No AWS, no network beyond loopback. -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Microsoft.Extensions.DependencyInjection" />
+  </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/Insolvia.Filing/Insolvia.Filing.csproj" />
+    <ProjectReference Include="../../src/Insolvia.Api/Insolvia.Api.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The reference case and its parser, shared with the Forms suite (read in place). -->
+    <Compile Include="../Insolvia.Forms.Tests/Support/CaseFiles.cs" Link="Shared/CaseFiles.cs" />
+    <Compile Include="../Insolvia.Forms.Tests/Support/CaseDatas.cs" Link="Shared/CaseDatas.cs" />
+    <!-- Real RS256 tokens the API verifies, shared with the API suite. -->
+    <Compile Include="../Insolvia.Api.Tests/Support/Tokens.cs" Link="Shared/Tokens.cs" />
+    <None Include="../Insolvia.Engines.Tests/Parity/*.case.json" Link="CaseFiles/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

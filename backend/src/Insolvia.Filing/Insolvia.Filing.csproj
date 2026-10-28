@@ -1,9 +1,27 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- Host: the filing worker Lambda. Gets its own Dockerfile target when it has a handler. -->
+  <!-- Host: the filing worker (ADR 0024 PR 7; plan 18.19). Inside Lambda the
+       SQS event source mapping's target at batch size 1; anywhere else the
+       local poller. FilingProgram.cs says how one binary does both. The
+       fake CM/ECF is a TEST fixture (tests/Insolvia.Filing.Tests/FakeCourt)
+       and never reaches this project or its image. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <!-- The Lambda base image runs an executable assembly by name: the
+         Dockerfile's CMD is this name. -->
+    <AssemblyName>Insolvia.Filing</AssemblyName>
+    <StartupObject>Insolvia.Filing.FilingProgram</StartupObject>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Amazon.Lambda.Core" />
+    <PackageReference Include="Amazon.Lambda.RuntimeSupport" />
+  </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../Insolvia.Core/Insolvia.Core.csproj" />
     <ProjectReference Include="../Insolvia.Forms/Insolvia.Forms.csproj" />
     <ProjectReference Include="../Insolvia.Data/Insolvia.Data.csproj" />
     <ProjectReference Include="../Insolvia.Aws/Insolvia.Aws.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Insolvia.Filing.Tests" />
   </ItemGroup>
 </Project>
