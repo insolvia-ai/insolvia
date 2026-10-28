@@ -113,6 +113,20 @@ public sealed class LayeringTests
 
     [Theory]
     [MemberData(nameof(SourceProjects))]
+    public void Only_the_worker_takes_the_model_sdk(string project)
+    {
+        // ADR 0015/0019: the model SDK is the pipeline worker's weight; the
+        // API image (and every other) never grows it.
+        if (project == "Worker")
+        {
+            return;
+        }
+
+        Assert.DoesNotContain("Anthropic", Elements(SourceProjectFile(project), "PackageReference"), StringComparer.OrdinalIgnoreCase);
+    }
+
+    [Theory]
+    [MemberData(nameof(SourceProjects))]
     public void Every_source_project_has_its_own_test_project(string project)
     {
         var testProject = Path.Combine(BackendRoot, "tests", $"Insolvia.{project}.Tests", $"Insolvia.{project}.Tests.csproj");

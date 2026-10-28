@@ -1,12 +1,14 @@
 using Amazon;
 using Amazon.KeyManagementService;
 using Amazon.S3;
+using Amazon.SQS;
 using Insolvia.Api.Configuration;
 using Insolvia.Api.Http;
 using Insolvia.Api.Logging;
 using Insolvia.Api.Mail;
 using Insolvia.Api.Routes;
 using Insolvia.Aws.Documents;
+using Insolvia.Aws.Jobs;
 using Insolvia.Aws.Jwks;
 using Insolvia.Aws.Mailer;
 using Insolvia.Aws.Sealing;
@@ -110,6 +112,11 @@ public static class ApiComposition
             builder.Services.AddScoped<IFilingStore>(services => new PostgresFilingStore(services.GetRequiredService<InsolviaDbContext>()));
             builder.Services.AddScoped<ITaxIdStore>(services => new PostgresTaxIdStore(services.GetRequiredService<InsolviaDbContext>()));
 
+            // The pipeline (18.17): the API creates and reads job rows, reads
+            // packets; the worker advances the one and writes the other.
+            builder.Services.AddScoped<IJobStore>(services => new PostgresJobStore(services.GetRequiredService<InsolviaDbContext>()));
+            builder.Services.AddScoped<IPacketStore>(services => new PostgresPacketStore(services.GetRequiredService<InsolviaDbContext>()));
+
             // Sealed data (18.12). The vault's stores, over the same context:
             // the API's role may INSERT and DELETE a credential and SELECT
             // its metadata columns only (GrantTable), which is all these
@@ -165,6 +172,23 @@ public static class ApiComposition
             builder.Services.AddSingleton<IMailer, MemoryMailer>();
         }
 
+        // The pipeline's queue (ADR 0018): with JOB_QUEUE_URL, SQS — a laptop's
+        // own dev queue, which the worker's poller consumes. Without it, a
+        // deployed API answers 503 on accept (the image can roll out ahead of
+        // the queue); everywhere else the memory sender records the message
+        // and runs nothing.
+        if (config.JobQueueUrl is { } queueUrl)
+        {
+            builder.Services.AddSingleton<IAmazonSQS>(_ => configuration["AWS_REGION"] is { Length: > 0 } region
+                ? new AmazonSQSClient(RegionEndpoint.GetBySystemName(region))
+                : new AmazonSQSClient());
+            builder.Services.AddSingleton<IJobSender>(services => new SqsJobSender(services.GetRequiredService<IAmazonSQS>(), queueUrl));
+        }
+        else if (!isLambda)
+        {
+            builder.Services.AddSingleton<IJobSender, MemoryJobSender>();
+        }
+
         if (!isLambda)
         {
             builder.Services.AddSingleton<IFirmStore>(services => new MemoryFirmStore(services.GetRequiredService<TimeProvider>()));
@@ -191,6 +215,8 @@ public static class ApiComposition
             builder.Services.AddSingleton<ICaseTaskStore, MemoryCaseTaskStore>();
             builder.Services.AddSingleton<IDocumentRequestStore, MemoryDocumentRequestStore>();
             builder.Services.AddSingleton<ITaxIdStore, MemoryTaxIdStore>();
+            builder.Services.AddSingleton<IJobStore, MemoryJobStore>();
+            builder.Services.AddSingleton<IPacketStore>(services => new MemoryPacketStore(services.GetRequiredService<MemoryCaseStore>()));
 
             // The vault's twins and the deterministic local key — never
             // composed beside a real table. Still a SEALER only: the
@@ -237,6 +263,12 @@ public static class ApiComposition
         builder.Services.AddSingleton<IEndpointModule, PortalInvitationRoutes>();
         builder.Services.AddSingleton<IEndpointModule, PortalRoutes>();
         builder.Services.AddSingleton<IEndpointModule, PortalDocumentRoutes>();
+
+        // The pipeline's routes (18.17).
+        builder.Services.AddSingleton<IEndpointModule, JobRoutes>();
+        builder.Services.AddSingleton<IEndpointModule, PacketRoutes>();
+        builder.Services.AddSingleton<IEndpointModule, CaseSummaryRoutes>();
+        builder.Services.AddSingleton<IEndpointModule, ExtractionReviewRoutes>();
 
         return builder;
     }

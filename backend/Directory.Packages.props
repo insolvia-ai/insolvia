@@ -51,6 +51,16 @@
          (S3DocumentBlobStore). Needs AWSSDK.Core >= 4.0.102.10 — the 4.0.102.14 above satisfies it. -->
     <PackageVersion Include="AWSSDK.S3" Version="4.0.104.3" />
   </ItemGroup>
+  <ItemGroup Label="Job pipeline">
+    <!-- The pipeline queue (ADR 0018): the API's enqueue (SqsJobSender) and
+         the worker's local poller. On the same AWSSDK.Core as the rest. -->
+    <PackageVersion Include="AWSSDK.SQS" Version="4.0.100.17" />
+    <!-- The worker's model calls (ADR 0019), pinned exact: the request bodies
+         are pinned to the Python adapters' by WireParityTests, and a newer
+         SDK may change the anthropic-version it sends (research
+         dotnet-mcp-and-anthropic-sdks-2026-10-27 § 3.3). Worker image only. -->
+    <PackageVersion Include="Anthropic" Version="[13.3.0]" />
+  </ItemGroup>
   <ItemGroup Label="AWS adapters">
     <!-- The default credential chain the mailer client signs with (SigV4 to
          the mailer's IAM-authorised API). The same version AWSSDK.RDS already

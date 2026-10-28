@@ -2,6 +2,31 @@
   "version": 2,
   "dependencies": {
     "net10.0": {
+      "Amazon.Lambda.Core": {
+        "type": "Direct",
+        "requested": "[3.3.0, )",
+        "resolved": "3.3.0",
+        "contentHash": "CZKlX8ZDMi6aKPo5lPAjmsJFDXNJHX00aiiYeRQOEszP8cjx6qklBvTPj4qpr4dlp3YYQjmB87CqAiWV7vk2fA=="
+      },
+      "Amazon.Lambda.RuntimeSupport": {
+        "type": "Direct",
+        "requested": "[2.2.0, )",
+        "resolved": "2.2.0",
+        "contentHash": "S2ey3Wwb1JBJzYOa1jHDfbATziS7BVDRd9ZzBBTIRf8+2KsAujlEUwbCAZ5WpfGl0poiTVdvD4S9ttrCX3fmdg==",
+        "dependencies": {
+          "Amazon.Lambda.Core": "3.3.0",
+          "SnapshotRestore.Registry": "1.0.2"
+        }
+      },
+      "Anthropic": {
+        "type": "Direct",
+        "requested": "[13.3.0, 13.3.0]",
+        "resolved": "13.3.0",
+        "contentHash": "LaqSBrXFuHxTG6+liUGZLL1kJbpyUfyD5UjiCO8CI90il+udIbaqwqA8iRKClSzLk57f+xhtFcqiCrKIFdW8jQ==",
+        "dependencies": {
+          "Microsoft.Extensions.AI.Abstractions": "10.5.1"
+        }
+      },
       "Microsoft.EntityFrameworkCore.Abstractions": {
         "type": "Transitive",
         "resolved": "10.0.14",
@@ -11,6 +36,11 @@
         "type": "Transitive",
         "resolved": "10.0.14",
         "contentHash": "gaANlGNTxkgODX2eeVT8jjd3AmlFilQV4DFf8qoW30+wUCm2o4N7nEHtZvnHIwfhaJni2DqcjE47Au7tC0Q5jA=="
+      },
+      "Microsoft.Extensions.AI.Abstractions": {
+        "type": "Transitive",
+        "resolved": "10.5.1",
+        "contentHash": "nB0l3IlsVbNeUxsE7nZNb9GY8rP1OSeqpj0pseORPejt474HNKEauTWTLdSJPkSvPlRMxowZNMo6nyp7APAiSg=="
       },
       "Microsoft.Extensions.Caching.Abstractions": {
         "type": "Transitive",
@@ -115,6 +145,11 @@
           "Microsoft.Extensions.Logging.Abstractions": "10.0.0"
         }
       },
+      "SnapshotRestore.Registry": {
+        "type": "Transitive",
+        "resolved": "1.0.2",
+        "contentHash": "clcAZGAb8sbtIuynOPiZkpHLdSb3RGxHJjSPyecgRh55fFY0KynqA7GEtrVL/sAUgO9jvC0IMhPXBRcJuFWrAA=="
+      },
       "insolvia.aws": {
         "type": "Project",
         "dependencies": {
@@ -122,6 +157,7 @@
           "AWSSDK.Core": "[4.0.102.14, )",
           "AWSSDK.KeyManagementService": "[4.0.101, )",
           "AWSSDK.S3": "[4.0.104.3, )",
+          "AWSSDK.SQS": "[4.0.100.17, )",
           "Insolvia.Core": "[1.0.0, )"
         }
       },
@@ -193,6 +229,15 @@
         "requested": "[4.0.104.3, )",
         "resolved": "4.0.104.3",
         "contentHash": "AWtrk6Nn9v2+9HdD1qR3o/7zqFnSNWymqAYGQgzs53i2WJHM58avatVJROtF8WjaUzi1k463+uQUsYtUBA8Elg==",
+        "dependencies": {
+          "AWSSDK.Core": "[4.0.102.10, 5.0.0)"
+        }
+      },
+      "AWSSDK.SQS": {
+        "type": "CentralTransitive",
+        "requested": "[4.0.100.17, )",
+        "resolved": "4.0.100.17",
+        "contentHash": "dtFV8i7/GfSb0e6MHT7gPDwIHhoq3MERO1YFs/VU6FGRBCB/pInqBJhlipXWS9AbdV1+Bu5+KftpAsIhmoPtcA==",
         "dependencies": {
           "AWSSDK.Core": "[4.0.102.10, 5.0.0)"
         }

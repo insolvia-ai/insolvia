@@ -133,3 +133,7 @@ jobs:
       - name: Build admin development image
         if: steps.filter.outputs.run == 'true'
         run: docker build --target admin-development -t insolvia-backend-admin-dev-pr-check .
+
+      - name: Build worker Lambda image
+        if: steps.filter.outputs.run == 'true'
+        run: docker build --target worker-lambda -t insolvia-backend-worker-pr-check .

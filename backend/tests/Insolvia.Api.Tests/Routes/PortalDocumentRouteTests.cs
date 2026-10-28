@@ -10,8 +10,8 @@ namespace Insolvia.Api.Tests.Routes;
 /// services/api tests/unit/test_portal_documents.py, the client half (the
 /// staff half is in <see cref="DocumentRouteTests"/>): a client's upload
 /// answers its request through the staff seam, a client sees only their own
-/// uploads, and every request is logged as the client. The auto-extraction
-/// test waits for the job store (18.17); a client's channel never triggers it.
+/// uploads, every request is logged as the client, and a client's upload is
+/// never auto-extracted while a staff one of the same kind is.
 /// </summary>
 public sealed class PortalDocumentRouteTests : IAsyncLifetime, IDisposable
 {
@@ -202,6 +202,28 @@ public sealed class PortalDocumentRouteTests : IAsyncLifetime, IDisposable
 
     private static string Sorted(JsonNode? node) =>
         new JsonObject([.. node!.AsObject().OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => KeyValuePair.Create(pair.Key, pair.Value?.DeepClone()))]).ToJsonString();
+
+    [Fact]
+    public async Task A_clients_upload_is_never_auto_extracted()
+    {
+        // Pay stubs are extractable: the staff upload proves the trigger is
+        // live in this host, so the client's silence is the channel.
+        var jobs = _world.Service<Core.Ports.IJobStore>();
+        var sender = (Core.Memory.MemoryJobSender)_world.Service<Core.Ports.IJobSender>();
+        var stubs = ByTitle((await ApplyChecklistAsync(_caseId))["requests"]!, "Pay stubs for the last six months");
+
+        await ClientUploadAsync(stubs.Str("id")!);
+        Assert.Empty(await jobs.ListForCaseAsync(_caseId, HttpAssert.Ct));
+        Assert.Empty(sender.Bodies);
+
+        var created = await _world.Post($"/v1/cases/{_caseId}/documents", $$"""{"kind": "pay_stub", "requestId": "{{stubs.Str("id")}}", {{Upload}}}""");
+        Assert.True(created.Status == 201, created.Body);
+        var documentId = created.Object["document"]!["id"]!.GetValue<string>();
+        Assert.Equal("staff", created.Object["document"]!["channel"]!.GetValue<string>());
+        Blobs.AcceptUpload($"cases/{_caseId}/{documentId}", 2048);
+        Assert.Equal(200, (await _world.Post($"/v1/cases/{_caseId}/documents/{documentId}/complete", null)).Status);
+        Assert.Equal(documentId, Assert.Single(await jobs.ListForCaseAsync(_caseId, HttpAssert.Ct)).DocumentId);
+    }
 
     private async Task<JsonObject> ApplyChecklistAsync(string caseId)
     {

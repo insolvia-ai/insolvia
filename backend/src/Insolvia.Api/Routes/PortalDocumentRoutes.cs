@@ -25,8 +25,8 @@ namespace Insolvia.Api.Routes;
 /// <c>client</c>, the REQUEST's kind, and the same presigned PUT
 /// (<see cref="DocumentRoutes.UploadBlockAsync"/>); <c>…/complete</c> is the
 /// staff route's three steps, then the request is satisfied. A client's upload
-/// is never auto-extracted (ADR 0019's ZDR item) — and the auto-trigger is
-/// 18.17's on the staff side too.</para>
+/// is never auto-extracted (ADR 0019's ZDR item): complete calls the staff
+/// route's trigger, whose channel check makes it a no-op here.</para>
 /// <para><b>What a client sees</b> of a document: their own uploads' metadata,
 /// against the request each answers. Never a staff upload, never a download URL.</para>
 /// <para>Every request is on the access log as the client: <c>portal.read</c>
@@ -111,6 +111,7 @@ public sealed class PortalDocumentRoutes : IEndpointModule
         }
 
         await DocumentRoutes.SatisfyRequestAsync(context, confirmed, cancellationToken);
+        await DocumentRoutes.TriggerExtractionAsync(context, confirmed, client.Subject, cancellationToken);
         context.Log(Logger, "client document completed", ("document_id", documentId));
         return FlaskJson.Result(new JsonObject { ["document"] = CaseViews.PortalDocument(confirmed) });
     }

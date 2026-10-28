@@ -238,6 +238,10 @@ public sealed class AccessLogTests
                 "portal.answer", "client.create", "client.read", "client.update", "client.merge", "case.delete", "credential.enrol",
                 "credential.revoke", "credential.open", "authorization.sign", "authorization.withdraw", "filing.approve", "filing.void",
                 "filing.consume", "filing.submit", "filing.hand_back", "filing.resolve",
+
+                // Python wrote these without listing them in ACTIONS (18.17).
+                "packet.read", "packet.download", "packet.assemble", "petition.review", "document.extract",
+                "extraction.read", "extraction.review",
             ],
             Wire.Names<AccessAction>());
         Assert.Equal(["allowed", "denied"], Wire.Names<AccessOutcome>());

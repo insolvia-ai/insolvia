@@ -29,7 +29,9 @@ internal sealed record CaseStores(
     ICaseTaskStore Tasks,
     IDocumentRequestStore Requests,
     IFilingStore Filings,
-    ITaxIdStore TaxIds);
+    ITaxIdStore TaxIds,
+    IJobStore Jobs,
+    IPacketStore Packets);
 
 /// <summary>The memory twins — the oracle.</summary>
 internal sealed class MemoryCaseWorld
@@ -51,7 +53,9 @@ internal sealed class MemoryCaseWorld
             new MemoryCaseTaskStore(),
             new MemoryDocumentRequestStore(),
             new MemoryFilingStore(cases),
-            new MemoryTaxIdStore());
+            new MemoryTaxIdStore(),
+            new MemoryJobStore(),
+            new MemoryPacketStore(cases));
     }
 
     public CaseStores Connect() => _stores;
@@ -80,7 +84,9 @@ internal sealed class PostgresCaseWorld(PostgresFixture postgres) : IAsyncDispos
             new PostgresCaseTaskStore(db),
             new PostgresDocumentRequestStore(db),
             new PostgresFilingStore(db),
-            new PostgresTaxIdStore(db));
+            new PostgresTaxIdStore(db),
+            new PostgresJobStore(db),
+            new PostgresPacketStore(db));
     }
 
     public ValueTask DisposeAsync() => _harness.DisposeAsync();

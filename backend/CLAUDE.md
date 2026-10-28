@@ -103,6 +103,7 @@ dotnet build Insolvia.slnx                       # warnings are errors
 dotnet test Insolvia.slnx                        # what the pre-push hook runs
 dotnet format Insolvia.slnx                      # fix; CI runs --verify-no-changes
 dotnet run --project src/Insolvia.Api            # http://127.0.0.1:8080/health
+dotnet run --project src/Insolvia.Worker         # the job poller: JOB_QUEUE_URL, INSOLVIA_DB_*, CASE_DOCUMENT_BUCKET (+ ANTHROPIC_API_KEY)
 docker compose up --build                        # Postgres 17 on :55432, the migrator, then the API on :8080
 INSOLVIA_DB_CONNECTION_STRING='Host=127.0.0.1;Port=55432;Database=insolvia;Username=insolvia;Password=insolvia-local-only' \
 INSOLVIA_DB_ROLE_PASSWORD=insolvia-local-only \
