@@ -52,16 +52,16 @@ internal static class TextAppearance
         if (fieldType == "/Ch" && (flags & (1 << 17)) == 0)
         {
             var options = Array(Inherited(widget, "/Opt")) ?? new PdfArray();
-            text = string.Join('\n', options.Elements.Select(option => Str(option)
+            text = string.Join('\n', options.Elements.Select(option => TextValue(option)
                 ?? throw new FontNotSupportedException("a list box whose options are [export, display] pairs is not supported (pypdf cannot join them either)")));
             var value = Resolve(field.Elements["/V"]);
             selection = value is PdfArray many
-                ? [.. many.Elements.Select(item => Str(item) ?? string.Empty)]
-                : value is null ? [] : [Str(value) ?? string.Empty];
+                ? [.. many.Elements.Select(item => TextValue(item) ?? string.Empty)]
+                : value is null ? [] : [TextValue(value) ?? string.Empty];
         }
         else
         {
-            text = Str(field.Elements["/V"]) ?? string.Empty;
+            text = TextValue(field.Elements["/V"]) ?? string.Empty;
             selection = [];
         }
 

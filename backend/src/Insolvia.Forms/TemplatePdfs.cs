@@ -21,7 +21,7 @@ public static class TemplatePdfs
     public static byte[] For(FormRelease release)
     {
         ArgumentNullException.ThrowIfNull(release);
-        var bytes = Loaded.GetOrAdd(release.ReleaseId, _ => Load(release));
+        var bytes = Loaded.GetOrAdd($"{release.ReleaseId}|{release.SourceSha256}", _ => Load(release));
         return (byte[])bytes.Clone();
     }
 

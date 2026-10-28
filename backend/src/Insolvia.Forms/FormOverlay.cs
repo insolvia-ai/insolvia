@@ -382,7 +382,7 @@ public static partial class FormOverlay
 
     /// <summary>The top-margin mark: date and time, UTC, stated as such.</summary>
     public static string StampText(DateTimeOffset printedAt) =>
-        "Printed " + printedAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture) + " UTC";
+        "Printed " + printedAt.DateTime.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture) + " UTC";
 
     /// <summary>
     /// Draw the requested marks on every page — <paramref name="pdf"/> itself,

@@ -53,6 +53,23 @@ internal static class PdfObjects
         _ => null,
     };
 
+    /// <summary>
+    /// A text string as pypdf's <c>TextStringObject</c> reads it: UTF-16 when
+    /// it carries a byte-order mark, PDFDocEncoding otherwise. PDFsharp hands
+    /// a BOM-less string back one char per byte, so it is decoded here (a
+    /// name comes back as itself).
+    /// </summary>
+    public static string? TextValue(PdfItem? item)
+    {
+        if (Resolve(item) is PdfString { Encoding: PdfStringEncoding.RawEncoding or PdfStringEncoding.PDFDocEncoding } text)
+        {
+            var table = FontData.Encodings["/PDFDocEncoding"];
+            return string.Concat(text.Value.Select(c => c < 256 ? table[c] : c.ToString()));
+        }
+
+        return Str(item);
+    }
+
     /// <summary>The widget annotations of a page, in /Annots order.</summary>
     public static IEnumerable<PdfDictionary> Widgets(PdfPage page)
     {

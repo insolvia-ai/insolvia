@@ -104,6 +104,20 @@ public static class FormFill
         return Determinism.Save(doc, Seed(template, values));
     }
 
+    /// <summary>
+    /// Set field values on any AcroForm PDF by qualified name, with no spec
+    /// to validate against — pypdf's <c>update_page_form_field_values</c>
+    /// path alone. The appearance generator's own tests run it over
+    /// synthetic PDFs carrying what no court form does.
+    /// </summary>
+    internal static byte[] FillFields(byte[] pdf, IReadOnlyList<(string Name, string Value)> values)
+    {
+        using var source = new MemoryStream(pdf, writable: false);
+        var doc = PdfReader.Open(source, PdfDocumentOpenMode.Modify);
+        ApplyFieldUpdates(doc, [.. values.Select(v => (v.Name, v.Name, v.Value, false))]);
+        return Determinism.Save(doc, pdf);
+    }
+
     /// <summary>The width, in points, <paramref name="value"/> takes in Helvetica (Python's <c>helvetica_width</c>).</summary>
     public static double HelveticaWidth(string value, double size = OverlayFontSize) => Helvetica.Width(value, size);
 
@@ -412,11 +426,27 @@ public static class FormFill
     }
 
     /// <summary>A text string as pypdf's <c>TextStringObject</c> writes it: PDFDocEncoding when it can, UTF-16BE otherwise.</summary>
+    /// <remarks>
+    /// The PDFDocEncoding bytes are computed here, from pypdf's own table,
+    /// and handed to PDFsharp raw: PDFsharp 6.2.4's own PDFDocEncoding
+    /// encoder lacks some of the table (it writes "Ł" as "?").
+    /// </remarks>
     internal static PdfString TextString(string value)
     {
         var pdfDoc = FontData.Encodings["/PDFDocEncoding"];
-        var encodable = Pdf.Py.Chars(value).All(ch => System.Array.IndexOf(pdfDoc, ch) >= 0);
-        return new PdfString(value, encodable ? PdfStringEncoding.PDFDocEncoding : PdfStringEncoding.Unicode);
+        var codes = new List<char>();
+        foreach (var ch in Pdf.Py.Chars(value))
+        {
+            var code = System.Array.IndexOf(pdfDoc, ch);
+            if (code < 0)
+            {
+                return new PdfString(value, PdfStringEncoding.Unicode);
+            }
+
+            codes.Add((char)code);
+        }
+
+        return new PdfString(new string([.. codes]), PdfStringEncoding.RawEncoding);
     }
 
     /// <summary>The broken-group route: /AS only, widgets indexed in the order the pages list them.</summary>
