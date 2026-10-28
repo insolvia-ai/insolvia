@@ -90,6 +90,7 @@
         "dependencies": {
           "AWSSDK.Core": "[4.0.102.14, )",
           "AWSSDK.KeyManagementService": "[4.0.101, )",
+          "AWSSDK.S3": "[4.0.104.3, )",
           "Insolvia.Core": "[1.0.0, )"
         }
       },
@@ -167,6 +168,15 @@
         "contentHash": "Oxzgg+2ViszJaaobY4W+gBN9D7Sk6cb1u52fQ478cFXVKzgAi3we0WFQm9mXUS9qEBxXOB9O2a7Wh4pzvIAYtA==",
         "dependencies": {
           "AWSSDK.Core": "[4.0.102.14, 5.0.0)"
+        }
+      },
+      "AWSSDK.S3": {
+        "type": "CentralTransitive",
+        "requested": "[4.0.104.3, )",
+        "resolved": "4.0.104.3",
+        "contentHash": "AWtrk6Nn9v2+9HdD1qR3o/7zqFnSNWymqAYGQgzs53i2WJHM58avatVJROtF8WjaUzi1k463+uQUsYtUBA8Elg==",
+        "dependencies": {
+          "AWSSDK.Core": "[4.0.102.10, 5.0.0)"
         }
       },
       "EFCore.NamingConventions": {

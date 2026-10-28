@@ -48,13 +48,83 @@ public sealed class RouteTableTests : IDisposable
         { "DELETE", "/v1/firm/document-checklist" },
     };
 
+    /// <summary>The case-side slice 18.15 part 1 maps (no analyses, forms, packets, jobs, extraction, approval or portal).</summary>
+    public static TheoryData<string, string> CaseSideRoutes => new()
+    {
+        { "POST", "/v1/cases" },
+        { "GET", "/v1/cases" },
+        { "GET", "/v1/cases/{caseId}" },
+        { "PATCH", "/v1/cases/{caseId}" },
+        { "DELETE", "/v1/cases/{caseId}" },
+        { "GET", "/v1/cases/{caseId}/assignees" },
+        { "PUT", "/v1/cases/{caseId}/assignees/{subject}" },
+        { "DELETE", "/v1/cases/{caseId}/assignees/{subject}" },
+        { "GET", "/v1/firm/clients/{clientId}/cases" },
+        { "GET", "/v1/courts" },
+        { "GET", "/v1/cases/{caseId}/status-history" },
+        { "GET", "/v1/cases/{caseId}/lifecycle" },
+        { "POST", "/v1/cases/{caseId}/conversions" },
+        { "PUT", "/v1/cases/{caseId}/archived" },
+        { "POST", "/v1/cases/{caseId}/copy" },
+        { "PUT", "/v1/cases/{caseId}/debtors/{filingRole}" },
+        { "GET", "/v1/cases/{caseId}/debtors" },
+        { "PUT", "/v1/cases/{caseId}/debtors/{filingRole}/client" },
+        { "POST", "/v1/cases/{caseId}/debtors/{filingRole}/copy-from-client" },
+        { "POST", "/v1/cases/{caseId}/debtors/{filingRole}/copy-to-client" },
+        { "POST", "/v1/cases/{caseId}/notes" },
+        { "GET", "/v1/cases/{caseId}/notes" },
+        { "PUT", "/v1/cases/{caseId}/notes/{noteId}" },
+        { "DELETE", "/v1/cases/{caseId}/notes/{noteId}" },
+        { "POST", "/v1/cases/{caseId}/documents" },
+        { "POST", "/v1/cases/{caseId}/documents/{documentId}/complete" },
+        { "GET", "/v1/cases/{caseId}/documents" },
+        { "GET", "/v1/cases/{caseId}/documents/{documentId}/url" },
+        { "DELETE", "/v1/cases/{caseId}/documents/{documentId}" },
+        { "GET", "/v1/cases/{caseId}/document-requests" },
+        { "POST", "/v1/cases/{caseId}/document-requests" },
+        { "POST", "/v1/cases/{caseId}/document-requests/from-checklist" },
+        { "PATCH", "/v1/cases/{caseId}/document-requests/{requestId}" },
+        { "DELETE", "/v1/cases/{caseId}/document-requests/{requestId}" },
+        { "POST", "/v1/cases/{caseId}/tasks" },
+        { "GET", "/v1/cases/{caseId}/tasks" },
+        { "GET", "/v1/cases/{caseId}/tasks/{taskId}" },
+        { "PATCH", "/v1/cases/{caseId}/tasks/{taskId}" },
+        { "DELETE", "/v1/cases/{caseId}/tasks/{taskId}" },
+        { "GET", "/v1/me/tasks" },
+        { "GET", "/v1/cases/{caseId}/events" },
+        { "POST", "/v1/cases/{caseId}/events" },
+        { "GET", "/v1/cases/{caseId}/events/{eventId}" },
+        { "PUT", "/v1/cases/{caseId}/events/{eventId}" },
+        { "PATCH", "/v1/cases/{caseId}/events/{eventId}" },
+        { "DELETE", "/v1/cases/{caseId}/events/{eventId}" },
+        { "GET", "/v1/firm/events" },
+        { "POST", "/v1/firm/events" },
+        { "GET", "/v1/firm/events/{eventId}" },
+        { "PUT", "/v1/firm/events/{eventId}" },
+        { "PATCH", "/v1/firm/events/{eventId}" },
+        { "DELETE", "/v1/firm/events/{eventId}" },
+        { "GET", "/v1/calendar" },
+        { "GET", "/v1/me/calendar.ics" },
+        { "POST", "/v1/me/calendar-token" },
+        { "DELETE", "/v1/me/calendar-token" },
+        { "POST", "/v1/cases/{caseId}/{collection}" },
+        { "GET", "/v1/cases/{caseId}/{collection}" },
+        { "GET", "/v1/cases/{caseId}/{collection}/{entityId}" },
+        { "PUT", "/v1/cases/{caseId}/{collection}/{entityId}" },
+        { "DELETE", "/v1/cases/{caseId}/{collection}/{entityId}" },
+    };
+
     public void Dispose() => _world.Dispose();
 
     [Theory]
     [MemberData(nameof(FirmSideRoutes))]
+    [MemberData(nameof(CaseSideRoutes))]
     public async Task Every_firm_side_route_is_a_staff_route_and_401s_without_a_token(string method, string template)
     {
-        var path = template.Replace("{subject}", Ids.Bob, StringComparison.Ordinal).Replace("{clientId}", "c-1", StringComparison.Ordinal).Replace("{creditorId}", "c-1", StringComparison.Ordinal);
+        var path = System.Text.RegularExpressions.Regex.Replace(
+            template.Replace("{subject}", Ids.Bob, StringComparison.Ordinal).Replace("{filingRole}", "debtor_1", StringComparison.Ordinal).Replace("{collection}", "creditors", StringComparison.Ordinal),
+            "\\{[A-Za-z]+\\}",
+            "c-1");
 
         var answer = await _world.SendAsync(new HttpMethod(method), path, json: "{}");
 
@@ -65,10 +135,10 @@ public sealed class RouteTableTests : IDisposable
     }
 
     [Fact]
-    public void The_route_table_is_exactly_the_firm_side_slice_plus_the_two_public_routes()
+    public void The_route_table_is_exactly_the_firm_and_case_side_slices_plus_the_two_public_routes()
     {
         var mapped = Endpoints().Where(e => e.Name.Contains("/v1/", StringComparison.Ordinal)).Select(e => e.Name).Order(StringComparer.Ordinal);
-        var expected = FirmSideRoutes.Select(row => $"{row.Data.Item1} {row.Data.Item2}").Concat(Public).Order(StringComparer.Ordinal);
+        var expected = FirmSideRoutes.Concat(CaseSideRoutes).Select(row => $"{row.Data.Item1} {row.Data.Item2}").Concat(Public).Order(StringComparer.Ordinal);
 
         Assert.Equal(expected, mapped);
         Assert.All(Endpoints().Where(e => Public.Contains(e.Name)), e => Assert.Null(e.Principal));

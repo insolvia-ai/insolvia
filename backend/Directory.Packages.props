@@ -46,6 +46,11 @@
          On the same AWSSDK.Core (4.0.102.14) as AWSSDK.RDS above. -->
     <PackageVersion Include="AWSSDK.KeyManagementService" Version="4.0.101" />
   </ItemGroup>
+  <ItemGroup Label="Case documents">
+    <!-- The document bucket: presigned SigV4 PUT/GET, HeadObject, tag clearing
+         (S3DocumentBlobStore). Needs AWSSDK.Core >= 4.0.102.10 — the 4.0.102.14 above satisfies it. -->
+    <PackageVersion Include="AWSSDK.S3" Version="4.0.104.3" />
+  </ItemGroup>
   <ItemGroup Label="AWS adapters">
     <!-- The default credential chain the mailer client signs with (SigV4 to
          the mailer's IAM-authorised API). The same version AWSSDK.RDS already

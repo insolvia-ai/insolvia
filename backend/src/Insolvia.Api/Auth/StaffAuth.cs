@@ -60,22 +60,31 @@ public static class StaffAuth
         ArgumentNullException.ThrowIfNull(builder);
         builder.WithMetadata(PrincipalClass.Staff);
         return builder.AddEndpointFilter(async (invocation, next) =>
-        {
-            var context = invocation.HttpContext;
-            Principal principal;
-            try
-            {
-                principal = await AuthenticateAsync(context).ConfigureAwait(false);
-            }
-            catch (AuthenticationException error)
-            {
-                Logger(context, StructuredLog.Categories.Auth).Info("authentication rejected", ("reason", error.Reason.ToWire()));
-                return JsonBodyResult.Unauthorized;
-            }
+            await AuthenticateHereAsync(invocation.HttpContext).ConfigureAwait(false)
+                ? await next(invocation).ConfigureAwait(false)
+                : JsonBodyResult.Unauthorized);
+    }
 
-            context.Items[PrincipalKey] = principal;
-            return await next(invocation).ConfigureAwait(false);
-        });
+    /// <summary>
+    /// <see cref="RequireAuth{TBuilder}"/>'s check run INSIDE a handler — for
+    /// the one route that authenticates one of two ways (the calendar feed:
+    /// its own token, or a staff session when it has none). False, the
+    /// rejection logged by category, is the caller's 401.
+    /// </summary>
+    /// <param name="context">The request.</param>
+    /// <returns>Whether the request carries a valid staff token.</returns>
+    internal static async Task<bool> AuthenticateHereAsync(HttpContext context)
+    {
+        try
+        {
+            context.Items[PrincipalKey] = await AuthenticateAsync(context).ConfigureAwait(false);
+            return true;
+        }
+        catch (AuthenticationException error)
+        {
+            Logger(context, StructuredLog.Categories.Auth).Info("authentication rejected", ("reason", error.Reason.ToWire()));
+            return false;
+        }
     }
 
     /// <summary>
@@ -95,17 +104,27 @@ public static class StaffAuth
         ArgumentNullException.ThrowIfNull(builder);
         return builder.AddEndpointFilter(async (invocation, next) =>
         {
-            var context = invocation.HttpContext;
-            var accessor = await context.CurrentAccessorAsync().ConfigureAwait(false);
-            if (!accessor.May(feature, level))
-            {
-                // The FEATURE is logged, never the subject.
-                Logger(context, StructuredLog.Categories.Auth).Info("permission refused", ("feature", feature.ToWire()));
-                throw new ForbiddenException("your firm has not granted you access to this");
-            }
-
+            await RequirePermissionAsync(invocation.HttpContext, feature, level).ConfigureAwait(false);
             return await next(invocation).ConfigureAwait(false);
         });
+    }
+
+    /// <summary><see cref="Requires{TBuilder}"/>'s check run inside a handler, after <see cref="AuthenticateHereAsync"/>.</summary>
+    /// <param name="context">The request.</param>
+    /// <param name="feature">The feature.</param>
+    /// <param name="level">The level required.</param>
+    /// <returns>The caller's accessor.</returns>
+    internal static async Task<Accessor> RequirePermissionAsync(HttpContext context, Feature feature, PermissionLevel level)
+    {
+        var accessor = await context.CurrentAccessorAsync().ConfigureAwait(false);
+        if (!accessor.May(feature, level))
+        {
+            // The FEATURE is logged, never the subject.
+            Logger(context, StructuredLog.Categories.Auth).Info("permission refused", ("feature", feature.ToWire()));
+            throw new ForbiddenException("your firm has not granted you access to this");
+        }
+
+        return accessor;
     }
 
     /// <summary>
