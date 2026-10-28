@@ -1,0 +1,290 @@
+{
+ "appearances": {
+  "$dr": {
+   "/Courier": "/Courier",
+   "/Helv": "/Helvetica",
+   "/Helvetica": "/Helvetica",
+   "/TiRo": "/Times-Roman",
+   "/WiFo": "/Helvetica-Bold"
+  },
+  "accents": {
+   "bbox": [
+    0.0,
+    0.0,
+    520.0,
+    20.0
+   ],
+   "da": "/Helv 10 Tf 0 g",
+   "fonts": [
+    "/Helv"
+   ],
+   "matrix": null,
+   "stream": "q\n/Tx BMC \nq\n2 1 516.0 18.0 re\nW\nBT\n/Helv 10.0 Tf 0 g\n2 6.41 Td\n(José Núñez-Ibáñez, Zoë, Søren, Æsir  quoted 5 ½) Tj\nET\nQ\nEMC\nQ\n"
+  },
+  "auto": {
+   "bbox": [
+    0.0,
+    0.0,
+    160.0,
+    20.0
+   ],
+   "da": "/Helv 0 Tf 0 g",
+   "fonts": [
+    "/Helv"
+   ],
+   "matrix": null,
+   "stream": "q\n/Tx BMC \nq\n2 1 156.0 18.0 re\nW\nBT\n/Helv 15.6 Tf 0 g\n2 4.3996 Td\n(Auto-sized text) Tj\nET\nQ\nEMC\nQ\n"
+  },
+  "center": {
+   "bbox": [
+    0.0,
+    0.0,
+    240.0,
+    20.0
+   ],
+   "da": "/Helv 9 Tf 0 g",
+   "fonts": [
+    "/Helv"
+   ],
+   "matrix": null,
+   "stream": "q\n/Tx BMC \nq\n2 1 236.0 18.0 re\nW\nBT\n/Helv 9.0 Tf 0 g\n103.9935 6.769 Td\n(Centred) Tj\nET\nQ\nEMC\nQ\n"
+  },
+  "comb": {
+   "bbox": [
+    0.0,
+    0.0,
+    120.0,
+    20.0
+   ],
+   "da": "/Helv 10 Tf 0 g",
+   "fonts": [
+    "/Helv"
+   ],
+   "matrix": null,
+   "stream": "q\n/Tx BMC \nq\n2 1 116.0 18.0 re\nW\nBT\n/Helv 10.0 Tf 0 g\n6.665 6.41 Td\n(A) Tj\n20.0 0.0 Td\n(B) Tj\n20.555 0.0 Td\n(1) Tj\n20.0 0.0 Td\n(2) Tj\nET\nQ\nEMC\nQ\n"
+  },
+  "combo": {
+   "bbox": [
+    0.0,
+    0.0,
+    160.0,
+    20.0
+   ],
+   "da": "/Helv 10 Tf 0 g",
+   "fonts": [
+    "/Helv"
+   ],
+   "matrix": null,
+   "stream": "q\n/Tx BMC \nq\n2 1 156.0 18.0 re\nW\nBT\n/Helv 10.0 Tf 0 g\n2 6.41 Td\n(No) Tj\nET\nQ\nEMC\nQ\n"
+  },
+  "courier": {
+   "bbox": [
+    0.0,
+    0.0,
+    260.0,
+    20.0
+   ],
+   "da": "/Courier 10 Tf 0 g",
+   "fonts": [
+    "/Courier"
+   ],
+   "matrix": null,
+   "stream": "q\n/Tx BMC \nq\n2 1 256.0 18.0 re\nW\nBT\n/Courier 10.0 Tf 0 g\n2 6.855 Td\n(Courier, not in DR) Tj\nET\nQ\nEMC\nQ\n"
+  },
+  "halfborder": {
+   "bbox": [
+    0.0,
+    0.0,
+    140.0,
+    25.0
+   ],
+   "da": "/Helv 10 Tf 0 g",
+   "fonts": [
+    "/Helv"
+   ],
+   "matrix": null,
+   "stream": "q\n/Tx BMC \nq\n2 1 136.0 23.0 re\nW\nBT\n/Helv 10.0 Tf 0 g\n2 8.91 Td\n(Half-point border) Tj\nET\nQ\nEMC\nQ\n"
+  },
+  "listauto": {
+   "bbox": [
+    0.0,
+    0.0,
+    160.0,
+    80.0
+   ],
+   "da": "/Helv 0 Tf 0 g",
+   "fonts": [
+    "/Helv"
+   ],
+   "matrix": null,
+   "stream": "q\n/Tx BMC \nq\n2 1 156.0 78.0 re\nW\nBT\n/Helv 36.0 Tf 0 g\n2 27.076 Td\n(One\nTwo) Tj\nET\nQ\nEMC\nQ\n"
+  },
+  "listbox": {
+   "bbox": [
+    0.0,
+    0.0,
+    160.0,
+    80.0
+   ],
+   "da": "/Helv 10 Tf 0 g",
+   "fonts": [
+    "/Helv"
+   ],
+   "matrix": null,
+   "stream": "q\n/Tx BMC \nq\n2 1 156.0 78.0 re\nW\nBT\n/Helv 10.0 Tf 0 g\n2 36.41 Td\n(Alpha) Tj\n1 23.849999999999998 158.0 12.0 re\n0.5 0.5 0.5 rg s\n/Helv 10.0 Tf 0 g\n0 -11.559999999999999 Td\n(Beta) Tj\n0 -11.559999999999999 Td\n(Gamma) Tj\nET\nQ\nEMC\nQ\n"
+  },
+  "multi": {
+   "bbox": [
+    0.0,
+    0.0,
+    160.0,
+    70.0
+   ],
+   "da": "/Helv 0 Tf 0 g",
+   "fonts": [
+    "/Helv"
+   ],
+   "matrix": null,
+   "stream": "q\n/Tx BMC \nq\n2 1 156.0 68.0 re\nW\nBT\n/Helv 12 Tf 0 g\n2 59.828 Td\n(A multiline value that wraps) Tj\n0 -13.872 Td\n(across several lines of the) Tj\n0 -13.872 Td\n(box and then shrinks until it) Tj\n0 -13.872 Td\n(fits) Tj\nET\nQ\nEMC\nQ\n"
+  },
+  "multifixed": {
+   "bbox": [
+    0.0,
+    0.0,
+    180.0,
+    70.0
+   ],
+   "da": "/Helv 8 Tf 0 g",
+   "fonts": [
+    "/Helv"
+   ],
+   "matrix": null,
+   "stream": "q\n/Tx BMC \nq\n2 1 176.0 68.0 re\nW\nBT\n/Helv 8.0 Tf 0 g\n2 63.552 Td\n(Line one) Tj\n0 -9.248 Td\n(Line two \\(with parens\\) \\\\ slash) Tj\nET\nQ\nEMC\nQ\n"
+  },
+  "plain": {
+   "bbox": [
+    0.0,
+    0.0,
+    260.0,
+    20.0
+   ],
+   "da": "/Helv 10 Tf 0 g",
+   "fonts": [
+    "/Helv"
+   ],
+   "matrix": null,
+   "stream": "q\n/Tx BMC \nq\n2 1 256.0 18.0 re\nW\nBT\n/Helv 10.0 Tf 0 g\n2 6.41 Td\n(Plain text) Tj\nET\nQ\nEMC\nQ\n"
+  },
+  "right": {
+   "bbox": [
+    0.0,
+    0.0,
+    240.0,
+    20.0
+   ],
+   "da": "/Helv 9 Tf 0 g",
+   "fonts": [
+    "/Helv"
+   ],
+   "matrix": null,
+   "stream": "q\n/Tx BMC \nq\n2 1 236.0 18.0 re\nW\nBT\n/Helv 9.0 Tf 0 g\n185.476 6.769 Td\n(Right aligned) Tj\nET\nQ\nEMC\nQ\n"
+  },
+  "rotated": {
+   "bbox": [
+    0.0,
+    0.0,
+    40.0,
+    120.0
+   ],
+   "da": "/Helv 10 Tf 0 g",
+   "fonts": [
+    "/Helv"
+   ],
+   "matrix": [
+    0.0,
+    1.0,
+    -1.0,
+    0.0,
+    120.0,
+    0.0
+   ],
+   "stream": "q\n/Tx BMC \nq\n2 1 36.0 118.0 re\nW\nBT\n/Helv 10.0 Tf 0 g\n2 56.41 Td\n(Turned) Tj\nET\nQ\nEMC\nQ\n"
+  },
+  "thick": {
+   "bbox": [
+    0.0,
+    0.0,
+    140.0,
+    40.0
+   ],
+   "da": "/Helv 10 Tf 0 g",
+   "fonts": [
+    "/Helv"
+   ],
+   "matrix": null,
+   "stream": "q\n/Tx BMC \nq\n12 6 116.0 28.0 re\nW\nBT\n/Helv 10.0 Tf 0 g\n12 16.41 Td\n(Beveled) Tj\nET\nQ\nEMC\nQ\n"
+  },
+  "times": {
+   "bbox": [
+    0.0,
+    0.0,
+    260.0,
+    25.0
+   ],
+   "da": "/TiRo 11 Tf 0 0 1 rg",
+   "fonts": [
+    "/TiRo"
+   ],
+   "matrix": null,
+   "stream": "q\n/Tx BMC \nq\n2 1 256.0 23.0 re\nW\nBT\n/TiRo 11.0 Tf 0 0 1 rg\n2 8.743500000000001 Td\n(Times Roman, in blue) Tj\nET\nQ\nEMC\nQ\n"
+  },
+  "unknownfont": {
+   "bbox": [
+    0.0,
+    0.0,
+    260.0,
+    20.0
+   ],
+   "da": "/Helvetica 10 Tf 0 g",
+   "fonts": [
+    "/Helvetica"
+   ],
+   "matrix": null,
+   "stream": "q\n/Tx BMC \nq\n2 1 256.0 18.0 re\nW\nBT\n/Helvetica 10.0 Tf 0 g\n2 6.41 Td\n(Falls back to Helvetica) Tj\nET\nQ\nEMC\nQ\n"
+  },
+  "widths": {
+   "bbox": [
+    0.0,
+    0.0,
+    260.0,
+    20.0
+   ],
+   "da": "/WiFo 10 Tf 0 g",
+   "fonts": [
+    "/WiFo"
+   ],
+   "matrix": null,
+   "stream": "q\n/Tx BMC \nq\n2 1 256.0 18.0 re\nW\nBT\n/WiFo 10.0 Tf 0 g\n2 6.5 Td\n(Own widths) Tj\nET\nQ\nEMC\nQ\n"
+  }
+ },
+ "values": {
+  "accents": "José Núñez-Ibáñez, Zoë, Søren, Æsir — “quoted” €5 ½",
+  "auto": "Auto-sized text",
+  "center": "Centred",
+  "comb": "AB12",
+  "combo": "No",
+  "courier": "Courier, not in DR",
+  "halfborder": "Half-point border",
+  "listauto": "Two",
+  "listbox": "Beta",
+  "multi": "A multiline value that wraps across several lines of the box and then shrinks until it fits",
+  "multifixed": "Line one\nLine two (with parens) \\ slash",
+  "plain": "Plain text",
+  "right": "Right aligned",
+  "rotated": "Turned",
+  "thick": "Beveled",
+  "times": "Times Roman, in blue",
+  "unknownfont": "Falls back to Helvetica",
+  "widths": "Own widths"
+ }
+}

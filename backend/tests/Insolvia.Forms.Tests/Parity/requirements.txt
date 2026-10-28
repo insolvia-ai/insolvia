@@ -1,0 +1,9 @@
+# The parity gate's Python half (backend-pr.yml, "Forms parity"), on top of
+# services/api/requirements.txt (which pins the oracle, pypdf 6.16.2). The
+# renderer is pinned for the same reason pypdf is: a PDFium change would move
+# the pixel comparison without either engine changing.
+pypdfium2==5.14.0
+pillow==13.0.0
+# compare.py reuses the goldens' own reader from services/api's
+# test_form_fill.py, which imports pytest at module level.
+pytest==8.4.2

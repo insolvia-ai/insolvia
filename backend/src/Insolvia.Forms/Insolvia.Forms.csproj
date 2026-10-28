@@ -1,6 +1,31 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- Form projections and the PDF engine, with the regulatory files embedded. References Core only. -->
+  <!-- The PDF engine (ADR 0028 § Libraries, plan 18.16): fills what
+       Insolvia.Engines projects into the official templates, draws the flat
+       forms' overlays and the output stamps, measures the parts, and
+       assembles the packet, the filing set and its approval digest. Pure:
+       bytes in, bytes out — packet storage is the worker's. PDFsharp is used
+       ONLY as a PDF object model; the appearance streams are a port of
+       pypdf 6.16.2's generator. References Core and Engines. -->
   <ItemGroup>
     <ProjectReference Include="../Insolvia.Core/Insolvia.Core.csproj" />
+    <ProjectReference Include="../Insolvia.Engines/Insolvia.Engines.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="PDFsharp" />
+    <PackageReference Include="System.Security.Cryptography.Pkcs" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Insolvia.Forms.Tests" />
+  </ItemGroup>
+  <!-- The official template PDFs ship in the artifact (ADR 0014), copied
+       byte for byte from services/api/src/insolvia_api/regulatory (frozen,
+       ADR 0028). TemplatePdfs re-hashes each against its manifest's
+       source.sha256 on load, and TemplateFileTests pins every copy to the
+       Python original until 18.23 deletes it. Pdf/FontData.json is pypdf's
+       core-font metrics and glyph list, written by
+       tests/Insolvia.Forms.Tests/Parity/font_data.py. -->
+  <ItemGroup>
+    <EmbeddedResource Include="Templates/**/*.pdf" LogicalName="Insolvia.Forms.Templates/%(RecursiveDir)%(Filename)%(Extension)" />
+    <EmbeddedResource Include="Pdf/FontData.json" LogicalName="Insolvia.Forms.FontData.json" />
   </ItemGroup>
 </Project>
