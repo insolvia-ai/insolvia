@@ -5,8 +5,9 @@
 #   curl http://127.0.0.1:8080/health
 #
 # The migrator runs once per `up`, after Postgres is healthy and before the
-# API starts: it applies EF migrations and (re)creates the per-service roles
-# with the local role password below. Running it again changes nothing.
+# API starts: it applies EF migrations, (re)creates the per-service roles
+# with the local role password below, and seeds seeds/dev.json. Running it
+# again changes nothing.
 #
 # Port 8080 is the API's everywhere (ADR 0028, § Local), which is also the
 # Python API's: run one stack at a time until the switch.
@@ -41,13 +42,25 @@ services:
   # A one-shot: it exits 0 when the database is current, and the API waits
   # for that. It connects as the superuser because it creates roles, as the
   # deployed migrator connects as the RDS master user.
+  #
+  # It then SEEDS seeds/dev.json and the fixture versions it names (as the
+  # `migrator` role; INSOLVIA_SEED=false skips it), and a second `up` writes
+  # nothing. With no pool named the people's subjects are derived from their
+  # addresses — rows for the admin portal to show, nobody to sign in as; run
+  # the seeder by hand with AUTH_USER_POOL_ID for the shared dev pool
+  # (backend/CLAUDE.md). The seeds arrive as a named build context: seeds/ is
+  # outside this directory.
   migrator:
     build:
       context: .
       target: migrator-development
+      additional_contexts:
+        seeds: ../seeds
     environment:
       INSOLVIA_DB_CONNECTION_STRING: Host=postgres;Port=5432;Database=insolvia;Username=insolvia;Password=insolvia-local-only
       INSOLVIA_DB_ROLE_PASSWORD: insolvia-local-only
+      INSOLVIA_ENV: ${INSOLVIA_ENV:-local}
+      INSOLVIA_SEED: ${INSOLVIA_SEED:-true}
     depends_on:
       postgres:
         condition: service_healthy

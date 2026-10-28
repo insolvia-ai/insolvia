@@ -46,6 +46,9 @@ jobs:
             services/api/tests/unit/goldens/**
             services/api/requirements.txt
             packages/insolvia_core/**
+            # The seeder's tests load the committed fixtures, and the
+            # migrator images carry them.
+            seeds/**
             .github/workflows/backend-pr.yml
             .github/actions/changed-paths/action.yml
 
@@ -109,11 +112,11 @@ jobs:
 
       - name: Build migrator Lambda image
         if: steps.filter.outputs.run == 'true'
-        run: docker build --target migrator -t insolvia-backend-migrator-pr-check .
+        run: docker build --build-context seeds=../seeds --target migrator -t insolvia-backend-migrator-pr-check .
 
       - name: Build migrator development image
         if: steps.filter.outputs.run == 'true'
-        run: docker build --target migrator-development -t insolvia-backend-migrator-dev-pr-check .
+        run: docker build --build-context seeds=../seeds --target migrator-development -t insolvia-backend-migrator-dev-pr-check .
 
       - name: Build MCP Lambda image
         if: steps.filter.outputs.run == 'true'

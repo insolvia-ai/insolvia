@@ -17,6 +17,19 @@
 # publish that project into /out/<host> in the build stage and copy it the
 # same way the lambda stage below does.
 
+# ── seeds: the repository's seeds/, as a named build context ─────────────────
+# seeds/ sits at the repository root, outside this build context, so the
+# migrator images take it as a named context:
+#
+#   docker build --build-context seeds=../seeds --target migrator .
+#
+# (compose passes it as additional_contexts). Built without one, this empty
+# stage stands in and the image carries no fixtures: the seeder then refuses
+# with "no seeds/<env>.json", and migrations are unaffected. The fixtures are
+# synthetic by rule (seeds/README.md), so every environment's image may carry
+# them; the loader refuses production whatever the image holds.
+FROM scratch AS seeds
+
 # ── build ───────────────────────────────────────────────────────────────────
 # The SDK is the exact one global.json pins. It runs on the BUILD platform:
 # the output is portable IL, so cross-building for arm64 or amd64 needs no
@@ -73,10 +86,13 @@ ENTRYPOINT ["dotnet", "Insolvia.Api.dll"]
 
 # ── migrator: the one-shot Lambda that migrates and provisions roles ────────
 # Invoked by CI before the `live` alias shifts (ADR 0028 § Runtime shape).
-# Program.cs runs one migration per invocation under the Lambda runtime
-# client, and exits after one run anywhere else.
+# Program.cs runs one command per invocation under the Lambda runtime client
+# ({} migrates, and seeds when INSOLVIA_SEED=true; {"command": "seed"} and
+# {"command": "purge-pre-client"} as MigratorCommand.cs says), and exits after
+# one run anywhere else.
 FROM public.ecr.aws/lambda/dotnet:10 AS migrator
 COPY --from=build /out/migrator ${LAMBDA_TASK_ROOT}/
+COPY --from=seeds / ${LAMBDA_TASK_ROOT}/seeds/
 CMD ["Insolvia.Migrator"]
 
 # ── migrator-development: the same build as compose's one-shot ──────────────
@@ -84,6 +100,7 @@ CMD ["Insolvia.Migrator"]
 FROM mcr.microsoft.com/dotnet/runtime:10.0 AS migrator-development
 WORKDIR /app
 COPY --from=build /out/migrator ./
+COPY --from=seeds / ./seeds/
 USER $APP_UID
 ENTRYPOINT ["dotnet", "Insolvia.Migrator.dll"]
 
