@@ -33,6 +33,12 @@
     <PackageVersion Include="AWSSDK.RDS" Version="4.0.107.2" />
     <PackageVersion Include="AWSSDK.SecretsManager" Version="4.0.100.22" />
   </ItemGroup>
+  <ItemGroup Label="Identity">
+    <!-- Token verification in Insolvia.Core: the signature check IS the domain
+         rule (auth.py's one PyJWT exception, carried over). Fetching a key is
+         a port; Core never makes the HTTP call. -->
+    <PackageVersion Include="Microsoft.IdentityModel.JsonWebTokens" Version="8.14.0" />
+  </ItemGroup>
   <ItemGroup Label="Tests">
     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.13" />
     <!-- The data tier tests against a real Postgres, never an in-memory provider. -->
