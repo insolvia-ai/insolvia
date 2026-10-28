@@ -95,12 +95,25 @@ public static partial class RoleProvisioner
             {
                 var qualified = $"{schema}.{Quote(table)}";
                 await ExecuteAsync(connection, $"REVOKE ALL ON TABLE {qualified} FROM {everyRole}", cancellationToken).ConfigureAwait(false);
-                foreach (var grant in grants.Where(grant => grant.Table == table && grant.Privileges != TablePrivileges.None))
+                foreach (var grant in grants.Where(grant => grant.Table == table))
                 {
-                    await ExecuteAsync(
-                        connection,
-                        $"GRANT {PrivilegeList(grant.Privileges)} ON TABLE {qualified} TO {Quote(grant.Role)}",
-                        cancellationToken).ConfigureAwait(false);
+                    if (grant.Privileges != TablePrivileges.None)
+                    {
+                        await ExecuteAsync(
+                            connection,
+                            $"GRANT {PrivilegeList(grant.Privileges)} ON TABLE {qualified} TO {Quote(grant.Role)}",
+                            cancellationToken).ConfigureAwait(false);
+                    }
+
+                    // REVOKE ALL ON TABLE above also revoked every column
+                    // privilege, so a column dropped from the list is revoked.
+                    if (grant.SelectColumns.Count > 0)
+                    {
+                        await ExecuteAsync(
+                            connection,
+                            $"GRANT SELECT ({string.Join(", ", grant.SelectColumns.Select(Quote))}) ON TABLE {qualified} TO {Quote(grant.Role)}",
+                            cancellationToken).ConfigureAwait(false);
+                    }
                 }
             }
 
@@ -207,6 +220,20 @@ public static partial class RoleProvisioner
         if (!ServiceRoles.All.Contains(grant.Role, StringComparer.Ordinal))
         {
             throw new ArgumentException($"'{grant.Role}' is not a service role ({string.Join(", ", ServiceRoles.All)}).", nameof(grant));
+        }
+
+        ArgumentNullException.ThrowIfNull(grant.SelectColumns);
+        if (grant.SelectColumns.Count > 0 && grant.Privileges.HasFlag(TablePrivileges.Select))
+        {
+            throw new ArgumentException($"'{grant.Table}' grants {grant.Role} both SELECT and a column list; a column list only narrows a role without SELECT.", nameof(grant));
+        }
+
+        foreach (var column in grant.SelectColumns)
+        {
+            if (!Identifier().IsMatch(column))
+            {
+                throw new ArgumentException($"'{column}' is not a snake_case column name.", nameof(grant));
+            }
         }
     }
 

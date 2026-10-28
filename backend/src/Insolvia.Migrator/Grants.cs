@@ -1,3 +1,5 @@
+using Insolvia.Data.Vault;
+
 namespace Insolvia.Migrator;
 
 /// <summary>
@@ -69,6 +71,18 @@ public enum TablePrivileges
 /// <param name="Privileges">Exactly what the role holds: anything not listed is revoked.</param>
 public sealed record TableGrant(string Table, string Role, TablePrivileges Privileges)
 {
+    /// <summary>
+    /// A column-level <c>SELECT</c>: the role may read these columns and no
+    /// other (<c>GRANT SELECT (a, b) ON …</c>). Empty for none. Cannot be
+    /// combined with a table-level <see cref="TablePrivileges.Select"/>, which
+    /// would make it meaningless; the migrator refuses the pair.
+    /// </summary>
+    /// <remarks>
+    /// Columns a statement's <c>WHERE</c> names need <c>SELECT</c> too, so a
+    /// role that deletes by key must be able to read the key columns.
+    /// </remarks>
+    public IReadOnlyList<string> SelectColumns { get; init; } = [];
+
     /// <summary>
     /// <c>INSERT</c> and <c>SELECT</c>, and nothing else: <c>UPDATE</c>,
     /// <c>DELETE</c> and <c>TRUNCATE</c> are revoked, so an application role
@@ -220,6 +234,35 @@ public static class GrantTable
         // The calendar and its feed tokens: the API's alone.
         new("calendar_events", ServiceRoles.Api, TablePrivileges.ReadWrite),
         new("calendar_tokens", ServiceRoles.Api, TablePrivileges.ReadWrite),
+
+        // ── Sealed data (18.12; ADR 0024, ADR 0028 § Data) ──────────
+        // The vault, isolated in two layers: KMS (only the filing worker may
+        // Decrypt under the vault key) and these grants. The API seals and
+        // stores (INSERT), revokes (DELETE) and reads the credential's
+        // METADATA for the status view, the enrolment's duplicate check and
+        // the approval's credential choice — a column-level SELECT that names
+        // no envelope column, so the API role cannot read a ciphertext at all.
+        // The filing worker reads everything and writes nothing here.
+        new(FilingCredentialColumns.Table, ServiceRoles.Api, TablePrivileges.Insert | TablePrivileges.Delete)
+        {
+            SelectColumns = FilingCredentialColumns.Metadata,
+        },
+        new(FilingCredentialColumns.Table, ServiceRoles.Filing, TablePrivileges.Select),
+
+        // Signed authorizations: the API signs (a history row, the pointer
+        // inserted or swapped, the replaced row marked superseded) and
+        // withdraws (the pointer deleted, the row marked withdrawn). History
+        // is never deleted. The filing worker's open re-checks the current one.
+        new("filing_authorizations", ServiceRoles.Api, ReadInsertUpdate),
+        new("filing_authorizations", ServiceRoles.Filing, TablePrivileges.Select),
+        new("current_filing_authorizations", ServiceRoles.Api, TablePrivileges.ReadWrite),
+        new("current_filing_authorizations", ServiceRoles.Filing, TablePrivileges.Select),
+
+        // The admin audit (ADR 0011): every staff mutation appends a row.
+        // INSERT alone — not even SELECT — as the Python role's grant was
+        // PutItem alone: the admin service can append an entry and never
+        // read, amend or delete one. No other role touches it.
+        new("admin_audit", ServiceRoles.Admin, TablePrivileges.Insert),
 
         // The access log: append-only for every service that writes it, and
         // no UPDATE, DELETE or TRUNCATE for anyone (ADR 0028 § Data).

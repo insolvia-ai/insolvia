@@ -92,6 +92,53 @@ namespace Insolvia.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Insolvia.Data.AdminAuditing.AdminAuditRow", b =>
+                {
+                    b.Property<string>("EventId")
+                        .HasColumnType("text")
+                        .HasColumnName("event_id");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("action");
+
+                    b.Property<string>("Detail")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("detail");
+
+                    b.Property<string>("FirmId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("firm_id");
+
+                    b.Property<string>("Principal")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("principal");
+
+                    b.Property<string>("PrincipalEmail")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("principal_email");
+
+                    b.Property<DateTimeOffset>("RecordedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("recorded_at");
+
+                    b.HasKey("EventId")
+                        .HasName("pk_admin_audit");
+
+                    b.HasIndex("FirmId", "RecordedAt", "EventId")
+                        .HasDatabaseName("ix_admin_audit_firm_id_recorded_at_event_id");
+
+                    b.ToTable("admin_audit", "insolvia", t =>
+                        {
+                            t.HasCheckConstraint("ck_admin_audit_action", "action IN ('firm.provision', 'firm.suspend', 'firm.reactivate', 'invite.resend')");
+                        });
+                });
+
             modelBuilder.Entity("Insolvia.Data.Cases.CalendarEventRow", b =>
                 {
                     b.Property<string>("FirmId")
@@ -1861,6 +1908,163 @@ namespace Insolvia.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Insolvia.Data.Vault.CurrentFilingAuthorizationRow", b =>
+                {
+                    b.Property<string>("FirmId")
+                        .HasColumnType("text")
+                        .HasColumnName("firm_id");
+
+                    b.Property<string>("AttorneyId")
+                        .HasColumnType("text")
+                        .HasColumnName("attorney_id");
+
+                    b.Property<string>("AuthorizationId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("authorization_id");
+
+                    b.HasKey("FirmId", "AttorneyId")
+                        .HasName("pk_current_filing_authorizations");
+
+                    b.HasIndex("AuthorizationId", "FirmId", "AttorneyId")
+                        .HasDatabaseName("ix_current_filing_authorizations_authorization_id_firm_id_atto");
+
+                    b.ToTable("current_filing_authorizations", "insolvia");
+                });
+
+            modelBuilder.Entity("Insolvia.Data.Vault.FilingAuthorizationRow", b =>
+                {
+                    b.Property<string>("AuthorizationId")
+                        .HasColumnType("text")
+                        .HasColumnName("authorization_id");
+
+                    b.Property<string>("AttorneyId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("attorney_id");
+
+                    b.Property<long>("AuthenticatedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("authenticated_at");
+
+                    b.Property<string>("FirmId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("firm_id");
+
+                    b.Property<DateTimeOffset>("SignedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("signed_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.Property<string>("TextDigest")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("text_digest");
+
+                    b.Property<string>("TextVersion")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("text_version");
+
+                    b.Property<DateTimeOffset?>("WithdrawnAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("withdrawn_at");
+
+                    b.HasKey("AuthorizationId")
+                        .HasName("pk_filing_authorizations");
+
+                    b.HasAlternateKey("AuthorizationId", "FirmId", "AttorneyId")
+                        .HasName("ak_filing_authorizations_owner");
+
+                    b.HasIndex("FirmId", "AttorneyId", "SignedAt")
+                        .HasDatabaseName("ix_filing_authorizations_firm_id_attorney_id_signed_at");
+
+                    b.ToTable("filing_authorizations", "insolvia", t =>
+                        {
+                            t.HasCheckConstraint("ck_filing_authorizations_status", "status IN ('signed', 'superseded', 'withdrawn')");
+
+                            t.HasCheckConstraint("ck_filing_authorizations_withdrawn", "(status = 'withdrawn') = (withdrawn_at IS NOT NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("Insolvia.Data.Vault.FilingCredentialRow", b =>
+                {
+                    b.Property<string>("FirmId")
+                        .HasColumnType("text")
+                        .HasColumnName("firm_id");
+
+                    b.Property<string>("AttorneyId")
+                        .HasColumnType("text")
+                        .HasColumnName("attorney_id");
+
+                    b.Property<string>("CredentialId")
+                        .HasColumnType("text")
+                        .HasColumnName("credential_id");
+
+                    b.Property<string>("AuthorizationRef")
+                        .HasColumnType("text")
+                        .HasColumnName("authorization_ref");
+
+                    b.Property<byte[]>("Ciphertext")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("ciphertext");
+
+                    b.PrimitiveCollection<string[]>("Courts")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("courts");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Login")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("login");
+
+                    b.Property<byte[]>("Nonce")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("nonce");
+
+                    b.Property<string>("Scheme")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("scheme");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("updated_at");
+
+                    b.Property<byte[]>("WrappedKey")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("wrapped_key");
+
+                    b.HasKey("FirmId", "AttorneyId", "CredentialId")
+                        .HasName("pk_filing_credentials");
+
+                    b.HasIndex("AuthorizationRef", "FirmId", "AttorneyId")
+                        .HasDatabaseName("ix_filing_credentials_authorization_ref_firm_id_attorney_id");
+
+                    b.ToTable("filing_credentials", "insolvia", t =>
+                        {
+                            t.HasCheckConstraint("ck_filing_credentials_status", "status IN ('active')");
+                        });
+                });
+
             modelBuilder.Entity("Insolvia.Data.Waitlist.WaitlistEntryRow", b =>
                 {
                     b.Property<string>("Id")
@@ -1913,6 +2117,16 @@ namespace Insolvia.Data.Migrations
                         {
                             t.HasCheckConstraint("ck_waitlist_entries_status", "status IN ('new')");
                         });
+                });
+
+            modelBuilder.Entity("Insolvia.Data.AdminAuditing.AdminAuditRow", b =>
+                {
+                    b.HasOne("Insolvia.Data.Firms.FirmRow", null)
+                        .WithMany()
+                        .HasForeignKey("FirmId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_admin_audit_firm");
                 });
 
             modelBuilder.Entity("Insolvia.Data.Cases.CalendarEventRow", b =>
@@ -2239,6 +2453,51 @@ namespace Insolvia.Data.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_client_bindings_case");
+                });
+
+            modelBuilder.Entity("Insolvia.Data.Vault.CurrentFilingAuthorizationRow", b =>
+                {
+                    b.HasOne("Insolvia.Data.Firms.FirmRow", null)
+                        .WithMany()
+                        .HasForeignKey("FirmId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_current_filing_authorizations_firm");
+
+                    b.HasOne("Insolvia.Data.Vault.FilingAuthorizationRow", null)
+                        .WithMany()
+                        .HasForeignKey("AuthorizationId", "FirmId", "AttorneyId")
+                        .HasPrincipalKey("AuthorizationId", "FirmId", "AttorneyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_current_filing_authorizations_authorization");
+                });
+
+            modelBuilder.Entity("Insolvia.Data.Vault.FilingAuthorizationRow", b =>
+                {
+                    b.HasOne("Insolvia.Data.Firms.FirmRow", null)
+                        .WithMany()
+                        .HasForeignKey("FirmId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_filing_authorizations_firm");
+                });
+
+            modelBuilder.Entity("Insolvia.Data.Vault.FilingCredentialRow", b =>
+                {
+                    b.HasOne("Insolvia.Data.Firms.FirmRow", null)
+                        .WithMany()
+                        .HasForeignKey("FirmId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_filing_credentials_firm");
+
+                    b.HasOne("Insolvia.Data.Vault.FilingAuthorizationRow", null)
+                        .WithMany()
+                        .HasForeignKey("AuthorizationRef", "FirmId", "AttorneyId")
+                        .HasPrincipalKey("AuthorizationId", "FirmId", "AttorneyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_filing_credentials_authorization");
                 });
 #pragma warning restore 612, 618
         }

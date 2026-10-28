@@ -14,7 +14,10 @@ namespace Insolvia.Api.Configuration;
 /// <c>FIRM_TABLE_NAME</c>) are read so the two backends see the same
 /// environment, but nothing in this host composes a store from them: the
 /// stores are Postgres (<c>INSOLVIA_DB_*</c>, owned by Insolvia.Data), and
-/// the Lambda boot does not require them (<see cref="LambdaBootRequirements"/>).</para>
+/// the Lambda boot does not require them (<see cref="LambdaBootRequirements"/>).
+/// The one exception is <c>CASE_TABLE_NAME</c>'s use as the source the two
+/// KMS key aliases are derived from when they are not set explicitly
+/// (<see cref="SealingKeys"/>).</para>
 /// </remarks>
 public sealed record ApiConfig
 {
