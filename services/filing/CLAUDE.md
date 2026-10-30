@@ -1,5 +1,13 @@
 # services/filing — agent rules
 
+> **Superseded — this service deploys nowhere since the switch** (plan
+> 18.22, [ADR 0028](../../docs/adr/0028-backend-moves-to-dotnet-and-postgres.md)).
+> Staging and prod run `backend/src/Insolvia.Filing` on Aurora; their rules are
+> [`backend/CLAUDE.md`](../../backend/CLAUDE.md). This directory is frozen to
+> fixes (a fix that lands here carries a `backend-mirror` issue) and is
+> deleted in 18.23. Its tests still run on a PR that touches it, and the
+> local Python dev stack (`scripts/dev-up.sh`) still runs it until then.
+
 The filing worker (ADR 0024 PR 7). Human docs: [`README.md`](README.md). Gate:
 `scripts/dev-test.sh` (ruff + mypy + pytest, exactly as CI); the real-AWS
 proof: `scripts/dev-filing-proof.sh`.
