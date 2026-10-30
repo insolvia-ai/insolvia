@@ -382,8 +382,8 @@ purge_pre_client() {
 # ── The .NET target (--dotnet) ──────────────────────────────────
 # The compose database's superuser — fixed, local-only values committed in
 # backend/docker-compose.yml, reachable from this machine alone. The migrator
-# connects as it (it creates roles), and the seed takes `SET ROLE migrator`
-# on that login, exactly as the deployed migrator does on the RDS master.
+# connects as it (it creates roles); the seed then logs in as the `migrator`
+# role itself, with INSOLVIA_DB_ROLE_PASSWORD (deployed, with an IAM token).
 LOCAL_DB='Host=127.0.0.1;Port=55432;Database=insolvia;Username=insolvia;Password=insolvia-local-only'
 
 migrator() {
