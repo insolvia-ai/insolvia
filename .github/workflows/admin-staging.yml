@@ -1,10 +1,12 @@
 name: Admin · Deploy · Staging
 
-# Steady-state deploy for services/admin (#213) — the api-staging.yml shape,
-# whose comments own the shared reasoning; only the paths differ. The first
+# Steady-state deploy for the admin service (#213; the .NET host
+# backend/src/Insolvia.Admin since the switch, ADR 0028) and the staff
+# portal — the api-staging.yml shape, whose comments own the shared
+# reasoning; only the paths differ. The migrator leg ran before it. The first
 # deploy in a fresh environment needs the image-before-apply bootstrap
-# (infra/modules/admin_service/main.tf header; scripts/bootstrap-ecr-images.sh
-# --services admin).
+# (infra/modules/admin_service/main.tf header;
+# scripts/bootstrap-ecr-images.sh staging admin).
 
 on:
   workflow_call:
@@ -66,12 +68,11 @@ jobs:
         run: |
           # sha-<sha> is the immutable identity a production promotion resolves
           # to a digest; `staging` is this environment's moving marker tag.
-          # Context is the repo root: the image installs the shared
-          # packages/insolvia_core by relative path (see the Dockerfile header).
-          docker build --target lambda -f services/admin/Dockerfile \
+          # Context is backend/ (backend/Dockerfile's header).
+          docker build --target admin-lambda \
             -t "$REPO:sha-${{ github.sha }}" \
             -t "$REPO:staging" \
-            .
+            backend
           docker push "$REPO:sha-${{ github.sha }}"
           docker push "$REPO:staging"
 
@@ -92,20 +93,12 @@ jobs:
           FUNCTION: ${{ steps.tf.outputs.function }}
         run: |
           # /insolvia/staging/admin-api/<kebab-key> -> KEBAB_KEY, e.g.
-          #   firm-table-name  -> FIRM_TABLE_NAME
-          #   google-client-id -> GOOGLE_CLIENT_ID
-          environment="$(
-            aws ssm get-parameters-by-path \
-              --path /insolvia/staging/admin-api \
-              --with-decryption \
-              --query 'Parameters[].{Name:Name,Value:Value}' \
-              --output json \
-            | jq -c 'map({key: (.Name | split("/") | last | ascii_upcase | gsub("-"; "_")), value: .Value})
-                     | {Variables: from_entries}'
-          )"
-          # Refuse to ship nonsense: an empty or half-applied namespace would
-          # otherwise silently wipe every variable the service reads.
-          echo "$environment" | jq -e '.Variables.INSOLVIA_ENV == "staging"' > /dev/null
+          #   insolvia-db-username -> INSOLVIA_DB_USERNAME (= admin)
+          #   google-client-id     -> GOOGLE_CLIENT_ID
+          # plus /insolvia/staging/db/* as INSOLVIA_DB_*
+          # (.github/scripts/lambda-environment.sh, which also refuses a
+          # namespace whose INSOLVIA_ENV is not "staging").
+          environment="$(.github/scripts/lambda-environment.sh staging admin-api --db --expect-env staging)"
           aws lambda update-function-configuration \
             --function-name "$FUNCTION" \
             --environment "$environment"

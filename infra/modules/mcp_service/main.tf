@@ -1,5 +1,7 @@
-# The Insolvia MCP service (services/mcp, ADR 0016): the MCP SDK + Mangum
-# Docker Lambda behind an API Gateway HTTP API, one instance per environment
+# The Insolvia MCP service (ADR 0016): since the switch (ADR 0028, plan
+# 18.22) the .NET host backend/src/Insolvia.Mcp in the VPC's private subnets —
+# services/mcp's MCP SDK + Mangum image before — behind an API Gateway HTTP
+# API, one instance per environment
 # (#262). The house pattern for a Mangum service, copied from
 # modules/api_service: HTTP API with a $default route to the Lambda, payload
 # format 2.0, regional custom domain, no CloudFront. Owns the per-env MCP
@@ -8,11 +10,11 @@
 # topic.
 #
 # NO DATA STORES OF ITS OWN, deliberately. This service is a second surface
-# over the SAME case, access-log and firm tables the API composes; its
-# execution role's grants attach from modules/case_store and
-# modules/firm_store (mcp_role_name), matching what ADR 0011 did for the
-# admin service — two execution roles with data-store access instead of one,
-# each scoped to what its service exports.
+# over the SAME case and firm data the API composes — since ADR 0028 the
+# database, reached as the `mcp` Postgres role, whose grants (SELECT on the
+# case and firm tables, candidates read/insert/update, the access log
+# append-only) are backend/src/Insolvia.Migrator/Grants.cs. The role holds
+# no KMS at all: no tool returns a full tax identifier.
 #
 # ITS OWN LAMBDA AND ITS OWN THROTTLES, and that is the ADR's blast-radius
 # argument: agent traffic is bursty, retry-happy, and shaped by harness
@@ -36,6 +38,10 @@ locals {
   # per the insolvia-aws-naming skill; `mcp` is the component because that is
   # the surface this serves (mcp.insolvia.ai).
   name = "${var.project}-${var.environment}-mcp"
+
+  # The Postgres role this host logs in as — modules/api_service's
+  # db_username note.
+  db_username = "mcp"
 
   # The per-environment MCP config namespace, a sibling of /…/api — the
   # namespace-per-service shape modules/api_service's #70 comment reserved.
@@ -66,11 +72,18 @@ resource "aws_iam_role_policy_attachment" "mcp_basic" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-# NO inline data policy here, deliberately: every data grant this role holds
-# attaches from the module that owns the store (modules/case_store's
-# mcp_case_access, modules/firm_store's mcp_firm_access), so what this
-# service may reach is readable next to what the other principals may — one
-# file per store, every principal's grant side by side.
+# The VPC's network interfaces and rds-db:connect as `mcp`
+# (modules/vpc_lambda_access). Nothing else: what this service may do to the
+# data is the `mcp` role's table grants, readable beside every other role's
+# in backend/src/Insolvia.Migrator/Grants.cs.
+module "vpc_access" {
+  source = "../vpc_lambda_access"
+
+  name                   = local.name
+  role_name              = aws_iam_role.mcp.name
+  db_username            = local.db_username
+  db_cluster_resource_id = var.db_cluster_resource_id
+}
 
 # ── Lambda function ─────────────────────────────────────────────
 
@@ -80,9 +93,16 @@ resource "aws_lambda_function" "mcp" {
   package_type  = "Image"
   # The per-environment marker tag, not `:latest` — modules/api_service's
   # promotion-invariant argument, verbatim.
-  image_uri   = "${var.ecr_repository_url}:${var.image_tag}"
-  timeout     = 30
-  memory_size = 512
+  image_uri = "${var.ecr_repository_url}:${var.image_tag}"
+  timeout   = 30
+  # api_service's note: CPU follows memory, and a .NET cold start is CPU-bound.
+  memory_size = 1024
+
+  # The private subnets; the issuer's JWKS leaves through the NAT.
+  vpc_config {
+    subnet_ids         = var.vpc_subnet_ids
+    security_group_ids = var.vpc_security_group_ids
+  }
 
   # Publish a numbered version on every Terraform-driven change so the alias
   # below always has a real version to point at.
@@ -100,7 +120,7 @@ resource "aws_lambda_function" "mcp" {
   lifecycle { ignore_changes = [image_uri, environment] }
 
   tags       = var.tags
-  depends_on = [aws_iam_role_policy_attachment.mcp_basic]
+  depends_on = [aws_iam_role_policy_attachment.mcp_basic, module.vpc_access]
 }
 
 resource "aws_cloudwatch_log_group" "lambda" {
@@ -254,13 +274,32 @@ resource "aws_route53_record" "mcp" {
 
 resource "aws_ssm_parameter" "config" {
   for_each = {
-    "insolvia-env" = var.insolvia_env
+    "insolvia-env"         = var.insolvia_env
+    "insolvia-db-username" = local.db_username
   }
 
   name  = "${local.ssm_prefix}/${each.key}"
   type  = "String"
   value = each.value
   tags  = var.tags
+}
+
+# The cursor key — modules/api_service's note. Its own key, not the API's:
+# a cursor is bound to the listing that minted it, and no listing crosses
+# the two services.
+resource "random_bytes" "cursor_key" {
+  length = 32
+}
+
+resource "aws_ssm_parameter" "cursor_key" {
+  name  = "${local.ssm_prefix}/insolvia-cursor-key"
+  type  = "SecureString"
+  value = random_bytes.cursor_key.base64
+  tags  = var.tags
+
+  lifecycle {
+    ignore_changes = [value]
+  }
 }
 
 # ── Alarms ──────────────────────────────────────────────────────

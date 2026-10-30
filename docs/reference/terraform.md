@@ -29,7 +29,13 @@ infra/
 │   │                         #   the backend Lambdas' security group (staging, prod)
 │   ├── aurora/               # ADR 0028: Aurora Serverless v2 PostgreSQL 17 under its
 │   │                         #   own KMS key + the /insolvia/<env>/db/* SSM contract
-│   │                         #   inputs (staging, prod; not attached to a Lambda yet)
+│   │                         #   inputs (staging, prod)
+│   ├── vpc_lambda_access/    # ADR 0028: the two grants every backend Lambda's role
+│   │                         #   holds — its VPC network interfaces, and
+│   │                         #   rds-db:connect as its own Postgres role
+│   ├── migrator/             # ADR 0028: the one-shot in-VPC migrator Lambda CI
+│   │                         #   invokes before every alias shift (and its staging
+│   │                         #   seed reach); the only reader of the master secret
 │   ├── audit_trail/          # CloudTrail data events on the case store, into
 │   │                         #   insolvia-<env>-audit under its own key
 │   ├── filing_credentials/   # the CM/ECF credential vault (ADR 0024): a dedicated
@@ -97,12 +103,58 @@ cannot apply it, what it deliberately does not model, and the MFA procedure
 ([`iam-mfa-rotation.md`](https://github.com/insolvia-ai/insolvia-services/blob/main/docs/runbooks/iam-mfa-rotation.md)). Nothing in this
 repo depends on it.
 
+## The backend on .NET and Aurora (ADR 0028, plan 18.22)
+
+Since the switch every backend Lambda runs a `backend/` image and keeps its
+data in the environment's Aurora cluster. What that means in Terraform, host
+by host (the per-module sections below keep their history):
+
+| Host (Lambda) | Image repository | Postgres role | SSM namespace (+ `/db/*`) | Grants beyond the database |
+|---|---|---|---|---|
+| `insolvia-<env>-api` | `insolvia-shared-api-dotnet` (`lambda`) | `api` | `/insolvia/<env>/api` | S3 documents, KMS tax-id seal+open and vault seal (by encryption context), SQS send on both queues, Cognito AdminCreateUser, the mailer's execute-api (insolvia-services) |
+| `insolvia-<env>-jobs-worker` | `insolvia-shared-worker-dotnet` (`worker-lambda`) | `worker` | `/insolvia/<env>/worker` | SQS consume (via the mapping), S3 documents read + packets write, KMS tax-id open |
+| `insolvia-<env>-admin-api` | `insolvia-shared-admin-api-dotnet` (`admin-lambda`) | `admin` | `/insolvia/<env>/admin-api` | Cognito AdminCreateUser |
+| `insolvia-<env>-mcp` | `insolvia-shared-mcp-dotnet` (`mcp-lambda`) | `mcp` | `/insolvia/<env>/mcp` | none — no KMS at all |
+| `insolvia-<env>-filing-worker` | `insolvia-shared-filing-dotnet` (`filing-lambda`) | `filing` | none: Terraform owns its environment (names only) | SQS consume, S3 packets read + filings write, KMS tax-id open and vault open, the kill switch |
+| `insolvia-<env>-migrator` | `insolvia-shared-migrator-dotnet` (`migrator`) | the RDS master, then `SET ROLE migrator` | `/insolvia/<env>/migrator` | the master secret's GetSecretValue; on staging also Cognito (Get/Create/SetPassword), the fixture bucket read, documents write, the case key through S3 and for tax-id sealing |
+
+- **The network.** Each runs in `module.network`'s private subnets under its
+  Lambda security group, the one `module.aurora` admits 5432 from.
+  `modules/vpc_lambda_access` adds the ENI permissions as an INLINE policy —
+  ci-trust lets the deploy role attach only AWSLambdaBasicExecutionRole — and
+  the per-role `rds-db:connect` on
+  `dbuser:<cluster resource id>/<role>`. The role name is one literal per
+  module, published as `insolvia-db-username` beside it, so the grant and
+  `INSOLVIA_DB_USERNAME` cannot disagree. The migrator creates those roles
+  `WITH rds_iam` on every run.
+- **The database contract** is `/insolvia/<env>/db/{endpoint,port,database-name,cluster-resource-id,master-secret-arn}`
+  (env root). `.github/scripts/lambda-environment.sh` maps it to the
+  `INSOLVIA_DB_*` names `backend/src/Insolvia.Data` reads — the one place the
+  infra's kebab naming and the backend's variable names meet — and passes the
+  master secret's ARN to the migrator alone. `AWS_REGION` is never published:
+  Lambda reserves it and sets it itself.
+- **The key aliases are explicit** (`insolvia-kms-case-key-alias`,
+  `insolvia-kms-filing-key-alias`); the .NET hosts no longer derive them from
+  a table name. A generated `insolvia-cursor-key` (SecureString) binds the
+  API's and MCP's keyset cursors.
+- **The DynamoDB tables stay; their grants do not.** Staging and prod pass
+  `dynamodb_grants = false` to `case_store`, `firm_store`,
+  `filing_credentials` and `filing_worker` (a TRANSITIONAL variable, true by
+  default so dev's Python stack keeps working), and the waitlist and
+  admin-audit PutItems are gone from `api_service`/`admin_service`. The
+  tables themselves are deleted in 18.23, with the maintainer — prod's carry
+  deletion protection (§ Destruction safety).
+- **The migrator runs before every alias shift** — `release.yml`'s first leg
+  after infra in both stages ([`architecture.md`](architecture.md) § CI/CD).
+
 ## Backend API (`infra/modules/api_service/`)
 
 One instance per environment (issue #63): `staging-api.insolvia.ai` and
 `api.insolvia.ai`. Each owns, per env:
 
-- **ECR** — *not* owned per env. One repository per service, `insolvia-shared-api`,
+- **ECR** — *not* owned per env. One repository per service,
+  `insolvia-shared-api-dotnet` since the switch (`insolvia-shared-api` held the
+  Python image),
   shared by staging and prod and created in insolvia-services'
   `infra/envs/shared`: prod deliberately
   deploys the exact image digest staging validated, which requires one place
@@ -113,13 +165,14 @@ One instance per environment (issue #63): `staging-api.insolvia.ai` and
   runtime). Retention is time-based with no catch-all rule, because ECR
   lifecycle rules only ever *expire* and never *protect*: a catch-all would
   evict the digest prod is running once staging churned past it.
-- **Lambda (Image)** `insolvia-<env>-api` — 30 s / 512 MB, Flask+Mangum from
-  `services/api/`. `lifecycle { ignore_changes = [image_uri, environment] }`:
+- **Lambda (Image)** `insolvia-<env>-api` — 30 s / 1024 MB, ASP.NET Core
+  from `backend/src/Insolvia.Api` (Flask+Mangum from `services/api/` before
+  the switch), in the VPC. `lifecycle { ignore_changes = [image_uri, environment] }`:
   the **deploy workflow owns both** — it pushes an image and injects the
   environment it resolves from SSM (below), so Terraform's copies are only the
   first-apply seed.
 - **HTTP API** — `$default` route to the Lambda, payload format 2.0 (what
-  Mangum consumes); stage throttling 20 rps / burst 40 as the unauthenticated
+  `AddAWSLambdaHosting(LambdaEventSource.HttpApi)` consumes); stage throttling 20 rps / burst 40 as the unauthenticated
   waitlist endpoint's abuse control; execute-api endpoint disabled so the
   custom domain is the only front door.
 - **Custom domain** — an API Gateway REGIONAL domain + Route53 alias,
@@ -130,10 +183,12 @@ One instance per environment (issue #63): `staging-api.insolvia.ai` and
   us-east-1.
 - **DynamoDB** `insolvia-<env>-waitlist` — `PK`/`SK` string keys,
   PAY_PER_REQUEST, PITR. Lives here rather than with the marketing site per
-  `docs/adr/0001`. The Lambda's role gets
-  **PutItem only** (append-only by design), on its own env's table only.
+  `docs/adr/0001`. **Unused since the switch** — the waitlist is the
+  `waitlist_entries` Postgres table, INSERT-only for the `api` role — and its
+  grant is gone; the table is deleted in 18.23.
 - **SSM namespace** `/insolvia/<env>/api/<key>` (#70) — Terraform writes the
-  values the service reads (`insolvia-env`, `waitlist-table-name`); the deploy
+  values the service reads (`insolvia-env`, `insolvia-db-username`, the cursor
+  key, and the env root's auth, queue, bucket and key-alias values); the deploy
   workflow resolves the namespace into the Lambda environment. Future secrets
   join as SecureStrings with `ignore_changes = [value]`, so Terraform creates
   the slot but never owns the value.
@@ -149,14 +204,17 @@ deadlocks**: Terraform owns the repo the image must already be in. Once per
 env:
 
 ```
-# in insolvia-services: release its infra/envs/shared (creates insolvia-shared-api)
-docker build --target lambda -f services/api/Dockerfile -t <repo-url>:<env> . && docker push <repo-url>:<env>
+# in insolvia-services: release its infra/envs/shared (creates insolvia-shared-api-dotnet)
+scripts/bootstrap-ecr-images.sh <env> api      # docker build --target lambda backend, push :<env>
 terraform apply
 ```
 
 Steady state is workflow-driven: push image → `aws lambda
-update-function-code` → resolve `/insolvia/<env>/api/*` →
-`update-function-configuration`. Terraform never notices.
+update-function-code` → resolve `/insolvia/<env>/api/*` + `/db/*`
+(`.github/scripts/lambda-environment.sh`) → `update-function-configuration`.
+Terraform never notices. **At the switch only the migrator needed this**: the
+other Lambdas already existed, and their ignored `image_uri` lets the deploy
+legs move them onto the `-dotnet` repositories themselves.
 
 ## Async job pipeline (`infra/modules/job_pipeline/`)
 
@@ -197,8 +255,9 @@ lives in the case table — this module owns no store.
   developer's own credentials, so the whole loop runs on a laptop; the one
   cloud-only piece is the managed SQS→Lambda event source mapping itself.
 - **First apply in a fresh environment** hits the usual image-before-apply
-  deadlock: `scripts/bootstrap-ecr-images.sh <env> jobs` seeds
-  `insolvia-shared-jobs:<env>` after `shared` applies, then apply the env.
+  deadlock: `scripts/bootstrap-ecr-images.sh <env> worker` seeds
+  `insolvia-shared-worker-dotnet:<env>` after `shared` applies, then apply the
+  env. (The Python worker image was `insolvia-shared-jobs`.)
 
 ## Auth (`infra/modules/auth/`) — the consumer half
 
@@ -271,7 +330,7 @@ grants, deliberately disjoint:
 | API Lambda role | Item-level reads and writes, **no `Scan`**, no control plane | `Decrypt`/`GenerateDataKey`, fenced to `kms:ViaService = dynamodb`; plus `GenerateDataKey`/`Decrypt` **directly**, fenced to `kms:EncryptionContext:purpose = debtor-tax-id` — the tax-id envelope (13.12), and the only direct use of the key |
 | Pipeline worker role | Item-level reads, no delete | The same DynamoDB-fenced pair; `Decrypt` alone under the tax-id context (it prints B121, it never enters an identifier) |
 | MCP service role | Item-level reads, candidate writes | The DynamoDB-fenced pair only — no tax-id context at all, so "no tool returns a full tax identifier" is an IAM fact |
-| Staging seed role (`ci-trust`) | Firm and case rows in staging | The DynamoDB- and S3-fenced pairs; `GenerateDataKey` alone under the tax-id context, to seal a fixture debtor's synthetic number — never `Decrypt` |
+| Staging seed role (`ci-trust`) | Firm and case rows in staging — **unused since the switch** (the staging migrator Lambda seeds; insolvia-services retires the role) | The DynamoDB- and S3-fenced pairs; `GenerateDataKey` alone under the tax-id context, to seal a fixture debtor's synthetic number — never `Decrypt` |
 | CI deploy role | Control plane only — create, update, tag, PITR | Manage the key; **explicitly denied** `Decrypt`, `GenerateDataKey*` and `ReEncrypt*` except where SSM or CloudTrail is the calling service |
 
 The tax-id statements are the one place a role touches the key without a
@@ -508,7 +567,7 @@ reasoning; the facts:
   null`); the local poller assumes the role.
 - **First apply in a fresh environment** needs the image bootstrap:
   `scripts/bootstrap-ecr-images.sh <env> filing` after `shared` has created the
-  repository.
+  repository (`insolvia-shared-filing-dotnet` since the switch).
 
 ## Per-machine development environment (`infra/envs/dev/`)
 

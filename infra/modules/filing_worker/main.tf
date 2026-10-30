@@ -1,5 +1,8 @@
 # ── The filing worker (ADR 0024 PR 7) ──────────────────────────
-# services/filing as an image Lambda consuming the filing queue, the kill
+# The filing worker as an image Lambda consuming the filing queue — since the
+# switch (ADR 0028, plan 18.22) backend/src/Insolvia.Filing in the VPC's
+# private subnets, logging in to Aurora as the `filing` Postgres role (the
+# vault's SELECT is that role's alone); services/filing before — the kill
 # switch it reads before every submission, and EVERY grant its role holds on
 # the case data — in one module, so "what can the filing worker touch" is one
 # file to read and one test (tests/filing_worker.tftest.hcl) pins it whole.
@@ -12,9 +15,14 @@
 #                                     table, Decrypt under the vault purpose,
 #                                     the access-log append (PR 4)
 #   from modules/filing_queue         consume on the filing queue (PR 6)
-#   from THIS module                  the case table, the documents bucket,
-#                                     the tax-id open (Case Upload, PR 9),
-#                                     the kill switch, its own logs
+#   from THIS module                  the documents bucket, the tax-id open
+#                                     (Case Upload, PR 9), the kill switch,
+#                                     its own logs, the VPC's network
+#                                     interfaces and rds-db:connect as
+#                                     `filing` (modules/vpc_lambda_access);
+#                                     the case table too while
+#                                     var.dynamodb_grants is true (dev's
+#                                     Python poller, until 18.23)
 #
 # The narrowest role in the account (ADR 0024, Risks): a compromise of it
 # defeats the approval check, so each statement below says what it is for.
@@ -27,7 +35,7 @@
 #
 # ── Bootstrap order (the first apply in a fresh account) ────────
 # Like every image Lambda here: insolvia-services' infra/envs/shared applies
-# first (creates insolvia-shared-filing), run `scripts/bootstrap-ecr-images.sh <env> filing`,
+# first (creates insolvia-shared-filing-dotnet), run `scripts/bootstrap-ecr-images.sh <env> filing`,
 # then apply the env. Later deploys are filing-<env>.yml pushing an image and
 # calling update-function-code; Terraform ignores the image drift.
 
@@ -39,6 +47,11 @@ locals {
   # `-worker`, the kill switch an SSM parameter in the service's namespace.
   name          = "${var.project}-${var.environment}-filing"
   function_name = "${local.name}-worker"
+
+  # The Postgres role this host logs in as — modules/api_service's
+  # db_username note. The Lambda's environment below is Terraform's own here
+  # (names only, no secret), so the literal is used directly.
+  db_username = "filing"
 
   worker_count = var.ecr_repository_url == null ? 0 : 1
   alarm_count  = var.ecr_repository_url != null && var.alarms_topic_arn != null ? 1 : 0
@@ -60,7 +73,7 @@ locals {
 
   worker_policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [
+    Statement = [for s in [
       {
         # READ the case partition: the approval it consumes, and the record
         # the approval's digest is recomputed over (the case, its debtors,
@@ -183,7 +196,7 @@ locals {
         Action   = ["ssm:GetParameter"]
         Resource = local.kill_switch_arn
       },
-    ]
+    ] : s if var.dynamodb_grants || contains(["TaxIdOpen", "PacketRead", "FilingReceiptWrite", "CaseKeyThroughS3", "KillSwitchRead"], s.Sid)]
   })
 }
 
@@ -219,6 +232,17 @@ resource "aws_iam_role_policy_attachment" "worker_logs" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
+# The VPC's network interfaces and rds-db:connect as `filing`.
+module "vpc_access" {
+  source = "../vpc_lambda_access"
+  count  = local.worker_count
+
+  name                   = local.function_name
+  role_name              = var.worker_role_name
+  db_username            = local.db_username
+  db_cluster_resource_id = var.db_cluster_resource_id
+}
+
 resource "aws_lambda_function" "worker" {
   count = local.worker_count
 
@@ -234,24 +258,47 @@ resource "aws_lambda_function" "worker" {
   timeout     = var.timeout_seconds
   memory_size = var.memory_mb
 
+  # The private subnets: Aurora, S3 through its gateway endpoint, KMS and SSM
+  # through the NAT — and the courts, through the NAT's stable address
+  # (modules/network's nat_public_ip, what a court would allow-list).
+  vpc_config {
+    subnet_ids         = coalesce(var.vpc_subnet_ids, [])
+    security_group_ids = coalesce(var.vpc_security_group_ids, [])
+  }
+
+  # What backend/src/Insolvia.Filing reads (FilingConfig, FilingComposition,
+  # Insolvia.Data's DatabaseSettings). AWS_REGION is Lambda's own reserved
+  # variable and cannot be set here; the runtime provides it.
   environment {
     variables = {
-      INSOLVIA_ENV                 = var.insolvia_env
-      CASE_TABLE_NAME              = var.case_table_name
-      CASE_ACCESS_LOG_TABLE_NAME   = var.case_access_log_table_name
-      CASE_DOCUMENT_BUCKET         = var.case_document_bucket_name
-      FILING_KILL_SWITCH_PARAMETER = local.kill_switch_name
+      INSOLVIA_ENV                  = var.insolvia_env
+      CASE_DOCUMENT_BUCKET          = var.case_document_bucket_name
+      FILING_KILL_SWITCH_PARAMETER  = local.kill_switch_name
+      INSOLVIA_DB_ENDPOINT          = coalesce(var.db_endpoint, "unset")
+      INSOLVIA_DB_PORT              = tostring(var.db_port)
+      INSOLVIA_DB_DATABASE_NAME     = coalesce(var.db_database_name, "unset")
+      INSOLVIA_DB_USERNAME          = local.db_username
+      INSOLVIA_KMS_CASE_KEY_ALIAS   = coalesce(var.case_kms_key_alias, "unset")
+      INSOLVIA_KMS_FILING_KEY_ALIAS = coalesce(var.filing_kms_key_alias, "unset")
     }
   }
 
   # The deploy workflow owns the image (filing-<env>.yml); Terraform owns the
   # environment, which holds names only — no secret ever rides here.
-  lifecycle { ignore_changes = [image_uri] }
+  lifecycle {
+    ignore_changes = [image_uri]
+
+    precondition {
+      condition     = var.vpc_subnet_ids != null && var.vpc_security_group_ids != null && var.db_cluster_resource_id != null && var.db_endpoint != null && var.db_database_name != null && var.case_kms_key_alias != null && var.filing_kms_key_alias != null
+      error_message = "A deployed filing worker runs in the VPC against Aurora: pass the vpc_*, db_* and *_kms_key_alias inputs (module.network, module.aurora, the key aliases)."
+    }
+  }
 
   tags = var.tags
   depends_on = [
     aws_iam_role_policy_attachment.worker_logs,
     aws_iam_role_policy.worker,
+    module.vpc_access,
   ]
 }
 

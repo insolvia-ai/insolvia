@@ -36,8 +36,13 @@ data "aws_acm_certificate" "wildcard" {
 # This is a second reason the documented apply order — shared before any
 # environment — is load-bearing rather than ceremonial: these lookups fail
 # outright until `shared` has applied, exactly as the certificate lookup does.
+#
+# The backend's repositories are the `-dotnet` six since the switch (ADR
+# 0028, plan 18.22) — created beside the Python ones by insolvia-services
+# (#11), which removes the Python repositories after 18.23. `worker` is the
+# .NET successor of `jobs`; `migrator` is new.
 data "aws_ecr_repository" "service" {
-  for_each = toset(["api", "admin-api", "jobs", "marketing", "mcp", "filing"])
+  for_each = toset(["api-dotnet", "admin-api-dotnet", "worker-dotnet", "marketing", "mcp-dotnet", "filing-dotnet", "migrator-dotnet"])
 
   name = "insolvia-shared-${each.key}"
 }
@@ -75,9 +80,14 @@ module "api_service" {
   domain_name         = var.api_subdomain
   hosted_zone_id      = data.aws_route53_zone.main.zone_id
   acm_certificate_arn = data.aws_acm_certificate.wildcard.arn
-  ecr_repository_url  = data.aws_ecr_repository.service["api"].repository_url
+  ecr_repository_url  = data.aws_ecr_repository.service["api-dotnet"].repository_url
   image_tag           = local.environment
-  tags                = local.common_tags
+
+  vpc_subnet_ids         = module.network.private_subnet_ids
+  vpc_security_group_ids = [module.network.lambda_security_group_id]
+  db_cluster_resource_id = module.aurora.cluster_resource_id
+
+  tags = local.common_tags
 }
 
 
@@ -114,11 +124,14 @@ module "admin_service" {
   domain_name         = var.admin_api_subdomain
   hosted_zone_id      = data.aws_route53_zone.main.zone_id
   acm_certificate_arn = data.aws_acm_certificate.wildcard.arn
-  ecr_repository_url  = data.aws_ecr_repository.service["admin-api"].repository_url
+  ecr_repository_url  = data.aws_ecr_repository.service["admin-api-dotnet"].repository_url
   image_tag           = local.environment
-  firm_table_name     = module.firm_store.table_name
   firm_user_pool_id   = module.auth.user_pool_id
   google_client_id    = var.google_admin_client_id
+
+  vpc_subnet_ids         = module.network.private_subnet_ids
+  vpc_security_group_ids = [module.network.lambda_security_group_id]
+  db_cluster_resource_id = module.aurora.cluster_resource_id
 
   audit_deletion_protection = true
 
@@ -140,9 +153,14 @@ module "mcp_service" {
   domain_name         = var.mcp_subdomain
   hosted_zone_id      = data.aws_route53_zone.main.zone_id
   acm_certificate_arn = data.aws_acm_certificate.wildcard.arn
-  ecr_repository_url  = data.aws_ecr_repository.service["mcp"].repository_url
+  ecr_repository_url  = data.aws_ecr_repository.service["mcp-dotnet"].repository_url
   image_tag           = local.environment
-  tags                = local.common_tags
+
+  vpc_subnet_ids         = module.network.private_subnet_ids
+  vpc_security_group_ids = [module.network.lambda_security_group_id]
+  db_cluster_resource_id = module.aurora.cluster_resource_id
+
+  tags = local.common_tags
 }
 
 # The mailer moved to the insolvia-services repo on 2026-10-11 (ADR 0025): its
@@ -305,11 +323,16 @@ module "job_pipeline" {
   project            = "insolvia"
   environment        = local.environment
   insolvia_env       = "production"
-  ecr_repository_url = data.aws_ecr_repository.service["jobs"].repository_url
+  ecr_repository_url = data.aws_ecr_repository.service["worker-dotnet"].repository_url
   image_tag          = local.environment
   api_role_name      = module.api_service.lambda_role_name
   alarms_topic_arn   = module.api_service.alarms_topic_arn
-  tags               = local.common_tags
+
+  vpc_subnet_ids         = module.network.private_subnet_ids
+  vpc_security_group_ids = [module.network.lambda_security_group_id]
+  db_cluster_resource_id = module.aurora.cluster_resource_id
+
+  tags = local.common_tags
 }
 
 # The queue URL, into the API's SSM config namespace — same env-level
@@ -333,11 +356,14 @@ resource "aws_ssm_parameter" "job_queue_url" {
 module "case_store" {
   source = "../../modules/case_store"
 
-  project                     = "insolvia"
-  environment                 = local.environment
-  api_role_name               = module.api_service.lambda_role_name
-  worker_role_name            = module.job_pipeline.worker_role_name
-  mcp_role_name               = module.mcp_service.lambda_role_name
+  project          = "insolvia"
+  environment      = local.environment
+  api_role_name    = module.api_service.lambda_role_name
+  worker_role_name = module.job_pipeline.worker_role_name
+  mcp_role_name    = module.mcp_service.lambda_role_name
+  # The switch (plan 18.22): the case data is Aurora's; the roles keep only
+  # the tax-id envelope grant on this key. The tables stay until 18.23.
+  dynamodb_grants             = false
   deletion_protection         = true
   key_deletion_window_in_days = 30
   tags                        = local.common_tags
@@ -353,13 +379,15 @@ module "case_store" {
 module "firm_store" {
   source = "../../modules/firm_store"
 
-  project                = "insolvia"
-  environment            = local.environment
-  aws_region             = var.aws_region
-  kms_key_arn            = module.case_store.kms_key_arn
-  api_role_name          = module.api_service.lambda_role_name
-  admin_role_name        = module.admin_service.lambda_role_name
-  mcp_role_name          = module.mcp_service.lambda_role_name
+  project         = "insolvia"
+  environment     = local.environment
+  aws_region      = var.aws_region
+  kms_key_arn     = module.case_store.kms_key_arn
+  api_role_name   = module.api_service.lambda_role_name
+  admin_role_name = module.admin_service.lambda_role_name
+  mcp_role_name   = module.mcp_service.lambda_role_name
+  # The switch: no role keeps a firm-table grant (the table stays until 18.23).
+  dynamodb_grants        = false
   point_in_time_recovery = true
   deletion_protection    = true
   tags                   = local.common_tags
@@ -379,11 +407,14 @@ module "firm_store" {
 module "filing_credentials" {
   source = "../../modules/filing_credentials"
 
-  project                     = "insolvia"
-  environment                 = local.environment
-  table_kms_key_arn           = module.case_store.kms_key_arn
-  access_log_table_arn        = module.case_store.access_log_table_arn
-  api_role_name               = module.api_service.lambda_role_name
+  project              = "insolvia"
+  environment          = local.environment
+  table_kms_key_arn    = module.case_store.kms_key_arn
+  access_log_table_arn = module.case_store.access_log_table_arn
+  api_role_name        = module.api_service.lambda_role_name
+  # The switch: the vault rows are Aurora's (filing_credentials — the API
+  # writes, only `filing` reads); the roles keep the vault KEY grants.
+  dynamodb_grants             = false
   point_in_time_recovery      = true
   deletion_protection         = true
   key_deletion_window_in_days = 30
@@ -452,88 +483,41 @@ module "case_documents" {
 module "filing_worker" {
   source = "../../modules/filing_worker"
 
-  project                    = "insolvia"
-  environment                = local.environment
-  insolvia_env               = "production"
-  ecr_repository_url         = data.aws_ecr_repository.service["filing"].repository_url
-  image_tag                  = local.environment
-  worker_role_name           = module.filing_credentials.worker_role_name
-  worker_role_arn            = module.filing_credentials.worker_role_arn
-  queue_arn                  = module.filing_queue.queue_arn
-  dlq_name                   = module.filing_queue.dlq_name
-  case_table_arn             = module.case_store.table_arn
-  case_table_name            = module.case_store.table_name
-  case_access_log_table_name = module.case_store.access_log_table_name
-  case_kms_key_arn           = module.case_store.kms_key_arn
-  case_document_bucket_arn   = module.case_documents.bucket_arn
-  case_document_bucket_name  = module.case_documents.bucket_name
-  alarms_topic_arn           = module.api_service.alarms_topic_arn
-  tags                       = local.common_tags
-}
+  project                   = "insolvia"
+  environment               = local.environment
+  insolvia_env              = "production"
+  ecr_repository_url        = data.aws_ecr_repository.service["filing-dotnet"].repository_url
+  image_tag                 = local.environment
+  worker_role_name          = module.filing_credentials.worker_role_name
+  worker_role_arn           = module.filing_credentials.worker_role_arn
+  queue_arn                 = module.filing_queue.queue_arn
+  dlq_name                  = module.filing_queue.dlq_name
+  case_kms_key_arn          = module.case_store.kms_key_arn
+  case_document_bucket_arn  = module.case_documents.bucket_arn
+  case_document_bucket_name = module.case_documents.bucket_name
+  alarms_topic_arn          = module.api_service.alarms_topic_arn
 
-# Publish the case table name into the API's SSM config namespace, env-level
-# for the same reason the auth parameters above are:
-# module.case_store already depends on module.api_service, so having
-# api_service read the table name back would be a dependency cycle.
-#
-# Same /insolvia/<env>/api/<kebab-key> convention, so the deploy workflow's
-# get-parameters-by-path step derives it into CASE_TABLE_NAME with no workflow
-# change. The key ARN is deliberately NOT published: the SDK resolves the key
-# from the table, so nothing in services/api ever names it. That is NOT the
-# same as the API role needing no key permissions — it does, and
-# modules/case_store explains why.
-resource "aws_ssm_parameter" "case_table_name" {
-  name  = "/insolvia/${local.environment}/api/case-table-name"
-  type  = "String"
-  value = module.case_store.table_name
-  tags  = local.common_tags
-}
+  # The switch (plan 18.22): the .NET worker in the VPC, against Aurora as
+  # the `filing` role, naming both of its keys explicitly.
+  dynamodb_grants        = false
+  vpc_subnet_ids         = module.network.private_subnet_ids
+  vpc_security_group_ids = [module.network.lambda_security_group_id]
+  db_cluster_resource_id = module.aurora.cluster_resource_id
+  db_endpoint            = module.aurora.endpoint
+  db_port                = module.aurora.port
+  db_database_name       = module.aurora.database_name
+  case_kms_key_alias     = module.case_store.kms_key_alias
+  filing_kms_key_alias   = module.filing_credentials.kms_key_alias
 
-# The access log's table name, same namespace and same reasoning as
-# case-table-name above — the API derives it as CASE_ACCESS_LOG_TABLE_NAME.
-resource "aws_ssm_parameter" "case_access_log_table_name" {
-  name  = "/insolvia/${local.environment}/api/case-access-log-table-name"
-  type  = "String"
-  value = module.case_store.access_log_table_name
-  tags  = local.common_tags
-}
-
-# The firm table's name, same namespace and same reasoning as the case tables
-# above — the API derives it as FIRM_TABLE_NAME.
-resource "aws_ssm_parameter" "firm_table_name" {
-  name  = "/insolvia/${local.environment}/api/firm-table-name"
-  type  = "String"
-  value = module.firm_store.table_name
-  tags  = local.common_tags
+  tags = local.common_tags
 }
 
 # ── MCP configuration namespace (#261/#262) ─────────────────────
-# The /insolvia/<env>/mcp siblings of the api namespace above — env-level for
-# the same cycle-avoidance reason (module.case_store and module.firm_store
-# depend on module.mcp_service to attach its grants), re-published under /mcp
-# because each service's namespace is its complete configuration contract.
-# See infra/envs/staging/main.tf for the longer form of both arguments.
-resource "aws_ssm_parameter" "mcp_case_table_name" {
-  name  = "/insolvia/${local.environment}/mcp/case-table-name"
-  type  = "String"
-  value = module.case_store.table_name
-  tags  = local.common_tags
-}
-
-resource "aws_ssm_parameter" "mcp_case_access_log_table_name" {
-  name  = "/insolvia/${local.environment}/mcp/case-access-log-table-name"
-  type  = "String"
-  value = module.case_store.access_log_table_name
-  tags  = local.common_tags
-}
-
-resource "aws_ssm_parameter" "mcp_firm_table_name" {
-  name  = "/insolvia/${local.environment}/mcp/firm-table-name"
-  type  = "String"
-  value = module.firm_store.table_name
-  tags  = local.common_tags
-}
-
+# The /insolvia/<env>/mcp siblings of the api namespace, env-level because
+# they reference module.auth: the MCP deploy step derives each into the
+# service's environment (last segment, upper-cased, hyphens to underscores).
+# The table names it once carried went with the switch (ADR 0028): the MCP
+# host reads the database contract, /insolvia/<env>/db/*, instead.
 resource "aws_ssm_parameter" "mcp_auth_issuer_url" {
   name  = "/insolvia/${local.environment}/mcp/auth-issuer-url"
   type  = "String"
@@ -596,10 +580,12 @@ module "audit_trail" {
 }
 
 # ── Network and database (ADR 0028, plan 18.5) ──────────────────
-# The VPC and the Aurora cluster the .NET backend will use. ATTACHED TO NO
-# LAMBDA YET: the switch PR (18.22) puts the functions in the VPC and the
-# migrator creates the schema, so until then these are additive and idle.
-# Declared after everything else on purpose — nothing else references them.
+# The VPC and the Aurora cluster the .NET backend runs on. Since the switch
+# (18.22) every backend Lambda above runs in the private subnets under the
+# Lambda security group, and logs in as its own Postgres role; the migrator
+# below creates the schema and the roles before each alias shift. (Terraform
+# orders by reference, not by position — the service modules above read
+# module.network and module.aurora.)
 #
 # modules/network: two AZs of private subnets, one fck-nat instance for egress,
 # free S3 and DynamoDB gateway endpoints. modules/aurora: Serverless v2
@@ -654,4 +640,63 @@ resource "aws_ssm_parameter" "db" {
   type  = "String"
   value = each.value
   tags  = local.common_tags
+}
+
+# ── The .NET hosts' configuration (ADR 0028, plan 18.22) ────────
+# Each host's namespace is its complete configuration contract, derived on
+# every deploy by .github/scripts/lambda-environment.sh (last segment,
+# upper-cased, hyphens to underscores) together with the database contract
+# /insolvia/<env>/db/* above (as INSOLVIA_DB_*). Env-level, like the auth and
+# queue parameters, because each value is another module's output.
+#
+# The key aliases are explicit since the switch: the .NET hosts used to be
+# able to derive them from CASE_TABLE_NAME, which names a DynamoDB table
+# that no host reads now. backend/src/Insolvia.Aws/Sealing/SealingKeys.cs
+# refuses any value not shaped alias/insolvia-<env>-cases /
+# -filing-credentials, which is also what ci-trust's decrypt denies match.
+resource "aws_ssm_parameter" "api_key_aliases" {
+  for_each = {
+    "insolvia-kms-case-key-alias"   = module.case_store.kms_key_alias
+    "insolvia-kms-filing-key-alias" = module.filing_credentials.kms_key_alias
+  }
+
+  name  = "/insolvia/${local.environment}/api/${each.key}"
+  type  = "String"
+  value = each.value
+  tags  = local.common_tags
+}
+
+# The pipeline worker's namespace (modules/job_pipeline writes insolvia-env
+# and insolvia-db-username into it): the bucket it reads and writes packets
+# in, and the case key it opens tax ids with for B121.
+resource "aws_ssm_parameter" "worker_config" {
+  for_each = {
+    "case-document-bucket"        = module.case_documents.bucket_name
+    "insolvia-kms-case-key-alias" = module.case_store.kms_key_alias
+  }
+
+  name  = "${module.job_pipeline.worker_ssm_parameter_prefix}/${each.key}"
+  type  = "String"
+  value = each.value
+  tags  = local.common_tags
+}
+
+# ── The migrator (ADR 0028 § Runtime shape) ─────────────────────
+# The one-shot Lambda CI invokes before every alias shift: migrations and the
+# per-service roles and grants. Production is never seeded (seeds/README.md),
+# so this migrator holds no Cognito, S3 or case-key grant at all — only the
+# master secret. modules/migrator owns the reasoning.
+module "migrator" {
+  source = "../../modules/migrator"
+
+  project                = "insolvia"
+  environment            = local.environment
+  insolvia_env           = "production"
+  ecr_repository_url     = data.aws_ecr_repository.service["migrator-dotnet"].repository_url
+  image_tag              = local.environment
+  vpc_subnet_ids         = module.network.private_subnet_ids
+  vpc_security_group_ids = [module.network.lambda_security_group_id]
+  master_secret_arn      = module.aurora.master_secret_arn
+  seed                   = false
+  tags                   = local.common_tags
 }

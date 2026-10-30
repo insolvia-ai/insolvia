@@ -15,13 +15,20 @@
 #
 # ── Bootstrap order (read before the FIRST apply in a fresh account) ────────
 # Same image-before-apply deadlock as every image Lambda here: the worker
-# function cannot be created until an image exists in insolvia-shared-jobs.
-# Once per environment:
+# function cannot be created until an image exists in its repository —
+# insolvia-shared-worker-dotnet since the switch (ADR 0028, plan 18.22; the
+# Python image was insolvia-shared-jobs). Once per environment:
 #
-#   1. insolvia-services' infra/envs/shared (creates insolvia-shared-jobs)
-#   2. scripts/bootstrap-ecr-images.sh <env> jobs
-#      (builds services/api/Dockerfile --target worker and pushes :<env>)
+#   1. insolvia-services' infra/envs/shared (creates the repository)
+#   2. scripts/bootstrap-ecr-images.sh <env> worker
+#      (builds backend/ --target worker-lambda and pushes :<env>)
 #   3. terraform apply                    (full)
+#
+# The worker is backend/src/Insolvia.Worker: in the VPC's private subnets,
+# logging in to Aurora as the `worker` Postgres role (the job and packet rows
+# are Postgres now — ADR 0028 amends ADR 0018 there), with its own config
+# namespace /insolvia/<env>/worker (below) rather than the API's, because
+# the two log in as different roles.
 #
 # Every later deploy is api-<env>.yml pushing and update-function-code —
 # Terraform ignores the image drift (see the lifecycle note on the Lambda).
@@ -30,6 +37,12 @@ locals {
   # insolvia-<env>-jobs — the component is `jobs`, named for what this
   # serves (the case-job pipeline), per the insolvia-aws-naming skill.
   name = "${var.project}-${var.environment}-jobs"
+
+  # The worker's Postgres role and config namespace — modules/api_service's
+  # db_username note; the namespace is the worker's own because the API's
+  # publishes INSOLVIA_DB_USERNAME = api.
+  db_username = "worker"
+  ssm_prefix  = "/${var.project}/${var.environment}/worker"
 
   # The worker half exists only where an image repository is supplied —
   # everywhere deployed, never in dev.
@@ -170,6 +183,18 @@ resource "aws_iam_role_policy" "api_enqueue" {
   })
 }
 
+# The VPC's network interfaces and rds-db:connect as `worker`
+# (modules/vpc_lambda_access).
+module "vpc_access" {
+  source = "../vpc_lambda_access"
+  count  = local.worker_count
+
+  name                   = "${local.name}-worker"
+  role_name              = aws_iam_role.worker[0].name
+  db_username            = local.db_username
+  db_cluster_resource_id = var.db_cluster_resource_id
+}
+
 # ── Worker Lambda ───────────────────────────────────────────────
 
 resource "aws_lambda_function" "worker" {
@@ -188,6 +213,13 @@ resource "aws_lambda_function" "worker" {
   timeout     = var.worker_timeout_seconds
   memory_size = var.worker_memory_mb
 
+  # The private subnets: Aurora, S3 through its gateway endpoint, KMS and
+  # Anthropic through the NAT.
+  vpc_config {
+    subnet_ids         = coalesce(var.vpc_subnet_ids, [])
+    security_group_ids = coalesce(var.vpc_security_group_ids, [])
+  }
+
   # No `publish`, no alias, unlike api_service — and that is a difference
   # with a reason, not an omission. The alias machinery exists so an API
   # deploy can smoke-test a version before API Gateway routes traffic to it;
@@ -202,18 +234,41 @@ resource "aws_lambda_function" "worker" {
   }
 
   # The deploy workflow owns both, exactly as it does for the API Lambda: it
-  # pushes an image and injects the environment it resolves from the same
-  # /insolvia/<env>/api SSM namespace (CASE_TABLE_NAME is what the worker
-  # actually reads). The block above is only the first-apply seed — which is
+  # pushes an image and injects the environment it resolves from the
+  # worker's own /insolvia/<env>/worker namespace plus /insolvia/<env>/db
+  # (.github/scripts/lambda-environment.sh). The block above is only the first-apply seed — which is
   # also why a freshly bootstrapped worker cannot run a job until the first
   # api-<env>.yml deploy injects its environment.
-  lifecycle { ignore_changes = [image_uri, environment] }
+  lifecycle {
+    ignore_changes = [image_uri, environment]
+
+    precondition {
+      condition     = var.vpc_subnet_ids != null && var.vpc_security_group_ids != null && var.db_cluster_resource_id != null
+      error_message = "A deployed worker runs in the VPC: pass vpc_subnet_ids, vpc_security_group_ids and db_cluster_resource_id (module.network, module.aurora)."
+    }
+  }
 
   tags = var.tags
   depends_on = [
     aws_iam_role_policy_attachment.worker_basic,
     aws_iam_role_policy.worker_queue,
+    module.vpc_access,
   ]
+}
+
+# The worker's configuration namespace: what this module owns. The bucket and
+# the case-key alias reference other modules and are written by the env root
+# beside these, as the API's namespace is.
+resource "aws_ssm_parameter" "worker_config" {
+  for_each = local.worker_count == 0 ? {} : {
+    "insolvia-env"         = var.insolvia_env
+    "insolvia-db-username" = local.db_username
+  }
+
+  name  = "${local.ssm_prefix}/${each.key}"
+  type  = "String"
+  value = each.value
+  tags  = var.tags
 }
 
 resource "aws_cloudwatch_log_group" "worker" {

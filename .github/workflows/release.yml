@@ -34,6 +34,11 @@ name: Release
 # an error. The gate double-checks on approval that nothing newer is waiting.
 #
 # ORDER MATTERS in the service legs, and it is not alphabetical:
+#   0. migrator   — ADR 0028: the database is private, so the migrator Lambda
+#                   applies the migrations, the per-service Postgres roles and
+#                   grants (and, on staging, the seed) BEFORE any leg shifts a
+#                   `live` alias. Every backend host after it starts against
+#                   a schema that is already current.
 #   1. api        — the backend everything else talks to.
 #   2. admin, mcp — after the API; nothing at runtime couples them to the
 #                   legs around them, they are placed here only because the
@@ -152,6 +157,7 @@ jobs:
       marketing: ${{ steps.f.outputs.marketing }}
       mcp: ${{ steps.f.outputs.mcp }}
       filing: ${{ steps.f.outputs.filing }}
+      migrator: ${{ steps.f.outputs.migrator }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -198,7 +204,7 @@ jobs:
           # Every leg, admin included — it was once missing from this list, so
           # an `all=true` dispatch deployed everything except admin.
           all_legs() {
-            for s in admin api app filing marketing mcp; do echo "$s=true" >> "$GITHUB_OUTPUT"; done
+            for s in admin api app filing marketing mcp migrator; do echo "$s=true" >> "$GITHUB_OUTPUT"; done
           }
 
           # Deploy everything when we cannot know what staging is missing.
@@ -231,33 +237,34 @@ jobs:
             fi
           }
 
-          # packages/insolvia_core is baked into the api image (issue #208), so
-          # a core change must rebuild and redeploy the service that ships it.
+          # THE BACKEND IS backend/ SINCE THE SWITCH (ADR 0028, plan 18.22):
+          # services/ and packages/insolvia_core no longer deploy anywhere (18.23
+          # deletes them), so they name no leg. One build stage compiles every
+          # .NET host, and the shared projects (Core, Engines, Forms, Data, Aws)
+          # plus the solution-level files are in every image — a change there
+          # redeploys every backend leg. A host's own project redeploys its leg.
+          # The deploy scripts every backend leg runs ride along.
+          shared='backend/(src/Insolvia\.(Core|Engines|Forms|Data|Aws)/|Directory\.[A-Za-z.]+|global\.json|Insolvia\.slnx|Dockerfile|\.editorconfig)|infra/envs/staging/|infra/modules/vpc_lambda_access/|\.github/(workflows/release\.yml|scripts/lambda-environment\.sh)'
+          # The migrator: migrations and grants live in Insolvia.Data and
+          # Insolvia.Migrator, the seed in Insolvia.Migrator and seeds/ (a
+          # named build context of its image), and the database in
+          # modules/aurora — any of them re-runs it.
+          emit migrator  "^($shared|backend/src/Insolvia\.Migrator/|seeds/|infra/modules/(migrator|aurora|network)/|\.github/workflows/migrator-staging\.yml)"
           # modules/job_pipeline rides the api leg: the pipeline worker's image
-          # is built from services/api and deployed by api-staging.yml
-          # (ADR 0018).
-          # seeds/ and the seed action ride the api leg too: its post-deploy
+          # (Insolvia.Worker) is built and deployed by api-staging.yml (ADR
+          # 0018). seeds/ and the seed action ride it too: its post-deploy
           # integration tier signs in as the people seeds/staging.json names.
-          # The seed loader lives in services/admin but runs in THIS leg's
-          # integration job, so a change to it must re-run that job.
-          emit api       '^(services/api/|packages/insolvia_core/|seeds/|services/admin/src/insolvia_admin/entrypoints/seed\.py|infra/envs/staging/|infra/modules/(api_service|job_pipeline)/|\.github/(workflows/(api-staging|release)\.yml|actions/seed-staging/))'
-          emit admin     '^(apps/insolvia_admin/|services/admin/|packages/insolvia_core/|infra/envs/staging/|infra/modules/(admin_service|web_hosting)/|\.github/workflows/(admin-staging|release)\.yml)'
+          emit api       "^($shared|backend/src/Insolvia\.(Api|Worker)/|seeds/|infra/modules/(api_service|job_pipeline)/|\.github/(workflows/api-staging\.yml|actions/seed-staging/))"
+          emit admin     "^($shared|apps/insolvia_admin/|backend/src/Insolvia\.Admin/|infra/modules/(admin_service|web_hosting)/|\.github/workflows/admin-staging\.yml)"
           emit marketing '^(apps/insolvia_marketing/|infra/envs/staging/|infra/modules/marketing_site/|\.github/workflows/(marketing-staging|release)\.yml)'
-          # packages/insolvia_core is baked into the mcp image too (ADR 0016's
-          # "a core change redeploys three services" consequence).
-          emit mcp       '^(services/mcp/|packages/insolvia_core/|infra/envs/staging/|infra/modules/mcp_service/|\.github/workflows/(mcp-staging|release)\.yml)'
-          # The filing worker's image carries packages/insolvia_core AND the
-          # API's source (the approval digest and the filing set it must
-          # compute exactly as the API does — services/filing/README.md), so
-          # a change to either redeploys it; and the API's unit tier, whose
-          # reference case its tests file.
-          emit filing    '^(services/filing/|services/api/src/|packages/insolvia_core/|infra/envs/staging/|infra/modules/(filing_worker|filing_queue|filing_credentials)/|\.github/workflows/(filing-staging|release)\.yml)'
+          emit mcp       "^($shared|backend/src/Insolvia\.Mcp/|infra/modules/mcp_service/|\.github/workflows/mcp-staging\.yml)"
+          emit filing    "^($shared|backend/src/Insolvia\.Filing/|infra/modules/(filing_worker|filing_queue|filing_credentials)/|\.github/workflows/filing-staging\.yml)"
           # apps/ and packages/ are named app-by-app rather than as whole
-          # directories: marketing has its own line above, and the Python
-          # packages/insolvia_core belongs to the api leg — a broad ^apps/ or
+          # directories: marketing has its own line above — a broad ^apps/ or
           # ^packages/ here would rebuild and redeploy the app for changes it
-          # never consumes.
-          emit app       '^(apps/insolvia_app/|packages/insolvia_api_client/|package(-lock)?\.json|infra/envs/staging/|infra/modules/|e2e/|seeds/|services/admin/src/insolvia_admin/entrypoints/seed\.py|\.github/(workflows/(app-staging|release)\.yml|actions/seed-staging/))'
+          # never consumes. seeds/ and the seed action: its e2e flows sign in
+          # as the seeded people.
+          emit app       '^(apps/insolvia_app/|packages/insolvia_api_client/|package(-lock)?\.json|infra/envs/staging/|infra/modules/|e2e/|seeds/|\.github/(workflows/(app-staging|release)\.yml|actions/seed-staging/))'
 
   # ── STAGING ──────────────────────────────────────────────────────────────
 
@@ -288,8 +295,17 @@ jobs:
   # prevent. (The status-check function has to stay in the expression: an
   # `if:` with none gets an implicit `success()`, which a path-skipped leg
   # upstream would turn false.)
-  api:
+  # The migrator FIRST among the legs (header, "ORDER MATTERS"): no backend
+  # host shifts its alias before the schema it needs is applied. A failure
+  # here stops the chain — every leg below has `!failure()`.
+  migrator:
     needs: [changes, infra]
+    if: ${{ !cancelled() && !failure() && needs.infra.result == 'success' && needs.changes.outputs.migrator == 'true' }}
+    uses: ./.github/workflows/migrator-staging.yml
+    secrets: inherit
+
+  api:
+    needs: [changes, infra, migrator]
     if: ${{ !cancelled() && !failure() && needs.infra.result == 'success' && needs.changes.outputs.api == 'true' }}
     uses: ./.github/workflows/api-staging.yml
     secrets: inherit
@@ -361,7 +377,7 @@ jobs:
   # that deploys staging, so no deploy can move a `staging` marker tag between
   # the read and the copy.
   record:
-    needs: [changes, infra, api, admin, mcp, marketing, app, filing]
+    needs: [changes, infra, migrator, api, admin, mcp, marketing, app, filing]
     if: ${{ !cancelled() && !failure() }}
     runs-on: ubuntu-latest
     concurrency:
@@ -418,6 +434,7 @@ jobs:
             echo "marketing=$(basename "$(tf marketing_ecr_repository_url)")"
             echo "mcp=$(basename "$(tf mcp_ecr_repository_url)")"
             echo "filing=$(basename "$(tf filing_ecr_repository_url)")"
+            echo "migrator=$(basename "$(tf migrator_ecr_repository_url)")"
           } >> "$GITHUB_OUTPUT"
 
       - name: Ensure every service has a sha-tagged image for this commit
@@ -430,6 +447,7 @@ jobs:
             ${{ steps.tf.outputs.marketing }}
             ${{ steps.tf.outputs.mcp }}
             ${{ steps.tf.outputs.filing }}
+            ${{ steps.tf.outputs.migrator }}
         run: |
           set -euo pipefail
           for repo in $REPOS; do
@@ -533,7 +551,7 @@ jobs:
           {
             echo "### :rocket: Promotion approved"
             echo
-            echo "Shipping \`${GITHUB_SHA:0:7}\` to production: infra, then api → admin → mcp → marketing → app → filing."
+            echo "Shipping \`${GITHUB_SHA:0:7}\` to production: infra, then migrator → api → admin → mcp → marketing → app → filing."
           } >> "$GITHUB_STEP_SUMMARY"
 
   # ── PRODUCTION ───────────────────────────────────────────────────────────
@@ -571,9 +589,21 @@ jobs:
       gated: true
     secrets: inherit
 
-  prod-api:
+  # Production's schema before production's code, as on staging. Not
+  # path-filtered (no prod leg is): migrating a current database is a no-op
+  # that costs one Aurora resume.
+  prod-migrator:
     needs: prod-infra
     if: ${{ !cancelled() && needs['prod-infra'].result == 'success' }}
+    uses: ./.github/workflows/migrator-prod.yml
+    with:
+      sha: ${{ github.sha }}
+      gated: true
+    secrets: inherit
+
+  prod-api:
+    needs: [prod-infra, prod-migrator]
+    if: ${{ !cancelled() && needs['prod-infra'].result == 'success' && needs['prod-migrator'].result == 'success' }}
     uses: ./.github/workflows/api-prod.yml
     with:
       sha: ${{ github.sha }}

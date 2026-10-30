@@ -1,18 +1,20 @@
-# The Insolvia admin service (services/admin, #213): a Flask+Mangum Docker
-# Lambda behind an API Gateway HTTP API, one instance per environment — the
+# The Insolvia admin service (#213): since the switch (ADR 0028, plan 18.22)
+# the .NET host backend/src/Insolvia.Admin, in the VPC's private subnets —
+# services/admin's Flask+Mangum image before — behind an API Gateway HTTP
+# API, one instance per environment — the
 # deploy shape of modules/api_service, which owns the long-form reasoning for
 # every pattern here (image seeding, the live alias, ignore_changes on
 # image_uri/environment, REGIONAL custom domain with no CloudFront, the SSM
 # namespace contract, alarm choices). This header records only what DIFFERS:
 #
-#   - It owns the APPEND-ONLY ADMIN AUDIT TABLE instead of the waitlist, and
-#     the role's grant on it is PutItem alone — an audit log its own subject
-#     can rewrite is not evidence (the same posture as the case access log).
-#   - Its cross-service grants arrive FROM OTHER MODULES' seams, not here:
-#     modules/firm_store's admin_role_name (table CRUD + the Scan the API
-#     role deliberately lacks) and modules/auth's admin_invite_role_name
-#     (AdminCreateUser on the firm pool — create and RESEND are one action).
-#     This module only exposes the role for them to attach to.
+#   - The admin audit is a Postgres table now (admin_audit, INSERT-only for
+#     the `admin` role — backend/src/Insolvia.Migrator/Grants.cs: an audit
+#     log its own subject can rewrite is not evidence). The DynamoDB audit
+#     table below outlives its grant until 18.23, with the maintainer.
+#   - Its one cross-service grant arrives FROM ANOTHER MODULE'S seam:
+#     modules/auth's admin_invite_role_name (AdminCreateUser on the firm pool
+#     — create and RESEND are one action). The firm data is the database,
+#     reached as the `admin` role (module.vpc_access below).
 #   - No unqualified Lambda permission: this module was born on the alias, so
 #     only the alias-qualified grant exists (api_service carries both only as
 #     a migration artifact).
@@ -34,6 +36,10 @@ locals {
   # (admin-api.insolvia.ai). They were both called `admin` and the pair was
   # unreadable.
   name = "${var.project}-${var.environment}-admin-api"
+
+  # The Postgres role this host logs in as — modules/api_service's
+  # db_username note.
+  db_username = "admin"
 
   # The per-environment config namespace: /insolvia/<env>/admin-api — a sibling
   # of the API's /api namespace, exactly as that namespace's comment
@@ -94,24 +100,17 @@ resource "aws_iam_role_policy_attachment" "admin_basic" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-# PutItem ONLY — see the header. The firm-table and Cognito grants are
-# attached by the other modules' seams, against the role this module outputs.
-resource "aws_iam_role_policy" "admin_audit" {
-  name = "${local.name}-audit"
-  role = aws_iam_role.admin.id
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect   = "Allow"
-        Action   = ["dynamodb:PutItem"]
-        Resource = aws_dynamodb_table.audit.arn
-        Condition = {
-          Bool = { "aws:SecureTransport" = "true" }
-        }
-      },
-    ]
-  })
+# The VPC's network interfaces and rds-db:connect as `admin` — the one
+# owner every backend host shares (modules/vpc_lambda_access). The Cognito
+# grant is attached by modules/auth's seam, against the role this module
+# outputs. No DynamoDB grant any more (see the header).
+module "vpc_access" {
+  source = "../vpc_lambda_access"
+
+  name                   = local.name
+  role_name              = aws_iam_role.admin.name
+  db_username            = local.db_username
+  db_cluster_resource_id = var.db_cluster_resource_id
 }
 
 # ── Lambda function ─────────────────────────────────────────────
@@ -125,16 +124,21 @@ resource "aws_lambda_function" "admin" {
   package_type  = "Image"
   image_uri     = "${var.ecr_repository_url}:${var.image_tag}"
   timeout       = 30
-  memory_size   = 512
-  publish       = true
+  # api_service's note: CPU follows memory, and a .NET cold start is CPU-bound.
+  memory_size = 1024
+  publish     = true
+
+  # The private subnets; Google's JWKS and Cognito leave through the NAT.
+  vpc_config {
+    subnet_ids         = var.vpc_subnet_ids
+    security_group_ids = var.vpc_security_group_ids
+  }
 
   environment {
     variables = {
-      INSOLVIA_ENV           = var.insolvia_env
-      FIRM_TABLE_NAME        = var.firm_table_name
-      FIRM_USER_POOL_ID      = var.firm_user_pool_id
-      ADMIN_AUDIT_TABLE_NAME = aws_dynamodb_table.audit.name
-      GOOGLE_CLIENT_ID       = var.google_client_id
+      INSOLVIA_ENV      = var.insolvia_env
+      FIRM_USER_POOL_ID = var.firm_user_pool_id
+      GOOGLE_CLIENT_ID  = var.google_client_id
     }
   }
 
@@ -143,7 +147,7 @@ resource "aws_lambda_function" "admin" {
   tags = var.tags
   depends_on = [
     aws_iam_role_policy_attachment.admin_basic,
-    aws_iam_role_policy.admin_audit,
+    module.vpc_access,
   ]
 }
 
@@ -279,11 +283,10 @@ resource "aws_route53_record" "admin" {
 
 resource "aws_ssm_parameter" "config" {
   for_each = {
-    "insolvia-env"           = var.insolvia_env
-    "firm-table-name"        = var.firm_table_name
-    "firm-user-pool-id"      = var.firm_user_pool_id
-    "admin-audit-table-name" = aws_dynamodb_table.audit.name
-    "google-client-id"       = var.google_client_id
+    "insolvia-env"         = var.insolvia_env
+    "insolvia-db-username" = local.db_username
+    "firm-user-pool-id"    = var.firm_user_pool_id
+    "google-client-id"     = var.google_client_id
   }
 
   name  = "${local.ssm_prefix}/${each.key}"

@@ -1,15 +1,17 @@
 name: MCP · Deploy · Staging
 
-# Steady-state deploy for the MCP service (services/mcp, ADR 0016): push a
-# fresh image, point the Lambda at it, re-derive its environment from the
-# /insolvia/staging/mcp SSM namespace, smoke-test the endpoint. Same shape as
-# api-staging.yml minus the worker half.
+# Steady-state deploy for the MCP service (ADR 0016; the .NET host
+# backend/src/Insolvia.Mcp since the switch, ADR 0028): push a fresh image
+# (backend/Dockerfile's `mcp-lambda` target), point the Lambda at it,
+# re-derive its environment from the /insolvia/staging/mcp SSM namespace and
+# the database contract, smoke-test the endpoint. Same shape as
+# api-staging.yml minus the worker half; the migrator leg ran before it.
 #
 # The FIRST deploy in a fresh environment cannot run through this workflow: an
 # Image-package Lambda refuses to be created before its image exists, so the
 # infra apply deadlocks. Bootstrap once by hand, per
 # infra/modules/mcp_service/main.tf:
-#   1. insolvia-services releases infra/envs/shared   (creates insolvia-shared-mcp)
+#   1. insolvia-services releases infra/envs/shared   (creates insolvia-shared-mcp-dotnet)
 #   2. scripts/bootstrap-ecr-images.sh staging mcp
 #   3. terraform apply   (full)
 # After that, every deploy is this workflow.
@@ -76,10 +78,10 @@ jobs:
           # from-scratch apply seeds the Lambda from — api-staging.yml's
           # comment owns the full argument. Context is the repo root: the
           # image installs packages/insolvia_core by relative path.
-          docker build --target lambda -f services/mcp/Dockerfile \
+          docker build --target mcp-lambda \
             -t "$REPO:sha-${{ github.sha }}" \
             -t "$REPO:staging" \
-            .
+            backend
           docker push "$REPO:sha-${{ github.sha }}"
           docker push "$REPO:staging"
 
@@ -100,26 +102,15 @@ jobs:
           FUNCTION: ${{ steps.tf.outputs.function }}
         run: |
           # /insolvia/staging/mcp/<kebab-key> -> KEBAB_KEY:
-          #   insolvia-env               -> INSOLVIA_ENV
-          #   case-table-name            -> CASE_TABLE_NAME
-          #   case-access-log-table-name -> CASE_ACCESS_LOG_TABLE_NAME
-          #   firm-table-name            -> FIRM_TABLE_NAME
-          #   auth-issuer-url            -> AUTH_ISSUER_URL
-          #   auth-client-ids            -> AUTH_CLIENT_IDS
-          # Terraform ignores `environment` drift on the Lambda — this step
-          # owns it.
-          environment="$(
-            aws ssm get-parameters-by-path \
-              --path /insolvia/staging/mcp \
-              --with-decryption \
-              --query 'Parameters[].{Name:Name,Value:Value}' \
-              --output json \
-            | jq -c 'map({key: (.Name | split("/") | last | ascii_upcase | gsub("-"; "_")), value: .Value})
-                     | {Variables: from_entries}'
-          )"
-          # Refuse to ship nonsense: an empty or half-applied namespace would
-          # otherwise silently wipe every variable the service reads.
-          echo "$environment" | jq -e '.Variables.INSOLVIA_ENV == "staging"' > /dev/null
+          #   insolvia-env         -> INSOLVIA_ENV
+          #   insolvia-db-username -> INSOLVIA_DB_USERNAME (= mcp)
+          #   insolvia-cursor-key  -> INSOLVIA_CURSOR_KEY
+          #   auth-issuer-url      -> AUTH_ISSUER_URL
+          #   auth-client-ids      -> AUTH_CLIENT_IDS
+          # plus /insolvia/staging/db/* as INSOLVIA_DB_*
+          # (.github/scripts/lambda-environment.sh). Terraform ignores
+          # `environment` drift on the Lambda — this step owns it.
+          environment="$(.github/scripts/lambda-environment.sh staging mcp --db --expect-env staging)"
           echo "$environment" | jq -e '.Variables.AUTH_CLIENT_IDS | length > 0' > /dev/null
           aws lambda update-function-configuration \
             --function-name "$FUNCTION" \

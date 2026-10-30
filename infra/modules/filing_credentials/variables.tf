@@ -81,3 +81,19 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+# TRANSITIONAL (ADR 0028): delete with the DynamoDB tables in plan 18.23.
+variable "dynamodb_grants" {
+  description = <<-EOT
+    Whether the application roles keep their DynamoDB grants on this module's
+    tables. true is the Python backend's shape, and stays the default for
+    infra/envs/dev, where a developer's local Python stack still reads the
+    per-machine tables until 18.23 deletes the Python. Staging and prod pass
+    false since the switch (plan 18.22): their .NET hosts keep their data in
+    Aurora, so a role keeps only the grants that are not DynamoDB's — the KMS
+    envelopes, S3, the kill switch. The TABLES themselves are untouched here;
+    18.23 deletes them with the maintainer.
+  EOT
+  type        = bool
+  default     = true
+}

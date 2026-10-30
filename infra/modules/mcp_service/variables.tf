@@ -54,3 +54,20 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+# ── The VPC and the database (ADR 0028, plan 18.22) ─────────────
+
+variable "vpc_subnet_ids" {
+  description = "Private subnets the Lambda runs in — module.network.private_subnet_ids."
+  type        = list(string)
+}
+
+variable "vpc_security_group_ids" {
+  description = "Security groups for the Lambda — [module.network.lambda_security_group_id], the one modules/aurora admits 5432 from."
+  type        = list(string)
+}
+
+variable "db_cluster_resource_id" {
+  description = "The Aurora cluster's resource id (module.aurora.cluster_resource_id) — what this host's rds-db:connect grant names."
+  type        = string
+}

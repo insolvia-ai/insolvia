@@ -58,18 +58,39 @@ variable "dlq_name" {
 }
 
 variable "case_table_arn" {
-  description = "The case table — module.case_store.table_arn. Read (GetItem, Query) and written (PutItem, UpdateItem) for the approval, the filing record and the receipt's document item."
+  description = "The case table — module.case_store.table_arn. Read and written by the Python worker while dynamodb_grants is true (dev's poller); unused once it is false. TRANSITIONAL — 18.23."
   type        = string
+  default     = null
 }
 
-variable "case_table_name" {
-  description = "The case table's name, for CASE_TABLE_NAME. The vault's table and key alias are derived from it (insolvia_core.adapters.aws.filing_credentials)."
+variable "db_endpoint" {
+  description = "Aurora's writer endpoint (module.aurora.endpoint), for INSOLVIA_DB_ENDPOINT. null in dev (no Lambda)."
   type        = string
+  default     = null
 }
 
-variable "case_access_log_table_name" {
-  description = "The case access log's name, for CASE_ACCESS_LOG_TABLE_NAME. The append grant is modules/filing_credentials'."
+variable "db_port" {
+  description = "Aurora's port (module.aurora.port), for INSOLVIA_DB_PORT."
+  type        = number
+  default     = 5432
+}
+
+variable "db_database_name" {
+  description = "The application database (module.aurora.database_name), for INSOLVIA_DB_DATABASE_NAME. null in dev."
   type        = string
+  default     = null
+}
+
+variable "case_kms_key_alias" {
+  description = "The case key's alias (alias/insolvia-<env>-cases), for INSOLVIA_KMS_CASE_KEY_ALIAS — the Case Upload file's taxid.read. null in dev."
+  type        = string
+  default     = null
+}
+
+variable "filing_kms_key_alias" {
+  description = "The vault key's alias (alias/insolvia-<env>-filing-credentials), for INSOLVIA_KMS_FILING_KEY_ALIAS — the credential opener. null in dev."
+  type        = string
+  default     = null
 }
 
 variable "case_kms_key_arn" {
@@ -104,7 +125,7 @@ variable "timeout_seconds" {
 }
 
 variable "memory_mb" {
-  description = "Lambda memory. The digest is recomputed through the forms engine (pypdf) twice a run."
+  description = "Lambda memory. The digest is recomputed through the forms engine twice a run."
   type        = number
   default     = 1024
 }
@@ -119,4 +140,43 @@ variable "tags" {
   description = "Tags applied to every resource in this module."
   type        = map(string)
   default     = {}
+}
+
+# ── The VPC and the database (ADR 0028, plan 18.22) ─────────────
+# null wherever the Lambda half is absent (infra/envs/dev); required, in
+# effect, wherever ecr_repository_url is set — the precondition on the
+# function says so by name.
+
+variable "vpc_subnet_ids" {
+  description = "Private subnets the Lambda runs in — module.network.private_subnet_ids. null in dev (no Lambda)."
+  type        = list(string)
+  default     = null
+}
+
+variable "vpc_security_group_ids" {
+  description = "Security groups for the Lambda — [module.network.lambda_security_group_id], the one modules/aurora admits 5432 from. null in dev."
+  type        = list(string)
+  default     = null
+}
+
+variable "db_cluster_resource_id" {
+  description = "The Aurora cluster's resource id (module.aurora.cluster_resource_id) — what this host's rds-db:connect grant names. null in dev."
+  type        = string
+  default     = null
+}
+
+# TRANSITIONAL (ADR 0028): delete with the DynamoDB tables in plan 18.23.
+variable "dynamodb_grants" {
+  description = <<-EOT
+    Whether the application roles keep their DynamoDB grants on this module's
+    tables. true is the Python backend's shape, and stays the default for
+    infra/envs/dev, where a developer's local Python stack still reads the
+    per-machine tables until 18.23 deletes the Python. Staging and prod pass
+    false since the switch (plan 18.22): their .NET hosts keep their data in
+    Aurora, so a role keeps only the grants that are not DynamoDB's — the KMS
+    envelopes, S3, the kill switch. The TABLES themselves are untouched here;
+    18.23 deletes them with the maintainer.
+  EOT
+  type        = bool
+  default     = true
 }

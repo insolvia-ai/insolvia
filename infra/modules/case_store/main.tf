@@ -417,7 +417,7 @@ resource "aws_iam_role_policy" "api_case_access" {
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [
+    Statement = [for s in [
       {
         Sid    = "CaseTableData"
         Effect = "Allow"
@@ -512,7 +512,7 @@ resource "aws_iam_role_policy" "api_case_access" {
           }
         }
       },
-    ]
+    ] : s if var.dynamodb_grants || contains(["TaxIdKeyUse"], s.Sid)]
   })
 }
 
@@ -539,7 +539,7 @@ resource "aws_iam_role_policy" "api_case_access" {
 # every case read through this surface is recorded, and the service can
 # never read, amend or delete an entry. No Scan, same as every principal.
 resource "aws_iam_role_policy" "mcp_case_access" {
-  count = var.mcp_role_name == null ? 0 : 1
+  count = var.mcp_role_name == null || !var.dynamodb_grants ? 0 : 1
 
   name = "${local.name}-mcp-access"
   role = var.mcp_role_name
@@ -611,7 +611,7 @@ resource "aws_iam_role_policy" "worker_case_access" {
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [
+    Statement = [for s in [
       {
         Sid    = "CaseTableData"
         Effect = "Allow"
@@ -671,6 +671,6 @@ resource "aws_iam_role_policy" "worker_case_access" {
           }
         }
       },
-    ]
+    ] : s if var.dynamodb_grants || contains(["TaxIdKeyUse"], s.Sid)]
   })
 }
