@@ -49,7 +49,12 @@ public sealed class PostgresJobStore(InsolviaDbContext db) : IJobStore
         var expected = expectedStatus.ToWire();
 
         // Python: Put … attribute_exists(SK) AND #status = :expected.
-        var written = await _db.Set<JobRow>()
+        // A lost acknowledgement would replay into the status this write set
+        // and read null — a worker's claim reported as lost to a rival, the job
+        // then left running with nobody on it. The row holding this write's
+        // status, attempt count and timestamp is this write.
+        var written = await _db.WriteOnceAsync(
+            token => _db.Set<JobRow>()
             .Where(stored => stored.CaseId == row.CaseId && stored.Id == row.Id && stored.Status == expected)
             .ExecuteUpdateAsync(
                 set => set
@@ -63,8 +68,13 @@ public sealed class PostgresJobStore(InsolviaDbContext db) : IJobStore
                     .SetProperty(stored => stored.Options, row.Options)
                     .SetProperty(stored => stored.Failure, row.Failure)
                     .SetProperty(stored => stored.Result, row.Result),
-                cancellationToken)
-            .ConfigureAwait(false);
+                token),
+            token => _db.Set<JobRow>().AsNoTracking().AnyAsync(
+                stored => stored.CaseId == row.CaseId && stored.Id == row.Id
+                    && stored.Status == row.Status && stored.Attempts == row.Attempts && stored.UpdatedAt == row.UpdatedAt,
+                token),
+            whenLanded: 1,
+            cancellationToken).ConfigureAwait(false);
         return written > 0 ? job : null;
     }
 
@@ -149,7 +159,11 @@ public sealed class PostgresPacketStore(InsolviaDbContext db) : IPacketStore
                         token).ConfigureAwait(false);
                     await _db.InsertOnceAsync(ToRow(packet, pins.FirmId), PacketRow.PrimaryKey, () => new InvalidOperationException("packet id already exists in this case"), token).ConfigureAwait(false);
                 },
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken,
+                // A lost commit acknowledgement: the replay's version CAS no
+                // longer matches (this unit moved updated_at) and would answer
+                // false. The packet's generated id present is this commit.
+                landed: token => _db.Set<PacketRow>().AsNoTracking().AnyAsync(stored => stored.CaseId == packet.CaseId && stored.Id == packet.Id, token)).ConfigureAwait(false);
             return true;
         }
         catch (ConditionNotMetException)

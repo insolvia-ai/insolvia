@@ -2,6 +2,7 @@ using Insolvia.Core;
 using Insolvia.Core.FilingCredentials;
 using Insolvia.Core.Ports;
 using Insolvia.Core.TaxIds;
+using Insolvia.Data.Concurrency;
 using Insolvia.Data.Storage;
 using Microsoft.EntityFrameworkCore;
 
@@ -104,11 +105,8 @@ public sealed class PostgresFilingCredentialStore(InsolviaDbContext db) : IFilin
 
     /// <inheritdoc />
     /// <remarks>Python: <c>DeleteItem … ReturnValues=ALL_OLD</c> → one <c>DELETE</c>; a row deleted is "there was one".</remarks>
-    public async Task<bool> DeleteAsync(string firmId, string attorneyId, string credentialId, CancellationToken cancellationToken = default) =>
-        await _db.Set<FilingCredentialRow>()
-            .Where(found => found.FirmId == firmId && found.AttorneyId == attorneyId && found.CredentialId == credentialId)
-            .ExecuteDeleteAsync(cancellationToken)
-            .ConfigureAwait(false) > 0;
+    public Task<bool> DeleteAsync(string firmId, string attorneyId, string credentialId, CancellationToken cancellationToken = default) =>
+        _db.DeleteOnceAsync(_db.Set<FilingCredentialRow>().Where(found => found.FirmId == firmId && found.AttorneyId == attorneyId && found.CredentialId == credentialId), cancellationToken);
 
     internal static FilingCredentialRow ToRow(FilingCredential credential) => new()
     {

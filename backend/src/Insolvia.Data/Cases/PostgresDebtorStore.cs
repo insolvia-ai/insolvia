@@ -5,6 +5,7 @@ using Insolvia.Data.Concurrency;
 using Insolvia.Data.Firms;
 using Insolvia.Data.Storage;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace Insolvia.Data.Cases;
 
@@ -43,7 +44,11 @@ public sealed class PostgresDebtorStore : IDebtorStore
         var firmId = await CaseFirms.OfAsync(_db, debtor.CaseId, cancellationToken).ConfigureAwait(false);
         try
         {
-            await _db.InsertOnceAsync(CaseRowMapping.ToRow(debtor, firmId), DebtorRow.PrimaryKey, () => new ConditionNotMetException(), cancellationToken).ConfigureAwait(false);
+            // The key is (case, role), which callers compete for — a conflict
+            // is the answer "role taken" — so a retry recognises its own row
+            // by the debtor's generated id.
+            var id = debtor.Id;
+            await _db.InsertOnceAsync(CaseRowMapping.ToRow(debtor, firmId), DebtorRow.PrimaryKey, () => new ConditionNotMetException(), cancellationToken, alsoMatching: row => row.Id == id).ConfigureAwait(false);
             return true;
         }
         catch (ConditionNotMetException)
@@ -88,7 +93,16 @@ public sealed class PostgresDebtorStore : IDebtorStore
                 await UpsertAsync(CaseRowMapping.ToRow(debtor, caseFirm), token).ConfigureAwait(false);
                 return LinkOutcome.Written;
             },
-            cancellationToken).ConfigureAwait(false);
+            cancellationToken,
+            // A lost commit acknowledgement: with create, the replay finds the
+            // role filled — by this write — and would answer RoleTaken. The
+            // row carrying this debtor's id, client and timestamp is this write.
+            landed: async token => await Rows.AnyAsync(
+                    row => row.CaseId == debtor.CaseId && row.FilingRole == debtor.FilingRole
+                        && row.Id == debtor.Id && row.ClientId == clientId && row.UpdatedAt == debtor.UpdatedAt,
+                    token).ConfigureAwait(false)
+                ? new ExecutionResult<LinkOutcome>(true, LinkOutcome.Written)
+                : new ExecutionResult<LinkOutcome>(false, default)).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -141,7 +155,15 @@ public sealed class PostgresDebtorStore : IDebtorStore
                     .ConfigureAwait(false);
                 return RepointOutcome.Written;
             },
-            cancellationToken);
+            cancellationToken,
+            // A lost commit acknowledgement: the replay finds the role naming
+            // the survivor and would answer Absent. The role naming it is the
+            // outcome this call asked for, whoever wrote it.
+            landed: async token => await Rows.AnyAsync(
+                    row => row.CaseId == caseId && row.FilingRole == filingRole && row.ClientId == toClientId,
+                    token).ConfigureAwait(false)
+                ? new ExecutionResult<RepointOutcome>(true, RepointOutcome.Written)
+                : new ExecutionResult<RepointOutcome>(false, default));
 
     /// <inheritdoc />
     public async Task<IReadOnlyList<DebtorClientLink>> ClientLinksForCaseAsync(string caseId, CancellationToken cancellationToken = default)
@@ -179,7 +201,7 @@ public sealed class PostgresDebtorStore : IDebtorStore
     }
 
     private Task<int> UpsertAsync(DebtorRow row, CancellationToken cancellationToken) =>
-        _db.Database.ExecuteSqlInterpolatedAsync(
+        _db.ExecuteIdempotentSqlAsync(
             $"""
             INSERT INTO insolvia.debtors AS debtor
                 (case_id, filing_role, firm_id, id, created_at, updated_at, body, provenance,

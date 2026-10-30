@@ -70,6 +70,32 @@ brings its Python tests across, translated, not rewritten.
   domain error — the Python store's `ConditionalCheckFailed` translation.
   Never read-then-write. A once-only insert is `SaveChangesOrConflictAsync`.
   A multi-row change is `InTransactionAsync`.
+- **Every write must be safe to retry** (#567). `UseInsolviaNpgsql` turns on
+  EF's retrying strategy (6 retries, ≤ 5 s apart — `InsolviaNpgsql.MaxRetryCount`
+  says why: a paused Aurora resuming inside a 30 s request). EF replays
+  queries, `SaveChanges`, `ExecuteUpdate`/`ExecuteDelete` and each
+  `InTransactionAsync` unit whole; it does **not** replay `ExecuteSql…` outside
+  a transaction (use `RetrySafety.ExecuteIdempotentSqlAsync` for an upsert) or
+  anything on a raw `NpgsqlConnection` (the migrator's `RoleProvisioner` and
+  `PreClientPurge`). A transaction begun outside `InTransactionAsync` is
+  refused by EF. For each new write:
+  - an `InTransactionAsync` delegate does its reads **inside** and is safe to
+    run twice from the start;
+  - assume the **lost acknowledgement**: the commit landed, the reply did not,
+    and the write runs again on top of itself. Idempotent (an unconditional
+    `SET` of fixed values, an upsert) needs nothing. A conditional write, a
+    once-only insert or a delete would answer the caller "refused" / "already
+    exists" / "not found" for its own write — give it a `landed` check that
+    recognises *this call's* write (`InTransactionAsync(…, landed:)`,
+    `RetrySafety.WriteOnceAsync`, `DeleteOnceAsync`). Compare on something only
+    this call wrote — a generated id, the attempt id, the `updated_at` it set —
+    never just "a row like it", or a rival's write reads as yours (a filing
+    claimed twice).
+  - `InsertOnceAsync` handles its own: a generated key's conflict on a replay
+    counts as done (no read — the waitlist and admin audit roles cannot read
+    their tables); a key callers compete for passes `alsoMatching:`.
+  - `RetryTests` (Data.Tests) injects both faults through `FaultInjector`;
+    a new write with a `landed` check gets a lost-ack test there.
 - **Listings page by keyset** (`Pagination/`): a `Keyset<TRow, TKey>` with a
   total order and a name that includes everything that changes the rows
   (index, view). `CursorCodec` binds a cursor to that name and refuses edits;

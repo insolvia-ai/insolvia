@@ -4,6 +4,7 @@ using Insolvia.Core.Ports;
 using Insolvia.Data.Concurrency;
 using Insolvia.Data.Storage;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace Insolvia.Data.Vault;
 
@@ -90,7 +91,13 @@ public sealed class PostgresFilingAuthorizationStore(InsolviaDbContext db) : IFi
                         .ConfigureAwait(false);
                 }
             },
-            cancellationToken);
+            cancellationToken,
+            // A lost commit acknowledgement: the replay meets its own history
+            // row and would throw "already exists". The pointer on this
+            // signature's generated id is this commit.
+            landed: token => _db.Set<CurrentFilingAuthorizationRow>().AsNoTracking().AnyAsync(
+                row => row.FirmId == authorization.FirmId && row.AttorneyId == authorization.AttorneyId && row.AuthorizationId == authorization.AuthorizationId,
+                token));
     }
 
     /// <inheritdoc />
@@ -129,7 +136,15 @@ public sealed class PostgresFilingAuthorizationStore(InsolviaDbContext db) : IFi
                     .ConfigureAwait(false);
                 return true;
             },
-            cancellationToken);
+            cancellationToken,
+            // A lost commit acknowledgement: the replay finds no pointer to
+            // delete and would answer false. The signature marked withdrawn at
+            // this call's instant is this commit.
+            landed: async token => await _db.Set<FilingAuthorizationRow>().AsNoTracking().AnyAsync(
+                    row => row.AuthorizationId == authorization.AuthorizationId && row.Status == AuthorizationStatus.Withdrawn && row.WithdrawnAt == at,
+                    token).ConfigureAwait(false)
+                ? new ExecutionResult<bool>(true, true)
+                : new ExecutionResult<bool>(false, false));
     }
 
     internal static FilingAuthorizationRow ToRow(FilingAuthorization authorization) => new()

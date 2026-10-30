@@ -45,7 +45,17 @@ public sealed class PostgresFilingStore(InsolviaDbContext db) : IFilingStore
         ArgumentNullException.ThrowIfNull(filing);
         try
         {
-            await _db.InsertOnceAsync(CaseRowMapping.ToRow(filing), FilingRow.PrimaryKey, () => new ConditionNotMetException(), cancellationToken).ConfigureAwait(false);
+            // Workers compete for this key, so a retried claim recognises its
+            // own row by the attempt id it wrote, never a rival's (ADR 0024:
+            // a filing is claimed — and filed — once).
+            var attemptId = filing.AttemptId;
+            await _db.InsertOnceAsync(
+                    CaseRowMapping.ToRow(filing),
+                    FilingRow.PrimaryKey,
+                    () => new ConditionNotMetException(),
+                    cancellationToken,
+                    alsoMatching: stored => stored.AttemptId == attemptId)
+                .ConfigureAwait(false);
             return true;
         }
         catch (ConditionNotMetException)
@@ -112,7 +122,15 @@ public sealed class PostgresFilingStore(InsolviaDbContext db) : IFilingStore
                         await FileTheCaseAsync(filedCase, token).ConfigureAwait(false);
                     }
                 },
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken,
+                // A lost commit acknowledgement: the replay's CAS no longer
+                // matches (the row left expectedState), which would read as a
+                // lost race. The row carrying this write's state, attempt and
+                // timestamp is this write — the case half shares its commit.
+                landed: token => _db.Set<FilingRow>().AsNoTracking().AnyAsync(
+                    stored => stored.CaseId == row.CaseId && stored.FilingId == row.FilingId
+                        && stored.State == row.State && stored.AttemptId == row.AttemptId && stored.UpdatedAt == row.UpdatedAt,
+                    token)).ConfigureAwait(false);
             return true;
         }
         catch (ConditionNotMetException)
