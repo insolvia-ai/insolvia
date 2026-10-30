@@ -14,6 +14,7 @@ using Insolvia.Aws.Jwks;
 using Insolvia.Aws.Mailer;
 using Insolvia.Aws.Sealing;
 using Insolvia.Core.Courts;
+using Insolvia.Core.Local;
 using Insolvia.Core.Memory;
 using Insolvia.Core.Ports;
 using Insolvia.Data;
@@ -42,9 +43,13 @@ namespace Insolvia.Api.Hosting;
 /// <see cref="InsolviaDbContext"/> per request). Never an in-memory store: an
 /// empty one would make every user look unprovisioned.</item>
 /// <item><b>Everything else</b> — <c>dotnet run</c>, docker compose, the test
-/// host — (development_server.py): auth is optional and fails CLOSED when
-/// absent; the stores are empty in-memory ones, so a signed-in developer with
-/// no firm is exactly the "authenticated, not provisioned" case.</item>
+/// host, the .NET contract stack — (development_server.py): auth is optional
+/// and fails CLOSED when absent. With <c>INSOLVIA_DB_CONNECTION_STRING</c> the
+/// stores are the same Postgres ones, as a group (this machine's database IS
+/// the database); without it they are empty in-memory ones, so a signed-in
+/// developer with no firm is exactly the "authenticated, not provisioned"
+/// case. Either way the user directory, the sealing keys and (unless the
+/// local blob pair is set) the blob store are the local twins.</item>
 /// </list>
 /// </summary>
 public static class ApiComposition
@@ -79,8 +84,20 @@ public static class ApiComposition
         var config = ApiConfig.Load(name => configuration[name]);
         if (isLambda)
         {
+            // A deployed service reads its bucket whatever the environment
+            // says: the local blob directory never reaches a Lambda.
+            config = config with { LocalBlobs = null };
             LambdaBootRequirements.Enforce(config);
+        }
 
+        // The stores are Postgres inside Lambda and, everywhere else, whenever
+        // INSOLVIA_DB_CONNECTION_STRING names a database — as a GROUP, the way
+        // admin and MCP switch: a real case beside a memory debtor is a
+        // half-state nobody can debug. docker compose and the .NET contract
+        // stack (contract/scripts/dev-test.sh --target dotnet) are that case.
+        var databaseConfigured = isLambda || !string.IsNullOrWhiteSpace(configuration[DatabaseSettings.ConnectionStringVariable]);
+        if (databaseConfigured)
+        {
             // Throws at composition when the INSOLVIA_DB_* contract is
             // incomplete, so a misconfigured Lambda never takes a request.
             builder.Services.AddInsolviaData(DatabaseSettings.FromEnvironment(name => configuration[name], applicationName: "insolvia-api"));
@@ -90,11 +107,6 @@ public static class ApiComposition
             builder.Services.AddScoped<IClientBindingStore>(services => new PostgresClientBindingStore(services.GetRequiredService<InsolviaDbContext>()));
             builder.Services.AddScoped<IAccessLog>(services => new PostgresAccessLog(services.GetRequiredService<InsolviaDbContext>()));
             builder.Services.AddScoped<IWaitlistStore>(services => new PostgresWaitlistStore(services.GetRequiredService<InsolviaDbContext>()));
-
-            // Cognito AdminCreateUser for POST /v1/firm/users and the portal
-            // invitation's POST …/portal/invitation and …/resend, over the pool
-            // LambdaBootRequirements already demanded.
-            builder.Services.AddSingleton<IUserDirectory>(_ => new Insolvia.Aws.Cognito.CognitoUserDirectory(new Amazon.CognitoIdentityProvider.AmazonCognitoIdentityProviderClient(), config.AuthUserPoolId!));
 
             // The case side (18.11): every store over the request's one
             // context, so a route's writes share its connection. Cursors are
@@ -129,23 +141,46 @@ public static class ApiComposition
             // it), and the vault key's policy refuses this role Decrypt
             // regardless. Aliases resolve at composition, so a Lambda that
             // cannot name its keys never takes a request (SealingKeys).
-            var keys = SealingKeys.Load(name => configuration[name]);
             builder.Services.AddScoped<IFilingCredentialStore>(services => new PostgresFilingCredentialStore(services.GetRequiredService<InsolviaDbContext>()));
             builder.Services.AddScoped<IFilingAuthorizationStore>(services => new PostgresFilingAuthorizationStore(services.GetRequiredService<InsolviaDbContext>()));
+
+            // The calendar (14.6 / #358).
+            builder.Services.AddScoped<ICalendarEventStore>(services => new PostgresCalendarEventStore(services.GetRequiredService<InsolviaDbContext>()));
+            builder.Services.AddScoped<ICalendarTokenStore>(services => new PostgresCalendarTokenStore(services.GetRequiredService<InsolviaDbContext>()));
+        }
+
+        if (isLambda)
+        {
+            // Cognito AdminCreateUser for POST /v1/firm/users and the portal
+            // invitation's POST …/portal/invitation and …/resend, over the pool
+            // LambdaBootRequirements already demanded.
+            builder.Services.AddSingleton<IUserDirectory>(_ => new Insolvia.Aws.Cognito.CognitoUserDirectory(new Amazon.CognitoIdentityProvider.AmazonCognitoIdentityProviderClient(), config.AuthUserPoolId!));
+
+            // KMS (18.12): the vault key's policy refuses this role Decrypt,
+            // and the aliases resolve at composition (SealingKeys).
+            var keys = SealingKeys.Load(name => configuration[name]);
             builder.Services.AddSingleton<IAmazonKeyManagementService>(_ => configuration["AWS_REGION"] is { Length: > 0 } region
                 ? new AmazonKeyManagementServiceClient(RegionEndpoint.GetBySystemName(region))
                 : new AmazonKeyManagementServiceClient());
             builder.Services.AddSingleton<ITaxIdCipher>(services => new KmsTaxIdCipher(services.GetRequiredService<IAmazonKeyManagementService>(), keys.CaseKeyAlias));
             builder.Services.AddSingleton<IFilingCredentialSealer>(services => new KmsFilingCredentialSealer(services.GetRequiredService<IAmazonKeyManagementService>(), keys.FilingKeyAlias));
 
-            // The calendar (14.6 / #358).
-            builder.Services.AddScoped<ICalendarEventStore>(services => new PostgresCalendarEventStore(services.GetRequiredService<InsolviaDbContext>()));
-            builder.Services.AddScoped<ICalendarTokenStore>(services => new PostgresCalendarTokenStore(services.GetRequiredService<InsolviaDbContext>()));
-
             // The bytes: the case-document bucket, which LambdaBootRequirements
             // already refuses to boot without. One client per process.
             var bucket = config.CaseDocumentBucket!;
-            builder.Services.AddSingleton<IDocumentBlobStore>(_ => new S3DocumentBlobStore(new AmazonS3Client(S3DocumentBlobStore.ClientConfig()), bucket));
+            // The region is read the way KMS and SQS read it: from
+            // configuration first, so a host that sets AWS_REGION there (and
+            // not in its process environment) still gets one.
+            builder.Services.AddSingleton<IDocumentBlobStore>(_ =>
+            {
+                var s3 = S3DocumentBlobStore.ClientConfig();
+                if (configuration["AWS_REGION"] is { Length: > 0 } region)
+                {
+                    s3.RegionEndpoint = RegionEndpoint.GetBySystemName(region);
+                }
+
+                return new S3DocumentBlobStore(new AmazonS3Client(s3), bucket);
+            });
         }
 
         // Constructed once, at start, so its key cache lives as long as the
@@ -194,13 +229,36 @@ public static class ApiComposition
 
         if (!isLambda)
         {
+            // Mints a subject where Cognito would; sends no invitation.
+            builder.Services.AddSingleton<IUserDirectory, MemoryUserDirectory>();
+
+            // The deterministic local keys — the ones the migrator's local
+            // seed seals with. Still a SEALER only: the development host is no
+            // more allowed to open a credential than the deployed one.
+            builder.Services.AddSingleton<ITaxIdCipher>(_ => new LocalTaxIdCipher());
+            builder.Services.AddSingleton<IFilingCredentialSealer, LocalFilingCredentialSealer>();
+
+            // The bytes. With the local blob pair (LOCAL ONLY, never inside
+            // Lambda — ApiConfig.LocalBlobs), a directory whose capabilities
+            // point at a local server that accepts the PUTs and serves the
+            // GETs (the contract stack's aux server); without it, the memory
+            // twin, whose memory+s3:// URLs no client can fetch.
+            if (config.LocalBlobs is { } local)
+            {
+                builder.Services.AddSingleton<IDocumentBlobStore>(_ => new DirectoryDocumentBlobStore(local.Directory, local.BaseUrl));
+            }
+            else
+            {
+                builder.Services.AddSingleton<IDocumentBlobStore, MemoryDocumentBlobStore>();
+            }
+        }
+
+        if (!databaseConfigured)
+        {
             builder.Services.AddSingleton<IFirmStore>(services => new MemoryFirmStore(services.GetRequiredService<TimeProvider>()));
             builder.Services.AddSingleton<IClientBindingStore, MemoryClientBindingStore>();
             builder.Services.AddSingleton<IAccessLog, MemoryAccessLog>();
             builder.Services.AddSingleton<IWaitlistStore, MemoryWaitlistStore>();
-
-            // Mints a subject where Cognito would; sends no invitation.
-            builder.Services.AddSingleton<IUserDirectory, MemoryUserDirectory>();
 
             // The case twins, wired as the real stores share one database:
             // the debtor store reads its client conditions from the firm
@@ -222,20 +280,11 @@ public static class ApiComposition
             builder.Services.AddSingleton<IPacketStore>(services => new MemoryPacketStore(services.GetRequiredService<MemoryCaseStore>()));
             builder.Services.AddSingleton<IFilingApprovalStore, MemoryFilingApprovalStore>();
 
-            // The vault's twins and the deterministic local key — never
-            // composed beside a real table. Still a SEALER only: the
-            // development host is no more allowed to open a credential than
-            // the deployed one.
+            // The vault's twins — never composed beside a real table.
             builder.Services.AddSingleton<IFilingCredentialStore, MemoryFilingCredentialStore>();
             builder.Services.AddSingleton<IFilingAuthorizationStore, MemoryFilingAuthorizationStore>();
-            builder.Services.AddSingleton<ITaxIdCipher>(_ => new LocalTaxIdCipher());
-            builder.Services.AddSingleton<IFilingCredentialSealer, LocalFilingCredentialSealer>();
             builder.Services.AddSingleton<ICalendarEventStore, MemoryCalendarEventStore>();
             builder.Services.AddSingleton<ICalendarTokenStore, MemoryCalendarTokenStore>();
-
-            // No local object store: the memory twin mints memory+s3:// URLs no
-            // client can fetch.
-            builder.Services.AddSingleton<IDocumentBlobStore, MemoryDocumentBlobStore>();
         }
 
         // The filing queue (ADR 0024): with FILING_QUEUE_URL — this machine's
@@ -248,6 +297,14 @@ public static class ApiComposition
                 ? new AmazonSQSClient(RegionEndpoint.GetBySystemName(region))
                 : new AmazonSQSClient());
             builder.Services.AddSingleton<IFilingJobSender>(services => new SqsFilingJobSender(services.GetRequiredService<IAmazonSQS>(), filingQueue));
+        }
+        else if (!isLambda)
+        {
+            // development_server.py's fallback: off Lambda the memory queue
+            // records the job and sends nothing, so approving reaches its
+            // rules (409 not-ready, 403 stale sign-in) instead of a 503. A
+            // Lambda with no queue still composes no sender at all.
+            builder.Services.AddSingleton<IFilingJobSender, MemoryFilingJobSender>();
         }
 
         // The firm-side routes (18.14), mapped after /health in this order.

@@ -94,6 +94,15 @@ public sealed record ApiConfig
     /// <summary><c>AUTH_PORTAL_CLIENT_ID</c>: the client portal's own app client (ADR 0023), disjoint from the staff one.</summary>
     public string? AuthPortalClientId { get; init; }
 
+    /// <summary>
+    /// <c>INSOLVIA_LOCAL_BLOB_DIR</c> and <c>INSOLVIA_LOCAL_BLOB_URL</c>, honoured
+    /// LOCALLY ONLY (<c>INSOLVIA_ENV=local</c>, and stripped inside Lambda by
+    /// the composition): a directory for the document bytes and the local
+    /// server that serves it, so a presigned PUT and GET work with no bucket —
+    /// the .NET contract stack's blob store. Both or neither; null otherwise.
+    /// </summary>
+    public LocalBlobSettings? LocalBlobs { get; init; }
+
     /// <summary>The marketing site's origin for this environment.</summary>
     public string MarketingOrigin { get; init; } = MarketingOrigins["local"];
 
@@ -119,8 +128,24 @@ public sealed record ApiConfig
         ArgumentNullException.ThrowIfNull(read);
         var environment = InsolviaEnvironment.FromVariable(read("INSOLVIA_ENV"));
         string? Optional(string name) => read(name) is { Length: > 0 } value ? value : null;
+        LocalBlobSettings? localBlobs = null;
+        if (environment.Name == "local" && (Optional("INSOLVIA_LOCAL_BLOB_DIR") is not null || Optional("INSOLVIA_LOCAL_BLOB_URL") is not null))
+        {
+            var directory = Optional("INSOLVIA_LOCAL_BLOB_DIR")
+                ?? throw new ArgumentException("INSOLVIA_LOCAL_BLOB_URL needs INSOLVIA_LOCAL_BLOB_DIR beside it.", nameof(read));
+            var urlText = Optional("INSOLVIA_LOCAL_BLOB_URL")
+                ?? throw new ArgumentException("INSOLVIA_LOCAL_BLOB_DIR needs INSOLVIA_LOCAL_BLOB_URL beside it.", nameof(read));
+            if (!Uri.TryCreate(urlText, UriKind.Absolute, out var url) || url.Scheme is not ("http" or "https"))
+            {
+                throw new ArgumentException($"INSOLVIA_LOCAL_BLOB_URL must be an absolute http(s) URL, got '{urlText}'.", nameof(read));
+            }
+
+            localBlobs = new LocalBlobSettings(directory, url);
+        }
+
         return new ApiConfig
         {
+            LocalBlobs = localBlobs,
             Environment = environment,
             WaitlistTableName = Optional("WAITLIST_TABLE_NAME"),
             CaseTableName = Optional("CASE_TABLE_NAME"),
@@ -143,3 +168,8 @@ public sealed record ApiConfig
         };
     }
 }
+
+/// <summary>Where a local API keeps document bytes, and the server that serves them (<see cref="ApiConfig.LocalBlobs"/>).</summary>
+/// <param name="Directory">The directory the bytes live in (the migrator's <c>INSOLVIA_SEED_DOCUMENT_DIR</c> too).</param>
+/// <param name="BaseUrl">The local blob server's origin.</param>
+public sealed record LocalBlobSettings(string Directory, Uri BaseUrl);

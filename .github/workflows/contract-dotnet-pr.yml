@@ -1,0 +1,82 @@
+name: Contract (.NET) · PR
+
+# The contract suite (contract/, plan 18.2) against the .NET backend on
+# Postgres — ADR 0028's acceptance gate: the switch PR waits until the same
+# suite passes against both backends. It runs exactly what a laptop runs,
+# `contract/scripts/dev-test.sh --target dotnet`: a throwaway postgres:17
+# container migrated and seeded by the real migrator, the API, admin and MCP
+# hosts each as its own role, the suite through the shipped api-client, and
+# the 126-method coverage gate.
+#
+# No `on.pull_request.paths:` filter, deliberately — see
+# `.github/actions/changed-paths/action.yml`: a check that may become required
+# must trigger and report on every PR; the `steps.filter` guard keeps an
+# unrelated PR cheap. NOT a required check yet; the ruleset script makes it one
+# (insolvia-branch-protection skill), and matches the job `name:` exactly.
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  # The root `npm ci` installs @insolvia-ai/design-system and tokens from
+  # GitHub Packages, which the workspace's lockfile names.
+  packages: read
+
+jobs:
+  contract-dotnet:
+    name: Contract (.NET)
+    runs-on: ubuntu-latest
+    env:
+      DOTNET_NOLOGO: 'true'
+      DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # Full history so the guard can diff against the PR base commit.
+          fetch-depth: 0
+
+      - id: filter
+        uses: ./.github/actions/changed-paths
+        with:
+          paths: |
+            # The stack under test and the suite.
+            backend/**
+            contract/**
+            # The client the suite drives, and the seeds the migrator loads.
+            packages/insolvia_api_client/**
+            seeds/**
+            package.json
+            package-lock.json
+            .github/workflows/contract-dotnet-pr.yml
+            .github/actions/changed-paths/action.yml
+
+      - uses: actions/setup-dotnet@v5
+        if: steps.filter.outputs.run == 'true'
+        with:
+          global-json-file: backend/global.json
+
+      # Must match the root package.json's `engines.node` (">=24"): the suite
+      # and its scripts are TypeScript Node runs directly.
+      - uses: actions/setup-node@v5
+        if: steps.filter.outputs.run == 'true'
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install
+        if: steps.filter.outputs.run == 'true'
+        run: npm ci
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Restore
+        if: steps.filter.outputs.run == 'true'
+        run: dotnet restore backend/Insolvia.slnx --locked-mode
+
+      # Starts the stack, runs the whole suite, enforces the coverage gate,
+      # stops the stack. Logs of every process print on a failure.
+      - name: Contract suite against .NET
+        if: steps.filter.outputs.run == 'true'
+        run: contract/scripts/dev-test.sh --target dotnet
+        env:
+          CONTRACT_SHOW_STACK_LOG: '1'
