@@ -79,16 +79,7 @@ public static partial class RoleProvisioner
                 await EnsureRoleAsync(connection, role, login, localPassword, cancellationToken).ConfigureAwait(false);
             }
 
-            // The seeder takes the migrator role on THIS login (SET ROLE), which
-            // needs membership unless the login is a superuser (local, tests).
-            // Aurora's master is not one; as the role's creator it may grant
-            // itself membership — SET only, never INHERIT, so the master's own
-            // sessions gain nothing from the migrator's grants.
-            if (!await ScalarAsync(connection, "SELECT rolsuper FROM pg_roles WHERE rolname = current_user", cancellationToken).ConfigureAwait(false)
-                && !await ScalarAsync(connection, "SELECT pg_has_role(current_user, @name, 'SET')", cancellationToken, ServiceRoles.Migrator).ConfigureAwait(false))
-            {
-                await ExecuteAsync(connection, $"GRANT {Quote(ServiceRoles.Migrator)} TO CURRENT_USER WITH INHERIT FALSE, SET TRUE", cancellationToken).ConfigureAwait(false);
-            }
+            await DetachLoginAsync(connection, login, cancellationToken).ConfigureAwait(false);
 
             var everyRole = string.Join(", ", ServiceRoles.All.Select(Quote));
             var schema = Quote(InsolviaDbContext.Schema);
@@ -130,6 +121,68 @@ public static partial class RoleProvisioner
 
             await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
             return new ProvisioningResult(login, ServiceRoles.All, tables);
+        }
+    }
+
+    /// <summary>
+    /// Keeps the provisioning login (the RDS master) out of every service
+    /// role: no membership it can SET or INHERIT. On RDS a login that is a
+    /// member of <c>rds_iam</c> — directly or through another role, whatever
+    /// its INHERIT — must sign in with an IAM token and has its password
+    /// refused, so a master that joined <c>migrator</c> (an earlier migrator
+    /// granted itself SET on it, for the seeder) locked itself out of the
+    /// secret's password (staging, 2026-10-30). Revoking those grants is the
+    /// repair; the ADMIN-only membership a role's creator holds stays, since
+    /// it neither sets nor inherits and is what lets the master manage the
+    /// role. A superuser (local, tests) is skipped: it holds every role
+    /// regardless and has no <c>rds_iam</c> to be locked out by.
+    /// </summary>
+    private static async Task DetachLoginAsync(NpgsqlConnection connection, RoleLogin login, CancellationToken cancellationToken)
+    {
+        if (await ScalarAsync(connection, "SELECT rolsuper FROM pg_roles WHERE rolname = current_user", cancellationToken).ConfigureAwait(false))
+        {
+            return;
+        }
+
+        var memberships = new List<(string Role, string Grantor)>();
+        var command = new NpgsqlCommand(
+            """
+            SELECT granted.rolname, grantor.rolname
+            FROM pg_auth_members membership
+            JOIN pg_roles granted ON granted.oid = membership.roleid
+            JOIN pg_roles grantor ON grantor.oid = membership.grantor
+            WHERE membership.member = (SELECT oid FROM pg_roles WHERE rolname = current_user)
+              AND (membership.set_option OR membership.inherit_option)
+              AND granted.rolname = ANY(@roles)
+            ORDER BY granted.rolname, grantor.rolname
+            """,
+            connection);
+        await using (command.ConfigureAwait(false))
+        {
+            command.Parameters.AddWithValue("roles", ServiceRoles.All.ToArray());
+            var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            await using (reader.ConfigureAwait(false))
+            {
+                while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                {
+                    memberships.Add((reader.GetString(0), reader.GetString(1)));
+                }
+            }
+        }
+
+        foreach (var (role, grantor) in memberships)
+        {
+            await ExecuteAsync(connection, $"REVOKE {Quote(role)} FROM CURRENT_USER GRANTED BY {Quote(grantor)}", cancellationToken).ConfigureAwait(false);
+        }
+
+        // Whatever the cause, a provisioning login that can still reach
+        // rds_iam would be refused its password on the next run: fail this
+        // one, loudly, instead (nothing it did commits).
+        if (login == RoleLogin.Iam
+            && await ScalarAsync(connection, "SELECT pg_has_role(current_user, 'rds_iam', 'SET') OR pg_has_role(current_user, 'rds_iam', 'USAGE')", cancellationToken).ConfigureAwait(false))
+        {
+            throw new InvalidOperationException(
+                "The provisioning login is still a member of rds_iam through a grant the migrator did not make, so RDS will refuse its password. Revoke it by hand (RoleProvisioner.DetachLoginAsync says why).");
         }
     }
 

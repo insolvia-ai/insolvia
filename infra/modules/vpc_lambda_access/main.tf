@@ -20,8 +20,8 @@
 #                      INSOLVIA_DB_USERNAME, and the migrator creates it WITH
 #                      rds_iam (backend/src/Insolvia.Migrator/RoleProvisioner.cs).
 #                      A host asking for any other role is refused by IAM
-#                      before Postgres is asked. Omitted for the migrator, which
-#                      signs in as the RDS master from the managed secret.
+#                      before Postgres is asked. Omitted for the migrator, whose
+#                      two logins (migrator, the master) modules/migrator grants.
 #
 # The Lambda that uses the role must wait for the network grant: Lambda checks
 # the execution role for CreateNetworkInterface when vpc_config is applied and

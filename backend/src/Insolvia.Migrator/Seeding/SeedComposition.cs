@@ -30,11 +30,12 @@ public sealed record SeedReport(string Environment, string Fixture, bool Check, 
 /// </summary>
 /// <remarks>
 /// <list type="table">
-/// <item><term>Database</term><description>The migrator's own connection
-/// with <c>role=migrator</c> set at session start, so every statement runs
-/// with the migrator role's grants (GrantTable: INSERT and SELECT on what a
-/// load writes, UPDATE only where a store's write needs it) and not the master
-/// user's — the role ADR 0028 reserved for exactly this.</description></item>
+/// <item><term>Database</term><description>A login AS the <c>migrator</c>
+/// role — an IAM token deployed, <c>INSOLVIA_DB_ROLE_PASSWORD</c> locally — so
+/// every statement runs with that role's grants (GrantTable: INSERT and
+/// SELECT on what a load writes, UPDATE only where a store's write needs it)
+/// and not the master user's: the role ADR 0028 reserved for exactly this.
+/// Never SET ROLE on the master's login (MigratorSettings says why).</description></item>
 /// <item><term>Accounts</term><description><c>AUTH_USER_POOL_ID</c> → the
 /// pool (Cognito: AdminGetUser, AdminCreateUser SUPPRESS,
 /// AdminSetUserPassword). Unset, locally only, subjects are derived from the
