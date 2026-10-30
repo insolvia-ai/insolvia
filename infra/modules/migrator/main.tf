@@ -16,11 +16,26 @@
 #
 # ── Who it is ───────────────────────────────────────────────────
 # The ONE principal that reads the RDS-managed master secret (only it can
-# create roles), and the one Lambda with no rds-db:connect: it signs in as the
-# master over TLS and takes `SET ROLE migrator` for the seed, whose grants are
-# INSERT/SELECT plus the UPDATEs a store write needs and never DELETE
-# (Grants.cs). The deploy role is explicitly denied GetSecretValue on every
-# `rds!cluster-*` secret by insolvia-services' ci-trust; nothing else holds it.
+# create roles). It signs in as the master over TLS with that password for
+# migrations, roles and the purge, and the seed logs in AS the `migrator`
+# Postgres role with an IAM token — whose grants are INSERT/SELECT plus the
+# UPDATEs a store write needs and never DELETE (Grants.cs). The deploy role is
+# explicitly denied GetSecretValue on every `rds!cluster-*` secret by
+# insolvia-services' ci-trust; nothing else holds it.
+#
+# rds-db:connect, therefore, for two database users (DatabaseLogin below):
+#   migrator         the seed's login.
+#   <master>         the way back in, never the normal path. On RDS a login
+#                    that is a member of an rds_iam role — directly or through
+#                    another, whatever its INHERIT — has its password refused
+#                    ("PAM authentication failed"). The first staging run
+#                    (2026-10-30) granted the master SET on `migrator` for a
+#                    SET ROLE seed and so locked it out; MigratorSettings now
+#                    retries such a refusal once with a token for the master,
+#                    and RoleProvisioner revokes the membership, after which
+#                    the password works again and the token is refused (the
+#                    master is no longer an rds_iam member). Without this
+#                    grant that lockout would need a human with the console.
 #
 # Seeding (var.seed, staging only) adds what the loader touches outside the
 # database — the same reach the old staging seed role had, now on a role
@@ -40,6 +55,7 @@
 # update-function-code; Terraform ignores the drift.
 
 data "aws_region" "current" {}
+data "aws_caller_identity" "current" {}
 
 locals {
   # insolvia-<env>-migrator — the component is the job it does.
@@ -72,7 +88,8 @@ resource "aws_iam_role_policy_attachment" "migrator_basic" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-# The VPC's network interfaces; no rds-db:connect (see the header).
+# The VPC's network interfaces. No db_username: that grant is for exactly
+# one service role, and the migrator's two logins are DatabaseLogin below.
 module "vpc_access" {
   source = "../vpc_lambda_access"
 
@@ -86,8 +103,18 @@ resource "aws_iam_role_policy" "migrator" {
   policy = jsonencode({
     Version = "2012-10-17"
     # Seed statements only where var.seed (staging); production's migrator
-    # holds the master-secret read and nothing else.
+    # holds the master-secret read and the two database logins.
     Statement = [for s in [
+      {
+        # The seed's login, and the master's token fallback (the header).
+        Sid    = "DatabaseLogin"
+        Effect = "Allow"
+        Action = ["rds-db:connect"]
+        Resource = [
+          for user in ["migrator", var.master_username] :
+          "arn:aws:rds-db:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:dbuser:${var.db_cluster_resource_id}/${user}"
+        ]
+      },
       {
         # The master credential, read per run (it rotates). The secret is
         # under the AWS-managed aws/secretsmanager key (modules/aurora says
@@ -142,7 +169,7 @@ resource "aws_iam_role_policy" "migrator" {
           StringEquals = { "kms:EncryptionContext:purpose" = local.tax_id_purpose }
         }
       },
-    ] : s if var.seed || s.Sid == "MasterSecretRead"]
+    ] : s if var.seed || contains(["MasterSecretRead", "DatabaseLogin"], s.Sid)]
   })
 
   lifecycle {

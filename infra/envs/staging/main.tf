@@ -715,6 +715,7 @@ module "migrator" {
   vpc_subnet_ids           = module.network.private_subnet_ids
   vpc_security_group_ids   = [module.network.lambda_security_group_id]
   master_secret_arn        = module.aurora.master_secret_arn
+  db_cluster_resource_id   = module.aurora.cluster_resource_id
   seed                     = true
   user_pool_arn            = module.auth.user_pool_arn
   fixture_bucket_arn       = data.aws_s3_bucket.dev_fixtures.arn

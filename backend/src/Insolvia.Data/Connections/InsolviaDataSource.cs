@@ -62,6 +62,10 @@ public static class InsolviaDataSource
         // (ADR 0028 § Data). The default 15 s connect timeout would fail the
         // first request after idle, so wait for it instead.
         connection.Timeout = 30;
+        if (settings.CommandTimeout is { } commandTimeout)
+        {
+            connection.CommandTimeout = commandTimeout;
+        }
 
         var provider = tokens ?? new RdsIamTokenProvider(
             settings.Region ?? throw new InvalidOperationException("IAM database authentication needs a region (AWS_REGION)."));

@@ -68,6 +68,11 @@ public sealed record DatabaseSettings
     /// <summary>The pool's ceiling for the IAM path.</summary>
     public int MaxPoolSize { get; init; } = LambdaMaxPoolSize;
 
+    /// <summary>A statement's time limit in seconds on the IAM path; null
+    /// keeps Npgsql's 30. The migrator raises it: a migration may rewrite a
+    /// table, and the Lambda's own timeout is the real bound.</summary>
+    public int? CommandTimeout { get; init; }
+
     /// <summary>Shows in <c>pg_stat_activity</c>: which service holds a connection.</summary>
     public string? ApplicationName { get; init; }
 

@@ -46,6 +46,17 @@ variable "master_secret_arn" {
   type        = string
 }
 
+variable "db_cluster_resource_id" {
+  description = "The cluster's immutable resource id (module.aurora.cluster_resource_id) — what the rds-db:connect ARNs for the migrator and master logins name."
+  type        = string
+}
+
+variable "master_username" {
+  description = "The cluster's master user (module.aurora's master_username, default insolvia_admin) — the IAM-token fallback login after an rds_iam lockout (main.tf's header)."
+  type        = string
+  default     = "insolvia_admin"
+}
+
 variable "seed" {
   description = "Whether this environment's migrator also seeds (staging: true; production: false, refused)."
   type        = bool

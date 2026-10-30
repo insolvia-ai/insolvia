@@ -4,6 +4,6 @@ output "network_policy_name" {
 }
 
 output "db_username" {
-  description = "The Postgres role this execution role may log in as (null for the migrator)."
+  description = "The Postgres role this execution role may log in as (null for the migrator, which grants its own)."
   value       = var.db_username
 }

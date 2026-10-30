@@ -25,16 +25,26 @@ public sealed partial class FormsHubRouteTests : IAsyncLifetime, IDisposable
 {
     private const string Typed = """{"source": "staff_typed"}""";
 
+    private readonly CaseWorld _world;
+
     // One instant for the whole test, so the route's render and the test's
     // own agree on "today" and on the printed-date stamp. Pinned at the real
-    // time: a staff token is checked against this clock.
-    private static readonly DateTimeOffset Now = DateTimeOffset.FromUnixTimeSeconds(DateTimeOffset.UtcNow.ToUnixTimeSeconds());
-
-    private readonly CaseWorld _world = new(services =>
+    // time and taken PER TEST (xUnit builds a fresh instance for each): a
+    // staff token is minted from the real clock and checked against this one,
+    // so an instant taken once per class drifted minutes behind the tokens on
+    // a slow runner and every later request read as a token from the future.
+    public FormsHubRouteTests()
     {
-        services.RemoveAll<TimeProvider>();
-        services.AddSingleton<TimeProvider>(new PinnedClock(Now));
-    });
+        var now = DateTimeOffset.FromUnixTimeSeconds(DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+        Now = now;
+        _world = new(services =>
+        {
+            services.RemoveAll<TimeProvider>();
+            services.AddSingleton<TimeProvider>(new PinnedClock(now));
+        });
+    }
+
+    private DateTimeOffset Now { get; }
 
     private MemoryDocumentBlobStore Blobs => (MemoryDocumentBlobStore)_world.Service<IDocumentBlobStore>();
 

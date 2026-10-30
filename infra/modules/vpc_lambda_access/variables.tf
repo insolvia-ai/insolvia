@@ -9,7 +9,7 @@ variable "role_name" {
 }
 
 variable "db_username" {
-  description = "The Postgres role the host connects as — one of the service roles the migrator creates (api, worker, admin, mcp, filing). null: no rds-db:connect grant (the migrator, which signs in as the master)."
+  description = "The Postgres role the host connects as — one of the service roles the migrator creates (api, worker, admin, mcp, filing). null: no rds-db:connect grant here (the migrator, whose two logins modules/migrator grants itself)."
   type        = string
   default     = null
 

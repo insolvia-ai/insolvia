@@ -685,7 +685,8 @@ resource "aws_ssm_parameter" "worker_config" {
 # The one-shot Lambda CI invokes before every alias shift: migrations and the
 # per-service roles and grants. Production is never seeded (seeds/README.md),
 # so this migrator holds no Cognito, S3 or case-key grant at all — only the
-# master secret. modules/migrator owns the reasoning.
+# master secret and rds-db:connect for its two logins. modules/migrator owns
+# the reasoning.
 module "migrator" {
   source = "../../modules/migrator"
 
@@ -697,6 +698,7 @@ module "migrator" {
   vpc_subnet_ids         = module.network.private_subnet_ids
   vpc_security_group_ids = [module.network.lambda_security_group_id]
   master_secret_arn      = module.aurora.master_secret_arn
+  db_cluster_resource_id = module.aurora.cluster_resource_id
   seed                   = false
   tags                   = local.common_tags
 }
