@@ -206,7 +206,7 @@ public sealed record MigratorSettings
         catch (PostgresException refused) when (IsIamOnlyRefusal(refused))
         {
             await withPassword.DisposeAsync().ConfigureAwait(false);
-            log($"migrator: RDS refused the master's password ({refused.SqlState}: {refused.MessageText}): it is a member of an rds_iam role. Signing in with an IAM token instead; provisioning revokes that membership.");
+            log($"migrator: RDS refused the master's password ({refused.SqlState}: {refused.MessageText}): the master reaches rds_iam through the service roles it created, as RDS arranges. Signing in with an IAM token.");
         }
         catch
         {

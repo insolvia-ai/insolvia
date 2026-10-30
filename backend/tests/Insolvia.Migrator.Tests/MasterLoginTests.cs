@@ -73,6 +73,46 @@ public sealed class MasterLoginTests(PostgresFixture postgres)
     }
 
     [Fact]
+    public async Task A_membership_another_role_granted_the_master_is_left_alone_and_provisioning_succeeds()
+    {
+        // RDS: when the master creates a role, rdsadmin grants it a SET and
+        // INHERIT membership in that role, which the master cannot revoke
+        // (staging, 2026-10-30: "permission denied to revoke privileges granted
+        // by role rdsadmin"). The superuser stands in for rdsadmin here.
+        var bootstrap = await postgres.CreateDatabaseAsync();
+        await MigrationRunner.RunAsync(NpgsqlDataSource.Create(bootstrap), GrantTable.All, Password, Ct);
+        var master = $"aurora_master_{Guid.NewGuid():N}"[..28];
+        var database = $"aurora_{Guid.NewGuid():N}";
+        await ExecuteAsync(
+            postgres.SuperuserConnectionString,
+            $"CREATE ROLE {master} LOGIN CREATEROLE PASSWORD '{Password}'",
+            $"GRANT api, worker, admin, mcp, filing, migrator TO {master} WITH ADMIN TRUE, INHERIT FALSE, SET FALSE",
+            $"GRANT api TO {master} WITH INHERIT TRUE, SET TRUE",
+            "CREATE ROLE rds_iam NOLOGIN",
+            $"GRANT rds_iam TO {master} WITH ADMIN TRUE, INHERIT FALSE, SET FALSE",
+            $"CREATE DATABASE {database} OWNER {master}");
+        var asMaster = new NpgsqlConnectionStringBuilder(postgres.SuperuserConnectionString) { Database = database, Username = master, Password = Password, Pooling = false }.ConnectionString;
+        try
+        {
+            await using (var dataSource = NpgsqlDataSource.Create(asMaster))
+            {
+                var report = await MigrationRunner.RunAsync(dataSource, GrantTable.All, Password, Ct);
+                Assert.Equal("Iam", report.RoleLogin);
+            }
+
+            // Kept: it is not the migrator's to revoke, and it is why the
+            // master signs in with an IAM token once api holds rds_iam.
+            Assert.True(await ScalarAsync<bool>(asMaster, $"SELECT pg_has_role('{master}', 'api', 'SET')"));
+            Assert.True(await ReachesRdsIamAsync(asMaster, master));
+        }
+        finally
+        {
+            await ExecuteAsync(postgres.SuperuserConnectionString, "DROP ROLE rds_iam");
+            await MigrationRunner.RunAsync(NpgsqlDataSource.Create(bootstrap), GrantTable.All, Password, Ct);
+        }
+    }
+
+    [Fact]
     public async Task The_seeder_logs_in_as_the_migrator_role_rather_than_setting_it_on_the_masters_login()
     {
         var connectionString = await postgres.CreateDatabaseAsync();
