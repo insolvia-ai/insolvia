@@ -1,4 +1,5 @@
 using Insolvia.Data;
+using Insolvia.Data.Connections;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
@@ -37,6 +38,11 @@ public static class MigrationRunner
     {
         ArgumentNullException.ThrowIfNull(dataSource);
 
+        // Wake the database first: a paused Aurora drops connections until it
+        // has resumed, and EF's first open would otherwise time out on it.
+        var wake = await DatabaseWake.OpenAsync(dataSource, cancellationToken).ConfigureAwait(false);
+        await wake.DisposeAsync().ConfigureAwait(false);
+
         var options = new DbContextOptionsBuilder<InsolviaDbContext>();
         options.UseInsolviaNpgsql(dataSource);
         IReadOnlyList<string> pending;
@@ -53,7 +59,7 @@ public static class MigrationRunner
             applied = [.. await context.Database.GetAppliedMigrationsAsync(cancellationToken).ConfigureAwait(false)];
         }
 
-        var connection = await dataSource.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        var connection = await DatabaseWake.OpenAsync(dataSource, cancellationToken).ConfigureAwait(false);
         await using (connection.ConfigureAwait(false))
         {
             var provisioned = await RoleProvisioner.ApplyAsync(connection, grants, localPassword, cancellationToken).ConfigureAwait(false);
