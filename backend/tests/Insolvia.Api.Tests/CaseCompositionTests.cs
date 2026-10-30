@@ -80,6 +80,21 @@ public sealed class CaseCompositionTests(WebApplicationFactory<Program> factory)
     }
 
     [Fact]
+    public void Off_lambda_with_no_filing_queue_the_memory_sender_records_and_inside_lambda_there_is_none()
+    {
+        Assert.IsType<MemoryFilingJobSender>(factory.Services.GetRequiredService<IFilingJobSender>());
+
+        using var lambda = factory.WithWebHostBuilder(host =>
+        {
+            foreach (var (name, value) in Lambda)
+            {
+                host.UseSetting(name, value);
+            }
+        });
+        Assert.Null(lambda.Services.GetService<IFilingJobSender>());
+    }
+
+    [Fact]
     public void Inside_lambda_the_local_blob_pair_is_ignored()
     {
         using var lambda = factory.WithWebHostBuilder(host =>

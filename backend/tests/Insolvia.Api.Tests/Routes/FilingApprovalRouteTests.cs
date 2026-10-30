@@ -4,6 +4,7 @@ using Insolvia.Core.AccessLog;
 using Insolvia.Core.Firms;
 using Insolvia.Core.Memory;
 using Insolvia.Core.Ports;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Insolvia.Api.Tests.Routes;
 
@@ -27,6 +28,9 @@ public sealed class FilingApprovalRouteTests : IDisposable
     {
         _world = new CaseWorld(services =>
         {
+            // The host composes a memory sender off Lambda; a deployed API
+            // with no FILING_QUEUE_URL has none, which `queue: false` stands for.
+            services.RemoveAll<IFilingJobSender>();
             if (queue)
             {
                 services.AddSingleton<IFilingJobSender>(_queue);

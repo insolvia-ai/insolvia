@@ -298,6 +298,14 @@ public static class ApiComposition
                 : new AmazonSQSClient());
             builder.Services.AddSingleton<IFilingJobSender>(services => new SqsFilingJobSender(services.GetRequiredService<IAmazonSQS>(), filingQueue));
         }
+        else if (!isLambda)
+        {
+            // development_server.py's fallback: off Lambda the memory queue
+            // records the job and sends nothing, so approving reaches its
+            // rules (409 not-ready, 403 stale sign-in) instead of a 503. A
+            // Lambda with no queue still composes no sender at all.
+            builder.Services.AddSingleton<IFilingJobSender, MemoryFilingJobSender>();
+        }
 
         // The firm-side routes (18.14), mapped after /health in this order.
         builder.Services.AddSingleton<IEndpointModule, MeRoutes>();
