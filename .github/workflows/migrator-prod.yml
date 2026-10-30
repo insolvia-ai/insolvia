@@ -1,0 +1,175 @@
+name: Migrator · Deploy · Production
+
+# PROMOTES the migrator image staging ran — resolved from `sha-<commit>` to
+# its digest by .github/actions/promote-image, never rebuilt — then invokes
+# it: EF migrations and the per-service roles and grants. Production is never
+# seeded: /insolvia/prod/migrator publishes no INSOLVIA_SEED, its role holds
+# no Cognito, S3 or case-key grant (modules/migrator), and the loader refuses
+# production before it connects.
+#
+# release.yml runs this between `prod-infra` and `prod-api`, behind the one
+# insolvia-production approval (`gated: true`), so no prod alias shifts onto
+# code whose schema has not been applied. Dispatched by hand it brings its
+# own two gates, exactly as api-prod.yml does: the staging-green check
+# (.github/actions/verified-commit) and an insolvia-production approval.
+
+on:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: "Commit to migrate to (default: main HEAD). Must have deployed green to staging."
+        required: false
+        type: string
+      force:
+        description: "Skip the staging-green check (emergency only)"
+        required: false
+        default: false
+        type: boolean
+  workflow_call:
+    inputs:
+      sha:
+        description: "Commit to migrate to (default: main HEAD). Must have deployed green to staging."
+        required: false
+        type: string
+      force:
+        description: "Skip the staging-green check (emergency only)"
+        required: false
+        default: false
+        type: boolean
+      gated:
+        description: "The caller already holds this run's insolvia-production approval — do not ask for a second one."
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  id-token: write
+  contents: read
+  statuses: read
+
+jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.commit.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - id: commit
+        uses: ./.github/actions/verified-commit
+        with:
+          sha: ${{ inputs.sha }}
+          force: ${{ inputs.force }}
+
+  approve:
+    needs: resolve
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.gated != true }}
+    runs-on: ubuntu-latest
+    environment: insolvia-production
+    steps:
+      - run: echo "Production migration to ${{ needs.resolve.outputs.sha }} approved."
+
+  migrate:
+    needs: [resolve, approve]
+    if: ${{ !cancelled() && !failure() }}
+    runs-on: ubuntu-latest
+    concurrency:
+      group: insolvia-terraform-prod
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: "~1.10"
+          terraform_wrapper: false
+
+      - name: Read prod infra outputs
+        id: tf
+        run: |
+          terraform -chdir=infra/envs/prod init -input=false
+          tf() { terraform -chdir=infra/envs/prod output -raw "$1"; }
+          {
+            echo "repo=$(tf migrator_ecr_repository_url)"
+            echo "function=$(tf migrator_function_name)"
+          } >> "$GITHUB_OUTPUT"
+
+      - id: image
+        uses: ./.github/actions/promote-image
+        with:
+          repository-url: ${{ steps.tf.outputs.repo }}
+          sha: ${{ needs.resolve.outputs.sha }}
+
+      - name: Update migrator code
+        env:
+          FUNCTION: ${{ steps.tf.outputs.function }}
+          IMAGE_URI: ${{ steps.image.outputs.image-uri }}
+        run: |
+          aws lambda update-function-code \
+            --function-name "$FUNCTION" \
+            --image-uri "$IMAGE_URI"
+          aws lambda wait function-updated --function-name "$FUNCTION"
+
+      - name: Re-derive migrator environment from SSM
+        env:
+          FUNCTION: ${{ steps.tf.outputs.function }}
+        run: |
+          environment="$(.github/scripts/lambda-environment.sh prod migrator --db-master --expect-env production)"
+          # Belt and braces over the loader's own refusal: a production
+          # migrator never carries the seed switch.
+          if echo "$environment" | jq -e '.Variables | has("INSOLVIA_SEED")' > /dev/null; then
+            echo "::error::/insolvia/prod/migrator publishes INSOLVIA_SEED — production is never seeded."
+            exit 1
+          fi
+          aws lambda update-function-configuration \
+            --function-name "$FUNCTION" \
+            --environment "$environment" > /dev/null
+          aws lambda wait function-updated --function-name "$FUNCTION"
+
+      - name: Migrate production
+        env:
+          FUNCTION: ${{ steps.tf.outputs.function }}
+        run: |
+          echo '{}' > migrate.json
+          aws lambda invoke \
+            --function-name "$FUNCTION" \
+            --payload fileb://migrate.json \
+            --cli-read-timeout 900 \
+            migrate-response.json > migrate-meta.json
+          cat migrate-meta.json
+          if jq -e '.FunctionError' migrate-meta.json > /dev/null; then
+            echo "::error::The migrator raised: $(jq -r '.errorMessage // .' migrate-response.json)"
+            cat migrate-response.json
+            exit 1
+          fi
+          jq '.' migrate-response.json
+          code="$(jq -r '.ExitCode // .exitCode // "missing"' migrate-response.json)"
+          if [ "$code" != "0" ]; then
+            echo "::error::The migrator answered exit code $code."
+            exit 1
+          fi
+          {
+            echo "### :card_file_box: Production database migrated"
+            echo
+            echo "Applied migrations: \`$(jq -c '(.Migration // .migration // {}) | (.AppliedMigrations // .appliedMigrations // [])' migrate-response.json)\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Move the migrator prod marker tag
+        env:
+          REPO: ${{ steps.tf.outputs.repo }}
+          DIGEST: ${{ steps.image.outputs.digest }}
+        run: |
+          manifest="$(aws ecr batch-get-image \
+            --repository-name "${REPO#*/}" \
+            --image-ids "imageDigest=$DIGEST" \
+            --query 'images[0].imageManifest' --output text)"
+          aws ecr put-image \
+            --repository-name "${REPO#*/}" \
+            --image-tag prod \
+            --image-manifest "$manifest" >/dev/null 2>&1 || \
+            echo "::notice::migrator \`prod\` tag already points at this digest."

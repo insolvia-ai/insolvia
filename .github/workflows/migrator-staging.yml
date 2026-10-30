@@ -1,0 +1,151 @@
+name: Migrator · Deploy · Staging
+
+# Builds backend/src/Insolvia.Migrator's image, rolls the staging migrator
+# Lambda onto it, re-derives its environment, and INVOKES it: EF migrations,
+# the per-service Postgres roles and grants, then the staging seed
+# (seeds/staging.json and the fixture versions it names — INSOLVIA_SEED is
+# true in /insolvia/staging/migrator). ADR 0028 § Runtime shape: the database
+# is private, so this Lambda is the only thing that reaches it, and it runs
+# BEFORE any `live` alias shifts — release.yml places this leg between
+# `infra` and `api`, so every service leg after it deploys against a schema
+# that is already current.
+#
+# A failure here (a FunctionError: a migration that would not apply, a seed
+# the loader refused) fails the release before any service moves.
+#
+# The FIRST deploy in a fresh environment: the migrator Lambda cannot be
+# created before its image exists — run
+#   scripts/bootstrap-ecr-images.sh staging migrator
+# before the infra apply that adds modules/migrator (its header has the
+# bootstrap note).
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+# The staging deploy group, shared with infra-staging.yml and every service
+# leg (release.yml declares none of its own — see its header).
+concurrency:
+  group: insolvia-terraform-staging
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    # Load-bearing: E2E_TEST_USER_PASSWORD, the seeded people's one shared
+    # password, is an insolvia-staging environment secret.
+    environment: insolvia-staging
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: "~1.10"
+          terraform_wrapper: false
+
+      - name: Read staging infra outputs
+        id: tf
+        run: |
+          terraform -chdir=infra/envs/staging init -input=false
+          tf() { terraform -chdir=infra/envs/staging output -raw "$1"; }
+          {
+            echo "repo=$(tf migrator_ecr_repository_url)"
+            echo "function=$(tf migrator_function_name)"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Log in to ECR
+        env:
+          REPO: ${{ steps.tf.outputs.repo }}
+        run: |
+          aws ecr get-login-password --region us-east-1 \
+            | docker login --username AWS --password-stdin "${REPO%%/*}"
+
+      # Context is backend/; seeds/ sits outside it and arrives as a named
+      # build context (backend/Dockerfile's `seeds` stage). Built without one
+      # the image carries no fixtures and the seed refuses — which is why the
+      # flag is here and not optional.
+      - name: Build and push the migrator image
+        env:
+          REPO: ${{ steps.tf.outputs.repo }}
+        run: |
+          docker build --target migrator --build-context seeds=seeds \
+            -t "$REPO:sha-${{ github.sha }}" \
+            -t "$REPO:staging" \
+            backend
+          docker push "$REPO:sha-${{ github.sha }}"
+          docker push "$REPO:staging"
+
+      - name: Update migrator code
+        env:
+          FUNCTION: ${{ steps.tf.outputs.function }}
+          REPO: ${{ steps.tf.outputs.repo }}
+        run: |
+          aws lambda update-function-code \
+            --function-name "$FUNCTION" \
+            --image-uri "$REPO:sha-${{ github.sha }}"
+          aws lambda wait function-updated --function-name "$FUNCTION"
+
+      - name: Re-derive migrator environment from SSM
+        env:
+          FUNCTION: ${{ steps.tf.outputs.function }}
+          E2E_TEST_USER_PASSWORD: ${{ secrets.E2E_TEST_USER_PASSWORD }}
+        run: |
+          # /insolvia/staging/migrator/* (insolvia-env, insolvia-seed, the
+          # pool, the buckets, the case key) + /insolvia/staging/db/* with the
+          # master secret's ARN — the migrator alone signs in as the master.
+          environment="$(.github/scripts/lambda-environment.sh staging migrator --db-master --expect-env staging)"
+          # The seed's one secret: the fixture's people carry
+          # ${E2E_TEST_USER_PASSWORD} (seeds/README.md). Named when absent,
+          # because an environment-scoped secret resolves to "" in silence.
+          if [ -z "${E2E_TEST_USER_PASSWORD:-}" ]; then
+            echo "::error::E2E_TEST_USER_PASSWORD is unset on the insolvia-staging environment — the staging seed cannot set the test accounts' password."
+            exit 1
+          fi
+          environment="$(echo "$environment" | jq -c --arg v "$E2E_TEST_USER_PASSWORD" '.Variables.E2E_TEST_USER_PASSWORD = $v')"
+          aws lambda update-function-configuration \
+            --function-name "$FUNCTION" \
+            --environment "$environment" > /dev/null
+          aws lambda wait function-updated --function-name "$FUNCTION"
+
+      # {} = migrate, then seed (INSOLVIA_SEED=true). Aurora at minimum
+      # capacity 0 resumes in ~15 s; the Lambda's own timeout is 900 s, and
+      # the read timeout matches it so the CLI never gives up first.
+      - name: Migrate and seed staging
+        env:
+          FUNCTION: ${{ steps.tf.outputs.function }}
+        run: |
+          echo '{}' > migrate.json
+          aws lambda invoke \
+            --function-name "$FUNCTION" \
+            --payload fileb://migrate.json \
+            --cli-read-timeout 900 \
+            migrate-response.json > migrate-meta.json
+          cat migrate-meta.json
+          if jq -e '.FunctionError' migrate-meta.json > /dev/null; then
+            echo "::error::The migrator raised: $(jq -r '.errorMessage // .' migrate-response.json)"
+            cat migrate-response.json
+            exit 1
+          fi
+          # Property casing follows the Lambda serializer; read either.
+          jq '.' migrate-response.json
+          code="$(jq -r '.ExitCode // .exitCode // "missing"' migrate-response.json)"
+          if [ "$code" != "0" ]; then
+            echo "::error::The migrator answered exit code $code."
+            exit 1
+          fi
+          {
+            echo "### :card_file_box: Staging database migrated and seeded"
+            echo
+            echo "Applied migrations: \`$(jq -c '(.Migration // .migration // {}) | (.AppliedMigrations // .appliedMigrations // [])' migrate-response.json)\`"
+            echo
+            echo "Seed: $(jq -r '(.Seed // .seed // {}) | "\(.Missing // .missing // 0) missing thing(s) written"' migrate-response.json)"
+          } >> "$GITHUB_STEP_SUMMARY"

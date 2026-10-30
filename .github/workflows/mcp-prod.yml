@@ -133,16 +133,7 @@ jobs:
         run: |
           # /insolvia/prod/mcp/<kebab-key> — the same derivation
           # mcp-staging.yml documents, against prod's namespace.
-          environment="$(
-            aws ssm get-parameters-by-path \
-              --path /insolvia/prod/mcp \
-              --with-decryption \
-              --query 'Parameters[].{Name:Name,Value:Value}' \
-              --output json \
-            | jq -c 'map({key: (.Name | split("/") | last | ascii_upcase | gsub("-"; "_")), value: .Value})
-                     | {Variables: from_entries}'
-          )"
-          echo "$environment" | jq -e '.Variables.INSOLVIA_ENV == "production"' > /dev/null
+          environment="$(.github/scripts/lambda-environment.sh prod mcp --db --expect-env production)"
           echo "$environment" | jq -e '.Variables.AUTH_CLIENT_IDS | length > 0' > /dev/null
           aws lambda update-function-configuration \
             --function-name "$FUNCTION" \
@@ -172,8 +163,8 @@ jobs:
           VERSION: ${{ steps.candidate.outputs.version }}
           DOMAIN: ${{ steps.tf.outputs.domain }}
         run: |
-          # Payload format 2.0 — the shape API Gateway sends and Mangum
-          # parses. The Host header matters doubly here: the service's
+          # Payload format 2.0 — the shape API Gateway sends and the host's
+          # HttpApi Lambda hosting parses. The Host header matters doubly here: the service's
           # transport security validates it against the canonical hostname.
           cat > event.json <<EOF
           {

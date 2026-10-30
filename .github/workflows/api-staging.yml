@@ -1,14 +1,18 @@
 name: API · Deploy · Staging
 
-# Steady-state deploy: apply the env, push a fresh image, point the Lambda at
-# it, re-derive its environment from SSM, smoke-test /health.
+# Steady-state deploy: push fresh .NET images (backend/Dockerfile's `lambda`
+# and `worker-lambda` targets — backend/src/Insolvia.Api and Insolvia.Worker,
+# ADR 0028), point the Lambdas at them, re-derive their environment from SSM,
+# smoke-test /health. The schema is already current: release.yml runs the
+# migrator leg (migrator-staging.yml) BEFORE this one, so the alias below
+# never shifts onto code ahead of its database. Dispatched by hand, run
+# migrator-staging.yml first when the change carries a migration.
 #
 # The FIRST deploy in a fresh environment cannot run through this workflow: an
 # Image-package Lambda refuses to be created before its image exists, so the
-# apply below deadlocks. Bootstrap once by hand, per
-# infra/modules/api_service/main.tf:
-#   1. insolvia-services releases infra/envs/shared   (creates insolvia-shared-api)
-#   2. docker build --target lambda (repo-root context, -f services/api/Dockerfile), tag <repo-url>:staging, push
+# apply deadlocks. Bootstrap once, per infra/modules/api_service/main.tf:
+#   1. insolvia-services releases infra/envs/shared (the -dotnet repositories)
+#   2. scripts/bootstrap-ecr-images.sh staging api worker
 #   3. terraform apply   (full)
 # After that, every deploy is this workflow.
 #
@@ -18,8 +22,11 @@ name: API · Deploy · Staging
 # ── Job order: deploy → integration ──────────────────────────────────────────
 #
 # `deploy` publishes, shifts the alias and smoke-tests /health. `integration`
-# then seeds staging (accounts, firms, the fixture case) and runs
-# services/api/tests/integration against the live API as those people —
+# then re-converges staging's seed (accounts, firms, the fixture case — the
+# migrator Lambda's `seed` command, .github/actions/seed-staging) and runs
+# services/api/tests/integration against the live API as those people. Since
+# the switch that suite is a black-box HTTP client of the .NET API: it
+# imports nothing from services/api, so it is the same oracle it was —
 # the same tier a developer runs against their dev stack with
 # services/api/scripts/dev-test-integration.sh. It runs AFTER the shift, so it
 # exercises the version now serving; staging is the proving ground and that
@@ -54,10 +61,7 @@ jobs:
     # Frozen for the integration job, so it never reads state that moved on.
     outputs:
       domain: ${{ steps.tf.outputs.domain }}
-      firm_table: ${{ steps.tf.outputs.firm_table }}
-      case_table: ${{ steps.tf.outputs.case_table }}
-      document_bucket: ${{ steps.tf.outputs.document_bucket }}
-      fixture_bucket: ${{ steps.tf.outputs.fixture_bucket }}
+      migrator_function: ${{ steps.tf.outputs.migrator_function }}
       auth_pool_id: ${{ steps.tf.outputs.auth_pool_id }}
       auth_client_id: ${{ steps.tf.outputs.auth_client_id }}
       auth_portal_client_id: ${{ steps.tf.outputs.auth_portal_client_id }}
@@ -87,12 +91,10 @@ jobs:
             echo "alias=$(terraform -chdir=infra/envs/staging output -raw api_lambda_alias_name)"
             echo "jobs_repo=$(terraform -chdir=infra/envs/staging output -raw jobs_ecr_repository_url)"
             echo "worker_function=$(terraform -chdir=infra/envs/staging output -raw jobs_worker_function_name)"
-            # The integration job's inputs: what the seed step loads into, and
-            # the pool + client the suite signs in against (public values).
-            echo "firm_table=$(terraform -chdir=infra/envs/staging output -raw firm_table_name)"
-            echo "case_table=$(terraform -chdir=infra/envs/staging output -raw case_table_name)"
-            echo "document_bucket=$(terraform -chdir=infra/envs/staging output -raw case_document_bucket)"
-            echo "fixture_bucket=$(terraform -chdir=infra/envs/staging output -raw dev_fixtures_bucket)"
+            # The integration job's inputs: the migrator the seed step
+            # invokes, and the pool + client the suite signs in against
+            # (public values).
+            echo "migrator_function=$(terraform -chdir=infra/envs/staging output -raw migrator_function_name)"
             echo "auth_pool_id=$(terraform -chdir=infra/envs/staging output -raw auth_user_pool_id)"
             echo "auth_client_id=$(terraform -chdir=infra/envs/staging output -raw auth_web_client_id)"
             # The client portal's app client (ADR 0023): the seeded client
@@ -117,30 +119,31 @@ jobs:
           # meaning "the image this environment currently runs"; it is what a
           # from-scratch `terraform apply` seeds the Lambda from
           # (var.image_tag). `:latest` is deliberately gone: the repository is
-          # now shared with prod, where `latest` would mean "whatever any
+          # shared with prod, where `latest` would mean "whatever any
           # environment pushed last".
-          # Context is the repo root: the image installs the shared
-          # packages/insolvia_core by relative path (see the Dockerfile header).
-          docker build --target lambda -f services/api/Dockerfile \
+          # Context is backend/ (backend/Dockerfile's header): one build stage
+          # compiles every host, each target copies one out.
+          docker build --target lambda \
             -t "$REPO:sha-${{ github.sha }}" \
             -t "$REPO:staging" \
-            .
+            backend
           docker push "$REPO:sha-${{ github.sha }}"
           docker push "$REPO:staging"
 
-      # The pipeline worker's image (ADR 0018): same Dockerfile, same repo-root
-      # context, the `worker` target, its own shared repository. Nearly every
-      # layer is shared with the build above, so this is cheap — and it keeps
-      # the api and worker images of one commit in lockstep, which run_job's
-      # unknown-kind window depends on being short.
+      # The pipeline worker's image (ADR 0018): same Dockerfile, same backend/
+      # context, the `worker-lambda` target, its own shared repository
+      # (insolvia-shared-worker-dotnet). The build stage is cached from the
+      # step above, so this is cheap — and it keeps the api and worker images
+      # of one commit in lockstep, which the unknown-kind window depends on
+      # being short.
       - name: Build and push worker image
         env:
           JOBS_REPO: ${{ steps.tf.outputs.jobs_repo }}
         run: |
-          docker build --target worker -f services/api/Dockerfile \
+          docker build --target worker-lambda \
             -t "$JOBS_REPO:sha-${{ github.sha }}" \
             -t "$JOBS_REPO:staging" \
-            .
+            backend
           docker push "$JOBS_REPO:sha-${{ github.sha }}"
           docker push "$JOBS_REPO:staging"
 
@@ -163,28 +166,20 @@ jobs:
           FUNCTION: ${{ steps.tf.outputs.function }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          # /insolvia/staging/api/<kebab-key> -> KEBAB_KEY:
-          #   insolvia-env        -> INSOLVIA_ENV
-          #   waitlist-table-name -> WAITLIST_TABLE_NAME
-          # Terraform ignores `environment` drift on the Lambda (see
-          # infra/modules/api_service/main.tf) — this step owns it.
-          environment="$(
-            aws ssm get-parameters-by-path \
-              --path /insolvia/staging/api \
-              --with-decryption \
-              --query 'Parameters[].{Name:Name,Value:Value}' \
-              --output json \
-            | jq -c 'map({key: (.Name | split("/") | last | ascii_upcase | gsub("-"; "_")), value: .Value})
-                     | {Variables: from_entries}'
-          )"
-          # Refuse to ship nonsense: an empty or half-applied namespace would
-          # otherwise silently wipe every variable the service reads.
-          echo "$environment" | jq -e '.Variables.INSOLVIA_ENV == "staging"' > /dev/null
+          # /insolvia/staging/api/<kebab-key> -> KEBAB_KEY (insolvia-env ->
+          # INSOLVIA_ENV, insolvia-db-username -> INSOLVIA_DB_USERNAME, …)
+          # plus the database contract /insolvia/staging/db/* as
+          # INSOLVIA_DB_* — .github/scripts/lambda-environment.sh, the one
+          # derivation every backend deploy uses. It refuses an empty or
+          # half-applied namespace (INSOLVIA_ENV must read "staging") and any
+          # Lambda-reserved name. Terraform ignores `environment` drift on the
+          # Lambda (infra/modules/api_service/main.tf) — this step owns it.
+          environment="$(.github/scripts/lambda-environment.sh staging api --db --expect-env staging)"
           # The Anthropic key rides a GitHub environment secret, not SSM —
           # the founder's choice (2026-09-05): pasted once into the
           # environment, overlaid here onto the derived namespace. Empty
           # secret = variable absent = the worker composes no ReviewModel
-          # and AI jobs fail honestly with not_configured (core/config.py).
+          # and AI jobs fail honestly with not_configured.
           if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
             environment="$(echo "$environment" | jq -c --arg v "$ANTHROPIC_API_KEY" '.Variables.ANTHROPIC_API_KEY = $v')"
           fi
@@ -239,25 +234,15 @@ jobs:
           WORKER: ${{ steps.tf.outputs.worker_function }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          # The SAME /insolvia/staging/api namespace as the API Lambda — the
-          # worker is the API's long-running half and reads the same config
-          # (CASE_TABLE_NAME is what it actually needs; the extras are
-          # harmless and keep this step one derivation, not two).
-          environment="$(
-            aws ssm get-parameters-by-path \
-              --path /insolvia/staging/api \
-              --with-decryption \
-              --query 'Parameters[].{Name:Name,Value:Value}' \
-              --output json \
-            | jq -c 'map({key: (.Name | split("/") | last | ascii_upcase | gsub("-"; "_")), value: .Value})
-                     | {Variables: from_entries}'
-          )"
-          echo "$environment" | jq -e '.Variables.INSOLVIA_ENV == "staging"' > /dev/null
+          # The worker's OWN namespace, /insolvia/staging/worker — not the
+          # API's, since the switch: the two log in as different Postgres
+          # roles (INSOLVIA_DB_USERNAME worker vs api). Plus /db/*.
+          environment="$(.github/scripts/lambda-environment.sh staging worker --db --expect-env staging)"
           # The Anthropic key rides a GitHub environment secret, not SSM —
           # the founder's choice (2026-09-05): pasted once into the
           # environment, overlaid here onto the derived namespace. Empty
           # secret = variable absent = the worker composes no ReviewModel
-          # and AI jobs fail honestly with not_configured (core/config.py).
+          # and AI jobs fail honestly with not_configured (WorkerHost.cs).
           if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
             environment="$(echo "$environment" | jq -c --arg v "$ANTHROPIC_API_KEY" '.Variables.ANTHROPIC_API_KEY = $v')"
           fi
@@ -266,10 +251,12 @@ jobs:
             --environment "$environment"
           aws lambda wait function-updated --function-name "$WORKER"
 
-      # A synthetic SQS event whose job id has no record: run_job logs and
-      # drops it by design, so a clean (no FunctionError) return proves the
-      # image boots, the handler resolves, and the store is reachable —
-      # without writing anything.
+      # A synthetic SQS event whose job id has no record: the worker logs and
+      # drops it by design (JobDispatch.RunJobAsync), so a clean (no
+      # FunctionError) return proves the image boots, the handler resolves,
+      # and Aurora answers a SELECT as the `worker` role through the VPC —
+      # the network, the IAM token and the grant, all at once — without
+      # writing anything.
       - name: Smoke test the worker
         env:
           WORKER: ${{ steps.tf.outputs.worker_function }}
@@ -300,16 +287,15 @@ jobs:
   # THIS IS WHAT MAKES THE API LEG ASSERT BEHAVIOUR. /health proves the
   # function booted; this proves a real token from the real pool verifies
   # against the deployed configuration, that the Lambda's own execution role
-  # may make every call the routes make (DynamoDB, KMS, S3 — the one thing
+  # may make every call the routes make (Aurora as `api`, KMS, S3 — the one thing
   # no test on a laptop can exercise, because a developer's credentials are
   # wider than the role's), that the bucket policy admits the presigned PUT
   # the API mints, and that ADR 0009's refusals hold from outside.
   #
-  # `environment: insolvia-staging` is load-bearing twice: it is what lets the
-  # seed action assume the seed role (its trust policy accepts only this
-  # environment's tokens) and where E2E_TEST_USER_PASSWORD lives. No AWS
-  # credentials reach the suite itself — sign-in is SRP over unsigned Cognito
-  # calls and everything after is HTTPS to the API.
+  # `environment: insolvia-staging` is load-bearing: AWS_ROLE_ARN (the seed
+  # action invokes the migrator with it) and E2E_TEST_USER_PASSWORD live
+  # there. No AWS credentials reach the suite itself — sign-in is SRP over
+  # unsigned Cognito calls and everything after is HTTPS to the API.
   integration:
     needs: deploy
     runs-on: ubuntu-latest
@@ -319,18 +305,18 @@ jobs:
 
       - uses: ./.github/actions/seed-staging
         with:
-          seed-role-arn: ${{ secrets.AWS_SEED_ROLE_ARN }}
-          test-user-password: ${{ secrets.E2E_TEST_USER_PASSWORD }}
-          firm-table: ${{ needs.deploy.outputs.firm_table }}
-          case-table: ${{ needs.deploy.outputs.case_table }}
-          document-bucket: ${{ needs.deploy.outputs.document_bucket }}
-          fixture-bucket: ${{ needs.deploy.outputs.fixture_bucket }}
-          user-pool-id: ${{ needs.deploy.outputs.auth_pool_id }}
+          role-arn: ${{ secrets.AWS_ROLE_ARN }}
+          migrator-function: ${{ needs.deploy.outputs.migrator_function }}
 
-      # The API's own pins (the seed action installed the admin service's;
-      # this tier imports nothing from either service, but runs under the
-      # same pytest the unit tier does).
-      - name: Install the API's test toolchain
+      # The suite's own pins. It imports nothing from services/api's source —
+      # it is an HTTP client — but runs under the pytest the Python unit tier
+      # pins. TRANSITIONAL: 18.23 deletes services/api, and this tier moves
+      # with it (the contract suite, contract/, is the .NET-era successor).
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install the integration tier's test toolchain
         run: pip install -r requirements.txt -r requirements-dev.txt
         working-directory: services/api
 

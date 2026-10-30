@@ -2,8 +2,9 @@ name: API · Deploy · Production
 
 # PROMOTES the image staging validated — it does not build one.
 #
-# The shared insolvia-shared-api repository (insolvia-services'
-# infra/envs/shared) already holds the image staging tested, tagged
+# The shared insolvia-shared-api-dotnet repository (insolvia-services'
+# infra/envs/shared; the .NET host since the switch, ADR 0028) already holds
+# the image staging tested, tagged
 # `sha-<commit>`. This workflow resolves that tag to an immutable digest and
 # points the prod Lambda at it, so production runs the exact bytes that were
 # exercised on staging rather than a fresh compile of the same source. There is deliberately no `docker build` here.
@@ -27,7 +28,11 @@ name: API · Deploy · Production
 #
 # This workflow applies no Terraform. Prod infra applies as the first leg of an
 # approved release (release.yml → infra-prod.yml), or via infra-prod.yml
-# dispatched on its own — never as a side effect of a service deploy.
+# dispatched on its own — never as a side effect of a service deploy. Nor does
+# it migrate: release.yml runs migrator-prod.yml between prod-infra and this
+# leg, so the candidate below is smoke-tested against a schema that is
+# already current. Dispatched by hand, dispatch migrator-prod.yml first when
+# the commit carries a migration.
 
 on:
   workflow_dispatch:
@@ -149,7 +154,7 @@ jobs:
 
       # The worker image is promoted by the same rule as the api's — the
       # digest staging validated, never a rebuild. The `record` job stamps
-      # sha-<commit> on insolvia-shared-jobs like every other repo, so an
+      # sha-<commit> on insolvia-shared-worker-dotnet like every other repo, so an
       # unchanged pipeline still resolves.
       - id: worker-image
         uses: ./.github/actions/promote-image
@@ -175,30 +180,19 @@ jobs:
           FUNCTION: ${{ steps.tf.outputs.function }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          # /insolvia/prod/api/<kebab-key> -> KEBAB_KEY:
-          #   insolvia-env        -> INSOLVIA_ENV  (= "production"; the infra
-          #                          env is "prod", the app-level value is not —
-          #                          the SSM parameter records that mapping)
-          #   waitlist-table-name -> WAITLIST_TABLE_NAME
+          # /insolvia/prod/api/<kebab-key> -> KEBAB_KEY plus /insolvia/prod/db/*
+          # as INSOLVIA_DB_* (.github/scripts/lambda-environment.sh). INSOLVIA_ENV
+          # must read "production" — the infra env is "prod", the app-level
+          # value is not; the SSM parameter records that mapping — or the
+          # step refuses rather than wipe the service's environment.
           # Terraform ignores `environment` drift on the Lambda (see
           # infra/modules/api_service/main.tf) — this step owns it.
-          environment="$(
-            aws ssm get-parameters-by-path \
-              --path /insolvia/prod/api \
-              --with-decryption \
-              --query 'Parameters[].{Name:Name,Value:Value}' \
-              --output json \
-            | jq -c 'map({key: (.Name | split("/") | last | ascii_upcase | gsub("-"; "_")), value: .Value})
-                     | {Variables: from_entries}'
-          )"
-          # Refuse to ship nonsense: an empty or half-applied namespace would
-          # otherwise silently wipe every variable the service reads.
-          echo "$environment" | jq -e '.Variables.INSOLVIA_ENV == "production"' > /dev/null
+          environment="$(.github/scripts/lambda-environment.sh prod api --db --expect-env production)"
           # The Anthropic key rides a GitHub environment secret, not SSM —
           # the founder's choice (2026-09-05): pasted once into the
           # environment, overlaid here onto the derived namespace. Empty
           # secret = variable absent = the worker composes no ReviewModel
-          # and AI jobs fail honestly with not_configured (core/config.py).
+          # and AI jobs fail honestly with not_configured (WorkerHost.cs).
           if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
             environment="$(echo "$environment" | jq -c --arg v "$ANTHROPIC_API_KEY" '.Variables.ANTHROPIC_API_KEY = $v')"
           fi
@@ -229,7 +223,8 @@ jobs:
           FUNCTION: ${{ steps.tf.outputs.function }}
           VERSION: ${{ steps.candidate.outputs.version }}
         run: |
-          # Payload format 2.0 — the shape API Gateway sends and Mangum parses.
+          # Payload format 2.0 — the shape API Gateway sends and the host's
+          # AddAWSLambdaHosting(LambdaEventSource.HttpApi) parses.
           cat > event.json <<'EOF'
           {
             "version": "2.0",
@@ -334,23 +329,14 @@ jobs:
           WORKER: ${{ steps.tf.outputs.worker_function }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          # The SAME /insolvia/prod/api namespace as the API Lambda — the
-          # worker is the API's long-running half and reads the same config.
-          environment="$(
-            aws ssm get-parameters-by-path \
-              --path /insolvia/prod/api \
-              --with-decryption \
-              --query 'Parameters[].{Name:Name,Value:Value}' \
-              --output json \
-            | jq -c 'map({key: (.Name | split("/") | last | ascii_upcase | gsub("-"; "_")), value: .Value})
-                     | {Variables: from_entries}'
-          )"
-          echo "$environment" | jq -e '.Variables.INSOLVIA_ENV == "production"' > /dev/null
+          # The worker's own /insolvia/prod/worker namespace (it logs in as the
+          # `worker` Postgres role, not `api`) plus /insolvia/prod/db/*.
+          environment="$(.github/scripts/lambda-environment.sh prod worker --db --expect-env production)"
           # The Anthropic key rides a GitHub environment secret, not SSM —
           # the founder's choice (2026-09-05): pasted once into the
           # environment, overlaid here onto the derived namespace. Empty
           # secret = variable absent = the worker composes no ReviewModel
-          # and AI jobs fail honestly with not_configured (core/config.py).
+          # and AI jobs fail honestly with not_configured (WorkerHost.cs).
           if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
             environment="$(echo "$environment" | jq -c --arg v "$ANTHROPIC_API_KEY" '.Variables.ANTHROPIC_API_KEY = $v')"
           fi
@@ -359,9 +345,9 @@ jobs:
             --environment "$environment"
           aws lambda wait function-updated --function-name "$WORKER"
 
-      # A synthetic SQS event whose job id has no record: run_job drops it by
-      # design, so a clean return proves boot + handler + store reachability
-      # without writing anything to the prod table.
+      # A synthetic SQS event whose job id has no record: the worker drops it
+      # by design, so a clean return proves boot + handler + a SELECT against
+      # Aurora as `worker` through the VPC, without writing anything.
       - name: Smoke test the worker
         env:
           WORKER: ${{ steps.tf.outputs.worker_function }}

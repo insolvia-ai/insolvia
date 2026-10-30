@@ -164,7 +164,7 @@ run_area() {
     portal)     node_standalone_suite portal apps/insolvia_admin apps/insolvia_admin/scripts/dev-setup.sh ;;
     marketing)  node_standalone_suite marketing apps/insolvia_marketing apps/insolvia_marketing/scripts/dev-setup.sh ;;
     forms)      ( cd "$REPO_ROOT" && ./forms/scripts/dev-test.sh ) ;;
-    ci-scripts) ( cd "$REPO_ROOT" && ./.github/scripts/release-diff-base.test.sh ) ;;
+    ci-scripts) ( cd "$REPO_ROOT" && ./.github/scripts/release-diff-base.test.sh && ./.github/scripts/lambda-environment.test.sh ) ;;
     *)          die "unknown area '$1'" ;;
   esac
 }
@@ -182,7 +182,7 @@ describe_area() {
     portal)     echo "apps/insolvia_admin      npm test (own lockfile)" ;;
     marketing)  echo "apps/insolvia_marketing  npm test (own lockfile)" ;;
     forms)      echo "forms/                   forms/scripts/dev-test.sh" ;;
-    ci-scripts) echo ".github/scripts/         release-diff-base.test.sh (plain bash)" ;;
+    ci-scripts) echo ".github/scripts/         release-diff-base.test.sh, lambda-environment.test.sh (plain bash)" ;;
   esac
 }
 

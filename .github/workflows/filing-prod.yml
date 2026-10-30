@@ -128,16 +128,20 @@ jobs:
           aws lambda wait function-updated --function-name "$FUNCTION"
 
       # The worker has no endpoint, so the smoke test is one invocation with a
-      # record that is not a filing job: the image boots, its configuration
-      # loads (a deployed worker REFUSES to start without its kill switch
-      # parameter, or with a fake court configured), the whole composition
-      # constructs, and the run answers `dropped` — writing nothing, opening
-      # nothing, contacting no court.
+      # WELL-FORMED filing job naming an approval that does not exist: the
+      # image boots, its configuration loads (a deployed worker REFUSES to
+      # start without its kill switch parameter, its key aliases, or with a
+      # fake court configured), the whole composition constructs, and the
+      # approval lookup — a SELECT against Aurora as the `filing` role,
+      # through the VPC — answers nothing, so the run answers `dropped`
+      # (no_such_approval): writing nothing, opening nothing, contacting no
+      # court. A malformed body would drop before the database, proving less.
       - name: Smoke test the worker
         env:
           FUNCTION: ${{ steps.tf.outputs.function }}
         run: |
-          echo '{"Records":[{"body":"deploy-smoke: not a filing job"}]}' > smoke.json
+          body='{"approval_id":"00000000-0000-4000-8000-000000000000","case_id":"00000000-0000-4000-8000-000000000000","filing_id":"00000000-0000-4000-8000-000000000000","kind":"filing.submit","version":1}'
+          jq -cn --arg body "$body" '{Records: [{body: $body}]}' > smoke.json
           aws lambda invoke \
             --function-name "$FUNCTION" \
             --payload fileb://smoke.json \

@@ -120,16 +120,7 @@ jobs:
         env:
           FUNCTION: ${{ steps.tf.outputs.function }}
         run: |
-          environment="$(
-            aws ssm get-parameters-by-path \
-              --path /insolvia/prod/admin-api \
-              --with-decryption \
-              --query 'Parameters[].{Name:Name,Value:Value}' \
-              --output json \
-            | jq -c 'map({key: (.Name | split("/") | last | ascii_upcase | gsub("-"; "_")), value: .Value})
-                     | {Variables: from_entries}'
-          )"
-          echo "$environment" | jq -e '.Variables.INSOLVIA_ENV == "production"' > /dev/null
+          environment="$(.github/scripts/lambda-environment.sh prod admin-api --db --expect-env production)"
           aws lambda update-function-configuration \
             --function-name "$FUNCTION" \
             --environment "$environment"
