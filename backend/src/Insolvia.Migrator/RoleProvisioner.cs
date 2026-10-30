@@ -125,17 +125,20 @@ public static partial class RoleProvisioner
     }
 
     /// <summary>
-    /// Keeps the provisioning login (the RDS master) out of every service
-    /// role: no membership it can SET or INHERIT. On RDS a login that is a
-    /// member of <c>rds_iam</c> — directly or through another role, whatever
-    /// its INHERIT — must sign in with an IAM token and has its password
-    /// refused, so a master that joined <c>migrator</c> (an earlier migrator
-    /// granted itself SET on it, for the seeder) locked itself out of the
-    /// secret's password (staging, 2026-10-30). Revoking those grants is the
-    /// repair; the ADMIN-only membership a role's creator holds stays, since
-    /// it neither sets nor inherits and is what lets the master manage the
-    /// role. A superuser (local, tests) is skipped: it holds every role
-    /// regardless and has no <c>rds_iam</c> to be locked out by.
+    /// Revokes any membership in a service role that the provisioning login
+    /// granted ITSELF with SET or INHERIT. An earlier migrator did that for the
+    /// seeder (staging, 2026-10-30); it is never done now.
+    /// <para>
+    /// What this cannot do, and does not try to: on RDS, the membership a role's
+    /// creator receives when it creates a role is granted by <c>rdsadmin</c>,
+    /// carries SET and INHERIT, and cannot be revoked by the master
+    /// ("permission denied to revoke privileges granted by role rdsadmin",
+    /// staging, 2026-10-30). So once the service roles hold <c>rds_iam</c>, the
+    /// master reaches <c>rds_iam</c> through them and RDS refuses its password.
+    /// That is expected, not a fault: deployed, the master signs in with an IAM
+    /// token whenever its password is refused (<c>MigratorSettings</c>).
+    /// </para>
+    /// A superuser (local, tests) is skipped.
     /// </summary>
     private static async Task DetachLoginAsync(NpgsqlConnection connection, RoleLogin login, CancellationToken cancellationToken)
     {
@@ -154,6 +157,7 @@ public static partial class RoleProvisioner
             WHERE membership.member = (SELECT oid FROM pg_roles WHERE rolname = current_user)
               AND (membership.set_option OR membership.inherit_option)
               AND granted.rolname = ANY(@roles)
+              AND membership.grantor = membership.member
             ORDER BY granted.rolname, grantor.rolname
             """,
             connection);
@@ -173,16 +177,6 @@ public static partial class RoleProvisioner
         foreach (var (role, grantor) in memberships)
         {
             await ExecuteAsync(connection, $"REVOKE {Quote(role)} FROM CURRENT_USER GRANTED BY {Quote(grantor)}", cancellationToken).ConfigureAwait(false);
-        }
-
-        // Whatever the cause, a provisioning login that can still reach
-        // rds_iam would be refused its password on the next run: fail this
-        // one, loudly, instead (nothing it did commits).
-        if (login == RoleLogin.Iam
-            && await ScalarAsync(connection, "SELECT pg_has_role(current_user, 'rds_iam', 'SET') OR pg_has_role(current_user, 'rds_iam', 'USAGE')", cancellationToken).ConfigureAwait(false))
-        {
-            throw new InvalidOperationException(
-                "The provisioning login is still a member of rds_iam through a grant the migrator did not make, so RDS will refuse its password. Revoke it by hand (RoleProvisioner.DetachLoginAsync says why).");
         }
     }
 
