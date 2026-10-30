@@ -2,6 +2,7 @@ using Insolvia.Core;
 using Insolvia.Core.Events;
 using Insolvia.Core.Ports;
 using Insolvia.Data.Cases;
+using Insolvia.Data.Concurrency;
 using Insolvia.Data.Storage;
 using Microsoft.EntityFrameworkCore;
 
@@ -68,7 +69,7 @@ public sealed class PostgresCalendarEventStore(InsolviaDbContext db) : ICalendar
     public async Task<bool> DeleteAsync(EventScope scope, string eventId, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(scope);
-        return await InScope(scope.FirmId, scope.CaseId, eventId).ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false) > 0;
+        return await _db.DeleteOnceAsync(InScope(scope.FirmId, scope.CaseId, eventId), cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -152,7 +153,7 @@ public sealed class PostgresCalendarTokenStore(InsolviaDbContext db) : ICalendar
         ArgumentNullException.ThrowIfNull(token);
 
         // One statement, so two racing rotations cannot both insert.
-        await _db.Database.ExecuteSqlInterpolatedAsync(
+        await _db.ExecuteIdempotentSqlAsync(
             $"""
             INSERT INTO insolvia.calendar_tokens (firm_id, subject, secret_hash, created_at)
             VALUES ({token.FirmId}, {token.Subject}, {token.SecretHash}, {Inserts.Utc(token.CreatedAt)})
@@ -169,8 +170,8 @@ public sealed class PostgresCalendarTokenStore(InsolviaDbContext db) : ICalendar
     }
 
     /// <inheritdoc />
-    public async Task<bool> DeleteAsync(string firmId, string subject, CancellationToken cancellationToken = default) =>
-        await Row(firmId, subject).ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false) > 0;
+    public Task<bool> DeleteAsync(string firmId, string subject, CancellationToken cancellationToken = default) =>
+        _db.DeleteOnceAsync(Row(firmId, subject), cancellationToken);
 
     private IQueryable<CalendarTokenRow> Row(string firmId, string subject) =>
         _db.Set<CalendarTokenRow>().Where(row => row.FirmId == firmId && row.Subject == subject);

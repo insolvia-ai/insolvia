@@ -10,6 +10,7 @@ using Insolvia.Data.Connections;
 using Insolvia.Data.Firms;
 using Insolvia.Data.Pagination;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Npgsql;
 
 namespace Insolvia.Data.Tests.Conformance;
@@ -120,7 +121,7 @@ internal static class Make
 /// <summary>
 /// One fresh, MIGRATED database per test — the real migration chain, not
 /// <c>EnsureCreated</c>, so the suite also proves the migration builds the
-/// schema the stores need. Each <see cref="NewContext"/> is another
+/// schema the stores need. Each <see cref="NewContext()"/> is another
 /// connection to the same database: two stores over two contexts race the
 /// way two requests do.
 /// </summary>
@@ -146,6 +147,16 @@ internal sealed class PostgresHarness(PostgresFixture postgres) : IAsyncDisposab
     public InsolviaDbContext NewContext()
     {
         var context = new InsolviaDbContext(_options ?? throw new InvalidOperationException("not initialised"));
+        _contexts.Add(context);
+        return context;
+    }
+
+    /// <summary>A context whose every operation passes through <paramref name="interceptors"/> (a <see cref="FaultInjector"/>).</summary>
+    public InsolviaDbContext NewContext(params IInterceptor[] interceptors)
+    {
+        var options = new DbContextOptionsBuilder<InsolviaDbContext>(_options ?? throw new InvalidOperationException("not initialised"))
+            .AddInterceptors(interceptors);
+        var context = new InsolviaDbContext(options.Options);
         _contexts.Add(context);
         return context;
     }

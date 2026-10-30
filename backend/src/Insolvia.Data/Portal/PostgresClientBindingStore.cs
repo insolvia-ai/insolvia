@@ -87,6 +87,21 @@ public sealed class PostgresClientBindingStore : IClientBindingStore
                     await _db.Database.ExecuteSqlInterpolatedAsync(UpsertMirror(other, onlyOverRevoked: false), token).ConfigureAwait(false);
                 }
             },
+            cancellationToken,
+            // A lost commit acknowledgement: the replay finds the binding live
+            // — this bind's — and would refuse it as "already has portal
+            // access". The binding row carrying this bind's case, status and
+            // timestamp is this commit (the unit writes it first).
+            landed: token => BindingLandedAsync(binding, token));
+    }
+
+    private Task<bool> BindingLandedAsync(ClientBinding binding, CancellationToken cancellationToken)
+    {
+        var status = binding.Status;
+        var updatedAt = Inserts.Utc(binding.UpdatedAt);
+        return _db.Set<ClientBindingRow>().AsNoTracking().AnyAsync(
+            row => row.FirmId == binding.FirmId && row.Subject == binding.Subject
+                && row.CaseId == binding.CaseId && row.Status == status && row.UpdatedAt == updatedAt,
             cancellationToken);
     }
 
