@@ -27,3 +27,8 @@ output "ecr_repository_url" {
   description = "Passed straight through, like api_service's — the repository the deploy workflow pushes worker images to. null in dev."
   value       = var.ecr_repository_url
 }
+
+output "worker_ssm_parameter_prefix" {
+  description = "The worker's config namespace (/insolvia/<env>/worker) — the env root writes its cross-module values here, the deploy step derives it."
+  value       = local.ssm_prefix
+}

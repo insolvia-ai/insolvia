@@ -142,8 +142,8 @@ output "marketing_url" {
 }
 
 output "admin_ecr_repository_url" {
-  description = "Shared insolvia-admin repository the deploy workflow pushes to."
-  value       = data.aws_ecr_repository.service["admin-api"].repository_url
+  description = "Shared insolvia-shared-admin-api-dotnet repository the deploy workflow pushes to."
+  value       = data.aws_ecr_repository.service["admin-api-dotnet"].repository_url
 }
 
 output "admin_lambda_function_name" {
@@ -257,4 +257,15 @@ output "filing_worker_function_name" {
 output "filing_kill_switch_parameter" {
   description = "The filing kill switch: \"true\" lets the worker submit. Created off; flipped by hand only."
   value       = module.filing_worker.kill_switch_parameter
+}
+
+# ── The migrator (ADR 0028) ─────────────────────────────────────
+output "migrator_function_name" {
+  description = "The migrator Lambda the deploy workflows invoke before every alias shift (migrate; seed on staging)."
+  value       = module.migrator.function_name
+}
+
+output "migrator_ecr_repository_url" {
+  description = "ECR repository holding the migrator image (insolvia-shared-migrator-dotnet)."
+  value       = module.migrator.ecr_repository_url
 }

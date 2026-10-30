@@ -23,21 +23,26 @@ mock_provider "aws" {
 }
 
 variables {
-  environment                = "staging"
-  insolvia_env               = "staging"
-  ecr_repository_url         = "111122223333.dkr.ecr.us-east-1.amazonaws.com/insolvia-shared-filing"
-  image_tag                  = "staging"
-  worker_role_name           = "insolvia-staging-filing-role"
-  worker_role_arn            = "arn:aws:iam::111122223333:role/insolvia-staging-filing-role"
-  queue_arn                  = "arn:aws:sqs:us-east-1:111122223333:insolvia-staging-filing"
-  dlq_name                   = "insolvia-staging-filing-dlq"
-  case_table_arn             = "arn:aws:dynamodb:us-east-1:111122223333:table/insolvia-staging-cases"
-  case_table_name            = "insolvia-staging-cases"
-  case_access_log_table_name = "insolvia-staging-case-access-log"
-  case_kms_key_arn           = "arn:aws:kms:us-east-1:111122223333:key/case-key"
-  case_document_bucket_arn   = "arn:aws:s3:::insolvia-staging-case-documents-us-east-1"
-  case_document_bucket_name  = "insolvia-staging-case-documents-us-east-1"
-  alarms_topic_arn           = "arn:aws:sns:us-east-1:111122223333:insolvia-staging-api-alarms"
+  environment               = "staging"
+  insolvia_env              = "staging"
+  ecr_repository_url        = "111122223333.dkr.ecr.us-east-1.amazonaws.com/insolvia-shared-filing"
+  image_tag                 = "staging"
+  worker_role_name          = "insolvia-staging-filing-role"
+  worker_role_arn           = "arn:aws:iam::111122223333:role/insolvia-staging-filing-role"
+  queue_arn                 = "arn:aws:sqs:us-east-1:111122223333:insolvia-staging-filing"
+  dlq_name                  = "insolvia-staging-filing-dlq"
+  case_table_arn            = "arn:aws:dynamodb:us-east-1:111122223333:table/insolvia-staging-cases"
+  case_kms_key_arn          = "arn:aws:kms:us-east-1:111122223333:key/case-key"
+  case_document_bucket_arn  = "arn:aws:s3:::insolvia-staging-case-documents-us-east-1"
+  case_document_bucket_name = "insolvia-staging-case-documents-us-east-1"
+  alarms_topic_arn          = "arn:aws:sns:us-east-1:111122223333:insolvia-staging-api-alarms"
+  vpc_subnet_ids            = ["subnet-aaaa", "subnet-bbbb"]
+  vpc_security_group_ids    = ["sg-lambda"]
+  db_cluster_resource_id    = "cluster-ABCDEFGHIJKL"
+  db_endpoint               = "insolvia-staging-db.cluster-x.us-east-1.rds.amazonaws.com"
+  db_database_name          = "insolvia"
+  case_kms_key_alias        = "alias/insolvia-staging-cases"
+  filing_kms_key_alias      = "alias/insolvia-staging-filing-credentials"
 }
 
 run "the_worker_grant_is_pinned" {
@@ -135,6 +140,77 @@ run "the_worker_grant_is_pinned" {
   assert {
     condition     = !contains(keys(aws_lambda_function.worker[0].environment[0].variables), "FAKE_CMECF_URL")
     error_message = "A deployed worker is never pointed at a fake court."
+  }
+}
+
+# The switch (ADR 0028, plan 18.22): staging and prod pass
+# dynamodb_grants = false, and the grant loses exactly its DynamoDB half —
+# the case data is the database, reached as the `filing` Postgres role.
+run "the_dotnet_worker_grant_is_pinned" {
+  command = apply
+
+  variables {
+    dynamodb_grants = false
+  }
+
+  assert {
+    condition = output.worker_policy == jsonencode({
+      Version = "2012-10-17"
+      Statement = [
+        {
+          Sid      = "TaxIdOpen"
+          Effect   = "Allow"
+          Action   = ["kms:Decrypt"]
+          Resource = "arn:aws:kms:us-east-1:111122223333:key/case-key"
+          Condition = {
+            StringEquals = { "kms:EncryptionContext:purpose" = "debtor-tax-id" }
+          }
+        },
+        {
+          Sid      = "PacketRead"
+          Effect   = "Allow"
+          Action   = ["s3:GetObject"]
+          Resource = "arn:aws:s3:::insolvia-staging-case-documents-us-east-1/cases/*/packets/*"
+        },
+        {
+          Sid      = "FilingReceiptWrite"
+          Effect   = "Allow"
+          Action   = ["s3:PutObject"]
+          Resource = "arn:aws:s3:::insolvia-staging-case-documents-us-east-1/cases/*/filings/*"
+        },
+        {
+          Sid      = "CaseKeyThroughS3"
+          Effect   = "Allow"
+          Action   = ["kms:Decrypt", "kms:GenerateDataKey", "kms:DescribeKey"]
+          Resource = "arn:aws:kms:us-east-1:111122223333:key/case-key"
+          Condition = {
+            StringEquals = { "kms:ViaService" = "s3.us-east-1.amazonaws.com" }
+          }
+        },
+        {
+          Sid      = "KillSwitchRead"
+          Effect   = "Allow"
+          Action   = ["ssm:GetParameter"]
+          Resource = "arn:aws:ssm:us-east-1:111122223333:parameter/insolvia/staging/filing/submissions-enabled"
+        },
+      ]
+    })
+    error_message = "The .NET filing worker's grant changed — this file must change with it, and the diff must say why."
+  }
+
+  assert {
+    condition     = aws_lambda_function.worker[0].environment[0].variables["INSOLVIA_DB_USERNAME"] == "filing"
+    error_message = "The filing worker logs in as the `filing` Postgres role — the only role that may read the vault."
+  }
+
+  assert {
+    condition     = !contains(keys(aws_lambda_function.worker[0].environment[0].variables), "CASE_TABLE_NAME")
+    error_message = "The .NET worker names its keys explicitly; CASE_TABLE_NAME names a table it no longer uses."
+  }
+
+  assert {
+    condition     = contains(aws_lambda_function.worker[0].vpc_config[0].security_group_ids, "sg-lambda")
+    error_message = "The worker runs in the VPC, under the Lambda security group Aurora admits."
   }
 }
 

@@ -208,7 +208,7 @@ locals {
   # (ADR 0024 PR 7), pinned whole by that module's test.
   worker_policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [
+    Statement = [for s in [
       {
         Sid      = "CredentialRead"
         Effect   = "Allow"
@@ -250,12 +250,12 @@ locals {
           StringEquals = { "kms:ViaService" = "dynamodb.${data.aws_region.current.region}.amazonaws.com" }
         }
       },
-    ]
+    ] : s if var.dynamodb_grants || contains(["CredentialOpen"], s.Sid)]
   })
 
   api_policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [
+    Statement = [for s in [
       {
         # Enrol (PutItem), status (Query, GetItem), revoke (DeleteItem — the
         # item is DESTROYED, ADR 0024: revocation is not a flag the worker
@@ -291,7 +291,7 @@ locals {
           StringEquals = { "kms:ViaService" = "dynamodb.${data.aws_region.current.region}.amazonaws.com" }
         }
       },
-    ]
+    ] : s if var.dynamodb_grants || contains(["CredentialSeal"], s.Sid)]
   })
 }
 

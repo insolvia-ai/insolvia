@@ -241,21 +241,19 @@ module "case_documents" {
 module "filing_worker" {
   source = "../../modules/filing_worker"
 
-  project                    = "insolvia"
-  environment                = local.environment
-  ecr_repository_url         = null
-  worker_role_name           = module.filing_credentials.worker_role_name
-  worker_role_arn            = module.filing_credentials.worker_role_arn
-  queue_arn                  = module.filing_queue.queue_arn
-  dlq_name                   = module.filing_queue.dlq_name
-  case_table_arn             = module.case_store.table_arn
-  case_table_name            = module.case_store.table_name
-  case_access_log_table_name = module.case_store.access_log_table_name
-  case_kms_key_arn           = module.case_store.kms_key_arn
-  case_document_bucket_arn   = module.case_documents.bucket_arn
-  case_document_bucket_name  = module.case_documents.bucket_name
-  alarms_topic_arn           = null
-  tags                       = local.common_tags
+  project                   = "insolvia"
+  environment               = local.environment
+  ecr_repository_url        = null
+  worker_role_name          = module.filing_credentials.worker_role_name
+  worker_role_arn           = module.filing_credentials.worker_role_arn
+  queue_arn                 = module.filing_queue.queue_arn
+  dlq_name                  = module.filing_queue.dlq_name
+  case_table_arn            = module.case_store.table_arn
+  case_kms_key_arn          = module.case_store.kms_key_arn
+  case_document_bucket_arn  = module.case_documents.bucket_arn
+  case_document_bucket_name = module.case_documents.bucket_name
+  alarms_topic_arn          = null
+  tags                      = local.common_tags
 }
 
 

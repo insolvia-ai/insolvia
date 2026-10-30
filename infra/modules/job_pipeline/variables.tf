@@ -89,3 +89,26 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+# ── The VPC and the database (ADR 0028, plan 18.22) ─────────────
+# null wherever the Lambda half is absent (infra/envs/dev); required, in
+# effect, wherever ecr_repository_url is set — the precondition on the
+# function says so by name.
+
+variable "vpc_subnet_ids" {
+  description = "Private subnets the Lambda runs in — module.network.private_subnet_ids. null in dev (no Lambda)."
+  type        = list(string)
+  default     = null
+}
+
+variable "vpc_security_group_ids" {
+  description = "Security groups for the Lambda — [module.network.lambda_security_group_id], the one modules/aurora admits 5432 from. null in dev."
+  type        = list(string)
+  default     = null
+}
+
+variable "db_cluster_resource_id" {
+  description = "The Aurora cluster's resource id (module.aurora.cluster_resource_id) — what this host's rds-db:connect grant names. null in dev."
+  type        = string
+  default     = null
+}

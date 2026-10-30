@@ -114,7 +114,7 @@ resource "aws_dynamodb_table" "firms" {
 # reference nor a plan-time data lookup — the latter deadlocks a first apply
 # that creates the role and its grants together).
 resource "aws_iam_role_policy" "api_firm_access" {
-  count = var.api_role_name == null ? 0 : 1
+  count = var.api_role_name == null || !var.dynamodb_grants ? 0 : 1
 
   name = "${local.name}-access"
   role = var.api_role_name
@@ -192,7 +192,7 @@ resource "aws_iam_role_policy" "api_firm_access" {
 # resolving which firm a subject belongs to IS the read, so there is nothing
 # to scope by until it has happened.
 resource "aws_iam_role_policy" "mcp_firm_access" {
-  count = var.mcp_role_name == null ? 0 : 1
+  count = var.mcp_role_name == null || !var.dynamodb_grants ? 0 : 1
 
   name = "${local.name}-mcp-access"
   role = var.mcp_role_name
@@ -245,7 +245,7 @@ resource "aws_iam_role_policy" "mcp_firm_access" {
 # sparse), and granting it HERE and not THERE is what makes "the tenant hot
 # path cannot enumerate firms" an IAM fact rather than a code-review hope.
 resource "aws_iam_role_policy" "admin_firm_access" {
-  count = var.admin_role_name == null ? 0 : 1
+  count = var.admin_role_name == null || !var.dynamodb_grants ? 0 : 1
 
   name = "${local.name}-admin-access"
   role = var.admin_role_name
