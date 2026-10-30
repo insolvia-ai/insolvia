@@ -27,10 +27,11 @@
 #              from the committed seeds/fixtures tree (no bucket locally —
 #              SeedComposition.cs).
 #
-# The default flips to --dotnet when scripts/dev-up.sh runs the .NET stack —
-# which needs backend/src/Insolvia.Api to compose its Postgres stores outside
-# Lambda (today its development host composes memory twins whatever
-# INSOLVIA_DB_CONNECTION_STRING says; the admin and MCP hosts already read it).
+# The default flips to --dotnet when scripts/dev-up.sh runs the .NET stack
+# (its API, admin and MCP hosts all read the compose Postgres when
+# INSOLVIA_DB_CONNECTION_STRING is set — #561); until then the signed-in
+# local flows (e2e/scripts/dev-test.sh, the integration tier) run against the
+# Python stack, which reads the DynamoDB tables.
 #
 # ## Why this exists
 #
