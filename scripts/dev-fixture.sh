@@ -15,6 +15,14 @@
 #   publish   git -> bucket                     a developer, after a fixture PR merges
 #   capture   a DEV stack -> git                a developer curating a new version
 #
+# Since the switch (ADR 0028, plan 18.22) `publish` is the .NET migrator's
+# `seed-publish` command (backend/src/Insolvia.Migrator/Seeding/SeedPublisher.cs,
+# the same keys and digests the Python publisher wrote, so published versions
+# stay valid) run with `dotnet run` on this machine. `capture` is still the
+# Python one, reading THIS machine's DynamoDB dev stack: the migrator has no
+# capture command yet, and the per-machine tables exist until 18.23 removes
+# them with the Python — a new fixture version until then is curated there.
+#
 # `publish` and `capture` are here and NOT in CI, deliberately. Curating a
 # fixture is a human act — choosing which case, checking every value is
 # synthetic — and the bucket is written by a developer's own credentials so
@@ -56,11 +64,18 @@ COMMAND="$1"; VERSION="$2"; shift 2
 FOLDER="$REPO_ROOT/seeds/fixtures/$VERSION"
 
 for command in aws jq terraform; do require_command "$command"; done
-VENV_PYTHON="$API_DIR/.venv/bin/python"
-[[ -x "$VENV_PYTHON" ]] || die "No API venv at $VENV_PYTHON. Run ./services/api/scripts/dev-setup.sh first."
 
+# capture only (see the header): the Python seeder over this machine's tables.
 seed() {
-  PYTHONPATH="$REPO_ROOT/services/admin/src" "$VENV_PYTHON" -m insolvia_admin.entrypoints.seed "$@"
+  local venv_python="$API_DIR/.venv/bin/python"
+  [[ -x "$venv_python" ]] || die "No API venv at $venv_python. Run ./services/api/scripts/dev-setup.sh first."
+  PYTHONPATH="$REPO_ROOT/services/admin/src" "$venv_python" -m insolvia_admin.entrypoints.seed "$@"
+}
+
+# publish: the .NET migrator, from source. --version takes the folder path.
+migrator() {
+  require_command dotnet
+  AWS_REGION="$AWS_REGION_VALUE" dotnet run --project "$REPO_ROOT/backend/src/Insolvia.Migrator" -- "$@"
 }
 
 load_machine_id false
@@ -80,7 +95,7 @@ case "$COMMAND" in
        — and that apply needs the deploy role's DevFixtureBucket grant, a human ci-trust
        apply (insolvia-services' scripts/apply-ci-trust.sh). Publish once the bucket exists."
     log "Publishing $VERSION to s3://$FIXTURE_BUCKET/$VERSION/"
-    seed publish --version "$FOLDER" --fixture-bucket "$FIXTURE_BUCKET" "$@"
+    migrator seed-publish --version "$FOLDER" --fixture-bucket "$FIXTURE_BUCKET" "$@"
     ;;
   capture)
     [[ $# -ge 2 ]] || usage 1

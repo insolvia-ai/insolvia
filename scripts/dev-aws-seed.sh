@@ -3,10 +3,34 @@
 # Make this machine's dev environment signable-in AND seeded: ensure the dev
 # account exists in the SHARED development Cognito pool (insolvia-dev-users —
 # one pool for every machine, insolvia-services', ADR 0026), then load
-# seeds/dev.json into this machine's own dev data stores.
+# seeds/dev.json into this machine's local data stores.
 #
 #   ./scripts/dev-aws-seed.sh
 #   ./scripts/dev-aws-seed.sh --check     # report what is missing, write nothing
+#   ./scripts/dev-aws-seed.sh --dotnet    # the .NET backend's local Postgres instead
+#
+# ## Which database (ADR 0028, plan 18.22)
+#
+# Two targets until 18.23 deletes the Python, because two local stacks exist:
+#
+#   (default)  this machine's per-machine DynamoDB tables, through
+#              services/admin's seeder — what scripts/dev-up.sh's API reads,
+#              and so what e2e/scripts/dev-test.sh and the API's local
+#              integration tier sign in against.
+#   --dotnet   the Postgres 17 of backend/docker-compose.yml (127.0.0.1:55432),
+#              loaded by the SAME code that seeds staging — the migrator's
+#              `seed` command (backend/src/Insolvia.Migrator), run here with
+#              `dotnet run` after `migrate` and `purge-pre-client`. The people
+#              get their REAL subjects from the shared dev pool
+#              (AUTH_USER_POOL_ID), so a local admin or MCP host signed in
+#              against that pool resolves them; the fixture documents come
+#              from the committed seeds/fixtures tree (no bucket locally —
+#              SeedComposition.cs).
+#
+# The default flips to --dotnet when scripts/dev-up.sh runs the .NET stack —
+# which needs backend/src/Insolvia.Api to compose its Postgres stores outside
+# Lambda (today its development host composes memory twins whatever
+# INSOLVIA_DB_CONNECTION_STRING says; the admin and MCP hosts already read it).
 #
 # ## Why this exists
 #
@@ -110,15 +134,19 @@ source "$SCRIPT_DIR/dev-aws-common.sh"
 DEV_ENV_FILE="$HOME/.config/insolvia/dev.env"
 
 CHECK_ONLY=0
+TARGET=python
 while [[ $# -gt 0 ]]; do
   case "$1" in
   --check) CHECK_ONLY=1 ;;
+  --dotnet) TARGET=dotnet ;;
   -h | --help)
-    printf 'Usage: %s [--check]\n\n' "$0"
+    printf 'Usage: %s [--check] [--dotnet]\n\n' "$0"
     printf '  DEV_USER_PASSWORD  optional — read from %s,\n' "$DEV_ENV_FILE"
     printf '                     or prompted for without echo, when an account must be created\n\n'
     printf 'Ensures the dev sign-in account(s) named by seeds/dev.json exist in the\n'
-    printf 'shared dev pool, then loads that fixture into this machine'"'"'s dev tables.\n'
+    printf 'shared dev pool, then loads that fixture into this machine'"'"'s DynamoDB\n'
+    printf 'dev tables (the Python dev stack) — or, with --dotnet, into the local .NET\n'
+    printf 'database (backend/docker-compose.yml'"'"'s Postgres, through the migrator).\n'
     printf 'Edit the fixture to change WHAT is seeded; this script only says where.\n'
     exit 0
     ;;
@@ -132,12 +160,18 @@ for command in aws jq terraform; do require_command "$command"; done
 FIXTURE="$REPO_ROOT/seeds/dev.json"
 [[ -f "$FIXTURE" ]] || die "No fixture at $FIXTURE."
 
-# The loader runs through the API's own code, so it needs the API's venv — the
-# one services/api/scripts/dev-setup.sh creates. Checked here rather than left
-# to a ModuleNotFoundError, which names `boto3` and not the missing step.
+# The default: the loader runs through the API's own code, so it needs the
+# API's venv — the one services/api/scripts/dev-setup.sh creates. Checked here
+# rather than left to a ModuleNotFoundError, which names `boto3` and not the
+# missing step. --dotnet needs the .NET SDK and Docker instead.
 VENV_PYTHON="$API_DIR/.venv/bin/python"
-[[ -x "$VENV_PYTHON" ]] ||
-  die "No API venv at $VENV_PYTHON. Run ./services/api/scripts/dev-setup.sh first."
+if [[ "$TARGET" == python ]]; then
+  [[ -x "$VENV_PYTHON" ]] ||
+    die "No API venv at $VENV_PYTHON. Run ./services/api/scripts/dev-setup.sh first."
+else
+  require_command dotnet
+  require_command docker
+fi
 
 load_machine_id false
 load_aws_identity
@@ -344,6 +378,61 @@ purge_pre_client() {
     "$@"
 }
 
+# ── The .NET target (--dotnet) ──────────────────────────────────
+# The compose database's superuser — fixed, local-only values committed in
+# backend/docker-compose.yml, reachable from this machine alone. The migrator
+# connects as it (it creates roles), and the seed takes `SET ROLE migrator`
+# on that login, exactly as the deployed migrator does on the RDS master.
+LOCAL_DB='Host=127.0.0.1;Port=55432;Database=insolvia;Username=insolvia;Password=insolvia-local-only'
+
+migrator() {
+  INSOLVIA_ENV=local \
+    INSOLVIA_DB_CONNECTION_STRING="$LOCAL_DB" \
+    INSOLVIA_DB_ROLE_PASSWORD=insolvia-local-only \
+    INSOLVIA_SEED=false \
+    AUTH_USER_POOL_ID="$POOL_ID" \
+    AWS_REGION="$AWS_REGION_VALUE" \
+    dotnet run --project "$REPO_ROOT/backend/src/Insolvia.Migrator" -- "$@"
+}
+
+dotnet_seed() {
+  log "Starting the local Postgres (backend/docker-compose.yml) if it is not up"
+  docker compose -f "$REPO_ROOT/backend/docker-compose.yml" up -d --wait postgres >/dev/null ||
+    die "Could not start backend/docker-compose.yml's postgres. Is Docker running?"
+  if [[ "$CHECK_ONLY" -eq 1 ]]; then
+    migrator purge-pre-client --check ||
+      die "The local database still holds pre-client cases (ADR 0022). Re-run without --check."
+    migrator seed --check || die "seeds/dev.json is not fully loaded locally. Re-run without --check."
+    return 0
+  fi
+  log "Migrating the local database (idempotent)"
+  migrator migrate || die "The migrator could not migrate the local database."
+  log "Deleting pre-client cases (ADR 0022) — finding none is the usual answer"
+  migrator purge-pre-client --apply
+  log "Loading $(basename "$FIXTURE") into the local database (subjects from $pool_name)"
+  migrator seed || die "The seed refused or failed — its output above says which person or case."
+}
+
+if [[ "$TARGET" == dotnet ]]; then
+  if [[ "$CHECK_ONLY" -eq 1 ]]; then
+    for email in "${ACCOUNT_EMAILS[@]}"; do
+      user_is_confirmed "$email" ||
+        die "No CONFIRMED user '$email' in $pool_name. Re-run without --check to create it."
+    done
+    dotnet_seed
+    ok "Sign-in ready and the local database matches seeds/dev.json."
+    exit 0
+  fi
+  for email in "${ACCOUNT_EMAILS[@]}"; do
+    ensure_account "$email"
+  done
+  offer_to_save_password
+  dotnet_seed
+  ok "Done. backend/: docker compose up (or dotnet run --project src/Insolvia.Admin) and sign in as ${ACCOUNT_EMAILS[0]}."
+  exit 0
+fi
+
+# ── The Python target (the default, until 18.23) ────────────────
 if [[ "$CHECK_ONLY" -eq 1 ]]; then
   for email in "${ACCOUNT_EMAILS[@]}"; do
     user_is_confirmed "$email" ||

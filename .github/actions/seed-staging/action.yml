@@ -31,11 +31,12 @@ description: >-
 # The staging seed ROLE (insolvia-services' ci-trust, AWS_SEED_ROLE_ARN) is
 # therefore unused from the switch on; insolvia-services retires it.
 #
-# THE CALLING JOB MUST DECLARE `environment: insolvia-staging`: AWS_ROLE_ARN
-# is scoped to it, and a missing `environment:` key does not error — it
-# resolves the secret to "" and the role assumption fails with "Could not
-# load credentials from any providers", which names nothing. The first step
-# names the missing input instead. The test users' password is NOT an input
+# THE CALLING JOB SHOULD DECLARE `environment: insolvia-staging`. AWS_ROLE_ARN
+# is a repository secret today, but an environment-scoped secret is invisible
+# without that key — it resolves to "" and the role assumption fails with
+# "Could not load credentials from any providers", which names nothing — and
+# the job it runs in is a staging deployment either way. The first step
+# names a missing input instead. The test users' password is NOT an input
 # any more: the migrator deploy (migrator-staging.yml) put
 # E2E_TEST_USER_PASSWORD in the Lambda's environment.
 #
@@ -44,7 +45,7 @@ description: >-
 
 inputs:
   role-arn:
-    description: "secrets.AWS_ROLE_ARN from the insolvia-staging environment — the deploy role, which may invoke the migrator"
+    description: "secrets.AWS_ROLE_ARN — the deploy role, which may invoke the migrator Lambda"
     required: true
   migrator-function:
     description: "Terraform output migrator_function_name"

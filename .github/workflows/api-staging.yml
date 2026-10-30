@@ -292,9 +292,9 @@ jobs:
   # wider than the role's), that the bucket policy admits the presigned PUT
   # the API mints, and that ADR 0009's refusals hold from outside.
   #
-  # `environment: insolvia-staging` is load-bearing: AWS_ROLE_ARN (the seed
-  # action invokes the migrator with it) and E2E_TEST_USER_PASSWORD live
-  # there. No AWS credentials reach the suite itself — sign-in is SRP over
+  # `environment: insolvia-staging` is load-bearing: E2E_TEST_USER_PASSWORD (the
+  # suite signs in with it) is an environment secret, and the seed action
+  # invokes the migrator with AWS_ROLE_ARN. No AWS credentials reach the suite itself — sign-in is SRP over
   # unsigned Cognito calls and everything after is HTTPS to the API.
   integration:
     needs: deploy

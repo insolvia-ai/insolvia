@@ -16,8 +16,23 @@
 #     does not exist. Provide a valid source image.
 #
 # The same note lives at the top of infra/modules/{api_service,admin_service,
-# job_pipeline,marketing_site}/main.tf and in each workflow header. This
-# script is that manual step, done once, for whatever services you name.
+# job_pipeline,mcp_service,filing_worker,migrator,marketing_site}/main.tf and
+# in each workflow header. This script is that manual step, done once, for
+# whatever services you name.
+#
+# ## The switch (ADR 0028, plan 18.22)
+#
+# The backend images are the .NET ones now: one Dockerfile, backend/Dockerfile,
+# context backend/, one target per host, each in its own `-dotnet` repository
+# (insolvia-shared-api-dotnet and friends — insolvia-services' #11). The
+# migrator is NEW at the switch, so its Lambda is the one that genuinely needs
+# this script before the switch's first apply in each environment:
+#
+#   scripts/bootstrap-ecr-images.sh staging migrator
+#   scripts/bootstrap-ecr-images.sh prod migrator
+#
+# The other Lambdas already exist (their Terraform ignores image_uri), so the
+# deploy legs roll them onto the new repositories themselves.
 #
 # NOT THE MAILER. It moved to the insolvia-services repo on 2026-10-11, and its
 # bootstrap is that repo's (mailer-staging.yml's header).
@@ -43,17 +58,19 @@
 #   scripts/bootstrap-ecr-images.sh <env> [service ...] [--dispatch] [--yes]
 #
 #   <env>        staging | prod   (matches infra/envs/<env> and the ECR suffix)
-#   service ...  any of: api admin jobs marketing mcp filing
-#                (default: all six; `jobs` is the pipeline worker image —
+#   service ...  any of: api admin worker mcp filing migrator marketing
+#                (default: all seven; `worker` is the pipeline worker image —
 #                ADR 0018, `mcp` the remote MCP server — ADR 0016, `filing`
-#                the filing worker — ADR 0024)
+#                the filing worker — ADR 0024, `migrator` the in-VPC
+#                migrator — ADR 0028)
 #   --dispatch   after pushing, re-run the matching deploy workflows
-#                (<service>-<env>.yml; jobs rides api-<env>.yml)
+#                (<service>-<env>.yml; worker rides api-<env>.yml)
 #   --yes        skip the confirmation prompt
 #
 # Examples:
 #   scripts/bootstrap-ecr-images.sh staging api marketing --dispatch
-#   scripts/bootstrap-ecr-images.sh staging            # all four, no dispatch
+#   scripts/bootstrap-ecr-images.sh staging migrator   # the switch's one new Lambda
+#   scripts/bootstrap-ecr-images.sh staging            # all seven, no dispatch
 #
 set -euo pipefail
 
@@ -99,9 +116,9 @@ ASSUME_YES=false
 SERVICES=()
 
 # The CLI name for a service is not always its component name: the admin
-# SERVICE is `admin` on the command line and in services/admin, but the surface
+# SERVICE is `admin` on the command line (backend/src/Insolvia.Admin), but the surface
 # it serves is admin-api.insolvia.ai — so its repository is
-# insolvia-shared-admin-api. `admin` alone is the staff PORTAL, which has no
+# insolvia-shared-admin-api-dotnet. `admin` alone is the staff PORTAL, which has no
 # container at all. See the insolvia-aws-naming skill.
 #
 # A `case`, not an associative array: macOS ships bash 3.2, where `declare -A`
@@ -111,24 +128,25 @@ SERVICES=()
 # bash, so nothing may use a bash 4 construct.
 ecr_component() {
   case "$1" in
-    api)       printf 'api' ;;
-    admin)     printf 'admin-api' ;;
-    jobs)      printf 'jobs' ;;
+    api)       printf 'api-dotnet' ;;
+    admin)     printf 'admin-api-dotnet' ;;
+    worker)    printf 'worker-dotnet' ;;
     marketing) printf 'marketing' ;;
-    mcp)       printf 'mcp' ;;
-    filing)    printf 'filing' ;;
+    mcp)       printf 'mcp-dotnet' ;;
+    filing)    printf 'filing-dotnet' ;;
+    migrator)  printf 'migrator-dotnet' ;;
     *)         die "no ECR component mapping for service '$1'" ;;
   esac
 }
 
 # Which deploy workflow rolls a service forward. Almost always
-# <service>-<env>.yml; `jobs` is the exception — the pipeline worker image is
-# built from services/api and deployed by the api workflow (ADR 0018), so
-# there is no jobs-<env>.yml to dispatch.
+# <service>-<env>.yml; `worker` is the exception — the pipeline worker image
+# is built and deployed by the api workflow (ADR 0018), so there is no
+# worker-<env>.yml to dispatch.
 deploy_workflow() {
   case "$1" in
-    jobs) printf 'api-%s.yml' "$ENV" ;;
-    *)    printf '%s-%s.yml' "$1" "$ENV" ;;
+    worker) printf 'api-%s.yml' "$ENV" ;;
+    *)      printf '%s-%s.yml' "$1" "$ENV" ;;
   esac
 }
 
@@ -137,7 +155,8 @@ for arg in "$@"; do
     -h|--help)  usage 0 ;;
     --dispatch) DISPATCH=true ;;
     --yes|-y)   ASSUME_YES=true ;;
-    api|admin|jobs|marketing|mcp|filing) SERVICES+=("$arg") ;;
+    api|admin|worker|marketing|mcp|filing|migrator) SERVICES+=("$arg") ;;
+    jobs) die "'jobs' was the Python worker image; the .NET one is 'worker' (ADR 0028)." ;;
     staging|prod)
       [[ -z "$ENV" ]] || die "environment given twice ('$ENV' and '$arg')"
       ENV="$arg" ;;
@@ -146,7 +165,7 @@ for arg in "$@"; do
 done
 
 [[ -n "$ENV" ]] || { warn "no environment given"; usage 1; }
-[[ ${#SERVICES[@]} -gt 0 ]] || SERVICES=(api admin jobs marketing mcp filing)
+[[ ${#SERVICES[@]} -gt 0 ]] || SERVICES=(api admin worker marketing mcp filing migrator)
 
 require_command aws
 require_command docker
@@ -202,49 +221,24 @@ ecr_repo_exists() {
 }
 
 # ── per-service build + push ───────────────────────────────────────
-build_api() {
-  # Pure Python; --target lambda selects the public.ecr.aws/lambda stage (the
-  # other stage is the local development server). Context is the REPO ROOT:
-  # the image installs the shared packages/insolvia_core by relative path
-  # (see services/api/Dockerfile's header).
-  docker build "${BUILD_FLAGS[@]}" --target lambda \
-    -f "$REPO_ROOT/services/api/Dockerfile" \
-    -t "$1:$ENV" "$REPO_ROOT"
+# The .NET hosts (ADR 0028): one Dockerfile, context backend/, one target per
+# deployable unit (backend/Dockerfile's header). The build stage runs on the
+# build platform and emits portable IL, so an Apple Silicon machine builds the
+# amd64 image without emulating the compiler; only the final stage is amd64.
+build_backend() {
+  docker build "${BUILD_FLAGS[@]}" --target "$2" "${@:3}" \
+    -t "$1:$ENV" "$REPO_ROOT/backend"
 }
 
-build_admin() {
-  # Same repo-root-context rule as build_api — the image installs the shared
-  # packages/insolvia_core by relative path.
-  docker build "${BUILD_FLAGS[@]}" --target lambda \
-    -f "$REPO_ROOT/services/admin/Dockerfile" \
-    -t "$1:$ENV" "$REPO_ROOT"
-}
-
-build_jobs() {
-  # The pipeline worker (ADR 0018): services/api's Dockerfile, `worker`
-  # target — same source tree as the api image, its own image and repo so
-  # worker-only dependencies never land in the request path's image.
-  docker build "${BUILD_FLAGS[@]}" --target worker \
-    -f "$REPO_ROOT/services/api/Dockerfile" \
-    -t "$1:$ENV" "$REPO_ROOT"
-}
-
-build_mcp() {
-  # Same repo-root-context rule as build_api — the image installs the shared
-  # packages/insolvia_core by relative path (ADR 0016).
-  docker build "${BUILD_FLAGS[@]}" --target lambda \
-    -f "$REPO_ROOT/services/mcp/Dockerfile" \
-    -t "$1:$ENV" "$REPO_ROOT"
-}
-
-build_filing() {
-  # The filing worker (ADR 0024): repo-root context — the image installs
-  # packages/insolvia_core and copies services/api/src (its Dockerfile's
-  # header). The fake CM/ECF is never in it.
-  docker build "${BUILD_FLAGS[@]}" --target lambda \
-    -f "$REPO_ROOT/services/filing/Dockerfile" \
-    -t "$1:$ENV" "$REPO_ROOT"
-}
+build_api()    { build_backend "$1" lambda; }
+build_admin()  { build_backend "$1" admin-lambda; }
+build_worker() { build_backend "$1" worker-lambda; }
+build_mcp()    { build_backend "$1" mcp-lambda; }
+# The fake CM/ECF is a test fixture and never reaches this image.
+build_filing() { build_backend "$1" filing-lambda; }
+# seeds/ is outside backend/, so it arrives as a named build context — the
+# image then carries the fixtures the staging seed loads.
+build_migrator() { build_backend "$1" migrator --build-context "seeds=$REPO_ROOT/seeds"; }
 
 build_marketing() {
   # The Dockerfile COPYs a pre-built ./build, so the app is built first. `npm
