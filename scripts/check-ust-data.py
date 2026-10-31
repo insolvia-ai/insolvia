@@ -38,7 +38,8 @@ from datetime import date, timedelta
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-REGISTRY = REPO_ROOT / "services/api/src/insolvia_api/regulatory"
+# The canonical registry (ADR 0014): the .NET engines embed it from here.
+REGISTRY = REPO_ROOT / "backend/src/Insolvia.Engines/Regulatory"
 
 MEANS_TESTING_URL = "https://www.justice.gov/ust/means-testing"
 DOC_BASE = "https://www.justice.gov/ust/eo/bapcpa/{period}/bci_data/docs/{name}.xlsx"

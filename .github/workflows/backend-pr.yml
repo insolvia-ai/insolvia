@@ -38,17 +38,7 @@ jobs:
         uses: ./.github/actions/changed-paths
         with:
           paths: |
-            # Everything under backend/, the standalone spikes included: they
-            # sit outside the solution but inherit backend/'s props files.
             backend/**
-            # The forms parity step's oracle: the Python fill engine, its
-            # goldens and the domain it reads. A change there must re-prove
-            # the .NET engine against it until cut-over (plan 18.22).
-            services/api/src/**
-            services/api/tests/unit/test_form_fill.py
-            services/api/tests/unit/goldens/**
-            services/api/requirements.txt
-            packages/insolvia_core/**
             # The seeder's tests load the committed fixtures, and the
             # migrator images carry them.
             seeds/**
@@ -86,27 +76,6 @@ jobs:
       - name: Test
         if: steps.filter.outputs.run == 'true'
         run: dotnet test Insolvia.slnx --configuration Release --no-build
-
-      # The forms parity gate (plan 18.16, ADR 0028 § Libraries): pypdf, the
-      # Python oracle, and Insolvia.Forms render every form, the special
-      # paths, non-ASCII text and seven packet assemblies; compare.py diffs
-      # fields, widget states, appearance-stream bytes, official pages, text
-      # runs and PDFium pixels, and fails on anything beyond the one
-      # documented quirk correction. Kept as Python (not ported into the
-      # test suite) because the checker reads both outputs with pypdf and
-      # rasterises with PDFium — a native renderer the .NET image must not
-      # carry — and it retires at cut-over (18.22). About a minute.
-      - uses: actions/setup-python@v6
-        if: steps.filter.outputs.run == 'true'
-        with:
-          python-version: "3.12"
-
-      - name: Forms parity
-        if: steps.filter.outputs.run == 'true'
-        run: |
-          python -m venv "$RUNNER_TEMP/parity"
-          (cd ../services/api && "$RUNNER_TEMP/parity/bin/pip" install --quiet -r requirements.txt -r ../../backend/tests/Insolvia.Forms.Tests/Parity/requirements.txt)
-          PYTHON="$RUNNER_TEMP/parity/bin/python" tests/Insolvia.Forms.Tests/Parity/run.sh "$RUNNER_TEMP/forms-parity"
 
       # Packaging check: the exact image a deploy will ship must build, and the
       # compose image beside it. A host that gains its own Dockerfile target

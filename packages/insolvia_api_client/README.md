@@ -1,6 +1,6 @@
 # insolvia_api_client
 
-A hand-written, typed client for the Insolvia API (`services/api`), published
+A hand-written, typed client for the Insolvia API (`backend/src/Insolvia.Api`), published
 into the workspace as `@insolvia-ai/api-client` and consumed by the Expo app.
 
 ## Surface
@@ -39,7 +39,7 @@ still works. There is no `close()` — `fetch` owns no client to release.
 Issue #66 left the door open to generating this client from an OpenAPI
 spec "if practical". It is not, yet, and the decision is deliberate:
 
-- `services/api` ships **no OpenAPI spec today** — there is nothing to
+- The API ships **no OpenAPI spec today** — there is nothing to
   generate from. Authoring a spec *plus* adopting a generator toolchain
   (and its output style, its dependency set, its CI hooks) to cover **two
   endpoints** is more machinery than the surface justifies, and generated
@@ -48,12 +48,14 @@ spec "if practical". It is not, yet, and the decision is deliberate:
   API — is covered another way: **this package's tests are the contract
   pin.** `src/index.test.ts` asserts the exact paths, methods, field names,
   status codes, and error-body shapes the API actually produces, with
-  pointers back to the `services/api` source they mirror. A contract change
-  must break those tests.
+  pointers back to the API source they mirror (the Python modules they
+  name were deleted in 18.23; the .NET routes carry the same names), and
+  `contract/` drives this same client against the running .NET hosts. A
+  contract change must break those tests.
 
 The OpenAPI route stays open: when the API surface grows past a handful of
 endpoints (real case/e-filing resources), publish a spec from
-`services/api` and revisit generating this package from it. Until then,
+the API and revisit generating this package from it. Until then,
 every endpoint added to the API gets a hand-written method here and a
 contract test alongside it.
 

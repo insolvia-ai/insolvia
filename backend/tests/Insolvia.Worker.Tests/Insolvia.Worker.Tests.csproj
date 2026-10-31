@@ -2,13 +2,14 @@
   <!-- Unit tests for Insolvia.Worker, translated from services/api's
        test_jobs, test_packet_assembly (the worker half), test_petition_review
        and test_extraction; plus the Anthropic wire-parity pin against the
-       captured Python request bodies (spikes/sdk/anthropic/fixtures). -->
+       request bodies the Python adapters sent (Fixtures/Anthropic, captured by
+       spike 18.4 before 18.23 deleted the Python). -->
   <ItemGroup>
     <ProjectReference Include="../../src/Insolvia.Worker/Insolvia.Worker.csproj" />
   </ItemGroup>
   <ItemGroup>
     <!-- The Python adapters' captured requests: the bodies the C# SDK must send. -->
-    <None Include="../../spikes/sdk/anthropic/fixtures/*.json" Link="AnthropicFixtures/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Fixtures/Anthropic/*.json" Link="AnthropicFixtures/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <!-- The reference cases the Forms suite assembles, read in place. -->
     <None Include="../Insolvia.Engines.Tests/Parity/*.case.json" Link="CaseFiles/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <Compile Include="../Insolvia.Forms.Tests/Support/CaseFiles.cs" Link="Support/CaseFiles.cs" />

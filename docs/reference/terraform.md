@@ -140,10 +140,10 @@ by host (the per-module sections below keep their history):
 - **The DynamoDB tables stay; their grants do not.** Staging and prod pass
   `dynamodb_grants = false` to `case_store`, `firm_store`,
   `filing_credentials` and `filing_worker` (a TRANSITIONAL variable, true by
-  default so dev's Python stack keeps working), and the waitlist and
-  admin-audit PutItems are gone from `api_service`/`admin_service`. The
-  tables themselves are deleted in 18.23, with the maintainer — prod's carry
-  deletion protection (§ Destruction safety).
+  default, which dev — granting no role — never exercises), and the waitlist
+  and admin-audit PutItems are gone from `api_service`/`admin_service`. The
+  tables themselves are deleted after the prod promote, in their own PR with
+  the maintainer — prod's carry deletion protection (§ Destruction safety).
 - **The migrator runs before every alias shift** — `release.yml`'s first leg
   after infra in both stages ([`architecture.md`](architecture.md) § CI/CD).
 
@@ -166,8 +166,8 @@ One instance per environment (issue #63): `staging-api.insolvia.ai` and
   lifecycle rules only ever *expire* and never *protect*: a catch-all would
   evict the digest prod is running once staging churned past it.
 - **Lambda (Image)** `insolvia-<env>-api` — 30 s / 1024 MB, ASP.NET Core
-  from `backend/src/Insolvia.Api` (Flask+Mangum from `services/api/` before
-  the switch), in the VPC. `lifecycle { ignore_changes = [image_uri, environment] }`:
+  from `backend/src/Insolvia.Api` (Flask+Mangum from the since-deleted
+  `services/api/` before the switch), in the VPC. `lifecycle { ignore_changes = [image_uri, environment] }`:
   the **deploy workflow owns both** — it pushes an image and injects the
   environment it resolves from SSM (below), so Terraform's copies are only the
   first-apply seed.
@@ -225,10 +225,10 @@ accepted jobs onto, a DLQ, and one image-packaged worker Lambda
 (`insolvia-<env>-jobs-worker`) consuming it at batch size 1. The job *record*
 lives in the case table — this module owns no store.
 
-- **The worker image** is `insolvia-shared-jobs` — services/api's Dockerfile,
-  `worker` target: the API's source tree, a different handler, its own image
-  so worker-only dependencies (9.6's PDF assembly, 9.7's model SDK) never
-  land in the request path's image (ADR 0015's rule). It deploys inside
+- **The worker image** is `insolvia-shared-worker-dotnet` — backend/Dockerfile's
+  `worker-lambda` target (`backend/src/Insolvia.Worker`), its own image so
+  worker-only dependencies (9.6's PDF assembly, 9.7's model SDK) never land
+  in the request path's image (ADR 0015's rule). It deploys inside
   `api-<env>.yml` — build/promote alongside the api image, then
   `update-function-code` on the worker — and the `record` job stamps its
   `sha-<commit>` tag like every other repo. No alias, no version dance:
@@ -250,9 +250,9 @@ lives in the case table — this module owns no store.
   alarms topic.
 - **In `infra/envs/dev` the worker half is absent** (`ecr_repository_url =
   null` — there is no Lambda in dev): the module creates the queue + DLQ
-  only. The local API enqueues onto that real queue and
-  `python -m insolvia_api.entrypoints.worker_poller` consumes it under the
-  developer's own credentials, so the whole loop runs on a laptop; the one
+  only. A local host enqueues onto that real queue and the worker's local
+  poller (`dotnet run --project backend/src/Insolvia.Worker`) consumes it
+  under the developer's own credentials, so the whole loop runs on a laptop; the one
   cloud-only piece is the managed SQS→Lambda event source mapping itself.
 - **First apply in a fresh environment** hits the usual image-before-apply
   deadlock: `scripts/bootstrap-ecr-images.sh <env> worker` seeds
@@ -295,8 +295,8 @@ does two things:
 
 The API **verifies** tokens. The env roots publish `auth_issuer_url` and the
 client ids into `/insolvia/<env>/api/`, the deploy workflow derives them into
-`AUTH_ISSUER_URL` / `AUTH_CLIENT_ID` / `AUTH_PORTAL_CLIENT_ID`, and
-`services/api` validates the issuer, `token_use == "access"` and `client_id`
+`AUTH_ISSUER_URL` / `AUTH_CLIENT_ID` / `AUTH_PORTAL_CLIENT_ID`, and the
+API validates the issuer, `token_use == "access"` and `client_id`
 against the pool's JWKS. Auth fails **closed**: missing config gives a 401 on
 every protected route, never a bypass.
 
@@ -484,7 +484,7 @@ header owns the reasoning; the facts a reader needs here:
   everyone and of any `Decrypt` outside the vault's encryption-context
   purpose. The API's role is allowed `kms:GenerateDataKey` alone: it seals
   and can never open. `terraform test` in the module pins the whole document.
-- **The worker's role is created here**, ahead of `services/filing` (ADR 0024
+- **The worker's role is created here**, ahead of the filing worker (ADR 0024
   PR 7), because KMS refuses a key policy naming a principal that does not
   exist. It holds GetItem on the vault, Decrypt on its key, and PutItem on the
   case access log; PR 7 adds its queue and case grants.
@@ -501,8 +501,8 @@ header owns the reasoning; the facts a reader needs here:
   both roles already hold — the API's Put/Get/Delete, the worker's GetItem —
   so it changed nothing in this module.
 - **Dev** passes `worker_assumable_by = [the developer]` so the open can be
-  proved by assuming the real role (`services/api/scripts/dev-filing-vault-proof.sh`);
-  a precondition refuses that list in any environment not named `dev-*`.
+  proved by assuming the real role; a precondition refuses that list in any
+  environment not named `dev-*`.
 
 **Locally** it is off by default: a per-developer trail bills to record a
 developer reading their own synthetic cases. It can still be stood up on a
@@ -535,16 +535,17 @@ queue). The module's header owns the reasoning; the facts:
 - **Retention is two approval lifetimes (2 h)** and the visibility timeout
   15 minutes: an approval expires after an hour, so an older job can never be
   consumed. DLQ 14 days, `maxReceiveCount = 3`.
-- **The consumer is `services/filing`** — the event source mapping is
+- **The consumer is the filing worker** (`backend/src/Insolvia.Filing`) — the event source mapping is
   `modules/filing_worker`'s (below), batch size 1.
 - The URL reaches the API as `/insolvia/<env>/api/filing-queue-url` →
   `FILING_QUEUE_URL`; dev publishes the same parameter and
-  `scripts/dev-aws-setup.sh` writes the output into `services/api/.env`.
+  `scripts/dev-aws-setup.sh` writes the output into `backend/.env`.
 
 ## Filing worker (`infra/modules/filing_worker/`)
 
-`services/filing` as `insolvia-<env>-filing-worker`, an image Lambda from the
-shared `insolvia-shared-filing` repository, consuming the filing queue at batch
+The filing worker (`backend/src/Insolvia.Filing`) as
+`insolvia-<env>-filing-worker`, an image Lambda from the shared
+`insolvia-shared-filing-dotnet` repository, consuming the filing queue at batch
 size 1 and at most two concurrent invocations. The module header owns the
 reasoning; the facts:
 
@@ -584,56 +585,60 @@ insolvia/dev/<account-id>/<machine-id>/terraform.tfstate
 — injected at init time with `-backend-config="key=..."` (the backend block
 declares no `key`), so two developers can never collide on names or state.
 
-What it owns is deliberately only what local dev consumes today:
+What it owns is deliberately only what local dev consumes today. **The
+database is not here**: local development runs Postgres 17 in Docker
+(`backend/docker-compose.yml`, ADR 0028), migrated by the real migrator. The
+waitlist and admin-audit tables this root held for the Python stack went in
+18.23 (the next `dev-aws-setup.sh` on each machine destroys them).
 
-- **DynamoDB** `insolvia-dev-<short-id>-waitlist` — same PK/SK schema as
-  `api_service`'s table so the API's adapter behaves identically, but PITR is
-  **off** (throwaway data; `dev-aws-reset.sh` wipes it by design).
-- **Case store** via the same `modules/case_store` as staging/prod —
-  `insolvia-dev-<short-id>-cases` and its access-log table under this
-  machine's own customer-managed key, so the tenancy indexes and the encrypted read path behave here exactly as
-  they do deployed. PITR and deletion protection are **off** and the key
-  deletion window is the minimum 7 days, so a teardown does not leave a
-  month-long pending key behind. `api_role_name` is null — there is no Lambda,
-  so no grant is created and the developer's own credentials are the
-  principal.
+- **Case store** via the same `modules/case_store` as staging/prod — today the
+  source of this machine's customer-managed key, which the bucket and the
+  vault are encrypted under. Its tables (`insolvia-dev-<short-id>-cases` and
+  the access log) are read by nothing local since 18.23; they leave with the
+  module change that deletes staging's and prod's tables, because the module
+  is shared. PITR and deletion protection are **off** and the key deletion
+  window is the minimum 7 days, so a teardown does not leave a month-long
+  pending key behind. `api_role_name` is null — there is no Lambda, so no
+  grant is created and the developer's own credentials are the principal.
 - **Auth is not per machine.** Every machine signs in against the ONE shared
   development pool, `insolvia-dev-users` (insolvia-services' `infra/envs/dev`,
   applied there by a human), read through `modules/auth_contract` from
   `/insolvia/dev/auth/*` — the same seam staging and prod read, so a laptop
-  exercises it. Only identities are shared; every table here stays this
-  machine's. The sign-in page's style is insolvia-services' too.
+  exercises it. `dev-aws-setup.sh` writes its ids into `backend/.env` and
+  `apps/insolvia_app/.env`. The sign-in page's style is insolvia-services' too.
 - **Job queue** via the same `modules/job_pipeline` as staging/prod, worker
-  half absent (`ecr_repository_url = null` — dev has no Lambda). The local
-  API enqueues onto `insolvia-dev-<short-id>-jobs` (`JOB_QUEUE_URL` in
-  `services/api/.env`) and the worker poller consumes it — the pipeline's
-  local story, ADR 0018.
+  half absent (`ecr_repository_url = null` — dev has no Lambda).
+  `insolvia-dev-<short-id>-jobs` (`JOB_QUEUE_URL` in `backend/.env`) is what
+  the worker's local poller (`dotnet run --project
+  backend/src/Insolvia.Worker`) consumes — the pipeline's local story, ADR
+  0018.
 - **Filing-credential vault** via the same `modules/filing_credentials` as
   staging/prod — the real key policy and the real filing worker's role, which
-  in dev alone also trusts the developer, so the seal-only/open-only split is
-  provable on a laptop (`services/api/scripts/dev-filing-vault-proof.sh`).
+  in dev alone also trusts the developer, so the seal-only/open-only split can
+  be proved on a laptop by assuming that role.
 - **Filing queue** via the same `modules/filing_queue` (no API role — the
-  developer sends, playing the API): the local API's approval enqueues onto
-  `insolvia-dev-<short-id>-filing` (`FILING_QUEUE_URL` in
-  `services/api/.env`); the approval's guarantees are proved against it by
-  `services/api/scripts/dev-filing-approval-proof.sh`.
+  developer sends, playing the API): `insolvia-dev-<short-id>-filing`
+  (`FILING_QUEUE_URL` in `backend/.env`), which the filing worker's local
+  poller (`dotnet run --project backend/src/Insolvia.Filing`) consumes.
 - **Filing worker** via the same `modules/filing_worker`, without its Lambda:
-  the grants attach to this machine's filing worker role, which
-  `services/filing`'s local poller assumes (`FILING_WORKER_ROLE_ARN` in
-  `services/filing/.env`); `services/filing/scripts/dev-filing-proof.sh`
-  files the reference case end to end against the fake CM/ECF that way.
+  the grants attach to this machine's filing worker role
+  (`filing_worker_role_arn`), so a run under that role is held to what the
+  deployed worker holds. The end-to-end filing proof against the fake CM/ECF
+  is the .NET filing suite's (`backend/tests/Insolvia.Filing.Tests`).
 
-No ECR/Lambda/API Gateway (local dev runs the API via compose, not Lambda),
-and no IAM beyond the filing worker's role above — the developer's own
-credentials are the principal. The stack is
+No ECR/Lambda/API Gateway (local dev runs the backend via compose or
+`dotnet run`, not Lambda), and no IAM beyond the filing worker's role above —
+the developer's own credentials are the principal. The local database is
 **seeded, not empty**: `scripts/dev-aws-seed.sh` converges it on
-`seeds/dev.json` — the dev account's firm and the fixture case it names, whose
-sample documents are copied server-side out of the shared fixture bucket
-(insolvia-services' `infra/envs/shared`) into this machine's own case-documents bucket. The same loader
-seeds staging on every deploy ([ADR 0021](../adr/0021-test-tiers-and-seed-fixtures.md)).
+`seeds/dev.json` — the dev account (in the shared pool), its firm and the
+fixture cases it names, whose sample documents come from the committed
+`seeds/fixtures` tree — through the migrator's `seed` command, the same
+loader that seeds staging on every deploy
+([ADR 0021](../adr/0021-test-tiers-and-seed-fixtures.md)).
 
-**CI never touches this env.** It is applied, reset, and destroyed only by
-`scripts/dev-aws-{setup,reset,destroy}.sh` (see `scripts/README.md`) with the
+**CI never touches this env.** It is applied and destroyed only by
+`scripts/dev-aws-{setup,destroy}.sh` (`dev-aws-reset.sh` wipes the local
+database and, with `--documents`, the bucket) (see `scripts/README.md`) with the
 developer's own profile; the PR gate only runs the same offline
 `terraform validate -backend=false` it runs everywhere, and the deploy role
 grants it nothing. Tags add `DeveloperMachineId`/`DeveloperPrincipal`/

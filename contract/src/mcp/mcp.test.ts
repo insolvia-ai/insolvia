@@ -1,5 +1,5 @@
 // The MCP server over raw JSON-RPC (docs/reference/mcp-surface.md; the
-// protocol revision services/mcp/tests/unit/test_protocol.py pins):
+// protocol revision backend/tests/Insolvia.Mcp.Tests/ProtocolTests.cs pins):
 // protected-resource metadata, the 401 challenge, initialize, the static
 // eight-tool listing, every tool, the error envelope — and the candidate
 // flow across services, proposed here and reviewed through the API.

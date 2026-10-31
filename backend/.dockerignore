@@ -3,5 +3,3 @@
 **/TestResults/
 **/*.user
 .vs/
-# Standalone spike projects are not part of any image.
-spikes/

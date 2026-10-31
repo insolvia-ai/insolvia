@@ -37,8 +37,8 @@ export const environmentHosts = {
 /**
  * The base URL of the Insolvia API this build talks to.
  *
- * Local is the `services/api` docker-compose port (see
- * services/api/docker-compose.yml — `127.0.0.1:8080`).
+ * Local is the backend's docker-compose API port (see
+ * backend/docker-compose.yml — `127.0.0.1:8080`).
  */
 export const environmentApiBaseUrls = {
   local: 'http://localhost:8080',

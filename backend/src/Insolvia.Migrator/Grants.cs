@@ -26,7 +26,9 @@ public static class ServiceRoles
 
     /// <summary>
     /// The seeder's role (18.20): a load runs with these grants alone, taken
-    /// with <c>SET ROLE</c> on the master's login (MigratorSettings). Schema
+    /// by logging in AS this role (an IAM token deployed, MigratorSettings) —
+    /// never by SET ROLE on the master, which would make the master an rds_iam
+    /// member and lock its password out. Schema
     /// changes, role management and the pre-client purge run as the RDS
     /// master user itself, which alone can create roles.
     /// </summary>

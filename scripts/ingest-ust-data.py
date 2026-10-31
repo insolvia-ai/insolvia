@@ -14,8 +14,9 @@ of an effective-dated series per docs/reference/effective-dating.md:
 
 This script is the mechanical half of "ingestion is a reviewed PR": it
 downloads the period's spreadsheets, converts them to the JSON payload shape
-core/ust_data.py validates, and writes the release directory (manifest.json +
-dataset.json) under services/api/src/insolvia_api/regulatory/. The DIFF of
+the engines validate (backend/src/Insolvia.Engines/Regulatory/UstData.cs), and
+writes the release directory (manifest.json + dataset.json) under
+backend/src/Insolvia.Engines/Regulatory/, the canonical registry. The DIFF of
 that directory is the review surface — read the numbers, spot-check them
 against the UST's own HTML tables, then commit. Merge is the release.
 
@@ -40,8 +41,9 @@ Usage (each subcommand writes one release directory):
       --msa-file /tmp/msa-counties.json
 
 After writing, edit the manifest's `notes` if anything about the source was
-odd, then run the api test gate — tests/test_ust_data.py validates every
-committed release and fails the PR on a malformed one.
+odd, then run the backend's tests (`cd backend && dotnet test
+tests/Insolvia.Engines.Tests`) — UstDataTests validates every committed
+release, and `Backend (.NET)` fails the PR on a malformed one.
 """
 
 from __future__ import annotations
@@ -60,7 +62,7 @@ from pathlib import Path
 from xml.etree import ElementTree as ET
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_OUT_ROOT = REPO_ROOT / "services/api/src/insolvia_api/regulatory"
+DEFAULT_OUT_ROOT = REPO_ROOT / "backend/src/Insolvia.Engines/Regulatory"
 
 BASE = "https://www.justice.gov/ust/eo/bapcpa/{period}/bci_data/docs/{name}.xlsx"
 

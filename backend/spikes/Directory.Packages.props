@@ -1,9 +1,0 @@
-<!--
-  Stops backend/Directory.Packages.props from applying here: spike projects
-  pin their package versions inline, not through central management.
--->
-<Project>
-  <PropertyGroup>
-    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
-  </PropertyGroup>
-</Project>

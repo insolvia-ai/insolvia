@@ -1,9 +1,9 @@
 {
   "//": [
     "What a contract stack and the suite agree on — the trust configuration",
-    "and who exists — so neither guesses. Read by contract_stack.py (the",
-    "Python stack) and by contract/src/support/env.ts; a .NET stack reads the",
-    "same file.",
+    "and who exists — so neither guesses. Read by contract/scripts/dev-test.sh",
+    "(which configures the .NET hosts from it), by contract/src/support/env.ts,",
+    "and by the migrator's SeedIdTests.",
     "",
     "clientIds are the app clients the services verify a token's client_id",
     "(Cognito) or aud (Google) against. They are local names, not real pool",
@@ -16,9 +16,8 @@
     "",
     "The subjects are the ones the .NET migrator's local seed DERIVES when no",
     "pool is named (LocalSeedAccounts: uuid5 over the seed namespace and",
-    "`local-account/<email>`), so both stacks seed the same people without",
-    "a directory of their own: the Python stack loads them from here, the",
-    ".NET one computes them, and the suite signs for either."
+    "`local-account/<email>`), so the stack seeds the people without a",
+    "directory of its own and the suite signs for them."
   ],
   "issuerPath": "contract-pool",
   "clientIds": {

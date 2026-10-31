@@ -3,10 +3,10 @@ name: insolvia-testing
 description: >-
   How Insolvia tests — which shape applies where, where a new test file goes,
   and the per-stack conventions that are easy to get subtly wrong. Use this
-  BEFORE writing or changing any test in this repo: a pytest test under
-  services/api (or admin, mcp, filing), a Jest test in apps/insolvia_app, a Vitest
-  test in packages/insolvia_api_client, or a
-  Playwright spec under e2e/. Reach for it the moment a task says "add a test",
+  BEFORE writing or changing any test in this repo: an xUnit test under
+  backend/tests, a contract test under contract/, an integration spec under
+  integration/, a Jest test in apps/insolvia_app, a Vitest test in
+  packages/insolvia_api_client, or a Playwright spec under e2e/. Reach for it the moment a task says "add a test",
   "write tests for", "improve coverage", "this needs test coverage", or when you
   have just added an endpoint, a component, a route, or a config value and owe
   it a test. Also read it before proposing a coverage threshold, a new test
@@ -17,7 +17,7 @@ description: >-
 
 # Testing in Insolvia
 
-Four runners, six units, ~400 tests. **The shape differs by area on purpose** —
+Several runners, one per stack. **The shape differs by area on purpose** —
 [ADR 0008](../../docs/adr/0008-testing-shape-follows-the-code-it-tests.md) owns
 that decision and the reasoning. **Every test belongs to one of four tiers,
 and the tier is a directory** —
@@ -26,37 +26,42 @@ runs against which environment. This file owns *how* to write one.
 
 | Tier | Where | Runner | Command | Runs against |
 |---|---|---|---|---|
-| **unit** | `services/*/tests/unit/`, `packages/insolvia_core/tests/unit/` | pytest | each unit's `scripts/dev-test.sh` (ruff → mypy → pytest, exactly as CI); a bare `pytest` is unit-only | nothing — memory adapters |
+| **unit** (incl. route and data) | `backend/tests/Insolvia.<Project>.Tests/` | xUnit v3 | `cd backend && dotnet test Insolvia.slnx` (CI: `Backend (.NET)`, after `dotnet format --verify-no-changes`) | nothing remote — memory twins; route tests in-process through `WebApplicationFactory`; the data tier a throwaway Postgres via Testcontainers (needs Docker) |
 | **unit** | `apps/insolvia_app` (colocated) | Jest (`jest-expo`) | `npm test --workspace apps/insolvia_app` | nothing — mocks |
 | **unit** | `packages/insolvia_api_client`, `apps/insolvia_admin` (colocated) | Vitest | `npm run test --workspace <pkg>` / `npm test` | nothing — stubbed `fetch` |
-| **unit**, all of the above at once | — | `scripts/dev-test-unit.sh` | every suite, or the ones a set of files touches; what the **pre-push hook** runs. Python areas run CI's ruff lint + format check first (not mypy) | nothing |
-| **integration** | `services/api/tests/integration/` | pytest, gated on `INSOLVIA_INTEGRATION=1` | `services/api/scripts/dev-test-integration.sh` (dev); `api-staging.yml` (staging) | the RUNNING API over HTTP, signed in by SRP as a seeded person |
+| **unit**, all of the above at once | — | `scripts/dev-test-unit.sh` | every suite, or the ones a set of files touches; what the **pre-push hook** runs | nothing |
+| **contract** | `contract/src/` | Vitest | `contract/scripts/dev-test.sh` (CI: `Contract (.NET)`) | the .NET hosts on a throwaway Postgres, offline, through the shipped api-client — the wire contract's oracle |
+| **integration** | `integration/tests/` | pytest, gated on `INSOLVIA_INTEGRATION=1` | `integration/scripts/dev-test.sh` (dev); `api-staging.yml` (staging) | the RUNNING API over HTTP, signed in by SRP as a seeded person |
 | **e2e `flows`** | `e2e/tests/flows/` | Playwright | `e2e/scripts/dev-test.sh` (dev); `app-staging.yml` (staging) | a real browser, signed in |
 | **e2e `smoke`** | `e2e/tests/smoke/` | Playwright | same wrappers; `app-prod.yml` (production) | HTTP + a browser, **no credentials** — the only thing that runs on prod |
 | `tool/` | none — gated by `npm run tokens:check` | — | `npm run tokens:check` | — |
 
 **Pick the tier by what the test needs to touch.** If it needs AWS, a running
 server or a secret, it is not a unit test, whatever it asserts — and the unit
-conftests give it nothing that reaches a network. If it needs to sign in, it is
+tier's fixtures give it nothing that reaches a network. If it needs to sign in, it is
 integration (HTTP) or `flows` (browser). If it must run against production, it
-is `smoke`, and it gets no credentials at all.
+is `smoke`, and it gets no credentials at all. (The backend's data tier is
+the one exception to "no server": a Testcontainers Postgres is part of the
+unit run, because an in-memory EF provider would test a database we do not
+ship.)
 
 ## Before you write it
 
 1. **Push it down.** Verify the behaviour at the cheapest level that can
-   observe it. A rule about *imports* belongs in `test_architecture.py`, not in
-   a route test.
-2. **Ask what would catch this in production.** If `tsc --strict`, `mypy
-   --strict`, ESLint or ruff already makes the failure impossible, the test is
-   noise. Static analysis is the base layer here, not a separate concern.
+   observe it. A rule about *references* belongs in
+   `Insolvia.Architecture.Tests`, not in a route test.
+2. **Ask what would catch this in production.** If `tsc --strict`, the C#
+   compiler with warnings as errors and nullable on, or ESLint already makes
+   the failure impossible, the test is noise. Static analysis is the base layer here, not a separate concern.
 3. **Colocation is not uniform.** TypeScript tests sit **beside** the file they
    test (`heading.tsx` ↔ `heading.test.tsx`) — never a `__tests__/` directory.
-   Python tests live in a **flat `tests/unit/`** directory, `test_<module>.py`,
-   never beside the source; shared fixtures stay in `tests/conftest.py` (the
-   parent — every tier inherits it) and `tests/paths.py` is the one place that
-   counts its way to `src/`. `tests/__init__.py` is each unit's map.
-4. **Name the behaviour, not the function.** `test_malformed_email_is_rejected`,
-   not `test_parse`. The existing suites are consistent about this; match them.
+   C# tests live in the project's own test project,
+   `backend/tests/Insolvia.<Project>.Tests/`, one per `src` project (the
+   architecture test fails until a new project has one); shared builders sit
+   in that project's `Support/`, committed oracle outputs in `Fixtures/`,
+   `Goldens/` or `Parity/`.
+4. **Name the behaviour, not the function.** `A_malformed_email_is_rejected`,
+   not `TestParse`. The existing suites are consistent about this; match them.
 
 ## React Native (`apps/insolvia_app`) — Jest + RNTL v13
 
@@ -91,39 +96,49 @@ found online.
 - **Never override `transformIgnorePatterns`.** A hand-copied list silently drops
   `standard-navigation` (pulled in by expo-router) and breaks every route test.
 
-## Python (`services/api` and the other services) — pytest
+## .NET (`backend/`) — xUnit v3
+
+`backend/CLAUDE.md` owns the layering and the data tier's rules; these are the
+testing half.
 
 - **Arrange–Act–Assert, one act per test.** The
   arrange–assert–act–assert–act pattern makes a failure ambiguous about which
   step broke.
-- **`@pytest.mark.parametrize` over copy-paste.** It is the biggest
-  coverage-per-line lever available and the suites already use it ~20 times.
-  Table-drive the cases; do not write five near-identical functions.
-- **Shared fixtures go in `tests/conftest.py`; per-test config does not.** When a
-  test needs different config, build the app inline with a local helper — see
-  `test_unsubscribe.py` and `test_health.py`. Do not add parameters to the
-  shared `client` fixture to serve one caller.
-- **`load_config({...})` is the config seam.** Pass an explicit mapping. Do not
-  reach for `monkeypatch.setenv` — nothing in the package reads `os.environ`
-  outside `load_config`, and keeping it that way is what makes config testable.
-- **Monkeypatch the transport, not the logic.** `test_mailer_client.py` patches
-  `urlopen`; `test_jwks_provider.py` patches the fetch. There is deliberately
-  **no `moto`, no `responses`, no `httpretty`** — do not add one.
-- **Fake at the port.** `core/ports.py` defines Protocols; `adapters/memory/`
-  implements them. A new external dependency gets a Protocol and a memory
-  adapter, not an inline `Mock()`.
-- **`tests/` is not type-checked.** `mypy --strict` is scoped to `src` on
-  purpose — fakes and monkeypatching are where strictness is noise.
-- **`test_architecture.py` is not editable to make your change pass.** If it
-  fails, your layering is wrong. Fix the layering.
+- **`[Theory]` with `[InlineData]` / `TheoryData` over copy-paste.** Table-drive
+  the cases; do not write five near-identical `[Fact]`s.
+- **Configuration is a function, not the process environment.** Each host's
+  config loads from a `Func<string, string?>` (`ApiConfig.Load(read)` and
+  siblings); a test passes a lambda. Do not set real environment variables in
+  a test — tests run in parallel.
+- **Fake at the port.** `Insolvia.Core` defines the interfaces; its memory
+  twins implement them, and every Postgres store must pass the same
+  conformance suite as its twin (`Insolvia.Data.Tests/Conformance`). A new
+  external dependency gets a port and a twin, not an inline mock. There is
+  deliberately **no mocking library** in `Directory.Packages.props`.
+- **Route tests go through the real pipeline** — `WebApplicationFactory`
+  (`Insolvia.Api.Tests/Support`), real auth with test-signed tokens, the
+  error envelope as the client sees it.
+- **The data tier uses a real Postgres** (`PostgresFixture`, a collection
+  fixture; a fresh database per test). Never the EF in-memory provider. A new
+  write with a `landed` check gets a lost-acknowledgement test in `RetryTests`.
+- **Committed oracle outputs are the spec.** `Parity/*.expected.json`,
+  `Goldens/`, `python-*.json` and `debtor-txt/` were captured from the Python
+  backend before 18.23 deleted it; their generators are gone. A deliberate
+  behaviour change edits them in the same PR, reviewed value by value — never
+  regenerated to make a red test green.
+- **`Insolvia.Architecture.Tests` is not editable to make your change pass.**
+  If it fails, your layering is wrong. Fix the layering.
 
 ## The api-client contract pin
 
-`packages/insolvia_api_client/src/index.test.ts` **is** the contract with
-`services/api`. There is no OpenAPI codegen, by decision.
+`packages/insolvia_api_client/src/index.test.ts` **is** the client's half of
+the contract with the API; `contract/` is the server's half, driving the same
+client against the running .NET hosts. There is no OpenAPI codegen, by
+decision.
 
-- **Every endpoint added to the API gets a hand-written method here *and* a
-  contract test**, in the same PR.
+- **Every endpoint added to the API gets a hand-written method here, a
+  contract test here, *and* a call in `contract/`** (its coverage gate fails
+  on a client method nothing calls), in the same PR.
 - **Assert the exact request and the exact response mapping** — method, URL,
   headers, body — against a stubbed `fetch`. Copy the literal JSON the server
   actually returns; read the route handler to get it, don't infer it.
@@ -131,12 +146,12 @@ found online.
   export map.
 - A server field rename is *supposed* to break these tests. That is the feature.
 
-## The integration tier (`services/api/tests/integration/`)
+## The integration tier (`integration/`)
 
 - **It drives the API over HTTP and nothing in-process.** The `Api` helper in
   its conftest is the whole client; `as_user("paralegal")` is a real token from
-  the real pool. Do not import the Flask app or a memory adapter here — that is
-  a unit test wearing the wrong directory.
+  the real pool. It imports no backend code and reaches no store — a test
+  that needs to is a backend test wearing the wrong directory.
 - **Who exists comes from `seeds/<target>.json`, by handle.** A spec that needs
   a person the fixture lacks adds them to the fixture (and the next seed
   creates them); it never invents an address or a subject.
@@ -150,8 +165,9 @@ found online.
   one-firm fixture cannot express cross-tenant isolation — return early and
   say so), never on the target name.
 - **Never a required PR check, never a unit-tier dependency.** It runs after
-  the staging alias shift and on a developer's dev stack, and its failure
-  fails the staging stage.
+  the staging alias shift and on a developer's local stack, and its failure
+  fails the staging stage. (The contract suite is the offline, per-PR check
+  of the same wire.)
 
 ## End-to-end (`e2e/`)
 
@@ -182,10 +198,10 @@ found online.
   you would write a request.
 - **A loaded fixture is never edited; a changed fixture is a new version.**
   Rows that exist are left alone on every load, so editing `v1` after it has
-  loaded changes nothing anywhere. `scripts/dev-fixture.sh capture v2 …`
-  writes a new version out of your dev stack.
+  loaded changes nothing anywhere. Copy the latest version to the next and
+  edit it by hand (`seeds/README.md`; the Python `capture` was not ported).
 - **Nothing real, ever.** Every value describes nobody; every address ends in
-  `.test`; capture refuses any source that is not a dev stack.
+  `.test`.
 
 ## Things this repo has decided against
 
@@ -194,8 +210,9 @@ ADR:
 
 - **A coverage threshold as a merge gate.** It rewards exactly the tests
   ADR 0008 says not to write. Measuring coverage for information is fine.
-- **`moto` / `responses` / a network-mocking library.** Monkeypatched transports
-  plus memory adapters already cover this, with no version coupling to AWS.
+- **A mocking or network-mocking library** (Moq, NSubstitute, WireMock, and
+  their kin). Ports plus memory twins, and a hand-written `HttpMessageHandler`
+  where a transport must be faked, already cover this.
 - **A second test runner in an existing unit**, or migrating one to another.
 - **Snapshot tests.** Nothing in the repo uses them; they pin rendered output
   rather than behaviour, and they get regenerated rather than read.
@@ -205,15 +222,16 @@ ADR:
 
 | You changed | Test goes |
 |---|---|
-| a `core/` function | `services/<svc>/tests/test_<module>.py`, pure, parametrised |
-| a Flask route | same file as its module's tests, through `app.test_client()` |
-| a new AWS-touching adapter | a Protocol in `core/ports.py`, a fake in `adapters/memory/`, transport monkeypatched |
+| a domain rule or an engine | `backend/tests/Insolvia.<Core\|Engines>.Tests/`, pure, table-driven |
+| a store | the conformance suite both the twin and the Postgres store run (`Insolvia.Data.Tests/Conformance`) |
+| a route | `backend/tests/Insolvia.<Host>.Tests/Routes/`, through `WebApplicationFactory` |
+| a new AWS-touching adapter | a port in `Insolvia.Core`, a twin beside it, the adapter in `Insolvia.Aws` with its transport faked |
 | an app component | beside it, `<name>.test.tsx`, rendered, queried by role |
 | an app route | beside the screen, via `renderRouter` |
-| an API endpoint | `services/api` tests **and** the api-client contract pin |
+| an API endpoint | the route's backend tests, the api-client contract pin, **and** a `contract/` call |
 | a design-system component | beside it — and remember the `.web`/`.native` leaves are separate files with separate tests |
-| an infra invariant | prefer an executable check (`test_architecture.py`, a workflow guard) over prose |
-| something only a real table, bucket, pool or the deployed role can answer | `services/api/tests/integration/test_<subject>.py`, through the `Api` helper, inside the scratch case |
+| an infra invariant | prefer an executable check (`Insolvia.Architecture.Tests`, a `terraform test`, a workflow guard) over prose |
+| something only a real bucket, pool, database role or the deployed Lambda role can answer | `integration/tests/test_<subject>.py`, through the `Api` helper, inside the scratch case |
 | something only a real browser and a real sign-in can answer | `e2e/tests/flows/<subject>.spec.ts` |
 | something a production deploy must announce when broken | `e2e/tests/smoke/<subject>.spec.ts` — no credentials, and it runs on staging first |
 | a person or a case a suite needs to exist | `seeds/<env>.json` (who) and `seeds/fixtures/<version>/` (what) — never a script, never a secret |

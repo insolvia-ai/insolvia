@@ -4,7 +4,7 @@
 #
 # Without INSOLVIA_API_BASE_URL the waitlist form logs submissions server-side
 # instead of calling the API (see app/lib/waitlist.server.ts). To exercise the
-# real API locally, start it first (./services/api/scripts/dev-up.sh) and run:
+# real API locally, start it first (./backend/scripts/dev-up.sh) and run:
 #
 #   INSOLVIA_API_BASE_URL=http://localhost:8080 ./apps/insolvia_marketing/scripts/dev-up.sh
 #

@@ -3,9 +3,9 @@
 # Shared developer / CI toolchain bootstrap for the Insolvia monorepo.
 #
 # Installs the cross-cutting tools every package needs (Terraform, tflint, AWS
-# CLI, jq, Node.js, Watchman, Python 3.12, the .NET SDK) with Homebrew on BOTH macOS and
+# CLI, jq, Node.js, Watchman, Python 3, the .NET SDK) with Homebrew on BOTH macOS and
 # Linux. Package-specific setup lives in per-package scripts, e.g.
-# services/api/scripts/dev-setup.sh (venv + pip).
+# apps/insolvia_app/scripts/dev-setup.sh (the Expo app).
 #
 # Homebrew details:
 #   - macOS (developer machines): brew runs as the normal user.
@@ -27,8 +27,11 @@
 #     bundler) uses it to watch the source tree; without it Metro falls back to
 #     Node's own recursive fs watching, which is slower and hits the macOS
 #     open-file limit on a tree this size.
-#   - Python:   3.12, matching services/api (pyproject `requires-python` and the
-#     public.ecr.aws/lambda/python:3.12 base image).
+#   - Python:   any python3. No service is Python since ADR 0028 (plan
+#     18.23); what still is: stdlib-only checkers (forms/scripts/check.py,
+#     scripts/check-ust-data.py, scripts/ingest-ust-data.py), the brand-mark
+#     cutter (scripts/render-brand-marks.sh, its own venv) and the API's
+#     integration tier (integration/, its own venv).
 #   - .NET SDK: 10.0, as backend/global.json pins it (the .NET backend, ADR
 #     0028). Checked against that file below, not here.
 #
@@ -150,7 +153,7 @@ brew_ensure aws       awscli
 brew_ensure jq        jq
 brew_ensure node      node
 brew_ensure watchman  watchman
-brew_ensure python3.12 python@3.12
+brew_ensure python3   python
 brew_ensure dotnet    dotnet
 
 # Node version floor (the OS may already ship a newer/older node than brew's).
@@ -252,8 +255,9 @@ else
   warn "root npm ci did not complete — the pre-commit hook cannot run until it does. Run: eval \"\$(./scripts/github-packages-auth.sh --export)\" && npm ci"
 fi
 
-# Docker is a daemon/GUI concern — check only, never auto-install. services/api
-# local dev (docker compose) and its Lambda image build need it.
+# Docker is a daemon/GUI concern — check only, never auto-install. The local
+# backend (backend/docker-compose.yml), its images and its Testcontainers data
+# tier need it.
 if have docker; then skip docker "$(command -v docker)"; else
   if [[ "$PLATFORM" == "macos" ]]; then
     warn "docker not found — install Docker Desktop: https://www.docker.com/products/docker-desktop/"
@@ -263,7 +267,6 @@ if have docker; then skip docker "$(command -v docker)"; else
 fi
 
 log "shared toolchain ready. For complete per-package setup run its script, e.g.:"
-log "    ./services/api/scripts/dev-setup.sh           # venv + pip"
 log "    ./apps/insolvia_app/scripts/dev-setup.sh        # the Expo app"
 log "    ./apps/insolvia_marketing/scripts/dev-setup.sh  # packages auth + npm ci"
 [[ "$PLATFORM" == "linux" && "$CHECK_ONLY" -ne 1 ]] && log "Tools are on PATH via /etc/profile.d/homebrew.sh (new shells) or: eval \"\$($LINUXBREW_PREFIX/bin/brew shellenv)\""

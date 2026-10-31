@@ -28,7 +28,7 @@ does not apply. Human docs: [`README.md`](README.md).
   one variable, `VITE_INSOLVIA_ENV`.
 - **The dev server is PINNED to :3100** (`strictPort`): Google's JavaScript
   origins are exact-match and the app owns :3000. Local loop:
-  `./services/admin/scripts/dev-up.sh` (service on :8090) +
+  `./backend/scripts/dev-up.sh` (the admin service on :8090) +
   `./apps/insolvia_admin/scripts/dev-up.sh` here + your real Workspace
   account — or both at once via the root `./scripts/dev-up.sh`.
 - **`RequireStaff` is a courtesy, never a control** — the admin service

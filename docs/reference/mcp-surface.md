@@ -12,7 +12,12 @@ downstream of them:
 
 - **One trust boundary** ([ADR 0001](../adr/0001-client-stays-dumb-trust-boundary.md)):
   an MCP client is a client. It never touches a data store; the server brokers
-  every read and write, exactly as `services/api` does for the app.
+  every read and write, exactly as the API does for the app.
+
+> **Module names below are the Python originals** (`insolvia_core.auth`,
+> `insolvia_core.errors`, …), ported one for one into `backend/src/Insolvia.Core`
+> and the MCP host `backend/src/Insolvia.Mcp` (ADR 0028) and deleted in 18.23.
+> The surface they describe is unchanged — `contract/src/mcp` pins it.
 - **A case belongs to a firm** ([ADR 0009](../adr/0009-a-case-belongs-to-a-firm.md)):
   an MCP session resolves to a Cognito `sub` with firm permissions, looked up
   in our store on every call, never cached, failing closed. The firm is never
@@ -78,7 +83,7 @@ starts from them rather than rediscovering them:
    contract parameter. Whether the harnesses
    we claim can work with a pre-registered client is a 12.5 question.
 2. **Cognito access tokens carry `client_id` and `scope`, not an RFC 8707
-   `aud`.** Audience binding is approximated the way `services/api` already
+   `aud`.** Audience binding is approximated the way the API already
    does it: verify issuer + signature + `token_use` and match `client_id`
    against an allowlist of *MCP* client ids — disjoint from the app's client
    id, so an app token is not an MCP token and vice versa. State this gap in

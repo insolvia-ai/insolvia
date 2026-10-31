@@ -3,20 +3,17 @@
        test_form_fill, test_form_overlay, test_packet_assembly,
        test_filing_set, test_case_summary, test_forms_hub,
        test_amendment_cover_sheet and test_form_templates' template half, test_case_upload;
-       the .NET goldens (Goldens/*.json); and the parity export
-       (Parity/, run by backend-pr.yml's "Forms parity" step). -->
+       and the .NET goldens (Goldens/*.json), whose field read-backs equal
+       the Python goldens' they replaced (18.23). -->
   <ItemGroup>
     <ProjectReference Include="../../src/Insolvia.Forms/Insolvia.Forms.csproj" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Goldens/*.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="Fixtures/*" CopyToOutputDirectory="PreserveNewest" />
-    <!-- services/api's Debtor.txt for the four parity case files (Parity/debtor_txt.py). -->
+    <!-- The Python backend's Debtor.txt for the four parity case files, captured before 18.23. -->
     <None Include="Parity/debtor-txt/*.txt" Link="DebtorTxt/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <!-- The parity case files the Engines suite already shares, read in place. -->
     <None Include="../Insolvia.Engines.Tests/Parity/*.case.json" Link="CaseFiles/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
-    <!-- The Python goldens (services/api) — their field read-backs are what
-         the .NET output must reproduce until 18.23 deletes them. -->
-    <None Include="../../../services/api/tests/unit/goldens/*.json" Link="PythonGoldens/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

@@ -83,7 +83,11 @@ public sealed class PostgresCaseStore : ICaseStore
                     await _db.InsertOnceAsync(CaseRowMapping.ToRow(debtor, created.FirmId), DebtorRow.PrimaryKey, () => new InvalidOperationException($"debtor {debtor.FilingRole.ToWire()} already exists"), token).ConfigureAwait(false);
                 }
             },
-            cancellationToken);
+            cancellationToken,
+            // A lost commit acknowledgement: the replay meets its own case id
+            // and would throw "already exists". The case is the unit's first
+            // row and the id is generated, so its presence is this commit.
+            landed: token => Rows.AnyAsync(row => row.Id == created.Id && row.FirmId == created.FirmId, token));
     }
 
     /// <inheritdoc />
@@ -210,7 +214,8 @@ public sealed class PostgresCaseStore : ICaseStore
                         .ConfigureAwait(false);
                     await _db.InsertOnceAsync(CaseRowMapping.ToRow(write.Event, row.FirmId), LifecycleEventRow.PrimaryKey, () => new ConditionNotMetException(), token).ConfigureAwait(false);
                 },
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken,
+                landed: token => LifecycleEventLanded(write.Event, token)).ConfigureAwait(false);
             return write.Case;
         }
         catch (ConditionNotMetException)
@@ -243,8 +248,9 @@ public sealed class PostgresCaseStore : ICaseStore
         ArgumentNullException.ThrowIfNull(assignment);
 
         // Unconditional, because the port says idempotent: a replay rewrites
-        // only who linked them and when. The firm is the case's own.
-        var written = await _db.Database.ExecuteSqlInterpolatedAsync(
+        // only who linked them and when. The firm is the case's own. Run
+        // through the strategy: EF does not retry raw SQL by itself.
+        var written = await _db.ExecuteIdempotentSqlAsync(
             $"""
             INSERT INTO insolvia.case_assignments (case_id, subject, firm_id, case_created_at, assigned_at, assigned_by)
             SELECT id, {assignment.Subject}, firm_id, {Inserts.Utc(assignment.CaseCreatedAt)}, {Inserts.Utc(assignment.AssignedAt)}, {assignment.AssignedBy}
@@ -260,11 +266,21 @@ public sealed class PostgresCaseStore : ICaseStore
     }
 
     /// <inheritdoc />
-    public async Task<bool> UnassignAsync(string caseId, string subject, CancellationToken cancellationToken = default) =>
-        await _db.Set<CaseAssignmentRow>()
-            .Where(link => link.CaseId == caseId && link.Subject == subject)
-            .ExecuteDeleteAsync(cancellationToken)
-            .ConfigureAwait(false) > 0;
+    public Task<bool> UnassignAsync(string caseId, string subject, CancellationToken cancellationToken = default) =>
+        _db.DeleteOnceAsync(_db.Set<CaseAssignmentRow>().Where(link => link.CaseId == caseId && link.Subject == subject), cancellationToken);
+
+    // The lifecycle unit (the case's version CAS and its event row) commits
+    // whole. After a lost acknowledgement the replay's CAS no longer matches
+    // and would read as "history moved"; the event row is the unit's proof.
+    // Its key is (case, recorded_at), so the writer and kind are compared too.
+    internal static Func<CancellationToken, Task<bool>> LifecycleEventLanded(InsolviaDbContext db, LifecycleEvent recorded) =>
+        token => db.Set<LifecycleEventRow>().AsNoTracking().AnyAsync(
+            stored => stored.CaseId == recorded.CaseId && stored.RecordedAt == recorded.RecordedAt
+                && stored.RecordedBy == recorded.RecordedBy && stored.Kind == recorded.Kind,
+            token);
+
+    private Task<bool> LifecycleEventLanded(LifecycleEvent recorded, CancellationToken cancellationToken) =>
+        LifecycleEventLanded(_db, recorded)(cancellationToken);
 
     /// <inheritdoc />
     public async Task<IReadOnlyList<CaseAssignment>> AssigneesAsync(string caseId, CancellationToken cancellationToken = default)

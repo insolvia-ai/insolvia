@@ -366,29 +366,6 @@ public sealed class CourtRegistryTests
         Assert.Equal("Creditor.txt", txwb.Opening.FileNames.Value!["creditor_matrix"]);
     }
 
-    // ── Beyond the Python suite: the copy this assembly embeds ─────────
-
-    [Fact]
-    public void The_embedded_registry_is_the_python_packages_copy_byte_for_byte()
-    {
-        // packages/insolvia_core is frozen (ADR 0028) and deleted by 18.23;
-        // until then the two copies must not drift.
-        var python = PythonRegistryRoot();
-        if (python is null)
-        {
-            return;
-        }
-
-        var embedded = CourtRegistry.EmbeddedFiles();
-        var onDisk = Directory.GetFiles(python, "*.json", SearchOption.AllDirectories)
-            .ToDictionary(path => "courts/" + Path.GetRelativePath(python, path).Replace('\\', '/'), File.ReadAllText);
-        Assert.Equal(onDisk.Keys.Order(StringComparer.Ordinal), embedded.Keys.Order(StringComparer.Ordinal));
-        foreach (var (path, text) in onDisk)
-        {
-            Assert.Equal(text, embedded[path]);
-        }
-    }
-
     private static JsonObject District(string release, string code) =>
         JsonNode.Parse(CourtRegistry.EmbeddedFiles()[$"courts/us-bankruptcy/{release}/districts/{code}.json"])!.AsObject();
 
@@ -403,19 +380,5 @@ public sealed class CourtRegistryTests
         var real = District("2026-10-06", "txwb");
         mutate(real["opening"]!.AsObject());
         return OneDistrict("2026-10-06", "txwb", real);
-    }
-
-    private static string? PythonRegistryRoot()
-    {
-        for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir is not null; dir = dir.Parent)
-        {
-            var candidate = Path.Combine(dir.FullName, "packages", "insolvia_core", "src", "insolvia_core", "regulatory", "courts");
-            if (Directory.Exists(candidate))
-            {
-                return candidate;
-            }
-        }
-
-        return null;
     }
 }

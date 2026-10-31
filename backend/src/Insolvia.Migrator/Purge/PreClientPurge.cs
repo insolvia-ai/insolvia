@@ -1,4 +1,5 @@
 using Insolvia.Data;
+using Insolvia.Data.Connections;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
@@ -65,7 +66,7 @@ public static class PreClientPurge
     public static async Task<PurgeReport> RunAsync(NpgsqlDataSource dataSource, bool apply, CancellationToken cancellationToken, Func<string, Task>? beforeDelete = null)
     {
         ArgumentNullException.ThrowIfNull(dataSource);
-        var connection = await dataSource.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        var connection = await DatabaseWake.OpenAsync(dataSource, cancellationToken).ConfigureAwait(false);
         await using (connection.ConfigureAwait(false))
         {
             var planned = await ListAsync(connection, $"SELECT c.id FROM insolvia.cases c WHERE {PreClient} ORDER BY c.id", cancellationToken).ConfigureAwait(false);

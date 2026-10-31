@@ -24,11 +24,11 @@ name: API · Deploy · Staging
 # `deploy` publishes, shifts the alias and smoke-tests /health. `integration`
 # then re-converges staging's seed (accounts, firms, the fixture case — the
 # migrator Lambda's `seed` command, .github/actions/seed-staging) and runs
-# services/api/tests/integration against the live API as those people. Since
-# the switch that suite is a black-box HTTP client of the .NET API: it
-# imports nothing from services/api, so it is the same oracle it was —
-# the same tier a developer runs against their dev stack with
-# services/api/scripts/dev-test-integration.sh. It runs AFTER the shift, so it
+# integration/ against the live API as those people. That suite is a
+# black-box HTTP client (it was written against the Python API and moved out
+# of services/api when 18.23 deleted it, unchanged) — the same tier a
+# developer runs against their local stack with
+# integration/scripts/dev-test.sh. It runs AFTER the shift, so it
 # exercises the version now serving; staging is the proving ground and that
 # window is accepted, exactly as app-staging.yml's e2e job accepts it. Its
 # failure fails this workflow, which is what makes it gate the release's
@@ -308,20 +308,20 @@ jobs:
           role-arn: ${{ secrets.AWS_ROLE_ARN }}
           migrator-function: ${{ needs.deploy.outputs.migrator_function }}
 
-      # The suite's own pins. It imports nothing from services/api's source —
-      # it is an HTTP client — but runs under the pytest the Python unit tier
-      # pins. TRANSITIONAL: 18.23 deletes services/api, and this tier moves
-      # with it (the contract suite, contract/, is the .NET-era successor).
+      # The suite's own pins (integration/requirements.txt): pytest, boto3 for
+      # the unsigned SRP calls, PyJWT. It imports no backend code — it is an
+      # HTTP client. The contract suite (contract/) cannot take this job: it
+      # signs its own tokens, which staging's pool rightly refuses.
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
       - name: Install the integration tier's test toolchain
-        run: pip install -r requirements.txt -r requirements-dev.txt
-        working-directory: services/api
+        run: pip install -r requirements.txt
+        working-directory: integration
 
       - name: Integration tier against staging
-        working-directory: services/api
+        working-directory: integration
         env:
           INSOLVIA_INTEGRATION: "1"
           INTEGRATION_TARGET: staging
@@ -330,4 +330,4 @@ jobs:
           INTEGRATION_AUTH_CLIENT_ID: ${{ needs.deploy.outputs.auth_client_id }}
           INTEGRATION_AUTH_PORTAL_CLIENT_ID: ${{ needs.deploy.outputs.auth_portal_client_id }}
           E2E_TEST_USER_PASSWORD: ${{ secrets.E2E_TEST_USER_PASSWORD }}
-        run: pytest tests/integration
+        run: pytest

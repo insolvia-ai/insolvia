@@ -236,10 +236,10 @@ install_from_lock() {
     # `cd "$REPO_ROOT"` in a subshell is load-bearing: `skills add` resolves
     # `.agents/skills/`, `.claude/skills/` and `skills-lock.json` against the
     # PROCESS's working directory, and this script is reached from a
-    # per-package one (`cd services/api && ./scripts/dev-setup.sh` → the shared
+    # per-package one (`cd apps/insolvia_app && ./scripts/dev-setup.sh` → the shared
     # base → here). Without the cd it installs a second skills tree under
-    # whatever directory the developer happened to be in — which `ruff check .`
-    # then lints as if it were service code, and which .gitignore does NOT
+    # whatever directory the developer happened to be in — which a linter
+    # then walks as if it were our code, and which .gitignore does NOT
     # cover: `.agents/skills/` contains a slash, so git anchors it to the repo
     # root and a nested copy shows up untracked alongside a stray
     # skills-lock.json. A subshell, not a bare cd, so the rest of the script

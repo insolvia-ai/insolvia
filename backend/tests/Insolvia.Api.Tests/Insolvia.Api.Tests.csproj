@@ -16,7 +16,7 @@
     <!-- core/mail.py's own output, which MailTemplateTests holds the port to. -->
     <None Include="Fixtures/*.json" CopyToOutputDirectory="PreserveNewest" />
     <!-- The analysis routes' end-to-end parity: the Python oracle's own case
-         files and outputs, owned by the Engines tests (Parity/generate.py). -->
+         files and outputs, owned by the Engines tests (Parity/*.json). -->
     <None Include="../Insolvia.Engines.Tests/Parity/*.json" LinkBase="Parity" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>

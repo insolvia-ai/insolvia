@@ -78,6 +78,18 @@ public sealed class ConnectionTests(PostgresFixture postgres)
     }
 
     [Fact]
+    public async Task The_iam_path_keeps_npgsqls_command_timeout_unless_one_is_given()
+    {
+        var settings = new DatabaseSettings { Endpoint = "db.cluster.example", DatabaseName = "insolvia", Username = "migrator", Region = "us-east-1" };
+
+        await using var plain = InsolviaDataSource.Create(settings, new FixedTokens("unused"));
+        await using var raised = InsolviaDataSource.Create(settings with { CommandTimeout = 300 }, new FixedTokens("unused"));
+
+        Assert.Equal(30, new NpgsqlConnectionStringBuilder(plain.ConnectionString).CommandTimeout);
+        Assert.Equal(300, new NpgsqlConnectionStringBuilder(raised.ConnectionString).CommandTimeout);
+    }
+
+    [Fact]
     public async Task A_host_registers_the_data_tier_and_resolves_a_working_context()
     {
         var connectionString = await postgres.CreateDatabaseAsync();

@@ -6,6 +6,7 @@ using Insolvia.Core.DocumentRequests;
 using Insolvia.Core.Documents;
 using Insolvia.Core.Ports;
 using Insolvia.Core.TaxIds;
+using Insolvia.Data.Concurrency;
 using Insolvia.Data.Storage;
 using Microsoft.EntityFrameworkCore;
 
@@ -70,7 +71,7 @@ public sealed class PostgresCaseEntityStore(InsolviaDbContext db) : ICaseEntityS
     public async Task<bool> DeleteAsync(string caseId, IEntityKind kind, string entityId, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(kind);
-        return await Row(caseId, kind.SkPrefix, entityId).ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false) > 0;
+        return await _db.DeleteOnceAsync(Row(caseId, kind.SkPrefix, entityId), cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -143,8 +144,8 @@ public sealed class PostgresDocumentStore(InsolviaDbContext db) : IDocumentStore
     }
 
     /// <inheritdoc />
-    public async Task<bool> DeleteAsync(string caseId, string documentId, CancellationToken cancellationToken = default) =>
-        await Row(caseId, documentId).ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false) > 0;
+    public Task<bool> DeleteAsync(string caseId, string documentId, CancellationToken cancellationToken = default) =>
+        _db.DeleteOnceAsync(Row(caseId, documentId), cancellationToken);
 
     private IQueryable<DocumentRow> Row(string caseId, string documentId) =>
         _db.Set<DocumentRow>().Where(stored => stored.CaseId == caseId && stored.Id == documentId);
@@ -185,7 +186,12 @@ public sealed class PostgresCandidateStore(InsolviaDbContext db) : ICandidateSto
 
         // Python: Put … attribute_exists(SK) AND #status = :expected. Of two
         // racing reviews exactly one matches; the other reads null.
-        var written = await _db.Set<CandidateRow>()
+        //
+        // A lost acknowledgement would replay into the status this write set
+        // and read null — a confirm reported as lost to a race it won. The row
+        // holding this write's status and timestamp is this write.
+        var written = await _db.WriteOnceAsync(
+            token => _db.Set<CandidateRow>()
             .Where(stored => stored.CaseId == row.CaseId && stored.Id == row.Id && stored.Status == expectedStatus)
             .ExecuteUpdateAsync(
                 set => set
@@ -206,8 +212,12 @@ public sealed class PostgresCandidateStore(InsolviaDbContext db) : ICandidateSto
                     .SetProperty(stored => stored.ConfirmedAt, row.ConfirmedAt)
                     .SetProperty(stored => stored.CorrectedPayload, row.CorrectedPayload)
                     .SetProperty(stored => stored.ResultingRecordId, row.ResultingRecordId),
-                cancellationToken)
-            .ConfigureAwait(false);
+                token),
+            token => _db.Set<CandidateRow>().AsNoTracking().AnyAsync(
+                stored => stored.CaseId == row.CaseId && stored.Id == row.Id && stored.Status == row.Status && stored.UpdatedAt == row.UpdatedAt,
+                token),
+            whenLanded: 1,
+            cancellationToken).ConfigureAwait(false);
         return written > 0 ? candidate : null;
     }
 }
@@ -277,8 +287,8 @@ public sealed class PostgresCaseTaskStore(InsolviaDbContext db) : ICaseTaskStore
     }
 
     /// <inheritdoc />
-    public async Task<bool> DeleteAsync(string caseId, string taskId, CancellationToken cancellationToken = default) =>
-        await Row(caseId, taskId).ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false) > 0;
+    public Task<bool> DeleteAsync(string caseId, string taskId, CancellationToken cancellationToken = default) =>
+        _db.DeleteOnceAsync(Row(caseId, taskId), cancellationToken);
 
     private IQueryable<CaseTaskRow> Row(string caseId, string taskId) =>
         _db.Set<CaseTaskRow>().Where(stored => stored.CaseId == caseId && stored.Id == taskId);
@@ -334,8 +344,8 @@ public sealed class PostgresDocumentRequestStore(InsolviaDbContext db) : IDocume
     }
 
     /// <inheritdoc />
-    public async Task<bool> DeleteAsync(string caseId, string requestId, CancellationToken cancellationToken = default) =>
-        await Row(caseId, requestId).ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false) > 0;
+    public Task<bool> DeleteAsync(string caseId, string requestId, CancellationToken cancellationToken = default) =>
+        _db.DeleteOnceAsync(Row(caseId, requestId), cancellationToken);
 
     private IQueryable<DocumentRequestRow> Row(string caseId, string requestId) =>
         _db.Set<DocumentRequestRow>().Where(stored => stored.CaseId == caseId && stored.Id == requestId);
@@ -355,7 +365,7 @@ public sealed class PostgresTaxIdStore(InsolviaDbContext db) : ITaxIdStore
     {
         ArgumentNullException.ThrowIfNull(sealedId);
         var row = CaseRowMapping.ToRow(caseId, sealedId);
-        await _db.Database.ExecuteSqlInterpolatedAsync(
+        await _db.ExecuteIdempotentSqlAsync(
             $"""
             INSERT INTO insolvia.tax_ids AS sealed
                 (case_id, ref, firm_id, kind, last_four, scheme, ciphertext, nonce, wrapped_key, created_at, updated_at)

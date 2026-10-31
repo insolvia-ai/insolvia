@@ -8,6 +8,7 @@ using Insolvia.Core.Questionnaires;
 using Insolvia.Data.Concurrency;
 using Insolvia.Data.Storage;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace Insolvia.Data.Firms;
 
@@ -183,11 +184,8 @@ public sealed class PostgresFirmStore : IFirmStore
     }
 
     /// <inheritdoc />
-    public async Task<bool> RemoveUserAsync(string firmId, string subject, CancellationToken cancellationToken = default) =>
-        await _db.Set<FirmUserRow>()
-            .Where(user => user.FirmId == firmId && user.Subject == subject)
-            .ExecuteDeleteAsync(cancellationToken)
-            .ConfigureAwait(false) > 0;
+    public Task<bool> RemoveUserAsync(string firmId, string subject, CancellationToken cancellationToken = default) =>
+        _db.DeleteOnceAsync(_db.Set<FirmUserRow>().Where(user => user.FirmId == firmId && user.Subject == subject), cancellationToken);
 
     // ── Library creditors ───────────────────────────────────────────
 
@@ -243,11 +241,8 @@ public sealed class PostgresFirmStore : IFirmStore
     }
 
     /// <inheritdoc />
-    public async Task<bool> DeleteLibraryCreditorAsync(string firmId, string creditorId, CancellationToken cancellationToken = default) =>
-        await _db.Set<LibraryCreditorRow>()
-            .Where(creditor => creditor.FirmId == firmId && creditor.Id == creditorId)
-            .ExecuteDeleteAsync(cancellationToken)
-            .ConfigureAwait(false) > 0;
+    public Task<bool> DeleteLibraryCreditorAsync(string firmId, string creditorId, CancellationToken cancellationToken = default) =>
+        _db.DeleteOnceAsync(_db.Set<LibraryCreditorRow>().Where(creditor => creditor.FirmId == firmId && creditor.Id == creditorId), cancellationToken);
 
     // ── Firm clients ────────────────────────────────────────────────
 
@@ -418,7 +413,23 @@ public sealed class PostgresFirmStore : IFirmStore
 
                     return await ReadClientAsync(firmId, mergedId, token).ConfigureAwait(false);
                 },
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken,
+                // A lost commit acknowledgement: the replay finds the claim
+                // gone — finished by this call — and would answer null. The
+                // merged row archived into the survivor at this call's instant
+                // is this commit, and is what the unit returns.
+                landed: async token =>
+                {
+                    var merged = await Clients
+                        .SingleOrDefaultAsync(
+                            stored => stored.FirmId == firmId && stored.Id == mergedId
+                                && stored.MergedInto == survivorId && stored.Status == FirmClientStatus.Archived && stored.UpdatedAt == mergedAt,
+                            token)
+                        .ConfigureAwait(false);
+                    return merged is null
+                        ? new ExecutionResult<FirmClient?>(false, null)
+                        : new ExecutionResult<FirmClient?>(true, FirmRowMapping.ToDomain(merged));
+                }).ConfigureAwait(false);
         }
         catch (ConditionNotMetException)
         {
@@ -462,7 +473,7 @@ public sealed class PostgresFirmStore : IFirmStore
         using var sections = StoredJson.ToDocument(config.Sections.ToDictionary(StringComparer.Ordinal));
 
         // A put with no condition: last writer wins.
-        await _db.Database.ExecuteSqlInterpolatedAsync(
+        await _db.ExecuteIdempotentSqlAsync(
             $"""
             INSERT INTO insolvia.firm_questionnaires (firm_id, sections, updated_at, updated_by)
             VALUES ({config.FirmId}, {sections.RootElement.GetRawText()}::jsonb, {Inserts.Utc(config.UpdatedAt)}, {config.UpdatedBy})
@@ -473,11 +484,8 @@ public sealed class PostgresFirmStore : IFirmStore
     }
 
     /// <inheritdoc />
-    public async Task<bool> DeleteQuestionnaireAsync(string firmId, CancellationToken cancellationToken = default) =>
-        await _db.Set<FirmQuestionnaireRow>()
-            .Where(config => config.FirmId == firmId)
-            .ExecuteDeleteAsync(cancellationToken)
-            .ConfigureAwait(false) > 0;
+    public Task<bool> DeleteQuestionnaireAsync(string firmId, CancellationToken cancellationToken = default) =>
+        _db.DeleteOnceAsync(_db.Set<FirmQuestionnaireRow>().Where(config => config.FirmId == firmId), cancellationToken);
 
     /// <inheritdoc />
     public async Task<DocumentChecklist?> GetDocumentChecklistAsync(string firmId, CancellationToken cancellationToken = default)
@@ -493,7 +501,7 @@ public sealed class PostgresFirmStore : IFirmStore
     {
         ArgumentNullException.ThrowIfNull(checklist);
         using var items = StoredJson.ToDocument(checklist.Items);
-        await _db.Database.ExecuteSqlInterpolatedAsync(
+        await _db.ExecuteIdempotentSqlAsync(
             $"""
             INSERT INTO insolvia.firm_document_checklists (firm_id, items, updated_at, updated_by)
             VALUES ({checklist.FirmId}, {items.RootElement.GetRawText()}::jsonb, {Inserts.Utc(checklist.UpdatedAt)}, {checklist.UpdatedBy})
@@ -504,11 +512,8 @@ public sealed class PostgresFirmStore : IFirmStore
     }
 
     /// <inheritdoc />
-    public async Task<bool> DeleteDocumentChecklistAsync(string firmId, CancellationToken cancellationToken = default) =>
-        await _db.Set<FirmDocumentChecklistRow>()
-            .Where(checklist => checklist.FirmId == firmId)
-            .ExecuteDeleteAsync(cancellationToken)
-            .ConfigureAwait(false) > 0;
+    public Task<bool> DeleteDocumentChecklistAsync(string firmId, CancellationToken cancellationToken = default) =>
+        _db.DeleteOnceAsync(_db.Set<FirmDocumentChecklistRow>().Where(checklist => checklist.FirmId == firmId), cancellationToken);
 
     // ── Helpers ─────────────────────────────────────────────────────
 

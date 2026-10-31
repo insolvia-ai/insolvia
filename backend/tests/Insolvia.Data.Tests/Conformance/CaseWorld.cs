@@ -78,9 +78,13 @@ internal sealed class PostgresCaseWorld(PostgresFixture postgres) : IAsyncDispos
 
     public Task InitializeAsync() => _harness.InitializeAsync();
 
-    public CaseStores Connect()
+    public CaseStores Connect() => Over(_harness.NewContext());
+
+    /// <summary>The stores over one context whose operations pass through <paramref name="interceptors"/>.</summary>
+    public CaseStores Connect(params Microsoft.EntityFrameworkCore.Diagnostics.IInterceptor[] interceptors) => Over(_harness.NewContext(interceptors));
+
+    private static CaseStores Over(InsolviaDbContext db)
     {
-        var db = _harness.NewContext();
         return new CaseStores(
             new PostgresFirmStore(db),
             new PostgresCaseStore(db, Cursors),

@@ -1,6 +1,6 @@
 # insolvia_api_client — agent rules
 
-Hand-written typed client for `services/api`, consumed by the Expo app as
+Hand-written typed client for the backend's API (`backend/src/Insolvia.Api`), consumed by the Expo app as
 `@insolvia-ai/api-client`. Human docs: [`README.md`](README.md).
 
 Gated by `.github/workflows/api-client-pr.yml` (the `API client` job): format,
@@ -8,7 +8,8 @@ lint, typecheck, test.
 
 - **No OpenAPI codegen — the tests are the contract pin.** `src/index.test.ts`
   asserts the exact paths, methods, field names, status codes, and error-body
-  shapes `services/api` produces. A contract change must break those tests.
+  shapes the API produces; `contract/` runs the same client against the
+  real .NET hosts. A contract change must break those tests.
 - **Models mirror the wire format exactly** (camelCase: `currentSoftware`,
   `submittedAt`); optional request fields are **omitted when absent, never
   sent as `null` or `""`**.

@@ -1,8 +1,12 @@
 # Insolvia — agent guide
 
-Bankruptcy case-prep & e-filing: one **TypeScript** monorepo on AWS. The app is
+Bankruptcy case-prep & e-filing: one monorepo on AWS. The app is
 **React Native on Expo** (`apps/insolvia_app`), the marketing site is React
-Router v7 + Vite (`apps/insolvia_marketing`), the services are Python on Lambda.
+Router v7 + Vite (`apps/insolvia_marketing`), the backend is **.NET 10 on
+Lambda with Aurora PostgreSQL** (`backend/`,
+[ADR 0028](docs/adr/0028-backend-moves-to-dotnet-and-postgres.md)). The
+Python backend it replaced is gone (plan 18.23); ADRs that name it are
+history.
 
 **Web is the only target that ships.** No desktop builds; nothing committed under
 `ios/`/`android/` — `expo prebuild` generates those on demand. **Expo free tier
@@ -13,8 +17,8 @@ fails the build on an `eas.json`. Decision **D9** in
 before proposing NativeWind, Tailwind-in-the-app, or a UI library.
 
 **Two repositories.** This one is the product: the apps, the marketing site,
-and the app's own backend (`api`, `admin`, `mcp`, `filing`, `insolvia_core`)
-with its staging/prod/dev Terraform. The account-wide AWS layer — Route53 zone,
+and the app's own backend (`backend/`: API, worker, admin, MCP, filing worker,
+migrator) with its staging/prod/dev Terraform. The account-wide AWS layer — Route53 zone,
 wildcard cert, SES identity, every service's ECR repository, the CI deploy
 role, the human IAM users — the **mailer** service and **auth** (the Cognito
 user pools and their app clients, dev pools included) live in
@@ -47,13 +51,13 @@ not here.
 
 ```
 apps/       insolvia_app (Expo / React Native, web) · insolvia_admin (staff portal, Vite SPA) · insolvia_marketing (React SSR)
-packages/   insolvia_api_client · insolvia_core (Python — shared by the services, not an npm member)
-services/   api · admin · mcp · filing    (Python on Lambda; the mailer is in insolvia-services)
-backend/    the .NET 10 + Postgres rewrite of services/ and insolvia_core (ADR 0028) — deploys nowhere until the switch
+packages/   insolvia_api_client (the app's typed client for the API)
+backend/    .NET 10 + Postgres: Api · Worker · Admin · Mcp · Filing · Migrator hosts over Core · Engines · Forms · Data · Aws (ADR 0028; the mailer is in insolvia-services)
 forms/      official-form field specs (B101, B106*, B107) — data + checker, no build
 seeds/      who exists per environment (dev.json, staging.json) · fixtures/<version>/ — what a seeded case contains
 e2e/        Playwright against deployed environments: flows (signed in; dev, staging) · smoke (no credentials; also prod)
-contract/   the backend's HTTP contract suite (Vitest, by base URL, through the shipped api-client) + the offline Python stack it runs against — ADR 0028's oracle
+contract/   the backend's HTTP contract suite (Vitest, by base URL, through the shipped api-client), run offline against the .NET hosts on a throwaway Postgres
+integration/ the API's integration tier (pytest over HTTPS, signed in through the real pool) — staging after each deploy, or a laptop's local stack
 infra/      Terraform: staging · prod · dev (shared, ci-trust, account-access are in insolvia-services)
 brand/      colors.json · fonts.json · radii.json — Insolvia's palette, typefaces and corners, the ONE place each is written down
 tool/       brand-palette.ts · render-brand-theme.ts · render-brand-marks.ts
@@ -115,7 +119,7 @@ before you touch anything:
 | **re-branding**: changing a brand colour or font the design system owns | `design-system-theming` skill — the override seams, and why `primaryHover` follows the base colour on web but is pre-computed on native |
 | wiring the packages into a **new** consumer (401/404 on the `@insolvia-ai` scope, Tailwind seeing `node_modules`, dark mode) | `design-system-setup` skill — both consumers here are already wired; this is for when one breaks |
 | **changing a shared component (Button, Field, …) or a design token** | **Not in this repo** — [`insolvia-ai/design-system`](https://github.com/insolvia-ai/design-system). Change it there, publish, then bump the dependency here · [ADR 0010](docs/adr/0010-design-system-moves-to-its-own-repository.md) · [ADR 0006](docs/adr/0006-owned-cross-platform-design-system.md) |
-| **touching the firm or case domain, token verification, or their stores** — item shapes, permissions, `FirmStore`, the case stores, JWKS | [`packages/insolvia_core/CLAUDE.md`](packages/insolvia_core/CLAUDE.md) — shared by the Python services; the item shapes have one owner · [ADR 0012](docs/adr/0012-shared-python-domain-package.md) · [ADR 0016](docs/adr/0016-mcp-server-is-its-own-service.md) |
+| **touching the backend** — the firm or case domain, token verification, the stores, migrations, grants, an engine, the PDF engine, a host | [`backend/CLAUDE.md`](backend/CLAUDE.md) — the layering (`Insolvia.Core` is the domain; `Insolvia.Data` the Postgres stores, migrations and the migrator's grants), the retry-safety rule for writes · [ADR 0028](docs/adr/0028-backend-moves-to-dotnet-and-postgres.md) · [ADR 0016](docs/adr/0016-mcp-server-is-its-own-service.md) |
 | **taking a new design-system / tokens version** (bumping the dependency) | `insolvia-design-system-bump` skill — bump every consumer's manifest and lockfile (app, admin portal, marketing), and regenerate the Cognito branding |
 | changing the app-local components (`apps/insolvia_app/src/components/`) | [`apps/insolvia_app/CLAUDE.md`](apps/insolvia_app/CLAUDE.md) · [ADR 0005](docs/adr/0005-expo-app-layout.md) — no version bump, not published; shared Button/Field come from the package, row above |
 | **changing a corner radius** | [`brand/radii.json`](brand/radii.json) — the third brand file. It deliberately REVERSES the base theme's "square IS the new design": on the warm-neutral palette a 0-radius card reads as a wireframe, because no colour is separating it from the page |
@@ -131,7 +135,7 @@ before you touch anything:
 | **touching the official-form field specs** — form fields, revisions, the forms engine's input | [`forms/CLAUDE.md`](forms/CLAUDE.md) — the AcroForm dumps are ground truth; `forms/scripts/dev-test.sh` gates every edit |
 | touching Terraform state / naming / deploy order | [`docs/reference/terraform.md`](docs/reference/terraform.md) |
 | doing one-time AWS/GitHub bootstrap | [insolvia-services' `docs/runbooks/aws-bootstrap.md`](https://github.com/insolvia-ai/insolvia-services/blob/main/docs/runbooks/aws-bootstrap.md) |
-| working on mail / SES — the mailer is in insolvia-services; this repo only calls it (`services/api`'s mailer client) | [`docs/reference/email.md`](https://github.com/insolvia-ai/insolvia-services/blob/main/docs/reference/email.md) · [`docs/runbooks/ses-production-access.md`](https://github.com/insolvia-ai/insolvia-services/blob/main/docs/runbooks/ses-production-access.md) — both in insolvia-services |
+| working on mail / SES — the mailer is in insolvia-services; this repo only calls it (the API's mailer client, `backend/src/Insolvia.Aws/Mailer`) | [`docs/reference/email.md`](https://github.com/insolvia-ai/insolvia-services/blob/main/docs/reference/email.md) · [`docs/runbooks/ses-production-access.md`](https://github.com/insolvia-ai/insolvia-services/blob/main/docs/runbooks/ses-production-access.md) — both in insolvia-services |
 | **adding, moving, or rewriting anything in `docs/`** | [`docs/CLAUDE.md`](docs/CLAUDE.md) — four kinds, one per directory; and what belongs in a skill instead |
 | looking for any other runbook | [`docs/README.md`](docs/README.md) |
 
@@ -160,11 +164,11 @@ one offline command, and it does **not** rewrite `skills-lock.json`:
 ./scripts/dev-skills.sh --link
 ```
 
-The same hook also links the four per-machine `.env` files
-(`services/{api,admin,mcp}/.env`, `apps/insolvia_app/.env`) from the primary
-checkout, because they are gitignored and a worktree starts without them —
-the symptom is an app that says "Sign-in is not configured" and an API stack
-that refuses to start, not an error. By hand: `./scripts/dev-env-files.sh
+The same hook also links the per-machine `.env` files (`backend/.env`,
+`apps/insolvia_app/.env`) from the primary checkout, because they are
+gitignored and a worktree starts without them — the symptom is an app that
+says "Sign-in is not configured" and an API that answers every signed-in
+route with 401, not an error. By hand: `./scripts/dev-env-files.sh
 --link`. [`scripts/README.md`](scripts/README.md) owns the detail.
 
 They were vendored once, and 131 files of other people's documentation sat in
@@ -205,7 +209,7 @@ invites the next agent to overrule it.
 | `apple-design` | **Use**, translated | Ours, hand-written, and **tracked** at `.claude/skills/apple-design/` rather than installed — it is in no lock. Apple's fluid-interface, materials and typography rules, written for the web platform. Three of its defaults lose to decisions here: it says "system font first" (the brand faces in `brand/fonts.json` win, so read its tracking/leading rules *for* Open Sans, and for Cormorant in the wordmark alone); its code is CSS, Pointer Events and Motion, which the app cannot run — translate to `Pressable` state, `Animated`/`lineHeight`/`letterSpacing` in a `StyleSheet`; and it wants `backdrop-filter` chrome that content scrolls under, where `AppShell` keeps the header outside the scroller on purpose. |
 | `expo-router` | **Use** | We use Expo Router with `web.output: "single"`; this is the routing reference. |
 | `expo-project-structure` | **Use**, with two exceptions | It *is* our layout ([ADR 0005](docs/adr/0005-expo-app-layout.md)) — minus `eas.json` and minus `src/server`/`app/api`. See below. |
-| `expo-data-fetching` | **Use** | Fetching against `services/api`; the caching and error-handling guidance is stack-neutral and correct. |
+| `expo-data-fetching` | **Use** | Fetching against the backend's API; the caching and error-handling guidance is stack-neutral and correct. |
 | `expo-upgrade` | **Use** | The SDK is pinned exact, so an upgrade is a deliberate task and this is the procedure for it. |
 | `eas-hosting` | **Do not use** | It deploys to Expo-managed Cloudflare Workers — exactly what `infra/modules/web_hosting` already does for free, under Terraform, in our own account. Adopting it would fork the deploy path. |
 | `eas-app-stores` | **Do not use** | `eas build`/`eas submit` are paid, need an Expo account in CI, and need paid Apple/Google accounts. We ship no store builds. |
@@ -236,8 +240,8 @@ own description.)
 [ADR 0004](docs/adr/0004-react-native-replaces-flutter.md):
 
 - **No `eas.json`.** Free tier; and see the guard above.
-- **No `src/server/` and no `+api.ts` routes.** The API is Python on Lambda in
-  `services/api` — one trust boundary, one place that touches the data stores
+- **No `src/server/` and no `+api.ts` routes.** The API is .NET on Lambda in
+  `backend/src/Insolvia.Api` — one trust boundary, one place that touches the data stores
   ([ADR 0001](docs/adr/0001-client-stays-dumb-trust-boundary.md)). Shipping
   Expo Router API routes would also need EAS Hosting.
 

@@ -90,7 +90,13 @@ public sealed class PostgresFilingApprovalStore(InsolviaDbContext db) : IFilingA
                         }
                     }
                 },
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken,
+                // A lost commit acknowledgement: the replay's insert meets its
+                // own approval id and would answer "raced". The approval
+                // present and the pointer on it is this unit, committed.
+                landed: token => _db.Set<CurrentFilingApprovalRow>().AsNoTracking().AnyAsync(
+                    pointer => pointer.CaseId == approval.CaseId && pointer.ApprovalId == approval.ApprovalId,
+                    token)).ConfigureAwait(false);
         }
         catch (ConditionNotMetException error)
         {
@@ -102,22 +108,38 @@ public sealed class PostgresFilingApprovalStore(InsolviaDbContext db) : IFilingA
     public async Task<bool> ConsumeAsync(string caseId, string approvalId, string digest, long nowSeconds, DateTimeOffset consumedAt, CancellationToken cancellationToken = default)
     {
         var at = Inserts.Utc(consumedAt);
-        var rows = await _db.Set<FilingApprovalRow>()
-            .Where(row => row.CaseId == caseId && row.ApprovalId == approvalId && row.Status == Pending && row.Digest == digest && row.ExpiresAt > nowSeconds)
-            .ExecuteUpdateAsync(set => set.SetProperty(row => row.Status, "consumed").SetProperty(row => row.ConsumedAt, at), cancellationToken)
+        var approval = _db.Set<FilingApprovalRow>().Where(row => row.CaseId == caseId && row.ApprovalId == approvalId);
+
+        // Single use (ADR 0024). A replay after a lost acknowledgement finds
+        // the approval consumed and would answer "not consumable" for the
+        // consume that landed; the consume is recognised by the instant it
+        // stamped, so a rival's consume of the same approval never reads as
+        // this one's.
+        return await _db.WriteOnceAsync(
+                async token => await approval
+                    .Where(row => row.Status == Pending && row.Digest == digest && row.ExpiresAt > nowSeconds)
+                    .ExecuteUpdateAsync(set => set.SetProperty(row => row.Status, "consumed").SetProperty(row => row.ConsumedAt, at), token)
+                    .ConfigureAwait(false) == 1,
+                token => approval.AsNoTracking().AnyAsync(row => row.Status == "consumed" && row.Digest == digest && row.ConsumedAt == at, token),
+                whenLanded: true,
+                cancellationToken)
             .ConfigureAwait(false);
-        return rows == 1;
     }
 
     /// <inheritdoc />
     public async Task<bool> VoidAsync(string caseId, string approvalId, string reason, DateTimeOffset voidedAt, CancellationToken cancellationToken = default)
     {
         var at = Inserts.Utc(voidedAt);
-        var rows = await _db.Set<FilingApprovalRow>()
-            .Where(row => row.CaseId == caseId && row.ApprovalId == approvalId && row.Status == Pending)
-            .ExecuteUpdateAsync(set => set.SetProperty(row => row.Status, "voided").SetProperty(row => row.VoidedAt, at).SetProperty(row => row.VoidReason, reason), cancellationToken)
+        var approval = _db.Set<FilingApprovalRow>().Where(row => row.CaseId == caseId && row.ApprovalId == approvalId);
+        return await _db.WriteOnceAsync(
+                async token => await approval
+                    .Where(row => row.Status == Pending)
+                    .ExecuteUpdateAsync(set => set.SetProperty(row => row.Status, "voided").SetProperty(row => row.VoidedAt, at).SetProperty(row => row.VoidReason, reason), token)
+                    .ConfigureAwait(false) == 1,
+                token => approval.AsNoTracking().AnyAsync(row => row.Status == "voided" && row.VoidedAt == at && row.VoidReason == reason, token),
+                whenLanded: true,
+                cancellationToken)
             .ConfigureAwait(false);
-        return rows == 1;
     }
 
     private static FilingApprovalRow ToRow(FilingApproval approval) => new()

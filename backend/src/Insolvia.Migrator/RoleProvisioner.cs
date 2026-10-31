@@ -79,16 +79,7 @@ public static partial class RoleProvisioner
                 await EnsureRoleAsync(connection, role, login, localPassword, cancellationToken).ConfigureAwait(false);
             }
 
-            // The seeder takes the migrator role on THIS login (SET ROLE), which
-            // needs membership unless the login is a superuser (local, tests).
-            // Aurora's master is not one; as the role's creator it may grant
-            // itself membership — SET only, never INHERIT, so the master's own
-            // sessions gain nothing from the migrator's grants.
-            if (!await ScalarAsync(connection, "SELECT rolsuper FROM pg_roles WHERE rolname = current_user", cancellationToken).ConfigureAwait(false)
-                && !await ScalarAsync(connection, "SELECT pg_has_role(current_user, @name, 'SET')", cancellationToken, ServiceRoles.Migrator).ConfigureAwait(false))
-            {
-                await ExecuteAsync(connection, $"GRANT {Quote(ServiceRoles.Migrator)} TO CURRENT_USER WITH INHERIT FALSE, SET TRUE", cancellationToken).ConfigureAwait(false);
-            }
+            await DetachLoginAsync(connection, login, cancellationToken).ConfigureAwait(false);
 
             var everyRole = string.Join(", ", ServiceRoles.All.Select(Quote));
             var schema = Quote(InsolviaDbContext.Schema);
@@ -130,6 +121,62 @@ public static partial class RoleProvisioner
 
             await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
             return new ProvisioningResult(login, ServiceRoles.All, tables);
+        }
+    }
+
+    /// <summary>
+    /// Revokes any membership in a service role that the provisioning login
+    /// granted ITSELF with SET or INHERIT. An earlier migrator did that for the
+    /// seeder (staging, 2026-10-30); it is never done now.
+    /// <para>
+    /// What this cannot do, and does not try to: on RDS, the membership a role's
+    /// creator receives when it creates a role is granted by <c>rdsadmin</c>,
+    /// carries SET and INHERIT, and cannot be revoked by the master
+    /// ("permission denied to revoke privileges granted by role rdsadmin",
+    /// staging, 2026-10-30). So once the service roles hold <c>rds_iam</c>, the
+    /// master reaches <c>rds_iam</c> through them and RDS refuses its password.
+    /// That is expected, not a fault: deployed, the master signs in with an IAM
+    /// token whenever its password is refused (<c>MigratorSettings</c>).
+    /// </para>
+    /// A superuser (local, tests) is skipped.
+    /// </summary>
+    private static async Task DetachLoginAsync(NpgsqlConnection connection, RoleLogin login, CancellationToken cancellationToken)
+    {
+        if (await ScalarAsync(connection, "SELECT rolsuper FROM pg_roles WHERE rolname = current_user", cancellationToken).ConfigureAwait(false))
+        {
+            return;
+        }
+
+        var memberships = new List<(string Role, string Grantor)>();
+        var command = new NpgsqlCommand(
+            """
+            SELECT granted.rolname, grantor.rolname
+            FROM pg_auth_members membership
+            JOIN pg_roles granted ON granted.oid = membership.roleid
+            JOIN pg_roles grantor ON grantor.oid = membership.grantor
+            WHERE membership.member = (SELECT oid FROM pg_roles WHERE rolname = current_user)
+              AND (membership.set_option OR membership.inherit_option)
+              AND granted.rolname = ANY(@roles)
+              AND membership.grantor = membership.member
+            ORDER BY granted.rolname, grantor.rolname
+            """,
+            connection);
+        await using (command.ConfigureAwait(false))
+        {
+            command.Parameters.AddWithValue("roles", ServiceRoles.All.ToArray());
+            var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            await using (reader.ConfigureAwait(false))
+            {
+                while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                {
+                    memberships.Add((reader.GetString(0), reader.GetString(1)));
+                }
+            }
+        }
+
+        foreach (var (role, grantor) in memberships)
+        {
+            await ExecuteAsync(connection, $"REVOKE {Quote(role)} FROM CURRENT_USER GRANTED BY {Quote(grantor)}", cancellationToken).ConfigureAwait(false);
         }
     }
 

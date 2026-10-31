@@ -4,9 +4,10 @@ node_modules/
 dist/
 build/
 
-# The contract stack's Python environment (contract/scripts/dev-test.sh builds
-# it; gitignored by the global `.venv/` rule). Its site-packages ship JS and
-# JSON nobody here wrote.
+# Python environments (integration/scripts/dev-test.sh builds one; a checkout
+# that ran the retired Python contract stack still has contract/.venv) —
+# gitignored by the global `.venv/` rule. Their site-packages ship JS and JSON
+# nobody here wrote.
 .venv/
 
 # Expo-generated, gitignored, and self-labelled "should not be edited". Prettier

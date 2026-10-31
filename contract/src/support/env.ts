@@ -2,7 +2,7 @@
 //
 // Every variable is required and none has a default: a suite that guessed a
 // URL would be a run against a stack nobody chose. contract/scripts/dev-test.sh
-// sets them all for the local Python stack.
+// sets them all for the local .NET stack.
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 

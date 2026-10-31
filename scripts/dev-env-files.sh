@@ -1,15 +1,13 @@
 #!/usr/bin/env bash
 # Per-machine `.env` files for THIS checkout — including git worktrees.
 #
-# `scripts/dev-aws-setup.sh` writes this machine's dev-AWS wiring into five
-# gitignored files (`services/api/.env`, `services/admin/.env`,
-# `services/mcp/.env`, `services/filing/.env`, `apps/insolvia_app/.env`), and
-# every `dev-up.sh` reads
-# one of them. They are per-machine state, so they are ignored — and a git
+# `scripts/dev-aws-setup.sh` writes this machine's dev wiring into two
+# gitignored files (`backend/.env`, `apps/insolvia_app/.env`), and the
+# backend's and the app's `dev-up.sh` each read one of them. They are per-machine state, so they are ignored — and a git
 # worktree checks out TRACKED files only, so it starts with none of them. The
 # symptom is not an error: the app's dev server boots with no Cognito config
-# and announces "Sign-in is not configured", the API's compose stack refuses
-# to start, and the agent in that worktree goes looking for a setup problem
+# and announces "Sign-in is not configured", the API answers every signed-in
+# route with 401, and the agent in that worktree goes looking for a setup problem
 # that the primary checkout solved weeks ago.
 #
 # This script closes that gap the way `dev-skills.sh` closes the same gap for
@@ -66,7 +64,7 @@ IS_WORKTREE=0
 
 # --- the list ---------------------------------------------------------------
 targets() {
-  # `/services/api/.env` → `services/api/.env`. Anchored lines only: an
+  # `/backend/.env` → `backend/.env`. Anchored lines only: an
   # unanchored `.env` pattern would be a glob, not a file.
   sed -n 's#^/\([^[:space:]#]*/\.env\)[[:space:]]*$#\1#p' "$REPO_ROOT/.gitignore"
 }

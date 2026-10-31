@@ -1,6 +1,5 @@
 // The .NET contract stack's auxiliary server: the per-run JWKS and a
-// stand-in for S3 — what contract/stack/contract_stack.py's aux thread is for
-// the Python stack, as its own process because the .NET hosts are three.
+// stand-in for S3, as its own process because the .NET hosts are three.
 //
 //   CONTRACT_AUX_PORT=18060 CONTRACT_JWKS=<run>/jwks.json \
 //   CONTRACT_BLOB_DIR=<run>/blobs node contract/scripts/aux-server.ts
