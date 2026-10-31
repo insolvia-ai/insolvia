@@ -16,15 +16,13 @@
 # Postgres in Docker (backend/docker-compose.yml, ADR 0028), so the waitlist
 # and admin-audit tables this root used to hold for the Python stack are gone
 # (18.23). What remains:
-#   • the case store via modules/case_store — today the source of the
-#     customer-managed key the bucket and the vault are encrypted under. Its
-#     DynamoDB tables (cases, access log) are read by nothing local any more;
-#     they leave with the module change that deletes the staging and prod
-#     tables (ADR 0028 § Cut-over), not before, because the module is shared;
-#   • the filing-credential vault via modules/filing_credentials (ADR 0024)
-#     — its key and the filing worker's role, so the key policy that keeps
-#     Decrypt to the worker is exercised here, not first met on staging (its
-#     table, like the firm store's, waits for the same module change);
+#   • the case key via modules/case_store — the customer-managed key the
+#     document bucket is encrypted under and tax ids are sealed with (its
+#     DynamoDB tables, and the firm store's, went in plan 18.23);
+#   • the filing-credential vault key via modules/filing_credentials
+#     (ADR 0024) — the key and the filing worker's role, so the key policy
+#     that keeps Decrypt to the worker is exercised here, not first met on
+#     staging;
 #   • the job and filing queues, and the case-document bucket — what a
 #     `dotnet run` of the worker or a host reads through backend/.env;
 #   • the SHARED development Cognito pool's identifiers, READ from
@@ -40,8 +38,8 @@
 locals {
   # dev-<machine_short_id> is this machine's environment name, and it slots
   # into the ENV segment of the repo-wide insolvia-<env>-<component>
-  # convention (the insolvia-aws-naming skill) — so this machine's case table
-  # is insolvia-dev-<short-id>-cases. The machine id being inside the env
+  # convention (the insolvia-aws-naming skill) — so this machine's case key
+  # is alias/insolvia-dev-<short-id>-cases. The machine id being inside the env
   # segment rather than trailing the whole name is what keeps two developers
   # from colliding on any name, including the globally-unique ones.
   environment = "dev-${var.machine_short_id}"
@@ -58,19 +56,15 @@ locals {
   }
 }
 
-# ── Case store (issue 8.2) ──────────────────────────────────────
+# ── Case key (issue 8.2) ────────────────────────────────────────
 # The SAME module staging and prod use, not a hand-rolled copy — which is the
-# whole point. The table's keys, its owner index and its customer-managed key
-# behave here exactly as they do deployed, so the DynamoDB adapter, the GSI
-# query behind GET /v1/cases, and any KMS permission mistake all surface on a
-# laptop instead of on staging.
+# whole point: the customer-managed key behaves here exactly as it does
+# deployed, so a KMS permission mistake surfaces on a laptop instead of on
+# staging.
 #
-# Three deliberate differences from the deployed instances, all because this
-# is throwaway data on a machine, not a case file:
-#   • PITR off — a developer wipes this with dev-aws-reset.sh.
-#   • Deletion protection off — dev-aws-destroy.sh has to be able to remove it.
-#   • The minimum 7-day key deletion window, so a destroy does not leave a
-#     30-day pending key (and a monthly charge) behind on every teardown.
+# One deliberate difference from the deployed instances: the minimum 7-day key
+# deletion window, so a destroy does not leave a 30-day pending key (and a
+# monthly charge) behind on every teardown.
 #
 # api_role_name is null: there is no Lambda here. The developer's own IAM user
 # is the principal, and it reaches the key through the key policy's root
@@ -81,8 +75,6 @@ module "case_store" {
   project                     = "insolvia"
   environment                 = local.environment
   api_role_name               = null
-  point_in_time_recovery      = false
-  deletion_protection         = false
   key_deletion_window_in_days = 7
   tags                        = local.common_tags
 }
@@ -112,22 +104,6 @@ module "job_pipeline" {
   tags               = local.common_tags
 }
 
-# ── Firms ───────────────────────────────────────────────────────
-# The same module staging and prod instantiate, on the same case key, so local
-# development resolves a caller through the real sparse index rather than a
-# stub. api_role_name is null for the same reason the case store's is: there is
-# no Lambda here.
-module "firm_store" {
-  source = "../../modules/firm_store"
-
-  project                = "insolvia"
-  environment            = local.environment
-  kms_key_arn            = module.case_store.kms_key_arn
-  point_in_time_recovery = false
-  deletion_protection    = false
-  tags                   = local.common_tags
-}
-
 # ── Filing credentials (ADR 0024, guardrail 3) ──────────────────
 # The same module staging and prod instantiate — the real dedicated key, its
 # real key policy and the real filing worker's role — so the sealed
@@ -147,11 +123,8 @@ module "filing_credentials" {
 
   project                     = "insolvia"
   environment                 = local.environment
-  table_kms_key_arn           = module.case_store.kms_key_arn
   api_role_name               = null
   worker_assumable_by         = [var.aws_principal_arn]
-  point_in_time_recovery      = false
-  deletion_protection         = false
   key_deletion_window_in_days = 7
   tags                        = local.common_tags
 }
@@ -200,7 +173,7 @@ module "case_documents" {
 
 # ── The filing worker (ADR 0024 PR 7) ───────────────────────────
 # The same module staging and prod instantiate, with no Lambda
-# (ecr_repository_url = null): its grants on the case table, the documents
+# (ecr_repository_url = null): its grants on the tax-id key, the documents
 # bucket and the kill switch attach to this machine's filing worker role all
 # the same, so a laptop run under that role (filing_worker_role_arn) is held
 # to exactly what the deployed worker holds. The kill switch parameter exists
@@ -292,26 +265,6 @@ resource "aws_ssm_parameter" "auth_portal_client_id" {
   tags  = local.common_tags
 }
 
-# Same reasoning as the auth parameters above: nothing reads it here, but
-# keeping the namespace identical across every environment means "where does
-# CASE_TABLE_NAME come from" has one answer rather than two. (The deployed
-# .NET API still reads CASE_TABLE_NAME to derive the vault's key alias.)
-resource "aws_ssm_parameter" "case_table_name" {
-  name  = "/insolvia/${local.environment}/api/case-table-name"
-  type  = "String"
-  value = module.case_store.table_name
-  tags  = local.common_tags
-}
-
-# The access log's table name, same namespace and same reasoning as
-# case-table-name above — the API derives it as CASE_ACCESS_LOG_TABLE_NAME.
-resource "aws_ssm_parameter" "case_access_log_table_name" {
-  name  = "/insolvia/${local.environment}/api/case-access-log-table-name"
-  type  = "String"
-  value = module.case_store.access_log_table_name
-  tags  = local.common_tags
-}
-
 # The job queue's URL, same namespace-parity reasoning as everything above.
 # The value a developer actually consumes is the job_queue_url output, which
 # dev-aws-setup.sh writes into backend/.env as JOB_QUEUE_URL.
@@ -346,7 +299,6 @@ module "audit_trail" {
 
   project                     = "insolvia"
   environment                 = local.environment
-  data_resource_arns          = [module.case_store.table_arn, module.filing_credentials.table_arn]
   include_management_events   = true
   retention_days              = 90
   key_deletion_window_in_days = 7

@@ -60,15 +60,6 @@ variable "google_client_id" {
   type        = string
 }
 
-# False everywhere since ADR 0028: the provisioning record is the Postgres
-# admin_audit table, and this DynamoDB table is deleted in plan 18.23 —
-# DynamoDB refuses to delete a protected table.
-variable "audit_deletion_protection" {
-  description = "Whether the (DynamoDB-era) admin audit table refuses deletion."
-  type        = bool
-  default     = false
-}
-
 variable "tags" {
   description = "Common tags applied to all resources."
   type        = map(string)

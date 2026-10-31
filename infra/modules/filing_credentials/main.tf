@@ -1,7 +1,9 @@
 # ── The credential vault (ADR 0024, guardrail 3) ────────────────
 # An attorney's CM/ECF login — the PACER password and the TOTP seed — sealed
-# under a DEDICATED key in a DEDICATED table, openable by the filing worker's
-# role and by nothing else. ADR 0024 makes three properties binding, and this
+# under a DEDICATED key, openable by the filing worker's role and by nothing
+# else. The sealed rows live in Aurora since ADR 0028 (filing_credentials,
+# SELECT for the `filing` Postgres role alone); the DynamoDB table this
+# module held was deleted in plan 18.23. ADR 0024 makes three properties binding, and this
 # module is where each one is enforced rather than promised:
 #
 #   1. ONLY THE FILING WORKER CAN DECRYPT, AND THE KEY POLICY SAYS SO — not
@@ -16,23 +18,10 @@
 #      enrolment is sealed with, and it cannot unwrap one afterwards.
 #   3. EVERY USE IS RECORDED. CloudTrail records each GenerateDataKey and
 #      Decrypt on this key (with the encryption context — firm, attorney,
-#      credential — in the event) and the data events on this table, via
-#      modules/audit_trail; the filing host appends the application
+#      credential — in the event), via modules/audit_trail's management
+#      events; the filing host appends the application
 #      `credential.open` row to the case access log (an Aurora table since
 #      ADR 0028), which names the attorney, the filing and the purpose.
-#
-# WHY THE TABLE IS ENCRYPTED UNDER THE CASE KEY AND NOT THE VAULT KEY. DynamoDB
-# decrypts a CMK-encrypted table's keys AS THE CALLER (kms:ViaService =
-# dynamodb), so a table under the vault key would need the API's role to hold
-# kms:Decrypt on the vault key — through DynamoDB, but Decrypt all the same,
-# and the deny in (1) would have to carve an exception for it. A key whose
-# policy reads "Decrypt: the worker, plus anyone via DynamoDB" is a weaker
-# sentence than "Decrypt: the worker". So the two jobs take two keys: the
-# table's at-rest wrapper is the case key, exactly as modules/firm_store's
-# is (ci-trust's DenyCaseDataDecryption already fences it from the
-# pipeline), and the SECRET inside each item is sealed under the vault key.
-# The non-secret attributes — the login name, the courts, the status — are
-# what the case key protects; the password and seed are what this key does.
 #
 # THE ESCAPE HATCH, NAMED. A principal holding kms:PutKeyPolicy can rewrite
 # this policy, and one holding iam:UpdateAssumeRolePolicy can widen who
@@ -49,13 +38,11 @@
 data "aws_caller_identity" "current" {}
 
 locals {
-  # insolvia-<env>-filing-credentials — the TABLE's name AND the KEY's alias
-  # (`alias/${local.name}`). One local on purpose, the case store's pattern:
-  # insolvia_core.adapters.aws.filing_credentials derives both from the case
-  # table name the API is already configured with, so no environment carries
-  # a new configuration value. ci-trust's DenyFilingCredentialDecryption
-  # matches `alias/insolvia-*-filing-credentials`; renaming here without
-  # renaming there silently stops that deny matching.
+  # insolvia-<env>-filing-credentials — the KEY's alias (`alias/${local.name}`),
+  # published to the hosts as insolvia-kms-filing-key-alias. ci-trust's
+  # DenyFilingCredentialDecryption matches `alias/insolvia-*-filing-credentials`
+  # and SealingKeys refuses any other shape; renaming here without renaming
+  # there silently stops that deny matching.
   name = "${var.project}-${var.environment}-filing-credentials"
 
   # The filing worker's role — services/filing's Lambda (ADR 0024 PR 7)
@@ -279,43 +266,6 @@ resource "aws_kms_key" "vault" {
 resource "aws_kms_alias" "vault" {
   name          = "alias/${local.name}"
   target_key_id = aws_kms_key.vault.key_id
-}
-
-# ── The table ───────────────────────────────────────────────────
-#   PK  ATTORNEY#<firm_id>#<subject>   the attorney the credential belongs to
-#   SK  CREDENTIAL#<credential_id>
-#
-# Keyed by the attorney because every read is "this attorney's credentials":
-# status lists them, revoke and open name one. No index — nothing asks the
-# table a question that does not start from the attorney.
-resource "aws_dynamodb_table" "credentials" {
-  name         = local.name
-  billing_mode = "PAY_PER_REQUEST"
-  hash_key     = "PK"
-  range_key    = "SK"
-
-  attribute {
-    name = "PK"
-    type = "S"
-  }
-  attribute {
-    name = "SK"
-    type = "S"
-  }
-
-  point_in_time_recovery { enabled = var.point_in_time_recovery }
-
-  server_side_encryption {
-    enabled     = true
-    kms_key_arn = var.table_kms_key_arn
-  }
-
-  # Off everywhere since ADR 0028: the vault's rows are Aurora's, and this
-  # table is deleted in plan 18.23 — DynamoDB refuses to delete a protected
-  # table, so protection comes off one apply before the resource goes.
-  deletion_protection_enabled = var.deletion_protection
-
-  tags = var.tags
 }
 
 # ── The API's seal-only grant ───────────────────────────────────

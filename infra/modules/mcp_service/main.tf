@@ -268,9 +268,9 @@ resource "aws_route53_record" "mcp" {
 # Convention: every MCP config value lives at /insolvia/<env>/mcp/<key>; the
 # deploy workflow resolves the namespace and injects it into the Lambda
 # environment (which Terraform ignores above). Only insolvia-env is created
-# HERE — the table names and auth values reference other modules' outputs and
-# live in the env root, the same env-level placement (and the same
-# cycle-avoidance reason) as /…/api/case-table-name.
+# HERE — the auth values reference other modules' outputs and live in the env
+# root, the same env-level placement (and the same cycle-avoidance reason) as
+# /…/api/job-queue-url.
 
 resource "aws_ssm_parameter" "config" {
   for_each = {

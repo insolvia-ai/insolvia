@@ -1,5 +1,7 @@
 # ── Case-data audit trail (issue 8.2) ───────────────────────────
-# CloudTrail data events for the stores holding GLBA-scope data, and the
+# CloudTrail events for the keys protecting GLBA-scope data (management
+# events, which is where KMS use lands) — and data events on named DynamoDB
+# tables when a root names any, which none has since plan 18.23 — and the
 # bucket they land in. Business plan §10 commits to audit logging alongside
 # encryption and least privilege; this is that commitment.
 #
@@ -217,8 +219,8 @@ data "aws_iam_policy_document" "bucket" {
   }
 
   # Belt and braces on the confidentiality side: nothing may read or write
-  # these objects over plain HTTP, matching the case table's SecureTransport
-  # condition.
+  # these objects over plain HTTP — the same SecureTransport rule the case
+  # document bucket keeps.
   statement {
     sid    = "DenyInsecureTransport"
     effect = "Deny"
@@ -264,24 +266,31 @@ resource "aws_cloudtrail" "audit" {
   enable_logging                = true
 
   # Management events are excluded by default. They would double the volume
-  # to say things the Terraform diff already says, and this trail's job is the
-  # data plane — EXCEPT that KMS key use is a management event, so a root
-  # holding the filing-credential vault opts in (include_management_events,
-  # the second selector below).
-  advanced_event_selector {
-    name = "Case data access"
+  # to say things the Terraform diff already says — EXCEPT that KMS key use is
+  # a management event, so a root holding the case or vault key opts in
+  # (include_management_events, the second selector below).
+  #
+  # DynamoDB data events on the named tables, when a root names any. Since the
+  # tables were deleted (plan 18.23, ADR 0028) no root does: Aurora's rows are
+  # not CloudTrail resources, and the hosts' access log is the
+  # application-level record of who read a case.
+  dynamic "advanced_event_selector" {
+    for_each = length(var.data_resource_arns) > 0 ? [1] : []
+    content {
+      name = "Case data access"
 
-    field_selector {
-      field  = "eventCategory"
-      equals = ["Data"]
-    }
-    field_selector {
-      field  = "resources.type"
-      equals = ["AWS::DynamoDB::Table"]
-    }
-    field_selector {
-      field       = "resources.ARN"
-      starts_with = var.data_resource_arns
+      field_selector {
+        field  = "eventCategory"
+        equals = ["Data"]
+      }
+      field_selector {
+        field  = "resources.type"
+        equals = ["AWS::DynamoDB::Table"]
+      }
+      field_selector {
+        field       = "resources.ARN"
+        starts_with = var.data_resource_arns
+      }
     }
   }
 
@@ -311,6 +320,13 @@ resource "aws_cloudtrail" "audit" {
   }
 
   tags = var.tags
+
+  lifecycle {
+    precondition {
+      condition     = length(var.data_resource_arns) > 0 || var.include_management_events
+      error_message = "A trail with no data resources and no management events records nothing — omit the module instead."
+    }
+  }
 
   depends_on = [aws_s3_bucket_policy.audit]
 }
