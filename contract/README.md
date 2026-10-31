@@ -1,9 +1,10 @@
 # contract — the backend's HTTP contract suite
 
 A Vitest suite that calls a running backend by base URL and checks what comes
-back over the wire. It exists for the .NET rewrite (ADR 0028,
-proposed; plan 18.2): the Python backend is the oracle, this suite is what it is the
-oracle *for*, and the switch to .NET waits until both pass it unchanged.
+back over the wire. It was built for the .NET rewrite (ADR 0028, plan 18.2):
+the Python backend passed it first, the .NET one passed it unchanged before
+the switch, and since the Python was deleted (18.23) it is what holds the
+wire contract the app depends on.
 
 - **API** calls go through the shipped client, `@insolvia-ai/api-client`, so a
   green run proves the client the app ships, not a copy of it.
@@ -17,29 +18,26 @@ oracle *for*, and the switch to .NET waits until both pass it unchanged.
 
 ```bash
 npm ci                                          # once, at the repo root
-contract/scripts/dev-test.sh                    # the Python stack: start, run, stop
-contract/scripts/dev-test.sh --target dotnet    # the .NET stack on Postgres
+contract/scripts/dev-test.sh                    # the .NET stack on Postgres: start, run, stop
 contract/scripts/dev-test.sh mcp                # a filtered run (the gate is not enforced)
 ```
 
-No AWS, no sign-in, no network beyond 127.0.0.1. Both targets mint a
-throwaway RS256 key, start the stack, wait for it, run the suite, and stop
-it. Ports 18060–18090, overridable with `CONTRACT_*_PORT`.
+No AWS, no sign-in, no network beyond 127.0.0.1. It mints a throwaway
+RS256 key, starts the stack, waits for it, runs the suite, and stops it.
+Ports 18060–18090, overridable with `CONTRACT_*_PORT`.
 `CONTRACT_SHOW_STACK_LOG=1` prints every stack log on a failure.
 
-- **`--target python`** (the default until the switch, plan 18.23) needs
-  Python 3.12; the first run builds `contract/.venv`. It starts
-  `stack/contract_stack.py`: the API, admin and MCP services composed over
-  their in-memory adapters in one process, seeded from `seeds/dev.json`.
-- **`--target dotnet`** needs Docker and the .NET SDK. It starts a
-  throwaway `postgres:17` container, runs the real migrator (migrations,
-  roles, grants, then the local seed of `seeds/dev.json` and its fixture
-  versions), starts `scripts/aux-server.ts` (the run's JWKS, and the blob
-  server the API's local directory store points its presigned URLs at), then
-  the API, admin and MCP hosts — each as its own database role, trusting the
-  key through configuration only (`AUTH_ISSUER_URL`; admin's local-only
-  `GOOGLE_JWKS_URL`). CI runs exactly this as `Contract (.NET)`
-  (`.github/workflows/contract-dotnet-pr.yml`).
+It needs Docker and the .NET SDK. It starts a throwaway `postgres:17`
+container, runs the real migrator (migrations, roles, grants, then the local
+seed of `seeds/dev.json` and its fixture versions), starts
+`scripts/aux-server.ts` (the run's JWKS, and the blob server the API's local
+directory store points its presigned URLs at), then the API, admin and MCP
+hosts — each as its own database role, trusting the key through
+configuration only (`AUTH_ISSUER_URL`; admin's local-only `GOOGLE_JWKS_URL`).
+CI runs exactly this as `Contract (.NET)`
+(`.github/workflows/contract-dotnet-pr.yml`). `--target dotnet` is still
+accepted; the Python target it once chose against went with the Python
+backend.
 
 ## Aim it at another stack
 

@@ -5,6 +5,15 @@ where it came from, and which values we refuse to store because they are
 arithmetic. This is the logical model. It is deliberately engine-neutral — the
 store that holds it is chosen in the encrypted-case-store work, not here.
 
+> **Module names below are the Python originals.** `insolvia_core.<module>`
+> and `services/api`'s `core/<module>.py` were ported one for one into the
+> .NET backend (ADR 0028) and deleted in 18.23: `insolvia_core.cases` is
+> `backend/src/Insolvia.Core/Cases`, `insolvia_core.tax_ids` is
+> `Insolvia.Core/TaxIds`, and so on; the API's calculators
+> (`core/means_test.py`, `core/chapter13_plan.py`, …) are
+> `backend/src/Insolvia.Engines`, the Case Upload and filing-set code
+> `backend/src/Insolvia.Forms`. The rules each names are unchanged.
+
 Three consumers pull in different directions, and every decision below is a
 trade between them:
 

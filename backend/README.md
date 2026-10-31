@@ -1,9 +1,9 @@
 # Insolvia backend (.NET)
 
-The C# rewrite of Insolvia's backend: the API, job worker, admin service, MCP
-server, filing worker and a migrator, on .NET 10 with PostgreSQL. It is being
-built here in the open and replaces `services/` in one switch; until then it
-deploys nowhere. The decision and the build plan are
+Insolvia's backend: the API, job worker, admin service, MCP server, filing
+worker and a migrator, on .NET 10 with PostgreSQL, deployed as Lambdas with
+Aurora Serverless v2 in a VPC. It replaced the Python services in one switch;
+the decision and the build plan are
 [ADR 0028](../docs/adr/0028-backend-moves-to-dotnet-and-postgres.md).
 
 ## Prerequisites
@@ -23,14 +23,16 @@ dotnet run --project src/Insolvia.Api      # http://127.0.0.1:8080/health
 Or the whole local stack, Postgres included:
 
 ```bash
-docker compose -f backend/docker-compose.yml up --build
+./backend/scripts/dev-up.sh                            # docker compose up --build
 curl http://127.0.0.1:8080/health
+./backend/scripts/dev-down.sh                          # stop; the database survives
 docker compose -f backend/docker-compose.yml down -v   # stop and wipe the database
 ```
 
 Postgres listens on `127.0.0.1:55432` (user and database `insolvia`, password
-`insolvia-local-only`, local only). Port 8080 is shared with the Python API,
-so stop one before starting the other.
+`insolvia-local-only`, local only). To sign in from the app against this API,
+run `./scripts/dev-aws-setup.sh` (writes `backend/.env`) and
+`./scripts/dev-aws-seed.sh` (your account and its firm) once.
 
 ## Layout
 
@@ -42,9 +44,8 @@ src/    Insolvia.Core · Engines · Forms · Data · Aws          libraries
 tests/  one Insolvia.<Project>.Tests per project, plus Insolvia.Architecture.Tests
 ```
 
-Only `Insolvia.Api` has code today: `GET /health`. The rest are empty
-projects waiting for their port. [`CLAUDE.md`](CLAUDE.md) has the layering
-rules.
+[`CLAUDE.md`](CLAUDE.md) has the layering rules, the data tier's rules and
+the test tiers.
 
 ## Images
 

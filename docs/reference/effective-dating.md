@@ -117,9 +117,10 @@ owns that decision and its trade-offs; the mechanics are:
   ...payload files     # shape owned by the consumer
 ```
 
-- A registry root lives beside the service that reads it (today that means
-  `services/api`; the exact path is the first consumer's call) and ships in its
-  image, so local, staging and prod read identical data by construction — no
+- A registry root lives beside the code that reads it (today that means
+  `backend/src/Insolvia.Engines/Regulatory`, with the template PDFs and the
+  filing series in `Insolvia.Forms` and the courts in `Insolvia.Core`) and is
+  embedded in the assembly that ships in each image, so local, staging and prod read identical data by construction — no
   per-environment seeding, no drift.
 - **Append-only is an invariant, not a habit:** a merged release directory is
   never edited or deleted, because pinned cases resolve ids by `get` forever.

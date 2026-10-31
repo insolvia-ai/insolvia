@@ -78,8 +78,9 @@ React Router v7 SSR marketing site for `www.insolvia.ai`. Human docs:
   exactly this; don't remove it. **Typecheck, lint and `npm test` all pass in
   that broken state — only `npm run build` catches it, so run the build before
   pushing a change under `app/routes/`.**
-- **The waitlist field caps in `app/lib/waitlist.server.ts` mirror
-  `services/api` `core/waitlist.py` and nothing mechanical keeps them in step.**
+- **The waitlist field caps in `app/lib/waitlist.server.ts` mirror the API's
+  (`backend/src/Insolvia.Api/Waitlist/WaitlistSubmissions.cs`) and nothing
+  mechanical keeps them in step.**
   `waitlist.server.test.ts` table-drives every cap as the drift alarm — if you
   change a limit on either side, change it on both.
 - **Only prod owns the apex.** Staging passes `apex_domain = null`; the module

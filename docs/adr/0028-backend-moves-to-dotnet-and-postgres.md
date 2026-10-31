@@ -1,11 +1,22 @@
 # ADR 0028 — The backend moves to .NET and PostgreSQL
 
-- **Status:** Accepted 2026-10-27
+- **Status:** Accepted — built. Accepted 2026-10-27
   ([#511](https://github.com/insolvia-ai/insolvia/issues/511)). The
   maintainer decided scope, cut-over and hosting in chat (backend only; one
   big-bang cut-over; Aurora Serverless v2 in a VPC with a NAT instance), and
   accepted the delegated calls as written, including the Python freeze and
-  re-baselining the PDFs. Not built: the build breakdown below is the work.
+  re-baselining the PDFs.
+- **Build note (2026-10-30):** 18.1–18.23 are done. Staging runs entirely
+  on .NET and Aurora since the switch (18.22); 18.23
+  ([#534](https://github.com/insolvia-ai/insolvia/issues/534)) deleted
+  `services/`, `packages/insolvia_core`, their CI and the contract suite's
+  Python stack. What outlived the Python, and where: the regulatory data is
+  canonical in `backend/` (`Insolvia.Engines/Regulatory`,
+  `Insolvia.Forms/Templates` and `Regulatory`, `Insolvia.Core/Regulatory`);
+  the oracles' outputs stay committed in `backend/tests` without their
+  generators; the API's integration tier, an HTTP client, moved to
+  `integration/`; `seed.py capture` was not ported. Still open: the prod
+  promote and the DynamoDB table deletion (plan.md § Platform).
 - **Date:** 2026-10-27
 - **Supersedes:** plan decision **D6** ("Python + Flask + Mangum on Lambda")
   and [ADR 0012](0012-shared-python-domain-package.md). The

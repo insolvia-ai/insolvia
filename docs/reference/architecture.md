@@ -17,8 +17,9 @@ insolvia/
 │   └── insolvia_marketing/            React Router v7 + Vite, SSR
 ├── packages/
 │   └── insolvia_api_client/           @insolvia-ai/api-client
-├── backend/                           the .NET 10 backend on Aurora PostgreSQL — what deploys (ADR 0028)
-├── services/                          api · admin · mcp · filing (Python — frozen, deploys nowhere, deleted in 18.23)
+├── backend/                           the .NET 10 backend on Aurora PostgreSQL (ADR 0028)
+├── contract/                          the backend's HTTP contract suite (Vitest, offline)
+├── integration/                       the API's integration tier (pytest over HTTPS, signed in)
 ├── infra/                             Terraform — staging / prod / dev
 ├── tool/                              brand generators (themes, favicon)
 └── docs/                              business plan + runbooks
@@ -35,7 +36,7 @@ repository, the CI deploy role, the human IAM users) or the mailer: those are
 which this repo depends on the way it depends on the design system — by name,
 never by path ([ADR 0025](../adr/0025-shared-infra-and-mailer-move-to-insolvia-services.md)).
 
-Everything is TypeScript. The app follows the layout Expo itself publishes —
+The front end is TypeScript and the backend C#. The app follows the layout Expo itself publishes —
 `src/app/` is routes-only, screen bodies live in `src/screens/` — see
 [ADR 0005](../adr/0005-expo-app-layout.md) for why, and
 [`apps/insolvia_app/CLAUDE.md`](../../apps/insolvia_app/CLAUDE.md) for the rules.
@@ -76,7 +77,7 @@ behind all of it, including the measurements that ruled out a component library.
 | Node | ≥ 24 (`engines.node`), installed by `scripts/dev-setup.sh` |
 | App | **Expo SDK 57**, pinned exact · Metro · Expo Router (`web.output: "single"`) |
 | Marketing | React Router v7 framework mode · Vite |
-| Services | **.NET 10** (ASP.NET Core minimal APIs) on image Lambdas in a VPC, on **Aurora Serverless v2 PostgreSQL 17** — [ADR 0028](../adr/0028-backend-moves-to-dotnet-and-postgres.md). The Python 3.12 services are frozen and deploy nowhere since the switch (18.22); 18.23 deletes them |
+| Services | **.NET 10** (ASP.NET Core minimal APIs) on image Lambdas in a VPC, on **Aurora Serverless v2 PostgreSQL 17** — [ADR 0028](../adr/0028-backend-moves-to-dotnet-and-postgres.md). The Python 3.12 services they replaced were deleted in 18.23 |
 | Lint/format | ESLint 9 + Prettier, fanned out per workspace member |
 
 **Expo's free tier only — and CI enforces it.** No EAS Build, Submit, Update or
@@ -248,9 +249,9 @@ Four test tiers, each aimed at the environments that can answer it —
 [ADR 0021](../adr/0021-test-tiers-and-seed-fixtures.md) owns the table and the
 `insolvia-testing` skill owns how to write one. In pipeline terms: the **unit**
 tier is every `*-pr.yml` check and the pre-push hook; the **integration** tier
-(`services/api/tests/integration`, the live API over HTTP signed in as a seeded
-person — a black-box client, so since the switch it tests the .NET API; it
-moves with the Python in 18.23) and the **e2e** suite (`e2e/`, both projects)
+(`integration/`, the live API over HTTP signed in as a seeded person — a
+black-box pytest client, written against the Python API and run unchanged
+against the .NET one) and the **e2e** suite (`e2e/`, both projects)
 run inside the staging stage after the deploys they test, seeded by
 `.github/actions/seed-staging` (the migrator Lambda's `seed` command), and
 their failure withholds the `insolvia/staging-release` status; the e2e
@@ -334,7 +335,7 @@ first.
 
 **Enforced today:** a PR is required (no direct pushes); linear history; no
 force-push; no branch deletion; squash or rebase merges only; review threads must
-be resolved, and pushes dismiss stale reviews. **Plus the thirteen required status
+be resolved, and pushes dismiss stale reviews. **Plus the required status
 checks below** — red CI cannot merge.
 
 **Not enforced today** (despite `.github/CODEOWNERS` existing):
@@ -347,31 +348,28 @@ last paragraph of this section.
 
 Red CI blocks a merge to `main`. The `protect-main` ruleset requires these
 job `name:` values (matrix legs get a `(leg)` suffix) — every `*-pr.yml` job,
-so a new PR gate is not finished until it is on this list. **At the switch
-(18.22) the five Python checks marked below leave the ruleset**
-(`scripts/update-ruleset.sh remove`, ADR 0028 § Consequences): their
-workflows keep running on PRs that touch `services/` until 18.23 deletes
-them, but the Python no longer deploys, so they gate nothing that ships.
+so a new PR gate is not finished until it is on this list. **18.23 deleted the
+five Python checks' workflows** (`API service`, `Admin service`,
+`MCP service`, `Filing worker`, `Core package`): if any is still on the
+ruleset, every PR waits on a status nobody reports, so they come off with
+`scripts/update-ruleset.sh remove "<name>"` (ADR 0028 § Consequences).
+`Contract (.NET)` runs on every PR and is not yet required; adding it is one
+`scripts/update-ruleset.sh add`.
 
 | Check name | Workflow |
 |---|---|
 | `App` | `app-pr.yml` |
 | `Admin portal` | `admin-pr.yml` |
-| `Admin service` | `admin-pr.yml` — Python; leaves at the switch |
 | `API client` | `api-client-pr.yml` |
-| `API service` | `api-pr.yml` — Python; leaves at the switch |
 | `Backend (.NET)` | `backend-pr.yml` — the backend that deploys (ADR 0028) |
 | `Cognito branding` | `branding-pr.yml` — the brand drift gate (ADR 0020); the name outlived Cognito, see the workflow's header |
-| `Core package` | `core-pr.yml` — Python; leaves at the switch |
-| `Filing worker` | `filing-pr.yml` — Python; leaves at the switch |
 | `Form specs` | `forms-pr.yml` |
 | `Marketing site` | `marketing-pr.yml` |
-| `MCP service` | `mcp-pr.yml` — Python; leaves at the switch |
 | `Terraform validate (staging)` | `shared-infra-plan.yml` |
 | `Terraform validate (prod)` | `shared-infra-plan.yml` |
 
-`Admin portal`, `Admin service` and `Cognito branding` were missing from the
-ruleset until 2026-10-13 although their workflows already said they were
+`Admin portal`, the since-deleted `Admin service` and `Cognito branding` were
+missing from the ruleset until 2026-10-13 although their workflows already said they were
 required — `scripts/update-ruleset.sh show` is the check, not this table.
 
 `Terraform validate (dev)` runs alongside the two above but is deliberately

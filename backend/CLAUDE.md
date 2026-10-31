@@ -1,10 +1,12 @@
 # backend/ — agent rules
 
-The .NET 10 + PostgreSQL rewrite of `services/` and `packages/insolvia_core`
-([ADR 0028](../docs/adr/0028-backend-moves-to-dotnet-and-postgres.md); plan
-18.x). It deploys **nowhere** until the switch PR (18.22); until then the
-Python services are what runs, and they are the oracle: a ported module
-brings its Python tests across, translated, not rewritten.
+Insolvia's backend: .NET 10 on Lambda, PostgreSQL (Aurora in staging and
+prod, Docker locally) —
+[ADR 0028](../docs/adr/0028-backend-moves-to-dotnet-and-postgres.md). It
+replaced the Python services and `insolvia_core` at the switch (18.22), and
+the Python was deleted in 18.23. Comments that name a Python module
+(`core/x.py`, `services/api/...`) record where a port came from; the module
+itself is gone, and `git log` before 18.23 has it.
 
 ## Layering — pinned by `tests/Insolvia.Architecture.Tests`
 
@@ -28,8 +30,10 @@ brings its Python tests across, translated, not rewritten.
 
 ## Rules that are easy to get wrong
 
-- **Money is `decimal`**, never `double`; Postgres `numeric`. Engine ports
-  must hold Decimal parity with the Python.
+- **Money is `decimal`**, never `double`; Postgres `numeric`. The engines'
+  parity outputs (`tests/Insolvia.Engines.Tests/Parity/*.expected.json`,
+  captured from the Python oracle) pin Decimal-exact results; a deliberate
+  change edits them in the same PR.
 - Timestamps are `DateTimeOffset` / `timestamptz`; court dates are `DateOnly`
   / `date`, never converted to UTC.
 - Package versions live in `Directory.Packages.props` only. Every project has
@@ -37,12 +41,12 @@ brings its Python tests across, translated, not rewritten.
   `--locked-mode`, so commit the lock diff with the change.
 - Warnings are errors (`Directory.Build.props`). Do not add `NoWarn` to make a
   build pass without saying why on the same line.
-- The wire contract is the Python API's, byte for byte where a test can see
-  it (`/health` keeps Flask's sorted keys and bare `application/json`).
+- The wire contract is the one the Python API defined, byte for byte where a
+  test can see it (`/health` keeps Flask's sorted keys and bare
+  `application/json`): `contract/` and `packages/insolvia_api_client` pin it,
+  and the app depends on it.
 - One deployable unit, one Dockerfile target. A host gets its stage when it
   gets a handler, and `backend-pr.yml` builds it in the same PR.
-- `spikes/` holds standalone throwaway projects, deliberately **not** in the
-  solution.
 
 ## The data tier — `Insolvia.Data` and `Insolvia.Migrator`
 
@@ -119,7 +123,10 @@ brings its Python tests across, translated, not rewritten.
   EF provider. One container per test assembly (`PostgresFixture`, a
   collection fixture), a fresh database per test (`CreateDatabaseAsync`).
   Needs Docker locally; GitHub's ubuntu runners have it.
-- **Contract:** `contract/` at the repo root, against a running base URL.
+- **Contract:** `contract/` at the repo root, against the hosts on a
+  throwaway Postgres (`contract/scripts/dev-test.sh`).
+- **Integration:** `integration/` at the repo root — signed in through the
+  real pool, against staging after each deploy or a laptop's compose stack.
 
 ## Run it
 
@@ -130,13 +137,16 @@ dotnet test Insolvia.slnx                        # what the pre-push hook runs
 dotnet format Insolvia.slnx                      # fix; CI runs --verify-no-changes
 dotnet run --project src/Insolvia.Api            # http://127.0.0.1:8080/health
 dotnet run --project src/Insolvia.Worker         # the job poller: JOB_QUEUE_URL, INSOLVIA_DB_*, CASE_DOCUMENT_BUCKET (+ ANTHROPIC_API_KEY)
-docker compose up --build                        # Postgres 17 on :55432, the migrator, then the API on :8080
+./scripts/dev-up.sh                              # this compose stack (backend/scripts/dev-up.sh) beside the apps
+docker compose up --build                        # Postgres 17 on :55432, the migrator, then the API on :8080, admin on :8090
 INSOLVIA_DB_CONNECTION_STRING='Host=127.0.0.1;Port=55432;Database=insolvia;Username=insolvia;Password=insolvia-local-only' \
 INSOLVIA_DB_ROLE_PASSWORD=insolvia-local-only \
   dotnet run --project src/Insolvia.Migrator      # migrate the compose database by hand
 ```
 
-The API on 8080 is the same port as the Python API: run one at a time. The
-CI check is `Backend (.NET)` in `.github/workflows/backend-pr.yml`;
-`scripts/dev-test-unit.sh` maps any `backend/` change to the same format
-and test steps.
+Compose reads `backend/.env` (`scripts/dev-aws-setup.sh` writes it: the
+shared dev pool's ids, so the app can sign in; `INSOLVIA_SEED=false`, because
+`scripts/dev-aws-seed.sh` then seeds with the pool's real subjects). The CI
+check is `Backend (.NET)` in `.github/workflows/backend-pr.yml`;
+`scripts/dev-test-unit.sh` maps any `backend/` change to the same format and
+test steps.

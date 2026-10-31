@@ -64,7 +64,7 @@ test.describe('smoke: the deployed API', () => {
     expect(
       theirs.headers()['access-control-allow-origin'] ?? null,
       'a preflight from an unlisted origin must not be admitted — the allowlist is ' +
-        'exact origins, no wildcard (services/api core/config.py)',
+        'exact origins, no wildcard (backend/src/Insolvia.Api/Http/Cors.cs)',
     ).not.toBe('https://not-insolvia.example');
   });
 });

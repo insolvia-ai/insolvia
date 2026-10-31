@@ -1,15 +1,16 @@
 # contract — agent rules
 
 The backend's HTTP contract suite (ADR 0028, plan 18.2). Human docs:
-[`README.md`](README.md). Run: `contract/scripts/dev-test.sh` (Python, the
-default) or `--target dotnet` (the .NET hosts on Postgres — ADR 0028's
-acceptance gate). CI: `Contract (.NET)` runs exactly the latter.
+[`README.md`](README.md). Run: `contract/scripts/dev-test.sh` — the .NET hosts
+on a throwaway Postgres, the only target. CI: `Contract (.NET)` runs exactly
+that.
 
-- **It is the oracle for the .NET rewrite.** Every test must pass against the
-  Python stack today and the .NET stack later, unchanged. So assert the
-  **wire** — status, the raw JSON's field names and types, the error envelope —
-  never Python internals, log lines or store contents. If a test only passes
-  because of how Flask or a memory adapter happens to behave, it is wrong.
+- **It is the wire contract's oracle.** It was proven against the Python
+  backend first and the .NET one at the switch, unchanged; since 18.23 deleted
+  the Python it is what keeps the wire from drifting. So assert the **wire** —
+  status, the raw JSON's field names and types, the error envelope — never
+  host internals, log lines or store contents. If a test only passes because
+  of how one host or a memory twin happens to behave, it is wrong.
 - **API calls go through `@insolvia-ai/api-client`, imported by package name.**
   Never a hand-rolled `fetch` to an API route: the point is to prove the
   shipped client. `support/client.ts` wraps the real class — a recording
@@ -34,19 +35,12 @@ acceptance gate). CI: `Contract (.NET)` runs exactly the latter.
   Cognito and Google issue; the stack verifies them with the same JWKS
   providers its deployed entrypoints use. Never add a verification bypass to
   make a test pass — break one claim per negative test instead.
-- **`stack/` is Python and dies with the Python (18.23).** It composes the
-  services from outside `services/` because admin's architecture test forbids
-  importing `insolvia_api`, and one shared set of memory stores needs one
-  process. It must not change route behaviour: it only chooses adapters, as
-  the services' own `development_server.py` files do. `LocalBlobStore` is the
-  one adapter it adds (an S3 stand-in, so presigned PUTs work).
-- **The .NET stack is composed by `scripts/dev-test.sh --target dotnet`**,
-  from the hosts' own configuration surfaces — no host code knows the suite
-  exists. Seeded ids are not shared between stacks (Python derives from table
-  names, .NET from the environment), so a test finds fixture records through
-  the API (`support/fixtures.ts`), never by id; the people's subjects are the
-  one exception, and `stack/stack.json` lists the ones the migrator derives.
-  `scripts/aux-server.ts` is the .NET side's JWKS and S3 stand-in, sharing
+- **The stack is composed by `scripts/dev-test.sh`** from the hosts' own
+  configuration surfaces — no host code knows the suite exists. A test finds
+  fixture records through the API (`support/fixtures.ts`), never by id; the
+  people's subjects are the one exception, and `stack/stack.json` lists the
+  ones the migrator derives (the migrator's `SeedIdTests` reads it too).
+  `scripts/aux-server.ts` is the run's JWKS and S3 stand-in, sharing
   `backend/src/Insolvia.Core/Local/DirectoryDocumentBlobStore.cs`'s layout.
 - **TypeScript rules are the workspace's**: no build step, `.ts` relative
   imports, `erasableSyntaxOnly`. Gate: `npm run lint`, `npm run typecheck`,
