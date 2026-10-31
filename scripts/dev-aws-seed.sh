@@ -3,35 +3,23 @@
 # Make this machine's dev environment signable-in AND seeded: ensure the dev
 # account exists in the SHARED development Cognito pool (insolvia-dev-users —
 # one pool for every machine, insolvia-services', ADR 0026), then load
-# seeds/dev.json into this machine's local data stores.
+# seeds/dev.json into this machine's local database.
 #
 #   ./scripts/dev-aws-seed.sh
 #   ./scripts/dev-aws-seed.sh --check     # report what is missing, write nothing
-#   ./scripts/dev-aws-seed.sh --dotnet    # the .NET backend's local Postgres instead
 #
-# ## Which database (ADR 0028, plan 18.22)
+# ## Which database (ADR 0028)
 #
-# Two targets until 18.23 deletes the Python, because two local stacks exist:
-#
-#   (default)  this machine's per-machine DynamoDB tables, through
-#              services/admin's seeder — what scripts/dev-up.sh's API reads,
-#              and so what e2e/scripts/dev-test.sh and the API's local
-#              integration tier sign in against.
-#   --dotnet   the Postgres 17 of backend/docker-compose.yml (127.0.0.1:55432),
-#              loaded by the SAME code that seeds staging — the migrator's
-#              `seed` command (backend/src/Insolvia.Migrator), run here with
-#              `dotnet run` after `migrate` and `purge-pre-client`. The people
-#              get their REAL subjects from the shared dev pool
-#              (AUTH_USER_POOL_ID), so a local admin or MCP host signed in
-#              against that pool resolves them; the fixture documents come
-#              from the committed seeds/fixtures tree (no bucket locally —
-#              SeedComposition.cs).
-#
-# The default flips to --dotnet when scripts/dev-up.sh runs the .NET stack
-# (its API, admin and MCP hosts all read the compose Postgres when
-# INSOLVIA_DB_CONNECTION_STRING is set — #561); until then the signed-in
-# local flows (e2e/scripts/dev-test.sh, the integration tier) run against the
-# Python stack, which reads the DynamoDB tables.
+# The Postgres 17 of backend/docker-compose.yml (127.0.0.1:55432) — what
+# scripts/dev-up.sh's API, admin and MCP hosts read — loaded by the SAME code
+# that seeds staging: the migrator's `seed` command
+# (backend/src/Insolvia.Migrator), run here with `dotnet run` after `migrate`
+# and `purge-pre-client`. The people get their REAL subjects from the shared
+# dev pool (AUTH_USER_POOL_ID), so a local host signed in against that pool
+# resolves them; the fixture documents come from the committed seeds/fixtures
+# tree (no bucket locally — SeedComposition.cs). `--dotnet` is still accepted
+# and changes nothing: the DynamoDB target it used to opt out of went with the
+# Python backend (plan 18.23).
 #
 # ## Why this exists
 #
@@ -43,9 +31,8 @@
 # only way an account comes into existence.
 #
 # An account gets you PAST sign-in and no further: the account lives in
-# Cognito, firm membership lives in DynamoDB, and without a firm every route
-# behind current_accessor() answers 403 ("accessor unresolved /
-# no_active_firm_user" in the API log). That is the tenancy model working as
+# Cognito, firm membership lives in the database, and without a firm every
+# signed-in route answers 403 (no active firm user). That is the tenancy model working as
 # designed (ADR 0009), and the first firm cannot be made through the API —
 # POST /v1/firm/users is itself behind FIRM_ADMINISTRATION, so it needs an
 # admin to make an admin. Those used to be two scripts run in an order you had
@@ -81,42 +68,31 @@
 # is reviewable as a diff. This script does not describe the data; it only says
 # WHERE to put it. The same loader puts seeds/staging.json into staging from
 # the seed step CI runs (.github/actions/seed-staging), so the two environments
-# differ in their fixture and their tables, never in the code path that built
-# the rows. The account step lives HERE in the wrapper, not in the loader, for
+# differ in their fixture and their database, never in the code path that
+# built the rows. The account step lives HERE in the wrapper, not in the loader, for
 # the same reason: staging's accounts come from its fixture (password via
 # ${E2E_TEST_USER_PASSWORD}), so a prompt in the loader would be a dev-only
 # fork of a CI-shared path.
 #
-# The fixture also names CASES (seeds/fixtures/<version>/), whose sample
-# documents live in the shared fixture bucket — one bucket for the account,
-# insolvia-services' infra/modules/dev_fixtures, applied by that repo's CI as
-# part of its infra/envs/shared. The loader copies them server-side into this
-# machine's own case-documents bucket; the developer's credentials are what
-# read the shared bucket. If the copy is
-# refused, the bucket has not been applied yet or the fixture version has not
-# been published (scripts/dev-fixture.sh publish).
+# The fixture also names CASES (seeds/fixtures/<version>/). Locally their
+# sample documents are read from the committed tree; staging copies them from
+# the shared fixture bucket (scripts/dev-fixture.sh publish).
 #
-# ## Why this is shell and the loading is Python
+# ## Why this is shell and the loading is .NET
 #
 # The split follows one question: does the step need to know the shape of our
-# data? Not here. This file resolves an ENVIRONMENT — the machine id, the table
-# and pool names in this machine's Terraform state, and, the load-bearing part,
-# AWS credentials an SDK can actually read. The `aws login` session format is
-# unreadable by boto3 and by Terraform's provider, which is what
-# `export_temporary_aws_credentials` in dev-aws-common.sh exists to fix, and a
-# child process cannot fix its own parent's environment. Run the loader without
-# this wrapper and it fails with NoCredentialsError.
-#
-# Building rows does need the shape, so that is Python next to the code owning
-# it: services/admin/src/insolvia_admin/entrypoints/seed.py.
+# data? Not here. This file resolves an ENVIRONMENT — the machine id, the pool
+# id in this machine's Terraform state, and AWS credentials an SDK can read
+# (dev-aws-common.sh). Building rows does need the shape, so that is the
+# migrator, next to the code owning it.
 #
 # ## Scope
 #
 # DEV ONLY, and not parameterised on purpose. A script that creates accounts
 # and could be pointed at the prod pool by changing one argument is a script
-# that eventually is. The names come from THIS machine's Terraform state and
-# must carry this machine's short id; the loader re-checks each name's shape
-# itself, so neither guard is load-bearing alone. Staging is seeded by the
+# that eventually is. The pool comes from THIS machine's Terraform state and
+# must be the shared dev pool by name; the database is the compose one on
+# 127.0.0.1. Staging is seeded by the
 # .github/actions/seed-staging step its deploy workflows share, and prod is
 # refused outright.
 #
@@ -135,19 +111,17 @@ source "$SCRIPT_DIR/dev-aws-common.sh"
 DEV_ENV_FILE="$HOME/.config/insolvia/dev.env"
 
 CHECK_ONLY=0
-TARGET=python
 while [[ $# -gt 0 ]]; do
   case "$1" in
   --check) CHECK_ONLY=1 ;;
-  --dotnet) TARGET=dotnet ;;
+  --dotnet) : ;; # the only target now; accepted for old habits
   -h | --help)
-    printf 'Usage: %s [--check] [--dotnet]\n\n' "$0"
+    printf 'Usage: %s [--check]\n\n' "$0"
     printf '  DEV_USER_PASSWORD  optional — read from %s,\n' "$DEV_ENV_FILE"
     printf '                     or prompted for without echo, when an account must be created\n\n'
     printf 'Ensures the dev sign-in account(s) named by seeds/dev.json exist in the\n'
-    printf 'shared dev pool, then loads that fixture into this machine'"'"'s DynamoDB\n'
-    printf 'dev tables (the Python dev stack) — or, with --dotnet, into the local .NET\n'
-    printf 'database (backend/docker-compose.yml'"'"'s Postgres, through the migrator).\n'
+    printf 'shared dev pool, then loads that fixture into the local database\n'
+    printf '(backend/docker-compose.yml'"'"'s Postgres, through the migrator).\n'
     printf 'Edit the fixture to change WHAT is seeded; this script only says where.\n'
     exit 0
     ;;
@@ -161,46 +135,13 @@ for command in aws jq terraform; do require_command "$command"; done
 FIXTURE="$REPO_ROOT/seeds/dev.json"
 [[ -f "$FIXTURE" ]] || die "No fixture at $FIXTURE."
 
-# The default: the loader runs through the API's own code, so it needs the
-# API's venv — the one services/api/scripts/dev-setup.sh creates. Checked here
-# rather than left to a ModuleNotFoundError, which names `boto3` and not the
-# missing step. --dotnet needs the .NET SDK and Docker instead.
-VENV_PYTHON="$API_DIR/.venv/bin/python"
-if [[ "$TARGET" == python ]]; then
-  [[ -x "$VENV_PYTHON" ]] ||
-    die "No API venv at $VENV_PYTHON. Run ./services/api/scripts/dev-setup.sh first."
-else
-  require_command dotnet
-  require_command docker
-fi
+require_command dotnet
+require_command docker
 
 load_machine_id false
 load_aws_identity
 terraform_init
 outputs="$(terraform_output_json)"
-
-# Belt and braces on "dev only", exactly as dev-aws-reset.sh does before it
-# deletes anything: every name must carry THIS machine's short id.
-FIRM_TABLE="$(jq -r '.firm_table_name.value // empty' <<<"$outputs")"
-[[ -n "$FIRM_TABLE" ]] ||
-  die "No firm_table_name in this machine's Terraform state. Run ./scripts/dev-aws-setup.sh first."
-[[ "$FIRM_TABLE" == "$FIRM_TABLE_NAME_EXPECTED" ]] ||
-  die "Refusing: firm table '$FIRM_TABLE' is not '$FIRM_TABLE_NAME_EXPECTED'."
-
-CASE_TABLE="$(jq -r '.case_table_name.value // empty' <<<"$outputs")"
-[[ -n "$CASE_TABLE" ]] ||
-  die "No case_table_name in this machine's Terraform state. Run ./scripts/dev-aws-setup.sh first."
-[[ "$CASE_TABLE" == "$CASE_TABLE_NAME_EXPECTED" ]] ||
-  die "Refusing: case table '$CASE_TABLE' is not '$CASE_TABLE_NAME_EXPECTED'."
-DOCUMENT_BUCKET="$(jq -r '.case_document_bucket.value // empty' <<<"$outputs")"
-[[ -n "$DOCUMENT_BUCKET" ]] ||
-  die "No case_document_bucket in this machine's Terraform state. Run ./scripts/dev-aws-setup.sh first."
-[[ "$DOCUMENT_BUCKET" == "$RESOURCE_PREFIX-case-documents-"* ]] ||
-  die "Refusing: document bucket '$DOCUMENT_BUCKET' does not carry this machine's prefix."
-# The shared fixture bucket is account-level and named deterministically
-# (insolvia-services' infra/modules/dev_fixtures); INSOLVIA_DEV_FIXTURES_BUCKET
-# overrides it for an account that names it differently.
-FIXTURE_BUCKET="${INSOLVIA_DEV_FIXTURES_BUCKET:-insolvia-shared-dev-fixtures-$AWS_REGION_VALUE}"
 
 POOL_ID="$(jq -r '.auth_user_pool_id.value // empty' <<<"$outputs")"
 [[ -n "$POOL_ID" ]] ||
@@ -346,40 +287,6 @@ ensure_account() {
 }
 
 # ── The data ────────────────────────────────────────────────────
-# PYTHONPATH rather than an install: the venv has the runtime dependencies but
-# the service itself is not packaged into it (pyproject declares no dependencies
-# and nothing runs `pip install -e .`), so `src` has to be on the path the same
-# way pytest's `pythonpath` setting puts it there.
-#
-# The seeder lives in the ADMIN service (#212 — provisioning tooling has one
-# home), while the venv is still the API's: its pinned boto3 + insolvia_core
-# cover everything the seeder imports, and a second venv for one entrypoint
-# would be setup for setup's sake.
-seed() {
-  PYTHONPATH="$REPO_ROOT/services/admin/src" "$VENV_PYTHON" -m insolvia_admin.entrypoints.seed load \
-    --fixture "$FIXTURE" \
-    --firm-table "$FIRM_TABLE" \
-    --user-pool-id "$POOL_ID" \
-    --case-table "$CASE_TABLE" \
-    --document-bucket "$DOCUMENT_BUCKET" \
-    --fixture-bucket "$FIXTURE_BUCKET" \
-    "$@"
-}
-
-# ADR 0022's release step, on this machine: delete the case partitions whose
-# debtors name no firm client — the rows seeded from fixtures v1..v3, or opened
-# before cases were opened for clients. Idempotent (a second run finds none),
-# and it can never delete a case that has a client; the entrypoint's docstring
-# owns the rule. Run before the load, so the v4 cases replace the v3 ones
-# rather than sitting beside them.
-purge_pre_client() {
-  PYTHONPATH="$REPO_ROOT/services/admin/src" "$VENV_PYTHON" -m insolvia_admin.entrypoints.purge_pre_client \
-    --case-table "$CASE_TABLE" \
-    --firm-table "$FIRM_TABLE" \
-    "$@"
-}
-
-# ── The .NET target (--dotnet) ──────────────────────────────────
 # The compose database's superuser — fixed, local-only values committed in
 # backend/docker-compose.yml, reachable from this machine alone. The migrator
 # connects as it (it creates roles); the seed then logs in as the `migrator`
@@ -414,46 +321,18 @@ dotnet_seed() {
   migrator seed || die "The seed refused or failed — its output above says which person or case."
 }
 
-if [[ "$TARGET" == dotnet ]]; then
-  if [[ "$CHECK_ONLY" -eq 1 ]]; then
-    for email in "${ACCOUNT_EMAILS[@]}"; do
-      user_is_confirmed "$email" ||
-        die "No CONFIRMED user '$email' in $pool_name. Re-run without --check to create it."
-    done
-    dotnet_seed
-    ok "Sign-in ready and the local database matches seeds/dev.json."
-    exit 0
-  fi
-  for email in "${ACCOUNT_EMAILS[@]}"; do
-    ensure_account "$email"
-  done
-  offer_to_save_password
-  dotnet_seed
-  ok "Done. backend/: docker compose up (or dotnet run --project src/Insolvia.Admin) and sign in as ${ACCOUNT_EMAILS[0]}."
-  exit 0
-fi
-
-# ── The Python target (the default, until 18.23) ────────────────
 if [[ "$CHECK_ONLY" -eq 1 ]]; then
   for email in "${ACCOUNT_EMAILS[@]}"; do
     user_is_confirmed "$email" ||
       die "No CONFIRMED user '$email' in $pool_name. Re-run without --check to create it."
   done
-  purge_pre_client --check ||
-    die "This machine still holds pre-client cases (ADR 0022). Re-run without --check."
-  seed --check || die "seeds/dev.json is not fully loaded. Re-run without --check."
-  ok "Sign-in ready and this machine matches seeds/dev.json."
+  dotnet_seed
+  ok "Sign-in ready and the local database matches seeds/dev.json."
   exit 0
 fi
-
 for email in "${ACCOUNT_EMAILS[@]}"; do
   ensure_account "$email"
 done
 offer_to_save_password
-
-log "Deleting pre-client cases from $CASE_TABLE (ADR 0022) — finding none is the usual answer"
-purge_pre_client --apply
-
-log "Loading $(basename "$FIXTURE") into $FIRM_TABLE and $CASE_TABLE (documents from s3://$FIXTURE_BUCKET)"
-seed
+dotnet_seed
 ok "Done. Start ./scripts/dev-up.sh if it is not running, then sign in at http://localhost:3000 as ${ACCOUNT_EMAILS[0]}."

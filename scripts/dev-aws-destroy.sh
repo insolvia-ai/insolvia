@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 #
 # Destroy this machine's isolated Insolvia development resources in AWS and
-# unwind the services/api/.env wiring. There is no local fallback database —
-# after this, dev-up.sh refuses to start until dev-aws-setup.sh runs again.
-# The machine ID is retained so a later dev-aws-setup.sh recreates the SAME
-# per-machine names and state key.
+# unwind the backend/.env and apps/insolvia_app/.env wiring. The local
+# database (backend/docker-compose.yml's Postgres) is not AWS and is left
+# alone — scripts/dev-aws-reset.sh wipes it. After this, the backend still
+# starts and every signed-in route answers 401 until dev-aws-setup.sh runs
+# again. The machine ID is retained so a later dev-aws-setup.sh recreates the
+# SAME per-machine names and state key.
 #
 set -euo pipefail
 
@@ -47,25 +49,15 @@ terraform -chdir="$TF_DIR" "${destroy_args[@]}"
 # The shared development pool (insolvia-services', its style included) is NOT
 # this machine's and is left alone: every machine signs in against it.
 
-# Unwind the setup script's wiring — a services/api/.env still naming the
-# destroyed table would send dev-up.sh at a table that no longer exists.
-# Removing WAITLIST_TABLE_NAME makes dev-up.sh fail fast with "run
-# dev-aws-setup.sh first" instead, and removing AWS_PROFILE stops it
-# exporting credentials.
-api_env="$API_DIR/.env"
-remove_env "$api_env" WAITLIST_TABLE_NAME
-remove_env "$api_env" CASE_TABLE_NAME
-remove_env "$api_env" CASE_ACCESS_LOG_TABLE_NAME
-remove_env "$api_env" FIRM_TABLE_NAME
-remove_env "$api_env" CASE_DOCUMENT_BUCKET
-remove_env "$api_env" AWS_PROFILE
+# Unwind the setup script's wiring: the bucket and queues it named are gone.
 # The shared pool survives, but this machine's wiring to it goes with the
 # rest: the API fails closed on absent auth config, so protected routes answer
 # a clean 401 until dev-aws-setup.sh runs again.
-remove_env "$api_env" AUTH_ISSUER_URL
-remove_env "$api_env" AUTH_CLIENT_ID
-remove_env "$api_env" AUTH_PORTAL_CLIENT_ID
-remove_env "$api_env" AUTH_USER_POOL_ID
+for key in CASE_DOCUMENT_BUCKET JOB_QUEUE_URL FILING_QUEUE_URL \
+  AUTH_ISSUER_URL AUTH_CLIENT_ID AUTH_PORTAL_CLIENT_ID AUTH_USER_POOL_ID \
+  AUTH_CLIENT_IDS GOOGLE_CLIENT_ID INSOLVIA_SEED; do
+  remove_env "$BACKEND_ENV" "$key"
+done
 
 # Same for the app: cleared, it renders "sign-in is not configured", which is
 # the honest state after a destroy.
@@ -74,4 +66,4 @@ remove_env "$app_env" EXPO_PUBLIC_COGNITO_DOMAIN
 remove_env "$app_env" EXPO_PUBLIC_COGNITO_CLIENT_ID
 remove_env "$app_env" EXPO_PUBLIC_COGNITO_PORTAL_CLIENT_ID
 
-ok "This machine's Insolvia development resources were destroyed; services/api/.env and apps/insolvia_app/.env were unwound. The machine ID was retained for safe reuse."
+ok "This machine's Insolvia development resources were destroyed; backend/.env and apps/insolvia_app/.env were unwound. The machine ID was retained for safe reuse."

@@ -9,8 +9,16 @@
 # with the local role password below, and seeds seeds/dev.json. Running it
 # again changes nothing.
 #
-# Port 8080 is the API's everywhere (ADR 0028, § Local), which is also the
-# Python API's: run one stack at a time until the switch.
+# Port 8080 is the API's everywhere (ADR 0028, § Local). scripts/dev-up.sh
+# runs this file through backend/scripts/dev-up.sh.
+#
+# backend/.env (written by scripts/dev-aws-setup.sh, gitignored) feeds the
+# ${VAR:-default} substitutions below: the shared dev pool's issuer and
+# client ids, so the app on :3000 signs in against this API, and
+# INSOLVIA_SEED=false, because scripts/dev-aws-seed.sh is then the seeder
+# (with the pool's REAL subjects). Without the file every value is empty: the
+# protected routes fail closed (401) and the migrator seeds derived subjects
+# for an offline look at the admin portal.
 #
 # Postgres listens on 127.0.0.1:55432, not 5432, so it never collides with a
 # Postgres already installed on the machine. The credentials are fixed,
@@ -76,6 +84,14 @@ services:
       # the Postgres stores (ApiComposition); the user directory, sealing keys
       # and blob store stay local twins.
       INSOLVIA_DB_CONNECTION_STRING: Host=postgres;Port=5432;Database=insolvia;Username=api;Password=insolvia-local-only
+      # Token verification against the shared dev pool (public values, from
+      # backend/.env). Unset fails CLOSED: every protected route answers 401.
+      AUTH_ISSUER_URL: ${AUTH_ISSUER_URL:-}
+      AUTH_CLIENT_ID: ${AUTH_CLIENT_ID:-}
+      AUTH_PORTAL_CLIENT_ID: ${AUTH_PORTAL_CLIENT_ID:-}
+      # Unset records mail in memory. http://host.docker.internal:8026 is the
+      # local mailer scripts/dev-up.sh starts from an insolvia-services checkout.
+      MAILER_API_URL: ${MAILER_API_URL:-}
     ports:
       - '127.0.0.1:8080:8080'
     depends_on:

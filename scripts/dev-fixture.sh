@@ -1,29 +1,31 @@
 #!/usr/bin/env bash
 #
-# Move a seed fixture between git and the shared fixture bucket, or capture a
-# new one out of THIS MACHINE's dev stack.
+# Publish a seed fixture version from the repository to the shared fixture
+# bucket.
 #
-#   ./scripts/dev-fixture.sh publish v1                 # git -> the bucket (idempotent)
+#   ./scripts/dev-fixture.sh publish v1                 # repo -> the bucket (idempotent)
 #   ./scripts/dev-fixture.sh publish v1 --check         # what would upload; write nothing
-#   ./scripts/dev-fixture.sh capture v2 <case-id> <handle> [--replace]
-#                                                       # this dev stack -> seeds/fixtures/v2/
 #
-# ## The three directions, and who runs which
+# ## The directions, and who runs which
 #
-#   load      git + bucket -> an environment    scripts/dev-aws-seed.sh (dev),
+#   load      repo + bucket -> an environment   scripts/dev-aws-seed.sh (dev),
 #                                               .github/actions/seed-staging (staging)
-#   publish   git -> bucket                     a developer, after a fixture PR merges
-#   capture   a DEV stack -> git                a developer curating a new version
+#   publish   repo -> bucket                    a developer, after a fixture PR merges
 #
-# Since the switch (ADR 0028, plan 18.22) `publish` is the .NET migrator's
-# `seed-publish` command (backend/src/Insolvia.Migrator/Seeding/SeedPublisher.cs,
-# the same keys and digests the Python publisher wrote, so published versions
-# stay valid) run with `dotnet run` on this machine. `capture` is still the
-# Python one, reading THIS machine's DynamoDB dev stack: the migrator has no
-# capture command yet, and the per-machine tables exist until 18.23 removes
-# them with the Python — a new fixture version until then is curated there.
+# `publish` is the .NET migrator's `seed-publish` command
+# (backend/src/Insolvia.Migrator/Seeding/SeedPublisher.cs, the same keys and
+# digests the Python publisher wrote, so published versions stay valid) run
+# with `dotnet run` on this machine.
 #
-# `publish` and `capture` are here and NOT in CI, deliberately. Curating a
+# THERE IS NO `capture` ANY MORE. It was the Python seeder reading a case out
+# of a developer's DynamoDB dev tables into seeds/fixtures/<version>/; it went
+# with the Python (ADR 0028, plan 18.23) and was deliberately not ported. A
+# new version is curated by hand: copy the latest seeds/fixtures/<version>/ to
+# the next one, edit cases.json (seeds/README.md says what a case may hold),
+# and list its documents in manifest.json. The migrator's seed tests load
+# every committed version, so a malformed one fails `Backend (.NET)`.
+#
+# `publish` is here and NOT in CI, deliberately. Curating a
 # fixture is a human act — choosing which case, checking every value is
 # synthetic — and the bucket is written by a developer's own credentials so
 # that CI's seed role stays read-only on it (insolvia-services'
@@ -33,9 +35,7 @@
 #
 # ## Guards the loader enforces (this wrapper adds none)
 #
-# `capture` refuses any source table that is not a dev table — what a
-# developer typed into their own stack is synthetic by construction, and
-# nothing else is. `publish` refuses a bucket outside the
+# `publish` refuses a bucket outside the
 # insolvia-shared-dev-fixtures-* family and refuses to upload bytes that
 # disagree with manifest.json. Every fixture value must describe nobody;
 # review a seeds/fixtures/ diff with that question in mind.
@@ -43,9 +43,7 @@
 # ## AWS credentials
 #
 # The developer's own session, exported the way every dev-aws-* script exports
-# it (dev-aws-common.sh). The fixture bucket is account-level; the case table
-# and document bucket for `capture` are this machine's, read from its
-# Terraform state.
+# it (dev-aws-common.sh). The fixture bucket is account-level.
 #
 set -euo pipefail
 
@@ -54,7 +52,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/dev-aws-common.sh"
 
 usage() {
-  sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '2,24p' "$0" | sed 's/^# \{0,1\}//'
   exit "${1:-0}"
 }
 
@@ -63,16 +61,9 @@ COMMAND="$1"; VERSION="$2"; shift 2
 [[ "$VERSION" =~ ^v[0-9]+$ ]] || die "A fixture version looks like v1, not '$VERSION'."
 FOLDER="$REPO_ROOT/seeds/fixtures/$VERSION"
 
-for command in aws jq terraform; do require_command "$command"; done
+for command in aws jq; do require_command "$command"; done
 
-# capture only (see the header): the Python seeder over this machine's tables.
-seed() {
-  local venv_python="$API_DIR/.venv/bin/python"
-  [[ -x "$venv_python" ]] || die "No API venv at $venv_python. Run ./services/api/scripts/dev-setup.sh first."
-  PYTHONPATH="$REPO_ROOT/services/admin/src" "$venv_python" -m insolvia_admin.entrypoints.seed "$@"
-}
-
-# publish: the .NET migrator, from source. --version takes the folder path.
+# The .NET migrator, from source. --version takes the folder path.
 migrator() {
   require_command dotnet
   AWS_REGION="$AWS_REGION_VALUE" dotnet run --project "$REPO_ROOT/backend/src/Insolvia.Migrator" -- "$@"
@@ -96,26 +87,6 @@ case "$COMMAND" in
        apply (insolvia-services' scripts/apply-ci-trust.sh). Publish once the bucket exists."
     log "Publishing $VERSION to s3://$FIXTURE_BUCKET/$VERSION/"
     migrator seed-publish --version "$FOLDER" --fixture-bucket "$FIXTURE_BUCKET" "$@"
-    ;;
-  capture)
-    [[ $# -ge 2 ]] || usage 1
-    CASE_ID="$1"; HANDLE="$2"; shift 2
-    terraform_init
-    outputs="$(terraform_output_json)"
-    CASE_TABLE="$(jq -r '.case_table_name.value // empty' <<<"$outputs")"
-    DOCUMENT_BUCKET="$(jq -r '.case_document_bucket.value // empty' <<<"$outputs")"
-    # The firm table too: a case's debtors are copies of firm clients
-    # (ADR 0022), and capture writes those clients into the version.
-    FIRM_TABLE="$(jq -r '.firm_table_name.value // empty' <<<"$outputs")"
-    [[ "$CASE_TABLE" == "$CASE_TABLE_NAME_EXPECTED" ]] ||
-      die "Refusing: case table '$CASE_TABLE' is not '$CASE_TABLE_NAME_EXPECTED'."
-    [[ "$FIRM_TABLE" == "$FIRM_TABLE_NAME_EXPECTED" ]] ||
-      die "Refusing: firm table '$FIRM_TABLE' is not '$FIRM_TABLE_NAME_EXPECTED'."
-    log "Capturing case $CASE_ID from $CASE_TABLE as '$HANDLE' into $FOLDER"
-    seed capture --version "$FOLDER" --case "$CASE_ID" --handle "$HANDLE" \
-      --case-table "$CASE_TABLE" --firm-table "$FIRM_TABLE" \
-      --document-bucket "$DOCUMENT_BUCKET" "$@"
-    ok "Review the diff under seeds/fixtures/$VERSION, open a PR, then publish it once merged."
     ;;
   *) usage 1 ;;
 esac
