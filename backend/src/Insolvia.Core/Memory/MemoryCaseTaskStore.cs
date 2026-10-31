@@ -64,6 +64,18 @@ public sealed class MemoryCaseTaskStore : ICaseTaskStore
     }
 
     /// <inheritdoc />
+    public Task<IReadOnlyList<CaseTask>> ListForCasesAsync(IReadOnlyCollection<string> caseIds, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(caseIds);
+        var wanted = caseIds.ToHashSet(StringComparer.Ordinal);
+        lock (_gate)
+        {
+            IReadOnlyList<CaseTask> listed = [.. _rows.Where(pair => wanted.Contains(pair.Key.CaseId)).Select(pair => pair.Value)];
+            return Task.FromResult(listed);
+        }
+    }
+
+    /// <inheritdoc />
     public Task<bool> DeleteAsync(string caseId, string taskId, CancellationToken cancellationToken = default)
     {
         lock (_gate)

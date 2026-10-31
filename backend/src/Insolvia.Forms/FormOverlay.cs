@@ -355,7 +355,7 @@ public static partial class FormOverlay
         }
 
         using var source = new MemoryStream(pdf, writable: false);
-        var doc = PdfReader.Open(source, PdfDocumentOpenMode.Modify);
+        using var doc = PdfReader.Open(source, PdfDocumentOpenMode.Modify);
         var total = doc.PageCount;
         var signature = release.SignaturePages.ToHashSet();
         var keep = mode == SignaturePagesMode.Only
@@ -382,7 +382,7 @@ public static partial class FormOverlay
 
     /// <summary>The top-margin mark: date and time, UTC, stated as such.</summary>
     public static string StampText(DateTimeOffset printedAt) =>
-        "Printed " + printedAt.DateTime.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture) + " UTC";
+        "Printed " + printedAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture) + " UTC";
 
     /// <summary>
     /// Draw the requested marks on every page — <paramref name="pdf"/> itself,
@@ -397,7 +397,7 @@ public static partial class FormOverlay
         }
 
         using var source = new MemoryStream(pdf, writable: false);
-        var doc = PdfReader.Open(source, PdfDocumentOpenMode.Modify);
+        using var doc = PdfReader.Open(source, PdfDocumentOpenMode.Modify);
         var font = PdfDraw.AddHelvetica(doc);
         var stamp = printDate ? StampText(printedAt) : null;
         foreach (var page in doc.Pages)

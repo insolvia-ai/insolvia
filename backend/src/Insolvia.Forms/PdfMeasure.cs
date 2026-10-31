@@ -41,7 +41,7 @@ public static partial class PdfMeasure
         try
         {
             using var source = new MemoryStream(content, writable: false);
-            var doc = PdfReader.Open(source, PdfDocumentOpenMode.Import);
+            using var doc = PdfReader.Open(source, PdfDocumentOpenMode.Import);
             var pages = doc.Pages.Cast<PdfPage>().ToList();
             return new PacketPart(
                 name,

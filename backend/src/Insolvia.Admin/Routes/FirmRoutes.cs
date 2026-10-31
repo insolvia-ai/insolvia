@@ -221,14 +221,7 @@ public static class FirmRoutes
         {
             using var reader = new StreamReader(request.Body, Encoding.UTF8);
             var text = await reader.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
-            try
-            {
-                parsed = JsonNode.Parse(text, documentOptions: new JsonDocumentOptions { AllowDuplicateProperties = true });
-            }
-            catch (Exception error) when (error is JsonException or ArgumentException or InvalidOperationException)
-            {
-                parsed = null;
-            }
+            parsed = RequestBodies.Parse(text);
         }
 
         return parsed as JsonObject ?? throw new FieldValidationException(new Dictionary<string, string>

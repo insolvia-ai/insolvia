@@ -20,7 +20,10 @@
     <!-- The .NET analyzers at their recommended set, and the code-style rules in
          .editorconfig enforced at build time, so `dotnet build` and
          `dotnet format verify-no-changes` agree on what is wrong. -->
-    <AnalysisLevel>latest</AnalysisLevel>
+    <!-- Pinned, not `latest`: under warnings-as-errors a newer SDK band's
+         new rules would turn the build red with no change in this repo. Move
+         it with the SDK, on purpose. -->
+    <AnalysisLevel>10.0</AnalysisLevel>
     <AnalysisMode>Recommended</AnalysisMode>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>

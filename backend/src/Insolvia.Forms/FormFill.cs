@@ -85,7 +85,7 @@ public static class FormFill
         }
 
         using var source = new MemoryStream(template, writable: false);
-        var doc = PdfReader.Open(source, PdfDocumentOpenMode.Modify);
+        using var doc = PdfReader.Open(source, PdfDocumentOpenMode.Modify);
         if (fieldUpdates.Count > 0)
         {
             ApplyFieldUpdates(doc, fieldUpdates);
@@ -113,7 +113,7 @@ public static class FormFill
     internal static byte[] FillFields(byte[] pdf, IReadOnlyList<(string Name, string Value)> values)
     {
         using var source = new MemoryStream(pdf, writable: false);
-        var doc = PdfReader.Open(source, PdfDocumentOpenMode.Modify);
+        using var doc = PdfReader.Open(source, PdfDocumentOpenMode.Modify);
         ApplyFieldUpdates(doc, [.. values.Select(v => (v.Name, v.Name, v.Value, false))]);
         return Determinism.Save(doc, pdf);
     }

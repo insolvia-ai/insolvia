@@ -24,11 +24,13 @@ namespace Insolvia.Aws.Documents;
 /// </remarks>
 /// <param name="s3">The S3 client.</param>
 /// <param name="bucketName">The case-document bucket (<c>CASE_DOCUMENT_BUCKET</c>).</param>
-public sealed class S3DocumentBlobStore(IAmazonS3 s3, string bucketName) : IDocumentBlobStore
+/// <param name="clock">Dates a presigned URL's expiry; the system clock when null.</param>
+public sealed class S3DocumentBlobStore(IAmazonS3 s3, string bucketName, TimeProvider? clock = null) : IDocumentBlobStore
 {
     private const string TaggingHeader = "x-amz-tagging";
 
     private readonly IAmazonS3 _s3 = s3 ?? throw new ArgumentNullException(nameof(s3));
+    private readonly TimeProvider _clock = clock ?? TimeProvider.System;
 
     /// <summary>The bucket.</summary>
     public string BucketName { get; } = string.IsNullOrEmpty(bucketName) ? throw new ArgumentException("a bucket name is required", nameof(bucketName)) : bucketName;
@@ -115,7 +117,7 @@ public sealed class S3DocumentBlobStore(IAmazonS3 s3, string bucketName) : IDocu
             Key = storageRef,
             Verb = verb,
             Protocol = Protocol.HTTPS,
-            Expires = DateTime.UtcNow.AddSeconds(expiresIn),
+            Expires = _clock.GetUtcNow().UtcDateTime.AddSeconds(expiresIn),
         };
     }
 }

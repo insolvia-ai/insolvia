@@ -215,6 +215,24 @@ public sealed class FirmRouteTests(WebApplicationFactory<Program> factory) : ICl
     }
 
     [Fact]
+    public async Task A_repeated_key_keeps_its_last_value_as_json_loads_does()
+    {
+        // A JsonNode parsed with duplicates allowed only throws when first
+        // read — a 500 — so the body must be rebuilt, last value winning.
+        using var host = new AdminHost(factory);
+        using var client = host.CreateClient();
+        using var body = new StringContent(
+            """{"name": "Discarded", "name": "Example & Partners", "admin": {"email": "admin@example.test", "firstName": "Alice", "lastName": "Attorney"}}""",
+            System.Text.Encoding.UTF8,
+            "application/json");
+
+        var answer = await client.SendAsync(HttpMethod.Post, "/v1/firms", StaffToken(), content: body);
+
+        Assert.Equal(201, answer.Status);
+        Assert.Equal("Example & Partners", answer.Json["firm"]!["name"]!.GetValue<string>());
+    }
+
+    [Fact]
     public async Task The_body_cannot_demote_the_first_admin()
     {
         // isAdmin: false in the payload is overridden, not honoured.

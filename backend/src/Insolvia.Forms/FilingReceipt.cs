@@ -23,7 +23,7 @@ public static class FilingReceipt
     {
         ArgumentNullException.ThrowIfNull(filing);
         ArgumentNullException.ThrowIfNull(confirmation);
-        var doc = new PdfDocument();
+        using var doc = new PdfDocument();
         var page = doc.AddPage();
         page.MediaBox = new PdfRectangle(new PdfSharp.Drawing.XPoint(0, 0), new PdfSharp.Drawing.XPoint(PageWidth, PageHeight));
         var font = PdfDraw.AddHelvetica(doc);

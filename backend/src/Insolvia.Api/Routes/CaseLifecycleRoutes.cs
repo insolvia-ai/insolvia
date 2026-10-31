@@ -12,6 +12,7 @@ using Insolvia.Core.Debtors;
 using Insolvia.Core.FirmClients;
 using Insolvia.Core.Firms;
 using Insolvia.Core.Ports;
+using Insolvia.Core.TaxIds;
 
 namespace Insolvia.Api.Routes;
 
@@ -159,10 +160,12 @@ public sealed class CaseLifecycleRoutes : IEndpointModule
         return FlaskJson.NoContent();
     }
 
-    // A NEW case from this one's data. ORDER IS THE TRANSACTION'S SUBSTITUTE:
-    // the entities and sealed tax ids land first under the new id, while no
-    // case record reaches them; the case, its assignment and debtors last, in
-    // the case store's one transaction. The body is ignored.
+    // A NEW case from this one's data, ALL OR NONE in one unit of work: the
+    // case, its assignment and debtors first (the records' and sealed tax
+    // ids' foreign keys need the case row), then the records and tax ids.
+    // Python ordered the writes the other way, entities first, because
+    // DynamoDB had no foreign keys and order was its transaction's
+    // substitute; Postgres refuses that order. The body is ignored.
     private static async Task<IResult> CopyAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
     {
         var store = context.Cases();
@@ -185,6 +188,7 @@ public sealed class CaseLifecycleRoutes : IEndpointModule
         // The ciphertext copied as it is (its context names the firm and the
         // ref, never the case); a pointer whose item is missing is dropped.
         var copiedDebtors = new List<Debtor>();
+        var sealedIds = new List<SealedTaxId>();
         foreach (var debtor in copy.Debtors)
         {
             var kept = debtor;
@@ -201,21 +205,35 @@ public sealed class CaseLifecycleRoutes : IEndpointModule
                 }
                 else
                 {
-                    await taxIds.PutAsync(copy.Case.Id, sealedId, cancellationToken);
+                    sealedIds.Add(sealedId);
                 }
             }
 
             copiedDebtors.Add(kept);
         }
 
-        foreach (var entity in copy.Entities)
-        {
-            await entityStore.CreateAsync(entity, cancellationToken);
-        }
-
         try
         {
-            await store.CreateAsync(copy.Case, copy.Assignment, copiedDebtors, cancellationToken);
+            await context.Port<IUnitOfWork>().RunAsync(
+                async token =>
+                {
+                    await store.CreateAsync(copy.Case, copy.Assignment, copiedDebtors, token);
+                    foreach (var sealedId in sealedIds)
+                    {
+                        await taxIds.PutAsync(copy.Case.Id, sealedId, token);
+                    }
+
+                    foreach (var entity in copy.Entities)
+                    {
+                        await entityStore.CreateAsync(entity, token);
+                    }
+                },
+                // A lost commit acknowledgement: the replay meets its own
+                // case row. The copy's id is generated, so its presence is
+                // this commit — the case store's own check, which a joined
+                // call skips.
+                landed: async token => await store.GetAsync(copy.Case.Id, accessor, token) is not null,
+                cancellationToken);
         }
         catch (ClientUnavailableException refused)
         {

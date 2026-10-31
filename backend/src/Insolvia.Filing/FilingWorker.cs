@@ -305,7 +305,12 @@ public static class FilingWorker
         var joint = (await deps.Debtors.ListForCaseAsync(approval.CaseId, cancellationToken).ConfigureAwait(false)).Count > 1;
 
         // 9. sign in, open, upload.
-        var session = driver.Start(deps.Http());
+        // A fresh client per run (its cookies are this court session's), so
+        // this run disposes it: a warm container would otherwise keep every
+        // past run's handler, pool and court cookies until a GC.
+        var http = deps.Http();
+        using var ownedHttp = http as IDisposable;
+        var session = driver.Start(http);
         await SignInAsync(run, session, cancellationToken).ConfigureAwait(false);
         if (!await run.MoveAsync(FilingState.SignedIn, filing => filing with { Driver = driver.DriverId }, cancellationToken: cancellationToken).ConfigureAwait(false))
         {

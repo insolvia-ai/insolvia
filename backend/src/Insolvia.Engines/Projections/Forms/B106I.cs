@@ -12,7 +12,7 @@ namespace Insolvia.Engines.Projections.Forms;
 /// deductions, 7 = 4 - 6, 9 sums the other income, 10 = 7 + 9, line 12 adds
 /// Debtor 1's household contributions.
 /// </summary>
-public static class B106I
+public static partial class B106I
 {
     private static readonly Dictionary<EmploymentStatus, string> EmploymentExports = new()
     {
@@ -251,7 +251,14 @@ public static class B106I
     public static string ColumnWidget(FormRelease release, string fieldId, string digit)
     {
         ArgumentNullException.ThrowIfNull(release);
-        var pattern = new Regex($"[Dd]ebtor {digit}a?$", RegexOptions.CultureInvariant);
+        // Compiled once, not per call: Python's f-string pattern for the two
+        // digits it is ever called with ($, not \z, as Python's re matches).
+        var pattern = digit switch
+        {
+            "1" => Debtor1Column(),
+            "2" => Debtor2Column(),
+            _ => throw new EngineKeyException($"{fieldId} has no single debtor-{digit} column"),
+        };
         var matches = release.Field(fieldId).PdfNames.Where(name => pattern.IsMatch(name)).ToList();
         if (matches.Count != 1)
         {
@@ -272,4 +279,10 @@ public static class B106I
 
         values.Rows(fieldId)[ColumnWidget(release, fieldId, digit)] = fill;
     }
+
+    [GeneratedRegex("[Dd]ebtor 1a?$", RegexOptions.CultureInvariant)]
+    private static partial Regex Debtor1Column();
+
+    [GeneratedRegex("[Dd]ebtor 2a?$", RegexOptions.CultureInvariant)]
+    private static partial Regex Debtor2Column();
 }

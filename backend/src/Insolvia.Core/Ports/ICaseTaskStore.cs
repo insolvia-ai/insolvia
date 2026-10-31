@@ -21,6 +21,13 @@ public interface ICaseTaskStore
     /// <summary>Every task of one case, in creation order. All of them.</summary>
     Task<IReadOnlyList<CaseTask>> ListForCaseAsync(string caseId, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Every task of every case in <paramref name="caseIds"/>, in one read —
+    /// a cross-case listing (GET /v1/tasks), not one round trip per case. No
+    /// order promised; the caller orders. The caller resolved access first.
+    /// </summary>
+    Task<IReadOnlyList<CaseTask>> ListForCasesAsync(IReadOnlyCollection<string> caseIds, CancellationToken cancellationToken = default);
+
     /// <summary>Remove the record. True if this call removed it.</summary>
     Task<bool> DeleteAsync(string caseId, string taskId, CancellationToken cancellationToken = default);
 }

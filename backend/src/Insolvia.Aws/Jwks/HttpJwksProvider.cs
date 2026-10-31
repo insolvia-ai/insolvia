@@ -240,7 +240,7 @@ public sealed class HttpJwksProvider : IJwksProvider, IDisposable
 
     private async Task<Dictionary<string, SecurityKey>> FetchAsync()
     {
-        using var timeout = new CancellationTokenSource(_timeout);
+        using var timeout = new CancellationTokenSource(_timeout, _clock);
         using var response = await _http
             .GetAsync(JwksUrl, HttpCompletionOption.ResponseHeadersRead, timeout.Token)
             .ConfigureAwait(false);
