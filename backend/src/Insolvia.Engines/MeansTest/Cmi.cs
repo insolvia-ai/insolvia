@@ -13,7 +13,7 @@ namespace Insolvia.Engines.MeansTest;
 // entered override replaces a line and says so (issue #349).
 //
 // Rounding: `_money` quantizes with the context default (half-even); the
-// monthly averages (÷ 6) quantize half-up — both as the Python does.
+// monthly averages (÷ 6) quantize half-up — both part of the contract.
 
 /// <summary>The six-month lookback: the first day of the earliest month through the last day of the month before filing.</summary>
 public sealed record CmiWindow(DateOnly FilingDate, DateOnly Start, DateOnly End, IReadOnlyList<string> Months)
@@ -66,7 +66,7 @@ public static class Cmi
     /// <summary>Line 8's contention category.</summary>
     public const string UnemploymentAsSsa = "unemployment_as_ssa";
 
-    /// <summary>The § 101(10A)(B)(ii) categories, in the Python order.</summary>
+    /// <summary>The § 101(10A)(B)(ii) categories, in the wire order.</summary>
     public static readonly IReadOnlyList<string> ExcludedCategories = [.. IncomeRules.ExcludedCategories.Select(category => category.ToWire())];
 
     internal static readonly IReadOnlyDictionary<string, string> IncomeLabels = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -159,7 +159,7 @@ public static class Cmi
                 continue;
             }
 
-            var receivedText = Py.Iso(receivedOn);
+            var receivedText = Exact.Iso(receivedOn);
             if (category is null)
             {
                 problems.Add($"the {receivedText} receipt has no category — say what kind of income it is");
@@ -199,10 +199,10 @@ public static class Cmi
 
             entries.Add(new CmiEntry(
                 receivedText,
-                Py.F(amount),
+                Exact.F(amount),
                 IncomeLabels[category]
                     + (string.IsNullOrEmpty(record.Payer) ? string.Empty : $" — {record.Payer}")
-                    + (record.Expenses is { } shown ? $" (expenses {Py.F(shown)})" : string.Empty)));
+                    + (record.Expenses is { } shown ? $" (expenses {Exact.F(shown)})" : string.Empty)));
             byCategory[category] = (entries, gross, expenses);
         }
 
@@ -275,12 +275,12 @@ public static class Cmi
             }
         }
 
-        var monthly = Py.Quantize(combined / 6, PyRounding.HalfUp);
+        var monthly = Exact.Quantize(combined / 6, Rounding.HalfUp);
         return new CmiResult(
             window,
             columns,
-            Py.F(monthly),
-            Py.F(Py.Quantize(monthly * 12, PyRounding.HalfEven)),
+            Exact.F(monthly),
+            Exact.F(Exact.Quantize(monthly * 12, Rounding.HalfEven)),
             gaps,
             problems);
     }
@@ -293,10 +293,10 @@ public static class Cmi
     };
 
     // `_money`: quantize with the context default, ROUND_HALF_EVEN.
-    private static string Money(decimal value) => Py.Money(value, PyRounding.HalfEven);
+    private static string Money(decimal value) => Exact.Money(value, Rounding.HalfEven);
 
     // `_monthly_average`: (total / 6) quantized ROUND_HALF_UP.
-    private static string MonthlyAverage(decimal total) => Py.Money(total / 6, PyRounding.HalfUp);
+    private static string MonthlyAverage(decimal total) => Exact.Money(total / 6, Rounding.HalfUp);
 
     private static (Dictionary<string, List<CmiEntry>> Entries, Dictionary<string, decimal> Totals, List<CmiGap> Gaps) WageLines(
         CmiWindow window,
@@ -318,7 +318,7 @@ public static class Cmi
 
         foreach (var record in payPeriods)
         {
-            var where = $"pay period paid {(record.PayDate is { } paid ? Py.Iso(paid) : "undated")}";
+            var where = $"pay period paid {(record.PayDate is { } paid ? Exact.Iso(paid) : "undated")}";
             var employment = record.EmploymentId is not null ? employmentsById.GetValueOrDefault(record.EmploymentId) : null;
             if (employment is null)
             {
@@ -338,7 +338,7 @@ public static class Cmi
                 continue;
             }
 
-            var payText = Py.Iso(payDate);
+            var payText = Exact.Iso(payDate);
             if (record.Gross is not { } gross)
             {
                 problems.Add($"the {payText} paycheck from {employer} has no gross amount — CMI counts gross wages");
@@ -360,7 +360,7 @@ public static class Cmi
                 entries[column] = list;
             }
 
-            list.Add(new CmiEntry(payText, Py.F(gross), $"paycheck (gross) — {employer}"));
+            list.Add(new CmiEntry(payText, Exact.F(gross), $"paycheck (gross) — {employer}"));
         }
 
         var gaps = new List<CmiGap>();
@@ -376,7 +376,7 @@ public static class Cmi
             IEnumerable<string> expected = window.Months;
             if (employment.EmployedSince is { } since)
             {
-                var hiredMonth = Py.Iso(since)[..7];
+                var hiredMonth = Exact.Iso(since)[..7];
                 expected = expected.Where(month => string.CompareOrdinal(month, hiredMonth) >= 0);
             }
 
@@ -422,8 +422,8 @@ public static class Cmi
                 var existing = lines.FirstOrDefault(line => line.Category == "unemployment");
                 if (existing is not null)
                 {
-                    var before = Py.Dec(existing.TotalReceived);
-                    var after = Py.Max(before - (monthly * 6), 0m);
+                    var before = Exact.Dec(existing.TotalReceived);
+                    var after = Exact.Max(before - (monthly * 6), 0m);
                     total -= before - after;
                     lines[lines.IndexOf(existing)] = existing with
                     {
@@ -448,7 +448,7 @@ public static class Cmi
                 var existing = lines.FirstOrDefault(line => line.Category == category);
                 if (existing is not null)
                 {
-                    total -= Py.Dec(existing.TotalReceived);
+                    total -= Exact.Dec(existing.TotalReceived);
                     lines = [.. lines.Where(line => line.Category != category)];
                 }
 

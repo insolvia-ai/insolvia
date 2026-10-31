@@ -63,7 +63,7 @@ public sealed class KmsFilingCredentialSealer(IAmazonKeyManagementService kms, s
 /// The <c>credential.open</c> access row is NOT written here: Core's
 /// <c>FilingCredentialRules.OpenAsync</c> writes it before it calls this — the
 /// one place the plaintext is asked for, holding the filing and the purpose
-/// this type never sees — exactly as in Python. A second row here would
+/// this type never sees. A second row here would
 /// double every open in the log. The ordering is pinned by a test.
 /// </remarks>
 /// <param name="kms">The KMS client.</param>

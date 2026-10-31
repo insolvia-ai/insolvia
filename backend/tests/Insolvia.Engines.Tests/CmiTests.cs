@@ -24,9 +24,9 @@ public sealed class CmiTests
     [InlineData("2026-01-02", "2025-07-01", "2025-12-31", "2025-07", "2025-12")]
     public void The_window_is_six_whole_calendar_months(string filing, string start, string end, string firstMonth, string lastMonth)
     {
-        var window = Cmi.Window(Py.ParseIso(filing)!.Value);
-        Assert.Equal(Py.ParseIso(start), window.Start);
-        Assert.Equal(Py.ParseIso(end), window.End);
+        var window = Cmi.Window(Exact.ParseIso(filing)!.Value);
+        Assert.Equal(Exact.ParseIso(start), window.Start);
+        Assert.Equal(Exact.ParseIso(end), window.End);
         Assert.Equal(6, window.Months.Count);
         Assert.Equal(firstMonth, window.Months[0]);
         Assert.Equal(lastMonth, window.Months[^1]);
@@ -202,7 +202,7 @@ public sealed class CmiTests
             otherIncome: [Receipt(OtherIncomeCategory.InterestDividendsRoyalties, new DateOnly(2026, 6, 30), 90.00m)]);
         foreach (var line in result.Columns.SelectMany(column => column.Lines).Where(line => line.Note.Length == 0))
         {
-            Assert.Equal(Py.Dec(line.TotalReceived), line.Entries.Sum(entry => Py.Dec(entry.Amount)));
+            Assert.Equal(Exact.Dec(line.TotalReceived), line.Entries.Sum(entry => Exact.Dec(entry.Amount)));
         }
 
         Assert.Equal("5215.00", result.CombinedMonthlyTotal);

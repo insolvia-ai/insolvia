@@ -34,7 +34,7 @@ namespace Insolvia.Api.Routes;
 /// created, so the common refusal costs no account. What remains is the race
 /// the store's transaction refuses, which leaves a pool user with no binding —
 /// a state every portal route already answers 403 for.</para>
-/// <para>Per CASE, as the Python is today: #501 (portal access keyed to the
+/// <para>Per CASE for now: #501 (portal access keyed to the
 /// client) re-keys this; see that issue for the new shape.</para>
 /// </remarks>
 public sealed class PortalInvitationRoutes : IEndpointModule
@@ -191,14 +191,14 @@ public sealed class PortalInvitationRoutes : IEndpointModule
         try
         {
             // Stable per binding and per write, so a retry of this one request
-            // dedupes at the mailer. (As in Python, a re-send does not rewrite
-            // the binding, so it carries the invitation's key.)
+            // dedupes at the mailer. (A re-send does not rewrite the binding, so
+            // it carries the invitation's key.)
             await context.Port<IMailer>().SendAsync(
                 email,
                 $"client-invitation:{binding.CaseId}:{binding.Subject}:{FlaskJson.Micros(binding.UpdatedAt)}",
                 cancellationToken);
         }
-#pragma warning disable CA1031 // Python's `except Exception`: the mail is best effort, the invitation already stands.
+#pragma warning disable CA1031 // The mail is best effort; the invitation already stands.
         catch (Exception)
 #pragma warning restore CA1031
         {

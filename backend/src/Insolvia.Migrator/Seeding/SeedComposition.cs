@@ -42,7 +42,7 @@ public sealed record SeedReport(string Environment, string Fixture, bool Check, 
 /// address (<see cref="LocalSeedAccounts"/>); a Lambda refuses.</description></item>
 /// <item><term>Bytes</term><description><c>CASE_DOCUMENT_BUCKET</c> and
 /// <c>INSOLVIA_SEED_FIXTURE_BUCKET</c> → server-side S3 copies from the shared
-/// fixture bucket with Python's keys (<c>&lt;version&gt;/objects/…</c>); a
+/// fixture bucket with the keys already in it (<c>&lt;version&gt;/objects/…</c>); a
 /// Lambda requires both. Unset, locally only, the committed
 /// <c>seeds/fixtures</c> tree is the source and
 /// <c>INSOLVIA_SEED_DOCUMENT_DIR</c> (default: a temp directory) the target.</description></item>

@@ -279,7 +279,7 @@ public sealed class Chapter13PlanTests
     [InlineData("1000000", "53250.00")]
     [InlineData("1100000", "56250.00")]
     public void The_section_326a_commission_follows_the_statutes_bands(string disbursed, string commission) =>
-        Assert.Equal(Py.Dec(commission), Section326aCommission(Py.Dec(disbursed)));
+        Assert.Equal(Exact.Dec(commission), Section326aCommission(Exact.Dec(disbursed)));
 
     [Fact]
     public void Other_chapter_7_costs_lower_the_floor() =>
@@ -332,8 +332,8 @@ public sealed class Chapter13PlanTests
 
     private static AssetExemptions Equity(string assetId, decimal value, decimal liens, decimal exempt)
     {
-        var net = Py.Max(value - liens, 0m);
-        return new AssetExemptions(assetId, assetId, null, value, liens, net, exempt, Py.Max(net - exempt, 0m), null, false, [], []);
+        var net = Exact.Max(value - liens, 0m);
+        return new AssetExemptions(assetId, assetId, null, value, liens, net, exempt, Exact.Max(net - exempt, 0m), null, false, [], []);
     }
 
     private static PlanBody Plan(string? overrides = null, string? remove = null)

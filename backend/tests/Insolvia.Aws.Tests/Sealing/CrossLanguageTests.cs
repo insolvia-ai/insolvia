@@ -45,7 +45,7 @@ public sealed class CrossLanguageTests
         Assert.Equal(sealedCase.Plaintext, await SealedFixtures.OpenAsync(sealedCase, sealedCase.Envelope, sealedCase.Context, kms));
         if (sealedCase.KeyId is not null)
         {
-            // What Python's adapter sends on open: KeyId, the wrapped blob, the same context.
+            // What the adapter sends on open: KeyId, the wrapped blob, the same context.
             var decrypt = Assert.IsType<DecryptRequest>(Assert.Single(state.Requests));
             Assert.Equal(sealedCase.KeyId, decrypt.KeyId);
             Assert.Equal(sealedCase.Context, decrypt.EncryptionContext);

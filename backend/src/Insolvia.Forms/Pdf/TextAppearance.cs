@@ -8,9 +8,9 @@ namespace Insolvia.Forms.Pdf;
 /// <summary>
 /// The text appearance stream of a text or choice widget — a port of pypdf
 /// 6.16.2's <c>TextStreamAppearance.from_text_annotation</c>
-/// (<c>pypdf/generic/_appearance_stream.py</c>), the path services/api runs
+/// (<c>pypdf/generic/_appearance_stream.py</c>), the path services/api ran
 /// with <c>auto_regenerate=False</c>. Numbers print the way Python's
-/// f-strings print them (<see cref="PyNum"/>), so the streams are byte-equal
+/// f-strings print them (<see cref="TypedNumber"/>), so the streams are byte-equal
 /// to pypdf's.
 /// </summary>
 /// <remarks>
@@ -30,7 +30,7 @@ namespace Insolvia.Forms.Pdf;
 internal static class TextAppearance
 {
     private const double TextSpaceToGlyphSpace = 1000;
-    private static readonly PyNum MultilineDefaultSize = PyNum.Int(12);
+    private static readonly TypedNumber MultilineDefaultSize = TypedNumber.Int(12);
 
     /// <summary>Generate and install the widget's appearance (pypdf's write path, with the shared /N replaced in place).</summary>
     public static void Write(PdfDocument doc, PdfDictionary acroForm, PdfPage page, PdfDictionary field, PdfDictionary widget)
@@ -70,7 +70,7 @@ internal static class TextAppearance
         var daFontName = properties[tf - 2];
         properties.RemoveAt(tf - 2);
         tf = properties.IndexOf("Tf");
-        var fontSize = PyNum.Float(double.Parse(properties[tf - 1], System.Globalization.CultureInfo.InvariantCulture));
+        var fontSize = TypedNumber.Float(double.Parse(properties[tf - 1], System.Globalization.CultureInfo.InvariantCulture));
         properties.RemoveAt(tf - 1);
         properties.Remove("Tf");
         var fontColor = string.Join(' ', properties);
@@ -87,13 +87,13 @@ internal static class TextAppearance
         int? maxLength = isComb && widget.Elements.ContainsKey("/MaxLen") ? (int)Num(widget.Elements["/MaxLen"]) : null;
         var isMultiline = (flags & (1 << 12)) != 0;
         var alignment = field.Elements.ContainsKey("/Q") ? (int)Num(field.Elements["/Q"]) : 0;
-        var borderWidth = PyNum.Int(1);
+        var borderWidth = TypedNumber.Int(1);
         var borderStyle = "/S";
         if (Dict(field.Elements["/BS"]) is { } bs)
         {
             if (bs.Elements.ContainsKey("/W"))
             {
-                borderWidth = PyNumber(bs.Elements["/W"]);
+                borderWidth = TypedNumberOf(bs.Elements["/W"]);
             }
 
             borderStyle = Str(bs, "/S") ?? borderStyle;
@@ -215,7 +215,7 @@ internal static class TextAppearance
 
         if (!font.CanEncode(text))
         {
-            var missing = string.Concat(Py.Chars(text).Where(ch => !font.Encoding.Values.Contains(ch)).Distinct(StringComparer.Ordinal));
+            var missing = string.Concat(CodePoints.Chars(text).Where(ch => !font.Encoding.Values.Contains(ch)).Distinct(StringComparer.Ordinal));
             throw new UnencodableTextException(font.Name, missing);
         }
 
@@ -283,10 +283,10 @@ internal static class TextAppearance
         var tx = -Math.Min(Math.Min(0.0, bottomRight.X), Math.Min(topLeft.X, topRight.X));
         var ty = -Math.Min(Math.Min(0.0, bottomRight.Y), Math.Min(topLeft.Y, topRight.Y));
         double[] ctm = [a, b, c, d, tx, ty];
-        return new PdfArray(doc, [.. ctm.Select(v => (PdfItem)new PdfReal(PyNum.Round(v, 3)))]);
+        return new PdfArray(doc, [.. ctm.Select(v => (PdfItem)new PdfReal(TypedNumber.Round(v, 3)))]);
     }
 
-    private sealed record Line(PyNum Width, string Word, string Glyphs);
+    private sealed record Line(TypedNumber Width, string Word, string Glyphs);
 
     /// <summary>pypdf's <c>_generate_appearance_stream_data</c>.</summary>
     internal static byte[] Stream(
@@ -294,7 +294,7 @@ internal static class TextAppearance
         IReadOnlyList<string> selection,
         Font font,
         string fontName,
-        PyNum fontSize,
+        TypedNumber fontSize,
         string fontColor,
         bool isMultiline,
         int alignment,
@@ -302,23 +302,23 @@ internal static class TextAppearance
         int? maxLength,
         double rectWidth,
         double rectHeight,
-        PyNum borderWidth,
+        TypedNumber borderWidth,
         string borderStyle)
     {
-        var width = PyNum.Float(rectWidth);
-        var height = PyNum.Float(rectHeight);
+        var width = TypedNumber.Float(rectWidth);
+        var height = TypedNumber.Float(rectHeight);
         var bbox = font.Descriptor.BBox;
-        var leadingFactor = PyNum.Float((bbox[3] - bbox[1]) / TextSpaceToGlyphSpace);
-        var factor = PyNum.Int(borderStyle is "/B" or "/I" ? 2 : 1);
-        var margin = PyNum.Max(borderWidth * factor, PyNum.Int(1));
-        var fieldHeight = height - (PyNum.Int(2) * margin);
-        var fieldWidth = width - (PyNum.Int(4) * margin);
-        var thousand = PyNum.Int(1000);
+        var leadingFactor = TypedNumber.Float((bbox[3] - bbox[1]) / TextSpaceToGlyphSpace);
+        var factor = TypedNumber.Int(borderStyle is "/B" or "/I" ? 2 : 1);
+        var margin = TypedNumber.Max(borderWidth * factor, TypedNumber.Int(1));
+        var fieldHeight = height - (TypedNumber.Int(2) * margin);
+        var fieldWidth = width - (TypedNumber.Int(4) * margin);
+        var thousand = TypedNumber.Int(1000);
 
         List<Line> lines;
         if (fontSize.Value == 0)
         {
-            var minFontSize = PyNum.Float(4.0);
+            var minFontSize = TypedNumber.Float(4.0);
             if (selection.Count > 0)
             {
                 isMultiline = false;
@@ -327,15 +327,15 @@ internal static class TextAppearance
             if (isMultiline)
             {
                 var paragraphs = new List<List<Line>>();
-                foreach (var line in Py.SplitLines(text))
+                foreach (var line in CodePoints.SplitLines(text))
                 {
-                    if (Py.IsBlank(line))
+                    if (CodePoints.IsBlank(line))
                     {
-                        paragraphs.Add([new Line(PyNum.Float(0.0), string.Empty, string.Empty)]);
+                        paragraphs.Add([new Line(TypedNumber.Float(0.0), string.Empty, string.Empty)]);
                         continue;
                     }
 
-                    paragraphs.Add([.. line.Split(' ').Select(word => new Line(PyNum.Float(font.TextWidth(word)) / thousand, word, font.ToGlyphs(word)))]);
+                    paragraphs.Add([.. line.Split(' ').Select(word => new Line(TypedNumber.Float(font.TextWidth(word)) / thousand, word, font.ToGlyphs(word)))]);
                 }
 
                 (lines, fontSize) = ScaleText(font, MultilineDefaultSize, leadingFactor, fieldWidth, fieldHeight, paragraphs, minFontSize);
@@ -344,9 +344,9 @@ internal static class TextAppearance
             {
                 var maxVertical = fieldHeight / leadingFactor;
                 var glyphs = font.ToGlyphs(text);
-                var unscaled = PyNum.Float(font.TextWidth(glyphs)) / thousand;
-                var maxHorizontal = fieldWidth / (unscaled.Value == 0 ? PyNum.Int(1) : unscaled);
-                fontSize = PyNum.Round1(PyNum.Max(PyNum.Min(maxVertical, maxHorizontal), minFontSize));
+                var unscaled = TypedNumber.Float(font.TextWidth(glyphs)) / thousand;
+                var maxHorizontal = fieldWidth / (unscaled.Value == 0 ? TypedNumber.Int(1) : unscaled);
+                fontSize = TypedNumber.Round1(TypedNumber.Max(TypedNumber.Min(maxVertical, maxHorizontal), minFontSize));
                 lines = [new Line(unscaled * fontSize, text, glyphs)];
             }
         }
@@ -354,13 +354,13 @@ internal static class TextAppearance
         {
             lines = [];
             var index = 0;
-            var limit = maxLength is > 0 ? maxLength.Value : Py.Length(text);
-            foreach (var ch in Py.Chars(text))
+            var limit = maxLength is > 0 ? maxLength.Value : CodePoints.Length(text);
+            foreach (var ch in CodePoints.Chars(text))
             {
                 if (index < limit)
                 {
                     var glyphs = font.ToGlyphs(ch);
-                    lines.Add(new Line(PyNum.Float(font.TextWidth(glyphs)) * fontSize / thousand, ch, glyphs));
+                    lines.Add(new Line(TypedNumber.Float(font.TextWidth(glyphs)) * fontSize / thousand, ch, glyphs));
                 }
 
                 index++;
@@ -368,56 +368,56 @@ internal static class TextAppearance
         }
         else
         {
-            lines = [.. Py.SplitLines(text).Select(line =>
+            lines = [.. CodePoints.SplitLines(text).Select(line =>
             {
                 var glyphs = font.ToGlyphs(line);
-                return new Line(PyNum.Float(font.TextWidth(glyphs)) * fontSize / thousand, line, glyphs);
+                return new Line(TypedNumber.Float(font.TextWidth(glyphs)) * fontSize / thousand, line, glyphs);
             })];
         }
 
         var yOffset = isMultiline
-            ? height + margin - (PyNum.Float(bbox[3]) * fontSize / thousand)
-            : margin + ((fieldHeight - (PyNum.Float(font.Descriptor.Ascent) * fontSize / thousand)) / PyNum.Int(2));
+            ? height + margin - (TypedNumber.Float(bbox[3]) * fontSize / thousand)
+            : margin + ((fieldHeight - (TypedNumber.Float(font.Descriptor.Ascent) * fontSize / thousand)) / TypedNumber.Int(2));
         var defaultAppearance = $"{fontName} {fontSize} Tf {fontColor}";
 
         var output = new List<byte>();
         void Emit(string ascii) => output.AddRange(Encoding.UTF8.GetBytes(ascii));
 
-        Emit($"q\n/Tx BMC \nq\n{PyNum.Int(2) * margin} {margin} {fieldWidth} {fieldHeight} re\nW\nBT\n{defaultAppearance}\n");
-        var currentX = PyNum.Int(0);
+        Emit($"q\n/Tx BMC \nq\n{TypedNumber.Int(2) * margin} {margin} {fieldWidth} {fieldHeight} re\nW\nBT\n{defaultAppearance}\n");
+        var currentX = TypedNumber.Int(0);
         var selectedGlyphs = selection.Count > 0 ? font.ToGlyphs(string.Concat(selection)) : string.Empty;
         for (var lineNumber = 0; lineNumber < lines.Count; lineNumber++)
         {
             var line = lines[lineNumber];
             if (selection.Count > 0 && selectedGlyphs.Contains(line.Glyphs, StringComparison.Ordinal))
             {
-                var top = yOffset - (PyNum.Int(lineNumber) * fontSize * leadingFactor) - PyNum.Int(1);
-                Emit($"1 {top} {width - PyNum.Int(2)} {fontSize + PyNum.Int(2)} re\n0.5 0.5 0.5 rg s\n{defaultAppearance}\n");
+                var top = yOffset - (TypedNumber.Int(lineNumber) * fontSize * leadingFactor) - TypedNumber.Int(1);
+                Emit($"1 {top} {width - TypedNumber.Int(2)} {fontSize + TypedNumber.Int(2)} re\n0.5 0.5 0.5 rg s\n{defaultAppearance}\n");
             }
 
-            PyNum desired;
+            TypedNumber desired;
             if (isComb && maxLength is > 0)
             {
-                var cell = width / PyNum.Int(maxLength.Value);
-                desired = (PyNum.Int(lineNumber) * cell) + ((cell - line.Width) / PyNum.Int(2));
+                var cell = width / TypedNumber.Int(maxLength.Value);
+                desired = (TypedNumber.Int(lineNumber) * cell) + ((cell - line.Width) / TypedNumber.Int(2));
             }
             else if (alignment == 2)
             {
-                desired = width - (margin * PyNum.Int(2)) - line.Width;
+                desired = width - (margin * TypedNumber.Int(2)) - line.Width;
             }
             else if (alignment == 1)
             {
-                desired = (width - line.Width) / PyNum.Int(2);
+                desired = (width - line.Width) / TypedNumber.Int(2);
             }
             else
             {
-                desired = margin * PyNum.Int(2);
+                desired = margin * TypedNumber.Int(2);
             }
 
             var xRel = desired - currentX;
             var yRel = lineNumber == 0
                 ? yOffset
-                : isComb ? PyNum.Float(0.0) : -fontSize * leadingFactor;
+                : isComb ? TypedNumber.Float(0.0) : -fontSize * leadingFactor;
             Emit($"{xRel} {yRel} Td\n");
             currentX = desired;
 
@@ -441,22 +441,22 @@ internal static class TextAppearance
     }
 
     /// <summary>pypdf's <c>_scale_text</c>: wrap by words, and shrink by 0.2 pt until the lines fit.</summary>
-    private static (List<Line> Lines, PyNum FontSize) ScaleText(Font font, PyNum fontSize, PyNum leadingFactor, PyNum fieldWidth, PyNum fieldHeight, List<List<Line>> paragraphs, PyNum minFontSize)
+    private static (List<Line> Lines, TypedNumber FontSize) ScaleText(Font font, TypedNumber fontSize, TypedNumber leadingFactor, TypedNumber fieldWidth, TypedNumber fieldHeight, List<List<Line>> paragraphs, TypedNumber minFontSize)
     {
-        var step = PyNum.Float(0.2);
+        var step = TypedNumber.Float(0.2);
         while (true)
         {
             var wrapped = new List<Line>();
             var current = new List<Line>();
-            var currentWidth = PyNum.Int(0);
-            var spaceWidth = PyNum.Float(font.SpaceWidth) * fontSize / PyNum.Int(1000);
+            var currentWidth = TypedNumber.Int(0);
+            var spaceWidth = TypedNumber.Float(font.SpaceWidth) * fontSize / TypedNumber.Int(1000);
             foreach (var paragraph in paragraphs)
             {
                 for (var i = 0; i < paragraph.Count; i++)
                 {
                     var word = paragraph[i];
                     var wordWidth = word.Width * fontSize;
-                    var testWidth = currentWidth + wordWidth + (i > 0 ? spaceWidth : PyNum.Int(0));
+                    var testWidth = currentWidth + wordWidth + (i > 0 ? spaceWidth : TypedNumber.Int(0));
                     if (testWidth.Value > fieldWidth.Value && current.Count > 0)
                     {
                         wrapped.Add(Joined(current, currentWidth, font));
@@ -467,7 +467,7 @@ internal static class TextAppearance
                     {
                         wrapped.Add(new Line(wordWidth, word.Word, word.Glyphs));
                         current = [];
-                        currentWidth = PyNum.Int(0);
+                        currentWidth = TypedNumber.Int(0);
                     }
                     else
                     {
@@ -485,11 +485,11 @@ internal static class TextAppearance
                 {
                     wrapped.Add(Joined(current, currentWidth, font));
                     current = [];
-                    currentWidth = PyNum.Int(0);
+                    currentWidth = TypedNumber.Int(0);
                 }
             }
 
-            var estimated = fontSize + (PyNum.Int(wrapped.Count - 1) * leadingFactor * fontSize);
+            var estimated = fontSize + (TypedNumber.Int(wrapped.Count - 1) * leadingFactor * fontSize);
             if (estimated.Value > fieldHeight.Value)
             {
                 var smaller = fontSize - step;
@@ -500,11 +500,11 @@ internal static class TextAppearance
                 }
             }
 
-            return (wrapped, PyNum.Round1(fontSize));
+            return (wrapped, TypedNumber.Round1(fontSize));
         }
     }
 
-    private static Line Joined(List<Line> words, PyNum width, Font font) =>
+    private static Line Joined(List<Line> words, TypedNumber width, Font font) =>
         new(width, string.Join(' ', words.Select(w => w.Word)), string.Join(font.SpaceChar, words.Select(w => w.Glyphs)));
 }
 

@@ -119,7 +119,7 @@ public static class B113
         return values;
     }
 
-    private static string Str(decimal? value) => value is { } present ? Py.F(present) : "None";
+    private static string Str(decimal? value) => value is { } present ? Exact.F(present) : "None";
 
     private static TextFill MoneyText(decimal value) => new(FormatMoney(value));
 
@@ -248,7 +248,7 @@ public static class B113
         else
         {
             values["line_2_4_additional"] = new CheckFill();
-            var described = string.Join("; ", lumps.Select(lump => $"{(string.IsNullOrEmpty(lump.Description) ? "Lump sum" : lump.Description)}: ${Py.Grouped(lump.Amount)} in month {lump.Month}"));
+            var described = string.Join("; ", lumps.Select(lump => $"{(string.IsNullOrEmpty(lump.Description) ? "Lump sum" : lump.Description)}: ${Exact.Grouped(lump.Amount)} in month {lump.Month}"));
             var spec = release.Field("line_2_4_description");
             var box = release.Boxes[spec.PdfNames[0]];
             var wrapped = WrapWidth(described, box.W, spec.PdfNames.Count, "line_2_4_description", problems, box.Size);

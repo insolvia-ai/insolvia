@@ -7,7 +7,7 @@ namespace Insolvia.Core;
 /// Python's <c>isinstance</c> checks, over a parsed JSON body. The domain's
 /// parsers take a request body as <see cref="JsonNode"/> — the C# shape of
 /// Python's <c>Mapping[str, object]</c> — and each check here answers exactly
-/// what its Python counterpart did: a JSON <c>true</c> is NOT a whole number
+/// what its <c>isinstance</c> spec does: a JSON <c>true</c> is NOT a whole number
 /// (Python's <c>bool</c> is an <c>int</c> subclass and every parser excludes
 /// it), and <c>1.0</c> is a number but not a whole number.
 /// </summary>

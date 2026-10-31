@@ -6,7 +6,7 @@ namespace Insolvia.Core.Ports;
 /// a firm's default court is validated exactly as a case's own reference is.
 /// The registry itself — <c>courts.py</c> and the release files under
 /// <c>regulatory/courts/us-bankruptcy/</c> — belongs to the case half (18.7),
-/// which implements this; codes match exactly, as Python's did. Synchronous:
+/// which implements this; codes match exactly, as the contract requires. Synchronous:
 /// the registry ships in the artifact (ADR 0014) and is read from memory.
 /// </summary>
 public interface ICourtRegistry

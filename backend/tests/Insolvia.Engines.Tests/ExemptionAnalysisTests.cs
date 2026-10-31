@@ -286,7 +286,7 @@ public sealed class ExemptionAnalysisTests
     {
         SofaEntryBody[] entries = which is null
             ? []
-            : [new SofaEntryBody(SofaEntryType.PriorAddress, new PriorAddress(Wire.TryParse<SofaDebtor>(which, out var debtor) ? debtor : null, new Address(State: "NY"), new DateOnly(2022, 1, 1), Py.ParseIso(toDate)))];
+            : [new SofaEntryBody(SofaEntryType.PriorAddress, new PriorAddress(Wire.TryParse<SofaDebtor>(which, out var debtor) ? debtor : null, new Address(State: "NY"), new DateOnly(2022, 1, 1), Exact.ParseIso(toDate)))];
         Assert.Equal(warned, Analysis("FL", sofa: entries).Warnings.Any(warning => warning.Contains("§ 522(b)(3)(A)", StringComparison.Ordinal)));
     }
 
@@ -320,7 +320,7 @@ public sealed class ExemptionAnalysisTests
     }
 
     private static (string, ExemptionBody) Claim(string id, string assetId, string citation, string? amount = null, bool? fullFmv = null, bool? acquired = null) =>
-        (id, new ExemptionBody(assetId, citation, amount is null ? null : Py.Dec(amount), fullFmv, acquired));
+        (id, new ExemptionBody(assetId, citation, amount is null ? null : Exact.Dec(amount), fullFmv, acquired));
 
     private static ExemptionAnalysis Analysis(
         string? state,

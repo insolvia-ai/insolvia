@@ -82,12 +82,12 @@ public static class FirmClientRules
     {
         ArgumentNullException.ThrowIfNull(payload);
         var merged = Json.AsString(payload["merged_client_id"]);
-        if (merged is null || PyText.Strip(merged).Length == 0)
+        if (merged is null || TextRules.Strip(merged).Length == 0)
         {
             throw new FieldValidationException(new Dictionary<string, string> { ["merged_client_id"] = "Choose the client to merge into this one." });
         }
 
-        return PyText.Strip(merged);
+        return TextRules.Strip(merged);
     }
 
     /// <summary><c>PUT /v1/firm/clients/&lt;id&gt;/status</c>: archive, or bring back. Never a delete.</summary>
@@ -171,9 +171,9 @@ public static class FirmClientRules
     {
         ArgumentNullException.ThrowIfNull(clients);
         return clients
-            .OrderBy(client => PyText.Casefold(client.Name.Surname ?? string.Empty), StringComparer.Ordinal)
-            .ThenBy(client => PyText.Casefold(client.Name.Given ?? string.Empty), StringComparer.Ordinal)
-            .ThenBy(client => PyText.Casefold(client.Name.Middle ?? string.Empty), StringComparer.Ordinal)
+            .OrderBy(client => TextRules.Casefold(client.Name.Surname ?? string.Empty), StringComparer.Ordinal)
+            .ThenBy(client => TextRules.Casefold(client.Name.Given ?? string.Empty), StringComparer.Ordinal)
+            .ThenBy(client => TextRules.Casefold(client.Name.Middle ?? string.Empty), StringComparer.Ordinal)
             .ThenBy(client => client.Id, StringComparer.Ordinal)
             .ToValueCollection();
     }

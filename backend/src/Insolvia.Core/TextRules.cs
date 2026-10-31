@@ -7,7 +7,7 @@ namespace Insolvia.Core;
 /// The handful of Python <c>str</c> behaviours the domain's rules lean on,
 /// spelled out once so every parser measures and trims the same way.
 /// </summary>
-public static class PyText
+public static class TextRules
 {
     /// <summary>Python's <c>len(s)</c>: Unicode code points, not UTF-16 units.</summary>
     public static int Length(string value)
@@ -41,7 +41,7 @@ public static class PyText
     /// the only difference is the handful of characters casefold expands
     /// (<c>ß</c> to <c>ss</c>), which no rule here depends on.
     /// </summary>
-    [SuppressMessage("Globalization", "CA1308:Normalize strings to uppercase", Justification = "Python lower-cases (casefold); a sort over the upper-cased form orders punctuation differently.")]
+    [SuppressMessage("Globalization", "CA1308:Normalize strings to uppercase", Justification = "The rule lower-cases (casefold); a sort over the upper-cased form orders punctuation differently.")]
     public static string Casefold(string value)
     {
         ArgumentNullException.ThrowIfNull(value);
@@ -49,7 +49,7 @@ public static class PyText
     }
 
     /// <summary>Python's <c>s.lower()</c>, for values that are STORED lower-cased (email addresses).</summary>
-    [SuppressMessage("Globalization", "CA1308:Normalize strings to uppercase", Justification = "The stored form is lower-case, as the Python domain wrote it; Cognito's pool is case-insensitive.")]
+    [SuppressMessage("Globalization", "CA1308:Normalize strings to uppercase", Justification = "The stored form is lower-case; Cognito's pool is case-insensitive.")]
     public static string Lower(string value)
     {
         ArgumentNullException.ThrowIfNull(value);
@@ -65,8 +65,8 @@ public static class PyText
 }
 
 /// <summary>
-/// The server's write-time instant. Python stamped every record with
-/// <c>datetime.now(UTC)</c> directly; here the clock is a
+/// The server's write-time instant: <c>datetime.now(UTC)</c> on every record,
+/// with the clock as a
 /// <see cref="TimeProvider"/> argument that defaults to the system clock, so
 /// a test can pin it without a port of its own.
 /// </summary>

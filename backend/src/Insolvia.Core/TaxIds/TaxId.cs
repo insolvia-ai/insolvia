@@ -107,7 +107,7 @@ public static class TaxIdRules
         if (kept is not null)
         {
             var keptText = Json.AsString(kept);
-            if (keptText is null || keptText.Length != 4 || !PyText.IsDigits(keptText))
+            if (keptText is null || keptText.Length != 4 || !TextRules.IsDigits(keptText))
             {
                 errors[$"{path}.last_four"] = "Must be exactly four digits.";
                 return null;
@@ -240,7 +240,7 @@ public static class TaxIdRules
     private static string? Digits(string value)
     {
         var stripped = new string([.. value.Where(ch => ch is not '-' and not ' ')]);
-        return stripped.Length == 9 && PyText.IsDigits(stripped) && stripped.All(char.IsAsciiDigit) ? stripped : null;
+        return stripped.Length == 9 && TextRules.IsDigits(stripped) && stripped.All(char.IsAsciiDigit) ? stripped : null;
     }
 
     private static string? SsnProblem(string digits)

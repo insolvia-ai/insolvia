@@ -8,8 +8,8 @@ namespace Insolvia.Aws.Jobs;
 /// <summary>
 /// The enqueue side of the pipeline (Python's <c>SqsJobQueue</c>; ADR 0018).
 /// Deliberately thin: the body is <see cref="JobRules.MessageBody"/> — the
-/// one owner of the wire shape, identifiers only, byte-for-byte what Python
-/// sent — so this adapter cannot invent a contract of its own. The worker's
+/// one owner of the wire shape, identifiers only, byte-for-byte the shape
+/// the queue already carries — so this adapter cannot invent a contract of its own. The worker's
 /// Lambda handler and local poller parse it with
 /// <see cref="JobRules.ParseMessageBody"/>.
 /// </summary>

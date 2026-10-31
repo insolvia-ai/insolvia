@@ -121,7 +121,7 @@ public static class B106C
             .ToList();
         decimal? cap = ExemptionRegistry.FederalLimits(caseFile.CreatedOn)
             .Where(limit => limit.LimitId == HomesteadCapLimitId)
-            .Select(limit => (decimal?)Py.Dec(limit.Amount))
+            .Select(limit => (decimal?)Exact.Dec(limit.Amount))
             .FirstOrDefault();
         var claimed = homesteads.Aggregate(0m, (sum, exemption) => sum + ClaimedAmount(exemption, caseFile));
         var overCap = cap is not null && claimed > cap;

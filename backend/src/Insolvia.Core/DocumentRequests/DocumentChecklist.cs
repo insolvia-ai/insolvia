@@ -80,7 +80,7 @@ public static class DocumentChecklists
     public static string TitleKey(string title)
     {
         ArgumentNullException.ThrowIfNull(title);
-        return PyText.Casefold(string.Join(" ", PyText.SplitWhitespace(title)));
+        return TextRules.Casefold(string.Join(" ", TextRules.SplitWhitespace(title)));
     }
 
     /// <summary>

@@ -22,13 +22,13 @@ public static class Releases
     /// <summary><c>series@date</c>, with <c>+sequence</c> past the first.</summary>
     public static string Id(string seriesId, DateOnly effective, int sequence)
     {
-        var baseId = $"{seriesId}@{Py.Iso(effective)}";
+        var baseId = $"{seriesId}@{Exact.Iso(effective)}";
         return sequence == 1 ? baseId : $"{baseId}+{sequence}";
     }
 
     /// <summary>The pin a case records: <c>date[+sequence]</c>.</summary>
     public static string Pin(DateOnly effective, int sequence) =>
-        sequence == 1 ? Py.Iso(effective) : $"{Py.Iso(effective)}+{sequence}";
+        sequence == 1 ? Exact.Iso(effective) : $"{Exact.Iso(effective)}+{sequence}";
 
     /// <summary>
     /// The release with the greatest effective date on or before
@@ -45,7 +45,7 @@ public static class Releases
             var earliest = candidates.Min(release => release.EffectiveDate);
             throw new EngineLookupException(
                 $"no release of {candidates[0].SeriesId} is effective on or "
-                + $"before {Py.Iso(asOf)} (series begins {Py.Iso(earliest)}); {refusal}");
+                + $"before {Exact.Iso(asOf)} (series begins {Exact.Iso(earliest)}); {refusal}");
         }
 
         return MaxByKey(applicable);

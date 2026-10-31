@@ -28,8 +28,7 @@ public sealed record MailLinks(string PrivacyUrl, string? UnsubscribeUrl = null)
 /// <para>HTML bodies are email-client-safe: one document, inline styles only,
 /// a table layout, and a table-wrapped <c>&lt;a&gt;</c> for the button.</para>
 /// <para>Only <see cref="ClientInvitation"/> has a caller today (the portal
-/// invitation); the other three wait for the signup/verify/reset routes, as
-/// they did in Python.</para>
+/// invitation); the other three wait for the signup/verify/reset routes.</para>
 /// </remarks>
 public static class MailTemplates
 {
@@ -179,8 +178,8 @@ public static class MailTemplates
     }
 
     private static string Greeting(string? recipientName) =>
-        recipientName is not null && PyText.Strip(recipientName).Length > 0
-            ? $"Hi {PyText.Strip(recipientName)},"
+        recipientName is not null && TextRules.Strip(recipientName).Length > 0
+            ? $"Hi {TextRules.Strip(recipientName)},"
             : "Hello,";
 
     private static string PasteLink(string url) =>

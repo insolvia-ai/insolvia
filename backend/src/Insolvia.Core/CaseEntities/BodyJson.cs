@@ -12,7 +12,7 @@ namespace Insolvia.Core.CaseEntities;
 /// (a member whose name carries digits pins its spelling with
 /// <see cref="JsonPropertyNameAttribute"/>); enums are their wire strings;
 /// money and percentages are the decimal's own text (<c>"1200.00"</c>,
-/// <c>"8.50"</c>) exactly as Python stored its <c>str</c>; dates are
+/// <c>"8.50"</c>) exactly as stored rows hold its <c>str</c>; dates are
 /// <c>YYYY-MM-DD</c>. Absent members are written as null, as <c>asdict</c>
 /// wrote <c>None</c> — <see cref="Prune"/> drops them.
 /// </summary>

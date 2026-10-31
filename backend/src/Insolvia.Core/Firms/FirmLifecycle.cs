@@ -4,8 +4,8 @@ namespace Insolvia.Core.Firms;
 
 /// <summary>
 /// Construction and the state transitions of firms and firm users (from
-/// <c>firms.py</c>). Timestamps are UTC, truncated to milliseconds, as the
-/// Python stamped them.
+/// <c>firms.py</c>). Timestamps are UTC, truncated to milliseconds, as stored
+/// rows already hold them.
 /// </summary>
 public static partial class FirmLifecycle
 {

@@ -13,8 +13,8 @@ namespace Insolvia.Data.Vault;
 // current authorization (AUTHORIZATION) and the authorization history
 // (AUTHORIZATION#<id>). Here: three tables, the same keys.
 //
-// Foreign keys go to `firms` only. Not to `firm_users`: Python's vault never
-// depended on membership — detaching a user leaves their vault partition as
+// Foreign keys go to `firms` only. Not to `firm_users`: the vault does not
+// depend on membership — detaching a user leaves their vault partition as
 // it was — and a key onto `firm_users` would either refuse the detach
 // (RESTRICT) or erase the signed authorization history with it (CASCADE).
 // Within the vault the keys are composite, so a credential can only cite a

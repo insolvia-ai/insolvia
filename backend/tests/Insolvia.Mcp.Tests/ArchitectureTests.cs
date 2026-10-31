@@ -24,7 +24,7 @@ public sealed class ArchitectureTests
     [Theory]
     [InlineData("Tools/CaseTools.cs")]
     [InlineData("Views/WireViews.cs")]
-    [InlineData("Views/PyJson.cs")]
+    [InlineData("Views/ToolResultJson.cs")]
     public void The_tools_meaning_imports_no_protocol_and_no_adapter(string file)
     {
         var source = File.ReadAllText(Path.Combine(SourceRoot(), file));

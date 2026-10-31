@@ -79,13 +79,13 @@ public static class FieldParsers
             return null;
         }
 
-        var stripped = PyText.Strip(raw);
+        var stripped = TextRules.Strip(raw);
         if (stripped.Length == 0)
         {
             return null;
         }
 
-        if (PyText.Length(stripped) > limit)
+        if (TextRules.Length(stripped) > limit)
         {
             errors[path] = $"Must be {limit} characters or fewer.";
             return null;
@@ -116,13 +116,13 @@ public static class FieldParsers
             return null;
         }
 
-        var stripped = PyText.Strip(raw);
+        var stripped = TextRules.Strip(raw);
         if (stripped.Length == 0)
         {
             return null;
         }
 
-        if (PyText.Length(stripped) > limit)
+        if (TextRules.Length(stripped) > limit)
         {
             errors[path] = $"Must be {limit} characters or fewer.";
             return null;
@@ -151,7 +151,7 @@ public static class FieldParsers
             return null;
         }
 
-        var stripped = PyText.Strip(raw);
+        var stripped = TextRules.Strip(raw);
         if (stripped.Length == 0)
         {
             return null;
@@ -188,7 +188,7 @@ public static class FieldParsers
             return null;
         }
 
-        var stripped = PyText.Strip(raw);
+        var stripped = TextRules.Strip(raw);
         if (stripped.Length == 0)
         {
             return null;
@@ -244,7 +244,7 @@ public static class FieldParsers
             return null;
         }
 
-        var stripped = PyText.Strip(raw);
+        var stripped = TextRules.Strip(raw);
         if (stripped.Length == 0)
         {
             return null;

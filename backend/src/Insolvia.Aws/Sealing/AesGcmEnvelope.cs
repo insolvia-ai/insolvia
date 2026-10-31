@@ -20,8 +20,8 @@ namespace Insolvia.Aws.Sealing;
 /// <para><b>Why the context is the AAD.</b> It ties the ciphertext to
 /// <c>{purpose, firm_id, …}</c> even before the wrapped key reaches KMS: an
 /// open under any other context fails the tag, whichever cipher did the
-/// unwrap. So the canonical form must be Python's exactly —
-/// <see cref="ContextAad"/> owns it.</para>
+/// unwrap. So the canonical form must never drift — every stored envelope
+/// was sealed under it; <see cref="ContextAad"/> owns it.</para>
 /// <para>One cipher differs from another only in where the data key is
 /// wrapped (KMS, or a fixed local key). Everything after that is this class,
 /// so a test against the local cipher proves what the deployed one stores.</para>
@@ -31,7 +31,7 @@ public static partial class AesGcmEnvelope
     /// <summary>AES-256: a 32-byte data key.</summary>
     public const int DataKeyBytes = 32;
 
-    /// <summary>The NIST SP 800-38D 96-bit nonce — the only size .NET's AesGcm takes, and the one Python mints.</summary>
+    /// <summary>The NIST SP 800-38D 96-bit nonce — the only size .NET's AesGcm takes, and the one stored envelopes carry.</summary>
     public const int NonceBytes = 12;
 
     /// <summary>The full 128-bit tag, appended to the ciphertext.</summary>
@@ -81,7 +81,7 @@ public static partial class AesGcmEnvelope
 
     /// <summary>
     /// The seal with a caller-chosen nonce — internal, for the byte-identity
-    /// test against Python only. A repeated nonce under one key breaks GCM.
+    /// test against the sealed fixtures only. A repeated nonce under one key breaks GCM.
     /// </summary>
     internal static Envelope Seal(ReadOnlySpan<byte> dataKey, string plaintext, IReadOnlyDictionary<string, string> context, ReadOnlySpan<byte> wrappedKey, byte[] nonce)
     {
@@ -122,7 +122,7 @@ public static partial class AesGcmEnvelope
         return output;
     }
 
-    /// <summary>The inverse of <see cref="Encrypt"/>. Anything too short to hold a tag fails as a bad tag, as in Python.</summary>
+    /// <summary>The inverse of <see cref="Encrypt"/>. Anything too short to hold a tag fails as a bad tag.</summary>
     internal static byte[] Decrypt(ReadOnlySpan<byte> key, byte[] nonce, byte[] sealedBytes, byte[] associatedData)
     {
         if (sealedBytes.Length < TagBytes)

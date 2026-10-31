@@ -15,7 +15,7 @@ namespace Insolvia.Engines.Projections;
 public static class ProjectionHelpers
 {
     /// <summary>The printed form of a money figure: thousands-grouped, two decimals, no currency sign.</summary>
-    public static string FormatMoney(decimal value) => Py.Grouped(value);
+    public static string FormatMoney(decimal value) => Exact.Grouped(value);
 
     /// <summary>A court date as the printed forms spell it: MM/DD/YYYY.</summary>
     public static string FormatDate(DateOnly value) => value.ToString("MM/dd/yyyy", CultureInfo.InvariantCulture);
@@ -45,7 +45,7 @@ public static class ProjectionHelpers
     public static List<string> WrapLines(string value, int width, int lines, string where, List<string> problems)
     {
         ArgumentNullException.ThrowIfNull(problems);
-        return Wrap(value, lines, where, problems, candidate => PyText.Length(candidate) <= width);
+        return Wrap(value, lines, where, problems, candidate => TextRules.Length(candidate) <= width);
     }
 
     /// <summary>
@@ -77,7 +77,7 @@ public static class ProjectionHelpers
         var matches = spec.Options.Where(option => option.MapsToValue == canonical).Select(option => option.Value).Where(states.Contains).ToList();
         if (matches.Count != 1)
         {
-            throw new EngineKeyException($"{fieldId} -> {Py.Repr(pdfName)}: no single export maps to {Py.Repr(canonical)}");
+            throw new EngineKeyException($"{fieldId} -> {Exact.Repr(pdfName)}: no single export maps to {Exact.Repr(canonical)}");
         }
 
         return new OptionFill(matches[0]);
@@ -226,7 +226,7 @@ public static class ProjectionHelpers
         }
     }
 
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Globalization", "CA1308:Normalize strings to uppercase", Justification = "Python compares the lower-cased export.")]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Globalization", "CA1308:Normalize strings to uppercase", Justification = "The rule compares the lower-cased export.")]
     private static string? Classify(string state)
     {
         var lowered = state.ToLowerInvariant();
@@ -242,7 +242,7 @@ public static class ProjectionHelpers
     {
         var rows = new List<string>();
         var current = string.Empty;
-        foreach (var word in PyText.SplitWhitespace(value))
+        foreach (var word in TextRules.SplitWhitespace(value))
         {
             var candidate = $"{current} {word}".Trim();
             if (fits(candidate) || current.Length == 0)

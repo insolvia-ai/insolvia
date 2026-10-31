@@ -23,8 +23,8 @@ internal enum JwtFailure
 /// produced), and the claim checks run here, in PyJWT 2.x's order and with its
 /// comparisons — required claims, <c>iat</c>, <c>nbf</c>, <c>exp</c> (each
 /// with the leeway), <c>iss</c>, <c>aud</c>, then <c>sub</c>/<c>jti</c> types
-/// — so each failure lands in the same <see cref="AuthFailureReason"/> it did
-/// in Python. The library's own lifetime/issuer/audience validation is off on
+/// — so each failure lands in the <see cref="AuthFailureReason"/> the contract
+/// names for it. The library's own lifetime/issuer/audience validation is off on
 /// purpose: its ordering and boundary rules differ, and the reasons would drift.
 /// </summary>
 internal static class JwtClaimsDecoder
@@ -107,7 +107,7 @@ internal static class JwtClaimsDecoder
 
         if (claims.ContainsKey("iat"))
         {
-            if (!TryPythonInt(claims["iat"], out var iat))
+            if (!TryCoerceInt(claims["iat"], out var iat))
             {
                 return JwtFailure.Other;
             }
@@ -120,7 +120,7 @@ internal static class JwtClaimsDecoder
 
         if (claims.ContainsKey("nbf"))
         {
-            if (!TryPythonInt(claims["nbf"], out var nbf) || nbf > now + leeway)
+            if (!TryCoerceInt(claims["nbf"], out var nbf) || nbf > now + leeway)
             {
                 return JwtFailure.Other;
             }
@@ -128,7 +128,7 @@ internal static class JwtClaimsDecoder
 
         if (claims.ContainsKey("exp"))
         {
-            if (!TryPythonInt(claims["exp"], out var exp))
+            if (!TryCoerceInt(claims["exp"], out var exp))
             {
                 return JwtFailure.Other;
             }
@@ -186,9 +186,9 @@ internal static class JwtClaimsDecoder
     }
 
     // Python's `int(x)` over a JSON value: a number truncates toward zero, a
-    // string must spell an integer, a bool is 0 or 1. Anything else raised in
-    // Python (a TypeError PyJWT did not catch); here it is a refusal.
-    private static bool TryPythonInt(JsonNode? node, out double value)
+    // string must spell an integer, a bool is 0 or 1. Anything else (a TypeError
+    // under `int(x)`, one PyJWT does not catch) is a refusal here.
+    private static bool TryCoerceInt(JsonNode? node, out double value)
     {
         value = 0;
         if (Json.AsBool(node) is { } flag)

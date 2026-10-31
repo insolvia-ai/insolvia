@@ -35,7 +35,7 @@ internal static class RouteSupport
     /// <summary>The request body as a JSON object, refused over <paramref name="maxBytes"/>.</summary>
     public static Task<JsonObject> BodyAsync(this HttpContext context, int maxBytes) => RequestBodies.ReadObjectAsync(context, maxBytes);
 
-    /// <summary>One metadata log line under the Python module's logger name — never a body, a name or an address.</summary>
+    /// <summary>One metadata log line under the module's logger name — never a body, a name or an address.</summary>
     public static void Log(this HttpContext context, string category, string message, params (string Key, object? Value)[] fields) =>
         context.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger(category).Info(message, fields);
 }

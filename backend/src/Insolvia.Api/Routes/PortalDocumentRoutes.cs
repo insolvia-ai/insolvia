@@ -117,7 +117,7 @@ public sealed class PortalDocumentRoutes : IEndpointModule
     }
 
     // The binding's case, if it still exists, with the request on the access
-    // log — the portal's one way to a case. The row is written first, as in Python.
+    // log — the portal's one way to a case. The row is written before the case is read.
     private static async Task<string> BoundCaseAsync(HttpContext context, ClientAccessor client, AccessAction action, CancellationToken cancellationToken)
     {
         await PortalRoutes.RecordAsync(context, client, action, cancellationToken);

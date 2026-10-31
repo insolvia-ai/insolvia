@@ -185,8 +185,8 @@ public static class McpComposition
                 mcp.UseAuthentication();
                 mcp.Use(async (context, next) =>
                 {
-                    // Every method on /mcp is protected: Python's auth
-                    // middleware wrapped the whole transport.
+                    // Every method on /mcp is protected: authentication
+                    // wraps the whole transport.
                     if (context.User.Identity?.IsAuthenticated != true)
                     {
                         await context.ChallengeAsync(BearerAuthentication.SchemeName).ConfigureAwait(false);

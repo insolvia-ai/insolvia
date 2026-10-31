@@ -44,7 +44,7 @@ public sealed record ToolCall(
 /// <remarks>
 /// A subclass of the SDK's <see cref="McpServerTool"/> rather than an
 /// attributed method because the listing is a contract: the schemas must be
-/// the ones the Python server published (the SDK would derive its own from a
+/// the ones already published (the SDK would derive its own from a
 /// C# signature), and <c>isError</c> must be ours to set. The accessor is
 /// resolved INSIDE each call, from the store, every time (ADR 0009).
 /// </remarks>
@@ -125,7 +125,7 @@ public sealed class InsolviaTool : McpServerTool
         ArgumentNullException.ThrowIfNull(payload);
         return new CallToolResult
         {
-            Content = [new TextContentBlock { Text = PyJson.Dumps(payload) }],
+            Content = [new TextContentBlock { Text = ToolResultJson.Dumps(payload) }],
             StructuredContent = JsonSerializer.SerializeToElement(payload),
             IsError = false,
         };
@@ -153,7 +153,7 @@ public sealed class InsolviaTool : McpServerTool
         var body = new JsonObject { ["error"] = error };
         return new CallToolResult
         {
-            Content = [new TextContentBlock { Text = PyJson.Dumps(body) }],
+            Content = [new TextContentBlock { Text = ToolResultJson.Dumps(body) }],
             StructuredContent = JsonSerializer.SerializeToElement(body),
             IsError = true,
         };

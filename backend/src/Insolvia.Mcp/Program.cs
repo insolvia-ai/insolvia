@@ -6,7 +6,7 @@ var builder = WebApplication.CreateBuilder(args);
 // swaps Kestrel for the Lambda runtime client and translates HTTP API
 // payload-v2 events (infra/modules/mcp_service's shape) into ASP.NET Core
 // requests. Everywhere else it is a no-op and Kestrel serves: `dotnet run`
-// (http://127.0.0.1:8788, Python's development port), the image's
+// (http://127.0.0.1:8788, the development port kept from the Python service), the image's
 // mcp-development stage, and WebApplicationFactory.
 builder.Services.AddAWSLambdaHosting(LambdaEventSource.HttpApi);
 

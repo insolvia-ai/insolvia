@@ -80,12 +80,12 @@ public static class LienEngine
             }
             else
             {
-                var available = Py.Max(collateralValue.Value - senior, Zero);
-                unsecured = Money(Py.Max(claimAmount.Value - available, Zero));
+                var available = Exact.Max(collateralValue.Value - senior, Zero);
+                unsecured = Money(Exact.Max(claimAmount.Value - available, Zero));
                 source = "derived";
             }
 
-            decimal? securedAmount = claimAmount is { } a && unsecured is { } u ? Money(Py.Max(a - u, Zero)) : null;
+            decimal? securedAmount = claimAmount is { } a && unsecured is { } u ? Money(Exact.Max(a - u, Zero)) : null;
             claims.Add(new ClaimLien(claimId, claim.AssetId, claim.LienPosition, claimAmount, description, collateralValue, senior, securedAmount, unsecured, source));
         }
 
@@ -175,9 +175,9 @@ public static class LienEngine
         };
     }
 
-    private static decimal Money(decimal value) => Py.Quantize(value, PyRounding.HalfEven);
+    private static decimal Money(decimal value) => Exact.Quantize(value, Rounding.HalfEven);
 
-    private static string MoneyJson(decimal value) => Py.F(Money(value));
+    private static string MoneyJson(decimal value) => Exact.F(Money(value));
 
     private static decimal? CollateralValue(ClaimBody claim, AssetBody? asset)
     {

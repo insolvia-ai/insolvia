@@ -4,7 +4,7 @@ namespace Insolvia.Core.Tests;
 
 // fields.py had no suite of its own (each case entity's tests exercised it).
 // These pin the places the C# port changed REPRESENTATION — money and rates
-// as decimal, form dates as DateOnly — against the Python's canonical forms.
+// as decimal, form dates as DateOnly — against the canonical wire forms.
 public sealed class FieldsTests
 {
     private readonly Dictionary<string, string> _errors = new(StringComparer.Ordinal);

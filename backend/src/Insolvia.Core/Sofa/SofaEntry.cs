@@ -282,7 +282,7 @@ public static class SofaRules
     private static ClosedAccount ParseClosedAccount(JsonObject raw, Dictionary<string, string> e)
     {
         var accountLast4 = FieldParsers.Text(raw["account_last4"], "payload.account_last4", e, limit: 4);
-        if (accountLast4 is not null && !PyText.IsDigits(accountLast4))
+        if (accountLast4 is not null && !TextRules.IsDigits(accountLast4))
         {
             e["payload.account_last4"] = "Must be up to four digits.";
             accountLast4 = null;

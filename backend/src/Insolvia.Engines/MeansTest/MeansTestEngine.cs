@@ -60,7 +60,7 @@ public sealed record MeansTestData(
     Ch13AdminMultipliers Ch13,
     DollarAmountsRelease AmountsRelease)
 {
-    /// <summary>Series id to release id, the pins the result records — in the Python dict's order.</summary>
+    /// <summary>Series id to release id, the pins the result records — in the wire order.</summary>
     public IReadOnlyDictionary<string, string> ReleaseIds
     {
         get
@@ -210,7 +210,7 @@ public static class MeansTestEngine
     {
         ArgumentNullException.ThrowIfNull(state);
         ArgumentNullException.ThrowIfNull(data);
-        var monthly = Py.Dec(monthlyCmi);
+        var monthly = Exact.Dec(monthlyCmi);
         var annualized = monthly * 12;
         decimal median;
         try
@@ -219,7 +219,7 @@ public static class MeansTestEngine
         }
         catch (Exception error) when (error is EngineKeyException or EngineValueException)
         {
-            throw new MeansTestException([Py.Str(error)]);
+            throw new MeansTestException([Exact.Str(error)]);
         }
 
         var upper = state.ToUpperInvariant();
@@ -247,14 +247,14 @@ public static class MeansTestEngine
     }
 
     // `_money`: ROUND_HALF_UP.
-    internal static string Money(decimal value) => Py.Money(value, PyRounding.HalfUp);
+    internal static string Money(decimal value) => Exact.Money(value, Rounding.HalfUp);
 
     private static int? EnteredHousehold(MeansTestInputBody inputs) =>
         inputs.PeopleUnder65 is { } under && inputs.People65OrOlder is { } over ? under + over : null;
 
     private static decimal Entered(decimal? value) => value ?? 0m;
 
-    private static decimal SixtyMonthAverage(decimal total) => Py.Quantize(total / 60, PyRounding.HalfUp);
+    private static decimal SixtyMonthAverage(decimal total) => Exact.Quantize(total / 60, Rounding.HalfUp);
 
     private static string RowName(OtherSecuredPayment payment) =>
         $"{(string.IsNullOrEmpty(payment.CreditorName) ? payment.Id : payment.CreditorName)} ({(string.IsNullOrEmpty(payment.PropertyDescription) ? "property" : payment.PropertyDescription)})";
@@ -343,8 +343,8 @@ public static class MeansTestEngine
         Put("5", "Number of people used in determining deductions", household, householdSource);
         var nationalSource = $"IRS National Standards, household of {household} — {data.NationalRelease.ReleaseId}";
         var line6 = Put("6", "Food, clothing, and other items", data.National.Allowance(household), nationalSource);
-        var oopUnder = Py.Dec(data.National.OopHealthcareUnder65);
-        var oopOver = Py.Dec(data.National.OopHealthcare65AndOlder);
+        var oopUnder = Exact.Dec(data.National.OopHealthcareUnder65);
+        var oopOver = Exact.Dec(data.National.OopHealthcare65AndOlder);
         Put("7a", "Out-of-pocket health care allowance per person (under 65)", oopUnder, nationalSource);
         Put("7b", "Number of people who are under 65", under65, "entered");
         var line7c = Put("7c", "Subtotal (under 65)", oopUnder * under65, "line 7a x line 7b");
@@ -360,7 +360,7 @@ public static class MeansTestEngine
         }
         catch (EngineKeyException error)
         {
-            throw new MeansTestException([.. problems, Py.Str(error)]);
+            throw new MeansTestException([.. problems, Exact.Str(error)]);
         }
 
         var (housingSize, housingSizeSource) = housingFamily;
@@ -374,7 +374,7 @@ public static class MeansTestEngine
         var line9a = Put("9a", "Housing and utilities — mortgage or rent expense (IRS Local Standard)", countyRow.MortgageRentFor(housingSize), housingSource);
         var (homeSecured, homeSource) = SecuredPayment(inputs, SecuredPaymentBucket.Home, inputs.HomeSecuredMonthlyTotal, "home_secured_monthly_total");
         var line9b = Put("9b", "Average monthly payment for all debts secured by your home", homeSecured, homeSource);
-        var line9c = Put("9c", "Net mortgage or rent expense", Py.Max(0m, line9a - line9b), "line 9a minus line 9b, not below zero");
+        var line9c = Put("9c", "Net mortgage or rent expense", Exact.Max(0m, line9a - line9b), "line 9a minus line 9b, not below zero");
         var line10 = Put(
             "10",
             "Claimed adjustment to the housing standard",
@@ -411,7 +411,7 @@ public static class MeansTestEngine
             var line13a = Put("13a", "Vehicle 1 ownership costs (IRS Local Standard)", ownershipEach, transportSource);
             var (vehicle1, vehicle1Source) = SecuredPayment(inputs, SecuredPaymentBucket.Vehicle1, inputs.Vehicle1LoanMonthly, "vehicle_1_loan_monthly");
             line13b = Put("13b", "Average monthly payment for debts secured by Vehicle 1", vehicle1, vehicle1Source);
-            line13 += Put("13c", "Net Vehicle 1 ownership or lease expense", Py.Max(0m, line13a - line13b), "line 13a minus line 13b, not below zero");
+            line13 += Put("13c", "Net Vehicle 1 ownership or lease expense", Exact.Max(0m, line13a - line13b), "line 13a minus line 13b, not below zero");
         }
 
         if (vehicles >= 2)
@@ -420,12 +420,12 @@ public static class MeansTestEngine
             var line13d = Put("13d", "Vehicle 2 ownership costs (IRS Local Standard)", ownershipEach, transportSource);
             var (vehicle2, vehicle2Source) = SecuredPayment(inputs, SecuredPaymentBucket.Vehicle2, inputs.Vehicle2LoanMonthly, "vehicle_2_loan_monthly");
             line13e = Put("13e", "Average monthly payment for debts secured by Vehicle 2", vehicle2, vehicle2Source);
-            line13 += Put("13f", "Net Vehicle 2 ownership or lease expense", Py.Max(0m, line13d - line13e), "line 13d minus line 13e, not below zero");
+            line13 += Put("13f", "Net Vehicle 2 ownership or lease expense", Exact.Max(0m, line13d - line13e), "line 13d minus line 13e, not below zero");
         }
 
         Put("13", "Vehicle ownership or lease expense", line13, "net vehicle expenses added");
 
-        var publicTransit = Py.Dec(transportation.PublicTransportationNational);
+        var publicTransit = Exact.Dec(transportation.PublicTransportationNational);
         var line14 = vehicles == 0
             ? Put("14", "Public transportation expense", publicTransit, transportSource)
             : Put("14", "Public transportation expense", 0m, "vehicles claimed on line 11");
@@ -475,7 +475,7 @@ public static class MeansTestEngine
         var line27 = Put("27", "Protection against family violence", Entered(inputs.FamilyViolenceProtection), "entered (means_test_input.family_violence_protection)");
         var line28 = Put("28", "Additional home energy costs", Entered(inputs.HomeEnergyExcess), "entered (means_test_input.home_energy_excess)");
         var educationCapAmount = data.AmountsRelease.Amount("means-test-education-annual-cap-per-child");
-        var monthlyCapPerChild = Py.Quantize(educationCapAmount.Value / 12, PyRounding.HalfUp);
+        var monthlyCapPerChild = Exact.Quantize(educationCapAmount.Value / 12, Rounding.HalfUp);
         var educationCap = monthlyCapPerChild * @case.ChildrenUnder18;
         var line29 = Entered(inputs.EducationUnder18);
         if (line29 > educationCap)
@@ -514,7 +514,7 @@ public static class MeansTestEngine
         var line33e = Put("33e", "Total average monthly payment on secured debts", line9b + line13b + line13e + line33d, "lines 33a through 33d");
         var (cureTotal, cureSource) = CureTotal(inputs);
         var line34 = Put("34", "Past-due amounts on secured debts necessary for support (÷ 60)", SixtyMonthAverage(cureTotal), $"{cureSource} divided by 60 — 11 U.S.C. § 707(b)(2)(A)(iii)(II)");
-        var line35 = Put("35", "Priority claims (÷ 60)", SixtyMonthAverage(Py.Dec(@case.PriorityDebtTotal)), "the claims' priority portions divided by 60 — 11 U.S.C. § 707(b)(2)(A)(iv)");
+        var line35 = Put("35", "Priority claims (÷ 60)", SixtyMonthAverage(Exact.Dec(@case.PriorityDebtTotal)), "the claims' priority portions divided by 60 — 11 U.S.C. § 707(b)(2)(A)(iv)");
         decimal line36;
         if (form == Form122C2 || inputs.Ch13Eligible == true)
         {
@@ -526,14 +526,14 @@ public static class MeansTestEngine
             }
             catch (EngineKeyException error)
             {
-                throw new MeansTestException([.. problems, Py.Str(error)]);
+                throw new MeansTestException([.. problems, Exact.Str(error)]);
             }
 
             line36 = Put(
                 "36",
                 "Chapter 13 administrative expenses",
-                Py.Quantize(planPayment * multiplier, PyRounding.HalfUp),
-                $"projected plan payment {Money(planPayment)} x the {@case.District} multiplier {Py.F(multiplier)} — {data.Ch13Release.ReleaseId}; 11 U.S.C. § 707(b)(2)(A)(ii)(III)"
+                Exact.Quantize(planPayment * multiplier, Rounding.HalfUp),
+                $"projected plan payment {Money(planPayment)} x the {@case.District} multiplier {Exact.F(multiplier)} — {data.Ch13Release.ReleaseId}; 11 U.S.C. § 707(b)(2)(A)(ii)(III)"
                     + (form == Form122C2 ? " applied by § 1325(b)(3)" : string.Empty));
         }
         else
@@ -592,7 +592,7 @@ public static class MeansTestEngine
         decimal Put(string line, string label, decimal amount, string source) => trace.Put(Form122A2, line, label, amount, source);
 
         // ── Part 1: adjusted current monthly income ──
-        var line1 = Put("1", "Total current monthly income", Py.Dec(@case.Cmi.CombinedMonthlyTotal), "Form 122A-1 line 11 — the § 101(10A) derivation (core/cmi.py)");
+        var line1 = Put("1", "Total current monthly income", Exact.Dec(@case.Cmi.CombinedMonthlyTotal), "Form 122A-1 line 11 — the § 101(10A) derivation (core/cmi.py)");
         var (marital, maritalSource) = MaritalAdjustment(@case, "122A-1", "3", problems);
         var line3 = Put("3", "Marital adjustment", marital, maritalSource);
         var line4 = Put("4", "Adjusted current monthly income", line1 - line3, "line 1 minus line 3");
@@ -623,9 +623,9 @@ public static class MeansTestEngine
         }
         else
         {
-            var nonpriority = Py.Dec(@case.NonpriorityUnsecuredTotal);
+            var nonpriority = Exact.Dec(@case.NonpriorityUnsecuredTotal);
             Put("41a", "Total nonpriority unsecured debt", nonpriority, "the claims' nonpriority unsecured portions");
-            var line41b = Put("41b", "25% of total nonpriority unsecured debt", Py.Quantize(nonpriority * 0.25m, PyRounding.HalfUp), $"line 41a x 0.25 — {floor.Citation}");
+            var line41b = Put("41b", "25% of total nonpriority unsecured debt", Exact.Quantize(nonpriority * 0.25m, Rounding.HalfUp), $"line 41a x 0.25 — {floor.Citation}");
             if (line39d >= line41b)
             {
                 (outcome, determinedBy) = ("presumption_of_abuse", "unsecured_ratio");
@@ -656,14 +656,14 @@ public static class MeansTestEngine
         var householdSize = MedianSizeOrRefuse(inputs, "line 16b's household size and line 5's deductions both need it");
 
         // ── B122C-1 Part 2 ──
-        var line11 = Put("11", "Total average monthly income", Py.Dec(@case.Cmi.CombinedMonthlyTotal), "Form 122C-1 line 11 — the § 101(10A) derivation (core/cmi.py)");
+        var line11 = Put("11", "Total average monthly income", Exact.Dec(@case.Cmi.CombinedMonthlyTotal), "Form 122C-1 line 11 — the § 101(10A) derivation (core/cmi.py)");
         var line12 = Put("12", "Copy of line 11", line11, "line 11");
         var (marital, maritalSource) = MaritalAdjustment(@case, "122C-1", "13", problems);
         var line13 = Put("13", "Marital adjustment", marital, maritalSource);
         var line14 = Put("14", "Current monthly income", line12 - line13, "line 12 minus line 13");
         Put("15a", "Copy of line 14", line14, "line 14");
         var comparison = Compare(Money(line14), @case.State, householdSize, data);
-        var median = Py.Dec(comparison.AnnualMedian);
+        var median = Exact.Dec(comparison.AnnualMedian);
         Put("15b", "Current monthly income for the year", line14 * 12, "line 15a x 12 — 11 U.S.C. § 1325(b)(3)");
         Put("16c", "Median family income for your state and size of household", median, comparison.Source);
         Put(

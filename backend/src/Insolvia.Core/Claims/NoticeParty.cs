@@ -25,7 +25,7 @@ public static class NoticeParties
     /// <summary>
     /// A <c>notice_parties</c> list. Errors are keyed under
     /// <c>notice_parties[…]</c> whatever the caller's field is called — the
-    /// library creditor parser rewrites the prefix, as Python's did.
+    /// library creditor parser rewrites the prefix.
     /// </summary>
     public static ValueCollection<NoticeParty> Parse(JsonNode? value, IDictionary<string, string> errors)
     {
@@ -78,7 +78,7 @@ public static class NoticeParties
     {
         ArgumentNullException.ThrowIfNull(errors);
         var last4 = FieldParsers.Text(value, path, errors, limit: 4);
-        if (last4 is not null && !PyText.IsDigits(last4))
+        if (last4 is not null && !TextRules.IsDigits(last4))
         {
             errors[path] = "Must be up to four digits.";
             return null;

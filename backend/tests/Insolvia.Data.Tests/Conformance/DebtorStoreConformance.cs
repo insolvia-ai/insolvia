@@ -8,7 +8,7 @@ namespace Insolvia.Data.Tests.Conformance;
 
 /// <summary>
 /// What every <see cref="Core.Ports.IDebtorStore"/> must do: once-only create,
-/// the link's three refusals in Python's order (role_taken, client_taken,
+/// the link's three refusals in the contract's order (role_taken, client_taken,
 /// client_unavailable), the merge's repoint, and the race of one client
 /// linked to two roles at once.
 /// </summary>

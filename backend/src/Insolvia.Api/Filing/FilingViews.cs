@@ -9,11 +9,11 @@ using Insolvia.Forms;
 namespace Insolvia.Api.Filing;
 
 /// <summary>
-/// The electronic-filing wire shapes, as the Python serializers wrote them:
+/// The electronic-filing wire shapes, ported from the Python serializers:
 /// <c>credential_json</c>, <c>text_json</c> and <c>authorization_json</c>
 /// (insolvia_core), <c>filing_json</c> (insolvia_core.filings), and
 /// <c>approval_json</c> / <c>basis_json</c> (core/filing_approval.py).
-/// Optional keys are absent, never null, wherever Python left them out.
+/// Optional keys are absent, never null, wherever the wire shape leaves them out.
 /// </summary>
 public static class FilingViews
 {

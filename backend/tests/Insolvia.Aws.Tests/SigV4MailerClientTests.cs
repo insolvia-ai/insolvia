@@ -10,7 +10,7 @@ namespace Insolvia.Aws.Tests;
 /// body, the non-2xx failure and the suppression call — with no network and
 /// no AWS configuration (the credentials and the clock are arguments). The
 /// signatures are botocore's own, computed by <c>SigV4Auth.add_auth</c> for
-/// the same request, so this pins parity with the Python client, not merely
+/// the same request, so this pins parity with botocore's signer, not merely
 /// self-consistency.
 /// </summary>
 public sealed class SigV4MailerClientTests

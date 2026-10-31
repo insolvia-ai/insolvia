@@ -8,7 +8,7 @@ namespace Insolvia.Migrator.Tests.Seeding;
 //   python3 -c "import uuid; NS=uuid.UUID('6f1c2b8e-3d4a-4f5b-9c6d-7e8f9a0b1c2d'); \
 //               print(uuid.uuid5(NS, '/'.join([...])))"
 //
-// — so a fixture derives the same ids in both backends, and a regression in
+// — so a fixture derives the ids the Python loader already seeded, and a regression in
 // the uuid5 (byte order, version bits, the joiner) is a failing vector.
 public sealed class SeedIdTests
 {

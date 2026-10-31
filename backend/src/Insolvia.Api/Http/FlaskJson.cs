@@ -8,9 +8,9 @@ using Insolvia.Core;
 namespace Insolvia.Api.Http;
 
 /// <summary>
-/// The bytes Flask's <c>jsonify</c> writes, so a route body is comparable
-/// byte for byte with the Python API's (apart from Flask's trailing newline,
-/// as <c>/health</c>): keys SORTED at every depth, compact separators, and
+/// The bytes Flask's <c>jsonify</c> writes — the API's wire format, byte for
+/// byte (apart from Flask's trailing newline, as <c>/health</c>): keys
+/// SORTED at every depth, compact separators, and
 /// <c>ensure_ascii</c> — every character outside printable ASCII escaped as
 /// a lower-case <c>\uXXXX</c>, and <c>&amp;</c>, <c>&lt;</c>, <c>'</c> left alone
 /// (where System.Text.Json's default encoder would escape them).
@@ -163,7 +163,7 @@ public static class FlaskJson
                         break;
                     default:
                         // Whole numbers only reach a body (chapters, epoch
-                        // seconds, counts); System.Text.Json writes them as Python does.
+                        // seconds, counts); System.Text.Json writes them as json.dumps does.
                         builder.Append(value.ToJsonString());
                         break;
                 }

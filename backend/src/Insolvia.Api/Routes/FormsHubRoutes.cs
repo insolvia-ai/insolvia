@@ -109,7 +109,7 @@ public sealed class FormsHubRoutes : IEndpointModule
     /// this case does not file is a 404, as <c>assemble</c> drops it.
     /// </summary>
     /// <remarks>
-    /// The Python's order, which decides the access-log rows a refused request
+    /// The order is part of the contract: it decides the access-log rows a refused request
     /// leaves: the <c>form_preview.render</c> row, the series 404, B121's
     /// <c>taxid.read</c> rows, and only then the options' 400.
     /// </remarks>

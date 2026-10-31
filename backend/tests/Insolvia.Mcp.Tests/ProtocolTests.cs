@@ -281,7 +281,7 @@ public sealed class ProtocolTests : IDisposable
     [Fact]
     public async Task Authentication_runs_before_the_transport_checks()
     {
-        // Python's auth middleware wrapped the transport: unauthenticated is
+        // Authentication wraps the transport: unauthenticated is
         // the challenge whatever else is wrong with the request.
         using var host = new McpHost(baseAddress: "http://testserver");
         Assert.Equal(HttpStatusCode.Unauthorized, (await host.RpcAsync("tools/list")).Status);

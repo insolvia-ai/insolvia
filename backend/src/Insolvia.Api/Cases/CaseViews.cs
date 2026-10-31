@@ -24,8 +24,9 @@ namespace Insolvia.Api.Cases;
 /// <c>portal_request_json</c>, <c>task_json</c>, <c>note_json</c>,
 /// <c>public_status_json</c>, the API's <c>event_json</c> and the courts
 /// route's bodies — and ADR 0027's lifecycle event, which has no Python twin.
-/// Each keeps its Python function's null-versus-absent rule (the comment on
-/// each says which); key order is <see cref="FlaskJson"/>'s to sort.
+/// Each keeps the null-versus-absent rule of the function it was ported from,
+/// part of the wire contract (the comment on each says which); key order is
+/// <see cref="FlaskJson"/>'s to sort.
 /// </summary>
 /// <remarks>
 /// Here rather than in Core, beside the records, for the reason
@@ -225,7 +226,7 @@ public static class CaseViews
 
     /// <summary>
     /// <c>document_json</c>: staff's view. No <c>uploadedBy</c>, <c>storageRef</c>
-    /// or <c>etag</c>; <c>requestId</c> present as null when unset (Python sent it so).
+    /// or <c>etag</c>; <c>requestId</c> present as null when unset (the wire shape has it so).
     /// </summary>
     /// <param name="document">The document.</param>
     /// <returns>The body.</returns>
