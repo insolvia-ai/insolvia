@@ -100,15 +100,15 @@ public static class B108
     /// <summary>The explanation split across the short first line and the full second, or null when it cannot fit.</summary>
     internal static (string First, string Second)? ExplainLines(string value)
     {
-        var words = new Queue<string>(PyText.SplitWhitespace(value));
+        var words = new Queue<string>(TextRules.SplitWhitespace(value));
         var first = new List<string>();
-        while (words.Count > 0 && PyText.Length(string.Join(' ', first.Append(words.Peek()))) <= ExplainFirst)
+        while (words.Count > 0 && TextRules.Length(string.Join(' ', first.Append(words.Peek()))) <= ExplainFirst)
         {
             first.Add(words.Dequeue());
         }
 
         var second = string.Join(' ', words);
-        if (PyText.Length(second) > ExplainSecond)
+        if (TextRules.Length(second) > ExplainSecond)
         {
             return null;
         }

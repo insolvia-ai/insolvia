@@ -16,12 +16,12 @@ namespace Insolvia.Mcp.Views;
 /// <c>entity_json</c>, <c>debtor_json</c>, <c>document_json</c>,
 /// <c>firm_client_json</c> and <c>candidate_review_json</c>. "A record's wire
 /// shape is the API's wire shape" (mcp-surface.md § Schemas), so each keeps
-/// its Python function's member order and its absent-versus-null rule.
+/// the member order and absent-versus-null rule of the function it was ported from.
 /// </summary>
 /// <remarks>
-/// These belong in Insolvia.Core beside the records, as the Python had them,
-/// where the API's case routes would share them; they are here because Core
-/// was closed to this change (#532), the same position Insolvia.Api's
+/// These belong in Insolvia.Core beside the records, where the API's case
+/// routes would share them; they are here because Core was closed to this
+/// change (#532), the same position Insolvia.Api's
 /// <c>FirmViews</c> is in. Moving both into Core is one mechanical PR.
 /// </remarks>
 public static class WireViews

@@ -10,7 +10,7 @@ namespace Insolvia.Mcp.Logging;
 /// </summary>
 public static class StructuredLog
 {
-    /// <summary>The logger names services/mcp used, kept so a CloudWatch query reads both backends.</summary>
+    /// <summary>The logger names services/mcp used, kept so existing CloudWatch queries still match.</summary>
     public static class Categories
     {
         /// <summary>The one-line-per-request log.</summary>

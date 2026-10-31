@@ -156,7 +156,7 @@ public static class ExemptionAnalyzer
     public static bool Cites(ExemptionEntry entry, string? citation)
     {
         ArgumentNullException.ThrowIfNull(entry);
-        return citation is not null && Authorities(entry.Citation).Contains(string.Join(' ', PyText.SplitWhitespace(citation)));
+        return citation is not null && Authorities(entry.Citation).Contains(string.Join(' ', TextRules.SplitWhitespace(citation)));
     }
 
     /// <summary>The § 522(b)(3)(A) warning, as far as the case file can tell, or null.</summary>
@@ -177,9 +177,9 @@ public static class ExemptionAnalyzer
             }
 
             var where = string.IsNullOrEmpty(state) ? string.Empty : $" in {state}";
-            var when = movedOut is { } date ? $"on {Py.Iso(date)}" : "on a date not yet recorded";
-            return $"Debtor 1 left a prior address {when}, inside the 730 days before {Py.Iso(asOf)}. Under § 522(b)(3)(A) the exemptions of the "
-                + $"state where the debtor was domiciled for the 180 days before {Py.Iso(periodStart)} may govern, not the current "
+            var when = movedOut is { } date ? $"on {Exact.Iso(date)}" : "on a date not yet recorded";
+            return $"Debtor 1 left a prior address {when}, inside the 730 days before {Exact.Iso(asOf)}. Under § 522(b)(3)(A) the exemptions of the "
+                + $"state where the debtor was domiciled for the 180 days before {Exact.Iso(periodStart)} may govern, not the current "
                 + $"residence{where}. Confirm the domicile before claiming.";
         }
 
@@ -206,7 +206,7 @@ public static class ExemptionAnalyzer
         }
         catch (EngineLookupException refusal)
         {
-            problems.Add(Py.Str(refusal));
+            problems.Add(Exact.Str(refusal));
             limits = [];
         }
 
@@ -250,7 +250,7 @@ public static class ExemptionAnalyzer
         var election = analysis.Election;
         return new JsonObject
         {
-            ["asOf"] = Py.Iso(analysis.AsOf),
+            ["asOf"] = Exact.Iso(analysis.AsOf),
             ["asOfSource"] = analysis.AsOfSource,
             ["election"] = new JsonObject
             {
@@ -284,10 +284,10 @@ public static class ExemptionAnalyzer
             })]),
             ["lookbacks"] = new JsonObject
             {
-                ["section522o"] = Py.Iso(analysis.Lookbacks.Section522o),
-                ["section522p"] = Py.Iso(analysis.Lookbacks.Section522p),
-                ["section522q"] = Py.Iso(analysis.Lookbacks.Section522q),
-                ["domicilePeriodStart"] = Py.Iso(analysis.Lookbacks.DomicilePeriodStart),
+                ["section522o"] = Exact.Iso(analysis.Lookbacks.Section522o),
+                ["section522p"] = Exact.Iso(analysis.Lookbacks.Section522p),
+                ["section522q"] = Exact.Iso(analysis.Lookbacks.Section522q),
+                ["domicilePeriodStart"] = Exact.Iso(analysis.Lookbacks.DomicilePeriodStart),
             },
             ["assets"] = new JsonArray([.. analysis.Assets.Select(row => (JsonNode)AssetJson(row))]),
             ["warnings"] = new JsonArray([.. analysis.Warnings.Select(warning => (JsonNode)warning)]),
@@ -295,9 +295,9 @@ public static class ExemptionAnalyzer
         };
     }
 
-    private static decimal Money(decimal value) => Py.Quantize(value, PyRounding.HalfEven);
+    private static decimal Money(decimal value) => Exact.Quantize(value, Rounding.HalfEven);
 
-    private static string? MoneyJson(decimal? value) => value is { } present ? Py.F(Money(present)) : null;
+    private static string? MoneyJson(decimal? value) => value is { } present ? Exact.F(Money(present)) : null;
 
     private static JsonObject AssetJson(AssetExemptions row)
     {
@@ -357,7 +357,7 @@ public static class ExemptionAnalyzer
         }
         catch (EngineLookupException refusal)
         {
-            problems.Add(Py.Str(refusal));
+            problems.Add(Exact.Str(refusal));
         }
 
         return [];
@@ -430,7 +430,7 @@ public static class ExemptionAnalyzer
                 return Zero;
             }
 
-            return limit is { } cap ? Money(Py.Min(value, cap)) : value;
+            return limit is { } cap ? Money(Exact.Min(value, cap)) : value;
         }
 
         return Money(claim.Amount ?? 0m);
@@ -440,16 +440,16 @@ public static class ExemptionAnalyzer
     {
         if (joint && entry.JointAmount is not null)
         {
-            return Py.Dec(entry.JointAmount);
+            return Exact.Dec(entry.JointAmount);
         }
 
-        return entry.Amount is not null ? Py.Dec(entry.Amount) : null;
+        return entry.Amount is not null ? Exact.Dec(entry.Amount) : null;
     }
 
     private static HashSet<string> Authorities(string citation)
     {
         var forms = new HashSet<string>(StringComparer.Ordinal);
-        var whole = string.Join(' ', PyText.SplitWhitespace(citation));
+        var whole = string.Join(' ', TextRules.SplitWhitespace(citation));
         forms.Add(whole);
         foreach (var piece in whole.Split(';'))
         {
@@ -501,8 +501,8 @@ public static class ExemptionAnalyzer
             var homestead = entry.WildcardCarryoverFrom is not null ? byId.GetValueOrDefault(entry.WildcardCarryoverFrom) : null;
             if (homestead is not null && entry.WildcardCarryoverCap is not null && BaseLimit(homestead, joint) is { } homesteadLimit)
             {
-                var unused = Py.Max(homesteadLimit - ClaimedUnder(homestead, homesteadLimit, inputs, values), Zero);
-                carryover = Money(Py.Min(unused, Py.Dec(entry.WildcardCarryoverCap)));
+                var unused = Exact.Max(homesteadLimit - ClaimedUnder(homestead, homesteadLimit, inputs, values), Zero);
+                carryover = Money(Exact.Min(unused, Exact.Dec(entry.WildcardCarryoverCap)));
                 limit = (limit ?? Zero) + carryover.Value;
             }
 
@@ -512,14 +512,14 @@ public static class ExemptionAnalyzer
                 limit is { } present ? Money(present) : null,
                 carryover,
                 claimed,
-                limit is { } cap ? Money(Py.Max(cap - claimed, Zero)) : null));
+                limit is { } cap ? Money(Exact.Max(cap - claimed, Zero)) : null));
         }
 
         return rows;
     }
 
     private static decimal? HomesteadCap(IReadOnlyList<StatutoryLimit> limits) =>
-        limits.Where(limit => limit.LimitId == Homestead1215DayCapId).Select(limit => (decimal?)Py.Dec(limit.Amount)).FirstOrDefault();
+        limits.Where(limit => limit.LimitId == Homestead1215DayCapId).Select(limit => (decimal?)Exact.Dec(limit.Amount)).FirstOrDefault();
 
     private static List<AssetExemptions> Assets(ExemptionCase inputs, List<EntryAvailability> entries, Dictionary<string, decimal?> values, decimal? cap)
     {
@@ -529,7 +529,7 @@ public static class ExemptionAnalyzer
         {
             var current = values[assetId];
             var liens = figures.Asset(assetId)?.SecuredTotal ?? Zero;
-            decimal? netEquity = current is { } value ? Money(Py.Max(value - liens, Zero)) : null;
+            decimal? netEquity = current is { } value ? Money(Exact.Max(value - liens, Zero)) : null;
 
             var claims = new List<AssetClaim>();
             foreach (var (exemptionId, claim) in inputs.Exemptions)
@@ -563,8 +563,8 @@ public static class ExemptionAnalyzer
                 }
             }
 
-            var counted = homesteadCap is { } h ? Py.Min(claimed, h) : claimed;
-            decimal? unexempt = netEquity is { } equity ? Money(Py.Max(equity - counted, Zero)) : null;
+            var counted = homesteadCap is { } h ? Exact.Min(claimed, h) : claimed;
+            decimal? unexempt = netEquity is { } equity ? Money(Exact.Max(equity - counted, Zero)) : null;
 
             var suggestions = new List<(string EntryId, decimal Amount)>();
             foreach (var row in entries)
@@ -572,7 +572,7 @@ public static class ExemptionAnalyzer
                 var known = new[] { unexempt, row.Available }.Where(figure => figure is not null).Select(figure => figure!.Value).ToList();
                 if (known.Count > 0)
                 {
-                    suggestions.Add((row.Entry.EntryId, Money(known.Aggregate(Py.Min))));
+                    suggestions.Add((row.Entry.EntryId, Money(known.Aggregate(Exact.Min))));
                 }
             }
 

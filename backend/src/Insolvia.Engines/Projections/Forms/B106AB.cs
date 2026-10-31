@@ -299,7 +299,7 @@ public static class B106AB
         }
     }
 
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Globalization", "CA1308:Normalize strings to uppercase", Justification = "Python matches the keywords against the lower-cased detail.")]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Globalization", "CA1308:Normalize strings to uppercase", Justification = "The keywords match against the lower-cased detail.")]
     private static void KeywordLines(FormRelease release, CaseFile caseFile, FieldValues values, List<string> problems)
     {
         foreach (var (line, category, columns) in new[] { ("28", "money_owed_to_you", Line28Columns), ("29", "family_support_owed", Line29Columns) })
@@ -329,7 +329,7 @@ public static class B106AB
                 var box = columns.FirstOrDefault(column => detail.Contains(column.Keyword, StringComparison.Ordinal)).Field;
                 if (box is null)
                 {
-                    problems.Add($"line_{line}: the amount columns route by keyword over the asset's detail ({string.Join(", ", columns.Select(column => column.Keyword))}); {(asset.Detail is null ? "None" : Py.Repr(asset.Detail))} names none of them");
+                    problems.Add($"line_{line}: the amount columns route by keyword over the asset's detail ({string.Join(", ", columns.Select(column => column.Keyword))}); {(asset.Detail is null ? "None" : Exact.Repr(asset.Detail))} names none of them");
                     continue;
                 }
 

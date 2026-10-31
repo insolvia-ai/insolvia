@@ -222,8 +222,8 @@ internal sealed class SeedWorld : IDisposable
 
     /// <summary>
     /// One load, as the CLI answers it: 0 converged, 1 check found something
-    /// missing, 2 refused. A body the API's parser refuses is THROWN, as the
-    /// Python let it propagate — those tests assert the API's own error.
+    /// missing, 2 refused. A body the API's parser refuses is THROWN, left to
+    /// propagate — those tests assert the API's own error.
     /// </summary>
     public async Task<int> LoadAsync(bool check = false, string environment = "local", string? fixture = null, Func<string, string?>? variables = null)
     {

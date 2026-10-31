@@ -1,7 +1,8 @@
 namespace Insolvia.Engines;
 
-// The Python exception kinds the engines raise and their callers tell apart,
-// carried over as types: a registry has no release for a date (LookupError),
+// The exception kinds the engines raise and their callers tell apart, carried
+// over as types from the Python built-ins the ported modules raised: a
+// registry has no release for a date (LookupError),
 // a table has no row for a key (KeyError — a LookupError too, and str() of
 // one is the repr of its message, which some problem lists print verbatim),
 // a value no rule accepts (ValueError), and a committed release that does not
@@ -30,7 +31,7 @@ public class EngineLookupException : Exception
 
 /// <summary>
 /// Python's <c>KeyError</c>: a table with no row for the key asked for.
-/// <see cref="Py.Str"/> renders it the way <c>str(KeyError(...))</c> does.
+/// <see cref="Exact.Str"/> renders it the way <c>str(KeyError(...))</c> does.
 /// </summary>
 public sealed class EngineKeyException : EngineLookupException
 {

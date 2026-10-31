@@ -263,9 +263,9 @@ public static class GrantTable
         new("current_filing_authorizations", ServiceRoles.Filing, TablePrivileges.Select),
 
         // The admin audit (ADR 0011): every staff mutation appends a row.
-        // INSERT alone — not even SELECT — as the Python role's grant was
-        // PutItem alone: the admin service can append an entry and never
-        // read, amend or delete one. No other role touches it.
+        // INSERT alone — not even SELECT: the admin service can append an
+        // entry and never read, amend or delete one (the Python role's grant
+        // was PutItem alone). No other role touches it.
         new("admin_audit", ServiceRoles.Admin, TablePrivileges.Insert),
 
         // ── The seeder (18.20) ──────────────────────────────────────

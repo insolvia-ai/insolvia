@@ -132,7 +132,7 @@ public static class PreClientPurge
         }
     }
 
-    /// <summary>The report as the Python printed it: case ids and counts only, never a name.</summary>
+    /// <summary>The report: case ids and counts only, never a name.</summary>
     /// <param name="report">The report.</param>
     /// <param name="environment">The environment it ran in.</param>
     /// <param name="apply">Whether it applied.</param>

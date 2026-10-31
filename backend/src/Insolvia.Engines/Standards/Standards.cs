@@ -98,7 +98,7 @@ public static class IrsStandards
             }
             catch (EngineKeyException error)
             {
-                problems.Add(Py.Str(error));
+                problems.Add(Exact.Str(error));
             }
 
             try
@@ -109,7 +109,7 @@ public static class IrsStandards
             }
             catch (EngineKeyException error)
             {
-                problems.Add(Py.Str(error));
+                problems.Add(Exact.Str(error));
             }
         }
 
@@ -135,5 +135,5 @@ public static class IrsStandards
     }
 
     // `_money`: ROUND_HALF_UP.
-    private static string Money(decimal value) => Py.Money(value, PyRounding.HalfUp);
+    private static string Money(decimal value) => Exact.Money(value, Rounding.HalfUp);
 }

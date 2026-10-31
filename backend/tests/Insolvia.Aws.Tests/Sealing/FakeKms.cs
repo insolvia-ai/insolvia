@@ -19,7 +19,7 @@ namespace Insolvia.Aws.Tests.Sealing;
 internal static class FakeKms
 {
     // TEST CONSTANTS — they secure nothing and are committed on purpose; the
-    // same sentences as the Python script, so both languages recompute them.
+    // same sentences the Python generator used, so the fixtures' keys recompute.
     public static readonly byte[] TestDataKey = SHA256.HashData(
         Encoding.ASCII.GetBytes("insolvia sealed-envelope fixture data key - TEST CONSTANT, never a real key"));
 

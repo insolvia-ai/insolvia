@@ -6,7 +6,7 @@ namespace Insolvia.Core.Events;
 // services/api core/events.py and core/calendar_feed.py). The RECORDS live
 // here because their ports do and an adapter in Insolvia.Data must name them;
 // the rules that make and show them (parse, replace, dismissal, event_json,
-// the ICS feed) are the API's, in Insolvia.Api/Calendar, as in Python.
+// the ICS feed) are the API's, in Insolvia.Api/Calendar.
 
 /// <summary>Where an event lives: its firm, and its case when it has one (a firm's own office event has none).</summary>
 /// <param name="FirmId">The firm.</param>
@@ -18,7 +18,7 @@ public sealed record EventScope(string FirmId, string? CaseId = null);
 /// decides how <see cref="Start"/> and <see cref="End"/> read: form dates
 /// (<c>YYYY-MM-DD</c>, <see cref="End"/> inclusive) when all-day, else RFC 3339
 /// instants normalised to UTC with a literal Z (<c>YYYY-MM-DDTHH:MM:SSZ</c>) —
-/// Python's strings, kept as strings so the wire and both stores agree byte for byte.
+/// kept as strings so the wire and both stores agree byte for byte.
 /// </summary>
 /// <param name="Id">The server-minted uuid.</param>
 /// <param name="FirmId">The owning firm.</param>

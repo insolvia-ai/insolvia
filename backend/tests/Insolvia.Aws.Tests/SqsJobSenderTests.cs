@@ -9,7 +9,7 @@ namespace Insolvia.Aws.Tests;
 /// <summary>
 /// The enqueue adapter (Python's SqsJobQueue): it sends exactly
 /// <see cref="JobRules.MessageBody"/> to the configured queue — the pinned,
-/// identifiers-only, byte-for-byte-Python body — and nothing else.
+/// identifiers-only, byte-exact body — and nothing else.
 /// </summary>
 public sealed class SqsJobSenderTests
 {

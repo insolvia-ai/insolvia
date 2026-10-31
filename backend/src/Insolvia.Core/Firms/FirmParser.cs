@@ -268,19 +268,19 @@ public static partial class FirmParser
     /// <summary>
     /// An email address, trimmed and LOWER-CASED (addresses are matched; a
     /// capital is not a second person). Shared with the client-portal
-    /// invitation parser, as in Python.
+    /// invitation parser.
     /// </summary>
     internal static string? ParseEmail(JsonNode? value, Dictionary<string, string> errors)
     {
         var raw = Json.AsString(value);
-        if (raw is null || PyText.Strip(raw).Length == 0)
+        if (raw is null || TextRules.Strip(raw).Length == 0)
         {
             errors["email"] = "An email address is required.";
             return null;
         }
 
-        var email = PyText.Lower(PyText.Strip(raw));
-        if (PyText.Length(email) > MaxEmail)
+        var email = TextRules.Lower(TextRules.Strip(raw));
+        if (TextRules.Length(email) > MaxEmail)
         {
             errors["email"] = $"Please keep this under {MaxEmail} characters.";
             return null;
@@ -319,14 +319,14 @@ public static partial class FirmParser
     private static string? ParseName(JsonNode? value, Dictionary<string, string> errors, string field, int cap)
     {
         var raw = Json.AsString(value);
-        if (raw is null || PyText.Strip(raw).Length == 0)
+        if (raw is null || TextRules.Strip(raw).Length == 0)
         {
             errors[field] = "A name is required.";
             return null;
         }
 
-        var name = PyText.Strip(raw);
-        if (PyText.Length(name) > cap)
+        var name = TextRules.Strip(raw);
+        if (TextRules.Length(name) > cap)
         {
             errors[field] = $"Please keep this under {cap} characters.";
             return null;
@@ -472,21 +472,21 @@ public static partial class FirmParser
         }
 
         var courtCode = Json.AsString(court);
-        if (courtCode is null || PyText.Strip(courtCode).Length == 0)
+        if (courtCode is null || TextRules.Strip(courtCode).Length == 0)
         {
             errors["defaultCourt"] = "Choose a court from the registry, or clear both.";
             return null;
         }
 
         var divisionCode = Json.AsString(division);
-        if (divisionCode is null || PyText.Strip(divisionCode).Length == 0)
+        if (divisionCode is null || TextRules.Strip(divisionCode).Length == 0)
         {
             errors["defaultDivision"] = "Choose the court's division, or clear both.";
             return null;
         }
 
-        courtCode = PyText.Strip(courtCode);
-        divisionCode = PyText.Strip(divisionCode);
+        courtCode = TextRules.Strip(courtCode);
+        divisionCode = TextRules.Strip(divisionCode);
         if (!courts.HasDivision(courtCode, divisionCode))
         {
             if (!courts.HasDistrict(courtCode))
@@ -538,7 +538,7 @@ public static class FirmNames
     public static (string First, string Last) SplitLegacyName(string value)
     {
         ArgumentNullException.ThrowIfNull(value);
-        var trimmed = PyText.Strip(value);
+        var trimmed = TextRules.Strip(value);
         if (trimmed.Length == 0)
         {
             return (string.Empty, string.Empty);
@@ -547,6 +547,6 @@ public static class FirmNames
         var space = trimmed.LastIndexOf(' ');
         return space < 0
             ? (trimmed, string.Empty)
-            : (PyText.Strip(trimmed[..space]), PyText.Strip(trimmed[(space + 1)..]));
+            : (TextRules.Strip(trimmed[..space]), TextRules.Strip(trimmed[(space + 1)..]));
     }
 }

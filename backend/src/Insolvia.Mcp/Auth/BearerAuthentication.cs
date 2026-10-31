@@ -28,7 +28,7 @@ namespace Insolvia.Mcp.Auth;
 /// token presented here fails closed (ADR 0016). The gap against the spec's
 /// aud-validation MUST is real and stated in mcp-surface.md § Identity.</para>
 /// <para>The challenge is written here rather than by the SDK's
-/// <c>McpAuthenticationHandler</c> because the Python SDK's is the contract:
+/// <c>McpAuthenticationHandler</c> because the contract is the Python SDK's challenge:
 /// <c>error="invalid_token"</c>, its description, a JSON body, and a
 /// <c>resource_metadata</c> built from the CONFIGURED resource URL — never
 /// from the request's Host, which behind API Gateway is not ours to trust.</para>
@@ -58,8 +58,8 @@ public sealed class BearerAuthentication(
     /// <inheritdoc />
     protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
     {
-        // The Python SDK's bearer backend never calls the verifier without a
-        // bearer credential, so no header is no log line — only a token that
+        // The verifier is never called without a bearer credential, so no
+        // header is no log line — only a token that
         // was presented and refused is.
         var header = Request.Headers.Authorization.ToString();
         if (!header.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))

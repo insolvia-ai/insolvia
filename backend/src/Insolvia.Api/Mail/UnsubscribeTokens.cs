@@ -73,7 +73,7 @@ public static class UnsubscribeTokens
     /// </summary>
     /// <param name="address">The address.</param>
     /// <returns>The normalised address.</returns>
-    public static string NormalizeAddress(string address) => PyText.Lower(PyText.Strip(address));
+    public static string NormalizeAddress(string address) => TextRules.Lower(TextRules.Strip(address));
 
     /// <summary>A token proving the holder was sent mail at <paramref name="address"/>.</summary>
     /// <param name="address">The address.</param>
@@ -85,7 +85,7 @@ public static class UnsubscribeTokens
         ArgumentNullException.ThrowIfNull(address);
         var key = RequireSecret(secret);
         var normalized = NormalizeAddress(address);
-        if (normalized.Length == 0 || PyText.Length(normalized) > MaxAddressChars)
+        if (normalized.Length == 0 || TextRules.Length(normalized) > MaxAddressChars)
         {
             throw new ValidationException(NotASubject);
         }

@@ -14,7 +14,7 @@ namespace Insolvia.Aws.Tests.Sealing;
 /// <summary>
 /// The KMS ciphers against a recording fake KMS — translated from the KMS
 /// cases of test_tax_ids.py and test_filing_credentials.py: the requests are
-/// asserted exactly as the Python adapters send them.
+/// asserted exactly as the Python adapters sent them.
 /// </summary>
 public sealed class KmsCipherTests
 {

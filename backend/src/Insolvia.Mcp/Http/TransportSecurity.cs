@@ -7,8 +7,8 @@ namespace Insolvia.Mcp.Http;
 /// <summary>
 /// The Python SDK's transport checks, in its order, in front of the C# SDK —
 /// which has none of them (research 2026-10-27 § 2.4). They run AFTER
-/// authentication, as Python's did (its auth middleware wraps the transport),
-/// so an unauthenticated request is the 401 challenge whatever else is wrong.
+/// authentication, so an unauthenticated request is the 401 challenge
+/// whatever else is wrong.
 /// </summary>
 /// <list type="number">
 /// <item><b>Host</b> — the spec's DNS-rebinding MUST: a deployed environment
@@ -16,8 +16,8 @@ namespace Insolvia.Mcp.Http;
 /// <c>Invalid Host header</c> (ASP.NET's HostFiltering would answer 400, a
 /// wire difference).</item>
 /// <item><b>Origin</b> — absent is fine (harnesses are not browsers);
-/// PRESENT is refused, 403 <c>Invalid Origin header</c>: the Python server
-/// was configured with an empty allowlist, so even its own origin is refused.</item>
+/// PRESENT is refused, 403 <c>Invalid Origin header</c>: the allowlist is
+/// empty, so even the server's own origin is refused.</item>
 /// <item><b>Accept</b> — a POST must accept <c>application/json</c> (406):
 /// the server answers JSON, never a stream.</item>
 /// <item><b>Content-Type</b> — a POST must be <c>application/json</c>
@@ -125,8 +125,8 @@ public sealed class TransportSecurity
                 }
             }
 
-            // Python's transport answered a body that is not JSON with
-            // JSON-RPC's own parse error; the C# SDK says -32600 instead.
+            // The contract answers a body that is not JSON with JSON-RPC's
+            // own parse error; the C# SDK says -32600 instead.
             if (!IsJson(buffer))
             {
                 context.Response.StatusCode = StatusCodes.Status400BadRequest;
@@ -140,7 +140,7 @@ public sealed class TransportSecurity
             request.ContentLength = buffer.Length;
 
             // The C# SDK insists on both media types; we answer JSON either way
-            // (JsonResponseShim), so a JSON-only client is served, as Python served it.
+            // (JsonResponseShim), so a JSON-only client is served.
             request.Headers.Accept = "application/json, text/event-stream";
         }
 

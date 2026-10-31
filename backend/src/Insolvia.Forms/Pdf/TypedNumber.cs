@@ -9,48 +9,48 @@ namespace Insolvia.Forms.Pdf;
 /// the type each operand would have in Python, and the streams come out
 /// byte-equal (research note 2026-10-27).
 /// </summary>
-internal readonly record struct PyNum(double Value, bool IsInt)
+internal readonly record struct TypedNumber(double Value, bool IsInt)
 {
     /// <summary>A Python <c>int</c>.</summary>
-    public static PyNum Int(long value) => new(value, true);
+    public static TypedNumber Int(long value) => new(value, true);
 
     /// <summary>A Python <c>float</c>.</summary>
-    public static PyNum Float(double value) => new(value, false);
+    public static TypedNumber Float(double value) => new(value, false);
 
-    public static PyNum operator +(PyNum a, PyNum b) => new(a.Value + b.Value, a.IsInt && b.IsInt);
+    public static TypedNumber operator +(TypedNumber a, TypedNumber b) => new(a.Value + b.Value, a.IsInt && b.IsInt);
 
-    public static PyNum operator -(PyNum a, PyNum b) => new(a.Value - b.Value, a.IsInt && b.IsInt);
+    public static TypedNumber operator -(TypedNumber a, TypedNumber b) => new(a.Value - b.Value, a.IsInt && b.IsInt);
 
-    public static PyNum operator *(PyNum a, PyNum b) => new(a.Value * b.Value, a.IsInt && b.IsInt);
+    public static TypedNumber operator *(TypedNumber a, TypedNumber b) => new(a.Value * b.Value, a.IsInt && b.IsInt);
 
     /// <summary>Python's true division: always a float.</summary>
-    public static PyNum operator /(PyNum a, PyNum b) => new(a.Value / b.Value, false);
+    public static TypedNumber operator /(TypedNumber a, TypedNumber b) => new(a.Value / b.Value, false);
 
-    public static PyNum operator -(PyNum a) => new(-a.Value, a.IsInt);
+    public static TypedNumber operator -(TypedNumber a) => new(-a.Value, a.IsInt);
 
     /// <summary>Named alternative to the + operator.</summary>
-    public static PyNum Add(PyNum a, PyNum b) => a + b;
+    public static TypedNumber Add(TypedNumber a, TypedNumber b) => a + b;
 
     /// <summary>Named alternative to the - operator.</summary>
-    public static PyNum Subtract(PyNum a, PyNum b) => a - b;
+    public static TypedNumber Subtract(TypedNumber a, TypedNumber b) => a - b;
 
     /// <summary>Named alternative to the * operator.</summary>
-    public static PyNum Multiply(PyNum a, PyNum b) => a * b;
+    public static TypedNumber Multiply(TypedNumber a, TypedNumber b) => a * b;
 
     /// <summary>Named alternative to the / operator.</summary>
-    public static PyNum Divide(PyNum a, PyNum b) => a / b;
+    public static TypedNumber Divide(TypedNumber a, TypedNumber b) => a / b;
 
     /// <summary>Named alternative to the unary - operator.</summary>
-    public static PyNum Negate(PyNum a) => -a;
+    public static TypedNumber Negate(TypedNumber a) => -a;
 
     /// <summary>Python's <c>max(a, b)</c>: the first argument wins a tie, keeping its type.</summary>
-    public static PyNum Max(PyNum a, PyNum b) => b.Value > a.Value ? b : a;
+    public static TypedNumber Max(TypedNumber a, TypedNumber b) => b.Value > a.Value ? b : a;
 
     /// <summary>Python's <c>min(a, b)</c>: the first argument wins a tie.</summary>
-    public static PyNum Min(PyNum a, PyNum b) => b.Value < a.Value ? b : a;
+    public static TypedNumber Min(TypedNumber a, TypedNumber b) => b.Value < a.Value ? b : a;
 
     /// <summary>Python's <c>round(x, 1)</c>: an int stays an int; a float rounds its exact binary value half-to-even.</summary>
-    public static PyNum Round1(PyNum x) => x.IsInt ? x : Float(Round1(x.Value));
+    public static TypedNumber Round1(TypedNumber x) => x.IsInt ? x : Float(Round1(x.Value));
 
     /// <summary>Python's <c>round(x, n)</c> on a float.</summary>
     public static double Round(double value, int digits)

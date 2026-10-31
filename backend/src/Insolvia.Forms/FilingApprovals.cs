@@ -445,7 +445,7 @@ public static class FilingApprovals
         }
 
         var digest = Json.AsString(body["digest"]);
-        if (digest is null || PyText.Length(digest) != 64)
+        if (digest is null || TextRules.Length(digest) != 64)
         {
             throw new ValidationException("digest is required: the digest of the filing set you were shown");
         }

@@ -187,7 +187,7 @@ public sealed class PostgresClientBindingStore : IClientBindingStore
     public async Task<ClientBinding?> FindByEmailAsync(string firmId, string email, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(email);
-        var lowered = PyText.Lower(email);
+        var lowered = TextRules.Lower(email);
         var row = await _db.Set<ClientBindingRow>().AsNoTracking()
             .Where(binding => binding.FirmId == firmId && binding.Email == lowered)
             .OrderBy(binding => binding.Subject)

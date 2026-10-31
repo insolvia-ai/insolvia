@@ -37,10 +37,10 @@ public sealed record ToolParameter(string Name, ArgumentKind Kind)
 }
 
 /// <summary>
-/// The arguments of one call, validated the way the Python SDK validated them
-/// — pydantic, in lax mode, over the tool function's signature — BEFORE the
-/// tool runs. That validation is part of the wire: a wrong type is not a
-/// domain refusal with an <c>error</c> envelope but a text-only
+/// The arguments of one call, validated by pydantic's rules in lax mode over
+/// the tool function's declared signature — BEFORE the tool runs. That
+/// validation is part of the wire: a wrong type is not a domain refusal
+/// with an <c>error</c> envelope but a text-only
 /// <c>isError</c> result (<c>Error executing tool …</c>), and lax mode
 /// ACCEPTS some inputs a strict reading would not (<c>"5"</c>, <c>2.0</c>
 /// and <c>true</c> are all an integer limit). Unknown arguments are ignored.

@@ -24,9 +24,9 @@ namespace Insolvia.Engines.Tests.Support;
 /// <summary>
 /// Case files as Parity/*.case.json holds them — every body in the stored
 /// shape, parsed here through Core's own parsers, the same trip the Python
-/// generator makes through insolvia_core's. The reference cases are
+/// generator made through insolvia_core's. The reference cases are
 /// test_form_projections.py's, so the translated targeted tests start from
-/// exactly the case the Python tests do.
+/// exactly the case the Python tests did.
 /// </summary>
 internal static class CaseFiles
 {
@@ -147,7 +147,7 @@ internal static class CaseFiles
 
     private static string? Str(JsonNode? node) => Json.AsString(node);
 
-    private static DateOnly? Date(JsonNode? node) => Py.ParseIso(Str(node));
+    private static DateOnly? Date(JsonNode? node) => Exact.ParseIso(Str(node));
 
     private static List<TBody> Bodies<TBody>(JsonObject data, string member, EntityKind<TBody> kind)
         where TBody : class =>

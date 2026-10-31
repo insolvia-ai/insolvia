@@ -3,18 +3,17 @@ namespace Insolvia.Api.Configuration;
 /// <summary>
 /// The service configuration, parsed once at composition (Python's
 /// <c>AppConfig</c> / <c>load_config</c> in services/api core/config.py). The
-/// variable names are the Python service's, so one environment drives either
-/// backend; <see cref="Load"/> is the only place that reads them.
+/// variable names are the ones the environments already set;
+/// <see cref="Load"/> is the only place that reads them.
 /// </summary>
 /// <remarks>
 /// <para>Every string is "set and non-empty, or null" — Python's
 /// <c>source.get(NAME) or None</c>.</para>
 /// <para>The DynamoDB-era names (<c>WAITLIST_TABLE_NAME</c>,
 /// <c>CASE_TABLE_NAME</c>, <c>CASE_ACCESS_LOG_TABLE_NAME</c>,
-/// <c>FIRM_TABLE_NAME</c>) are read so the two backends see the same
-/// environment, but nothing in this host composes a store from them: the
-/// stores are Postgres (<c>INSOLVIA_DB_*</c>, owned by Insolvia.Data), and
-/// the Lambda boot does not require them (<see cref="LambdaBootRequirements"/>).
+/// <c>FIRM_TABLE_NAME</c>) are still read, but nothing in this host composes a
+/// store from them: the stores are Postgres (<c>INSOLVIA_DB_*</c>, owned by
+/// Insolvia.Data), and the Lambda boot does not require them (<see cref="LambdaBootRequirements"/>).
 /// The one exception is <c>CASE_TABLE_NAME</c>'s use as the source the two
 /// KMS key aliases are derived from when they are not set explicitly
 /// (<see cref="Aws.Sealing.SealingKeys"/>).</para>

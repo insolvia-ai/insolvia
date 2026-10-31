@@ -128,7 +128,7 @@ public static class PlanRules
             PresentValueRate: Rate("present_value_rate"));
 
         // NOTE: the index is the row's position among the PARSED rows, not the
-        // payload's — Python's; it differs only when an earlier row was refused,
+        // payload's — as the contract has it; it differs only when an earlier row was refused,
         // and then the request fails on that row anyway.
         var starts = new HashSet<int>();
         for (var index = 0; index < body.StepPayments.Count; index++)

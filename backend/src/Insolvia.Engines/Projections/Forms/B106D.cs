@@ -179,7 +179,7 @@ public static class B106D
                 var first = secured.Count > 0 ? secured[0].AccountLast4 : null;
                 if (last4 != first)
                 {
-                    problems.Add($"notify.account_last4: the fourth notice row's box is the PDF's second widget of claim row 2.1's account field and can only repeat its value; {Py.Repr(last4)} differs");
+                    problems.Add($"notify.account_last4: the fourth notice row's box is the PDF's second widget of claim row 2.1's account field and can only repeat its value; {Exact.Repr(last4)} differs");
                 }
 
                 continue;

@@ -51,7 +51,7 @@ public sealed class FirmsTests
     [Fact]
     public void A_level_this_version_does_not_know_is_hidden()
     {
-        // Python ranked an unknown STORED level as hidden in permission_for.
+        // permission_for ranked an unknown STORED level as hidden.
         // A PermissionLevel cannot hold one, so the rule lives where a wire
         // value becomes a member: an unknown level never parses.
         Assert.False(Wire.TryParse<PermissionLevel>("full_control", out _));

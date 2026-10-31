@@ -334,7 +334,7 @@ public sealed class ProjectionMeansTestTests
     [InlineData("10.00", "10")]
     [InlineData("100", "100")]
     public void B113_prints_a_rate_normalised(string stored, string printed) =>
-        Assert.Equal(printed, B113.Rate(Py.Dec(stored)));
+        Assert.Equal(printed, B113.Rate(Exact.Dec(stored)));
 
     private static FieldValues B113Values(Func<PlanBody, PlanBody>? change = null) =>
         Project("form/b113", Reference13 with { Plans = [(change ?? (plan => plan))(Reference13.Plans[0])] });

@@ -38,7 +38,7 @@ internal static class PdfObjects
     };
 
     /// <summary>The item as a Python-typed number.</summary>
-    public static PyNum PyNumber(PdfItem? item) => IsInteger(item) ? PyNum.Int((long)Num(item)) : PyNum.Float(Num(item));
+    public static TypedNumber TypedNumberOf(PdfItem? item) => IsInteger(item) ? TypedNumber.Int((long)Num(item)) : TypedNumber.Float(Num(item));
 
     /// <summary>A name or string value of a dictionary key, or null.</summary>
     public static string? Str(PdfDictionary dict, string key) => Str(dict.Elements[key]);

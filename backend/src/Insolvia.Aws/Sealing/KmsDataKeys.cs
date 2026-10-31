@@ -7,7 +7,7 @@ namespace Insolvia.Aws.Sealing;
 
 /// <summary>
 /// The two KMS verbs every sealed value goes through, as the Python adapters
-/// call them (adapters/aws/tax_id_cipher.py, filing_credentials.py):
+/// called them (adapters/aws/tax_id_cipher.py, filing_credentials.py):
 /// <c>GenerateDataKey(KeyId, KeySpec=AES_256, EncryptionContext)</c> to seal,
 /// <c>Decrypt(KeyId, CiphertextBlob, EncryptionContext)</c> to open.
 /// </summary>

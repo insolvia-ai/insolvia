@@ -172,14 +172,14 @@ internal sealed class Font
     public bool CanEncode(string text)
     {
         var supported = Encoding.Values.ToHashSet(StringComparer.Ordinal);
-        return Py.Chars(text).All(supported.Contains);
+        return CodePoints.Chars(text).All(supported.Contains);
     }
 
     /// <summary>Sum of the characters' widths (pypdf's <c>get_text_width</c>), keyed by character.</summary>
     public double TextWidth(string text)
     {
         var total = 0.0;
-        foreach (var ch in Py.Chars(text))
+        foreach (var ch in CodePoints.Chars(text))
         {
             total += Widths.TryGetValue(ch, out var width) ? width : DefaultWidth;
         }
@@ -191,14 +191,14 @@ internal sealed class Font
     public string ToGlyphs(string text)
     {
         _reverse ??= BuildReverse();
-        return string.Concat(Py.Chars(text).Select(ch => _reverse.TryGetValue(ch, out var glyph) ? glyph : ch));
+        return string.Concat(CodePoints.Chars(text).Select(ch => _reverse.TryGetValue(ch, out var glyph) ? glyph : ch));
     }
 
     /// <summary>Glyph characters to the bytes a simple font shows (pypdf's <c>_glyph_id_to_bytes</c>).</summary>
     public static byte[] GlyphBytes(string glyphs)
     {
         var bytes = new List<byte>();
-        foreach (var ch in Py.Chars(glyphs))
+        foreach (var ch in CodePoints.Chars(glyphs))
         {
             var code = char.ConvertToUtf32(ch, 0);
             bytes.Add(code < 256 ? (byte)code : (byte)'?');
@@ -364,7 +364,7 @@ internal static class FontData
 }
 
 /// <summary>Python string semantics where they differ from .NET's UTF-16 ones.</summary>
-internal static class Py
+internal static class CodePoints
 {
     /// <summary>The string's code points as strings — what iterating a Python <c>str</c> yields.</summary>
     public static IEnumerable<string> Chars(string text)

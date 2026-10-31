@@ -133,7 +133,7 @@ public static partial class CreditorMatrices
 
         printable.Sort((left, right) =>
         {
-            var byName = string.CompareOrdinal(PyText.Casefold(left[0]), PyText.Casefold(right[0]));
+            var byName = string.CompareOrdinal(TextRules.Casefold(left[0]), TextRules.Casefold(right[0]));
             return byName != 0 ? byName : CompareBlocks(left, right);
         });
         var blocks = new List<string[]>();
@@ -141,7 +141,7 @@ public static partial class CreditorMatrices
         var duplicates = 0;
         foreach (var block in printable)
         {
-            var key = string.Join("\n", block.Select(PyText.Casefold));
+            var key = string.Join("\n", block.Select(TextRules.Casefold));
             if (!seen.Add(key))
             {
                 duplicates++;
@@ -305,7 +305,7 @@ public static partial class CreditorMatrices
         foreach (var (field, line) in lines)
         {
             var limit = field == "name" && fmt.NameLineChars is { } wider ? wider : fmt.MaxLineChars;
-            if (PyText.Length(line) > limit)
+            if (TextRules.Length(line) > limit)
             {
                 problems.Add(new MatrixProblem(id, field, $"Exceeds {limit} characters — the courts reject longer matrix lines, so shorten it (abbreviate, or move detail to the second address line)."));
             }
@@ -331,7 +331,7 @@ public static partial class CreditorMatrices
         {
             problems.Add(new MatrixProblem(null, "case_number", "The case number for the matrix header is blank."));
         }
-        else if (PyText.Length(caseNumber) > fmt.MaxLineChars || !PrintableAscii(caseNumber))
+        else if (TextRules.Length(caseNumber) > fmt.MaxLineChars || !PrintableAscii(caseNumber))
         {
             problems.Add(new MatrixProblem(null, "case_number", $"The case number must be plain ASCII of at most {fmt.MaxLineChars} characters to print as the matrix's first line."));
         }

@@ -301,7 +301,7 @@ public sealed class CaseLifecycleRoutes : IEndpointModule
 
         DateOnly? effectiveOn = null;
         var raw = Json.AsString(payload["effectiveOn"]);
-        var stripped = raw is null ? string.Empty : PyText.Strip(raw);
+        var stripped = raw is null ? string.Empty : TextRules.Strip(raw);
         if (DateOnly.TryParseExact(stripped, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed) && FlaskJson.Date(parsed) == stripped)
         {
             effectiveOn = parsed;

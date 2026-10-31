@@ -402,7 +402,7 @@ public static class CaseRules
         }
 
         // Python's json.dumps(sort_keys=True, separators=(",", ":")): "i" sorts before "k".
-        var raw = new JsonObject { ["i"] = index, ["k"] = sorted }.ToJsonString(PythonJson);
+        var raw = new JsonObject { ["i"] = index, ["k"] = sorted }.ToJsonString(CompactJson);
         return Convert.ToBase64String(Encoding.UTF8.GetBytes(raw)).Replace('+', '-').Replace('/', '_');
     }
 
@@ -439,7 +439,7 @@ public static class CaseRules
         return result;
     }
 
-    private static readonly JsonSerializerOptions PythonJson = new() { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
+    private static readonly JsonSerializerOptions CompactJson = new() { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
 
     private static int? ParseChapter(JsonNode? value, Dictionary<string, string> errors)
     {
@@ -467,22 +467,22 @@ public static class CaseRules
     {
         var court = Json.AsString(payload["court"]);
         var division = Json.AsString(payload["division"]);
-        if (court is null || PyText.Strip(court).Length == 0)
+        if (court is null || TextRules.Strip(court).Length == 0)
         {
             errors["court"] = "Choose the bankruptcy court this case will be filed in.";
             return null;
         }
 
-        if (division is null || PyText.Strip(division).Length == 0)
+        if (division is null || TextRules.Strip(division).Length == 0)
         {
             errors["division"] = "Choose the court's division.";
             return null;
         }
 
-        var found = courts.Division(PyText.Strip(court), PyText.Strip(division));
+        var found = courts.Division(TextRules.Strip(court), TextRules.Strip(division));
         if (found is null)
         {
-            if (courts.District(PyText.Strip(court)) is null)
+            if (courts.District(TextRules.Strip(court)) is null)
             {
                 errors["court"] = "That court is not in the registry.";
             }
@@ -556,13 +556,13 @@ public static class CaseRules
     internal static DateOnly? ParseCourtDate(JsonNode? value, string field, Dictionary<string, string> errors)
     {
         var raw = Json.AsString(value);
-        if (raw is null || PyText.Strip(raw).Length == 0)
+        if (raw is null || TextRules.Strip(raw).Length == 0)
         {
             errors[field] = DateMessage;
             return null;
         }
 
-        var stripped = PyText.Strip(raw);
+        var stripped = TextRules.Strip(raw);
         if (!DateOnly.TryParseExact(stripped, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed)
             || parsed.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) != stripped)
         {
@@ -592,13 +592,13 @@ public static class CaseRules
         }
 
         var ids = list.Select(item => Json.AsString(item)).ToList();
-        if (ids.Any(id => id is null || PyText.Strip(id).Length == 0))
+        if (ids.Any(id => id is null || TextRules.Strip(id).Length == 0))
         {
             errors["client_ids"] = "Each client must be a client id.";
             return [];
         }
 
-        var stripped = ids.Select(id => PyText.Strip(id!)).ToList();
+        var stripped = ids.Select(id => TextRules.Strip(id!)).ToList();
         if (stripped.Distinct(StringComparer.Ordinal).Count() != stripped.Count)
         {
             errors["client_ids"] = "The same client cannot be both debtors on one case.";

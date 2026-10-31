@@ -112,12 +112,12 @@ public static class TokenVerification
     /// </summary>
     public static string BearerToken(string? headerValue)
     {
-        if (headerValue is null || PyText.Strip(headerValue).Length == 0)
+        if (headerValue is null || TextRules.Strip(headerValue).Length == 0)
         {
             throw new AuthenticationException(AuthFailureReason.MissingCredentials);
         }
 
-        var parts = PyText.SplitWhitespace(headerValue);
+        var parts = TextRules.SplitWhitespace(headerValue);
         if (parts.Length != 2 || !string.Equals(parts[0], "bearer", StringComparison.OrdinalIgnoreCase) || parts[1].Length == 0)
         {
             throw new AuthenticationException(AuthFailureReason.MalformedHeader);
@@ -305,7 +305,7 @@ public static class TokenVerification
             Subject: subject,
             Username: string.IsNullOrEmpty(username) ? null : username,
             ClientId: clientId,
-            Scopes: scope is null ? [] : PyText.SplitWhitespace(scope).ToValueCollection(),
+            Scopes: scope is null ? [] : TextRules.SplitWhitespace(scope).ToValueCollection(),
             ExpiresAt: WholeNumberOrNull(claims["exp"]),
             AuthenticatedAt: AuthTime(claims["auth_time"]));
     }

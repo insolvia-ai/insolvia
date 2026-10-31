@@ -182,7 +182,7 @@ public static class PetitionRules
 
         if (value is not JsonObject raw)
         {
-            // Python's own lower-case spelling, kept: a client may match it.
+            // The contract's own lower-case spelling, kept: a client may match it.
             errors[path] = "must be an object";
             return new HazardousProperty();
         }

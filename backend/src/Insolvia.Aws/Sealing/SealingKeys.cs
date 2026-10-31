@@ -16,7 +16,7 @@ namespace Insolvia.Aws.Sealing;
 /// — the names the switch (18.22) will set, because <c>CASE_TABLE_NAME</c>
 /// names a DynamoDB table that stops existing with it. Until then, when a
 /// variable is unset, the alias is DERIVED from <c>CASE_TABLE_NAME</c> exactly
-/// as the Python composers derive it (<see cref="KeyAliases"/>), so today's
+/// as the Python composers derived it (<see cref="KeyAliases"/>), so today's
 /// Terraform environment needs no new line.
 /// </para>
 /// <para>

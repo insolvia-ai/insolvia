@@ -8,8 +8,8 @@ namespace Insolvia.Core;
 /// An immutable list with VALUE equality — the C# shape of a Python tuple on
 /// a frozen dataclass. A record holding a plain array or <c>List</c> compares
 /// it by reference, so two records describing the same client would be
-/// unequal; the stores' "round-trips" and "unchanged since" checks need the
-/// Python meaning.
+/// unequal; the stores' "round-trips" and "unchanged since" checks need
+/// equality by contents.
 /// </summary>
 [CollectionBuilder(typeof(ValueCollections), nameof(ValueCollections.Create))]
 public sealed class ValueCollection<T> : IReadOnlyList<T>, IEquatable<ValueCollection<T>>

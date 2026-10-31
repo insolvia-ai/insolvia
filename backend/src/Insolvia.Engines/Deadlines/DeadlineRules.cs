@@ -36,7 +36,7 @@ public sealed record RulesRelease(string SeriesId, DateOnly EffectiveDate, int S
     /// <summary>The rule with this id; <see cref="EngineKeyException"/> when there is none.</summary>
     public DeadlineRule Rule(string ruleId) =>
         Rules.FirstOrDefault(rule => rule.RuleId == ruleId)
-        ?? throw new EngineKeyException($"{ReleaseId} has no rule {Py.Repr(ruleId)}");
+        ?? throw new EngineKeyException($"{ReleaseId} has no rule {Exact.Repr(ruleId)}");
 }
 
 /// <summary>The deadline-rule registry (Python's <c>core/deadline_rules.py</c>).</summary>
@@ -111,7 +111,7 @@ public static class DeadlineRules
         {
             var earliest = All.Min(release => release.EffectiveDate);
             throw new EngineLookupException(
-                $"no release of {SeriesId} is effective on or before {Py.Iso(asOf)} (series begins {Py.Iso(earliest)})");
+                $"no release of {SeriesId} is effective on or before {Exact.Iso(asOf)} (series begins {Exact.Iso(earliest)})");
         }
 
         return Releases.MaxByKey(applicable);
@@ -234,7 +234,7 @@ public static class DeadlineRules
         var verificationRaw = StrField(raw, "verification", where);
         if (!Core.Wire.TryParse<Verification>(verificationRaw, out var verification))
         {
-            throw Fail(where, $"verification {Py.Repr(verificationRaw)}");
+            throw Fail(where, $"verification {Exact.Repr(verificationRaw)}");
         }
 
         if (verification == Verification.Unverified)
