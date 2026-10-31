@@ -5,7 +5,7 @@ using Insolvia.Core.TaxIds;
 
 namespace Insolvia.Aws.Tests.Sealing;
 
-/// <summary>One case of Fixtures/python-sealed.json (or dotnet-sealed.json) — the schema sealed_envelopes.py writes.</summary>
+/// <summary>One case of Fixtures/python-sealed.json (or dotnet-sealed.json) — the schema the Python generator wrote before 18.23.</summary>
 internal sealed record SealedCase(
     string Name,
     string Kind,

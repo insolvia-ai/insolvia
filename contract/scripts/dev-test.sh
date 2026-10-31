@@ -2,23 +2,22 @@
 # The contract suite against a local stack — offline, no AWS, no sign-in
 # anywhere.
 #
-#   contract/scripts/dev-test.sh                    # the Python stack (default)
-#   contract/scripts/dev-test.sh --target dotnet    # the .NET stack on Postgres
+#   contract/scripts/dev-test.sh                    # the .NET stack on Postgres
 #   contract/scripts/dev-test.sh api                # extra args go to vitest
 #
-# Both targets:
-# 1. mint a throwaway RS256 key for this run;
-# 2. start the stack in the background and wait for every service to answer;
-# 3. run the Vitest suite against it (the coverage gate is enforced on an
-#    unfiltered run), and stop the stack however that ends.
+# It:
+# 1. mints a throwaway RS256 key for this run;
+# 2. starts the stack in the background and waits for every service to answer:
+#    a throwaway Postgres 17 container, migrated and seeded from
+#    seeds/dev.json by the real migrator; contract/scripts/aux-server.ts for
+#    the JWKS and the blob URLs; then the API, admin and MCP hosts, each as
+#    its own database role;
+# 3. runs the Vitest suite against it (the coverage gate is enforced on an
+#    unfiltered run), and stops the stack however that ends.
 #
-# --target python: contract/stack/contract_stack.py, one process over the
-#   services' memory adapters (builds contract/.venv on first use).
-# --target dotnet (ADR 0028's acceptance gate): a throwaway Postgres 17
-#   container, migrated and seeded from seeds/dev.json by the real migrator;
-#   contract/scripts/aux-server.ts for the JWKS and the blob URLs; then the
-#   API, admin and MCP hosts, each as its own database role. Needs Docker and
-#   the .NET SDK (backend/global.json).
+# Needs Docker and the .NET SDK (backend/global.json). `--target dotnet` is
+# still accepted, and is the only target: the Python stack this suite was
+# first proven against went with the Python backend (ADR 0028, plan 18.23).
 #
 # To aim the suite at some other stack, skip this script: set the CONTRACT_*
 # variables contract/src/support/env.ts names and run
@@ -29,7 +28,7 @@ CONTRACT="$(cd "$(dirname "$0")/.." && pwd)"
 REPO="$(cd "$CONTRACT/.." && pwd)"
 BACKEND="$REPO/backend"
 
-TARGET=python
+TARGET=dotnet
 VITEST_ARGS=()
 while (($#)); do
   case "$1" in
@@ -39,8 +38,8 @@ while (($#)); do
   esac
 done
 case "$TARGET" in
-  python | dotnet) ;;
-  *) echo "--target must be python or dotnet, got '$TARGET'" >&2; exit 2 ;;
+  dotnet) ;;
+  *) echo "--target must be dotnet (the only stack), got '$TARGET'" >&2; exit 2 ;;
 esac
 
 RUN="$(mktemp -d "${TMPDIR:-/tmp}/insolvia-contract.XXXXXX")"
@@ -78,25 +77,6 @@ export CONTRACT_ADMIN_URL="http://127.0.0.1:$CONTRACT_ADMIN_PORT"
 export CONTRACT_MCP_URL="http://127.0.0.1:$CONTRACT_MCP_PORT/mcp"
 export CONTRACT_ISSUER_URL="$ISSUER_URL"
 export CONTRACT_SIGNING_KEY="$RUN/signing-key.pem"
-
-# ── the Python stack ───────────────────────────────────────────────
-
-start_python() {
-  local venv="$CONTRACT/.venv"
-  local python="${PYTHON:-python3.12}"
-  if [[ ! -x "$venv/bin/python" ]]; then
-    echo "creating $venv"
-    "$python" -m venv "$venv"
-    "$venv/bin/pip" install --quiet --upgrade pip
-  fi
-  # Converges every run (fast when nothing moved). From contract/stack/: the
-  # requirements' relative paths resolve against the working directory.
-  (cd "$CONTRACT/stack" && "$venv/bin/pip" install --quiet -r requirements.txt)
-
-  CONTRACT_JWKS="$RUN/jwks.json" "$venv/bin/python" "$CONTRACT/stack/contract_stack.py" \
-    >"$RUN/stack.log" 2>&1 &
-  PIDS+=($!)
-}
 
 # ── the .NET stack ─────────────────────────────────────────────────
 

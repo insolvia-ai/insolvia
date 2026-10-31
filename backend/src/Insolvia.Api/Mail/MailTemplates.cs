@@ -15,10 +15,10 @@ namespace Insolvia.Api.Mail;
 public sealed record MailLinks(string PrivacyUrl, string? UnsubscribeUrl = null);
 
 /// <summary>
-/// The transactional email templates, ported from services/api's
-/// <c>core/mail.py</c> byte for byte — <c>Fixtures/python-mail.json</c> is
-/// that module's own output, and the tests compare every part of every
-/// template against it.
+/// The transactional email templates, ported from the Python backend's
+/// <c>core/mail.py</c> byte for byte — the tests' <c>Fixtures/python-mail.json</c>
+/// is that module's own output, and every part of every template is compared
+/// against it.
 /// </summary>
 /// <remarks>
 /// <para>Every category and the message class MUST match the mailer's

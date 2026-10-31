@@ -4,13 +4,10 @@ using Insolvia.Engines.Projections;
 namespace Insolvia.Forms.Tests;
 
 // The template-PDF half of test_form_templates.py: every release ships its
-// template, it hashes to the manifest's source.sha256, and every embedded
-// copy is byte-identical to the Python original (frozen, ADR 0028) until
-// 18.23 deletes it.
+// template, and it hashes to the manifest's source.sha256 — the court's own
+// PDF, byte for byte. Templates/ is the canonical copy (ADR 0014).
 public sealed class TemplateFileTests
 {
-    private static readonly string PythonRegistry = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "..", "services", "api", "src", "insolvia_api", "regulatory"));
-
     public static TheoryData<string> Releases() =>
         [.. FormTemplates.Registry.Values.SelectMany(releases => releases).Select(release => release.ReleaseId)];
 
@@ -24,15 +21,6 @@ public sealed class TemplateFileTests
         var release = Release(releaseId);
 
         Assert.Equal(release.SourceSha256, Convert.ToHexStringLower(SHA256.HashData(TemplatePdfs.For(release))));
-    }
-
-    [Theory]
-    [MemberData(nameof(Releases))]
-    public void The_embedded_template_is_the_python_copy_byte_for_byte(string releaseId)
-    {
-        var path = TemplatePdfs.PathOf(Release(releaseId));
-
-        Assert.Equal(File.ReadAllBytes(Path.Combine(PythonRegistry, path)), TemplatePdfs.Read(path));
     }
 
     [Fact]

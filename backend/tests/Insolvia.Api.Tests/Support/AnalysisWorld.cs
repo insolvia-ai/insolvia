@@ -39,7 +39,7 @@ namespace Insolvia.Api.Tests.Support;
 /// </remarks>
 internal sealed class AnalysisWorld : IDisposable
 {
-    /// <summary>Parity/generate.py's <c>TODAY</c>, noon UTC.</summary>
+    /// <summary>The oracle's <c>TODAY</c> (the date Parity/*.expected.json was computed for), noon UTC.</summary>
     public static readonly DateTimeOffset ParityToday = new(2026, 10, 1, 12, 0, 0, TimeSpan.Zero);
 
     /// <summary>The four case files the oracle ran over.</summary>
@@ -104,7 +104,7 @@ internal sealed class AnalysisWorld : IDisposable
     public static JsonObject CaseFileJson(string name) =>
         JsonNode.Parse(File.ReadAllText(Path.Combine(ParityDirectory, $"{name}.case.json")))!.AsObject();
 
-    /// <summary>The oracle's output for one case file (generate.py's <c>expected</c>).</summary>
+    /// <summary>The oracle's output for one case file (Parity/&lt;case&gt;.expected.json).</summary>
     public static JsonObject Expected(string name) =>
         JsonNode.Parse(File.ReadAllText(Path.Combine(ParityDirectory, $"{name}.expected.json")))!.AsObject();
 

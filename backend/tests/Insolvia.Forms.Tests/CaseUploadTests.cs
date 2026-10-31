@@ -426,10 +426,10 @@ public sealed class CaseUploadTests
 }
 
 // The Case Upload half of the parity gate: Debtor.txt for the four parity
-// case files, built by Insolvia.Forms, byte-identical to what services/api's
-// case_upload.build_debtor_txt wrote (Parity/debtor_txt.py ->
-// Parity/debtor-txt/<case>.Debtor.txt) — encoding, line endings, delimiters
-// and blanks included. And the embedded spec, pinned to the Python copy.
+// case files, built by Insolvia.Forms, byte-identical to what the Python
+// backend's case_upload.build_debtor_txt wrote before 18.23 deleted it
+// (committed as Parity/debtor-txt/<case>.Debtor.txt) — encoding, line
+// endings, delimiters and blanks included.
 public sealed class CaseUploadParityTests
 {
     private static readonly DateOnly AsOf = new(2026, 10, 1);
@@ -452,34 +452,5 @@ public sealed class CaseUploadParityTests
         var expected = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "DebtorTxt", $"{name}.Debtor.txt"));
         Assert.Equal(Encoding.ASCII.GetString(expected), Encoding.ASCII.GetString(file.Content));
         Assert.Equal(expected, file.Content);
-    }
-
-    // The embedded copies' sha256, as services/api's files hash today.
-    public static TheoryData<string, string> Pinned() => new()
-    {
-        { "filing/case-upload/2022-03-01/manifest.json", "4212d0a06f13f649735f43799a6519d0c91fefbef4b6b8fb6e333fa888865a89" },
-        { "filing/case-upload/2022-03-01/spec.json", "65aaf9c11308a897dfecb31226fb42a1d2b8bb7e203511c30f75e5620d9266ab" },
-    };
-
-    [Theory]
-    [MemberData(nameof(Pinned))]
-    public void The_embedded_spec_is_the_python_copy_byte_for_byte(string path, string sha256)
-    {
-        var embedded = CaseUploadSpecs.EmbeddedFiles();
-
-        Assert.Equal(sha256, Convert.ToHexStringLower(SHA256.HashData(embedded[path])));
-        var python = Path.Combine(CaseUploadTests.SourceRoot(), "..", "..", "services", "api", "src", "insolvia_api", "regulatory", path);
-        Assert.Equal(sha256, Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(python))));
-    }
-
-    [Fact]
-    public void Every_python_case_upload_file_is_embedded()
-    {
-        var root = Path.Combine(CaseUploadTests.SourceRoot(), "..", "..", "services", "api", "src", "insolvia_api", "regulatory");
-        var onDisk = Directory.GetFiles(Path.Combine(root, "filing"), "*", SearchOption.AllDirectories)
-            .Select(path => Path.GetRelativePath(root, path).Replace('\\', '/'))
-            .Order(StringComparer.Ordinal);
-
-        Assert.Equal(onDisk, CaseUploadSpecs.EmbeddedFiles().Keys);
     }
 }

@@ -16,9 +16,9 @@ repos:
       # S.D. Tex.'s ends in padding blank lines — so neither fixer may touch
       # them (their directory's .gitattributes does the same for git).
       - id: end-of-file-fixer
-        exclude: ^(services/api/tests/unit/goldens|backend/tests/Insolvia\.Engines\.Tests/Goldens)/creditor_matrix/.*\.txt$
+        exclude: ^backend/tests/Insolvia\.Engines\.Tests/Goldens/creditor_matrix/.*\.txt$
       - id: trailing-whitespace
-        exclude: ^(services/api/tests/unit/goldens|backend/tests/Insolvia\.Engines\.Tests/Goldens)/creditor_matrix/.*\.txt$
+        exclude: ^backend/tests/Insolvia\.Engines\.Tests/Goldens/creditor_matrix/.*\.txt$
       - id: check-yaml
       - id: check-merge-conflict
 
@@ -78,8 +78,8 @@ repos:
       # the `files:` filter would otherwise decide the hook has nothing to do.
       # Unit only, by construction: nothing it runs needs AWS, a server, a
       # secret or the network. The integration tier is a differently named
-      # script (services/api/scripts/dev-test-integration.sh) so a hook can
-      # never reach for it by accident.
+      # script (integration/scripts/dev-test.sh) so a hook can never reach
+      # for it by accident.
       - id: unit-tests
         name: unit tests for the areas this push touches (scripts/dev-test-unit.sh)
         entry: scripts/dev-test-unit.sh

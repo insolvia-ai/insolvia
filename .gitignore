@@ -53,16 +53,12 @@ terraform.rc
 # Lambda zips built by archive_file at plan time.
 infra/modules/*/.build/
 
-# Per-machine local wiring written by scripts/dev-aws-setup.sh (table name,
-# profile name, this machine's own Cognito pool ids — no secrets, but
-# machine-specific and never committed). There is deliberately no `.example`
-# alongside these: every value is an identifier for a resource `infra/envs/dev`
-# creates per machine, so a copied template would name nothing. Run
-# `./scripts/dev-aws-setup.sh` and it writes both files.
-/services/api/.env
-/services/admin/.env
-/services/mcp/.env
-/services/filing/.env
+# Per-machine local wiring written by scripts/dev-aws-setup.sh (the shared dev
+# pool's ids, the Google client id — no secrets, but machine-specific and never
+# committed). There is deliberately no `.example` alongside these: every value
+# names a resource that exists outside this repo, so a copied template would
+# name nothing. Run `./scripts/dev-aws-setup.sh` and it writes both files.
+/backend/.env
 /apps/insolvia_app/.env
 
 # ── Python ──────────────────────────────────────────────────────
@@ -77,10 +73,6 @@ venv/
 # wordmark and icon out of the display face. Anchored: it is one known path,
 # not a licence for any `.cache` anywhere.
 /.cache/
-# setuptools drops this when a consumer pip-installs the shared package from
-# its local path (ADR 0012). Anchored, matching the Node rule below: a bare
-# `build/` would silently swallow any future build directory anywhere.
-/packages/insolvia_core/build/
 
 # ── Node (the npm workspace + the version-gated React packages) ─
 # package-lock.json IS committed (reproducible npm installs in CI).

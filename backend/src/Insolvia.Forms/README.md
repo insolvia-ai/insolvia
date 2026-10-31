@@ -6,7 +6,7 @@ draws the flat forms, stamps and measures the output, and assembles the
 packet, the filing set and the approval digest. Pure — bytes in, bytes out;
 storing a packet is the worker's job (18.17).
 
-| Python (`services/api/src/insolvia_api/core/`) | C# | Tests |
+| Python it ports (`core/`, deleted in 18.23) | C# | Tests |
 |---|---|---|
 | `form_fill.py` | `FormFill`, `Pdf/TextAppearance`, `Pdf/Fonts`, `Pdf/PyNum`, `Pdf/Determinism` | `FormFillTests`, `GoldenTests`, `AppearanceTests` |
 | `form_templates.py` (the `template.pdf` half) | `TemplatePdfs`, `Templates/**` | `TemplateFileTests` |
@@ -35,7 +35,7 @@ gives the same bytes (`GoldenTests` fills every form twice).
 
 ## pypdf's quirks — what was kept and what was corrected
 
-pypdf 6.16.2 is the oracle until cut-over (18.22). Three of its behaviours
+pypdf 6.16.2 was the oracle until cut-over (18.22). Three of its behaviours
 were decided on explicitly:
 
 1. **A button field's `/V` — corrected.** pypdf writes a radio group's (or
@@ -43,8 +43,8 @@ were decided on explicitly:
    § 12.7.4.2 says a *name*. The .NET engine writes the name. Readers that
    compare `str(/V)` — the goldens' own reader among them — see no
    difference, the widgets' `/AS` (what prints) are untouched, and the
-   rendered pixels are identical; `Parity/compare.py` counts this one
-   difference as "quirk 1" and fails on any other.
+   rendered pixels are identical; the parity gate counted this one
+   difference as "quirk 1" and failed on any other.
 2. **The shared `/AP /N` overwrite — kept.** The court PDFs give all of a
    field's widgets one `/N` stream (B106D's "Debtor 1" caption spans three
    pages), and pypdf replaces that one object, so the last widget's box size
@@ -79,16 +79,16 @@ pypdf cannot fill them either.
 - `tests/Insolvia.Forms.Tests/Goldens/<form>.json` — the .NET goldens:
   release, the sha256 of the .NET output (re-baselined from pypdf's, as ADR
   0028 accepts), and the field read-back. `GoldenTests` also holds the
-  read-back to the Python goldens' (`services/api/tests/unit/goldens/`).
-  Regenerate with `UPDATE_FORM_GOLDENS=1 dotnet test --filter GoldenTests`
-  and review the diff field by field.
-- `tests/Insolvia.Forms.Tests/Parity/run.sh` — the gate against pypdf:
-  every form, the special paths, non-ASCII text and the packet assemblies of
-  the four parity case files, compared on fields, widget states,
-  appearance-stream bytes, official pages, text runs and PDFium pixels.
-  CI runs it (`backend-pr.yml`, "Forms parity") until cut-over.
-- `tests/Insolvia.Forms.Tests/Parity/debtor_txt.py` — the Case Upload
-  oracle: services/api's Debtor.txt for the same four case files, written to
-  `Parity/debtor-txt/`; `CaseUploadParityTests` asserts the .NET file is
-  byte-identical. Regenerate (same `PYTHONPATH` as `run.sh`) and review the
-  diff when the Python changes.
+  read-back, which was checked equal to the Python goldens' (pypdf's)
+  before 18.23 deleted them. Regenerate with
+  `UPDATE_FORM_GOLDENS=1 dotnet test --filter GoldenTests` and review the
+  diff field by field.
+- **The parity gate against pypdf ran until the cut-over** (every form, the
+  special paths, non-ASCII text and the packet assemblies of the four parity
+  case files, compared on fields, widget states, appearance-stream bytes,
+  official pages, text runs and PDFium pixels). It retired with the Python
+  in 18.23; the goldens above are what holds the engine now.
+- `tests/Insolvia.Forms.Tests/Parity/debtor-txt/` — the Case Upload oracle:
+  the Python backend's Debtor.txt for the same four case files;
+  `CaseUploadParityTests` asserts the .NET file is byte-identical. A
+  deliberate format change edits these files in the same PR.
