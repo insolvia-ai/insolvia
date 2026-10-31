@@ -10,7 +10,7 @@ namespace Insolvia.Core.Memory;
 public sealed class MemoryUnitOfWork : IUnitOfWork
 {
     /// <inheritdoc />
-    public Task RunAsync(Func<CancellationToken, Task> work, CancellationToken cancellationToken = default)
+    public Task RunAsync(Func<CancellationToken, Task> work, Func<CancellationToken, Task<bool>>? landed = null, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(work);
         return work(cancellationToken);

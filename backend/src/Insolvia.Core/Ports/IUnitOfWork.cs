@@ -13,5 +13,15 @@ public interface IUnitOfWork
     /// throws (the exception propagates). <paramref name="work"/> must be safe
     /// to run again from the start: do its reads inside it, not before.
     /// </summary>
-    Task RunAsync(Func<CancellationToken, Task> work, CancellationToken cancellationToken = default);
+    /// <remarks>
+    /// A store's own <c>landed</c> check does not run inside this unit — a
+    /// joined call is not retried on its own — so a unit whose replay would
+    /// meet its own rows (a lost commit acknowledgement) passes
+    /// <paramref name="landed"/>: whether THIS call's write is there.
+    /// </remarks>
+    /// <param name="work">The writes; may run more than once.</param>
+    /// <param name="landed">After a transient failure, whether the failed attempt had in fact committed.</param>
+    /// <param name="cancellationToken">Cancels the unit.</param>
+    /// <returns>A task that completes when the unit has committed.</returns>
+    Task RunAsync(Func<CancellationToken, Task> work, Func<CancellationToken, Task<bool>>? landed = null, CancellationToken cancellationToken = default);
 }

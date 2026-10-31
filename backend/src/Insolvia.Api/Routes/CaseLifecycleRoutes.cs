@@ -228,6 +228,11 @@ public sealed class CaseLifecycleRoutes : IEndpointModule
                         await entityStore.CreateAsync(entity, token);
                     }
                 },
+                // A lost commit acknowledgement: the replay meets its own
+                // case row. The copy's id is generated, so its presence is
+                // this commit — the case store's own check, which a joined
+                // call skips.
+                landed: async token => await store.GetAsync(copy.Case.Id, accessor, token) is not null,
                 cancellationToken);
         }
         catch (ClientUnavailableException refused)
