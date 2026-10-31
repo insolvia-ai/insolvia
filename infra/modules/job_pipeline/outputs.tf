@@ -19,7 +19,7 @@ output "worker_function_name" {
 }
 
 output "worker_role_name" {
-  description = "Worker Lambda execution role name — what modules/case_store's worker_role_name takes to attach the table grant. null in dev."
+  description = "Worker Lambda execution role name — what modules/case_store's worker_role_name takes to attach the tax-id key grant. null in dev."
   value       = local.worker_count == 0 ? null : aws_iam_role.worker[0].name
 }
 

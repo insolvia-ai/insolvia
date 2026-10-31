@@ -1,18 +1,18 @@
-# ── Case data store (issue 8.2) ─────────────────────────────────
-# The first persistent store of GLBA-scope data in this account: SSNs, full
+# ── Case data key (issue 8.2) ───────────────────────────────────
+# The customer-managed KMS key for GLBA-scope case data: SSNs, full
 # financials, and the source documents behind them. Business plan §10 and the
 # Safeguards Rule floor in the regulatory register set the bar; the logical
-# model it holds is docs/reference/case-data-model.md.
+# model is docs/reference/case-data-model.md.
 #
-# It owns four things: a customer-managed KMS key, the case table, the API
-# role's grant on both, and nothing else. The case DOCUMENT bucket (8.6) is
-# deliberately not here — it will take this module's key ARN as an input
-# rather than minting a second key, so that one key protects one case.
+# It owns the key, its alias, and the roles' tax-id envelope grants on it,
+# and nothing else. The case ROWS are Aurora's since ADR 0028 (the DynamoDB
+# case and access-log tables this module held were deleted in plan 18.23);
+# the case DOCUMENT bucket (modules/case_documents) takes this module's key
+# ARN rather than minting a second key, so that one key protects one case.
 #
-# WHY A SEPARATE MODULE rather than more of api_service: this store outlives
-# any one service, and keeping it separate keeps the blast radius of an
-# api_service change away from the data. The cost is the cross-module role
-# reference below, which follows the mailer's precedent exactly.
+# The module keeps its name, `case_store`, on purpose: renaming the call in an
+# env root moves the key's address, and Terraform would destroy and re-create
+# the key — which makes every sealed tax id and every document unreadable.
 
 data "aws_caller_identity" "current" {}
 
@@ -36,18 +36,16 @@ data "aws_caller_identity" "current" {}
 #
 # Optional, and null in exactly one place: infra/envs/dev, where there is no
 # Lambda at all — the local API runs as a dev server or under compose and the
-# developer's own IAM user is the principal. The waitlist table's dev instance
-# skips its grant for the same reason.
+# developer's own IAM user is the principal.
 
 locals {
-  # insolvia-<env>-cases — the TABLE's name AND the KEY's alias
-  # (`alias/${local.name}`, below). That they are one local is load-bearing:
-  # the tax-id ciphers (insolvia_core.adapters.aws.tax_id_cipher,
-  # `case_key_alias`) derive the key alias from the table name they are
-  # already configured with, in every environment including a developer's
-  # `insolvia-dev-<short-id>-cases`, so no environment carries a second
-  # configuration value for the key. Give the alias its own name and every
-  # seal starts failing with NotFoundException on the next deploy.
+  # insolvia-<env>-cases — the KEY's alias (`alias/${local.name}`, below). It
+  # was also the DynamoDB case table's name, and the .NET hosts can still
+  # derive the alias from a CASE_TABLE_NAME of that shape
+  # (backend/src/Insolvia.Aws/Sealing/KeyAliases.cs) — though every deployed
+  # environment names it explicitly (insolvia-kms-case-key-alias). The alias
+  # must keep matching `alias/insolvia-*-cases`: SealingKeys refuses any
+  # other, and ci-trust's DenyCaseDataDecryption is written against it.
   name = "${var.project}-${var.environment}-cases"
 
   # The tax-id envelope's encryption-context purpose (issue 13.12 / #382) —
@@ -75,7 +73,7 @@ locals {
 # change it is unrecoverable, and AWS documents exactly this as the way to
 # make a key permanently unmanageable. The "no human read paths in prod" that
 # issue 8.2 asks for is delivered instead by no human principal holding
-# dynamodb data-plane or kms decrypt permissions, and by the audit trail
+# data-plane or kms decrypt permissions, and by the audit trail
 # recording it if one ever does.
 data "aws_iam_policy_document" "key" {
   statement {
@@ -103,291 +101,11 @@ resource "aws_kms_alias" "case" {
   target_key_id = aws_kms_key.case.key_id
 }
 
-# ── The table ───────────────────────────────────────────────────
-# Single-table, partitioned by case. Every access pattern in
-# docs/reference/case-data-model.md § "What this demands of the store" is
-# either "fetch a whole case" or "list one entity type within a case", which
-# is one Query on PK with an optional begins_with on SK:
-#
-#   PK = CASE#<case_id>
-#   SK = META                     the case record itself
-#      | <ENTITY>#<id>            DEBTOR#…, CLAIM#…, ASSET#…, SOFA#…, …
-#
-# TWO cross-case reads, because "list the cases I may see" has two answers —
-# and a third for "this client's cases" (by-client, below the other two).
-# Every index is SPARSE: only the item that carries the key attributes
-# appears, so none holds one entry per row.
-#
-#   by-firm       GSI1PK = FIRM#<firm_id>              on the META item
-#                 GSI1SK = <created_at>#<case_id>
-#
-#   by-assignee   GSI2PK = ASSIGNEE#<subject>          on ASSIGNEE#… items
-#                 GSI2SK = <created_at>#<case_id>
-#
-# WHICH ONE A REQUEST USES DEPENDS ON THE CALLER, and that is the awkward part
-# of this design rather than a detail to discover later. A firm admin, or
-# anyone whose firm user carries `access_all_cases`, lists through by-firm. A
-# user restricted to their assigned matters lists through by-assignee. The two
-# indexes return different sets by construction, so a pagination cursor minted
-# against one is meaningless against the other — services/api must refuse a
-# mismatched cursor rather than silently skip cases.
-#
-# It was GSI1PK = OWNER#<principal> until firms existed, which made a case the
-# property of one Cognito subject: a colleague at the same firm got a 404, and
-# two people could not work one matter. Renaming the index is what forces the
-# rest of the system to stop pretending otherwise.
-#
-# Both sort keys sort lexicographically, so created_at must be fixed-width
-# RFC 3339 with a literal Z — a "+00:00" offset is the same instant and sorts
-# wrong, silently misordering the listing. DynamoDB cannot enforce that; the
-# core layer owes it a contract test.
-#
-# Item-shape conventions are enforced in services/api's core layer, not here —
-# DynamoDB validates only the key attributes below.
-resource "aws_dynamodb_table" "cases" {
-  name         = local.name
-  billing_mode = "PAY_PER_REQUEST"
-  hash_key     = "PK"
-  range_key    = "SK"
-
-  attribute {
-    name = "PK"
-    type = "S"
-  }
-  attribute {
-    name = "SK"
-    type = "S"
-  }
-  attribute {
-    name = "GSI1PK"
-    type = "S"
-  }
-  attribute {
-    name = "GSI1SK"
-    type = "S"
-  }
-  attribute {
-    name = "GSI2PK"
-    type = "S"
-  }
-  attribute {
-    name = "GSI2SK"
-    type = "S"
-  }
-  attribute {
-    name = "GSI3PK"
-    type = "S"
-  }
-  attribute {
-    name = "GSI3SK"
-    type = "S"
-  }
-
-  # key_schema rather than the GSI's hash_key/range_key: the provider
-  # deprecated those in 6.29.0 when it added multi-attribute index keys, and
-  # `terraform validate` warns on them. Order matters — DynamoDB requires HASH
-  # before RANGE, and this list is passed through verbatim.
-  #
-  # RENAMING AN INDEX REPLACES IT. `by-owner` -> `by-firm` is a destroy and a
-  # create, not an update, and DynamoDB backfills a new GSI from the table
-  # rather than from the old index. Staging and prod hold zero items so there
-  # is nothing to backfill; a developer machine may hold probe rows, which
-  # scripts/dev-aws-reset.sh clears. Read the plan before applying this to
-  # anything holding real cases — after which it is a migration, not an edit.
-  #
-  # AND IT TAKES TWO APPLIES, which is DynamoDB's constraint rather than
-  # Terraform's: **one index may be created or deleted per UpdateTable call**.
-  # Going from one index to two therefore needs the first apply to finish and
-  # the new index to reach ACTIVE before the second can start. Observed on dev:
-  # the first apply dropped by-owner and created by-firm, a re-run created
-  # by-assignee. A CI apply that appears to succeed while leaving an index
-  # missing is this, and re-running is the fix.
-  global_secondary_index {
-    name            = "by-firm"
-    projection_type = "ALL"
-
-    key_schema {
-      attribute_name = "GSI1PK"
-      key_type       = "HASH"
-    }
-    key_schema {
-      attribute_name = "GSI1SK"
-      key_type       = "RANGE"
-    }
-  }
-
-  # The restricted-access listing. Its entries are ASSIGNEE#<subject> items in
-  # the case's own partition — the assignment IS the index entry, so linking a
-  # user to a case and making it appear in their list are one write.
-  global_secondary_index {
-    name            = "by-assignee"
-    projection_type = "ALL"
-
-    key_schema {
-      attribute_name = "GSI2PK"
-      key_type       = "HASH"
-    }
-    key_schema {
-      attribute_name = "GSI2SK"
-      key_type       = "RANGE"
-    }
-  }
-
-  # A firm client's cases (ADR 0022). Its entries are DEBTOR#<role> items that
-  # name a client — the debtor copy IS the index entry, exactly as an
-  # assignment is by-assignee's, so opening a case for a client and making it
-  # appear in that client's list are one write, and there is no link row to
-  # disagree with the debtor's clientId. Sparse: a non-filing spouse who is
-  # not a client carries no GSI3 keys. A joint case appears once per client.
-  #
-  #   by-client     GSI3PK = CLIENT#<client_id>        on DEBTOR#… items
-  #                 GSI3SK = <case created_at>#<case_id>
-  #
-  # ADDED ONLINE: a new GSI is created and backfilled by DynamoDB while the
-  # table serves traffic (docs/reference/terraform.md). One index per
-  # UpdateTable call is DynamoDB's rule, and this is one — a single apply.
-  # The API's grant below already covers `${table}/index/*`, so no IAM
-  # changes with it.
-  global_secondary_index {
-    name            = "by-client"
-    projection_type = "ALL"
-
-    key_schema {
-      attribute_name = "GSI3PK"
-      key_type       = "HASH"
-    }
-    key_schema {
-      attribute_name = "GSI3SK"
-      key_type       = "RANGE"
-    }
-  }
-
-  point_in_time_recovery { enabled = var.point_in_time_recovery }
-
-  # The whole point of this module. `enabled = true` alone would encrypt under
-  # the AWS-owned DynamoDB key, which is not a key we control and not what
-  # business plan §10 commits to.
-  server_side_encryption {
-    enabled     = true
-    kms_key_arn = aws_kms_key.case.arn
-  }
-
-  # Off everywhere since ADR 0028: the case data is Aurora's, and this table
-  # is deleted in plan 18.23 — DynamoDB refuses to delete a protected table,
-  # so protection comes off one apply before the resource goes.
-  deletion_protection_enabled = var.deletion_protection
-
-  tags = var.tags
-}
-
-# ── The access log ──────────────────────────────────────────────
-# The log that answers "which signed-in user read this case", which the
-# CloudTrail trail in modules/audit_trail structurally cannot: ADR 0001 makes
-# the API role the only principal AWS ever sees, so the end user's identity
-# exists only inside the request. This table is where the API writes it down.
-#
-# The two are complementary and neither replaces the other. CloudTrail proves
-# nothing but the API touched the store; this proves who asked the API to.
-#
-#   PK = CASE#<case_id>
-#   SK = <recorded_at>#<event_id>   chronological within a case
-#
-# Keyed by case because that is the question actually asked — of a client, in
-# a dispute, or in a breach notice: who saw THIS file. "What did this account
-# touch" wants a by-principal index instead; it is deliberately not here yet,
-# and a GSI can be added online later without a migration.
-#
-# READS ARE LOGGED, not just writes. A write log answers "who changed this",
-# which the provenance fields in the case record already answer better. The
-# question this table exists for is who *saw* it.
-resource "aws_dynamodb_table" "access_log" {
-  name         = "${var.project}-${var.environment}-case-access-log"
-  billing_mode = "PAY_PER_REQUEST"
-  hash_key     = "PK"
-  range_key    = "SK"
-
-  attribute {
-    name = "PK"
-    type = "S"
-  }
-  attribute {
-    name = "SK"
-    type = "S"
-  }
-
-  # NO TTL, and it cannot be added here. This table had `ttl { attribute_name
-  # = "expires_at", enabled = true }` and it broke every staging deploy, for a
-  # reason that is structural rather than a missing permission:
-  #
-  #   DynamoDB's UpdateTimeToLive is authorised against the CALLER, and on a
-  #   CMK-encrypted table it needs kms:Decrypt on that key. This table is
-  #   encrypted under the case key on purpose (see below), and ci-trust's
-  #   DenyCaseDataDecryption denies the deploy role kms:Decrypt on exactly
-  #   alias/insolvia-*-cases. An explicit deny wins, so the create half-
-  #   succeeded — table made, TTL rejected — leaving a tainted resource that
-  #   every later run destroyed and failed to recreate. Four merges in a row.
-  #
-  # There is no condition key that separates "enable TTL" from "read a row":
-  # both are kms:ViaService = dynamodb. Granting Decrypt back would hand CI the
-  # case data the deny exists to withhold, and re-keying the log to an alias
-  # outside the pattern would hand it the access log. Both are worse than
-  # having no TTL.
-  #
-  # It is also the posture DenyAuditLogErasure already argues for the trail
-  # bucket: a retention rule the deploy pipeline can set is a delete button the
-  # deploy pipeline can press, and TTL deletes silently. Retention here is a
-  # compliance decision that belongs to the regulatory register and to a human
-  # apply, not to a Terraform default. Until it is made, rows are kept.
-  #
-  # PITR is fine on the same key and stays: enabling it needs no data-plane
-  # verb, which is why the case table has always applied cleanly.
-  #
-  # SPELLED OUT rather than deleted, and that is not style. `ttl` is
-  # optional+computed in the provider, so simply removing the block produces
-  # "No changes" against a table that already has TTL on — the config stops
-  # describing reality and never converges. Verified against a dev env that had
-  # it enabled: block deleted → no diff; block present and disabled → one
-  # in-place change. On a table being created this is the default, so the
-  # provider issues no UpdateTimeToLive and the deploy role needs nothing.
-  #
-  # The name must stay `expires_at`, and not because anything reads it. An
-  # attribute name is required even to disable (an empty one is a
-  # ValidationException) and DynamoDB will only accept the name TTL is
-  # CURRENTLY active on — anything else fails with "TimeToLive is active on a
-  # different AttributeName". Any dev env that applied the old config has it on
-  # `expires_at`, so this is what lets those converge instead of erroring
-  # forever. Both were found by running it; neither is in the provider docs.
-  #
-  # It is inert either way. Turning `enabled` on is not a one-line change: it
-  # needs an attribute something actually writes — nothing does, and the old
-  # writer used `expiresAt`, which is how this went unnoticed — AND it will
-  # fail in CI on the KMS deny above.
-  ttl {
-    attribute_name = "expires_at"
-    enabled        = false
-  }
-
-  point_in_time_recovery { enabled = var.point_in_time_recovery }
-
-  # Same key as the case table. That is deliberate: it means the deploy role,
-  # already denied every data-plane verb on alias/insolvia-*-cases, cannot read
-  # the access log either.
-  server_side_encryption {
-    enabled     = true
-    kms_key_arn = aws_kms_key.case.arn
-  }
-
-  deletion_protection_enabled = var.deletion_protection
-
-  tags = var.tags
-}
-
 # ── The application principals: the tax-id envelope only ───────
-# Since the switch (ADR 0028) the case data is Aurora's, so no role holds a
-# DynamoDB verb on the tables above, nor the table key through DynamoDB — the
-# tables are kept only until the delete that follows (plan 18.23). What a
-# role still holds on THIS key is the one direct use: the debtor's tax
-# identifier, envelope-encrypted by the host itself (issue 13.12 / #382).
+# Since the switch (ADR 0028) the case data is Aurora's. What a role holds on
+# THIS key is the one direct use: the debtor's tax identifier,
+# envelope-encrypted by the host itself (issue 13.12 / #382). (The S3 fence
+# on the same key is modules/case_documents' and modules/filing_worker's.)
 #
 # The fence is the ENCRYPTION CONTEXT rather than a calling service: both
 # verbs require the context's `purpose` member to be the one the hosts stamp

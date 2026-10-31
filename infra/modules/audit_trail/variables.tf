@@ -11,20 +11,15 @@ variable "environment" {
 
 variable "data_resource_arns" {
   description = <<-EOT
-    Resource ARN prefixes whose DATA events this trail records — today the
-    case table, and the case document bucket when 8.6 lands. Matched with
-    starts_with, so a table ARN also covers its indexes.
-
-    Deliberately a list of named resources rather than "every table in the
-    account": data events bill per event, and this trail exists to record
-    case-data access rather than to be a general audit surface.
+    DynamoDB table ARN prefixes whose DATA events this trail records, matched
+    with starts_with so a table ARN also covers its indexes. Empty in every
+    root since the tables were deleted (plan 18.23, ADR 0028): the trail then
+    records management events alone, which is where KMS key use lands.
+    Deliberately named resources rather than "every table in the account":
+    data events bill per event.
   EOT
   type        = list(string)
-
-  validation {
-    condition     = length(var.data_resource_arns) > 0
-    error_message = "A trail with no data resources records nothing — omit the module instead."
-  }
+  default     = []
 }
 
 variable "include_management_events" {

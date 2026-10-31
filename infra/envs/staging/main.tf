@@ -59,7 +59,7 @@ module "web_hosting" {
   tags                = local.common_tags
 }
 
-# Backend API (#62, #63): ECR + Docker Lambda + HTTP API + waitlist table.
+# Backend API (#62, #63): ECR + Docker Lambda + HTTP API.
 # The cert lookup above is shared with CloudFront on purpose: an API Gateway
 # REGIONAL custom domain needs its cert in the API's own region, and since
 # everything here is us-east-1 the one wildcard cert serves both fronts — no
@@ -130,10 +130,6 @@ module "admin_service" {
   vpc_subnet_ids         = module.network.private_subnet_ids
   vpc_security_group_ids = [module.network.lambda_security_group_id]
   db_cluster_resource_id = module.aurora.cluster_resource_id
-
-  # Staging's audit rows are test provisioning of test firms; the table must
-  # be destroyable with the environment.
-  audit_deletion_protection = false
 
   tags = local.common_tags
 }
@@ -308,7 +304,7 @@ module "marketing_site" {
   site_mode    = "full"
 
   # The SSR waitlist action brokers through the API (docs/adr/0001) — the
-  # staging API, so staging submissions never touch the prod table.
+  # staging API, so staging submissions never touch prod's database.
   api_base_url = "https://${module.api_service.domain_name}"
   tags         = local.common_tags
 }
@@ -346,8 +342,7 @@ module "job_pipeline" {
 # other parameters in this namespace (module.api_service never reads another
 # module's outputs back, which is what keeps these roots acyclic), and the deploy workflow's
 # get-parameters-by-path step derives it into JOB_QUEUE_URL with no workflow
-# change. The WORKER reads the same namespace: it needs CASE_TABLE_NAME, which
-# is already published below.
+# change. The WORKER reads the same namespace.
 resource "aws_ssm_parameter" "job_queue_url" {
   name  = "/insolvia/${local.environment}/api/job-queue-url"
   type  = "String"
@@ -355,14 +350,14 @@ resource "aws_ssm_parameter" "job_queue_url" {
   tags  = local.common_tags
 }
 
-# Case data store (issue 8.2): the first GLBA-scope persistent store — a
-# customer-managed key and the case table behind it. Declared after
+# Case data key (issue 8.2): the customer-managed key for GLBA-scope case data
+# — the debtors' sealed tax ids and the case documents. Declared after
 # module.api_service because it takes that module's execution role name and
-# attaches the table grant onto it from its own side (modules/case_store).
+# attaches the tax-id grant onto it from its own side (modules/case_store).
 #
-# Staging is disposable on purpose: synthetic cases only, no deletion
-# protection, and the minimum key deletion window so a teardown does not leave
-# a 30-day-pending key behind. Prod inverts both.
+# Staging is disposable on purpose: synthetic cases only, and the minimum key
+# deletion window so a teardown does not leave a 30-day-pending key behind.
+# Prod inverts it.
 module "case_store" {
   source = "../../modules/case_store"
 
@@ -370,24 +365,8 @@ module "case_store" {
   environment                 = local.environment
   api_role_name               = module.api_service.lambda_role_name
   worker_role_name            = module.job_pipeline.worker_role_name
-  deletion_protection         = false
   key_deletion_window_in_days = 7
   tags                        = local.common_tags
-}
-
-# ── Firms ───────────────────────────────────────────────────────
-# Tenancy: which firm a signed-in user belongs to and what they may do. Takes
-# the case store's key rather than minting one — firm membership decides who
-# reads case data, and one deny should cover both.
-module "firm_store" {
-  source = "../../modules/firm_store"
-
-  project                = "insolvia"
-  environment            = local.environment
-  kms_key_arn            = module.case_store.kms_key_arn
-  point_in_time_recovery = false
-  deletion_protection    = false
-  tags                   = local.common_tags
 }
 
 # ── Filing credentials (ADR 0024, guardrail 3) ──────────────────
@@ -400,10 +379,7 @@ module "filing_credentials" {
 
   project                     = "insolvia"
   environment                 = local.environment
-  table_kms_key_arn           = module.case_store.kms_key_arn
   api_role_name               = module.api_service.lambda_role_name
-  point_in_time_recovery      = false
-  deletion_protection         = false
   key_deletion_window_in_days = 7
   tags                        = local.common_tags
 }
@@ -538,9 +514,13 @@ resource "aws_ssm_parameter" "case_document_bucket" {
   tags  = local.common_tags
 }
 
-# Case-data audit trail (issue 8.2): CloudTrail data events on the case table,
-# into an insolvia-<env>-audit bucket under its own key. Declared after
-# module.case_store because it records that module's table.
+# Case-data audit trail (issue 8.2): CloudTrail management events — which is
+# where KMS key use lands, so every seal and open of a tax id or a filing
+# credential, with its encryption context — into an insolvia-<env>-audit
+# bucket under its own key. It recorded DynamoDB data events on the case and
+# vault tables until those were deleted (plan 18.23, ADR 0028); Aurora's
+# rows are not CloudTrail resources, and the hosts' own access log is the
+# application-level record.
 #
 # The key is separate from the case key by necessity as well as design:
 # ci-trust denies the deploy role kms:GenerateDataKey on alias/insolvia-*-cases,
@@ -556,13 +536,6 @@ module "audit_trail" {
   project     = "insolvia"
   environment = local.environment
 
-  # The case table, and its indexes via starts_with; the filing-credential
-  # vault's table (ADR 0024, guardrail 3).
-  data_resource_arns = [
-    module.case_store.table_arn,
-    module.filing_credentials.table_arn,
-  ]
-
   # The vault KEY's seals and opens are management events (the module's
   # selector note) — this is what puts them in the retained record.
   include_management_events = true
@@ -574,9 +547,9 @@ module "audit_trail" {
 # ── The shared seed-fixture bucket ──────────────────────────────
 # Owned by insolvia-services' envs/shared (module.dev_fixtures); resolved here the way every
 # shared resource is — a hard-failing data lookup, never shared's state — so
-# the seed step can read its name from this env's outputs alongside the
-# tables it loads into. Named deterministically by the module, which is why a
-# lookup by name is honest here.
+# the seed step can read its name from this env's outputs. Named
+# deterministically by the module, which is why a lookup by name is honest
+# here.
 data "aws_s3_bucket" "dev_fixtures" {
   bucket = "insolvia-shared-dev-fixtures-${var.aws_region}"
 }
@@ -590,7 +563,7 @@ data "aws_s3_bucket" "dev_fixtures" {
 # module.network and module.aurora.)
 #
 # modules/network: two AZs of private subnets, one fck-nat instance for egress,
-# free S3 and DynamoDB gateway endpoints. modules/aurora: Serverless v2
+# a free S3 gateway endpoint. modules/aurora: Serverless v2
 # PostgreSQL 17 under its own key, 5432 admitted from the Lambda security group
 # only. Staging is disposable: no deletion protection, a short backup window, the 7-day key deletion window, and a 2-ACU ceiling.
 module "network" {
@@ -652,8 +625,8 @@ resource "aws_ssm_parameter" "db" {
 # queue parameters, because each value is another module's output.
 #
 # The key aliases are explicit since the switch: the .NET hosts used to be
-# able to derive them from CASE_TABLE_NAME, which names a DynamoDB table
-# that no host reads now. backend/src/Insolvia.Aws/Sealing/SealingKeys.cs
+# able to derive them from CASE_TABLE_NAME, the name of a DynamoDB table
+# deleted in plan 18.23. backend/src/Insolvia.Aws/Sealing/SealingKeys.cs
 # refuses any value not shaped alias/insolvia-<env>-cases /
 # -filing-credentials, which is also what ci-trust's decrypt denies match.
 resource "aws_ssm_parameter" "api_key_aliases" {

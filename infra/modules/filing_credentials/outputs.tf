@@ -1,13 +1,3 @@
-output "table_name" {
-  description = "The credential table — insolvia-<env>-filing-credentials."
-  value       = aws_dynamodb_table.credentials.name
-}
-
-output "table_arn" {
-  description = "The credential table's ARN, for modules/audit_trail's data events."
-  value       = aws_dynamodb_table.credentials.arn
-}
-
 output "kms_key_arn" {
   description = "The vault key's ARN — the key the password and TOTP seed are sealed under."
   value       = aws_kms_key.vault.arn

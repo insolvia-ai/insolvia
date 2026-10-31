@@ -354,12 +354,10 @@ state object in the bucket, destroys everything the state tracks, and removes
 the state object. It refuses the current machine's id, and without `--yes`
 the embedded `terraform destroy` shows its plan and asks first.
 
-**The DynamoDB tables a machine still has** (cases, access log, firms, the
-vault) are read by nothing local since 18.23. They live inside modules
-staging and prod share, so they leave with the module change that deletes
-the deployed tables. The waitlist and admin-audit tables, which were this
-root's own, are already gone: the first `dev-aws-setup.sh` after 18.23
-destroys them on each machine.
+**A machine holds no DynamoDB tables** since 18.23: the waitlist and
+admin-audit tables, then the cases, access-log, firms and vault tables, went
+with the modules that declared them. The next `dev-aws-setup.sh` on each
+machine destroys whichever it still has.
 
 How it works:
 

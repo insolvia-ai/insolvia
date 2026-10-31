@@ -53,9 +53,9 @@ locals {
   serves_apex = var.apex_domain != null
 }
 
-# No waitlist table here. The SSR action brokers submissions through the
+# No waitlist store here. The SSR action brokers submissions through the
 # API's POST /v1/waitlist (per docs/adr/0001 — no client holds AWS access),
-# and the table lives with modules/api_service as insolvia-<env>-waitlist.
+# and the list lives in the API's database (waitlist_entries, ADR 0028).
 
 # ── ECR — the SSR Lambda's Docker image ─────────────────────────
 # Not owned here: `insolvia-shared-marketing` is one repository shared by every

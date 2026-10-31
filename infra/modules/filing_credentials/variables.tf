@@ -9,16 +9,6 @@ variable "environment" {
   type        = string
 }
 
-variable "table_kms_key_arn" {
-  description = <<-EOT
-    The key the credential TABLE is encrypted under at rest — the case key
-    (modules/case_store), exactly as modules/firm_store takes it. This is NOT
-    the key the password and TOTP seed are sealed under: that is this
-    module's own `aws_kms_key.vault`. main.tf says why the two are separate.
-  EOT
-  type        = string
-}
-
 variable "api_role_name" {
   description = <<-EOT
     The API Lambda's execution role. It is granted SEAL-ONLY use of the vault
@@ -42,18 +32,6 @@ variable "worker_assumable_by" {
   EOT
   type        = list(string)
   default     = []
-}
-
-variable "point_in_time_recovery" {
-  description = "PITR on the credential table."
-  type        = bool
-  default     = false
-}
-
-variable "deletion_protection" {
-  description = "Deletion protection on the credential table. False everywhere since ADR 0028: the table is being deleted (plan 18.23)."
-  type        = bool
-  default     = false
 }
 
 variable "key_deletion_window_in_days" {

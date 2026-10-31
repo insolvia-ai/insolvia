@@ -231,9 +231,11 @@ maintainer's:**
 
 1. **Promote the switch to prod** — the release run's `promote` gate.
 2. **Delete the DynamoDB tables** in staging and prod (and the module-owned
-   ones left in each machine's `infra/envs/dev`): a separate PR that removes
-   them from `case_store`, `firm_store`, `filing_credentials` and the API and
-   admin service modules, after the prod promote, confirmed before apply.
+   ones left in each machine's `infra/envs/dev`) — two stacked changes,
+   because DynamoDB refuses to delete a protected table: deletion protection
+   and every DynamoDB grant off first, then the tables, `modules/firm_store`
+   and the VPC's DynamoDB gateway endpoint. Each applies through the release
+   (staging, then the prod promote).
 
 ## Next — the build order (as of 2026-10-13)
 

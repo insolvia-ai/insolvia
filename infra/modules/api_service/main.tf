@@ -3,8 +3,7 @@
 # the VPC's private subnets) behind an API Gateway HTTP API, one instance per
 # environment (#62, #63). It was services/api's Flask+Mangum image before. Owns the
 # whole per-env API stack: Lambda + execution role, HTTP API +
-# custom domain + DNS, the waitlist DynamoDB table
-# (per docs/adr/0001), the /insolvia/<env>/api SSM config
+# custom domain + DNS, the /insolvia/<env>/api SSM config
 # namespace (#70), and the CloudWatch alarms + SNS topic (#69).
 #
 # The house pattern for a Mangum service: HTTP API with a $default route to the
@@ -112,39 +111,6 @@ removed {
   }
 }
 
-# ── Waitlist storage ────────────────────────────────────────────
-# The API owns the waitlist table: docs/adr/0001 makes the API the only
-# application principal with data-store access (an SSR Lambda holding a
-# DynamoDB grant was reviewed and rejected). Named insolvia-<env>-waitlist —
-# deliberately NOT insolvia-marketing-waitlist-*: the table belongs to the
-# API, not to any one client of it.
-#
-# Schema matches insolvia_api.core.waitlist.record_item exactly: constant
-# "WAITLIST" partition, "<submittedAt>#<id>" sort key, so rows read back
-# time-ordered with a single Query. Separate tables per environment is a #63
-# requirement: staging must never be able to read (or pollute) prod.
-
-resource "aws_dynamodb_table" "waitlist" {
-  name         = "${var.project}-${var.environment}-waitlist"
-  billing_mode = "PAY_PER_REQUEST"
-  hash_key     = "PK"
-  range_key    = "SK"
-
-  attribute {
-    name = "PK"
-    type = "S"
-  }
-
-  attribute {
-    name = "SK"
-    type = "S"
-  }
-
-  point_in_time_recovery { enabled = true }
-  server_side_encryption { enabled = true }
-  tags = var.tags
-}
-
 # ── Lambda execution role ───────────────────────────────────────
 
 data "aws_iam_policy_document" "lambda_trust" {
@@ -169,12 +135,10 @@ resource "aws_iam_role_policy_attachment" "api_basic" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-# NO DynamoDB grant any more (ADR 0028, plan 18.22). The waitlist's
-# append-only rule moved into the database: waitlist_entries is INSERT-only
-# for the `api` Postgres role (backend/src/Insolvia.Migrator/Grants.cs), so a
-# compromised API still cannot enumerate the list. The TABLE above outlives
-# its grant until 18.23 deletes the DynamoDB tables, with the maintainer;
-# nothing reads or writes it now.
+# NO DynamoDB grant (ADR 0028). The waitlist is the waitlist_entries Postgres
+# table, INSERT-only for the `api` role (backend/src/Insolvia.Migrator/
+# Grants.cs), so a compromised API still cannot enumerate the list. The
+# DynamoDB waitlist table this module held was deleted in plan 18.23.
 #
 # What the role holds instead: the VPC's network interfaces and
 # rds-db:connect as `api` (module.vpc_access, one owner for every backend

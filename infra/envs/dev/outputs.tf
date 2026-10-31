@@ -12,24 +12,9 @@ output "environment" {
   value       = local.environment
 }
 
-output "case_table_name" {
-  description = "This machine's case DynamoDB table (CASE_TABLE_NAME for the local API)."
-  value       = module.case_store.table_name
-}
-
-output "case_access_log_table_name" {
-  description = "This machine's case access-log table (CASE_ACCESS_LOG_TABLE_NAME for the local API)."
-  value       = module.case_store.access_log_table_name
-}
-
 output "case_kms_key_alias" {
-  description = "Alias of this machine's case-data key. Printed for orientation; nothing consumes it — DynamoDB resolves the key from the table."
+  description = "Alias of this machine's case-data key — INSOLVIA_KMS_CASE_KEY_ALIAS for a local host that seals tax ids against AWS."
   value       = module.case_store.kms_key_alias
-}
-
-output "filing_credentials_table_name" {
-  description = "This machine's filing-credential vault table. Nothing needs it configured — the API derives it from CASE_TABLE_NAME — printed for the dev proof."
-  value       = module.filing_credentials.table_name
 }
 
 output "filing_credentials_key_alias" {
@@ -65,11 +50,6 @@ output "auth_domain" {
 output "auth_issuer_url" {
   description = "OIDC issuer for tokens from this machine's pool."
   value       = module.auth.issuer_url
-}
-
-output "firm_table_name" {
-  description = "Firms, firm users and their permissions (FIRM_TABLE_NAME for the API)."
-  value       = module.firm_store.table_name
 }
 
 output "case_document_bucket" {

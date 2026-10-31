@@ -13,7 +13,7 @@ variable "api_role_name" {
   description = <<-EOT
     Execution role of the API Lambda — module.api_service.lambda_role_name.
     Passed as a NAME, not an ARN: this module looks it up with a data source
-    and attaches the case-table grant from its own side, so api_service never
+    and attaches the tax-id key grant from its own side, so api_service never
     has to know this module exists. A resource reference here would be a
     dependency cycle.
 
@@ -32,7 +32,7 @@ variable "worker_role_name" {
     reasoning as api_role_name above: a name, attached from this side, so
     neither this module nor job_pipeline has to reference the other's
     resources (job_pipeline's Lambda does not read this module's outputs
-    either — the table name reaches the worker through SSM via the deploy
+    either — the key alias reaches the worker through SSM via the deploy
     workflow, exactly as it reaches the API).
 
     null in infra/envs/dev, where there is no worker Lambda — jobs run
@@ -42,27 +42,11 @@ variable "worker_role_name" {
   default     = null
 }
 
-variable "point_in_time_recovery" {
-  description = <<-EOT
-    DynamoDB PITR. On everywhere that holds data worth recovering; off in dev,
-    which holds synthetic cases a developer wipes with dev-aws-reset.sh and
-    where paying for recovery would be noise.
-  EOT
-  type        = bool
-  default     = true
-}
-
-variable "deletion_protection" {
-  description = "DynamoDB deletion protection on the case and access-log tables. False everywhere since ADR 0028: the tables are being deleted (plan 18.23), and DynamoDB refuses to delete a protected table."
-  type        = bool
-  default     = false
-}
-
 variable "key_deletion_window_in_days" {
   description = <<-EOT
     Days a scheduled key deletion waits before it is irreversible. A deleted
-    key makes every row in the table permanently unreadable — there is no
-    restore, and PITR does not help, so prod takes the maximum.
+    key makes every sealed tax id and every case document permanently
+    unreadable — there is no restore, so prod takes the maximum.
   EOT
   type        = number
   default     = 30
