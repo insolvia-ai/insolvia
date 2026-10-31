@@ -194,6 +194,24 @@ public abstract class CaseChildStoreConformance : CaseConformance
     }
 
     [Fact]
+    public async Task Tasks_across_cases_are_read_together_and_only_from_the_cases_named()
+    {
+        var first = await CreateCaseAsync();
+        var second = await CreateCaseAsync();
+        var unnamed = await CreateCaseAsync();
+        var a = MakeTask(first.Id, Opened);
+        var b = MakeTask(second.Id, Opened.AddMinutes(1));
+        await Connect().Tasks.CreateAsync(a, Ct);
+        await Connect().Tasks.CreateAsync(b, Ct);
+        await Connect().Tasks.CreateAsync(MakeTask(unnamed.Id, Opened), Ct);
+
+        var listed = await Connect().Tasks.ListForCasesAsync([first.Id, second.Id], Ct);
+
+        Assert.Equal([a, b], listed.OrderBy(task => task.CreatedAt));
+        Assert.Empty(await Connect().Tasks.ListForCasesAsync([], Ct));
+    }
+
+    [Fact]
     public async Task A_document_request_keeps_its_answers_in_order()
     {
         var owner = await CreateCaseAsync();

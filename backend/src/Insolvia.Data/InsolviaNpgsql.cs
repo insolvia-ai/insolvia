@@ -22,7 +22,12 @@ public static class InsolviaNpgsql
             .UseNpgsql(dataSource, npgsql => npgsql
                 .MigrationsAssembly(typeof(InsolviaDbContext).Assembly.GetName().Name)
                 .MigrationsHistoryTable(InsolviaDbContext.MigrationsHistoryTable, InsolviaDbContext.Schema))
-            .UseSnakeCaseNamingConvention();
+            .UseSnakeCaseNamingConvention()
+
+            // No query tracks, by default rather than by each store's
+            // .AsNoTracking(): every write is an ExecuteUpdate/Delete or an
+            // insert-then-detach, and nothing may linger in the change tracker.
+            .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking);
     }
 
     /// <summary>

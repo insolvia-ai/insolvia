@@ -295,14 +295,18 @@ public sealed class PostgresCaseStore : ICaseStore
     /// The listing's keyset: newest first, the id (compared bytewise, as the
     /// memory store's ordinal sort key does) breaking ties. The name carries
     /// the index AND the view, so a cursor from one is refused by the other.
+    /// The leading <c>created_at &lt;= key</c> is redundant for the rows it
+    /// selects and is there for the planner: an OR alone is no index range,
+    /// so without it a deep page filters down from the newest row.
     /// </summary>
 #pragma warning disable CA1309 // Translated to SQL, not run: id COLLATE "C" < @id, a bytewise (ordinal) comparison.
     private static Keyset<CaseRow, CaseCursor> Listing(string tag) => new(
         $"cases.{tag}",
         rows => rows.OrderByDescending(row => row.CreatedAt).ThenByDescending(row => EF.Functions.Collate(row.Id, "C")),
         row => new CaseCursor(row.CreatedAt, row.Id),
-        (rows, key) => rows.Where(row => row.CreatedAt < key.CreatedAt
-            || (row.CreatedAt == key.CreatedAt && string.Compare(EF.Functions.Collate(row.Id, "C"), key.Id) < 0)));
+        (rows, key) => rows.Where(row => row.CreatedAt <= key.CreatedAt
+            && (row.CreatedAt < key.CreatedAt
+                || (row.CreatedAt == key.CreatedAt && string.Compare(EF.Functions.Collate(row.Id, "C"), key.Id) < 0))));
 #pragma warning restore CA1309
 
     // Every column a whole-record write replaces — all but the key, the

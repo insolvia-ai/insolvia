@@ -263,6 +263,20 @@ public sealed class PostgresCaseTaskStore(InsolviaDbContext db) : ICaseTaskStore
     }
 
     /// <inheritdoc />
+    public async Task<IReadOnlyList<CaseTask>> ListForCasesAsync(IReadOnlyCollection<string> caseIds, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(caseIds);
+        if (caseIds.Count == 0)
+        {
+            return [];
+        }
+
+        // case_id = ANY(@ids): the primary key leads with case_id.
+        var rows = await _db.Set<CaseTaskRow>().AsNoTracking().Where(row => caseIds.Contains(row.CaseId)).ToListAsync(cancellationToken).ConfigureAwait(false);
+        return [.. rows.Select(CaseRowMapping.ToDomain)];
+    }
+
+    /// <inheritdoc />
     public async Task<bool> DeleteAsync(string caseId, string taskId, CancellationToken cancellationToken = default) =>
         await Row(caseId, taskId).ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false) > 0;
 

@@ -19,6 +19,9 @@ jobs:
     # (insolvia-branch-protection skill).
     name: Backend (.NET)
     runs-on: ubuntu-latest
+    # A hung suite (the fake CM/ECF's slow faults, a stuck container) fails
+    # the required check in half an hour instead of GitHub's six.
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: backend
@@ -59,6 +62,10 @@ jobs:
         with:
           # The exact SDK backend/global.json pins, so CI and a laptop agree.
           global-json-file: backend/global.json
+          # The NuGet cache, keyed on every project's lock file: locked-mode
+          # restore still checks the graph, it just stops downloading it.
+          cache: true
+          cache-dependency-path: backend/**/packages.lock.json
 
       - name: Restore
         if: steps.filter.outputs.run == 'true'

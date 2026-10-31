@@ -21,6 +21,7 @@ using Insolvia.Data;
 using Insolvia.Data.AccessLogging;
 using Insolvia.Data.Calendar;
 using Insolvia.Data.Cases;
+using Insolvia.Data.Concurrency;
 using Insolvia.Data.Connections;
 using Insolvia.Data.Firms;
 using Insolvia.Data.Pagination;
@@ -71,9 +72,6 @@ public static class ApiComposition
         builder.Logging.AddConsoleFormatter<JsonLogFormatter, ConsoleFormatterOptions>();
         builder.Logging.AddFilter("Microsoft.AspNetCore", LogLevel.Warning);
 
-        // Read through IConfiguration (environment variables are one of its
-        // sources), so a test host can set any of them with UseSetting.
-        builder.Services.AddSingleton(_ => ApiConfig.Load(name => configuration[name]));
         builder.Services.AddSingleton(services => services.GetRequiredService<ApiConfig>().Environment);
         builder.Services.AddSingleton(TimeProvider.System);
 
@@ -81,6 +79,9 @@ public static class ApiComposition
         // same everywhere: a firm's default court is validated against it.
         builder.Services.AddSingleton<ICourtRegistry>(CourtRegistry.Shipped);
 
+        // Read through IConfiguration (environment variables are one of its
+        // sources), so a test host can set any of them with UseSetting. Parsed
+        // ONCE: the instance DI hands out is the one checked below.
         var config = ApiConfig.Load(name => configuration[name]);
         if (isLambda)
         {
@@ -89,6 +90,8 @@ public static class ApiComposition
             config = config with { LocalBlobs = null };
             LambdaBootRequirements.Enforce(config);
         }
+
+        builder.Services.AddSingleton(config);
 
         // The stores are Postgres inside Lambda and, everywhere else, whenever
         // INSOLVIA_DB_CONNECTION_STRING names a database — as a GROUP, the way
@@ -126,6 +129,7 @@ public static class ApiComposition
             builder.Services.AddScoped<IFilingStore>(services => new PostgresFilingStore(services.GetRequiredService<InsolviaDbContext>()));
             builder.Services.AddScoped<ITaxIdStore>(services => new PostgresTaxIdStore(services.GetRequiredService<InsolviaDbContext>()));
             builder.Services.AddScoped<IFilingApprovalStore>(services => new PostgresFilingApprovalStore(services.GetRequiredService<InsolviaDbContext>()));
+            builder.Services.AddScoped<IUnitOfWork>(services => new PostgresUnitOfWork(services.GetRequiredService<InsolviaDbContext>()));
 
             // The pipeline (18.17): the API creates and reads job rows, reads
             // packets; the worker advances the one and writes the other.
@@ -279,6 +283,7 @@ public static class ApiComposition
             builder.Services.AddSingleton<IJobStore, MemoryJobStore>();
             builder.Services.AddSingleton<IPacketStore>(services => new MemoryPacketStore(services.GetRequiredService<MemoryCaseStore>()));
             builder.Services.AddSingleton<IFilingApprovalStore, MemoryFilingApprovalStore>();
+            builder.Services.AddSingleton<IUnitOfWork, MemoryUnitOfWork>();
 
             // The vault's twins — never composed beside a real table.
             builder.Services.AddSingleton<IFilingCredentialStore, MemoryFilingCredentialStore>();
@@ -291,7 +296,7 @@ public static class ApiComposition
         // dev queue locally, the environment's deployed — the SQS sender, the
         // approve rule's one way to reach the worker. Without it no sender at
         // all, and POST …/filing-approval answers 503 before recording anything.
-        if (configuration["FILING_QUEUE_URL"] is { Length: > 0 } filingQueue)
+        if (config.FilingQueueUrl is { Length: > 0 } filingQueue)
         {
             builder.Services.TryAddSingleton<IAmazonSQS>(_ => configuration["AWS_REGION"] is { Length: > 0 } region
                 ? new AmazonSQSClient(RegionEndpoint.GetBySystemName(region))

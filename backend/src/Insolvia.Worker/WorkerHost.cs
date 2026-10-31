@@ -177,7 +177,9 @@ public sealed class WorkerRuntime : IAsyncDisposable
                     continue;
                 }
 
-                await sqs.DeleteMessageAsync(queueUrl, message.ReceiptHandle, cancellationToken).ConfigureAwait(false);
+                // Not cancellable: a Ctrl-C landing after the job finished must
+                // not leave its message to be redelivered and run again.
+                await sqs.DeleteMessageAsync(queueUrl, message.ReceiptHandle, CancellationToken.None).ConfigureAwait(false);
             }
         }
     }

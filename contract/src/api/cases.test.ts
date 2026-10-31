@@ -166,10 +166,18 @@ describe('a case, opened from a client', () => {
     admin.wire(200, CASE);
     expect(restored.archivedAt).toBeUndefined();
 
+    // A record on the source, so the copy has a collection to carry: copying
+    // an empty case never exercised the order the copy is written in.
+    await admin.api.addCaseEntity(caseId, 'creditors', {
+      name: 'Example Bank',
+      provenance: { name: { source: 'staff_typed' } },
+    });
     const copy = await admin.api.copyCase(caseId);
     admin.wire(201, CASE);
     expect(copy.id).not.toBe(caseId);
     expect(copy.status).toBe('intake');
+    const copied = await admin.api.listCaseEntities(copy.id, 'creditors');
+    expect(copied.map((c) => c.name)).toEqual(['Example Bank']);
 
     await admin.api.deleteCase(copy.id);
     admin.wire(204);

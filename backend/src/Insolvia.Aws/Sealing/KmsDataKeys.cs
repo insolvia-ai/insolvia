@@ -43,6 +43,7 @@ internal static class KmsDataKeys
         finally
         {
             CryptographicOperations.ZeroMemory(dataKey);
+            Scrub(response.Plaintext);
         }
     }
 
@@ -71,6 +72,25 @@ internal static class KmsDataKeys
         finally
         {
             CryptographicOperations.ZeroMemory(dataKey);
+            Scrub(response.Plaintext);
         }
+    }
+
+    // ToArray() copies: zeroing the copy leaves the plaintext key in the
+    // response's own buffer. Zero that too where the stream exposes it, and
+    // dispose it either way.
+    private static void Scrub(MemoryStream? plaintext)
+    {
+        if (plaintext is null)
+        {
+            return;
+        }
+
+        if (plaintext.TryGetBuffer(out var buffer))
+        {
+            CryptographicOperations.ZeroMemory(buffer.AsSpan());
+        }
+
+        plaintext.Dispose();
     }
 }
