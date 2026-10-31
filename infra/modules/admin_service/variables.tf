@@ -60,13 +60,13 @@ variable "google_client_id" {
   type        = string
 }
 
-# True everywhere this module runs in a deployed environment: the audit table
-# IS the durable provisioning record (#178). Dev instances may disarm it so
-# dev-aws-destroy.sh can remove the table.
+# False everywhere since ADR 0028: the provisioning record is the Postgres
+# admin_audit table, and this DynamoDB table is deleted in plan 18.23 —
+# DynamoDB refuses to delete a protected table.
 variable "audit_deletion_protection" {
-  description = "Whether the admin audit table refuses deletion."
+  description = "Whether the (DynamoDB-era) admin audit table refuses deletion."
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "tags" {

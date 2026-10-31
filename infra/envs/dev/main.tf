@@ -122,9 +122,7 @@ module "firm_store" {
 
   project                = "insolvia"
   environment            = local.environment
-  aws_region             = var.aws_region
   kms_key_arn            = module.case_store.kms_key_arn
-  api_role_name          = null
   point_in_time_recovery = false
   deletion_protection    = false
   tags                   = local.common_tags
@@ -150,7 +148,6 @@ module "filing_credentials" {
   project                     = "insolvia"
   environment                 = local.environment
   table_kms_key_arn           = module.case_store.kms_key_arn
-  access_log_table_arn        = module.case_store.access_log_table_arn
   api_role_name               = null
   worker_assumable_by         = [var.aws_principal_arn]
   point_in_time_recovery      = false
@@ -220,7 +217,6 @@ module "filing_worker" {
   worker_role_arn           = module.filing_credentials.worker_role_arn
   queue_arn                 = module.filing_queue.queue_arn
   dlq_name                  = module.filing_queue.dlq_name
-  case_table_arn            = module.case_store.table_arn
   case_kms_key_arn          = module.case_store.kms_key_arn
   case_document_bucket_arn  = module.case_documents.bucket_arn
   case_document_bucket_name = module.case_documents.bucket_name

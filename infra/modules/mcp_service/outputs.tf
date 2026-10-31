@@ -38,9 +38,9 @@ output "alarms_topic_arn" {
   value       = aws_sns_topic.alarms.arn
 }
 
-# The seam modules/case_store and modules/firm_store attach this service's
-# data grants onto (mcp_role_name) — the third application principal, after
-# the API (ADR 0001) and the admin service (ADR 0011).
+# The MCP host's execution role — the third application principal, after the
+# API (ADR 0001) and the admin service (ADR 0011). Its data is Aurora's since
+# ADR 0028 (rds-db:connect as `mcp`), so no store module attaches to it now.
 output "lambda_role_name" {
   description = "MCP Lambda execution role name."
   value       = aws_iam_role.mcp.name

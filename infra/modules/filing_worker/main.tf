@@ -11,18 +11,18 @@
 # name it, so it is created there, ahead of the service) and arrives here by
 # name and ARN. What it holds, all told:
 #
-#   from modules/filing_credentials   the vault: GetItem on the credential
-#                                     table, Decrypt under the vault purpose,
-#                                     the access-log append (PR 4)
+#   from modules/filing_credentials   the vault: Decrypt under the vault
+#                                     purpose (PR 4)
 #   from modules/filing_queue         consume on the filing queue (PR 6)
 #   from THIS module                  the documents bucket, the tax-id open
 #                                     (Case Upload, PR 9), the kill switch,
 #                                     its own logs, the VPC's network
 #                                     interfaces and rds-db:connect as
-#                                     `filing` (modules/vpc_lambda_access);
-#                                     the case table too while
-#                                     var.dynamodb_grants is true (dev's
-#                                     Python poller, until 18.23)
+#                                     `filing` (modules/vpc_lambda_access)
+#
+# No DynamoDB verb anywhere since ADR 0028: the case partition the worker
+# reads and the filing records it writes are Aurora rows, reached as the
+# `filing` Postgres role.
 #
 # The narrowest role in the account (ADR 0024, Risks): a compromise of it
 # defeats the approval check, so each statement below says what it is for.
@@ -73,73 +73,7 @@ locals {
 
   worker_policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [for s in [
-      {
-        # READ the case partition: the approval it consumes, and the record
-        # the approval's digest is recomputed over (the case, its debtors,
-        # every case collection, its packets) — twice per run, at consume and
-        # immediately before the final submit. GetItem and Query on the table
-        # alone: no index (every read starts from the case id), no Scan, no
-        # BatchGetItem (nothing the worker calls batches).
-        Sid      = "FilingCaseRead"
-        Effect   = "Allow"
-        Action   = ["dynamodb:GetItem", "dynamodb:Query"]
-        Resource = var.case_table_arn
-        Condition = {
-          Bool = { "aws:SecureTransport" = "true" }
-        }
-      },
-      {
-        # WRITE five kinds of item in the case partition, every one
-        # conditional: the approval's consume (UpdateItem — pending →
-        # consumed, or voided when the digest no longer matches), the
-        # FILING#<id> record (PutItem — claimed once, then each transition
-        # conditional on its state and attempt), the receipt's DOCUMENT#
-        # item (PutItem), and — ADR 0024 PR 8, in ONE transaction with the
-        # record's move to `filed` — the case's META (UpdateItem of `status`,
-        # `filedAt`, `caseNumber`, `caseNumberKey` and `updatedAt` only,
-        # conditional on the status the worker read) and its STATUS#
-        # history row (PutItem, conditional on not existing).
-        #
-        # PR 8 adds NO action: IAM authorizes each item of a
-        # TransactWriteItems as the PutItem / UpdateItem it is — there is no
-        # separate transaction action to grant (DynamoDB's "Using IAM with
-        # transactions"; `dynamodb:EnclosingOperation` is the only
-        # transaction-specific key). Which also means the grant never stopped
-        # this role from writing a transaction, whatever an earlier version of
-        # this comment said.
-        #
-        # Honest about the limit, as modules/case_store's MCP grant is: IAM
-        # cannot fence a write to a SORT-KEY namespace (dynamodb:LeadingKeys
-        # is partition keys only) or to one item's attributes when the same
-        # statement must Put whole items, so "those five only, those
-        # attributes only" is a property of the code — services/filing writes
-        # nothing but through insolvia_core.adapters.aws.filing_store and the
-        # API's approval and document stores, and the case update's attribute
-        # list is pinned by packages/insolvia_core tests/unit/test_filings.py.
-        # What the omissions buy: no DeleteItem, no BatchWriteItem — the
-        # worker cannot delete a row.
-        Sid      = "FilingRecordWrite"
-        Effect   = "Allow"
-        Action   = ["dynamodb:PutItem", "dynamodb:UpdateItem"]
-        Resource = var.case_table_arn
-        Condition = {
-          Bool = { "aws:SecureTransport" = "true" }
-        }
-      },
-      {
-        # The case table's at-rest key, through DynamoDB only — the same
-        # per-caller table-key need modules/case_store's api_key_actions
-        # note explains. Never a direct Decrypt — the one direct Decrypt this
-        # role holds is TaxIdOpen, next.
-        Sid      = "CaseKeyThroughDynamoDb"
-        Effect   = "Allow"
-        Action   = ["kms:Decrypt", "kms:GenerateDataKey", "kms:DescribeKey"]
-        Resource = var.case_kms_key_arn
-        Condition = {
-          StringEquals = { "kms:ViaService" = "dynamodb.${local.region}.amazonaws.com" }
-        }
-      },
+    Statement = [
       {
         # OPEN a debtor's sealed tax id, for the Case Upload file (ADR 0024
         # PR 9): Debtor.txt carries the full SSN, and the worker builds it in
@@ -196,7 +130,7 @@ locals {
         Action   = ["ssm:GetParameter"]
         Resource = local.kill_switch_arn
       },
-    ] : s if var.dynamodb_grants || contains(["TaxIdOpen", "PacketRead", "FilingReceiptWrite", "CaseKeyThroughS3", "KillSwitchRead"], s.Sid)]
+    ]
   })
 }
 

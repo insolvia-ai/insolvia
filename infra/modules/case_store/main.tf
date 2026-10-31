@@ -15,7 +15,6 @@
 # reference below, which follows the mailer's precedent exactly.
 
 data "aws_caller_identity" "current" {}
-data "aws_region" "current" {}
 
 # The one principal allowed to touch case rows arrives as var.api_role_name —
 # a NAME, used directly by the policy attachments below, and deliberately
@@ -58,25 +57,6 @@ locals {
   # might one day be asked to decrypt: a call that does not carry this
   # context is denied, and a call that does is one this module designed.
   tax_id_purpose = "debtor-tax-id"
-
-  # Every KMS action the API role needs, and no more.
-  #
-  # This is NOT dead weight, and it is the thing most likely to be deleted by
-  # someone tidying up. The grant DynamoDB creates at table-creation time
-  # covers its own key management, not caller reads: the table-key Decrypt is
-  # issued ON BEHALF OF THE CALLING PRINCIPAL, and AWS's own documentation
-  # notes the cached table key is per-caller and picks up IAM changes. Remove
-  # these and every read fails once the cache expires — which is the worst
-  # possible failure shape, because it passes review and passes the first
-  # smoke test.
-  #
-  # Fenced to DynamoDB as the calling service, so the role can never turn this
-  # into a direct Decrypt of a case document.
-  api_key_actions = [
-    "kms:Decrypt",
-    "kms:GenerateDataKey",
-    "kms:DescribeKey",
-  ]
 }
 
 # ── The key ─────────────────────────────────────────────────────
@@ -292,8 +272,9 @@ resource "aws_dynamodb_table" "cases" {
     kms_key_arn = aws_kms_key.case.arn
   }
 
-  # Prod on, staging off. A case table that can be destroyed by a plan is not
-  # a case table; staging holds only synthetic data and stays disposable.
+  # Off everywhere since ADR 0028: the case data is Aurora's, and this table
+  # is deleted in plan 18.23 — DynamoDB refuses to delete a protected table,
+  # so protection comes off one apply before the resource goes.
   deletion_protection_enabled = var.deletion_protection
 
   tags = var.tags
@@ -401,14 +382,28 @@ resource "aws_dynamodb_table" "access_log" {
   tags = var.tags
 }
 
-# ── The one application principal ───────────────────────────────
-# Attached from inside this module onto the role looked up above — the mailer
-# module's pattern, and the reason there is no dependency cycle.
+# ── The application principals: the tax-id envelope only ───────
+# Since the switch (ADR 0028) the case data is Aurora's, so no role holds a
+# DynamoDB verb on the tables above, nor the table key through DynamoDB — the
+# tables are kept only until the delete that follows (plan 18.23). What a
+# role still holds on THIS key is the one direct use: the debtor's tax
+# identifier, envelope-encrypted by the host itself (issue 13.12 / #382).
 #
-# Data-plane only: no CreateTable, no UpdateTable, no DeleteTable. The deploy
-# role manages the table's shape and can never read a row; this role reads and
-# writes rows and can never change the shape. Per ADR 0001 it is also the only
-# principal on either side of that line.
+# The fence is the ENCRYPTION CONTEXT rather than a calling service: both
+# verbs require the context's `purpose` member to be the one the hosts stamp
+# (local.tax_id_purpose), so a grant here authorises exactly the tax-id
+# envelope and cannot be turned into a general Decrypt of anything else
+# sealed under the key (a case document's data key carries no such context
+# and stays behind the S3 fence in modules/case_documents).
+#
+# The API role holds BOTH verbs: it seals on the debtor PUT and opens for the
+# single-form B121 preview. The pipeline worker holds Decrypt alone (it prints
+# identifiers, it never enters one), and the MCP role holds neither — "no
+# tool returns a full tax identifier" is thereby an IAM fact as well as an
+# application one (docs/reference/mcp-surface.md).
+#
+# Attached from inside this module onto the role named by var.api_role_name /
+# var.worker_role_name — the shape the header's role-name note owns.
 resource "aws_iam_role_policy" "api_case_access" {
   count = var.api_role_name == null ? 0 : 1
 
@@ -417,88 +412,8 @@ resource "aws_iam_role_policy" "api_case_access" {
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [for s in [
+    Statement = [
       {
-        Sid    = "CaseTableData"
-        Effect = "Allow"
-        Action = [
-          "dynamodb:GetItem",
-          "dynamodb:BatchGetItem",
-          "dynamodb:Query",
-          "dynamodb:PutItem",
-          "dynamodb:UpdateItem",
-          "dynamodb:DeleteItem",
-          "dynamodb:BatchWriteItem",
-          "dynamodb:TransactGetItems",
-          "dynamodb:TransactWriteItems",
-          "dynamodb:ConditionCheckItem",
-        ]
-        Resource = [
-          aws_dynamodb_table.cases.arn,
-          "${aws_dynamodb_table.cases.arn}/index/*",
-        ]
-        # DynamoDB's endpoint accepts plain HTTP as well as HTTPS, and the SDK
-        # choosing HTTPS is a default rather than a guarantee. Issue 8.2 puts
-        # TLS in transit in scope, so this makes it one. Behaviour-neutral
-        # today — nothing in services/api would notice.
-        Condition = {
-          Bool = { "aws:SecureTransport" = "true" }
-        }
-      },
-      {
-        # APPEND-ONLY, and the omissions are the design. No GetItem, no Query,
-        # no UpdateItem, no DeleteItem: the API writes access records and can
-        # never read, amend or remove one. An audit log the audited service can
-        # rewrite is not evidence, and the waitlist table's PutItem-only grant
-        # is the same reasoning.
-        #
-        # The consequence is that no endpoint can serve an access history
-        # today. That is a real limitation and the right default — serving it
-        # means granting Query, which should be its own decision with its own
-        # diff, not a capability that arrived by accident.
-        Sid      = "CaseAccessLogAppend"
-        Effect   = "Allow"
-        Action   = ["dynamodb:PutItem"]
-        Resource = aws_dynamodb_table.access_log.arn
-        Condition = {
-          Bool = { "aws:SecureTransport" = "true" }
-        }
-      },
-      {
-        # No dynamodb:Scan anywhere above — every read in the model is keyed,
-        # and a Scan on this table is a full read of every debtor's financials.
-        # If something ever genuinely needs one, it should have to come back
-        # here and say so in a diff.
-        Sid      = "CaseKeyUse"
-        Effect   = "Allow"
-        Action   = local.api_key_actions
-        Resource = aws_kms_key.case.arn
-        Condition = {
-          StringEquals = {
-            "kms:ViaService" = "dynamodb.${data.aws_region.current.region}.amazonaws.com"
-          }
-        }
-      },
-      {
-        # THE ONE DIRECT USE OF THE KEY (issue 13.12 / #382): the debtor's
-        # tax identifier is envelope-encrypted by the API itself — a data key
-        # generated under this key per sealed value, opened again only for
-        # the form that prints the number (B121) — so the DynamoDB fence
-        # above cannot cover it: DynamoDB is not the caller. FirmKeyUse's
-        # pattern is kept in spirit: the fence is the ENCRYPTION CONTEXT
-        # instead of the calling service. Both verbs require the context's
-        # `purpose` member to be the one insolvia_core.tax_ids stamps, so
-        # this statement authorises exactly the tax-id envelope and cannot be
-        # turned into a general Decrypt of anything else sealed under the
-        # key (a case document's data key carries no such context and stays
-        # behind the S3 fence in modules/case_documents).
-        #
-        # The API role holds BOTH verbs: it seals on the debtor PUT and opens
-        # for the single-form B121 preview. The worker's grant below holds
-        # Decrypt alone (it prints identifiers, it never enters one), and the
-        # MCP role holds neither — the last-four view is on the plain item,
-        # and "no tool returns a full tax identifier" is thereby an IAM fact
-        # as well as an application one (docs/reference/mcp-surface.md).
         Sid    = "TaxIdKeyUse"
         Effect = "Allow"
         Action = [
@@ -512,97 +427,16 @@ resource "aws_iam_role_policy" "api_case_access" {
           }
         }
       },
-    ] : s if var.dynamodb_grants || contains(["TaxIdKeyUse"], s.Sid)]
-  })
-}
-
-# ── The third application principal: the MCP service ────────────
-# ADR 0016 amends "exactly one principal reads this table" the way ADR 0011
-# did for the admin service: the MCP server is a second protocol surface
-# over the same case domain, under a role of its own so a misbehaving
-# harness's blast radius is its own.
-#
-# Same statements as the API's grant with the write set NARROWED, and the
-# narrowing is the design: no UpdateItem, no DeleteItem, no BatchWriteItem,
-# no TransactWriteItems. The only rows this service writes are CANDIDATE#
-# items — agent proposals awaiting human review — and both candidate writes
-# are conditional PutItems (create refuses to overwrite; withdrawal is a
-# compare-and-swap on status). Honest about the limit: IAM cannot fence a
-# PutItem to one SORT-KEY namespace (dynamodb:LeadingKeys is partition keys
-# only), so "candidates only" remains an application property enforced by
-# services/mcp having no case-record write path (ADR 0013's structural
-# invariant) — what the omissions DO buy is that a compromised MCP service
-# cannot delete rows, and cannot make the transactional case+assignment
-# write that creating a case requires.
-#
-# The access-log append rides along, same append-only shape as the API's:
-# every case read through this surface is recorded, and the service can
-# never read, amend or delete an entry. No Scan, same as every principal.
-resource "aws_iam_role_policy" "mcp_case_access" {
-  count = var.mcp_role_name == null || !var.dynamodb_grants ? 0 : 1
-
-  name = "${local.name}-mcp-access"
-  role = var.mcp_role_name
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid    = "CaseTableData"
-        Effect = "Allow"
-        Action = [
-          "dynamodb:GetItem",
-          "dynamodb:BatchGetItem",
-          "dynamodb:Query",
-          "dynamodb:PutItem",
-          "dynamodb:ConditionCheckItem",
-        ]
-        Resource = [
-          aws_dynamodb_table.cases.arn,
-          "${aws_dynamodb_table.cases.arn}/index/*",
-        ]
-        Condition = {
-          Bool = { "aws:SecureTransport" = "true" }
-        }
-      },
-      {
-        Sid      = "CaseAccessLogAppend"
-        Effect   = "Allow"
-        Action   = ["dynamodb:PutItem"]
-        Resource = aws_dynamodb_table.access_log.arn
-        Condition = {
-          Bool = { "aws:SecureTransport" = "true" }
-        }
-      },
-      {
-        Sid      = "CaseKeyUse"
-        Effect   = "Allow"
-        Action   = local.api_key_actions
-        Resource = aws_kms_key.case.arn
-        Condition = {
-          StringEquals = {
-            "kms:ViaService" = "dynamodb.${data.aws_region.current.region}.amazonaws.com"
-          }
-        }
-      },
     ]
   })
 }
 
-# ── The second application principal: the pipeline worker ───────
-# ADR 0018 amends "exactly one principal reads this table" the way ADR 0011
-# amended ADR 0001: the worker Lambda is the API's own long-running half — it
-# advances the job rows the API accepted, and (with 9.6/9.7) reads the case
-# it is assembling — under a role of its own so its blast radius is its own.
-#
-# Same statements as the API's grant. The access-log append arrived exactly
-# the way the original omission promised it would — in a diff that says so:
-# packet assembly (issue #96) is the first worker that reads case DATA (the
-# whole file, to project the forms), and a case-data read that the access
-# log cannot see is the failure the api-and-log pairing rule exists to
-# prevent. Recorded against the preparer whose accept caused the run
-# (core/packet_assembly.py). Write-only, PutItem alone, exactly as the API's
-# grant is; no Scan, same as the API, for the same reason.
+# The pipeline worker (ADR 0018): the API's TaxIdKeyUse NARROWED to Decrypt.
+# Packet assembly opens each debtor's sealed identifier to print B121, and the
+# review worker opens it to reproduce the packet's bytes — reads both, logged
+# as `taxid.read` rows by the code that performs them. No GenerateDataKey:
+# nothing in the worker enters a tax id, so nothing in the worker can seal
+# one. Same context fence.
 resource "aws_iam_role_policy" "worker_case_access" {
   count = var.worker_role_name == null ? 0 : 1
 
@@ -611,56 +445,8 @@ resource "aws_iam_role_policy" "worker_case_access" {
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [for s in [
+    Statement = [
       {
-        Sid    = "CaseTableData"
-        Effect = "Allow"
-        Action = [
-          "dynamodb:GetItem",
-          "dynamodb:BatchGetItem",
-          "dynamodb:Query",
-          "dynamodb:PutItem",
-          "dynamodb:UpdateItem",
-          "dynamodb:ConditionCheckItem",
-        ]
-        Resource = [
-          aws_dynamodb_table.cases.arn,
-          "${aws_dynamodb_table.cases.arn}/index/*",
-        ]
-        Condition = {
-          Bool = { "aws:SecureTransport" = "true" }
-        }
-      },
-      {
-        # Append-only, like the API's CaseAccessLogAppend and for its
-        # reasons: the packet worker reads whole case files (issue #96) and
-        # must record that it did; nothing grants it a read of the log.
-        Sid      = "CaseAccessLogAppend"
-        Effect   = "Allow"
-        Action   = ["dynamodb:PutItem"]
-        Resource = aws_dynamodb_table.access_log.arn
-        Condition = {
-          Bool = { "aws:SecureTransport" = "true" }
-        }
-      },
-      {
-        Sid      = "CaseKeyUse"
-        Effect   = "Allow"
-        Action   = local.api_key_actions
-        Resource = aws_kms_key.case.arn
-        Condition = {
-          StringEquals = {
-            "kms:ViaService" = "dynamodb.${data.aws_region.current.region}.amazonaws.com"
-          }
-        }
-      },
-      {
-        # The API's TaxIdKeyUse, NARROWED to Decrypt (issue 13.12 / #382):
-        # packet assembly opens each debtor's sealed identifier to print
-        # B121, and the review worker opens it to reproduce the packet's
-        # bytes — reads both, logged as `taxid.read` rows by the code that
-        # performs them. No GenerateDataKey: nothing in the worker enters a
-        # tax id, so nothing in the worker can seal one. Same context fence.
         Sid      = "TaxIdKeyUse"
         Effect   = "Allow"
         Action   = ["kms:Decrypt"]
@@ -671,6 +457,6 @@ resource "aws_iam_role_policy" "worker_case_access" {
           }
         }
       },
-    ] : s if var.dynamodb_grants || contains(["TaxIdKeyUse"], s.Sid)]
+    ]
   })
 }
