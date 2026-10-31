@@ -76,8 +76,8 @@ jobs:
           # `sha-<sha>` is the immutable build identity a production promotion
           # resolves to a digest; `staging` is the moving marker tag a
           # from-scratch apply seeds the Lambda from — api-staging.yml's
-          # comment owns the full argument. Context is the repo root: the
-          # image installs packages/insolvia_core by relative path.
+          # comment owns the full argument. Context is backend/: every .NET
+          # host builds from its one Dockerfile.
           docker build --target mcp-lambda \
             -t "$REPO:sha-${{ github.sha }}" \
             -t "$REPO:staging" \
