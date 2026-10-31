@@ -91,7 +91,7 @@ jobs:
         if: steps.filter.outputs.run == 'true'
         run: npm run typecheck --workspace @insolvia-ai/api-client
 
-      # The contract pin for services/api — see the header comment in
+      # The contract pin for the backend's API — see the header comment in
       # packages/insolvia_api_client/src/index.test.ts.
       - name: Test
         if: steps.filter.outputs.run == 'true'

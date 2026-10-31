@@ -25,7 +25,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # Bash 3.2 is what macOS ships, so no associative arrays — same as dev-up.sh.
-SERVICES="api admin-api mailer app portal marketing"
+SERVICES="backend mailer app portal marketing"
 
 # The mailer lives in the insolvia-services repo (since 2026-10-11); it runs
 # from that checkout when this machine has one, and is left out otherwise —
@@ -33,7 +33,7 @@ SERVICES="api admin-api mailer app portal marketing"
 # MAILER_API_URL is unset. scripts/services-checkout.sh owns where it looks.
 . "$SCRIPT_DIR/services-checkout.sh"
 SERVICES_REPO="$(services_checkout "$REPO_ROOT")"
-[[ -n "$SERVICES_REPO" ]] || SERVICES="api admin-api app portal marketing"
+[[ -n "$SERVICES_REPO" ]] || SERVICES="backend app portal marketing"
 
 c_reset=$'\033[0m'
 c_red=$'\033[1;31m'
@@ -49,8 +49,7 @@ die() {
 
 service_dir() {
   case "$1" in
-  api) printf '%s/services/api' "$REPO_ROOT" ;;
-  admin-api) printf '%s/services/admin' "$REPO_ROOT" ;;
+  backend) printf '%s/backend' "$REPO_ROOT" ;;
   mailer) printf '%s/services/mailer' "$SERVICES_REPO" ;;
   app) printf '%s/apps/insolvia_app' "$REPO_ROOT" ;;
   portal) printf '%s/apps/insolvia_admin' "$REPO_ROOT" ;;
@@ -64,12 +63,12 @@ case "${1:-}" in
   cat <<'USAGE'
 Usage: ./scripts/dev-down.sh
 
-Stops everything ./scripts/dev-up.sh starts: api, admin api, mailer, app,
-admin portal, marketing — containers included. Safe to run when nothing is up.
+Stops everything ./scripts/dev-up.sh starts: the backend (api, admin api and
+their Postgres), mailer, app, admin portal, marketing — containers included.
+Safe to run when nothing is up.
 
 To stop one part, run that part's own script instead:
-  ./services/api/scripts/dev-down.sh
-  ./services/admin/scripts/dev-down.sh
+  ./backend/scripts/dev-down.sh
   ../insolvia-services/services/mailer/scripts/dev-down.sh   (separate repo)
   ./apps/insolvia_app/scripts/dev-down.sh
   ./apps/insolvia_admin/scripts/dev-down.sh

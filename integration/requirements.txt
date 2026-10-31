@@ -1,0 +1,9 @@
+# The integration tier's whole toolchain. It is an HTTP client suite, so no
+# backend code is installed. Pinned exact, as every Python pin here is: local
+# and CI must resolve the same thing.
+pytest==8.4.2
+# Unsigned cognito-idp calls for SRP sign-in (tests/cognito_srp.py), and the
+# filing-authorization specs' token refresh.
+boto3==1.40.66
+# Reads claims (auth_time, client_id) off the real pool's tokens.
+PyJWT[crypto]==2.13.0

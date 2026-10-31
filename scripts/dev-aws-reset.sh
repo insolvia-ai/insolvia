@@ -1,10 +1,15 @@
 #!/usr/bin/env bash
 #
-# Reset this machine's AWS-backed Insolvia development data: delete and
-# recreate the waitlist, case, access-log and firm tables (cheaper and simpler
-# than item-level scans for throwaway data). The resources themselves survive;
-# only data is wiped. Every resource is asserted against this machine's
-# expected names before anything is touched.
+# Reset this machine's Insolvia development DATA: wipe the local database
+# (backend/docker-compose.yml's Postgres volume, `insolvia-backend-pgdata`)
+# and, with --documents, empty this machine's case-document bucket. The
+# resources themselves survive; only data goes. The next `docker compose up`
+# (scripts/dev-up.sh) migrates an empty database, and scripts/dev-aws-seed.sh
+# seeds it again.
+#
+# The name predates ADR 0028: the data used to be per-machine DynamoDB tables,
+# which this script deleted and recreated. The database is local now, so
+# most of a reset needs no AWS at all; only --documents does.
 #
 # COGNITO USERS ARE NOT DELETED. Sign-in uses the ONE development pool every
 # machine shares (insolvia-services', ADR 0026); its accounts are not this
@@ -12,6 +17,10 @@
 #
 # AFTERWARDS YOUR ACCOUNT STILL EXISTS BUT HAS NO FIRM. Re-run
 # scripts/dev-aws-seed.sh — it reseeds the firm (and converges the account).
+#
+#   ./scripts/dev-aws-reset.sh                 # the local database
+#   ./scripts/dev-aws-reset.sh --documents     # and this machine's bucket
+#   ./scripts/dev-aws-reset.sh --dry-run       # say what would go
 #
 set -euo pipefail
 
@@ -21,15 +30,17 @@ source "$SCRIPT_DIR/dev-aws-common.sh"
 
 AUTO_APPROVE=0
 DRY_RUN=0
+DOCUMENTS=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --profile) [[ $# -ge 2 ]] || die "--profile requires a value."; AWS_PROFILE_VALUE="$2"; shift ;;
     --region) [[ $# -ge 2 ]] || die "--region requires a value."; AWS_REGION_VALUE="$2"; shift ;;
     --yes|-y) AUTO_APPROVE=1 ;;
     --dry-run) DRY_RUN=1 ;;
+    --documents) DOCUMENTS=1 ;;
     --skip-cognito) : ;; # accepted for old habits; users are never deleted now
     --help|-h)
-      printf 'Usage: %s [--profile NAME] [--region REGION] [--yes] [--dry-run] [--skip-cognito]\n' "$0"
+      printf 'Usage: %s [--documents] [--profile NAME] [--region REGION] [--yes] [--dry-run]\n' "$0"
       exit 0
       ;;
     *) die "Unknown option: $1" ;;
@@ -37,42 +48,30 @@ while [[ $# -gt 0 ]]; do
   shift
 done
 
-for command in aws jq terraform; do require_command "$command"; done
-load_machine_id false
-load_aws_identity
-terraform_init
-outputs="$(terraform_output_json)"
-output_machine_id="$(jq -r '.machine_id.value' <<<"$outputs")"
-[[ "$output_machine_id" == "$MACHINE_ID" ]] ||
-  die "Terraform state belongs to machine '$output_machine_id', not '$MACHINE_ID'."
+COMPOSE_FILE="$REPO_ROOT/backend/docker-compose.yml"
+VOLUME="insolvia-backend-pgdata"
+require_command docker
 
-# Paranoid ownership checks: every name must carry THIS machine's short id
-# and match what infra/envs/dev provisions, or the reset refuses to run.
-table="$(jq -r '.waitlist_table_name.value' <<<"$outputs")"
-case_table="$(jq -r '.case_table_name.value' <<<"$outputs")"
-access_log_table="$(jq -r '.case_access_log_table_name.value' <<<"$outputs")"
-firm_table="$(jq -r '.firm_table_name.value' <<<"$outputs")"
-pool_id="$(jq -r '.auth_user_pool_id.value' <<<"$outputs")"
-[[ "$table" == "$WAITLIST_TABLE_NAME_EXPECTED" ]] ||
-  die "Refusing reset: unexpected DynamoDB table '$table' (expected '$WAITLIST_TABLE_NAME_EXPECTED')."
-[[ "$case_table" == "$CASE_TABLE_NAME_EXPECTED" ]] ||
-  die "Refusing reset: unexpected case table '$case_table' (expected '$CASE_TABLE_NAME_EXPECTED')."
-[[ "$access_log_table" == "$CASE_ACCESS_LOG_TABLE_NAME_EXPECTED" ]] ||
-  die "Refusing reset: unexpected access-log table '$access_log_table' (expected '$CASE_ACCESS_LOG_TABLE_NAME_EXPECTED')."
-[[ "$firm_table" == "$FIRM_TABLE_NAME_EXPECTED" ]] ||
-  die "Refusing reset: unexpected firm table '$firm_table' (expected '$FIRM_TABLE_NAME_EXPECTED')."
-pool_name="$(aws_dev cognito-idp describe-user-pool --user-pool-id "$pool_id" --query 'UserPool.Name' --output text)"
-[[ "$pool_name" == "$USER_POOL_NAME_EXPECTED" ]] ||
-  die "Refusing reset: Cognito pool is named '$pool_name', not '$USER_POOL_NAME_EXPECTED'."
+bucket=""
+if [[ "$DOCUMENTS" -eq 1 ]]; then
+  for command in aws jq terraform; do require_command "$command"; done
+  load_machine_id false
+  load_aws_identity
+  terraform_init
+  outputs="$(terraform_output_json)"
+  output_machine_id="$(jq -r '.machine_id.value' <<<"$outputs")"
+  [[ "$output_machine_id" == "$MACHINE_ID" ]] ||
+    die "Terraform state belongs to machine '$output_machine_id', not '$MACHINE_ID'."
+  # Paranoid ownership check: the bucket must carry THIS machine's prefix.
+  bucket="$(jq -r '.case_document_bucket.value // empty' <<<"$outputs")"
+  [[ "$bucket" == "$RESOURCE_PREFIX-case-documents-"* ]] ||
+    die "Refusing reset: document bucket '$bucket' does not carry this machine's prefix ($RESOURCE_PREFIX)."
+fi
 
-printf '\nThis will clear development data owned by:\n'
-printf '  AWS account: %s\n' "$AWS_ACCOUNT_ID"
-printf '  Machine ID:  %s\n' "$MACHINE_ID"
-printf '  Table:       %s (delete + recreate)\n' "$table"
-printf '  Case table:  %s (delete + recreate)\n' "$case_table"
-printf '  Access log:  %s (delete + recreate)\n' "$access_log_table"
-printf '  Firm table:  %s (delete + recreate)\n' "$firm_table"
-printf '  Cognito:     %s — the shared pool; its users are NOT deleted\n\n' "$pool_id"
+printf '\nThis will clear development data on this machine:\n'
+printf '  Database:   docker volume %s (backend/docker-compose.yml)\n' "$VOLUME"
+[[ -n "$bucket" ]] && printf '  Documents:  every object in s3://%s\n' "$bucket"
+printf '  Cognito:    the shared pool — its users are NOT deleted\n\n'
 
 if [[ "$DRY_RUN" -eq 1 ]]; then
   ok "Dry run complete; nothing was changed."
@@ -84,49 +83,13 @@ if [[ "$AUTO_APPROVE" -eq 0 ]]; then
   [[ "$confirmation" == "RESET" ]] || die "Reset canceled."
 fi
 
-# Pause a running API container while its table disappears (docker is
-# optional here — the plain no-compose dev server is a supported path, so the
-# reset works without docker installed).
-compose_file="$API_DIR/docker-compose.yml"
-api_was_running=0
-if command -v docker >/dev/null 2>&1 &&
-  docker compose version >/dev/null 2>&1 &&
-  docker compose -f "$compose_file" ps --services --status running 2>/dev/null | grep -qx api; then
-  api_was_running=1
-  docker compose -f "$compose_file" stop api >/dev/null
+# `down -v` stops the stack and removes its named volume — the database.
+log "Stopping the local backend and removing its database volume..."
+docker compose -f "$COMPOSE_FILE" down -v --remove-orphans
+
+if [[ -n "$bucket" ]]; then
+  log "Emptying s3://$bucket..."
+  aws_dev s3 rm "s3://$bucket" --recursive >/dev/null
 fi
 
-log "Deleting $table..."
-aws_dev dynamodb delete-table --table-name "$table" >/dev/null
-aws_dev dynamodb wait table-not-exists --table-name "$table"
-
-# The case store goes the same way. Its customer-managed key is deliberately
-# NOT touched: the key is Terraform-owned and survives a reset, so recreating
-# the table below re-grants against the same key rather than churning a new
-# one (and leaving the old one pending deletion) on every wipe.
-log "Deleting $case_table..."
-aws_dev dynamodb delete-table --table-name "$case_table" >/dev/null
-aws_dev dynamodb wait table-not-exists --table-name "$case_table"
-
-# The access log goes with the cases it describes. Keeping it would leave
-# entries pointing at case ids that no longer exist, which is worse than
-# nothing — and on a laptop it is synthetic either way.
-log "Deleting $access_log_table..."
-aws_dev dynamodb delete-table --table-name "$access_log_table" >/dev/null
-aws_dev dynamodb wait table-not-exists --table-name "$access_log_table"
-
-# The firms go too, and this table is the one with a foot in both halves of the
-# reset: its firm rows own the cases deleted just above, so a surviving firm
-# would be an empty shell. The accounts survive (shared pool, above), and
-# re-running `dev-aws-seed.sh` gives them their firm back in one command.
-log "Deleting $firm_table..."
-aws_dev dynamodb delete-table --table-name "$firm_table" >/dev/null
-aws_dev dynamodb wait table-not-exists --table-name "$firm_table"
-
-log "Recreating the empty DynamoDB tables through Terraform..."
-terraform -chdir="$TF_DIR" apply -input=false -auto-approve "${TF_VARS[@]}"
-
-if [[ "$api_was_running" -eq 1 ]]; then
-  docker compose -f "$compose_file" up -d api >/dev/null
-fi
-ok "This machine's AWS development data has been reset."
+ok "Reset. Next: ./scripts/dev-up.sh (migrates the empty database), then ./scripts/dev-aws-seed.sh."

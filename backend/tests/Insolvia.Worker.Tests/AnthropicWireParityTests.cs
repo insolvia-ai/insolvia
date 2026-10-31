@@ -37,7 +37,7 @@ internal sealed class RecordingHandler : HttpMessageHandler
 /// The Anthropic seam pinned to Python's wire (research
 /// dotnet-mcp-and-anthropic-sdks-2026-10-27 § 3): the production adapters'
 /// request bodies are DEEP-EQUAL to the bodies the Python adapters sent
-/// (captured by spikes/sdk/anthropic/capture_python_requests.py) — which pins
+/// (captured by spike 18.4, committed as Fixtures/Anthropic) — which pins
 /// the review prompt and schema and the credit-report prompt and schema to
 /// Python's byte for byte. Plus the client policy and the failure split.
 /// </summary>

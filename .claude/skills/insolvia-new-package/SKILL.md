@@ -3,7 +3,7 @@ name: insolvia-new-package
 description: >-
   How to add a new package, app, or backend service to the Insolvia monorepo.
   Use this when scaffolding a new buildable unit — "add a package", "create a
-  new app", "scaffold a service", "new shared library", "spin up services/<x>" —
+  new app", "scaffold a service", "new shared library", "a new backend host or project" —
   so it lands with the workspace wiring, the README + CLAUDE.md pair, the CI
   workflows, and the infra entry the repo expects. Reach for it before creating
   the directory, so nothing is missed.
@@ -42,13 +42,18 @@ description: >-
    `ci-trust` PR there too (the `insolvia-deploy-role-permissions` skill).
 5. Document it in the map in the root [`README.md`](../../../README.md).
 
-## Python service (the exception — not a workspace member)
+## Backend project or host (.NET — not a workspace member)
 
-Lives under `services/<name>/`, is **not** an npm workspace member (no
-`package.json` in the root `workspaces` list). Use the layered `src/`
-layout every service here shares (see `services/api` or `services/mcp`) (`core/api/adapters/entrypoints`) with a per-service `pyproject.toml`
-(pytest) plus the shared root `ruff.toml`, and its own `tests/test_architecture.py`
-enforcing the dependency direction. Steps 3–5 above still apply.
+Lives in `backend/` as `src/Insolvia.<Name>/` with a matching
+`tests/Insolvia.<Name>.Tests/`, both listed in `backend/Insolvia.slnx`, and
+named in `tests/Insolvia.Architecture.Tests`' layering rule — the test fails
+until all of that is done ([`backend/CLAUDE.md`](../../../backend/CLAUDE.md)
+owns the rule). Package versions go in `Directory.Packages.props`; commit the
+`packages.lock.json` it generates. A new **host** (a deployable unit) also
+gets its own `backend/Dockerfile` target, a build line in `backend-pr.yml`, a
+`<name>-<env>.yml` deploy pair, a leg in `release.yml`, and its ECR repository
+first in insolvia-services (step 4 above). There is no Python service any
+more (ADR 0028, plan 18.23). Steps 3–5 above still apply.
 
 ## The design system is in another repository
 

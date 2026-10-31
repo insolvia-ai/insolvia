@@ -2,7 +2,8 @@ using Insolvia.Engines.Tests.Support;
 
 namespace Insolvia.Engines.Tests;
 
-// The ports against their oracle: Parity/generate.py ran the Python
+// The ports against their oracle: the Python oracle's generator (deleted
+// with the Python, 18.23; the outputs are committed) ran the Python
 // projections and engines over four case files (the two reference cases of
 // test_form_projections.py, and the latest seed fixture's two cases) and
 // wrote every output; this suite parses the same case files through Core's

@@ -24,7 +24,7 @@ import { expect, type Page } from '@playwright/test';
  *   - the CASE on that client's record, by its district — a court no fixture
  *     case uses (they are all `flmb`) and the integration tier's own scratch
  *     case does not use either (`flnb`,
- *     `services/api/tests/integration/conftest.py`) — and then CONFIRMED by
+ *     `integration/tests/conftest.py`) — and then CONFIRMED by
  *     the case's heading, which names its debtors: Debtor 1's surname is the
  *     scratch client's, and no spec changes it. A case that is not ours is
  *     passed over, never written to.

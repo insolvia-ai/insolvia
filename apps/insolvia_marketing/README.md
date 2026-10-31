@@ -16,7 +16,7 @@ scripts/dev-up.sh               # the RR7 dev server
 `dev-setup.sh` handles the GitHub Packages token dance (a plain `npm install`
 401s even for public packages). To point the local dev server at a locally-running
 API instead of logging waitlist submissions, start the API
-(`services/api/scripts/dev-up.sh`) and run
+(`backend/scripts/dev-up.sh`) and run
 `INSOLVIA_API_BASE_URL=http://localhost:8080 scripts/dev-up.sh`.
 
 Other commands: `npm run build` (production), `npm run typecheck`, `npm run lint`.

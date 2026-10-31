@@ -68,7 +68,7 @@ the linked owner has the detail:
 | Web app | Expo / React Native SPA, `app.insolvia.ai`, S3 + CloudFront | [ADR 0004](adr/0004-react-native-replaces-flutter.md) · [`apps/insolvia_app/CLAUDE.md`](../apps/insolvia_app/CLAUDE.md) |
 | Design system | **One cross-platform package** (`@insolvia-ai/design-system`) serving both surfaces — platform-split leaves, no third-party UI dependency. Lives in [`insolvia-ai/design-system`](https://github.com/insolvia-ai/design-system); consumed here by published version | [ADR 0006](adr/0006-owned-cross-platform-design-system.md) · [ADR 0010](adr/0010-design-system-moves-to-its-own-repository.md) |
 | Tokens | One `tokens.json` → generated `theme.css` (web) + `tokens.ts` (native), drift-gated in CI — in the design-system repo. What is generated *here* is the brand override (`brand/` → the app, marketing and admin themes; ADR 0020), drift-checked by `branding-pr.yml`. Cognito's sign-in style is insolvia-services' (ADR 0026) | [`reference/package-publishing.md`](reference/package-publishing.md) |
-| API | Python/Flask on Lambda, `api.insolvia.ai` — firms, clients, cases and their schedules, forms and packets, the client portal, and the filing endpoints; the client-stays-dumb trust boundary | [ADR 0001](adr/0001-client-stays-dumb-trust-boundary.md) · [`services/api/CLAUDE.md`](../services/api/CLAUDE.md) |
+| API | .NET 10 on Lambda over Aurora PostgreSQL, `api.insolvia.ai` — firms, clients, cases and their schedules, forms and packets, the client portal, and the filing endpoints; the client-stays-dumb trust boundary. Beside it: the job worker, admin, MCP and filing worker hosts, and the migrator | [ADR 0001](adr/0001-client-stays-dumb-trust-boundary.md) · [ADR 0028](adr/0028-backend-moves-to-dotnet-and-postgres.md) · [`backend/CLAUDE.md`](../backend/CLAUDE.md) |
 | API client | Hand-written TypeScript, contract-pinned by tests, wired into the app | [`packages/insolvia_api_client/CLAUDE.md`](../packages/insolvia_api_client/CLAUDE.md) |
 | Mailer | SES-backed transactional service with unsubscribe path — in insolvia-services since 2026-10-11 | [`services/mailer/CLAUDE.md`](https://github.com/insolvia-ai/insolvia-services/blob/main/services/mailer/CLAUDE.md) |
 | Auth | Cognito pools per env (and one shared dev pool) owned by insolvia-services, read here through the SSM contract `/insolvia/<env>/auth/*`; the app signs in with authorization-code + PKCE, keeps access/ID tokens in memory and the refresh token in `localStorage`, and guards its routes | [ADR 0007](adr/0007-hosted-ui-pkce-refresh-token-in-local-storage.md) · insolvia-services' `infra/modules/auth` ([ADR 0026](adr/0026-auth-is-a-shared-service.md)) |
@@ -99,7 +99,7 @@ died in — this plan no longer carries their bodies.
 | D3 | Marketing is **React Router v7 SSR** — Flutter web could not be crawled, and the replacement stack must stay dramatically lighter than any app runtime | `apps/insolvia_marketing/lighthouserc.json` (the enforced budget) |
 | D4 | **One owned cross-platform design system**, platform-split leaves, over one token source | [ADR 0006](adr/0006-owned-cross-platform-design-system.md) |
 | D5 | **The API is required for MVP** — GLBA-scope data (SSNs, financials) keeps the trust boundary server-side | [ADR 0001](adr/0001-client-stays-dumb-trust-boundary.md) |
-| D6 | Backend is **Python + Flask + Mangum on Lambda** — **being superseded**: the backend is rewritten in .NET 10 on Aurora PostgreSQL (milestone 18) | [ADR 0028](adr/0028-backend-moves-to-dotnet-and-postgres.md) |
+| D6 | ~~Backend is Python + Flask + Mangum on Lambda~~ — **superseded** by ADR 0028: the backend is .NET 10 on Lambda over Aurora PostgreSQL (milestone 18; the Python was deleted in 18.23) | [ADR 0028](adr/0028-backend-moves-to-dotnet-and-postgres.md) |
 | D7 | Human email and product email are **separate providers** (Workspace in, SES out) | insolvia-services' [`email.md`](https://github.com/insolvia-ai/insolvia-services/blob/main/docs/reference/email.md) |
 | D10 | **A case belongs to a FIRM, not to a user.** Firm, role, admin flag, per-case linking and per-feature permissions live in our own store rather than in Cognito claims — an access token carries a `sub` and nothing else authorization-bearing | [ADR 0009](adr/0009-a-case-belongs-to-a-firm.md) |
 | D9 | **React Native on Expo replaced Flutter**; Expo free tier only, CI-enforced; **desktop deleted**, mobile held open by `expo prebuild` | [ADR 0004](adr/0004-react-native-replaces-flutter.md) |
@@ -169,7 +169,7 @@ above; the intake data model's old sync seam narrowed to an origin pointer
 | [`Product · Intake`](https://github.com/insolvia-ai/insolvia/milestone/5) | M2 / P1 | 8.1–8.6, 8.10 | Standalone intake behind auth: case data model, encrypted store, case CRUD, the intake form widgets (risk 4), the questionnaire, document upload. Only the design-partner web-first test (risk 3) is still open. |
 | [`Product · Forms & petition engine`](https://github.com/insolvia-ai/insolvia/milestone/6) — **built 2026-09-04** | M3 / P2 | 9.1–9.10 | Deterministic, versioned forms; Chapter 7 packet; AI review agent — all merged. #96 stays open for its staging validation (a walkthrough with the design partner); #97's seeded-defect review closed 2026-09-04. |
 | [`Product · Means test`](https://github.com/insolvia-ai/insolvia/milestone/7) — **built 2026-09-04** | P3 | 10.1–10.4 | §707(b) engine, CMI, UST/IRS/Census registry series with a weekly staleness tripwire (`regulatory-refresh.yml`), B122A-1/A-2 in the packet. `code/dollar-amounts` now written at pin time. |
-| [`Product · Firms & access control`](https://github.com/insolvia-ai/insolvia/milestone/8) | M2 / P1 | 11.1–11.7 | A case belongs to a **firm**, not to whoever opened it — firm users, roles, per-case linking, per-feature permissions ([ADR 0009](adr/0009-a-case-belongs-to-a-firm.md)). Staff provision firms through the admin portal and `services/admin` (`POST /v1/firms`, audited — [ADR 0011](adr/0011-cross-tenant-administration-is-a-separate-principal-class.md)). One item stays open on purpose: the pool's case sensitivity is a decision rather than a task. |
+| [`Product · Firms & access control`](https://github.com/insolvia-ai/insolvia/milestone/8) | M2 / P1 | 11.1–11.7 | A case belongs to a **firm**, not to whoever opened it — firm users, roles, per-case linking, per-feature permissions ([ADR 0009](adr/0009-a-case-belongs-to-a-firm.md)). Staff provision firms through the admin portal and the admin service (`POST /v1/firms`, audited — [ADR 0011](adr/0011-cross-tenant-administration-is-a-separate-principal-class.md)). One item stays open on purpose: the pool's case sensitivity is a decision rather than a task. |
 | [`Product · AI extraction`](https://github.com/insolvia-ai/insolvia/milestone/9) — **built 2026-09-04** | M2 / P1 | 8.7–8.9 | Credit reports and pay stubs into candidate records via pipeline workers (ADR 0019 as amended: document bytes reach the API, so **ZDR gates real-firm documents**); one shared review queue with MCP; human-confirmed before case entry. |
 | [`Product · Schedules workbench`](https://github.com/insolvia-ai/insolvia/milestone/11) — **built 2026-09-23** | M3 / P2 | 13.1–13.12 | Finish the Chapter 7 data-entry surface over entities that already exist: the petition screen, a forms hub with single-form preview, category-driven assets, claims linked to collateral with derived deficiency, the Schedule C workbench over the exemptions registry, Schedules G/H, the income workbench, a means-test screen with a live verdict, a firm creditor library, the four missing filing forms (B108/B121/B2010/B2030 — two are flat PDFs, so the engine gained an overlay pass that draws on vendored pages without touching their bytes), output options, and the tax id's encrypted storage with its logged full-value read (13.12 — B121 and B101's last four print). |
 | [`Product · Practice management`](https://github.com/insolvia-ai/insolvia/milestone/12) — **built** | — | 14.1–14.8 | The layer around the case: tasks, notes, events with sixteen cited deadline rules and Rule 9006(a) counting, the dashboard, the court registry with firm defaults, and — per [ADR 0022](adr/0022-a-client-is-not-a-case.md), all eight PRs — the firm client record, cases opened for clients, the client list and record screens, the debtor screen reading its client, client records over MCP, merge clients, and the lifecycle with post-filing fields (14.3). |
@@ -218,12 +218,22 @@ milestone (10.1).
 
 ## Platform · .NET + Postgres rewrite (milestone 18, from 2026-10-27)
 
-The backend (`services/*`, `insolvia_core`) is rewritten in C# on .NET 10,
-and DynamoDB is replaced by Aurora Serverless v2 PostgreSQL in a VPC. It is
-built in `backend/` and cut over once. [ADR 0028](adr/0028-backend-moves-to-dotnet-and-postgres.md)
-owns the decision and the **18.1–18.23 build breakdown**. Accepted
-2026-10-27: the Python backend takes fixes only, and the items in § Next
-below that need new backend code are built in `backend/`.
+The backend (`services/*`, `insolvia_core`) was rewritten in C# on .NET 10,
+and DynamoDB replaced by Aurora Serverless v2 PostgreSQL in a VPC, built in
+`backend/` and cut over once. [ADR 0028](adr/0028-backend-moves-to-dotnet-and-postgres.md)
+owns the decision and the **18.1–18.23 build breakdown**.
+
+**Status: built.** 18.1–18.21 are merged; the switch (18.22) runs staging
+entirely on .NET and Aurora (release run 41144870519 green: migrator, API and
+its integration tier, admin, MCP, app e2e, filing); 18.23 deleted the Python
+backend, its CI and its local tooling. **Two steps remain, both the
+maintainer's:**
+
+1. **Promote the switch to prod** — the release run's `promote` gate.
+2. **Delete the DynamoDB tables** in staging and prod (and the module-owned
+   ones left in each machine's `infra/envs/dev`): a separate PR that removes
+   them from `case_store`, `firm_store`, `filing_credentials` and the API and
+   admin service modules, after the prod promote, confirmed before apply.
 
 ## Next — the build order (as of 2026-10-13)
 
@@ -303,7 +313,7 @@ In order of likely bite:
    the deferral was correct and its preconditions are now met.
 6. **Firm provisioning is ours alone.** Self-signup is disabled on the pool by
    design, so a firm and its first administrator are created by Insolvia
-   staff — through the admin portal and `services/admin` (`POST /v1/firms`),
+   staff — through the admin portal and the admin service (`POST /v1/firms`),
    every mutation writing an append-only audit row
    ([ADR 0011](adr/0011-cross-tenant-administration-is-a-separate-principal-class.md)).
    What remains is bounded: a firm that loses its last administrator cannot

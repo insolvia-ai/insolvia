@@ -12,8 +12,8 @@ using Insolvia.Engines.Standards;
 namespace Insolvia.Engines.Tests.Support;
 
 /// <summary>
-/// Produces, for one case file, exactly the document Parity/generate.py
-/// writes from the Python — so the two can be diffed value by value.
+/// Produces, for one case file, exactly the document the Python oracle
+/// wrote (Parity/*.expected.json) — so the two can be diffed value by value.
 /// </summary>
 internal static class Oracle
 {

@@ -7,7 +7,7 @@ after that the pipeline provisions its own test data on every staging deploy.
 
 Two post-deploy suites sign in against real staging: the browser suite in
 [`e2e/`](../../e2e/README.md) through the Cognito hosted UI, and the API's
-integration tier in [`services/api/tests/integration/`](../../services/api/tests/integration/)
+integration tier in [`integration/`](../../integration/README.md)
 by SRP. A signed-in user is useless to either without a **firm** — a case
 belongs to one (ADR 0009), so a user in none resolves to no accessor and every
 route behind `current_accessor()` answers 403 — and the specs that touch a case

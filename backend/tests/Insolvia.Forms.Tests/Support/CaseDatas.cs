@@ -21,7 +21,7 @@ namespace Insolvia.Forms.Tests.Support;
 /// <summary>
 /// A parity case file as <see cref="CaseData"/>: every body wrapped with the
 /// case file's id, or <c>&lt;collection&gt;-&lt;n&gt;</c> where it carries
-/// none — the same synthetic ids Parity/dump.py's <c>case_data</c> builds.
+/// none — the same synthetic ids the Python parity harness's <c>case_data</c> built.
 /// </summary>
 internal static class CaseDatas
 {
@@ -68,7 +68,7 @@ internal static class CaseDatas
         };
     }
 
-    /// <summary>dump.py's <c>amended</c>: the case filed on 2026-09-15, the first asset and the first nonpriority claim flagged amended.</summary>
+    /// <summary>The parity harness's <c>amended</c>: the case filed on 2026-09-15, the first asset and the first nonpriority claim flagged amended.</summary>
     public static CaseData Amended(CaseData data)
     {
         var firstNonpriority = data.Claims.FirstOrDefault(e => e.Body.ClaimClass == ClaimClass.NonpriorityUnsecured)?.Id;

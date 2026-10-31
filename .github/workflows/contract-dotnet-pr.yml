@@ -1,9 +1,10 @@
 name: Contract (.NET) · PR
 
 # The contract suite (contract/, plan 18.2) against the .NET backend on
-# Postgres — ADR 0028's acceptance gate: the switch PR waits until the same
-# suite passes against both backends. It runs exactly what a laptop runs,
-# `contract/scripts/dev-test.sh --target dotnet`: a throwaway postgres:17
+# Postgres — ADR 0028's acceptance gate, which the switch passed against both
+# backends; since 18.23 deleted the Python it is the wire contract's only
+# oracle. It runs exactly what a laptop runs, `contract/scripts/dev-test.sh`
+# (the .NET stack is its only target): a throwaway postgres:17
 # container migrated and seeded by the real migrator, the API, admin and MCP
 # hosts each as its own role, the suite through the shipped api-client, and
 # the 126-method coverage gate.
@@ -77,6 +78,6 @@ jobs:
       # stops the stack. Logs of every process print on a failure.
       - name: Contract suite against .NET
         if: steps.filter.outputs.run == 'true'
-        run: contract/scripts/dev-test.sh --target dotnet
+        run: contract/scripts/dev-test.sh
         env:
           CONTRACT_SHOW_STACK_LOG: '1'

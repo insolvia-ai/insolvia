@@ -21,9 +21,10 @@ The only credential that touches staging/prod AWS is the CI OIDC deploy role.
 One workflow, `release.yml`, owns the whole path to production:
 
 1. **Merge to `main`.** The staging stage runs automatically: staging infra
-   applies, then the changed services deploy (path-filtered against the last
-   commit staging released green, so a leg an earlier run lost is retried),
-   in dependency order.
+   applies, the migrator Lambda migrates (and seeds) Aurora, then the changed
+   services deploy (path-filtered against the last commit staging released
+   green, so a leg an earlier run lost is retried), in dependency order. The
+   backend is .NET since ADR 0028; there is no Python leg.
 2. **Staging goes green → the run parks at the `promote` job**, waiting on the
    `insolvia-production` environment's required reviewer.
 3. **Approve it in the GitHub UI** (the run's page, "Review deployments" —
@@ -38,7 +39,7 @@ commit, and an unapproved run ending `cancelled` is normal, not a failure.
 
 | Target | Trigger |
 |---|---|
-| **staging** (infra + api, admin, mcp, filing, marketing, app) | automatic on merge to `main` — the staging stage of `release.yml` |
+| **staging** (infra, then the migrator, then api + its worker, admin, mcp, filing, marketing, app) | automatic on merge to `main` — the staging stage of `release.yml` |
 | **prod** (infra + all services) | approving the `promote` gate of a green `release.yml` run |
 | **shared infra + the mailer** | **not from this repo** — they release from [insolvia-services](https://github.com/insolvia-ai/insolvia-services)' own `release.yml`. A new service's ECR repository is added and released there *before* the PR here that deploys it, because the env root's `data "aws_ecr_repository"` hard-fails until it exists |
 | **one prod service, out of band** | dispatch its `*-prod.yml` (emergency path: staging-green check + its own approval) |

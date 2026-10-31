@@ -9,14 +9,13 @@ using PdfSharp.Pdf.IO;
 namespace Insolvia.Forms.Tests;
 
 // The fill engine's goldens (test_form_fill.py's, re-baselined): every form
-// filled with the full-coverage synthetic values and pinned three ways —
+// filled with the full-coverage synthetic values and pinned two ways —
 //
-//   1. field-exact against the PYTHON goldens (services/api/tests/unit/
-//      goldens/<form>.json): the read-back of the .NET output is the
-//      read-back pypdf's output gave, until 18.23 deletes them;
-//   2. template-exact: every page's official content is the court's own;
-//   3. byte-exact against the .NET goldens (Goldens/<form>.json): the
-//      output's sha256, re-baselined over the .NET bytes as ADR 0028 accepts.
+//   1. template-exact: every page's official content is the court's own;
+//   2. field- and byte-exact against the .NET goldens (Goldens/<form>.json):
+//      the read-back, and the output's sha256 re-baselined over the .NET
+//      bytes as ADR 0028 accepts. Their field read-backs were checked equal
+//      to the Python goldens' (pypdf's) before 18.23 deleted those.
 //
 // REGENERATING: UPDATE_FORM_GOLDENS=1 dotnet test --filter GoldenTests
 // rewrites Goldens/*.json in the source tree; review the diff field by field.
@@ -35,17 +34,6 @@ public sealed class GoldenTests
     {
         release = FormTemplates.Latest(series);
         return FormFill.Fill(release, Synthetic.ValuesFor(release));
-    }
-
-    [Theory]
-    [MemberData(nameof(Series))]
-    public void The_filled_form_reads_back_as_the_python_golden(string series)
-    {
-        var data = Filled(series, out var release);
-        var golden = JsonNode.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "PythonGoldens", $"{release.Form}.json")))!;
-
-        Assert.Equal(release.ReleaseId, (string)golden["release"]!);
-        Assert.True(JsonNode.DeepEquals(golden["fields"], FormReader.Read(release, data)), $"{release.Form}: field read-back differs from the Python golden");
     }
 
     [Theory]

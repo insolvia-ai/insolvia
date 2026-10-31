@@ -9,8 +9,8 @@ namespace Insolvia.Api.Tests.Routes;
 /// four Engines parity case files is stored into the API's stores, read back
 /// through the whole HTTP pipeline (auth, the permission filters, the store
 /// reads, the engine, FlaskJson), and the response body must be exactly the
-/// bytes Flask's <c>jsonify</c> writes for the output Parity/generate.py
-/// recorded — or, where the Python route wraps the engine's result, for that
+/// bytes Flask's <c>jsonify</c> writes for the output the Python oracle
+/// recorded (Parity/*.expected.json) — or, where the Python route wraps the engine's result, for that
 /// wrapping of it.
 /// </summary>
 public sealed class AnalysisParityTests : IAsyncLifetime, IDisposable

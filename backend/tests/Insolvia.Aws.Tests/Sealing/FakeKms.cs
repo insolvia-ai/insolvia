@@ -10,7 +10,7 @@ namespace Insolvia.Aws.Tests.Sealing;
 
 /// <summary>
 /// <c>GenerateDataKey</c> / <c>Decrypt</c> as KMS answers them, with no
-/// network — the same stub as <c>StubKms</c> in Fixtures/sealed_envelopes.py.
+/// network — the same stub the Python generator of Fixtures/python-sealed.json used.
 /// The data key is wrapped under a fixed stub key with the encryption context
 /// as associated data, so a Decrypt under any other context is refused here
 /// as KMS refuses it. Every request is recorded; any other KMS call fails the

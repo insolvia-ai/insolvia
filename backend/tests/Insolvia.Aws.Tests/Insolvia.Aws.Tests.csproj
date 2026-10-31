@@ -4,7 +4,7 @@
     <ProjectReference Include="../../src/Insolvia.Aws/Insolvia.Aws.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <!-- The cross-language sealed-data fixtures (Fixtures/sealed_envelopes.py writes and checks them). -->
+    <!-- The cross-language sealed-data fixtures (written by the Python generator before 18.23; now frozen evidence). -->
     <None Include="Fixtures/*.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

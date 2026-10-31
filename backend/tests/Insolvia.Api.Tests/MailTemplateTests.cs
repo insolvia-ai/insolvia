@@ -5,11 +5,11 @@ namespace Insolvia.Api.Tests;
 
 /// <summary>
 /// The transactional templates. Parity first: <c>Fixtures/python-mail.json</c>
-/// is services/api's core/mail.py rendering every template, with and without
-/// an unsubscribe link, named / unnamed / blank, through inputs that exercise
-/// every escape — and each part of each message must match byte for byte
-/// (regenerate with <c>python3 Fixtures/python_mail.py</c>). Then test_mail.py,
-/// translated.
+/// is the Python backend's core/mail.py rendering every template (captured
+/// before 18.23 deleted it), with and without an unsubscribe link, named /
+/// unnamed / blank, through inputs that exercise every escape — and each part
+/// of each message must match byte for byte. A deliberate template change
+/// edits the fixture in the same PR. Then test_mail.py, translated.
 /// </summary>
 public sealed class MailTemplateTests
 {

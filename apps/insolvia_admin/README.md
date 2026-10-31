@@ -5,7 +5,7 @@ The internal staff portal — provisioning and administering law firms
 of closing [#178](https://github.com/insolvia-ai/insolvia/issues/178)).
 
 Staff sign in with their Insolvia **Google Workspace** account; the portal
-talks to `services/admin`. Screens: the firm list (status, seats,
+talks to the admin service (`backend/src/Insolvia.Admin`). Screens: the firm list (status, seats,
 provisioning provenance), a firm's detail (people, suspend/reactivate,
 resend a stranded invite), and the provision form that replaces the shell
 session #178 was written about.
@@ -21,8 +21,9 @@ session #178 was written about.
 includes this portal and the admin service.)
 
 Sign-in works against the real dev Google client out of the box; the firm
-data needs the admin service running (`./services/admin/scripts/dev-up.sh`,
-port 8090) against your dev AWS layer (`./scripts/dev-aws-setup.sh`).
+data needs the admin service running (`./backend/scripts/dev-up.sh`,
+port 8090), with the dev Google client id from `./scripts/dev-aws-setup.sh`
+in `backend/.env`.
 
 Gate (same as CI): `npm run typecheck && npm run lint && npm test && npm run build`.
 

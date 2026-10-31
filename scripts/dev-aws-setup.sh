@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 #
-# Provision this machine's isolated Insolvia development resources in AWS and
-# wire services/api at them. This IS local development's database (no local
-# emulator): the compose stack's API talks to the real
-# per-machine waitlist table this script creates. Sign-in uses the ONE shared
-# development pool (insolvia-services', ADR 0026 — its sign-in page's style
-# too), read through SSM; this script checks the pool exists, then applies
-# this machine's own stack. services/api/scripts/dev-setup.sh
-# chains into this script unconditionally.
+# Provision this machine's isolated Insolvia development resources in AWS
+# (infra/envs/dev: a case-document bucket, the job and filing queues, the
+# keys) and wire the local backend and the app at the ONE shared development
+# pool (insolvia-services', ADR 0026 — its sign-in page's style too), read
+# through SSM. The database is NOT here: it is the Postgres of
+# backend/docker-compose.yml (ADR 0028). This script checks the pool exists,
+# applies this machine's own stack, and writes backend/.env and
+# apps/insolvia_app/.env.
 #
 #   ./scripts/dev-aws-setup.sh               # uses the default AWS profile
 #   ./scripts/dev-aws-setup.sh --check       # verify, change nothing
@@ -55,23 +55,13 @@ if [[ "$CHECK_ONLY" -eq 1 ]]; then
     die "Terraform state is missing. Run ./scripts/dev-aws-setup.sh --profile $AWS_PROFILE_VALUE."
   [[ "$(jq -r '.outputs.machine_id.value // empty' <<<"$state_json")" == "$MACHINE_ID" ]] ||
     die "Terraform state does not match this machine ID."
-  table="$(jq -r '.outputs.waitlist_table_name.value // empty' <<<"$state_json")"
-  case_table="$(jq -r '.outputs.case_table_name.value // empty' <<<"$state_json")"
-  access_log_table="$(jq -r '.outputs.case_access_log_table_name.value // empty' <<<"$state_json")"
-  firm_table="$(jq -r '.outputs.firm_table_name.value // empty' <<<"$state_json")"
   pool_id="$(jq -r '.outputs.auth_user_pool_id.value // empty' <<<"$state_json")"
+  issuer_url="$(jq -r '.outputs.auth_issuer_url.value // empty' <<<"$state_json")"
   document_bucket="$(jq -r '.outputs.case_document_bucket.value // empty' <<<"$state_json")"
   job_queue_url="$(jq -r '.outputs.job_queue_url.value // empty' <<<"$state_json")"
   filing_queue_url="$(jq -r '.outputs.filing_queue_url.value // empty' <<<"$state_json")"
-  [[ -n "$table" && -n "$case_table" && -n "$access_log_table" && -n "$firm_table" && -n "$document_bucket" && -n "$pool_id" && -n "$job_queue_url" && -n "$filing_queue_url" ]] || die "Terraform state is missing required development outputs."
-  aws_dev dynamodb describe-table --table-name "$table" >/dev/null ||
-    die "Development DynamoDB table '$table' is unavailable."
-  aws_dev dynamodb describe-table --table-name "$case_table" >/dev/null ||
-    die "Development case table '$case_table' is unavailable."
-  aws_dev dynamodb describe-table --table-name "$access_log_table" >/dev/null ||
-    die "Development case access-log table '$access_log_table' is unavailable."
-  aws_dev dynamodb describe-table --table-name "$firm_table" >/dev/null ||
-    die "Development firm table '$firm_table' is unavailable."
+  [[ -n "$document_bucket" && -n "$pool_id" && -n "$issuer_url" && -n "$job_queue_url" && -n "$filing_queue_url" ]] ||
+    die "Terraform state is missing required development outputs."
   aws_dev s3api head-bucket --bucket "$document_bucket" >/dev/null ||
     die "Development case document bucket '$document_bucket' is unavailable."
   aws_dev cognito-idp describe-user-pool --user-pool-id "$pool_id" >/dev/null ||
@@ -80,29 +70,14 @@ if [[ "$CHECK_ONLY" -eq 1 ]]; then
     die "Development job queue '$job_queue_url' is unavailable."
   aws_dev sqs get-queue-attributes --queue-url "$filing_queue_url" --attribute-names QueueArn >/dev/null ||
     die "Development filing queue '$filing_queue_url' is unavailable."
-  if [[ ! -f "$API_DIR/.env" ]] || ! grep -q "^WAITLIST_TABLE_NAME=$table\$" "$API_DIR/.env" ||
-    ! grep -q "^CASE_TABLE_NAME=$case_table\$" "$API_DIR/.env" ||
-    ! grep -q "^CASE_ACCESS_LOG_TABLE_NAME=$access_log_table\$" "$API_DIR/.env" ||
-    ! grep -q "^FIRM_TABLE_NAME=$firm_table\$" "$API_DIR/.env" ||
-    ! grep -q "^CASE_DOCUMENT_BUCKET=$document_bucket\$" "$API_DIR/.env" ||
-    ! grep -q "^JOB_QUEUE_URL=$job_queue_url\$" "$API_DIR/.env" ||
-    ! grep -q "^FILING_QUEUE_URL=$filing_queue_url\$" "$API_DIR/.env" ||
-    ! grep -q "^AUTH_USER_POOL_ID=$pool_id\$" "$API_DIR/.env"; then
-    die "services/api/.env is missing or stale. Run setup without --check."
+  if [[ ! -f "$BACKEND_ENV" ]] ||
+    ! grep -q "^AUTH_ISSUER_URL=$issuer_url\$" "$BACKEND_ENV" ||
+    ! grep -q "^AUTH_USER_POOL_ID=$pool_id\$" "$BACKEND_ENV" ||
+    ! grep -q "^AUTH_CLIENT_ID=." "$BACKEND_ENV" ||
+    ! grep -q "^AUTH_PORTAL_CLIENT_ID=." "$BACKEND_ENV"; then
+    die "backend/.env is missing or stale. Run setup without --check."
   fi
-  if [[ ! -f "$REPO_ROOT/services/mcp/.env" ]] ||
-    ! grep -q "^CASE_TABLE_NAME=$case_table\$" "$REPO_ROOT/services/mcp/.env" ||
-    ! grep -q "^FIRM_TABLE_NAME=$firm_table\$" "$REPO_ROOT/services/mcp/.env" ||
-    ! grep -q "^AUTH_CLIENT_IDS=" "$REPO_ROOT/services/mcp/.env"; then
-    die "services/mcp/.env is missing or stale. Run setup without --check."
-  fi
-  if [[ ! -f "$REPO_ROOT/services/filing/.env" ]] ||
-    ! grep -q "^CASE_TABLE_NAME=$case_table\$" "$REPO_ROOT/services/filing/.env" ||
-    ! grep -q "^FILING_QUEUE_URL=$filing_queue_url\$" "$REPO_ROOT/services/filing/.env" ||
-    ! grep -q "^FILING_WORKER_ROLE_ARN=" "$REPO_ROOT/services/filing/.env"; then
-    die "services/filing/.env is missing or stale. Run setup without --check."
-  fi
-  ok "Per-machine AWS resources and services/api/.env are ready."
+  ok "Per-machine AWS resources and backend/.env are ready."
   exit 0
 fi
 
@@ -118,126 +93,53 @@ apply_args=(apply -input=false "${TF_VARS[@]}")
 terraform -chdir="$TF_DIR" "${apply_args[@]}"
 
 outputs="$(terraform_output_json)"
-table="$(jq -r '.waitlist_table_name.value' <<<"$outputs")"
-case_table="$(jq -r '.case_table_name.value' <<<"$outputs")"
-access_log_table="$(jq -r '.case_access_log_table_name.value' <<<"$outputs")"
-firm_table="$(jq -r '.firm_table_name.value' <<<"$outputs")"
 document_bucket="$(jq -r '.case_document_bucket.value' <<<"$outputs")"
 pool_id="$(jq -r '.auth_user_pool_id.value' <<<"$outputs")"
 web_client_id="$(jq -r '.auth_web_client_id.value' <<<"$outputs")"
 portal_client_id="$(jq -r '.auth_portal_client_id.value' <<<"$outputs")"
 auth_domain="$(jq -r '.auth_domain.value' <<<"$outputs")"
 issuer_url="$(jq -r '.auth_issuer_url.value' <<<"$outputs")"
-admin_audit_table="$(jq -r '.admin_audit_table_name.value' <<<"$outputs")"
 google_admin_client_id="$(jq -r '.google_admin_client_id.value' <<<"$outputs")"
 job_queue_url="$(jq -r '.job_queue_url.value' <<<"$outputs")"
 filing_queue_url="$(jq -r '.filing_queue_url.value' <<<"$outputs")"
 mcp_auth_client_ids="$(jq -r '.mcp_auth_client_ids.value' <<<"$outputs")"
-filing_worker_role_arn="$(jq -r '.filing_worker_role_arn.value' <<<"$outputs")"
 
-# ── Wire services/api at the real table ─────────────────────────
-# Mechanism (chosen after reading services/api/docker-compose.yml): docker
-# compose auto-reads services/api/.env for VARIABLE SUBSTITUTION — not
-# container env — and the compose file's `environment:` block is written as
-# ${VAR:-default} substitutions for exactly the keys below. So:
-#   • WAITLIST_TABLE_NAME here points the stack at this machine's table
-#     (dev-up.sh refuses to start without it).
-#   • CASE_TABLE_NAME points it at this machine's case store (issue 8.2),
-#     encrypted under this machine's own customer-managed key. Local work on
-#     anything storing case data needs it, and having it here means a KMS or
-#     IAM mistake fails on a laptop rather than after a deploy.
-#   • AWS_PROFILE is not read by compose at all — it is the profile name
-#     services/api/scripts/dev-up.sh uses to export short-lived credentials
-#     into the container at `compose up` time. Credentials are never written
-#     to this file.
-#   • INSOLVIA_ENV/AWS_DEFAULT_REGION also serve anyone running the plain
-#     dev server off this file: `set -a; source services/api/.env; set +a`.
-#   • AUTH_ISSUER_URL/AUTH_CLIENT_ID point token verification at this
-#     machine's own Cognito pool. Without them every authenticated route
-#     answers 401 — the service fails closed rather than waving requests
-#     through when auth is unconfigured, so these are not optional for
-#     local work on anything behind sign-in. Neither is a secret: both
-#     appear in every sign-in redirect.
-
-api_env="$API_DIR/.env"
-upsert_env "$api_env" WAITLIST_TABLE_NAME "$table"
-upsert_env "$api_env" CASE_TABLE_NAME "$case_table"
-upsert_env "$api_env" CASE_ACCESS_LOG_TABLE_NAME "$access_log_table"
-upsert_env "$api_env" FIRM_TABLE_NAME "$firm_table"
-upsert_env "$api_env" CASE_DOCUMENT_BUCKET "$document_bucket"
-# The pipeline's local seam (ADR 0018): the local API enqueues accepted jobs
-# onto this machine's real queue, and `python -m
-# insolvia_api.entrypoints.worker_poller` (same .env) runs them.
-upsert_env "$api_env" JOB_QUEUE_URL "$job_queue_url"
-# The filing queue (ADR 0024 PR 6): an attorney's approval puts its one
-# filing job here; services/filing's local poller consumes it.
-upsert_env "$api_env" FILING_QUEUE_URL "$filing_queue_url"
-upsert_env "$api_env" INSOLVIA_ENV "local"
-upsert_env "$api_env" AWS_PROFILE "$AWS_PROFILE_VALUE"
-upsert_env "$api_env" AWS_DEFAULT_REGION "$AWS_REGION_VALUE"
-upsert_env "$api_env" AUTH_ISSUER_URL "$issuer_url"
-upsert_env "$api_env" AUTH_CLIENT_ID "$web_client_id"
-# The client portal's app client (ADR 0023): the one id every /v1/portal/
-# route verifies, disjoint from AUTH_CLIENT_ID. Also what
-# dev-test-integration.sh signs the seeded client in against.
-upsert_env "$api_env" AUTH_PORTAL_CLIENT_ID "$portal_client_id"
-# The pool the API CALLS, as against the issuer it verifies against. Both end
-# in the same id and neither is derived from the other — see services/api's
-# core/config.py for why parsing one out of the other is refused.
-upsert_env "$api_env" AUTH_USER_POOL_ID "$pool_id"
-
-# ── Wire services/admin at the same resources (#213) ───────────
-# Same compose-substitution mechanism as the API's file above. FIRM_TABLE_NAME
-# is the SAME table the API reads — the admin service is the second principal
-# with access to it (ADR 0011); locally both run as the developer's own IAM
-# user. FIRM_USER_POOL_ID is the pool provisioning mints first-administrator
-# accounts in (the one the API verifies against — one dev pool serves both
-# jobs). GOOGLE_CLIENT_ID is the dev Workspace OAuth client, a public value.
-admin_env="$REPO_ROOT/services/admin/.env"
-upsert_env "$admin_env" FIRM_TABLE_NAME "$firm_table"
-upsert_env "$admin_env" FIRM_USER_POOL_ID "$pool_id"
-upsert_env "$admin_env" ADMIN_AUDIT_TABLE_NAME "$admin_audit_table"
-upsert_env "$admin_env" GOOGLE_CLIENT_ID "$google_admin_client_id"
-upsert_env "$admin_env" INSOLVIA_ENV "local"
-upsert_env "$admin_env" AWS_PROFILE "$AWS_PROFILE_VALUE"
-upsert_env "$admin_env" AWS_DEFAULT_REGION "$AWS_REGION_VALUE"
-
-# ── Wire services/mcp at the same resources (#261/#262) ─────────
-# The MCP server is a second surface over the SAME tables and the SAME pool
-# (ADR 0016); locally it runs under the developer's own IAM user like the API
-# and admin dev servers. AUTH_CLIENT_IDS is the harness allowlist — this
-# machine's claude + inspector app clients, comma-joined exactly as the
-# deployed SSM parameter is. None of these values is a secret.
-mcp_env="$REPO_ROOT/services/mcp/.env"
-upsert_env "$mcp_env" CASE_TABLE_NAME "$case_table"
-upsert_env "$mcp_env" CASE_ACCESS_LOG_TABLE_NAME "$access_log_table"
-upsert_env "$mcp_env" FIRM_TABLE_NAME "$firm_table"
-upsert_env "$mcp_env" AUTH_ISSUER_URL "$issuer_url"
-upsert_env "$mcp_env" AUTH_CLIENT_IDS "$mcp_auth_client_ids"
-upsert_env "$mcp_env" INSOLVIA_ENV "local"
-upsert_env "$mcp_env" AWS_PROFILE "$AWS_PROFILE_VALUE"
-upsert_env "$mcp_env" AWS_DEFAULT_REGION "$AWS_REGION_VALUE"
-
-# ── Wire services/filing at the same resources (ADR 0024 PR 7) ──
-# The filing worker reads the case table (the approval, the record its digest
-# is computed over, the packet), writes its filing record and the receipt,
-# opens the vault and consumes the filing queue. Locally it runs as the
-# filing worker's ROLE, not as the developer: FILING_WORKER_ROLE_ARN is what
-# the poller assumes (infra/envs/dev trusts this machine's principal to), so
-# a laptop run is held to the role's real grants and the vault key's policy.
-# FILING_SUBMISSIONS_ENABLED is the local stand-in for the kill switch — on,
-# because the only court a laptop can reach is the fake (core/fence.py);
-# FAKE_CMECF_URL is set by services/filing/scripts/dev-up.sh at run time.
-filing_env="$REPO_ROOT/services/filing/.env"
-upsert_env "$filing_env" CASE_TABLE_NAME "$case_table"
-upsert_env "$filing_env" CASE_ACCESS_LOG_TABLE_NAME "$access_log_table"
-upsert_env "$filing_env" CASE_DOCUMENT_BUCKET "$document_bucket"
-upsert_env "$filing_env" FILING_QUEUE_URL "$filing_queue_url"
-upsert_env "$filing_env" FILING_WORKER_ROLE_ARN "$filing_worker_role_arn"
-upsert_env "$filing_env" FILING_SUBMISSIONS_ENABLED "true"
-upsert_env "$filing_env" INSOLVIA_ENV "local"
-upsert_env "$filing_env" AWS_PROFILE "$AWS_PROFILE_VALUE"
-upsert_env "$filing_env" AWS_DEFAULT_REGION "$AWS_REGION_VALUE"
+# ── Wire the local backend at the shared pool ───────────────────
+# Mechanism: docker compose auto-reads backend/.env for VARIABLE SUBSTITUTION
+# (not container env), and backend/docker-compose.yml's `environment:` blocks
+# are ${VAR:-default} substitutions for exactly the keys below. None is a
+# secret — every one appears in a sign-in redirect or a public config.
+#   • AUTH_ISSUER_URL / AUTH_CLIENT_ID / AUTH_PORTAL_CLIENT_ID: token
+#     verification against the shared dev pool. Without them every protected
+#     route answers 401 — the API fails closed rather than waving requests
+#     through when auth is unconfigured.
+#   • AUTH_USER_POOL_ID: not read by compose; integration/scripts/dev-test.sh
+#     signs in against it, and scripts/dev-aws-seed.sh resolves real subjects
+#     from it.
+#   • GOOGLE_CLIENT_ID: the dev Workspace OAuth client the admin service
+#     verifies staff tokens against (the admin portal on :3100).
+#   • INSOLVIA_SEED=false: the compose migrator only migrates, because
+#     scripts/dev-aws-seed.sh is the seeder once a pool is wired — with the
+#     people's REAL subjects, which a derived local seed would contradict.
+#   • AUTH_CLIENT_IDS: the MCP harness allowlist (this pool's claude +
+#     inspector clients), for `dotnet run --project src/Insolvia.Mcp`.
+#   • CASE_DOCUMENT_BUCKET / JOB_QUEUE_URL / FILING_QUEUE_URL: this machine's
+#     own bucket and queues, for a `dotnet run` of the worker or a host that
+#     wants the real AWS adapters (`set -a; source backend/.env; set +a`).
+#     The compose stack keeps its local twins and does not read them.
+backend_env="$BACKEND_ENV"
+upsert_env "$backend_env" INSOLVIA_ENV "local"
+upsert_env "$backend_env" AUTH_ISSUER_URL "$issuer_url"
+upsert_env "$backend_env" AUTH_CLIENT_ID "$web_client_id"
+upsert_env "$backend_env" AUTH_PORTAL_CLIENT_ID "$portal_client_id"
+upsert_env "$backend_env" AUTH_USER_POOL_ID "$pool_id"
+upsert_env "$backend_env" GOOGLE_CLIENT_ID "$google_admin_client_id"
+upsert_env "$backend_env" INSOLVIA_SEED "false"
+upsert_env "$backend_env" AUTH_CLIENT_IDS "$mcp_auth_client_ids"
+upsert_env "$backend_env" CASE_DOCUMENT_BUCKET "$document_bucket"
+upsert_env "$backend_env" JOB_QUEUE_URL "$job_queue_url"
+upsert_env "$backend_env" FILING_QUEUE_URL "$filing_queue_url"
+upsert_env "$backend_env" AWS_DEFAULT_REGION "$AWS_REGION_VALUE"
 
 # ── Wire the Expo app at the same pool ──────────────────────────
 # The app reads these two at BUILD time, not runtime: Expo inlines only
@@ -262,26 +164,13 @@ upsert_env "$app_env" EXPO_PUBLIC_COGNITO_CLIENT_ID "$web_client_id"
 # says "sign-in is not configured" and the staff app is unaffected.
 upsert_env "$app_env" EXPO_PUBLIC_COGNITO_PORTAL_CLIENT_ID "$portal_client_id"
 
-ok "AWS development resources are ready; services/api/.env, services/admin/.env, services/mcp/.env, services/filing/.env and apps/insolvia_app/.env were updated."
+ok "AWS development resources are ready; backend/.env and apps/insolvia_app/.env were updated."
 
-# If setup is reapplied while the API container is already running, replace it
-# so it picks up the new table name and the freshly exported credentials —
-# container environment variables cannot be changed in place.
-compose_file="$API_DIR/docker-compose.yml"
-if command -v docker >/dev/null 2>&1 &&
-  docker compose version >/dev/null 2>&1 &&
-  docker compose -f "$compose_file" ps --services --status running 2>/dev/null | grep -qx api; then
-  log "Recreating the running API container with refreshed AWS credentials..."
-  export AWS_DEFAULT_REGION="$AWS_REGION_VALUE"
-  docker compose -f "$compose_file" up -d --build --force-recreate api
-  ok "The running API container now targets $table."
-fi
-
-printf '\nCognito (for upcoming local auth work — nothing consumes these yet):\n'
+printf '\nThe shared dev pool:\n'
 printf '  User pool id:      %s\n' "$pool_id"
 printf '  Web client id:     %s\n' "$web_client_id"
 printf '  Portal client id:  %s\n' "$portal_client_id"
 printf '  Hosted domain:     %s\n' "$auth_domain"
 printf '  Issuer:            %s\n' "$issuer_url"
-printf '\nStart the API against your per-machine table with:\n  ./services/api/scripts/dev-up.sh\n'
-printf 'Start the MCP server (then connect an inspector — services/mcp/README.md):\n  ./services/mcp/scripts/dev-up.sh\n'
+printf '\nNext: ./scripts/dev-aws-seed.sh (your account and its firm, in the local database),\n'
+printf 'then ./scripts/dev-up.sh. A running backend picks up backend/.env on its next up.\n'

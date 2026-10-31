@@ -1,6 +1,4 @@
 using System.Text;
-using System.Text.Json;
-using System.Text.Json.Nodes;
 using Amazon.KeyManagementService.Model;
 using Insolvia.Aws.Sealing;
 
@@ -8,16 +6,14 @@ namespace Insolvia.Aws.Tests.Sealing;
 
 /// <summary>
 /// THE CROSS-LANGUAGE PROOF (plan 18.12: "an envelope sealed by Python opens
-/// in .NET and vice versa"). Fixtures/python-sealed.json is sealed by the real
-/// insolvia_core code (Fixtures/sealed_envelopes.py generate); each case is
-/// opened here, re-sealed here, and the .NET seals are exported to
-/// dotnet-sealed.json, which <c>sealed_envelopes.py check</c> opens in Python.
+/// in .NET and vice versa"). Fixtures/python-sealed.json was sealed by the
+/// Python backend's own envelope code before 18.23 deleted it; each case is
+/// opened here and re-sealed here. dotnet-sealed.json is the .NET half, which
+/// the Python check opened before the cut-over. Both are now frozen evidence:
+/// an envelope sealed before the switch still opens, byte for byte.
 /// </summary>
 public sealed class CrossLanguageTests
 {
-    /// <summary>Set to a path to (re)write the .NET-sealed fixture the Python check opens.</summary>
-    private const string ExportVariable = "INSOLVIA_EXPORT_DOTNET_SEALED";
-
     public static TheoryData<string> AllCases() => [.. SealedFixtures.Python.Select(c => c.Name)];
 
     public static TheoryData<string> KmsCases() => [.. SealedFixtures.Python.Where(c => c.Kind.StartsWith("kms_", StringComparison.Ordinal)).Select(c => c.Name)];
@@ -99,36 +95,5 @@ public sealed class CrossLanguageTests
         {
             Assert.Equal(sealedCase.Plaintext, await SealedFixtures.OpenAsync(sealedCase, sealedCase.Envelope, sealedCase.Context));
         }
-    }
-
-    /// <summary>
-    /// Seals every Python case with the .NET code. Writes dotnet-sealed.json
-    /// only when <c>INSOLVIA_EXPORT_DOTNET_SEALED</c> names a path:
-    /// <c>INSOLVIA_EXPORT_DOTNET_SEALED=$PWD/tests/Insolvia.Aws.Tests/Fixtures/dotnet-sealed.json dotnet test tests/Insolvia.Aws.Tests</c>.
-    /// </summary>
-    [Fact]
-    public async Task Dotnet_seals_every_case_for_the_python_check()
-    {
-        var cases = new JsonArray();
-        foreach (var sealedCase in SealedFixtures.Python)
-        {
-            cases.Add(SealedFixtures.ToJson(await SealedFixtures.SealAsync(sealedCase)));
-        }
-
-        Assert.Equal(SealedFixtures.Python.Count, cases.Count);
-        var target = Environment.GetEnvironmentVariable(ExportVariable);
-        if (string.IsNullOrEmpty(target))
-        {
-            return;
-        }
-
-        var document = new JsonObject
-        {
-            ["_comment"] = "Sealed by Insolvia.Aws (.NET) with TEST CONSTANT keys - synthetic data only. Opened by: python sealed_envelopes.py check",
-            ["test_data_key"] = Convert.ToBase64String(FakeKms.TestDataKey),
-            ["stub_kms_wrapping_key"] = Convert.ToBase64String(FakeKms.StubWrappingKey),
-            ["cases"] = cases,
-        };
-        await File.WriteAllTextAsync(target, document.ToJsonString(new JsonSerializerOptions { WriteIndented = true }) + "\n", TestContext.Current.CancellationToken);
     }
 }

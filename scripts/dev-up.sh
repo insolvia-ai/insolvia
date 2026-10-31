@@ -7,24 +7,25 @@
 # That is the entire interface. There is no flag to run a subset, because
 # there is already a better way to run one part — that part's own dev-up.sh:
 #
-#   ./services/api/scripts/dev-up.sh
+#   ./backend/scripts/dev-up.sh
 #   ./apps/insolvia_app/scripts/dev-up.sh
 #
 # This script starts and stops NOTHING itself. Every area owns a dev-up.sh
-# that knows how to run its own thing (the API's keeps its container's
-# short-lived AWS credentials refreshed while `compose up` runs; the app's
-# pins port 3000 because Cognito registers that exact origin) and a dev-down.sh that knows how to stop it
+# that knows how to run its own thing (the backend's runs its compose stack —
+# Postgres, the migrator, the API and the admin service; the app's pins port
+# 3000 because Cognito registers that exact origin) and a dev-down.sh that knows how to stop it
 # (compose containers outlive the process that started them; a stray npx
 # grandchild keeps holding 3000). Both halves of that knowledge belong next to
 # the thing they describe. This file is an orchestrator: preflight, launch,
 # prefix each stream, and on Ctrl-C run every dev-down.sh.
 #
-# WHAT LOCAL ACTUALLY MEANS HERE. There is no DynamoDB emulator and no fake
-# Cognito: the API talks to this machine's REAL per-developer tables and the
-# app signs in against this machine's REAL Cognito pool, both provisioned by
-# scripts/dev-aws-setup.sh into infra/envs/dev. That is the point — a KMS or
-# IAM mistake surfaces on a laptop rather than after a deploy — but it does
-# mean this script cannot do anything useful until that one has run.
+# WHAT LOCAL ACTUALLY MEANS HERE. The database is Postgres 17 in Docker
+# (backend/docker-compose.yml) — the production engine, offline (ADR 0028).
+# There is no fake Cognito: the app signs in against the REAL shared dev pool,
+# whose ids scripts/dev-aws-setup.sh writes into backend/.env and
+# apps/insolvia_app/.env, and scripts/dev-aws-seed.sh creates the account and
+# seeds its firm into the local database. Without those two, everything still
+# starts, and every signed-in route answers 401.
 #
 set -euo pipefail
 
@@ -32,7 +33,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # Bash 3.2 is what macOS ships, so no associative arrays anywhere below.
-SERVICES="api admin-api mailer app portal marketing"
+SERVICES="backend mailer app portal marketing"
 
 # The mailer lives in the insolvia-services repo (since 2026-10-11); it runs
 # from that checkout when this machine has one, and is left out otherwise —
@@ -40,7 +41,7 @@ SERVICES="api admin-api mailer app portal marketing"
 # MAILER_API_URL is unset. scripts/services-checkout.sh owns where it looks.
 . "$SCRIPT_DIR/services-checkout.sh"
 SERVICES_REPO="$(services_checkout "$REPO_ROOT")"
-[[ -n "$SERVICES_REPO" ]] || SERVICES="api admin-api app portal marketing"
+[[ -n "$SERVICES_REPO" ]] || SERVICES="backend app portal marketing"
 PIDS=""
 
 c_reset=$'\033[0m'
@@ -61,8 +62,7 @@ die() {
 
 service_dir() {
   case "$1" in
-  api) printf '%s/services/api' "$REPO_ROOT" ;;
-  admin-api) printf '%s/services/admin' "$REPO_ROOT" ;;
+  backend) printf '%s/backend' "$REPO_ROOT" ;;
   mailer) printf '%s/services/mailer' "$SERVICES_REPO" ;;
   app) printf '%s/apps/insolvia_app' "$REPO_ROOT" ;;
   portal) printf '%s/apps/insolvia_admin' "$REPO_ROOT" ;;
@@ -72,8 +72,7 @@ service_dir() {
 
 service_port() {
   case "$1" in
-  api) printf '8080' ;;
-  admin-api) printf '8090' ;;
+  backend) printf '8080' ;;
   mailer) printf '8026' ;;
   app) printf '3000' ;;
   portal) printf '3100' ;;
@@ -83,8 +82,7 @@ service_port() {
 
 service_url() {
   case "$1" in
-  api) printf 'http://127.0.0.1:8080/health' ;;
-  admin-api) printf 'http://127.0.0.1:8090/health' ;;
+  backend) printf 'http://127.0.0.1:8080/health  (admin api: http://127.0.0.1:8090/health)' ;;
   mailer) printf 'http://127.0.0.1:8026  (Mailpit: http://127.0.0.1:8025)' ;;
   app) printf 'http://localhost:3000' ;;
   portal) printf 'http://localhost:3100' ;;
@@ -95,8 +93,7 @@ service_url() {
 # One colour per service so six interleaved log streams stay attributable.
 service_colour() {
   case "$1" in
-  api) printf '\033[36m' ;;
-  admin-api) printf '\033[94m' ;;
+  backend) printf '\033[36m' ;;
   mailer) printf '\033[35m' ;;
   app) printf '\033[32m' ;;
   portal) printf '\033[95m' ;;
@@ -118,14 +115,13 @@ case "${1:-}" in
   cat <<'USAGE'
 Usage: ./scripts/dev-up.sh
 
-Brings up the whole system: api, admin api, mailer, app, admin portal,
-marketing. Ctrl-C stops all of it, containers included. The mailer comes from
-a sibling insolvia-services checkout (or $INSOLVIA_SERVICES_DIR) and is
-skipped when there is none.
+Brings up the whole system: the backend (Postgres, migrator, api, admin api),
+mailer, app, admin portal, marketing. Ctrl-C stops all of it, containers
+included. The mailer comes from a sibling insolvia-services checkout (or
+$INSOLVIA_SERVICES_DIR) and is skipped when there is none.
 
 To run one part, run that part's own script instead:
-  ./services/api/scripts/dev-up.sh
-  ./services/admin/scripts/dev-up.sh
+  ./backend/scripts/dev-up.sh
   ../insolvia-services/services/mailer/scripts/dev-up.sh   (separate repo)
   ./apps/insolvia_app/scripts/dev-up.sh
   ./apps/insolvia_admin/scripts/dev-up.sh
@@ -177,7 +173,6 @@ stale_node_modules() {
 # container or bundler output that never names the missing step.
 preflight() {
   local failures=0
-  local api_env="$REPO_ROOT/services/api/.env"
 
   if command -v docker >/dev/null 2>&1; then
     if ! docker info >/dev/null 2>&1; then
@@ -189,33 +184,12 @@ preflight() {
     failures=$((failures + 1))
   fi
 
-  # The API is the one service with nothing local to fall back to:
-  # infra/envs/dev IS the dev database.
-  if [[ ! -f "$api_env" ]]; then
-    warn "services/api/.env is missing — run ./scripts/dev-aws-setup.sh to provision this machine's dev tables and write it."
-    failures=$((failures + 1))
-  else
-    local missing="" key
-    for key in WAITLIST_TABLE_NAME CASE_TABLE_NAME CASE_ACCESS_LOG_TABLE_NAME CASE_DOCUMENT_BUCKET; do
-      grep -q "^$key=" "$api_env" || missing="$missing $key"
-    done
-    if [[ -n "$missing" ]]; then
-      warn "services/api/.env is missing:$missing — re-run ./scripts/dev-aws-setup.sh (it adds keys as new stores land)."
-      failures=$((failures + 1))
-    fi
-    # Not fatal: the API fails closed, so the public routes still work and
-    # only sign-in breaks. Worth saying out loud, because "every protected
-    # route 401s" reads as a bug rather than a setup gap.
-    grep -q '^AUTH_ISSUER_URL=' "$api_env" ||
-      warn "services/api/.env has no AUTH_ISSUER_URL — protected routes will answer 401 and the app cannot sign in."
-  fi
-
-  # Warn-only, matching the admin service's own posture: without its .env it
-  # runs on in-memory adapters, which is fine for poking at the portal but
-  # means a provisioned firm evaporates on restart and never reaches the real
-  # dev tables the app reads.
-  [[ -f "$REPO_ROOT/services/admin/.env" ]] ||
-    warn "services/admin/.env is missing — the admin service will run in-memory only. Run ./scripts/dev-aws-setup.sh to point it at this machine's dev tables."
+  # Not fatal: the backend runs offline on its own Postgres, and the API fails
+  # closed, so the public routes still work and only sign-in breaks. Worth
+  # saying out loud, because "every protected route 401s" reads as a bug
+  # rather than a setup gap.
+  grep -qs '^AUTH_ISSUER_URL=.' "$REPO_ROOT/backend/.env" ||
+    warn "backend/.env has no AUTH_ISSUER_URL — protected routes will answer 401 and the app cannot sign in. Run ./scripts/dev-aws-setup.sh, then ./scripts/dev-aws-seed.sh."
 
   if [[ ! -d "$REPO_ROOT/node_modules" ]]; then
     warn "root node_modules missing — run ./apps/insolvia_app/scripts/dev-setup.sh (the app resolves through the root workspace)."
@@ -257,10 +231,14 @@ preflight() {
       }
     done
     port="$(service_port "$name")"
-    if port_open "$port"; then
-      warn "port $port is already in use — $name will fail to bind. Run ./scripts/dev-down.sh first (or $dir/scripts/dev-down.sh for just this one)."
-      failures=$((failures + 1))
-    fi
+    # The backend binds two ports (api 8080, admin api 8090); check both.
+    [[ "$name" == backend ]] && port="$port 8090"
+    for port in $port; do
+      if port_open "$port"; then
+        warn "port $port is already in use — $name will fail to bind. Run ./scripts/dev-down.sh first (or $dir/scripts/dev-down.sh for just this one)."
+        failures=$((failures + 1))
+      fi
+    done
   done
 
   return "$failures"
@@ -329,7 +307,7 @@ start_service() {
 
 wait_for_ports() {
   # Generous, because the first run of the day is not the steady state: the
-  # two compose stacks build images and Vite does its cold dependency scan,
+  # backend's compose stack builds its images and Vite does its cold dependency scan,
   # all concurrently. 180s was not enough for marketing on a cold start.
   local deadline=$((SECONDS + 420))
   local pending="$SERVICES"
@@ -366,14 +344,14 @@ banner() {
   # seeds the firm, which covers the failure that is easier to miss: an
   # account gets you PAST sign-in, and every route then answers 403 until the
   # firm exists. That failure looks like a broken build, not a missing step.
-  printf '\n%s  Sign in at http://localhost:3000 — this machine'"'"'s own Cognito pool.%s\n' "$c_dim" "$c_reset"
+  printf '\n%s  Sign in at http://localhost:3000 — the shared dev Cognito pool.%s\n' "$c_dim" "$c_reset"
   printf '%s  No account yet (there is no sign-up screen by design), or signed in%s\n' "$c_dim" "$c_reset"
   printf '%s  but everything 403s? One script creates the account and its firm:%s\n' "$c_dim" "$c_reset"
   printf '%s      ./scripts/dev-aws-seed.sh%s\n' "$c_dim" "$c_reset"
   # The portal is the odd one out: no Cognito, no account script — staff sign
   # in with their own @insolvia.ai Google Workspace account. And name the
   # split explicitly: someone WILL open 8090 in a browser expecting the admin
-  # UI, meet Flask's 404, and read it as broken.
+  # UI, meet the service's 404, and read it as broken.
   printf '%s  The admin UI is the PORTAL (http://localhost:3100) — sign in with your%s\n' "$c_dim" "$c_reset"
   printf '%s  own @insolvia.ai Google account; nothing to create locally. The admin%s\n' "$c_dim" "$c_reset"
   printf '%s  api on 8090 is JSON only: /health in a browser, everything else 404s.%s\n' "$c_dim" "$c_reset"
