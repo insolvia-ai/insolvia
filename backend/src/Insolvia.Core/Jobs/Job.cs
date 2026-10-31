@@ -179,12 +179,12 @@ public static class JobRules
         if (DocumentScopedKinds.Contains(kind))
         {
             var text = Json.AsString(rawDocument);
-            if (text is null || PyText.Strip(text).Length == 0)
+            if (text is null || TextRules.Strip(text).Length == 0)
             {
                 throw Field("documentId", "This kind works on one document; name it.");
             }
 
-            documentId = PyText.Strip(text);
+            documentId = TextRules.Strip(text);
         }
         else if (hasDocument)
         {
@@ -265,7 +265,7 @@ public static class JobRules
         return job with { Status = JobStatus.Failed, Failure = failure, UpdatedAt = Clock.NowMillis(clock) };
     }
 
-    /// <summary>Millisecond UTC with a literal Z — the access log's (and Python's job) format.</summary>
+    /// <summary>Millisecond UTC with a literal Z — the access log's (and the stored jobs') format.</summary>
     public static string Timestamp(DateTimeOffset value) =>
         value.UtcDateTime.ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'", CultureInfo.InvariantCulture);
 
@@ -321,7 +321,7 @@ public static class JobRules
 
     /// <summary>
     /// The exact message body (<c>job_message</c>): identifiers only, in
-    /// Python's key order. <c>documentId</c> appears exactly when the job
+    /// the contract's key order. <c>documentId</c> appears exactly when the job
     /// carries one, so every earlier kind's version-1 shape is unchanged.
     /// </summary>
     public static JsonObject Message(Job job)
@@ -343,11 +343,11 @@ public static class JobRules
     }
 
     /// <summary>
-    /// The SQS body, byte for byte what Python's
-    /// <c>json.dumps(job_message(job), separators=(",", ":"))</c> sends:
+    /// The SQS body, byte for byte what
+    /// <c>json.dumps(job_message(job), separators=(",", ":"))</c> produces:
     /// compact, insertion order, ASCII-escaped (every value is an identifier).
     /// </summary>
-    public static string MessageBody(Job job) => PythonJson.Dumps(Message(job), compact: true);
+    public static string MessageBody(Job job) => AsciiJson.Dumps(Message(job), compact: true);
 
     /// <summary>Inverse of <see cref="Message"/>, refusing anything this service did not mint.</summary>
     public static JobMessage ParseMessage(JsonNode? payload)

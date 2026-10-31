@@ -91,8 +91,8 @@ public sealed class CaseSummaryAndHubTests
 
         Assert.Equal(new FormMetric("count", data.Assets.Count.ToString(System.Globalization.CultureInfo.InvariantCulture)), rows["form/b106ab"].Metric);
         Assert.Equal(new FormMetric("count", data.Claims.Count(c => c.Body.ClaimClass == ClaimClass.Secured).ToString(System.Globalization.CultureInfo.InvariantCulture)), rows["form/b106d"].Metric);
-        Assert.Equal(new FormMetric("total", Engines.Py.F(totals.MonthlyIncome)), rows["form/b106i"].Metric);
-        Assert.Equal(new FormMetric("total", Engines.Py.F(totals.MonthlyExpenses)), rows["form/b106j"].Metric);
+        Assert.Equal(new FormMetric("total", Engines.Exact.F(totals.MonthlyIncome)), rows["form/b106i"].Metric);
+        Assert.Equal(new FormMetric("total", Engines.Exact.F(totals.MonthlyExpenses)), rows["form/b106j"].Metric);
         Assert.Null(rows["form/b101"].Metric);
         Assert.Null(rows["form/b107"].Metric);
     }

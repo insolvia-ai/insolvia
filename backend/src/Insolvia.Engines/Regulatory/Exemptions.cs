@@ -195,7 +195,7 @@ public static class ExemptionRegistry
 
     /// <summary>A series' releases, oldest first.</summary>
     public static IReadOnlyList<ExemptionRelease> ReleasesOf(string seriesId) =>
-        Registry.TryGetValue(seriesId, out var found) ? found : throw new EngineKeyException($"unknown series {Py.Repr(seriesId)}");
+        Registry.TryGetValue(seriesId, out var found) ? found : throw new EngineKeyException($"unknown series {Exact.Repr(seriesId)}");
 
     /// <summary>The release with the greatest effective date on or before <paramref name="asOf"/>.</summary>
     public static ExemptionRelease PickRelease(IReadOnlyList<ExemptionRelease> candidates, DateOnly asOf) =>
@@ -207,7 +207,7 @@ public static class ExemptionRegistry
     /// <summary>That exact release.</summary>
     public static ExemptionRelease Get(string seriesId, string releaseId) =>
         ReleasesOf(seriesId).FirstOrDefault(release => release.ReleaseId == releaseId)
-        ?? throw new EngineKeyException($"series {Py.Repr(seriesId)} has no release {Py.Repr(releaseId)}");
+        ?? throw new EngineKeyException($"series {Exact.Repr(seriesId)} has no release {Exact.Repr(releaseId)}");
 
     /// <summary>Newest by (effective date, sequence).</summary>
     public static ExemptionRelease Latest(string seriesId) => ReleasesOf(seriesId)[^1];
@@ -221,10 +221,10 @@ public static class ExemptionRegistry
     public static IReadOnlyList<ExemptionScheme> SchemesForState(string state, DateOnly asOf)
     {
         ArgumentNullException.ThrowIfNull(state);
-        var seriesId = $"exemptions/{Core.PyText.Lower(state)}";
+        var seriesId = $"exemptions/{Core.TextRules.Lower(state)}";
         if (!LaunchStates.Contains(state.ToUpperInvariant()) || !Registry.ContainsKey(seriesId))
         {
-            throw new EngineKeyException($"state {Py.Repr(state)} is not in the launch set ('FL', 'TX', 'GA') (ADR 0017)");
+            throw new EngineKeyException($"state {Exact.Repr(state)} is not in the launch set ('FL', 'TX', 'GA') (ADR 0017)");
         }
 
         var scheme = Resolve(seriesId, asOf).Scheme;
@@ -245,7 +245,7 @@ public static class ExemptionRegistry
         where = $"{where} entry {entryId}";
         if (!Core.Wire.TryParse<ExemptionCategory>(Core.Json.AsString(raw["category"]), out var category))
         {
-            throw Fail(where, $"{Py.Repr(raw["category"])} is not a valid Category");
+            throw Fail(where, $"{Exact.Repr(raw["category"])} is not a valid Category");
         }
 
         var verification = ParseVerification(raw["verification"], where);

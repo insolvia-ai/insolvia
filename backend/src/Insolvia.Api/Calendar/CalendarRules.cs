@@ -63,7 +63,7 @@ public static partial class CalendarRules
         bool allDay;
         if (payload["all_day"] is null)
         {
-            allDay = Json.AsString(rawStart) is { } text && PyText.Strip(text).Length == 10;
+            allDay = Json.AsString(rawStart) is { } text && TextRules.Strip(text).Length == 10;
         }
         else if (Json.AsBool(payload["all_day"]) is { } given)
         {
@@ -249,13 +249,13 @@ public static partial class CalendarRules
         }
 
         var text = Json.AsString(value);
-        if (text is null || PyText.Strip(text).Length == 0)
+        if (text is null || TextRules.Strip(text).Length == 0)
         {
             errors[path] = "Must be a date-time.";
             return null;
         }
 
-        var match = Instant().Match(PyText.Strip(text));
+        var match = Instant().Match(TextRules.Strip(text));
         if (!match.Success
             || !DateTimeOffset.TryParse(
                 match.Groups["offset"].Success ? match.Value.Replace(' ', 'T') : match.Value.Replace(' ', 'T') + "Z",
@@ -396,7 +396,7 @@ public static class CalendarFeed
         .Replace("\r\n", "\\n", StringComparison.Ordinal)
         .Replace("\n", "\\n", StringComparison.Ordinal);
 
-    // RFC 5545 §3.1 as the Python folded it: 75 characters (code points),
+    // RFC 5545 §3.1 folding, as the contract fixes it: 75 characters (code points),
     // then continuation lines of a space and 74.
     private static IEnumerable<string> Fold(string line)
     {

@@ -13,9 +13,9 @@ namespace Insolvia.Api.Waitlist;
 public static partial class WaitlistSubmissions
 {
     /// <summary>
-    /// Per-field caps, in Python's dict order (the order the "keep this under"
-    /// checks run): the marketing form's caps, and the DNS name limit for the
-    /// host the marketing action sends.
+    /// Per-field caps, in the order the "keep this under" checks run: the
+    /// marketing form's caps, and the DNS name limit for the host the
+    /// marketing action sends.
     /// </summary>
     public static readonly IReadOnlyList<(string Field, int Cap)> MaxLengths =
     [
@@ -40,7 +40,7 @@ public static partial class WaitlistSubmissions
     public static WaitlistSubmission Parse(JsonObject payload)
     {
         ArgumentNullException.ThrowIfNull(payload);
-        var values = Fields.ToDictionary(key => key, key => Json.AsString(payload[key]) is { } text ? PyText.Strip(text) : "", StringComparer.Ordinal);
+        var values = Fields.ToDictionary(key => key, key => Json.AsString(payload[key]) is { } text ? TextRules.Strip(text) : "", StringComparer.Ordinal);
 
         var errors = new Dictionary<string, string>(StringComparer.Ordinal);
         if (values["name"].Length == 0)
@@ -64,7 +64,7 @@ public static partial class WaitlistSubmissions
 
         foreach (var (field, cap) in MaxLengths)
         {
-            if (!errors.ContainsKey(field) && PyText.Length(values[field]) > cap)
+            if (!errors.ContainsKey(field) && TextRules.Length(values[field]) > cap)
             {
                 errors[field] = $"Please keep this under {cap} characters.";
             }

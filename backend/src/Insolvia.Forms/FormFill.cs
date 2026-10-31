@@ -159,7 +159,7 @@ public static class FormFill
                 var unknown = entries.Select(pair => pair.Key).Except(spec.PdfNames, StringComparer.Ordinal).Order(StringComparer.Ordinal).ToList();
                 if (unknown.Count > 0)
                 {
-                    problems.Add($"{fieldId}: not among this field's PDF fields: {PyList(unknown)}");
+                    problems.Add($"{fieldId}: not among this field's PDF fields: {ReprList(unknown)}");
                     continue;
                 }
             }
@@ -199,7 +199,7 @@ public static class FormFill
 
     private static void ValidateOne(FieldSpec spec, Widget widget, FieldFill fill, List<string> problems)
     {
-        var where = $"{spec.Id} -> {Engines.Py.Repr(widget.Name)}";
+        var where = $"{spec.Id} -> {Engines.Exact.Repr(widget.Name)}";
         switch (fill)
         {
             case TextFill text when !TextTypes.Contains(spec.Type):
@@ -218,7 +218,7 @@ public static class FormFill
                 problems.Add($"{where}: Option on a {spec.Type} field");
                 break;
             case OptionFill option when !widget.States.Contains(option.Export):
-                problems.Add($"{where}: export {Engines.Py.Repr(option.Export)} is not one of the PDF's states {PyList(widget.States.Order(StringComparer.Ordinal))}");
+                problems.Add($"{where}: export {Engines.Exact.Repr(option.Export)} is not one of the PDF's states {ReprList(widget.States.Order(StringComparer.Ordinal))}");
                 break;
             case WidgetStatesFill states:
                 if (spec.Type is not ("radio" or "checkbox"))
@@ -231,7 +231,7 @@ public static class FormFill
                     {
                         if (!widget.States.Contains(state))
                         {
-                            problems.Add($"{where}: state {Engines.Py.Repr(state)} is not one of the PDF's states {PyList(widget.States.Order(StringComparer.Ordinal))}");
+                            problems.Add($"{where}: state {Engines.Exact.Repr(state)} is not one of the PDF's states {ReprList(widget.States.Order(StringComparer.Ordinal))}");
                         }
                     }
                 }
@@ -260,20 +260,20 @@ public static class FormFill
             problems.Add($"{where}: value contains a carriage return");
         }
 
-        if (widget.MaxLen is { } maxLen && Pdf.Py.Length(fill.Value) > maxLen)
+        if (widget.MaxLen is { } maxLen && Pdf.CodePoints.Length(fill.Value) > maxLen)
         {
-            problems.Add($"{where}: {Engines.Py.Repr(fill.Value)} is longer than the PDF's {maxLen}-character box — it would be truncated");
+            problems.Add($"{where}: {Engines.Exact.Repr(fill.Value)} is longer than the PDF's {maxLen}-character box — it would be truncated");
         }
 
         if (widget.Kind == "choice" && !widget.ChoiceOptions.Contains(fill.Value))
         {
-            problems.Add($"{where}: {Engines.Py.Repr(fill.Value)} is not an option of the {Engines.Py.Repr(widget.Name)} dropdown");
+            problems.Add($"{where}: {Engines.Exact.Repr(fill.Value)} is not an option of the {Engines.Exact.Repr(widget.Name)} dropdown");
         }
     }
 
     private static void ValidateBox(FieldSpec spec, OverlayBox box, FieldFill fill, List<string> problems)
     {
-        var where = $"{spec.Id} -> {Engines.Py.Repr(box.Name)}";
+        var where = $"{spec.Id} -> {Engines.Exact.Repr(box.Name)}";
         switch (fill)
         {
             case TextFill when !TextTypes.Contains(spec.Type):
@@ -308,19 +308,19 @@ public static class FormFill
 
         if (!CanEncodeCp1252(fill.Value))
         {
-            problems.Add($"{where}: {Engines.Py.Repr(fill.Value)} has a character Helvetica cannot draw");
+            problems.Add($"{where}: {Engines.Exact.Repr(fill.Value)} has a character Helvetica cannot draw");
             return;
         }
 
         var width = HelveticaWidth(fill.Value, box.Size ?? OverlayFontSize);
         if (width > box.W + 0.01)
         {
-            problems.Add($"{where}: {Engines.Py.Repr(fill.Value)} is {PyFormat0(width)} points wide; the printed space is {PyFormat0(box.W)}");
+            problems.Add($"{where}: {Engines.Exact.Repr(fill.Value)} is {FormatWhole(width)} points wide; the printed space is {FormatWhole(box.W)}");
         }
     }
 
     /// <summary>Python's <c>f"{x:.0f}"</c>: round half to even on the exact value.</summary>
-    internal static string PyFormat0(double value) => PyNum.Round(value, 0).ToString("0", System.Globalization.CultureInfo.InvariantCulture);
+    internal static string FormatWhole(double value) => TypedNumber.Round(value, 0).ToString("0", System.Globalization.CultureInfo.InvariantCulture);
 
     internal static bool CanEncodeCp1252(string value)
     {
@@ -336,7 +336,7 @@ public static class FormFill
     }
 
     /// <summary>Python's <c>repr(list_of_str)</c>.</summary>
-    internal static string PyList(IEnumerable<string> items) => "[" + string.Join(", ", items.Select(Engines.Py.Repr)) + "]";
+    internal static string ReprList(IEnumerable<string> items) => "[" + string.Join(", ", items.Select(Engines.Exact.Repr)) + "]";
 
     // --- the AcroForm write ------------------------------------------------------
 
@@ -382,11 +382,11 @@ public static class FormFill
             }
             catch (UnencodableTextException error)
             {
-                problems.Add($"{fieldId} -> {Engines.Py.Repr(name)}: {Engines.Py.Repr(value)} has a character the form's {error.FontName} font cannot draw ({Engines.Py.Repr(error.Characters)})");
+                problems.Add($"{fieldId} -> {Engines.Exact.Repr(name)}: {Engines.Exact.Repr(value)} has a character the form's {error.FontName} font cannot draw ({Engines.Exact.Repr(error.Characters)})");
             }
             catch (FontNotSupportedException error)
             {
-                problems.Add($"{fieldId} -> {Engines.Py.Repr(name)}: {error.Message}");
+                problems.Add($"{fieldId} -> {Engines.Exact.Repr(name)}: {error.Message}");
             }
         }
 
@@ -435,7 +435,7 @@ public static class FormFill
     {
         var pdfDoc = FontData.Encodings["/PDFDocEncoding"];
         var codes = new List<char>();
-        foreach (var ch in Pdf.Py.Chars(value))
+        foreach (var ch in Pdf.CodePoints.Chars(value))
         {
             var code = System.Array.IndexOf(pdfDoc, ch);
             if (code < 0)
@@ -555,7 +555,7 @@ public static class FormFill
     /// <summary>Python's <c>f"{x:.{digits}f}"</c>.</summary>
     internal static string FixedPoint(double value, int digits)
     {
-        var rounded = PyNum.Round(value, digits);
+        var rounded = TypedNumber.Round(value, digits);
         var text = Math.Abs(rounded).ToString("F" + digits, System.Globalization.CultureInfo.InvariantCulture);
         return (double.IsNegative(rounded) && !(rounded == 0 && !double.IsNegative(value)) ? "-" : string.Empty) + text;
     }

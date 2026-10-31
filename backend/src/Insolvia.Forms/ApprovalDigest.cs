@@ -31,7 +31,7 @@ public sealed record ApprovalBasis(string Digest, FilingSet FilingSet, FeeHandli
 /// <remarks>
 /// <para>
 /// <b>The digest</b> is the SHA-256 (lowercase hex) of ONE canonical JSON
-/// document — exactly Python's definition, computed over the .NET packet's
+/// document — the definition ported unchanged, computed over the .NET packet's
 /// own bytes from cut-over on (ADR 0028; there are no live approvals to
 /// invalidate):
 /// </para>
@@ -51,8 +51,7 @@ public sealed record ApprovalBasis(string Digest, FilingSet FilingSet, FeeHandli
 /// ensure_ascii=False)</c> in UTF-8: keys sorted by code point, no whitespace,
 /// non-ASCII written raw, decimals as their exact text, dates ISO, timestamps
 /// as the stored <c>YYYY-MM-DDTHH:MM:SS.mmmZ</c>. <see cref="CanonicalBytes"/>
-/// is that encoder; ParityExportTests holds it byte-equal to Python's over
-/// the parity cases.
+/// is that encoder; FilingSetTests pins its bytes.
 /// </para>
 /// </remarks>
 public static class ApprovalDigest

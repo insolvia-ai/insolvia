@@ -19,8 +19,8 @@ namespace Insolvia.Aws.Sealing;
 /// <para>THE REAL CODE PATH MINUS THE NETWORK: seal mints a data key as KMS
 /// would and wraps it as <c>nonce ‖ AES-GCM(master, data key, AAD=context)</c>
 /// — the binding KMS enforces on its side — so an envelope sealed for one firm
-/// and ref cannot be opened for another. Byte-compatible with Python's: an
-/// envelope either one seals, the other opens.</para>
+/// and ref cannot be opened for another. Byte-compatible with envelopes
+/// sealed before the port: any of them opens here, and the reverse.</para>
 /// </remarks>
 /// <param name="masterKey">The wrapping key; <see cref="LocalMasterKey"/> by default.</param>
 public sealed class LocalTaxIdCipher(byte[]? masterKey = null) : ITaxIdCipher

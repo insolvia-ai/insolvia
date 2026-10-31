@@ -11,7 +11,7 @@ namespace Insolvia.Core.Courts;
 /// shipped inside this assembly as embedded resources (ADR 0014 — the
 /// registry is read by the CASE DOMAIN, so it ships with the domain), and the
 /// resolver a case's court reference is validated against (from
-/// <c>courts.py</c>). Codes match exactly, as Python's did.
+/// <c>courts.py</c>). Codes match exactly, as the contract requires.
 /// </summary>
 public sealed class CourtRegistry : ICourtRegistry
 {
@@ -177,7 +177,7 @@ public static partial class CourtRegistryLoader
     private static string StrField(JsonObject data, string key, string where)
     {
         var value = Json.AsString(data[key]);
-        if (value is null || PyText.Strip(value).Length == 0)
+        if (value is null || TextRules.Strip(value).Length == 0)
         {
             throw Fail(where, $"{key} missing or empty");
         }
@@ -368,7 +368,7 @@ public static partial class CourtRegistryLoader
                 var text = Json.AsString(key);
                 if (text is null || !DocumentKey().IsMatch(text))
                 {
-                    throw Fail(dw, $"{PyRepr(key)} is not a document key");
+                    throw Fail(dw, $"{QuotedRepr(key)} is not a document key");
                 }
 
                 keys.Add(text);
@@ -408,7 +408,7 @@ public static partial class CourtRegistryLoader
                 var text = Json.AsString(name);
                 if (text is null || !FileName().IsMatch(text))
                 {
-                    throw Fail(nw, $"{PyRepr(name)} is not a plain .pdf/.txt file name");
+                    throw Fail(nw, $"{QuotedRepr(name)} is not a plain .pdf/.txt file name");
                 }
 
                 pairs.Add(new(key, text));
@@ -674,7 +674,7 @@ public static partial class CourtRegistryLoader
         }
 
         var notes = Json.AsString(manifest["notes"]);
-        if (notes is null || PyText.Strip(notes).Length == 0)
+        if (notes is null || TextRules.Strip(notes).Length == 0)
         {
             throw Fail(where, "manifest notes missing — say what this release is");
         }
@@ -714,7 +714,7 @@ public static partial class CourtRegistryLoader
             districts.ToValueCollection());
     }
 
-    private static string PyRepr(JsonNode? value)
+    private static string QuotedRepr(JsonNode? value)
     {
         var text = Json.AsString(value);
         return text is null ? Repr(value) : "'" + text.Replace("\n", "\\n", StringComparison.Ordinal) + "'";

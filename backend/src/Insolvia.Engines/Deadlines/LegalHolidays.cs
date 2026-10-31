@@ -33,13 +33,13 @@ public sealed record HolidayRule(string HolidayId, string Name, string Citation,
         if (ordinal > 0)
         {
             var first = new DateOnly(year, Month, 1);
-            var offset = Mod(weekday - LegalHolidays.PyWeekday(first), 7);
+            var offset = Mod(weekday - LegalHolidays.MondayFirstWeekday(first), 7);
             return first.AddDays(offset + (7 * (ordinal - 1)));
         }
 
         var nextMonth = new DateOnly(year + (Month == 12 ? 1 : 0), (Month % 12) + 1, 1);
         var last = nextMonth.AddDays(-1);
-        return last.AddDays(-Mod(LegalHolidays.PyWeekday(last) - weekday, 7));
+        return last.AddDays(-Mod(LegalHolidays.MondayFirstWeekday(last) - weekday, 7));
     }
 
     private static int Mod(int value, int divisor) => ((value % divisor) + divisor) % divisor;
@@ -152,21 +152,21 @@ public static class LegalHolidays
         {
             var earliest = releases.Min(release => release.EffectiveDate);
             throw new EngineLookupException(
-                $"no release of {SeriesId} is effective on or before {Py.Iso(asOf)} (series begins {Py.Iso(earliest)})");
+                $"no release of {SeriesId} is effective on or before {Exact.Iso(asOf)} (series begins {Exact.Iso(earliest)})");
         }
 
         return Releases.MaxByKey(applicable);
     }
 
     /// <summary>Python's <c>date.weekday()</c>: Monday 0 through Sunday 6.</summary>
-    internal static int PyWeekday(DateOnly day) => ((int)day.DayOfWeek + 6) % 7;
+    internal static int MondayFirstWeekday(DateOnly day) => ((int)day.DayOfWeek + 6) % 7;
 
     internal static (DateOnly Effective, int Sequence) CodeDirectoryName(string name, string where)
     {
         var plus = name.IndexOf('+', StringComparison.Ordinal);
         var effectiveText = plus < 0 ? name : name[..plus];
         var sequenceText = plus < 0 ? string.Empty : name[(plus + 1)..];
-        var effective = Py.ParseIso(effectiveText) ?? throw Fail(where, "directory name is not <effective_date>[+<sequence>]");
+        var effective = Exact.ParseIso(effectiveText) ?? throw Fail(where, "directory name is not <effective_date>[+<sequence>]");
         var sequence = sequenceText.Length > 0 ? int.Parse(sequenceText, System.Globalization.CultureInfo.InvariantCulture) : 1;
         return (effective, sequence);
     }

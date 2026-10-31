@@ -195,18 +195,18 @@ public sealed class CaseSummaryRoutes : IEndpointModule
     /// <summary>Money as STRINGS, never JSON numbers — a double would not carry 1234.05 unchanged.</summary>
     internal static JsonObject TotalsJson(CaseTotals totals) => new()
     {
-        ["realEstate"] = Engines.Py.F(totals.RealEstate),
-        ["personalProperty"] = Engines.Py.F(totals.PersonalProperty),
-        ["assets"] = Engines.Py.F(totals.Assets),
-        ["totalExempt"] = Engines.Py.F(totals.TotalExempt),
-        ["totalNonExempt"] = Engines.Py.F(totals.TotalNonExempt),
-        ["secured"] = Engines.Py.F(totals.Secured),
-        ["priorityUnsecured"] = Engines.Py.F(totals.PriorityUnsecured),
-        ["nonpriorityUnsecured"] = Engines.Py.F(totals.NonpriorityUnsecured),
-        ["liabilities"] = Engines.Py.F(totals.Liabilities),
-        ["monthlyIncome"] = Engines.Py.F(totals.MonthlyIncome),
-        ["monthlyExpenses"] = Engines.Py.F(totals.MonthlyExpenses),
-        ["monthlyExcess"] = Engines.Py.F(totals.MonthlyExcess),
+        ["realEstate"] = Engines.Exact.F(totals.RealEstate),
+        ["personalProperty"] = Engines.Exact.F(totals.PersonalProperty),
+        ["assets"] = Engines.Exact.F(totals.Assets),
+        ["totalExempt"] = Engines.Exact.F(totals.TotalExempt),
+        ["totalNonExempt"] = Engines.Exact.F(totals.TotalNonExempt),
+        ["secured"] = Engines.Exact.F(totals.Secured),
+        ["priorityUnsecured"] = Engines.Exact.F(totals.PriorityUnsecured),
+        ["nonpriorityUnsecured"] = Engines.Exact.F(totals.NonpriorityUnsecured),
+        ["liabilities"] = Engines.Exact.F(totals.Liabilities),
+        ["monthlyIncome"] = Engines.Exact.F(totals.MonthlyIncome),
+        ["monthlyExpenses"] = Engines.Exact.F(totals.MonthlyExpenses),
+        ["monthlyExcess"] = Engines.Exact.F(totals.MonthlyExcess),
     };
 
     private static async Task<IResult> SummaryAsync(HttpContext context, string caseId, CancellationToken cancellationToken)

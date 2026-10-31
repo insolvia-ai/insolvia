@@ -336,7 +336,7 @@ public sealed class ProjectionStatementTests
     [InlineData("5200.00", "5,200.00")]
     [InlineData("1234567.89", "1,234,567.89")]
     public void Money_prints_grouped_with_two_decimals(string stored, string printed) =>
-        Assert.Equal(printed, ProjectionHelpers.FormatMoney(Py.Dec(stored)));
+        Assert.Equal(printed, ProjectionHelpers.FormatMoney(Exact.Dec(stored)));
 
     [Fact]
     public void Dates_print_as_the_forms_spell_them() =>

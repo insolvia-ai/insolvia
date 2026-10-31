@@ -65,7 +65,7 @@ public sealed class ErrorMappingTests(WebApplicationFactory<Program> factory) : 
     [InlineData("authentication")]
     public async Task Anything_else_is_the_one_500_body_logged_with_its_stack(string kind)
     {
-        // An AuthenticationException is not an ApiError in Python either: one
+        // An AuthenticationException is not an ApiError: one
         // raised outside the auth filters is a bug, not a 401.
         using var host = new AuthHost(factory, extraRoutes: Throwing);
         using var client = host.CreateClient();

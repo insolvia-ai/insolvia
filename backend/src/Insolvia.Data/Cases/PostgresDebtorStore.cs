@@ -20,7 +20,7 @@ namespace Insolvia.Data.Cases;
 /// client's row). Here: the case row is locked (<c>FOR NO KEY UPDATE</c>, so
 /// links to one case queue), the other roles are read under that lock, the
 /// client row is locked <c>FOR SHARE</c> (<see cref="FirmClientLinks"/>), and
-/// the outcome is answered in Python's order — role_taken, client_taken,
+/// the outcome is answered in the contract's order — role_taken, client_taken,
 /// client_unavailable — before anything is written. The partial unique index
 /// on (case, client) makes "one client, one role" structural besides.</item>
 /// </list>

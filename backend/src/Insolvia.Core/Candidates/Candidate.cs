@@ -151,14 +151,14 @@ public static class CandidateRules
                 continue;
             }
 
-            if (note is not null && PyText.Length(note) > MaxNote)
+            if (note is not null && TextRules.Length(note) > MaxNote)
             {
                 errors[$"proposals[{index}].note"] = $"Must be at most {MaxNote} characters.";
                 continue;
             }
 
             var externalRef = ParseExternalRef(raw["externalRef"], index, errors);
-            drafts.Add(new ProposalDraft(entityType, payload, externalRef, note is not null && PyText.Strip(note).Length > 0 ? PyText.Strip(note) : null));
+            drafts.Add(new ProposalDraft(entityType, payload, externalRef, note is not null && TextRules.Strip(note).Length > 0 ? TextRules.Strip(note) : null));
         }
 
         if (errors.Count > 0)
@@ -254,19 +254,19 @@ public static class CandidateRules
         var urlNode = raw["externalUrl"];
         var externalUrl = Json.AsString(urlNode);
         var refErrors = false;
-        if (system is null || PyText.Strip(system).Length == 0)
+        if (system is null || TextRules.Strip(system).Length == 0)
         {
             errors[$"{prefix}.system"] = "A source system name is required.";
             refErrors = true;
         }
 
-        if (externalId is null || PyText.Strip(externalId).Length == 0)
+        if (externalId is null || TextRules.Strip(externalId).Length == 0)
         {
             errors[$"{prefix}.externalId"] = "A source record id is required.";
             refErrors = true;
         }
 
-        if (urlNode is not null && (externalUrl is null || PyText.Strip(externalUrl).Length == 0))
+        if (urlNode is not null && (externalUrl is null || TextRules.Strip(externalUrl).Length == 0))
         {
             errors[$"{prefix}.externalUrl"] = "externalUrl must be a string.";
             refErrors = true;
@@ -274,7 +274,7 @@ public static class CandidateRules
 
         foreach (var (name, text) in new[] { ("system", system), ("externalId", externalId), ("externalUrl", externalUrl) })
         {
-            if (text is not null && PyText.Length(text) > MaxExternalRefField)
+            if (text is not null && TextRules.Length(text) > MaxExternalRefField)
             {
                 errors[$"{prefix}.{name}"] = $"Must be at most {MaxExternalRefField} characters.";
                 refErrors = true;
@@ -287,9 +287,9 @@ public static class CandidateRules
         }
 
         return new ExternalRef(
-            PyText.Strip(system),
-            PyText.Strip(externalId),
-            externalUrl is not null && PyText.Strip(externalUrl).Length > 0 ? PyText.Strip(externalUrl) : null);
+            TextRules.Strip(system),
+            TextRules.Strip(externalId),
+            externalUrl is not null && TextRules.Strip(externalUrl).Length > 0 ? TextRules.Strip(externalUrl) : null);
     }
 }
 

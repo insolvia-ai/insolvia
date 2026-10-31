@@ -45,7 +45,7 @@ public enum ProvenanceSource
 /// is the audit record of invariant 2, stored inside the JSONB provenance map
 /// and echoed back byte for byte, and the "kept, never minted" check compares
 /// entries for exact equality. <see cref="Locator"/> is kept as the JSON
-/// object that was validated, unknown members included, as Python kept it.
+/// object that was validated, unknown members included, as stored maps hold it.
 /// </remarks>
 public sealed record ProvenanceEntry(ProvenanceSource Source)
 {

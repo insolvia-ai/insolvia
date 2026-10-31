@@ -5,8 +5,8 @@ namespace Insolvia.Mcp.Tools;
 /// <summary>
 /// The JSON Schemas the listing publishes, in the exact shape the Python SDK
 /// derived them (pydantic over each tool's signature for the input; over the
-/// result TypedDict for the output) — so a harness that cached the Python
-/// listing sees the same eight tools. <c>ToolListingTests</c> compares every
+/// result TypedDict for the output) — so a harness that cached the listing
+/// before the port sees the same eight tools. <c>ToolListingTests</c> compares every
 /// one with the listing captured from the Python server.
 /// </summary>
 public static class ToolSchemas

@@ -57,7 +57,7 @@ public static class Permissions
     /// on everything.
     /// </summary>
     /// <remarks>
-    /// Python also ranked an UNKNOWN level (a row from a newer version) as
+    /// An UNKNOWN level (a row from a newer version) also ranks as
     /// hidden here. A <see cref="PermissionLevel"/> cannot hold an unknown
     /// value, so that rule moves to the boundary that parses a stored or sent
     /// map: an unrecognised wire level never becomes a member.

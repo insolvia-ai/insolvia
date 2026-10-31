@@ -7,7 +7,7 @@ namespace Insolvia.Engines.Projections;
 // The form template registry's field half (from core/form_templates.py): each
 // release's spec.json (the curated logical fields, their types and exact radio
 // export states) and acroform.json (the machine-extracted widget dump), loaded
-// and validated the way the Python loader does. The template PDF itself, and
+// and validated by the rules of the loader it was ported from. The template PDF itself, and
 // the check that it hashes to the manifest's sha256, belong to the fill engine
 // (Insolvia.Forms, 18.16), which ships the PDFs; a projection never needs the
 // bytes, only which fields exist and which widget states they take.
@@ -57,7 +57,7 @@ public sealed record FormRelease(
     /// <summary>The field with this id; <see cref="EngineKeyException"/> when there is none.</summary>
     public FieldSpec Field(string fieldId) =>
         Fields.FirstOrDefault(field => field.Id == fieldId)
-        ?? throw new EngineKeyException($"{ReleaseId} has no field {Py.Repr(fieldId)}");
+        ?? throw new EngineKeyException($"{ReleaseId} has no field {Exact.Repr(fieldId)}");
 }
 
 /// <summary>The form registry: load, validate, resolve (Python's <c>core/form_templates.py</c>, less the PDF bytes).</summary>
@@ -109,7 +109,7 @@ public static partial class FormTemplates
 
     /// <summary>A series' releases, oldest first.</summary>
     public static IReadOnlyList<FormRelease> ReleasesOf(string seriesId) =>
-        Registry.TryGetValue(seriesId, out var found) ? found : throw new EngineKeyException($"unknown series {Py.Repr(seriesId)}");
+        Registry.TryGetValue(seriesId, out var found) ? found : throw new EngineKeyException($"unknown series {Exact.Repr(seriesId)}");
 
     /// <summary>The revision in force on <paramref name="asOf"/>.</summary>
     public static FormRelease Resolve(string seriesId, DateOnly asOf) =>
@@ -118,7 +118,7 @@ public static partial class FormTemplates
     /// <summary>That exact release.</summary>
     public static FormRelease Get(string seriesId, string releaseId) =>
         ReleasesOf(seriesId).FirstOrDefault(release => release.ReleaseId == releaseId)
-        ?? throw new EngineKeyException($"series {Py.Repr(seriesId)} has no release {Py.Repr(releaseId)}");
+        ?? throw new EngineKeyException($"series {Exact.Repr(seriesId)} has no release {Exact.Repr(releaseId)}");
 
     /// <summary>Newest by (effective date, sequence), even if still in the future.</summary>
     public static FormRelease Latest(string seriesId) => ReleasesOf(seriesId)[^1];
@@ -151,7 +151,7 @@ public static partial class FormTemplates
     private static JsonObject LoadJson(RegistryTree root, string path, string where)
     {
         var name = path[(path.LastIndexOf('/') + 1)..];
-        var text = root.Read(path) ?? throw Fail(where, $"{name}: [Errno 2] No such file or directory: {Py.Repr(name)}");
+        var text = root.Read(path) ?? throw Fail(where, $"{name}: [Errno 2] No such file or directory: {Exact.Repr(name)}");
         JsonNode? parsed;
         try
         {
@@ -214,22 +214,22 @@ public static partial class FormTemplates
             var name = StrField(raw, "name", where);
             if (widgets.ContainsKey(name))
             {
-                throw Fail(where, $"duplicate acroform field name {Py.Repr(name)}");
+                throw Fail(where, $"duplicate acroform field name {Exact.Repr(name)}");
             }
 
             var kind = StrField(raw, "kind", where);
-            var pages = IntList(raw.TryGetPropertyValue("pages", out var p) ? p : new JsonArray(), () => Fail(where, $"{Py.Repr(name)}: pages must be a list of integers").Message);
-            var states = StringList(raw.TryGetPropertyValue("states", out var s) ? s : new JsonArray(), () => Fail(where, $"{Py.Repr(name)}: states must be a list of strings").Message);
+            var pages = IntList(raw.TryGetPropertyValue("pages", out var p) ? p : new JsonArray(), () => Fail(where, $"{Exact.Repr(name)}: pages must be a list of integers").Message);
+            var states = StringList(raw.TryGetPropertyValue("states", out var s) ? s : new JsonArray(), () => Fail(where, $"{Exact.Repr(name)}: states must be a list of strings").Message);
             var optionsNode = raw["options"];
             var choiceOptions = optionsNode is null or JsonArray { Count: 0 }
                 ? []
-                : StringList(optionsNode, () => Fail(where, $"{Py.Repr(name)}: options must be a list of strings").Message);
+                : StringList(optionsNode, () => Fail(where, $"{Exact.Repr(name)}: options must be a list of strings").Message);
             int? maxLen = null;
             if (raw["max_len"] is { } maxLenNode)
             {
                 if (!Core.Json.TryGetWholeNumber(maxLenNode, out var number) || number < 1)
                 {
-                    throw Fail(where, $"{Py.Repr(name)}: max_len must be a positive integer");
+                    throw Fail(where, $"{Exact.Repr(name)}: max_len must be a positive integer");
                 }
 
                 maxLen = (int)number;
@@ -348,34 +348,34 @@ public static partial class FormTemplates
             var name = StrField(item, "name", where);
             if (boxes.ContainsKey(name))
             {
-                throw Fail(where, $"overlay box {Py.Repr(name)} claimed twice");
+                throw Fail(where, $"overlay box {Exact.Repr(name)} claimed twice");
             }
 
             if (!Core.Json.TryGetWholeNumber(item["page"], out var page) || page < 1 || page > pageCount)
             {
-                throw Fail(where, $"{fieldId}: overlay box {Py.Repr(name)} page is not on the PDF");
+                throw Fail(where, $"{fieldId}: overlay box {Exact.Repr(name)} page is not on the PDF");
             }
 
             var height = item["h"];
             if ((fieldType == "checkbox") != (height is not null))
             {
-                throw Fail(where, $"{fieldId}: overlay box {Py.Repr(name)} carries h exactly when the field is a checkbox");
+                throw Fail(where, $"{fieldId}: overlay box {Exact.Repr(name)} carries h exactly when the field is a checkbox");
             }
 
             var size = item["size"];
             if (size is not null && height is not null)
             {
-                throw Fail(where, $"{fieldId}: overlay box {Py.Repr(name)} is a checkbox and has no size");
+                throw Fail(where, $"{fieldId}: overlay box {Exact.Repr(name)} is a checkbox and has no size");
             }
 
             boxes[name] = new OverlayBox(
                 name,
                 (int)page,
-                Number(item["x"], where, $"{fieldId}: overlay box {Py.Repr(name)} x"),
-                Number(item["y"], where, $"{fieldId}: overlay box {Py.Repr(name)} y"),
-                Number(item["w"], where, $"{fieldId}: overlay box {Py.Repr(name)} w"),
-                height is not null ? Number(height, where, $"{fieldId}: overlay box {Py.Repr(name)} h") : null,
-                size is not null ? Number(size, where, $"{fieldId}: overlay box {Py.Repr(name)} size") : null);
+                Number(item["x"], where, $"{fieldId}: overlay box {Exact.Repr(name)} x"),
+                Number(item["y"], where, $"{fieldId}: overlay box {Exact.Repr(name)} y"),
+                Number(item["w"], where, $"{fieldId}: overlay box {Exact.Repr(name)} w"),
+                height is not null ? Number(height, where, $"{fieldId}: overlay box {Exact.Repr(name)} h") : null,
+                size is not null ? Number(size, where, $"{fieldId}: overlay box {Exact.Repr(name)} size") : null);
             names.Add(name);
         }
 
@@ -393,7 +393,7 @@ public static partial class FormTemplates
         var fieldType = StrField(raw, "type", where);
         if (!FieldTypes.Contains(fieldType))
         {
-            throw Fail(where, $"{fieldId}: unknown type {Py.Repr(fieldType)}");
+            throw Fail(where, $"{fieldId}: unknown type {Exact.Repr(fieldType)}");
         }
 
         int? part = null;
@@ -441,7 +441,7 @@ public static partial class FormTemplates
             var name = Core.Json.AsString(nameNode);
             if (name is null || !widgets.ContainsKey(name))
             {
-                throw Fail(where, $"{fieldId}: claims unknown PDF field {Py.Repr(nameNode)}");
+                throw Fail(where, $"{fieldId}: claims unknown PDF field {Exact.Repr(nameNode)}");
             }
 
             claimed.Add(name);
@@ -454,7 +454,7 @@ public static partial class FormTemplates
             var hits = widgets.Keys.Where(name => regex.IsMatch(name)).ToList();
             if (hits.Count == 0)
             {
-                throw Fail(where, $"{fieldId}: pattern matched nothing: {Py.Repr(pattern)}");
+                throw Fail(where, $"{fieldId}: pattern matched nothing: {Exact.Repr(pattern)}");
             }
 
             claimed.AddRange(PatternOrder(hits, dumpOrder));
@@ -470,7 +470,7 @@ public static partial class FormTemplates
         var allowed = ButtonKinds.Contains(fieldType) ? ButtonKinds : EntryKinds;
         if (!kinds.IsSubsetOf(allowed))
         {
-            throw Fail(where, $"{fieldId}: type {fieldType} claims widget kinds [{string.Join(", ", kinds.Order(StringComparer.Ordinal).Select(Py.Repr))}]");
+            throw Fail(where, $"{fieldId}: type {fieldType} claims widget kinds [{string.Join(", ", kinds.Order(StringComparer.Ordinal).Select(Exact.Repr))}]");
         }
 
         var options = Options(raw["options"], where, fieldId);
@@ -480,7 +480,7 @@ public static partial class FormTemplates
             var declared = options.Select(option => option.Value).ToHashSet(StringComparer.Ordinal);
             if (!declared.SetEquals(states))
             {
-                throw Fail(where, $"{fieldId}: options [{string.Join(", ", declared.Order(StringComparer.Ordinal).Select(Py.Repr))}] != PDF export states [{string.Join(", ", states.Order(StringComparer.Ordinal).Select(Py.Repr))}]");
+                throw Fail(where, $"{fieldId}: options [{string.Join(", ", declared.Order(StringComparer.Ordinal).Select(Exact.Repr))}] != PDF export states [{string.Join(", ", states.Order(StringComparer.Ordinal).Select(Exact.Repr))}]");
             }
         }
 
@@ -517,7 +517,7 @@ public static partial class FormTemplates
         var form = StrField(spec, "form", where);
         if (form != seriesId["form/".Length..])
         {
-            throw Fail(where, $"spec form {Py.Repr(form)} disagrees with the series id");
+            throw Fail(where, $"spec form {Exact.Repr(form)} disagrees with the series id");
         }
 
         if (Core.Json.AsString(spec["form"]) != Core.Json.AsString(dump["form"]))
@@ -533,7 +533,7 @@ public static partial class FormTemplates
 
         foreach (var (doc, docName) in new[] { (spec, "spec"), (dump, "acroform") })
         {
-            if (Core.Json.AsString(doc["effective_date"]) != Py.Iso(effective))
+            if (Core.Json.AsString(doc["effective_date"]) != Exact.Iso(effective))
             {
                 throw Fail(where, $"{docName} effective_date disagrees with the path");
             }
@@ -565,7 +565,7 @@ public static partial class FormTemplates
             {
                 if (claimedBy.TryGetValue(pdfName, out var owner))
                 {
-                    throw Fail(where, $"PDF field {Py.Repr(pdfName)} claimed by both {owner} and {parsed.Id}");
+                    throw Fail(where, $"PDF field {Exact.Repr(pdfName)} claimed by both {owner} and {parsed.Id}");
                 }
 
                 claimedBy[pdfName] = parsed.Id;
@@ -580,7 +580,7 @@ public static partial class FormTemplates
             .ToList();
         if (uncovered.Count > 0)
         {
-            throw Fail(where, $"{uncovered.Count} fillable PDF fields not claimed by any spec field: [{string.Join(", ", uncovered.Take(5).Select(Py.Repr))}]");
+            throw Fail(where, $"{uncovered.Count} fillable PDF fields not claimed by any spec field: [{string.Join(", ", uncovered.Take(5).Select(Exact.Repr))}]");
         }
 
         var signaturePages = IntList(spec["signature_pages"], () => Fail(where, "signature_pages must be a list of positive integers").Message);

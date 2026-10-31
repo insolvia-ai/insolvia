@@ -2,8 +2,8 @@ namespace Insolvia.Api;
 
 /// <summary>
 /// <c>GET /health</c>: the service's identity, unauthenticated. The body and
-/// status are the Python API's (services/api routes/health.py), field for
-/// field, so the contract suite passes against either backend.
+/// status are the contract's, field for field (ported from services/api
+/// routes/health.py).
 /// </summary>
 public static class HealthEndpoint
 {

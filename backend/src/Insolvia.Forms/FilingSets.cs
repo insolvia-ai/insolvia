@@ -321,7 +321,7 @@ public static class FilingSets
         string[] facts =
         [
             @case.CaseNumber is { Length: > 0 } number ? $"Case number {number}." : "No case number is recorded yet.",
-            @case.FiledAt is { } filed ? $"Filed {Engines.Py.Iso(filed)}." : "No filing date is recorded yet.",
+            @case.FiledAt is { } filed ? $"Filed {Engines.Exact.Iso(filed)}." : "No filing date is recorded yet.",
         ];
         return new ChecklistItem(
             "filed",

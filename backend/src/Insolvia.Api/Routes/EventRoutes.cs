@@ -381,12 +381,12 @@ public sealed class CalendarRoutes : IEndpointModule
     // Python's date.fromisoformat after strip: YYYY-MM-DD.
     private static DateOnly ParseDate(string? raw, string name)
     {
-        if (raw is null || PyText.Strip(raw).Length == 0)
+        if (raw is null || TextRules.Strip(raw).Length == 0)
         {
             throw new ValidationException($"{name} is required (YYYY-MM-DD)");
         }
 
-        return DateOnly.TryParseExact(PyText.Strip(raw), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed)
+        return DateOnly.TryParseExact(TextRules.Strip(raw), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed)
             ? parsed
             : throw new ValidationException($"{name} must be a date in YYYY-MM-DD form");
     }

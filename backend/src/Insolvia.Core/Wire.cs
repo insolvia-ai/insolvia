@@ -5,12 +5,12 @@ using System.Text.Json.Serialization;
 namespace Insolvia.Core;
 
 /// <summary>
-/// The wire string of every domain enum. Python spelled these as string
+/// The wire string of every domain enum. The contract spells these as string
 /// literal sets (<c>("attorney", "paralegal", "staff")</c>); here each is an
 /// enum whose members carry <see cref="JsonStringEnumMemberNameAttribute"/>,
-/// so System.Text.Json's string-enum converter writes exactly the Python
+/// so System.Text.Json's string-enum converter writes exactly the wire
 /// value and this class reads the same attribute — one spelling, two readers.
-/// Declaration order is the Python tuple's order, and the "Must be one of …"
+/// Declaration order is the contract's order, and the "Must be one of …"
 /// messages list members in it.
 /// </summary>
 public static class Wire

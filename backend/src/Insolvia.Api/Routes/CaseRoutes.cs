@@ -31,8 +31,8 @@ namespace Insolvia.Api.Routes;
 /// edit (<see cref="ICaseStore.UpdateAsync"/>), conditioned on the status read.</para>
 /// <para><b>A filed case's chapter changes only by a conversion</b>
 /// (<c>POST …/conversions</c>) — a different <c>chapter</c> in its PATCH is
-/// a 409 (ADR 0027 row 3, #509). Its <c>filed_at</c> stays EDITABLE, as in
-/// Python: a mistyped petition date must be correctable, and the filed event
+/// a 409 (ADR 0027 row 3, #509). Its <c>filed_at</c> stays EDITABLE:
+/// a mistyped petition date must be correctable, and the filed event
 /// keeps the date it was recorded with (a correction is not a court event).</para>
 /// <para><b>The engines' two hooks</b> (Insolvia.Engines): the 106C opt-out
 /// refusal before the write, and the deadline regeneration after it
@@ -235,7 +235,7 @@ public sealed class CaseRoutes : IEndpointModule
         var (asOf, _) = ExemptionAnalyzer.ResolutionDate(petitions.Count > 0 ? petitions[0].Body : null, context.Today());
         var refusal = ExemptionAnalyzer.ElectionRefusal(
             election.ToWire(),
-            state is null || PyText.Strip(state).Length == 0 ? null : PyText.Strip(state).ToUpperInvariant(),
+            state is null || TextRules.Strip(state).Length == 0 ? null : TextRules.Strip(state).ToUpperInvariant(),
             asOf);
         if (refusal is not null)
         {

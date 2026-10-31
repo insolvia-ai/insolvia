@@ -587,7 +587,7 @@ public static class PacketAssembly
             }
             catch (EngineLookupException error)
             {
-                problems.Add(new(seriesId, null, string.Empty, Engines.Py.Str(error)));
+                problems.Add(new(seriesId, null, string.Empty, Engines.Exact.Str(error)));
             }
         }
 
@@ -598,7 +598,7 @@ public static class PacketAssembly
         }
         catch (EngineLookupException error)
         {
-            problems.Add(new(DollarAmounts.SeriesId, null, string.Empty, Engines.Py.Str(error)));
+            problems.Add(new(DollarAmounts.SeriesId, null, string.Empty, Engines.Exact.Str(error)));
         }
 
         var projected = new OrderedDictionary<string, FieldValues>(StringComparer.Ordinal);
@@ -708,7 +708,7 @@ public static class PacketAssembly
     /// rw-r--r--. Written by hand rather than through ZipArchive, whose
     /// "made by" byte follows the host OS: this writes exactly the records
     /// CPython's <c>zipfile</c> writes on a Unix host, so the same parts give
-    /// the same zip on any machine — and the same zip Python gives.
+    /// the same zip on any machine — and the same sha256 the approval digest records.
     /// </summary>
     public static byte[] PacketZip(IReadOnlyList<(string Name, byte[] Content)> parts)
     {

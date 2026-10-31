@@ -39,7 +39,7 @@ internal sealed class RecordingHandler : HttpMessageHandler
 /// request bodies are DEEP-EQUAL to the bodies the Python adapters sent
 /// (captured by spike 18.4, committed as Fixtures/Anthropic) — which pins
 /// the review prompt and schema and the credit-report prompt and schema to
-/// Python's byte for byte. Plus the client policy and the failure split.
+/// the captured bodies byte for byte. Plus the client policy and the failure split.
 /// </summary>
 public sealed class AnthropicWireParityTests
 {

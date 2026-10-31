@@ -5,7 +5,7 @@ namespace Insolvia.Data.Storage;
 
 /// <summary>
 /// Stores a domain enum as its wire string (<see cref="Wire"/>) — the value
-/// Python wrote, so a row reads the same in <c>psql</c> as on the wire. A
+/// the contract carries, so a row reads the same in <c>psql</c> as on the wire. A
 /// stored string this version does not know fails the read loudly: an enum
 /// column is not a place a newer version may add values silently (the
 /// permission map, which is, is read defensively in <see cref="StoredJson"/>).

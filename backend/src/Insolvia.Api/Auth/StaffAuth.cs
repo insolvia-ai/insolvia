@@ -26,8 +26,8 @@ namespace Insolvia.Api.Auth;
 /// order they are added, the first outermost — exactly as Flask's
 /// <c>@require_auth</c> above <c>@requires</c>. So <c>RequireAuth</c> must
 /// come first: <c>Requires</c> placed before it (or without it) reads a
-/// principal nobody has set, which is a programming error and a 500 — as
-/// <c>current_principal()</c> raised in Python — never a request that proceeds.
+/// principal nobody has set, which is a programming error and a 500 — never a
+/// request that proceeds.
 /// Filters attach only to delegate handlers (<c>MapGet(pattern, (…) =&gt; …)</c>);
 /// a raw <c>RequestDelegate</c> endpoint ignores them, so feature routes use delegates.</para>
 /// <para><b>Accessor resolution is a separate step</b>

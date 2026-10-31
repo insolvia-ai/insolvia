@@ -231,14 +231,14 @@ public static partial class CaseTaskRules
     private static string? ParseSubject(JsonNode? value, Dictionary<string, string> errors)
     {
         var raw = Json.AsString(value);
-        if (raw is null || PyText.Strip(raw).Length == 0)
+        if (raw is null || TextRules.Strip(raw).Length == 0)
         {
             errors["subject"] = "A subject is required.";
             return null;
         }
 
-        var subject = PyText.Strip(raw);
-        if (PyText.Length(subject) > MaxSubject)
+        var subject = TextRules.Strip(raw);
+        if (TextRules.Length(subject) > MaxSubject)
         {
             errors["subject"] = $"Must be {MaxSubject} characters or fewer.";
             return null;
@@ -261,13 +261,13 @@ public static partial class CaseTaskRules
         }
 
         var raw = Json.AsString(value);
-        if (raw is null || !SubjectPattern().IsMatch(PyText.Strip(raw)))
+        if (raw is null || !SubjectPattern().IsMatch(TextRules.Strip(raw)))
         {
             errors["assigneeSubject"] = "Must be a firm user's subject.";
             return null;
         }
 
-        return PyText.Strip(raw);
+        return TextRules.Strip(raw);
     }
 
     private static string? ParseFormSeries(JsonNode? value, Dictionary<string, string> errors)
@@ -278,13 +278,13 @@ public static partial class CaseTaskRules
         }
 
         var raw = Json.AsString(value);
-        if (raw is null || !FormSeriesPattern().IsMatch(PyText.Lower(PyText.Strip(raw))))
+        if (raw is null || !FormSeriesPattern().IsMatch(TextRules.Lower(TextRules.Strip(raw))))
         {
             errors["formSeries"] = "Must be a form key, like \"b106d\" — lowercase letters and digits.";
             return null;
         }
 
-        return PyText.Lower(PyText.Strip(raw));
+        return TextRules.Lower(TextRules.Strip(raw));
     }
 
     [GeneratedRegex(@"^[a-z][a-z0-9]{1,31}\z")]

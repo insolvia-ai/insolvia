@@ -265,7 +265,7 @@ public static class CaseEntityRules
 
     /// <summary>
     /// <c>amended</c>: shape and type only — true or false, defaulting false.
-    /// Present-but-null is refused, as Python's <c>payload.get("amended", False)</c> was.
+    /// Present-but-null is refused: the default covers an absent key only (<c>payload.get("amended", False)</c>).
     /// </summary>
     private static bool ParseAmended(JsonObject payload)
     {

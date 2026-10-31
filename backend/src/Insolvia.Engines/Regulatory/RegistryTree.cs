@@ -115,9 +115,9 @@ public sealed class RegistryTree
 }
 
 /// <summary>
-/// The validation helpers every registry loader shares — each Python
-/// module carried its own private copy (<c>_fail</c>, <c>_str_field</c>,
-/// <c>_sources</c>, ...); the messages are theirs, word for word.
+/// The validation helpers every registry loader shares — each module it was
+/// ported from carried its own private copy (<c>_fail</c>, <c>_str_field</c>,
+/// <c>_sources</c>, ...); their messages are kept word for word.
 /// </summary>
 internal static partial class ReleaseParsing
 {
@@ -149,9 +149,9 @@ internal static partial class ReleaseParsing
         }
 
         var text = Core.Json.AsString(value)
-            ?? throw Fail(where, $"{fieldName} {Py.Repr(value)} is not a date string");
-        return Py.ParseIso(text)
-            ?? throw Fail(where, $"{fieldName} {Py.Repr(text)}: Invalid isoformat string: {Py.Repr(text)}");
+            ?? throw Fail(where, $"{fieldName} {Exact.Repr(value)} is not a date string");
+        return Exact.ParseIso(text)
+            ?? throw Fail(where, $"{fieldName} {Exact.Repr(text)}: Invalid isoformat string: {Exact.Repr(text)}");
     }
 
     /// <summary>The exemptions/dollar-amounts/UST flavour of <c>_sources</c>.</summary>
@@ -195,8 +195,8 @@ internal static partial class ReleaseParsing
             }
 
             var accessedText = StrField(item, "accessed", where);
-            var accessed = Py.ParseIso(accessedText)
-                ?? throw Fail(where, $"source.accessed: Invalid isoformat string: {Py.Repr(accessedText)}");
+            var accessed = Exact.ParseIso(accessedText)
+                ?? throw Fail(where, $"source.accessed: Invalid isoformat string: {Exact.Repr(accessedText)}");
             parsed.Add(new Source(StrField(item, "title", where), StrField(item, "url", where), accessed));
         }
 
@@ -207,7 +207,7 @@ internal static partial class ReleaseParsing
     internal static JsonObject LoadJson(RegistryTree root, string path, string where)
     {
         var name = path[(path.LastIndexOf('/') + 1)..];
-        var text = root.Read(path) ?? throw Fail(where, $"{name}: [Errno 2] No such file or directory: {Py.Repr(name)}");
+        var text = root.Read(path) ?? throw Fail(where, $"{name}: [Errno 2] No such file or directory: {Exact.Repr(name)}");
         JsonNode? parsed;
         try
         {
@@ -243,7 +243,7 @@ internal static partial class ReleaseParsing
     internal static (DateOnly Effective, int Sequence) ParseDirectoryName(string name, string where, Func<string, string, MalformedReleaseException>? fail = null)
     {
         var match = DirectoryName().Match(name);
-        var effective = match.Success ? Py.ParseIso(match.Groups[1].Value) : null;
+        var effective = match.Success ? Exact.ParseIso(match.Groups[1].Value) : null;
         if (effective is null)
         {
             throw (fail ?? Fail)(where, "directory name is not <effective_date>[+<sequence>]");
@@ -264,10 +264,10 @@ internal static partial class ReleaseParsing
         fail ??= Fail;
         if (Core.Json.AsString(manifest["series_id"]) != seriesId)
         {
-            throw fail(where, $"manifest series_id {Py.Repr(manifest["series_id"])}");
+            throw fail(where, $"manifest series_id {Exact.Repr(manifest["series_id"])}");
         }
 
-        if (Core.Json.AsString(manifest["effective_date"]) != Py.Iso(effective))
+        if (Core.Json.AsString(manifest["effective_date"]) != Exact.Iso(effective))
         {
             throw fail(where, "manifest effective_date disagrees with the path");
         }
@@ -286,7 +286,7 @@ internal static partial class ReleaseParsing
         var text = Core.Json.AsString(value);
         if (text is null || !MoneyPattern().IsMatch(text))
         {
-            throw Fail(where, $"{fieldName} {Py.Repr(value)} is not a two-decimal money string");
+            throw Fail(where, $"{fieldName} {Exact.Repr(value)} is not a two-decimal money string");
         }
 
         return text;
@@ -304,7 +304,7 @@ internal static partial class ReleaseParsing
             return verification;
         }
 
-        throw Fail(where, $"{Py.Repr(value)} is not a valid Verification");
+        throw Fail(where, $"{Exact.Repr(value)} is not a valid Verification");
     }
 
     /// <summary>A string member, or empty when absent (Python's <c>raw.get("notes", "")</c>).</summary>

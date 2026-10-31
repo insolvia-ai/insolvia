@@ -64,6 +64,6 @@ internal static class CaseRouteSupport
             cancellationToken);
     }
 
-    /// <summary>"Today" for every task in one response — UTC, as the Python's <c>datetime.now(UTC).date()</c>.</summary>
+    /// <summary>"Today" for every task in one response — the UTC date.</summary>
     public static DateOnly Today(this HttpContext context) => Clock.Today(context.Clock());
 }

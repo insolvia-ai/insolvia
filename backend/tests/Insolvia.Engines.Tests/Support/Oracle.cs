@@ -84,7 +84,7 @@ internal static class Oracle
 
     private static JsonObject StandardsJson(StandardsResult result) => new()
     {
-        ["as_of"] = Py.Iso(result.AsOf),
+        ["as_of"] = Exact.Iso(result.AsOf),
         ["state"] = result.State,
         ["county"] = result.County,
         ["household_size"] = result.HouseholdSize,

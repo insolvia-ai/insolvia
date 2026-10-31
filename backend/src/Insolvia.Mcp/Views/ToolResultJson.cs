@@ -12,7 +12,7 @@ namespace Insolvia.Mcp.Views;
 /// separators, and <c>ensure_ascii</c>: everything outside printable ASCII
 /// escaped as a lower-case <c>\uXXXX</c> (surrogate pairs as two escapes).
 /// </summary>
-public static class PyJson
+public static class ToolResultJson
 {
     /// <summary>Serializes <paramref name="node"/> as <c>json.dumps</c> would.</summary>
     /// <param name="node">The value; null is <c>null</c>.</param>

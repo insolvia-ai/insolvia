@@ -13,7 +13,7 @@ namespace Insolvia.Core;
 /// everything outside printable ASCII escaped as lower-case <c>\uXXXX</c>
 /// (a surrogate pair as two escapes).
 /// </summary>
-public static class PythonJson
+public static class AsciiJson
 {
     /// <summary>Serializes <paramref name="node"/> as <c>json.dumps</c> would.</summary>
     /// <param name="node">The value; null is <c>null</c>.</param>

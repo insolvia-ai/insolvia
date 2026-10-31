@@ -45,7 +45,7 @@ public static class MeansTestTraces
         }
         catch (EngineLookupException error)
         {
-            problems.Add(Py.Str(error));
+            problems.Add(Exact.Str(error));
         }
 
         if (data is not null)
@@ -79,7 +79,7 @@ public static class MeansTestTraces
 
         return new JsonObject
         {
-            ["asOf"] = Py.Iso(trace.AsOf),
+            ["asOf"] = Exact.Iso(trace.AsOf),
             ["asOfSource"] = trace.AsOfSource,
             ["chapter"] = trace.Case.Chapter,
             ["releaseIds"] = releaseIds,
@@ -135,9 +135,9 @@ public static class MeansTestTraces
         {
             ["window"] = new JsonObject
             {
-                ["filingDate"] = Py.Iso(cmi.Window.FilingDate),
-                ["start"] = Py.Iso(cmi.Window.Start),
-                ["end"] = Py.Iso(cmi.Window.End),
+                ["filingDate"] = Exact.Iso(cmi.Window.FilingDate),
+                ["start"] = Exact.Iso(cmi.Window.Start),
+                ["end"] = Exact.Iso(cmi.Window.End),
                 ["months"] = new JsonArray([.. cmi.Window.Months.Select(month => (JsonNode)month)]),
             },
             ["columns"] = new JsonArray([.. cmi.Columns.Select(column => (JsonNode)ColumnJson(column))]),

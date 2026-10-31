@@ -45,7 +45,7 @@ public sealed class UstDataTests
     public void Households_above_four_add_the_excess_person_figure()
     {
         var (_, table) = UstData.MedianIncomeTable(AsOf);
-        Assert.Equal(table.AnnualMedian("FL", 4) + (2 * Py.Dec(table.ExcessPersonAnnualAddition)), table.AnnualMedian("FL", 6));
+        Assert.Equal(table.AnnualMedian("FL", 4) + (2 * Exact.Dec(table.ExcessPersonAnnualAddition)), table.AnnualMedian("FL", 6));
     }
 
     [Fact]
@@ -53,7 +53,7 @@ public sealed class UstDataTests
     {
         var (_, table) = UstData.MedianIncomeTable(AsOf);
         var addon = DollarAmounts.Latest().Amount("median-addon-per-person-safe-harbor");
-        Assert.Equal(12 * addon.Value, Py.Dec(table.ExcessPersonAnnualAddition));
+        Assert.Equal(12 * addon.Value, Exact.Dec(table.ExcessPersonAnnualAddition));
     }
 
     [Fact]
@@ -89,7 +89,7 @@ public sealed class UstDataTests
         var (_, standards) = UstData.NationalStandards(AsOf);
         for (var size = 0; size < 4; size++)
         {
-            Assert.Equal(Py.Dec(standards.MonthlyAllowances[size]), standards.Components.Sum(component => Py.Dec(component.Monthly[size])));
+            Assert.Equal(Exact.Dec(standards.MonthlyAllowances[size]), standards.Components.Sum(component => Exact.Dec(component.Monthly[size])));
         }
     }
 
@@ -99,12 +99,12 @@ public sealed class UstDataTests
         var (_, standards) = UstData.NationalStandards(AsOf);
         for (var size = 0; size < 4; size++)
         {
-            var expected = Py.Quantize(0.05m * Py.Dec(standards.FoodAndClothing[size]), PyRounding.HalfUp, places: 0);
-            Assert.Equal(expected, Py.Dec(standards.AdditionalFoodClothingCap[size]));
+            var expected = Exact.Quantize(0.05m * Exact.Dec(standards.FoodAndClothing[size]), Rounding.HalfUp, places: 0);
+            Assert.Equal(expected, Exact.Dec(standards.AdditionalFoodClothingCap[size]));
         }
 
         Assert.Equal(
-            Py.Dec(standards.AdditionalFoodClothingCap[3]) + (2 * Py.Dec(standards.AdditionalFoodClothingCapEachAdditionalPerson)),
+            Exact.Dec(standards.AdditionalFoodClothingCap[3]) + (2 * Exact.Dec(standards.AdditionalFoodClothingCapEachAdditionalPerson)),
             standards.AdditionalFoodClothingCapFor(6));
     }
 

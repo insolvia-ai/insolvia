@@ -118,7 +118,7 @@ public static class B122A1
         void Put(string fieldId, string amount)
         {
             filled.Add(fieldId);
-            RowFill(release, values, fieldId, index, new TextFill(FormatMoney(Py.Dec(amount))), problems);
+            RowFill(release, values, fieldId, index, new TextFill(FormatMoney(Exact.Dec(amount))), problems);
         }
 
         foreach (var line in column.Lines)
@@ -227,7 +227,7 @@ public static class B122A1
 
         if (cmi.Columns.Count > 0)
         {
-            values["total_cmi"] = new TextFill(FormatMoney(Py.Dec(cmi.CombinedMonthlyTotal)));
+            values["total_cmi"] = new TextFill(FormatMoney(Exact.Dec(cmi.CombinedMonthlyTotal)));
             Determination(values, caseFile, cmi, problems);
         }
 
@@ -269,7 +269,7 @@ public static class B122A1
 
     private static void Determination(FieldValues values, CaseFile caseFile, CmiResult cmi, List<string> problems)
     {
-        values["annualized_cmi"] = new TextFill(FormatMoney(Py.Dec(cmi.Annualized)));
+        values["annualized_cmi"] = new TextFill(FormatMoney(Exact.Dec(cmi.Annualized)));
 
         if (MeansTestEngine.PresumptionExemption(MeansTestInputs(caseFile)) is { } exemption)
         {
@@ -302,12 +302,12 @@ public static class B122A1
         }
         catch (Exception error) when (error is EngineKeyException or EngineValueException)
         {
-            problems.Add(Py.Str(error));
+            problems.Add(Exact.Str(error));
             return;
         }
 
         values["median_income"] = new TextFill(FormatMoney(median));
-        if (Py.Dec(cmi.CombinedMonthlyTotal) * 12 > median)
+        if (Exact.Dec(cmi.CombinedMonthlyTotal) * 12 > median)
         {
             values["median_comparison"] = new OptionFill("12b more than 13");
             values["caption.presumption_box"] = new OptionFill("Presumption of abuse applies");
@@ -411,7 +411,7 @@ public static class B122A2
             return true;
         }
 
-        return Py.Dec(B122A1.ComputeCmi(caseFile).CombinedMonthlyTotal) * 12 > median;
+        return Exact.Dec(B122A1.ComputeCmi(caseFile).CombinedMonthlyTotal) * 12 > median;
     }
 
     /// <summary>The engine's inputs, derived from the case records.</summary>
@@ -429,8 +429,8 @@ public static class B122A2
             District: caseFile.Case.District,
             Cmi: B122A1.ComputeCmi(caseFile),
             Inputs: B122A1.MeansTestInputs(caseFile),
-            PriorityDebtTotal: Py.F(priority),
-            NonpriorityUnsecuredTotal: Py.F(nonpriority),
+            PriorityDebtTotal: Exact.F(priority),
+            NonpriorityUnsecuredTotal: Exact.F(nonpriority),
             ChildrenUnder18: caseFile.Dependents.Count(dependent => dependent.Age is < 18),
             Chapter: caseFile.Case.Chapter);
     }
@@ -466,7 +466,7 @@ public static class B122A2
         }
         catch (EngineLookupException error)
         {
-            throw new FormProjectionException([Py.Str(error)]);
+            throw new FormProjectionException([Exact.Str(error)]);
         }
 
         if (result.Outcome == "below_median")
@@ -500,21 +500,21 @@ public static class B122A2
                 continue;
             }
 
-            values[fieldId] = new TextFill(FormatMoney(Py.Dec(line.Amount)));
+            values[fieldId] = new TextFill(FormatMoney(Exact.Dec(line.Amount)));
         }
 
         values["household_size"] = new TextFill(byLine["5"].Amount.Split('.')[0]);
         values["oop_health_under_65_count"] = new TextFill(byLine["7b"].Amount.Split('.')[0]);
         values["oop_health_over_65_count"] = new TextFill(byLine["7e"].Amount.Split('.')[0]);
 
-        if (Py.Dec(test.PriorityDebtTotal) > 0)
+        if (Exact.Dec(test.PriorityDebtTotal) > 0)
         {
-            values["priority_claims_total"] = new TextFill(FormatMoney(Py.Dec(test.PriorityDebtTotal)));
+            values["priority_claims_total"] = new TextFill(FormatMoney(Exact.Dec(test.PriorityDebtTotal)));
         }
 
         if (test.Inputs.Ch13Eligible == true)
         {
-            values["ch13_multiplier"] = new TextFill(Py.F(data.Ch13.MultiplierFor(test.District)));
+            values["ch13_multiplier"] = new TextFill(Exact.F(data.Ch13.MultiplierFor(test.District)));
         }
 
         EnteredRows(release, values, caseFile, problems);
@@ -584,7 +584,7 @@ public static class B122A2
         }
 
         values["cure_claimed"] = new OptionFill(inputs.PriorityCureTotal is not null ? "Yes" : "No");
-        values["priority_claims_owed"] = new OptionFill(Py.Dec(test.PriorityDebtTotal) > 0 ? "Yes" : "No");
+        values["priority_claims_owed"] = new OptionFill(Exact.Dec(test.PriorityDebtTotal) > 0 ? "Yes" : "No");
         if (inputs.Ch13Eligible is { } eligible)
         {
             values["ch13_eligible"] = new OptionFill(eligible ? "Yes" : "No");
@@ -657,7 +657,7 @@ public static class B122C1
 
         if (cmi.Columns.Count > 0)
         {
-            values["total_cmi"] = new TextFill(FormatMoney(Py.Dec(cmi.CombinedMonthlyTotal)));
+            values["total_cmi"] = new TextFill(FormatMoney(Exact.Dec(cmi.CombinedMonthlyTotal)));
             Determination(values, caseFile, status, problems);
         }
 
@@ -734,7 +734,7 @@ public static class B122C1
         }
         catch (EngineLookupException error)
         {
-            problems.Add(Py.Str(error));
+            problems.Add(Exact.Str(error));
             return;
         }
 
@@ -742,7 +742,7 @@ public static class B122C1
         {
             if (line.Form == MeansTestEngine.Form122C1 && LineFields.TryGetValue(line.Line, out var fieldId))
             {
-                values[fieldId] = new TextFill(FormatMoney(Py.Dec(line.Amount)));
+                values[fieldId] = new TextFill(FormatMoney(Exact.Dec(line.Amount)));
             }
         }
 
@@ -888,28 +888,28 @@ public static class B122C2
                 continue;
             }
 
-            values[fieldId] = new TextFill(FormatMoney(Py.Dec(printed)));
+            values[fieldId] = new TextFill(FormatMoney(Exact.Dec(printed)));
         }
 
         values["household_size"] = new TextFill(byLine["5"].Split('.')[0]);
         values["oop_health_under_65_count"] = new TextFill(byLine["7b"].Split('.')[0]);
         values["oop_health_over_65_count"] = new TextFill(byLine["7e"].Split('.')[0]);
 
-        if (Py.Dec(test.PriorityDebtTotal) > 0)
+        if (Exact.Dec(test.PriorityDebtTotal) > 0)
         {
-            values["priority_claims_total"] = new TextFill(FormatMoney(Py.Dec(test.PriorityDebtTotal)));
+            values["priority_claims_total"] = new TextFill(FormatMoney(Exact.Dec(test.PriorityDebtTotal)));
         }
 
-        values["ch13_multiplier"] = new TextFill(Py.F(data.Ch13.MultiplierFor(test.District)));
+        values["ch13_multiplier"] = new TextFill(Exact.F(data.Ch13.MultiplierFor(test.District)));
         if (test.Inputs.Ch13ProjectedPlanPayment is { } payment)
         {
             values["ch13_plan_payment"] = new TextFill(FormatMoney(payment));
         }
 
         // Line 33c's box is the widget of 13e's first creditor row.
-        if (byLine.TryGetValue("13e", out var total) && Py.Dec(total) != 0)
+        if (byLine.TryGetValue("13e", out var total) && Exact.Dec(total) != 0)
         {
-            RowFill(release, values, "vehicle_2_loan_rows", 0, new TextFill(FormatMoney(Py.Dec(total))), problems);
+            RowFill(release, values, "vehicle_2_loan_rows", 0, new TextFill(FormatMoney(Exact.Dec(total))), problems);
         }
 
         EnteredRows(release, values, caseFile, problems);
@@ -926,7 +926,7 @@ public static class B122C2
         }
 
         values["cure_claimed"] = new OptionFill(inputs.PriorityCureTotal is not null ? "yes" : "no");
-        values["priority_claims_owed"] = new OptionFill(Py.Dec(test.PriorityDebtTotal) > 0 ? "yes" : "no");
+        values["priority_claims_owed"] = new OptionFill(Exact.Dec(test.PriorityDebtTotal) > 0 ? "yes" : "no");
         B122A1.FillSignatureDates(values, caseFile);
 
         if (problems.Count > 0)
@@ -956,7 +956,7 @@ public static class B122C2
         }
         catch (EngineLookupException error)
         {
-            throw new FormProjectionException([Py.Str(error)]);
+            throw new FormProjectionException([Exact.Str(error)]);
         }
     }
 
