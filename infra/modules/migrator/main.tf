@@ -136,10 +136,12 @@ resource "aws_iam_role_policy" "migrator" {
         Resource = var.user_pool_arn
       },
       {
-        Sid      = "SeedFixtureRead"
-        Effect   = "Allow"
-        Action   = ["s3:GetObject"]
-        Resource = "${var.fixture_bucket_arn}/*"
+        Sid    = "SeedFixtureRead"
+        Effect = "Allow"
+        Action = ["s3:GetObject"]
+        # Guarded: the comprehension builds every statement before the
+        # filter drops the seed ones, and prod passes no buckets.
+        Resource = var.seed ? "${var.fixture_bucket_arn}/*" : null
       },
       {
         # The fixture case's documents land under cases/<case_id>/…, the
@@ -147,7 +149,7 @@ resource "aws_iam_role_policy" "migrator" {
         Sid      = "SeedDocumentWrite"
         Effect   = "Allow"
         Action   = ["s3:PutObject", "s3:GetObject", "s3:PutObjectTagging"]
-        Resource = "${var.case_document_bucket_arn}/cases/*"
+        Resource = var.seed ? "${var.case_document_bucket_arn}/cases/*" : null
       },
       {
         Sid      = "SeedDocumentKeyThroughS3"
