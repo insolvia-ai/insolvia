@@ -9,20 +9,9 @@ variable "environment" {
   type        = string
 }
 
-variable "aws_region" {
-  description = "Region, used only to fence the API's KMS grant to DynamoDB as the calling service."
-  type        = string
-}
-
 variable "kms_key_arn" {
   description = "The CASE key, from modules/case_store. Deliberately not a key of this module's own — firm membership decides who reads case data, and a second key would be a second deny to get right."
   type        = string
-}
-
-variable "api_role_name" {
-  description = "Execution role that resolves callers and administers firm users. Null in infra/envs/dev, where there is no Lambda and the developer's own IAM user is the principal."
-  type        = string
-  default     = null
 }
 
 variable "point_in_time_recovery" {
@@ -32,7 +21,7 @@ variable "point_in_time_recovery" {
 }
 
 variable "deletion_protection" {
-  description = "Whether the table refuses to be destroyed. True in prod: losing a firm's user list locks every one of its staff out of every case."
+  description = "Whether the table refuses to be destroyed. False everywhere since ADR 0028: the table is being deleted (plan 18.23)."
   type        = bool
   default     = false
 }
@@ -41,39 +30,4 @@ variable "tags" {
   description = "Tags applied to the table."
   type        = map(string)
   default     = {}
-}
-
-# The admin service's Lambda execution role (#213), or null where there is no
-# admin Lambda (dev — the local admin service runs under the developer's own
-# IAM user). Looked up by name for the same no-circular-dependency reason as
-# api_role_name.
-variable "admin_role_name" {
-  description = "Admin Lambda execution role name to grant firm-table CRUD + Scan, or null."
-  type        = string
-  default     = null
-}
-
-# The MCP service's Lambda execution role (ADR 0016), or null where there is
-# no MCP Lambda (dev — the local MCP server runs under the developer's own
-# IAM user). Same name-not-ARN shape as the two above.
-variable "mcp_role_name" {
-  description = "MCP Lambda execution role name to grant read-only firm resolution, or null."
-  type        = string
-  default     = null
-}
-
-# TRANSITIONAL (ADR 0028): delete with the DynamoDB tables in plan 18.23.
-variable "dynamodb_grants" {
-  description = <<-EOT
-    Whether the application roles keep their DynamoDB grants on this module's
-    tables. true is the Python backend's shape, and stays the default for
-    infra/envs/dev, where a developer's local Python stack still reads the
-    per-machine tables until 18.23 deletes the Python. Staging and prod pass
-    false since the switch (plan 18.22): their .NET hosts keep their data in
-    Aurora, so a role keeps only the grants that are not DynamoDB's — the KMS
-    envelopes, S3, the kill switch. The TABLES themselves are untouched here;
-    18.23 deletes them with the maintainer.
-  EOT
-  type        = bool
-  default     = true
 }

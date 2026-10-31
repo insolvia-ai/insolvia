@@ -42,20 +42,6 @@ variable "worker_role_name" {
   default     = null
 }
 
-variable "mcp_role_name" {
-  description = <<-EOT
-    Execution role of the MCP service Lambda —
-    module.mcp_service.lambda_role_name (ADR 0016). Same name-not-ARN shape
-    and same reasoning as api_role_name above: the grant attaches from this
-    side, so neither module references the other's resources.
-
-    null in infra/envs/dev, where there is no Lambda — the local MCP server
-    runs under the developer's own IAM user, like the API's dev server.
-  EOT
-  type        = string
-  default     = null
-}
-
 variable "point_in_time_recovery" {
   description = <<-EOT
     DynamoDB PITR. On everywhere that holds data worth recovering; off in dev,
@@ -67,9 +53,9 @@ variable "point_in_time_recovery" {
 }
 
 variable "deletion_protection" {
-  description = "DynamoDB deletion protection. True in prod; staging stays disposable."
+  description = "DynamoDB deletion protection on the case and access-log tables. False everywhere since ADR 0028: the tables are being deleted (plan 18.23), and DynamoDB refuses to delete a protected table."
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "key_deletion_window_in_days" {
@@ -91,20 +77,4 @@ variable "tags" {
   description = "Tags applied to every resource in this module."
   type        = map(string)
   default     = {}
-}
-
-# TRANSITIONAL (ADR 0028): delete with the DynamoDB tables in plan 18.23.
-variable "dynamodb_grants" {
-  description = <<-EOT
-    Whether the application roles keep their DynamoDB grants on this module's
-    tables. true is the Python backend's shape, and stays the default for
-    infra/envs/dev, where a developer's local Python stack still reads the
-    per-machine tables until 18.23 deletes the Python. Staging and prod pass
-    false since the switch (plan 18.22): their .NET hosts keep their data in
-    Aurora, so a role keeps only the grants that are not DynamoDB's — the KMS
-    envelopes, S3, the kill switch. The TABLES themselves are untouched here;
-    18.23 deletes them with the maintainer.
-  EOT
-  type        = bool
-  default     = true
 }

@@ -17,9 +17,9 @@
 #   3. EVERY USE IS RECORDED. CloudTrail records each GenerateDataKey and
 #      Decrypt on this key (with the encryption context — firm, attorney,
 #      credential — in the event) and the data events on this table, via
-#      modules/audit_trail; the worker's role can append the application
-#      `credential.open` row to the case access log, which names the
-#      attorney, the filing and the purpose (insolvia_core.filing_credentials).
+#      modules/audit_trail; the filing host appends the application
+#      `credential.open` row to the case access log (an Aurora table since
+#      ADR 0028), which names the attorney, the filing and the purpose.
 #
 # WHY THE TABLE IS ENCRYPTED UNDER THE CASE KEY AND NOT THE VAULT KEY. DynamoDB
 # decrypts a CMK-encrypted table's keys AS THE CALLER (kms:ViaService =
@@ -47,7 +47,6 @@
 # that rewrote the key policy could not open a credential ITSELF.
 
 data "aws_caller_identity" "current" {}
-data "aws_region" "current" {}
 
 locals {
   # insolvia-<env>-filing-credentials — the TABLE's name AND the KEY's alias
@@ -199,25 +198,16 @@ locals {
     )
   })
 
-  # What the filing worker may do, and it is exactly what PR 7's Lambda needs
-  # FROM THE VAULT: read a credential's item (its status is re-checked
-  # immediately before the final submit — ADR 0024), open its envelope, and
-  # append the access row. No Put/Update/Delete on the vault: the worker
-  # never enrols or revokes. Its queue grant is modules/filing_queue's; its
-  # case-table, bucket, kill-switch and log grants are modules/filing_worker's
-  # (ADR 0024 PR 7), pinned whole by that module's test.
+  # What the filing worker may do FROM THE VAULT: open a credential's
+  # envelope, under the vault purpose, and nothing else. The credential's ROW
+  # is Aurora's since ADR 0028 (filing_credentials, SELECT for the `filing`
+  # Postgres role alone), and so is the access row it appends; neither is an
+  # IAM grant any more. Its queue grant is modules/filing_queue's; its
+  # bucket, kill-switch and log grants are modules/filing_worker's, pinned
+  # whole by that module's test.
   worker_policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [for s in [
-      {
-        Sid      = "CredentialRead"
-        Effect   = "Allow"
-        Action   = ["dynamodb:GetItem"]
-        Resource = "arn:aws:dynamodb:${data.aws_region.current.region}:${local.account_id}:table/${local.name}"
-        Condition = {
-          Bool = { "aws:SecureTransport" = "true" }
-        }
-      },
+    Statement = [
       {
         Sid      = "CredentialOpen"
         Effect   = "Allow"
@@ -227,52 +217,15 @@ locals {
           StringEquals = { "kms:EncryptionContext:purpose" = local.credential_purpose }
         }
       },
-      {
-        # Append-only, the API's CaseAccessLogAppend posture: the worker
-        # records that it opened a credential and can never read the log.
-        Sid      = "CredentialAccessLogAppend"
-        Effect   = "Allow"
-        Action   = ["dynamodb:PutItem"]
-        Resource = var.access_log_table_arn
-        Condition = {
-          Bool = { "aws:SecureTransport" = "true" }
-        }
-      },
-      {
-        # The table's (and the access log's) at-rest key, through DynamoDB
-        # only — modules/case_store's api_key_actions note says why this is
-        # not dead weight.
-        Sid      = "TableKeyThroughDynamoDb"
-        Effect   = "Allow"
-        Action   = ["kms:Decrypt", "kms:GenerateDataKey", "kms:DescribeKey"]
-        Resource = var.table_kms_key_arn
-        Condition = {
-          StringEquals = { "kms:ViaService" = "dynamodb.${data.aws_region.current.region}.amazonaws.com" }
-        }
-      },
-    ] : s if var.dynamodb_grants || contains(["CredentialOpen"], s.Sid)]
+    ]
   })
 
+  # SEAL-ONLY: the API mints the data key an enrolment is sealed with and
+  # can never unwrap it (the key policy denies it Decrypt). Enrol, status and
+  # revoke are rows in Aurora since ADR 0028, not IAM grants.
   api_policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [for s in [
-      {
-        # Enrol (PutItem), status (Query, GetItem), revoke (DeleteItem — the
-        # item is DESTROYED, ADR 0024: revocation is not a flag the worker
-        # might fail to read). No Scan: every read names the attorney.
-        Sid    = "CredentialRows"
-        Effect = "Allow"
-        Action = [
-          "dynamodb:PutItem",
-          "dynamodb:GetItem",
-          "dynamodb:Query",
-          "dynamodb:DeleteItem",
-        ]
-        Resource = aws_dynamodb_table.credentials.arn
-        Condition = {
-          Bool = { "aws:SecureTransport" = "true" }
-        }
-      },
+    Statement = [
       {
         Sid      = "CredentialSeal"
         Effect   = "Allow"
@@ -282,16 +235,7 @@ locals {
           StringEquals = { "kms:EncryptionContext:purpose" = local.credential_purpose }
         }
       },
-      {
-        Sid      = "TableKeyThroughDynamoDb"
-        Effect   = "Allow"
-        Action   = ["kms:Decrypt", "kms:GenerateDataKey", "kms:DescribeKey"]
-        Resource = var.table_kms_key_arn
-        Condition = {
-          StringEquals = { "kms:ViaService" = "dynamodb.${data.aws_region.current.region}.amazonaws.com" }
-        }
-      },
-    ] : s if var.dynamodb_grants || contains(["CredentialSeal"], s.Sid)]
+    ]
   })
 }
 
@@ -366,6 +310,9 @@ resource "aws_dynamodb_table" "credentials" {
     kms_key_arn = var.table_kms_key_arn
   }
 
+  # Off everywhere since ADR 0028: the vault's rows are Aurora's, and this
+  # table is deleted in plan 18.23 — DynamoDB refuses to delete a protected
+  # table, so protection comes off one apply before the resource goes.
   deletion_protection_enabled = var.deletion_protection
 
   tags = var.tags

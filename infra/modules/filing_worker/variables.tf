@@ -57,12 +57,6 @@ variable "dlq_name" {
   type        = string
 }
 
-variable "case_table_arn" {
-  description = "The case table — module.case_store.table_arn. Read and written by the Python worker while dynamodb_grants is true (dev's poller); unused once it is false. TRANSITIONAL — 18.23."
-  type        = string
-  default     = null
-}
-
 variable "db_endpoint" {
   description = "Aurora's writer endpoint (module.aurora.endpoint), for INSOLVIA_DB_ENDPOINT. null in dev (no Lambda)."
   type        = string
@@ -94,7 +88,7 @@ variable "filing_kms_key_alias" {
 }
 
 variable "case_kms_key_arn" {
-  description = "The case key — module.case_store.kms_key_arn — usable through DynamoDB and S3 only."
+  description = "The case key — module.case_store.kms_key_arn — usable through S3 and under the tax-id context only."
   type        = string
 }
 
@@ -163,20 +157,4 @@ variable "db_cluster_resource_id" {
   description = "The Aurora cluster's resource id (module.aurora.cluster_resource_id) — what this host's rds-db:connect grant names. null in dev."
   type        = string
   default     = null
-}
-
-# TRANSITIONAL (ADR 0028): delete with the DynamoDB tables in plan 18.23.
-variable "dynamodb_grants" {
-  description = <<-EOT
-    Whether the application roles keep their DynamoDB grants on this module's
-    tables. true is the Python backend's shape, and stays the default for
-    infra/envs/dev, where a developer's local Python stack still reads the
-    per-machine tables until 18.23 deletes the Python. Staging and prod pass
-    false since the switch (plan 18.22): their .NET hosts keep their data in
-    Aurora, so a role keeps only the grants that are not DynamoDB's — the KMS
-    envelopes, S3, the kill switch. The TABLES themselves are untouched here;
-    18.23 deletes them with the maintainer.
-  EOT
-  type        = bool
-  default     = true
 }
