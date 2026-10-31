@@ -112,9 +112,7 @@ module "admin_web_hosting" {
 
 # Admin service (#213): the cross-tenant provisioning surface (services/admin,
 # ADR 0011). Staging's block owns the shared commentary; prod differs only in
-# insolvia_env, the hostname, the client id, and the audit table keeping its
-# deletion protection — it is the durable record of who provisioned every
-# real firm (#178).
+# insolvia_env, the hostname and the client id.
 module "admin_service" {
   source = "../../modules/admin_service"
 
@@ -133,7 +131,9 @@ module "admin_service" {
   vpc_security_group_ids = [module.network.lambda_security_group_id]
   db_cluster_resource_id = module.aurora.cluster_resource_id
 
-  audit_deletion_protection = true
+  # OFF ahead of the DynamoDB audit table's delete (plan 18.23): the admin
+  # audit is the Postgres admin_audit table since ADR 0028.
+  audit_deletion_protection = false
 
   tags = local.common_tags
 }
@@ -141,9 +141,9 @@ module "admin_service" {
 # MCP service (#262, ADR 0016): the remote MCP server (services/mcp) — a
 # second protocol surface over the same case and firm stores, deployed the
 # way the API is: same cert-lookup reuse, same image-before-apply bootstrap
-# on the first apply (scripts/bootstrap-ecr-images.sh prod mcp). Its data
-# grants attach from modules/case_store and modules/firm_store
-# (mcp_role_name), so this module owns only the service stack itself.
+# on the first apply (scripts/bootstrap-ecr-images.sh prod mcp). Its data is
+# Aurora's (ADR 0028), reached as the `mcp` Postgres role, so this module owns
+# the service stack and nothing else.
 module "mcp_service" {
   source = "../../modules/mcp_service"
 
@@ -360,11 +360,9 @@ module "case_store" {
   environment      = local.environment
   api_role_name    = module.api_service.lambda_role_name
   worker_role_name = module.job_pipeline.worker_role_name
-  mcp_role_name    = module.mcp_service.lambda_role_name
-  # The switch (plan 18.22): the case data is Aurora's; the roles keep only
-  # the tax-id envelope grant on this key. The tables stay until 18.23.
-  dynamodb_grants             = false
-  deletion_protection         = true
+  # OFF ahead of the delete (plan 18.23): the data is Aurora's since ADR 0028,
+  # and DynamoDB refuses to delete a table with deletion protection on.
+  deletion_protection         = false
   key_deletion_window_in_days = 30
   tags                        = local.common_tags
 }
@@ -379,18 +377,14 @@ module "case_store" {
 module "firm_store" {
   source = "../../modules/firm_store"
 
-  project         = "insolvia"
-  environment     = local.environment
-  aws_region      = var.aws_region
-  kms_key_arn     = module.case_store.kms_key_arn
-  api_role_name   = module.api_service.lambda_role_name
-  admin_role_name = module.admin_service.lambda_role_name
-  mcp_role_name   = module.mcp_service.lambda_role_name
-  # The switch: no role keeps a firm-table grant (the table stays until 18.23).
-  dynamodb_grants        = false
+  project                = "insolvia"
+  environment            = local.environment
+  kms_key_arn            = module.case_store.kms_key_arn
   point_in_time_recovery = true
-  deletion_protection    = true
-  tags                   = local.common_tags
+  # OFF ahead of the delete (plan 18.23): the data is Aurora's since ADR 0028,
+  # and DynamoDB refuses to delete a table with deletion protection on.
+  deletion_protection = false
+  tags                = local.common_tags
 }
 
 # ── Filing credentials (ADR 0024, guardrail 3) ──────────────────
@@ -407,16 +401,14 @@ module "firm_store" {
 module "filing_credentials" {
   source = "../../modules/filing_credentials"
 
-  project              = "insolvia"
-  environment          = local.environment
-  table_kms_key_arn    = module.case_store.kms_key_arn
-  access_log_table_arn = module.case_store.access_log_table_arn
-  api_role_name        = module.api_service.lambda_role_name
-  # The switch: the vault rows are Aurora's (filing_credentials — the API
-  # writes, only `filing` reads); the roles keep the vault KEY grants.
-  dynamodb_grants             = false
-  point_in_time_recovery      = true
-  deletion_protection         = true
+  project                = "insolvia"
+  environment            = local.environment
+  table_kms_key_arn      = module.case_store.kms_key_arn
+  api_role_name          = module.api_service.lambda_role_name
+  point_in_time_recovery = true
+  # OFF ahead of the delete (plan 18.23): the data is Aurora's since ADR 0028,
+  # and DynamoDB refuses to delete a table with deletion protection on.
+  deletion_protection         = false
   key_deletion_window_in_days = 30
   tags                        = local.common_tags
 }
@@ -499,7 +491,6 @@ module "filing_worker" {
 
   # The switch (plan 18.22): the .NET worker in the VPC, against Aurora as
   # the `filing` role, naming both of its keys explicitly.
-  dynamodb_grants        = false
   vpc_subnet_ids         = module.network.private_subnet_ids
   vpc_security_group_ids = [module.network.lambda_security_group_id]
   db_cluster_resource_id = module.aurora.cluster_resource_id

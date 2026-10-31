@@ -31,7 +31,6 @@ variables {
   worker_role_arn           = "arn:aws:iam::111122223333:role/insolvia-staging-filing-role"
   queue_arn                 = "arn:aws:sqs:us-east-1:111122223333:insolvia-staging-filing"
   dlq_name                  = "insolvia-staging-filing-dlq"
-  case_table_arn            = "arn:aws:dynamodb:us-east-1:111122223333:table/insolvia-staging-cases"
   case_kms_key_arn          = "arn:aws:kms:us-east-1:111122223333:key/case-key"
   case_document_bucket_arn  = "arn:aws:s3:::insolvia-staging-case-documents-us-east-1"
   case_document_bucket_name = "insolvia-staging-case-documents-us-east-1"
@@ -52,33 +51,6 @@ run "the_worker_grant_is_pinned" {
     condition = output.worker_policy == jsonencode({
       Version = "2012-10-17"
       Statement = [
-        {
-          Sid      = "FilingCaseRead"
-          Effect   = "Allow"
-          Action   = ["dynamodb:GetItem", "dynamodb:Query"]
-          Resource = "arn:aws:dynamodb:us-east-1:111122223333:table/insolvia-staging-cases"
-          Condition = {
-            Bool = { "aws:SecureTransport" = "true" }
-          }
-        },
-        {
-          Sid      = "FilingRecordWrite"
-          Effect   = "Allow"
-          Action   = ["dynamodb:PutItem", "dynamodb:UpdateItem"]
-          Resource = "arn:aws:dynamodb:us-east-1:111122223333:table/insolvia-staging-cases"
-          Condition = {
-            Bool = { "aws:SecureTransport" = "true" }
-          }
-        },
-        {
-          Sid      = "CaseKeyThroughDynamoDb"
-          Effect   = "Allow"
-          Action   = ["kms:Decrypt", "kms:GenerateDataKey", "kms:DescribeKey"]
-          Resource = "arn:aws:kms:us-east-1:111122223333:key/case-key"
-          Condition = {
-            StringEquals = { "kms:ViaService" = "dynamodb.us-east-1.amazonaws.com" }
-          }
-        },
         {
           # ADR 0024 PR 9: the Case Upload file's tax-id read — Decrypt only,
           # fenced to the tax-id envelope's encryption context.
@@ -143,60 +115,10 @@ run "the_worker_grant_is_pinned" {
   }
 }
 
-# The switch (ADR 0028, plan 18.22): staging and prod pass
-# dynamodb_grants = false, and the grant loses exactly its DynamoDB half —
-# the case data is the database, reached as the `filing` Postgres role.
-run "the_dotnet_worker_grant_is_pinned" {
+# The .NET host (ADR 0028): the case data is the database, reached as the
+# `filing` Postgres role, so the grant above holds no DynamoDB verb.
+run "the_dotnet_worker_runs_as_filing_in_the_vpc" {
   command = apply
-
-  variables {
-    dynamodb_grants = false
-  }
-
-  assert {
-    condition = output.worker_policy == jsonencode({
-      Version = "2012-10-17"
-      Statement = [
-        {
-          Sid      = "TaxIdOpen"
-          Effect   = "Allow"
-          Action   = ["kms:Decrypt"]
-          Resource = "arn:aws:kms:us-east-1:111122223333:key/case-key"
-          Condition = {
-            StringEquals = { "kms:EncryptionContext:purpose" = "debtor-tax-id" }
-          }
-        },
-        {
-          Sid      = "PacketRead"
-          Effect   = "Allow"
-          Action   = ["s3:GetObject"]
-          Resource = "arn:aws:s3:::insolvia-staging-case-documents-us-east-1/cases/*/packets/*"
-        },
-        {
-          Sid      = "FilingReceiptWrite"
-          Effect   = "Allow"
-          Action   = ["s3:PutObject"]
-          Resource = "arn:aws:s3:::insolvia-staging-case-documents-us-east-1/cases/*/filings/*"
-        },
-        {
-          Sid      = "CaseKeyThroughS3"
-          Effect   = "Allow"
-          Action   = ["kms:Decrypt", "kms:GenerateDataKey", "kms:DescribeKey"]
-          Resource = "arn:aws:kms:us-east-1:111122223333:key/case-key"
-          Condition = {
-            StringEquals = { "kms:ViaService" = "s3.us-east-1.amazonaws.com" }
-          }
-        },
-        {
-          Sid      = "KillSwitchRead"
-          Effect   = "Allow"
-          Action   = ["ssm:GetParameter"]
-          Resource = "arn:aws:ssm:us-east-1:111122223333:parameter/insolvia/staging/filing/submissions-enabled"
-        },
-      ]
-    })
-    error_message = "The .NET filing worker's grant changed — this file must change with it, and the diff must say why."
-  }
 
   assert {
     condition     = aws_lambda_function.worker[0].environment[0].variables["INSOLVIA_DB_USERNAME"] == "filing"

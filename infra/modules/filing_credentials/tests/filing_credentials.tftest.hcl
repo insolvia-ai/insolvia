@@ -17,17 +17,12 @@ mock_provider "aws" {
     target = data.aws_caller_identity.current
     values = { account_id = "111122223333" }
   }
-  override_data {
-    target = data.aws_region.current
-    values = { region = "us-east-1" }
-  }
 }
 
 variables {
-  environment          = "staging"
-  table_kms_key_arn    = "arn:aws:kms:us-east-1:111122223333:key/case-key"
-  access_log_table_arn = "arn:aws:dynamodb:us-east-1:111122223333:table/insolvia-staging-case-access-log"
-  api_role_name        = "insolvia-staging-api-role"
+  environment       = "staging"
+  table_kms_key_arn = "arn:aws:kms:us-east-1:111122223333:key/case-key"
+  api_role_name     = "insolvia-staging-api-role"
 }
 
 run "deployed_key_policy_is_pinned" {
@@ -135,8 +130,14 @@ run "deployed_key_policy_is_pinned" {
   }
 
   assert {
-    condition     = jsondecode(aws_iam_role_policy.api[0].policy).Statement[1].Action == ["kms:GenerateDataKey"]
-    error_message = "The API's vault-key grant is GenerateDataKey alone — seal, never open."
+    condition = jsondecode(aws_iam_role_policy.api[0].policy).Statement == [{
+      Sid       = "CredentialSeal"
+      Effect    = "Allow"
+      Action    = ["kms:GenerateDataKey"]
+      Resource  = aws_kms_key.vault.arn
+      Condition = { StringEquals = { "kms:EncryptionContext:purpose" = "filing-credential" } }
+    }]
+    error_message = "The API's grant is GenerateDataKey on the vault key alone — seal, never open, and no DynamoDB verb since ADR 0028."
   }
 }
 

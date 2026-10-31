@@ -83,11 +83,9 @@ bootstrap is its
   (`backend/src/Insolvia.Migrator`'s `ServiceRoles` and `Grants.cs`), then its
   name in `vpc_lambda_access`'s validation. The migrator Lambda
   (`modules/migrator`) is the only reader of the RDS master secret; the deploy
-  role is denied it. `dynamodb_grants` on `case_store`, `firm_store`,
-  `filing_credentials` and `filing_worker` is TRANSITIONAL — false in staging
-  and prod, the default in dev (which passes no role to grant) — and goes
-  with the tables, in the table-deletion PR after the prod promote (18.23
-  deleted the Python but not the tables). `docs/reference/terraform.md` § "The backend on .NET and
+  role is denied it. No role holds a DynamoDB grant any
+  more; the tables themselves go in two applies (deletion protection off,
+  then the delete — DynamoDB refuses to delete a protected table). `docs/reference/terraform.md` § "The backend on .NET and
   Aurora" has the per-host table.
 - **Structure:** `modules/<concern>/{main,variables,outputs}.tf`,
   `envs/<env>/{main,variables,providers,backend,outputs}.tf`. State:

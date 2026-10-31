@@ -110,10 +110,9 @@ module "admin_web_hosting" {
 # ADR 0011), deployed the way the API is — same cert-lookup reuse, same
 # image-before-apply bootstrap on the first apply (extend it with
 # scripts/bootstrap-ecr-images.sh --services admin). Declared after
-# api_service only by convention; its cross-module grants attach from
-# modules/firm_store (admin_role_name — CRUD + the Scan the API role
-# deliberately lacks) and modules/auth (admin_invite_role_name — the same
-# one-action AdminCreateUser shape as the API's invite grant).
+# api_service only by convention; its one cross-module grant attaches from
+# modules/auth (admin_invite_role_name — the same one-action AdminCreateUser
+# shape as the API's invite grant). Its firm data is Aurora's (ADR 0028).
 module "admin_service" {
   source = "../../modules/admin_service"
 
@@ -142,9 +141,9 @@ module "admin_service" {
 # MCP service (#262, ADR 0016): the remote MCP server (services/mcp) — a
 # second protocol surface over the same case and firm stores, deployed the
 # way the API is: same cert-lookup reuse, same image-before-apply bootstrap
-# on the first apply (scripts/bootstrap-ecr-images.sh staging mcp). Its data
-# grants attach from modules/case_store and modules/firm_store
-# (mcp_role_name), so this module owns only the service stack itself.
+# on the first apply (scripts/bootstrap-ecr-images.sh staging mcp). Its data is
+# Aurora's (ADR 0028), reached as the `mcp` Postgres role, so this module owns
+# the service stack and nothing else.
 module "mcp_service" {
   source = "../../modules/mcp_service"
 
@@ -367,14 +366,10 @@ resource "aws_ssm_parameter" "job_queue_url" {
 module "case_store" {
   source = "../../modules/case_store"
 
-  project          = "insolvia"
-  environment      = local.environment
-  api_role_name    = module.api_service.lambda_role_name
-  worker_role_name = module.job_pipeline.worker_role_name
-  mcp_role_name    = module.mcp_service.lambda_role_name
-  # The switch (plan 18.22): the case data is Aurora's; the roles keep only
-  # the tax-id envelope grant on this key. The tables stay until 18.23.
-  dynamodb_grants             = false
+  project                     = "insolvia"
+  environment                 = local.environment
+  api_role_name               = module.api_service.lambda_role_name
+  worker_role_name            = module.job_pipeline.worker_role_name
   deletion_protection         = false
   key_deletion_window_in_days = 7
   tags                        = local.common_tags
@@ -387,15 +382,9 @@ module "case_store" {
 module "firm_store" {
   source = "../../modules/firm_store"
 
-  project         = "insolvia"
-  environment     = local.environment
-  aws_region      = var.aws_region
-  kms_key_arn     = module.case_store.kms_key_arn
-  api_role_name   = module.api_service.lambda_role_name
-  admin_role_name = module.admin_service.lambda_role_name
-  mcp_role_name   = module.mcp_service.lambda_role_name
-  # The switch: no role keeps a firm-table grant (the table stays until 18.23).
-  dynamodb_grants        = false
+  project                = "insolvia"
+  environment            = local.environment
+  kms_key_arn            = module.case_store.kms_key_arn
   point_in_time_recovery = false
   deletion_protection    = false
   tags                   = local.common_tags
@@ -409,14 +398,10 @@ module "firm_store" {
 module "filing_credentials" {
   source = "../../modules/filing_credentials"
 
-  project              = "insolvia"
-  environment          = local.environment
-  table_kms_key_arn    = module.case_store.kms_key_arn
-  access_log_table_arn = module.case_store.access_log_table_arn
-  api_role_name        = module.api_service.lambda_role_name
-  # The switch: the vault rows are Aurora's (filing_credentials — the API
-  # writes, only `filing` reads); the roles keep the vault KEY grants.
-  dynamodb_grants             = false
+  project                     = "insolvia"
+  environment                 = local.environment
+  table_kms_key_arn           = module.case_store.kms_key_arn
+  api_role_name               = module.api_service.lambda_role_name
   point_in_time_recovery      = false
   deletion_protection         = false
   key_deletion_window_in_days = 7
@@ -507,7 +492,6 @@ module "filing_worker" {
 
   # The switch (plan 18.22): the .NET worker in the VPC, against Aurora as
   # the `filing` role, naming both of its keys explicitly.
-  dynamodb_grants        = false
   vpc_subnet_ids         = module.network.private_subnet_ids
   vpc_security_group_ids = [module.network.lambda_security_group_id]
   db_cluster_resource_id = module.aurora.cluster_resource_id

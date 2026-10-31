@@ -8,9 +8,8 @@ output "lambda_alias_name" {
   value       = aws_lambda_alias.live.name
 }
 
-# The role modules/firm_store (admin_role_name) and modules/auth
-# (admin_invite_role_name) attach their grants to — the seams live there so
-# each grant sits beside the resource it opens.
+# The role modules/auth (admin_invite_role_name) attaches its grant to — the
+# seam lives there so the grant sits beside the resource it opens.
 output "lambda_role_name" {
   description = "Admin Lambda execution role name."
   value       = aws_iam_role.admin.name

@@ -137,13 +137,14 @@ by host (the per-module sections below keep their history):
   `insolvia-kms-filing-key-alias`); the .NET hosts no longer derive them from
   a table name. A generated `insolvia-cursor-key` (SecureString) binds the
   API's and MCP's keyset cursors.
-- **The DynamoDB tables stay; their grants do not.** Staging and prod pass
-  `dynamodb_grants = false` to `case_store`, `firm_store`,
-  `filing_credentials` and `filing_worker` (a TRANSITIONAL variable, true by
-  default, which dev — granting no role — never exercises), and the waitlist
-  and admin-audit PutItems are gone from `api_service`/`admin_service`. The
-  tables themselves are deleted after the prod promote, in their own PR with
-  the maintainer — prod's carry deletion protection (§ Destruction safety).
+- **No role reaches DynamoDB.** Every DynamoDB statement — table verbs and
+  the `kms:ViaService = dynamodb` key grants — is gone from `case_store`,
+  `firm_store`, `filing_credentials` and `filing_worker` (and the transitional
+  `dynamodb_grants` variable with them); what a role keeps on the case and
+  vault keys is the tax-id and vault envelopes, and the S3 fence. The tables
+  themselves are deleted in two applies, because DynamoDB refuses to delete a
+  protected table: deletion protection comes off everywhere first (plan
+  18.23, phase 1), then the resources go (phase 2).
 - **The migrator runs before every alias shift** — `release.yml`'s first leg
   after infra in both stages ([`architecture.md`](architecture.md) § CI/CD).
 
