@@ -42,6 +42,11 @@ jobs:
           paths: |
             # The stack under test and the suite.
             backend/**
+            # Not built or tested by this check: the developer scripts, the docs,
+            # and the local compose stack.
+            !backend/scripts/**
+            !backend/*.md
+            !backend/docker-compose.yml
             contract/**
             # The client the suite drives, and the seeds the migrator loads.
             packages/insolvia_api_client/**
