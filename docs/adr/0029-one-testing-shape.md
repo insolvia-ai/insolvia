@@ -1,6 +1,6 @@
 # ADR 0029 — One testing shape: xUnit, Jest, Playwright and `terraform test`; route tests and contract tests split the API between them
 
-- **Status:** Proposed
+- **Status:** Accepted 2026-11-01 ([#578](https://github.com/insolvia-ai/insolvia/issues/578)). The maintainer revised it on review: no Python code of our own (not a tooling exception); outside-in specs go through the client callers run; `pre-commit` stays.
 - **Date:** 2026-11-01
 - **Relates to:** [#578](https://github.com/insolvia-ai/insolvia/issues/578)
   carries the work this decides, item by item.
