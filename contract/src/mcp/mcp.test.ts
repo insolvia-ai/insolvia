@@ -1,28 +1,35 @@
-// The MCP server over raw JSON-RPC (docs/reference/mcp-surface.md; the
-// protocol revision backend/tests/Insolvia.Mcp.Tests/ProtocolTests.cs pins):
-// protected-resource metadata, the 401 challenge, initialize, the static
-// eight-tool listing, every tool, the error envelope — and the candidate
-// flow across services, proposed here and reviewed through the API.
-import { expect, it } from '@jest/globals';
+// The MCP server through the official TypeScript SDK (docs/reference/
+// mcp-surface.md; ADR 0029 rule 2): protected-resource metadata, the 401
+// challenge, the handshake, the static eight-tool listing, every tool, the
+// error envelope — and the candidate flow across services, proposed here and
+// reviewed through the API.
+//
+// Signed in on both targets. Offline, the run's own key mints the MCP
+// client's token; deployed, the seeded firm admin signs in by SRP through an
+// MCP harness's real app client, and the server admits that token only if
+// the client is on its allowlist (AUTH_CLIENT_IDS) — #583 verified it is.
+//
+// The 2026-07-28 transport (server/discover, the Mcp-Method and Mcp-Name
+// headers and their mismatch refusal) is not here: no released TypeScript SDK
+// speaks it, and ProtocolTests.cs owns it (support/mcp.ts says so).
+import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
+import {
+  discoverOAuthProtectedResourceMetadata,
+  extractWWWAuthenticateParams,
+} from '@modelcontextprotocol/sdk/client/auth.js';
+import { StreamableHTTPError } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { SUPPORTED_PROTOCOL_VERSIONS } from '@modelcontextprotocol/sdk/types.js';
 
-import { firmAdmin, scratchCase } from '../support/actors.ts';
+import { firmAdmin, scratchCase, tokenOf } from '../support/actors.ts';
 import { env, seeded } from '../support/env.ts';
 import { fixtureCase } from '../support/fixtures.ts';
-import { mcpToken, staffToken } from '../support/tokens.ts';
 import { offlineOnly } from '../support/gates.ts';
+import { connectMcp, type McpConnection, mcpTokenOfFirmAdmin } from '../support/mcp.ts';
+import { mcpToken } from '../support/tokens.ts';
 import { expectShape, withMessage } from '../support/wire.ts';
 
-// The MCP server signs in with tokens only the run's own key mints (Google ID
-// tokens for admin, the MCP harness's client for MCP); #583 brings it to the
-// deployed target, through its own client.
-const NOT_YET_DEPLOYED = 'signs with the run’s own key; the deployed MCP server target is #583';
+const MINTS = 'mints a token the real pool never issued (ADR 0029)';
 
-const PROTOCOL_VERSION = '2026-07-28';
-const META = {
-  'io.modelcontextprotocol/protocolVersion': PROTOCOL_VERSION,
-  'io.modelcontextprotocol/clientInfo': { name: 'insolvia-contract', version: '0' },
-  'io.modelcontextprotocol/clientCapabilities': {},
-};
 const TOOLS = [
   'whoami',
   'list_cases',
@@ -42,78 +49,6 @@ const READ_ONLY = new Set([
   'check_proposals',
 ]);
 
-let rpcId = 0;
-
-async function rpc(
-  method: string,
-  params: Record<string, unknown> = {},
-  options: { token?: string | null; headers?: Record<string, string>; legacy?: boolean } = {},
-): Promise<{ status: number; headers: Headers; body: Record<string, unknown> | null }> {
-  const token = options.token === undefined ? mcpToken(seeded.firmAdmin.subject) : options.token;
-  const response = await fetch(env.mcpUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'application/json, text/event-stream',
-      // A legacy (initialize-era) harness sends neither header nor envelope.
-      ...(options.legacy ? {} : { 'MCP-Protocol-Version': PROTOCOL_VERSION, 'Mcp-Method': method }),
-      ...(token === null ? {} : { Authorization: `Bearer ${token}` }),
-      ...options.headers,
-    },
-    body: JSON.stringify({
-      jsonrpc: '2.0',
-      id: ++rpcId,
-      method,
-      params: options.legacy ? params : { ...params, _meta: META },
-    }),
-  });
-  const text = await response.text();
-  return {
-    status: response.status,
-    headers: response.headers,
-    body: text === '' ? null : (JSON.parse(text) as Record<string, unknown>),
-  };
-}
-
-interface ToolResult {
-  readonly isError?: boolean;
-  readonly structuredContent: Record<string, unknown>;
-  readonly content: readonly { type: string; text: string }[];
-}
-
-async function call(
-  tool: string,
-  args: Record<string, unknown>,
-  token?: string,
-): Promise<ToolResult> {
-  const response = await rpc(
-    'tools/call',
-    { name: tool, arguments: args },
-    { headers: { 'Mcp-Name': tool }, ...(token === undefined ? {} : { token }) },
-  );
-  withMessage(JSON.stringify(response.body), () => expect(response.status).toBe(200));
-  expectShape(response.body, { jsonrpc: 'string', id: 'integer', result: 'object' });
-  const result = (response.body as { result: ToolResult }).result;
-  expectShape(result, {
-    structuredContent: 'object',
-    content: [{ type: 'string', text: 'string' }],
-  });
-  // The text block is the same JSON, for harnesses without structured output.
-  expect(JSON.parse(result.content[0]!.text)).toEqual(result.structuredContent);
-  return result;
-}
-
-async function refusal(tool: string, args: Record<string, unknown>, code: string, token?: string) {
-  const result = await call(tool, args, token);
-  expect(result.isError).toBe(true);
-  expectShape(result.structuredContent, {
-    error: { code: 'string', message: 'string', 'fields?': 'object' },
-  });
-  const error = (result.structuredContent as { error: { code: string } }).error;
-  expect(error.code).toBe(code);
-  return error as { code: string; message: string; fields?: Record<string, string> };
-}
-
 const CASE_SHAPE = {
   id: 'string',
   chapter: 'integer',
@@ -122,17 +57,41 @@ const CASE_SHAPE = {
   createdAt: 'string',
 } as const;
 
-offlineOnly(NOT_YET_DEPLOYED).describe('transport', () => {
+function metadataUrl(): string {
+  const url = new URL(env.mcpUrl);
+  return `${url.origin}/.well-known/oauth-protected-resource${url.pathname}`;
+}
+
+/** Connecting as `token` must fail on a 401 carrying the RFC 9728 challenge. */
+async function expectChallenged(token: string | null): Promise<void> {
+  const responses: Response[] = [];
+  let caught: unknown;
+  try {
+    await (await connectMcp(token, responses)).close();
+  } catch (error) {
+    caught = error;
+  }
+  withMessage('the SDK connected', () => expect(caught).toBeInstanceOf(StreamableHTTPError));
+  expect((caught as StreamableHTTPError).code).toBe(401);
+  const refused = responses.at(-1)!;
+  expect(refused.headers.get('www-authenticate')?.startsWith('Bearer ')).toBe(true);
+  // What a harness reads to find the authorization server, by the SDK's parser.
+  expect(extractWWWAuthenticateParams(refused).resourceMetadataUrl?.href).toBe(metadataUrl());
+}
+
+let mcp: McpConnection;
+
+beforeAll(async () => {
+  mcp = await connectMcp(await mcpTokenOfFirmAdmin());
+});
+
+afterAll(async () => {
+  await mcp?.close();
+});
+
+describe('mcp: transport', () => {
   it('publishes RFC 9728 protected-resource metadata naming the issuer', async () => {
-    const url = new URL(env.mcpUrl);
-    const response = await fetch(
-      `${url.origin}/.well-known/oauth-protected-resource${url.pathname}`,
-    );
-    expect(response.status).toBe(200);
-    const metadata = (await response.json()) as {
-      resource: unknown;
-      authorization_servers: unknown;
-    };
+    const metadata = await discoverOAuthProtectedResourceMetadata(env.mcpUrl);
     expectShape(metadata, {
       resource: 'string',
       authorization_servers: ['string'],
@@ -142,72 +101,32 @@ offlineOnly(NOT_YET_DEPLOYED).describe('transport', () => {
     expect(metadata.authorization_servers).toEqual([env.issuerUrl]);
   });
 
-  it('challenges a missing, expired, or other-client token with a 401', async () => {
-    for (const token of [
-      null,
-      mcpToken(seeded.firmAdmin.subject, { exp: Math.floor(Date.now() / 1000) - 600 }),
-      // The app's own token: valid, but not issued to an MCP client.
-      staffToken(seeded.firmAdmin.subject),
-    ]) {
-      const response = await rpc('tools/list', {}, { token });
-      expect(response.status).toBe(401);
-      const challenge = response.headers.get('www-authenticate') ?? '';
-      expect(challenge.startsWith('Bearer ')).toBe(true);
-      expect(challenge).toContain('resource_metadata=');
-    }
+  it('challenges a harness with no token', async () => {
+    await expectChallenged(null);
   });
 
-  it('rejects a header/body mismatch at the protocol layer', async () => {
-    const response = await rpc(
-      'tools/call',
-      { name: 'whoami', arguments: {} },
-      { headers: { 'Mcp-Name': 'somebody_else' } },
+  // The app's own token: valid, from the same pool, but not issued to an MCP
+  // client — the allowlist keeps the two disjoint (mcp-surface.md).
+  it('challenges the app’s own token, which no MCP client was issued', async () => {
+    await expectChallenged(tokenOf('admin'));
+  });
+
+  offlineOnly(MINTS).it('challenges an expired MCP token', async () => {
+    await expectChallenged(
+      mcpToken(seeded.firmAdmin.subject, { exp: Math.floor(Date.now() / 1000) - 600 }),
     );
-    expect(response.status).toBe(400);
-    expect((response.body as { error: { code: number } }).error.code).toBe(-32020);
   });
 });
 
-offlineOnly(NOT_YET_DEPLOYED).describe('the protocol', () => {
-  it('server/discover names the supported revisions and the tool capability', async () => {
-    // Revision 2026-07-28 has no handshake: discovery is a plain request.
-    const response = await rpc('server/discover');
-    withMessage(JSON.stringify(response.body), () => expect(response.status).toBe(200));
-    expectShape(response.body, {
-      jsonrpc: 'string',
-      id: 'integer',
-      result: { supportedVersions: ['string'], capabilities: { tools: 'object' } },
-    });
-    const result = (response.body as { result: { supportedVersions: string[] } }).result;
-    expect(result.supportedVersions).toContain(PROTOCOL_VERSION);
-  });
-
-  it('initialize still answers an initialize-era harness', async () => {
-    const response = await rpc(
-      'initialize',
-      {
-        protocolVersion: '2025-06-18',
-        capabilities: {},
-        clientInfo: { name: 'insolvia-contract', version: '0' },
-      },
-      { legacy: true },
-    );
-    withMessage(JSON.stringify(response.body), () => expect(response.status).toBe(200));
-    expectShape(response.body, {
-      jsonrpc: 'string',
-      id: 'integer',
-      result: {
-        protocolVersion: 'string',
-        capabilities: { tools: 'object' },
-        serverInfo: { name: 'string', version: 'string' },
-      },
-    });
+describe('mcp: the protocol', () => {
+  it('the handshake negotiates a revision the SDK speaks, and the tools capability', () => {
+    expect(SUPPORTED_PROTOCOL_VERSIONS).toContain(mcp.transport.protocolVersion);
+    expectShape(mcp.client.getServerVersion(), { name: 'string', version: 'string' });
+    expect(mcp.client.getServerCapabilities()?.tools).toBeDefined();
   });
 
   it('tools/list is the static eight, each with an output schema and annotations', async () => {
-    const response = await rpc('tools/list');
-    expect(response.status).toBe(200);
-    const tools = (response.body as { result: { tools: Record<string, unknown>[] } }).result.tools;
+    const tools = await mcp.listTools();
     expect(tools.map((t) => t.name)).toEqual(TOOLS);
     for (const tool of tools) {
       expectShape(tool, {
@@ -217,28 +136,24 @@ offlineOnly(NOT_YET_DEPLOYED).describe('the protocol', () => {
         outputSchema: 'object',
         annotations: { readOnlyHint: 'boolean' },
       });
-      withMessage(String(tool.name), () =>
-        expect((tool.annotations as { readOnlyHint: boolean }).readOnlyHint).toBe(
-          READ_ONLY.has(String(tool.name)),
-        ),
+      withMessage(tool.name, () =>
+        expect(tool.annotations?.readOnlyHint).toBe(READ_ONLY.has(tool.name)),
       );
     }
   });
 
   it('an unknown tool is a protocol-level error, not a tool result', async () => {
-    const response = await rpc(
-      'tools/call',
-      { name: 'no_such_tool', arguments: {} },
-      { headers: { 'Mcp-Name': 'no_such_tool' } },
-    );
-    const body = response.body as { error?: unknown; result?: { isError?: boolean } };
-    expect(body.error !== undefined || body.result?.isError === true).toBe(true);
+    const outcome = await mcp.client
+      .callTool({ name: 'no_such_tool', arguments: {} })
+      .then((result) => ({ result }))
+      .catch((error: unknown) => ({ error }));
+    expect('error' in outcome || outcome.result.isError === true).toBe(true);
   });
 });
 
-offlineOnly(NOT_YET_DEPLOYED).describe('the eight tools', () => {
+describe('mcp: the eight tools', () => {
   it('whoami names the caller’s firm and permissions', async () => {
-    const result = await call('whoami', {});
+    const result = await mcp.call('whoami', {});
     expectShape(result.structuredContent, {
       firm: { id: 'string', name: 'string' },
       displayName: 'string',
@@ -246,33 +161,41 @@ offlineOnly(NOT_YET_DEPLOYED).describe('the eight tools', () => {
       accessAllCases: 'boolean',
       permissions: 'object',
     });
-    expect((result.structuredContent.firm as { name: string }).name).toBe('Dev Firm');
+    expect((result.structuredContent.firm as { name: string }).name).toBe(
+      seeded.firmAdmin.firmName,
+    );
+  });
 
-    // A signed-in stranger has no firm: whoami says so instead of refusing.
-    const stranger = await call('whoami', {}, mcpToken(crypto.randomUUID()));
-    expect(stranger.structuredContent.firm).toBeNull();
-    await refusal('list_cases', {}, 'permission_denied', mcpToken(crypto.randomUUID()));
+  offlineOnly(MINTS).it('a signed-in stranger has no firm: whoami says so', async () => {
+    const stranger = await connectMcp(mcpToken(crypto.randomUUID()));
+    try {
+      const result = await stranger.call('whoami', {});
+      expect(result.structuredContent.firm).toBeNull();
+      await stranger.refuse('list_cases', {}, 'permission_denied');
+    } finally {
+      await stranger.close();
+    }
   });
 
   it('list_cases, get_case, list_case_records and get_case_record read the fixture', async () => {
     const fixture = await fixtureCase(13);
-    const page = await call('list_cases', { limit: 1 });
+    const page = await mcp.call('list_cases', { limit: 1 });
     expectShape(page.structuredContent, { cases: [CASE_SHAPE], 'nextCursor?': 'string' });
     expect(typeof page.structuredContent.nextCursor).toBe('string');
-    const next = await call('list_cases', {
+    const next = await mcp.call('list_cases', {
       limit: 100,
       cursor: page.structuredContent.nextCursor,
     });
     expectShape(next.structuredContent, { cases: [CASE_SHAPE] });
-    await refusal('list_cases', { cursor: 'not-a-cursor' }, 'validation_failed');
+    await mcp.refuse('list_cases', { cursor: 'not-a-cursor' }, 'validation_failed');
 
-    const one = await call('get_case', { caseId: fixture.id });
+    const one = await mcp.call('get_case', { caseId: fixture.id });
     expectShape(one.structuredContent, { case: CASE_SHAPE, recordCounts: 'object' });
     const counts = one.structuredContent.recordCounts as Record<string, number>;
     expect(counts.creditors).toBeGreaterThan(0);
-    await refusal('get_case', { caseId: 'no-such-case' }, 'not_found');
+    await mcp.refuse('get_case', { caseId: 'no-such-case' }, 'not_found');
 
-    const records = await call('list_case_records', {
+    const records = await mcp.call('list_case_records', {
       caseId: fixture.id,
       entityType: 'creditors',
       limit: 100,
@@ -284,7 +207,7 @@ offlineOnly(NOT_YET_DEPLOYED).describe('the eight tools', () => {
     const first = (records.structuredContent.records as { id: string }[])[0]!;
     // The same record the API serves, field for field.
     const viaApi = await firmAdmin().api.getCaseEntity(fixture.id, 'creditors', first.id);
-    const record = await call('get_case_record', {
+    const record = await mcp.call('get_case_record', {
       caseId: fixture.id,
       entityType: 'creditors',
       recordId: first.id,
@@ -293,20 +216,27 @@ offlineOnly(NOT_YET_DEPLOYED).describe('the eight tools', () => {
     expect((record.structuredContent.record as { name: string }).name).toBe(viaApi.name);
 
     // The case's clients, last four of the tax id only.
-    const clients = await call('list_case_records', { caseId: fixture.id, entityType: 'clients' });
+    const clients = await mcp.call('list_case_records', {
+      caseId: fixture.id,
+      entityType: 'clients',
+    });
     expectShape(clients.structuredContent, {
       records: [{ id: 'string', name: 'object', 'tax_id_last_four?': 'string' }],
     });
-    await refusal(
+    await mcp.refuse(
       'get_case_record',
-      { caseId: fixture.id, entityType: 'creditors', recordId: 'no-such-record' },
+      {
+        caseId: fixture.id,
+        entityType: 'creditors',
+        recordId: 'no-such-record',
+      },
       'not_found',
     );
   });
 
   it('propose → check → (review in the API) → check; and withdraw', async () => {
     const { caseId } = await scratchCase();
-    const proposed = await call('propose_case_records', {
+    const proposed = await mcp.call('propose_case_records', {
       caseId,
       proposals: [
         { entityType: 'creditors', payload: { name: 'Proposed Bank' }, note: 'from the PMS' },
@@ -322,13 +252,17 @@ offlineOnly(NOT_YET_DEPLOYED).describe('the eight tools', () => {
     }[];
     expect(kept!.status).toBe('pending');
 
-    const withdrawn = await call('withdraw_proposal', {
+    const withdrawn = await mcp.call('withdraw_proposal', {
       caseId,
       candidateId: dropped!.candidateId,
     });
     expectShape(withdrawn.structuredContent, { candidateId: 'string', status: 'string' });
     expect(withdrawn.structuredContent.status).toBe('withdrawn');
-    await refusal('withdraw_proposal', { caseId, candidateId: dropped!.candidateId }, 'conflict');
+    await mcp.refuse(
+      'withdraw_proposal',
+      { caseId, candidateId: dropped!.candidateId },
+      'conflict',
+    );
 
     // The firm reviews the agent's proposal in the API's queue.
     const admin = firmAdmin();
@@ -342,7 +276,7 @@ offlineOnly(NOT_YET_DEPLOYED).describe('the eight tools', () => {
     admin.wire(200, { candidate: 'object', record: { id: 'string' } });
     expect(reviewed.candidate.status).toBe('corrected');
 
-    const checked = await call('check_proposals', { caseId });
+    const checked = await mcp.call('check_proposals', { caseId });
     expectShape(checked.structuredContent, {
       candidates: [
         {
@@ -365,16 +299,19 @@ offlineOnly(NOT_YET_DEPLOYED).describe('the eight tools', () => {
       }[]
     ).find((c) => c.candidateId === kept!.candidateId);
     expect(outcome?.status).toBe('corrected');
-    const created = await call('get_case_record', {
+    const created = await mcp.call('get_case_record', {
       caseId,
       entityType: 'creditors',
       recordId: outcome!.resultingRecordId!,
     });
     expect((created.structuredContent.record as { name: string }).name).toBe('Corrected Bank');
 
-    const invalid = await refusal(
+    const invalid = await mcp.refuse(
       'propose_case_records',
-      { caseId, proposals: [{ entityType: 'creditors', payload: { name: 42 } }] },
+      {
+        caseId,
+        proposals: [{ entityType: 'creditors', payload: { name: 42 } }],
+      },
       'validation_failed',
     );
     expect(Object.keys(invalid.fields ?? {})).toContain('proposals[0].payload.name');

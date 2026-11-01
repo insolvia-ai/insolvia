@@ -1,6 +1,6 @@
 import { createContext, useContext } from 'react';
 
-import type { AdminClient } from './client';
+import type { AdminClient } from '@insolvia-ai/admin-client';
 
 export const ClientContext = createContext<AdminClient | null>(null);
 

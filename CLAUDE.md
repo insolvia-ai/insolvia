@@ -51,7 +51,7 @@ not here.
 
 ```
 apps/       insolvia_app (Expo / React Native, web) · insolvia_admin (staff portal, Vite SPA) · insolvia_marketing (React SSR)
-packages/   insolvia_api_client (the app's typed client for the API)
+packages/   insolvia_api_client (the app's typed client for the API) · insolvia_admin_client (the admin portal's client for the admin service; unpublished, the portal takes it by file:)
 backend/    .NET 10 + Postgres: Api · Worker · Admin · Mcp · Filing · Migrator hosts over Core · Engines · Forms · Data · Aws (ADR 0028; the mailer is in insolvia-services)
 forms/      official-form field specs (B101, B106*, B107) — data + checker, no build
 seeds/      who exists per environment (dev.json, staging.json) · fixtures/<version>/ — what a seeded case contains

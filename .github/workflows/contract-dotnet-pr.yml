@@ -48,7 +48,8 @@ jobs:
             !backend/*.md
             !backend/docker-compose.yml
             contract/**
-            # The client the suite drives, and the seeds the migrator loads.
+            # The clients the suite drives, and the seeds the migrator loads.
+            packages/insolvia_admin_client/**
             packages/insolvia_api_client/**
             seeds/**
             package.json

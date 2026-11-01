@@ -255,9 +255,13 @@ jobs:
           # post-deploy integration job runs contract/'s deployed target,
           # signed in as the people seeds/staging.json names.
           emit api       "^($shared|backend/src/Insolvia\.(Api|Worker)/|seeds/|contract/|infra/modules/(api_service|job_pipeline)/|\.github/(workflows/api-staging\.yml|actions/seed-staging/))"
-          emit admin     "^($shared|apps/insolvia_admin/|backend/src/Insolvia\.Admin/|infra/modules/(admin_service|web_hosting)/|\.github/workflows/admin-staging\.yml)"
+          # admin and mcp each run their own contract/ specs after deploying
+          # (ADR 0029 rule 2), so their spec directories ride them; the shared
+          # support/ and the seeds ride the api leg, above. The portal is built
+          # from packages/insolvia_admin_client, so that rides admin too.
+          emit admin     "^($shared|apps/insolvia_admin/|packages/insolvia_admin_client/|contract/src/admin/|backend/src/Insolvia\.Admin/|infra/modules/(admin_service|web_hosting)/|\.github/workflows/admin-staging\.yml)"
           emit marketing '^(apps/insolvia_marketing/|infra/envs/staging/|infra/modules/marketing_site/|\.github/workflows/(marketing-staging|release)\.yml)'
-          emit mcp       "^($shared|backend/src/Insolvia\.Mcp/|infra/modules/mcp_service/|\.github/workflows/mcp-staging\.yml)"
+          emit mcp       "^($shared|backend/src/Insolvia\.Mcp/|contract/src/mcp/|infra/modules/mcp_service/|\.github/workflows/mcp-staging\.yml)"
           emit filing    "^($shared|backend/src/Insolvia\.Filing/|infra/modules/(filing_worker|filing_queue|filing_credentials)/|\.github/workflows/filing-staging\.yml)"
           # apps/ and packages/ are named app-by-app rather than as whole
           # directories: marketing has its own line above — a broad ^apps/ or

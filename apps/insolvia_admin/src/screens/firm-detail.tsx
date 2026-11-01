@@ -7,7 +7,7 @@ import {
   AdminUnauthorizedError,
   type FirmSummary,
   type FirmUser,
-} from '../api/client';
+} from '@insolvia-ai/admin-client';
 import { useClient } from '../api/use-client';
 import { useSession } from '../session/session';
 

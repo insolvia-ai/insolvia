@@ -1,0 +1,29 @@
+{
+  "name": "@insolvia-ai/admin-client",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "//": [
+    "The staff portal's client for the admin service (ADR 0029 rule 2), moved",
+    "out of apps/insolvia_admin unchanged so contract/ can go through the same",
+    "code the portal ships. Private, unpublished, no dependencies of any kind.",
+    "",
+    "Two consumers, two ways in: contract/ as a root workspace member (by",
+    "symlink), and the portal — which stays OUTSIDE the workspace, with its own",
+    "lockfile — as `file:../../packages/insolvia_admin_client`. Unpublished",
+    "means one version, so the two cannot disagree; this is not the split",
+    "channel ADR 0010 removed (that was one PUBLISHED package read from two",
+    "places).",
+    "",
+    "No build step: `exports` names the TypeScript source, which Vite, Jest",
+    "and tsc each consume directly."
+  ],
+  "exports": {
+    ".": "./src/client.ts"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "jest"
+  }
+}

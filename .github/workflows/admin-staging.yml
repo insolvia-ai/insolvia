@@ -7,6 +7,19 @@ name: Admin · Deploy · Staging
 # deploy in a fresh environment needs the image-before-apply bootstrap
 # (infra/modules/admin_service/main.tf header;
 # scripts/bootstrap-ecr-images.sh staging admin).
+#
+# ── Job order: deploy → contract ─────────────────────────────────────────────
+#
+# `contract` runs contract/'s admin specs on the DEPLOYED target against the
+# admin service now serving (ADR 0029 rule 2; api-staging.yml's `integration`
+# job is the model and owns the shared reasoning). Admin is checked SIGNED
+# OUT here, by decision: staff sign in through Google Workspace, whose `hd`
+# claim no automatable identity carries (ADR 0029, "Staff sign-in is not
+# automated on any deployed environment"). So it proves health, the portal's
+# CORS, and that every route refuses both no credential and a seeded
+# person's REAL Cognito token from staging's pool — ADR 0011 against the
+# deployed configuration. The signed-in specs run offline on every PR. Its
+# failure fails this workflow, and so the release's production stage.
 
 on:
   workflow_call:
@@ -26,6 +39,14 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     environment: insolvia-staging
+    # Frozen for the contract job, so it never reads state that moved on.
+    outputs:
+      domain: ${{ steps.tf.outputs.domain }}
+      api_domain: ${{ steps.tf.outputs.api_domain }}
+      migrator_function: ${{ steps.tf.outputs.migrator_function }}
+      auth_pool_id: ${{ steps.tf.outputs.auth_pool_id }}
+      auth_client_id: ${{ steps.tf.outputs.auth_client_id }}
+      auth_portal_client_id: ${{ steps.tf.outputs.auth_portal_client_id }}
     steps:
       - uses: actions/checkout@v5
 
@@ -52,6 +73,14 @@ jobs:
             echo "alias=$(terraform -chdir=infra/envs/staging output -raw admin_lambda_alias_name)"
             echo "web_bucket=$(terraform -chdir=infra/envs/staging output -raw admin_web_bucket_name)"
             echo "web_dist=$(terraform -chdir=infra/envs/staging output -raw admin_web_distribution_id)"
+            # The contract job's inputs (public values): the API whose /health
+            # the suite checks before signing anyone in, the migrator the seed
+            # step invokes, and the pool + clients the seeded people sign in to.
+            echo "api_domain=$(terraform -chdir=infra/envs/staging output -raw api_domain)"
+            echo "migrator_function=$(terraform -chdir=infra/envs/staging output -raw migrator_function_name)"
+            echo "auth_pool_id=$(terraform -chdir=infra/envs/staging output -raw auth_user_pool_id)"
+            echo "auth_client_id=$(terraform -chdir=infra/envs/staging output -raw auth_web_client_id)"
+            echo "auth_portal_client_id=$(terraform -chdir=infra/envs/staging output -raw auth_portal_client_id)"
           } >> "$GITHUB_OUTPUT"
 
       - name: Log in to ECR
@@ -161,3 +190,56 @@ jobs:
           # must serve, carrying the app's title.
           curl -sSf --retry 5 --retry-delay 5 --retry-all-errors \
             "https://staging-admin.insolvia.ai/" | grep -q "Insolvia Admin"
+
+  # ── Contract: the deployed admin service, signed out ───────────────────
+  #
+  # `environment: insolvia-staging` is load-bearing, as in api-staging.yml:
+  # E2E_TEST_USER_PASSWORD is an environment secret, and the seed step
+  # invokes the migrator with AWS_ROLE_ARN. The suite itself holds no AWS
+  # credentials — SRP is unsigned Cognito calls, the rest HTTPS.
+  contract:
+    needs: deploy
+    runs-on: ubuntu-latest
+    environment: insolvia-staging
+    permissions:
+      id-token: write
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@v5
+
+      # The global setup signs in every person seeds/staging.json names, so
+      # they must exist; converging is a fast no-op when the API leg already
+      # seeded this release.
+      - uses: ./.github/actions/seed-staging
+        with:
+          role-arn: ${{ secrets.AWS_ROLE_ARN }}
+          migrator-function: ${{ needs.deploy.outputs.migrator_function }}
+
+      # The root workspace's lockfile: contract/ goes through
+      # @insolvia-ai/admin-client, a workspace member.
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install
+        run: npm ci
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # src/admin only. CONTRACT_ADMIN_ORIGIN is the portal's own origin — the
+      # one the smoke test above fetches, and the one AdminConfig admits for
+      # staging. The offline-only specs are listed as skipped, by name.
+      - name: Contract suite against staging admin (deployed target)
+        env:
+          CONTRACT_TARGET: deployed
+          CONTRACT_ENVIRONMENT: staging
+          CONTRACT_API_URL: https://${{ needs.deploy.outputs.api_domain }}
+          CONTRACT_ADMIN_URL: https://${{ needs.deploy.outputs.domain }}
+          CONTRACT_ADMIN_ORIGIN: https://staging-admin.insolvia.ai
+          CONTRACT_AUTH_POOL_ID: ${{ needs.deploy.outputs.auth_pool_id }}
+          CONTRACT_AUTH_CLIENT_ID: ${{ needs.deploy.outputs.auth_client_id }}
+          CONTRACT_AUTH_PORTAL_CLIENT_ID: ${{ needs.deploy.outputs.auth_portal_client_id }}
+          E2E_TEST_USER_PASSWORD: ${{ secrets.E2E_TEST_USER_PASSWORD }}
+        run: npm run contract --workspace @insolvia-ai/contract -- src/admin

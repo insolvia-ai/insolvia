@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { Alert, Badge, Button, Spinner, Table } from '@insolvia-ai/design-system';
 
-import { AdminUnauthorizedError, type FirmSummary } from '../api/client';
+import { AdminUnauthorizedError, type FirmSummary } from '@insolvia-ai/admin-client';
 import { useClient } from '../api/use-client';
 import { useSession } from '../session/session';
 

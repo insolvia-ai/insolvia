@@ -8,11 +8,18 @@ wire contract the app depends on.
 
 - **API** calls go through the shipped client, `@insolvia-ai/api-client`, so a
   green run proves the client the app ships, not a copy of it.
-- **Admin** (all seven routes) and **MCP** (protected-resource metadata,
-  discovery, `initialize`, the tool listing and all eight tools) are called over
-  raw HTTP and JSON-RPC.
-- **A coverage gate** fails the run when any public `InsolviaApiClient` method
-  was never called. The run prints `client coverage: N/N methods called`.
+- **Admin** goes through the portal's own client, `@insolvia-ai/admin-client`
+  (`packages/insolvia_admin_client`) — all six of its methods, plus the three
+  things a browser does that no client does (the CORS preflight, a request
+  with no credential, `/health`).
+- **MCP** goes through the official TypeScript SDK, `@modelcontextprotocol/sdk`:
+  its `Client` over Streamable HTTP, handshake included — protected-resource
+  metadata, the 401 challenge, the tool listing and all eight tools.
+- **Three coverage gates** fail the run when any public `InsolviaApiClient`
+  method, any public `AdminClient` method, or any tool the MCP server lists in
+  `tools/list` was never called. The run prints one line for each:
+  `client coverage: N/N methods called`, `admin-client coverage: …`,
+  `mcp tool coverage: N/N tools called`.
 
 ## Run it
 
@@ -44,15 +51,18 @@ accepted as another name for `--target offline`.
 The same suite runs against a **running** dev stack or staging, signed in by
 real Cognito SRP as the people `seeds/<environment>.json` names
 (`src/support/session.ts`, `src/support/cognito-srp.ts`). Staging runs it after
-every API deploy (`api-staging.yml`'s `integration` job); on a laptop:
+every API deploy (`api-staging.yml`'s `integration` job), and runs `src/admin`
+and `src/mcp` after every admin and MCP deploy (`admin-staging.yml`'s and
+`mcp-staging.yml`'s `contract` jobs). On a laptop:
 
 ```bash
-backend/scripts/dev-up.sh                       # the compose stack, API on :8080
+backend/scripts/dev-up.sh                       # the compose stack: API :8080, admin :8090, MCP :8788
 scripts/dev-aws-seed.sh                         # once: the seeded people exist in the shared dev pool
 contract/scripts/dev-test.sh --target deployed  # sign in, run, report
 ```
 
-The script reads the pool ids from `backend/.env` and the password from
+The script reads the pool ids — the MCP Inspector's client included — from
+`backend/.env` and the password from
 `E2E_TEST_USER_PASSWORD` or `~/.config/insolvia/dev.env`. It never aims at
 staging — CI does that. **There is no production target**:
 `CONTRACT_ENVIRONMENT` must be `dev` or `staging`, and the global setup
@@ -68,6 +78,10 @@ Every input comes from the environment, with no defaults in the suite:
 | `CONTRACT_AUTH_POOL_ID` | the Cognito user pool |
 | `CONTRACT_AUTH_CLIENT_ID` | the firm app's client (staff sign in here) |
 | `CONTRACT_AUTH_PORTAL_CLIENT_ID` | the portal's client (portal clients sign in here) |
+| `CONTRACT_ADMIN_URL` | the admin service origin (`src/admin`) |
+| `CONTRACT_ADMIN_ORIGIN` | the admin portal's origin, which the admin service's CORS must admit (`src/admin`) |
+| `CONTRACT_MCP_URL` | the MCP endpoint, path included (`…/mcp`; `src/mcp`) |
+| `CONTRACT_AUTH_MCP_CLIENT_ID` | an MCP harness's client on the server's allowlist that permits SRP — the Inspector's (`src/mcp`) |
 | `E2E_TEST_USER_PASSWORD` | the seeded people's password — never in a file here |
 
 What changes on the deployed target:
@@ -83,10 +97,16 @@ What changes on the deployed target:
   tokens, provisions a firm through admin, or waits out a sign-in window),
   `needsSeeded(...)` (the seed has no second firm, or no unlinked colleague),
   `needsBlobUrls()` (the dev stack's blob store has no URL to fetch). Jest
-  lists each skipped spec with its reason in brackets. Admin and MCP are
-  offline-only until #583.
-- **The coverage gate is reported, not enforced** — it is enforced only on a
-  full offline run.
+  lists each skipped spec with its reason in brackets.
+- **Admin is checked signed out; MCP is signed in.** Staff sign in through
+  Google Workspace, whose `hd` claim no automatable identity carries, so no
+  deployed run signs into admin (ADR 0029): it checks health, CORS, and every
+  route refusing both no credential and a seeded person's real Cognito token.
+  The signed-in admin specs run offline. MCP's seeded admin signs in by SRP
+  through `CONTRACT_AUTH_MCP_CLIENT_ID`, a token the server admits because
+  that client is on its `AUTH_CLIENT_IDS`.
+- **The coverage gates are reported, not enforced** — they are enforced only
+  on a full offline run.
 
 ## Aim it at another offline stack
 
@@ -96,6 +116,7 @@ Start the stack yourself, then:
 |---|---|
 | `CONTRACT_API_URL` | the API origin |
 | `CONTRACT_ADMIN_URL` | the admin service origin |
+| `CONTRACT_ADMIN_ORIGIN` | an origin the admin service's CORS admits (`dev-test.sh` uses `http://localhost:3100`) |
 | `CONTRACT_MCP_URL` | the MCP endpoint, path included (`…/mcp`) |
 | `CONTRACT_ISSUER_URL` | the Cognito-shaped issuer the stack trusts |
 | `CONTRACT_SIGNING_KEY` | a PKCS#8 PEM whose public half the stack serves as that issuer's JWKS (and as Google's, for admin) |
