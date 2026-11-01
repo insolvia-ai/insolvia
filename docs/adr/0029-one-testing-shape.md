@@ -23,7 +23,7 @@
 ## Decision
 
 **The repo tests with four frameworks, and each level of testing has exactly
-one owner.** Vitest and pytest leave the repo.
+one owner.** Vitest, pytest and Python itself leave the repo.
 
 | Level | Framework | Owns | Local | CI |
 |---|---|---|---|---|
@@ -116,33 +116,33 @@ gotchas for one language.
 Playwright is not a second unit runner: it drives a browser against a deployed
 bundle, and nothing else here can.
 
-### 4. Python is a tooling language only
+### 4. Python leaves the repo entirely
 
-Python stays for **tools** — a script a person or a scheduled workflow runs to
-produce or check committed data — and for nothing else:
+No Python file, no Python test, no Python tool, and no Python on a
+developer's machine or a CI runner for this repo's sake. Since ADR 0028 no
+product code is Python; what is left is four tools and the git-hook framework,
+and every one of them moves.
 
-- **Never product code, never a test, never a PR check.** No pytest, no
-  Python job on a required check.
-- **Standard library only, or its own pinned virtualenv created by its own
-  wrapper script.** Nothing installs Python packages into a shared
-  environment.
-- **What a tool produces is tested by its consumer, in that consumer's
-  framework.** The engines' xUnit tests load the UST registry the ingest
-  writes; `npm run tokens:check` gates the marks the cutter writes.
+**A tool is written in the language of what consumes its output**, so its
+output is checked by tests in that consumer's framework:
 
-Under this exception today:
+| Today | Becomes | Because |
+|---|---|---|
+| `forms/scripts/check.py` (the `Form specs` PR check) | An xUnit test in `Insolvia.Forms.Tests` | `Insolvia.Forms.Tests` and `Insolvia.Engines.Tests` already load these specs. |
+| `scripts/ingest-ust-data.py`, `scripts/check-ust-data.py` (the regulatory refresh) | A .NET console tool beside the engines that references `Insolvia.Engines`, with xUnit tests over its parsers fed a recorded spreadsheet | It writes `backend/src/Insolvia.Engines/Regulatory/`. Built on the engine, it validates through `UstData.cs` itself and cannot write a payload the engine would reject. The XLSX is still unzipped and read as XML, with the BCL's `System.IO.Compression` and `XDocument` and no package. `regulatory-refresh.yml` runs it on `setup-dotnet`. |
+| `scripts/render-brand-marks.py` (+ its `.sh` venv wrapper) | TypeScript in `tool/`, beside `render-brand-marks.ts` | The `npm run tokens` pipeline consumes its SVGs, and `tokens:check` gates them. HarfBuzz's own WebAssembly build (`harfbuzzjs`) does the shaping and the glyph outlines, so the geometry comes from the same shaper the Python used. `@resvg/resvg-js` rasterises the favicon and PWA icons. `tool/` stops being dependency-free: two root devDependencies, pinned by the root lockfile. |
+| The `pre-commit` framework (`.pre-commit-config.yaml`), and its Python hooks from `pre-commit-hooks` | **lefthook**, installed as a root devDependency (a prebuilt binary, version pinned by the lockfile), running the same commands at the same two stages | The hooks themselves are already npm, `terraform` and `tflint` commands. Prettier, which parses YAML, covers `check-yaml`. A short Node check takes over end-of-file, trailing whitespace and merge-conflict markers. |
 
-| Tool | Why it stays Python |
-|---|---|
-| `scripts/check-ust-data.py`, `scripts/ingest-ust-data.py` | Standard library only; run by `regulatory-refresh.yml` (weekly, not a PR check) and by a developer refreshing a dataset. A ~900-line port buys no coverage the engines' tests don't already have. |
-| `scripts/render-brand-marks.py` | Cuts the logo and icon out of the display face with fontTools, HarfBuzz and Pillow, in its own venv. Neither .NET nor Node has an equal without a WebAssembly shaper; its outputs are committed and gated by `tokens:check`. |
+**The port of each tool re-cuts or re-ingests its committed output and shows
+it unchanged**, or explains every difference. For the registry that is a
+byte-identical `dataset.json` for a period already ingested. For the marks it
+is a pixel diff of the rasters, plus SVG path data compared after
+normalising number formatting.
 
-**`forms/scripts/check.py` leaves.** It *is* a PR check (`Form specs`), and it
-validates specs that `Insolvia.Forms.Tests` and `Insolvia.Engines.Tests`
-already load — so it becomes an xUnit test there.
-
-A new Python file is admissible only if it fits this definition, and the PR
-adding it says which row it joins.
+**It is enforced, not remembered.** A guard in CI fails on any tracked `*.py`,
+any `requirements*.txt` or `pyproject.toml`, and any `setup-python` in a
+workflow. Per ADR 0008, a rule that would otherwise live only in prose becomes
+executable. `scripts/dev-setup.sh` stops installing `python3`.
 
 ### 5. Bash tests and `terraform test` stay where they are
 
@@ -216,8 +216,12 @@ with them.
 ## Consequences
 
 - **`vitest` and `pytest` appear in no manifest, lockfile, config or
-  workflow** once #578 lands, and the `insolvia-testing` skill describes the
-  shape above.
+  workflow, and no `*.py` file is tracked**, once #578 lands; the
+  `insolvia-testing` skill describes the shape above.
+- **#578's item 6 widens** from "port or keep" to four ports: the forms
+  check, the UST tool, the marks cutter, and the git hooks. Each is its own PR
+  with its own before-and-after evidence, and the Python guard lands with the
+  last of them.
 - **Required check names do not have to change.** `API client`,
   `Contract (.NET)`, `Marketing site`, `Admin portal` and `App` keep their job
   names across the runner change. `Form specs` keeps its name if its job
@@ -254,10 +258,16 @@ by contract pins and which ADR 0028 made the oracle.
 slower, cannot reach host seams (a failing store, a frozen clock), and fails
 far from its cause. Refusals are cheapest and most precise in-process.
 
-**No Python at all.** Rejected for now: it means porting the marks cutter onto
-a WebAssembly shaper and ~900 lines of UST parsing, for tools that run weekly
-or by hand and whose outputs are already tested by their consumers. Revisit if
-UST parsing ever moves to runtime.
+**Keep Python as a tooling language** (the UST tool and the marks cutter
+under an exception, with stdlib or their own venv). This draft proposed it, and
+the maintainer rejected it on review. An exception is a second toolchain every
+machine and runner has to carry for three scripts, and it is a door the next
+script walks through. The cost of closing it is the ports above, paid once.
+
+**Keep `pre-commit` as an external program.** Rejected with the rest: it is a
+Python program installed by Homebrew, and its built-in hooks are Python
+packages it fetches on first run. lefthook runs the same commands from one
+binary that the lockfile pins.
 
 **Jest with native ESM (`--experimental-vm-modules`).** Rejected: experimental,
 flag-gated on every invocation, and not what `jest-expo` does.
