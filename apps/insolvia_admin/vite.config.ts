@@ -1,12 +1,11 @@
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
-// vitest/config, not vite: the `test` block below is Vitest's extension of
-// the Vite config type, invisible to plain `vite`'s defineConfig.
-import { defineConfig } from "vitest/config";
+import { defineConfig } from "vite";
 
 export default defineConfig({
   plugins: [tailwindcss(), react()],
   resolve: {
+    // jest.config.js restates this list as moduleFileExtensions; change both.
     // Platform-split resolution, copied from apps/insolvia_marketing's config
     // (whose comment owns the full argument): @insolvia-ai/design-system
     // publishes SOURCE with extensionless platform-split leaf imports, and
@@ -40,13 +39,5 @@ export default defineConfig({
     // port a hard error instead of a silent hop to a port Google refuses.
     port: 3100,
     strictPort: true,
-  },
-  // Vitest configuration lives here rather than a separate file so the
-  // resolve.extensions above apply to tests too — a test importing a
-  // design-system component must resolve the same .web leaf the bundle does.
-  test: {
-    environment: "jsdom",
-    setupFiles: ["./src/test-setup.ts"],
-    globals: false,
   },
 });

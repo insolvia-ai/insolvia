@@ -1,6 +1,6 @@
 // The firm and its settings: profile, people, questionnaire, document
 // checklist, creditor library, court registry.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from '@jest/globals';
 
 import { firmAdmin, firmUser, tag } from '../support/actors.ts';
 import { seeded } from '../support/env.ts';

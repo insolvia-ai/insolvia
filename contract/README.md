@@ -1,6 +1,6 @@
 # contract — the backend's HTTP contract suite
 
-A Vitest suite that calls a running backend by base URL and checks what comes
+A Jest suite that calls a running backend by base URL and checks what comes
 back over the wire. It was built for the .NET rewrite (ADR 0028, plan 18.2):
 the Python backend passed it first, the .NET one passed it unchanged before
 the switch, and since the Python was deleted (18.23) it is what holds the

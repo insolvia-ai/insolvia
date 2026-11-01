@@ -15,6 +15,8 @@
  * same value for the service side).
  */
 
+import { buildEnvironment } from './build-environment';
+
 export type InsolviaEnvironment = 'local' | 'staging' | 'production';
 
 export interface AdminConfig {
@@ -53,6 +55,4 @@ export function resolveConfig(raw: string | undefined): AdminConfig {
   return config;
 }
 
-export const config: AdminConfig = resolveConfig(
-  import.meta.env.VITE_INSOLVIA_ENV as string | undefined,
-);
+export const config: AdminConfig = resolveConfig(buildEnvironment);

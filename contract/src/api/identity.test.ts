@@ -1,6 +1,6 @@
 // Public routes, the caller's own identity, and the fail-closed 401 matrix.
 import { ApiUnauthorizedException } from '@insolvia-ai/api-client';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from '@jest/globals';
 
 import { contractClient } from '../support/client.ts';
 import { seeded } from '../support/env.ts';

@@ -21,7 +21,7 @@
 // The client is imported by package name rather than by relative path: that
 // is the specifier the export map in package.json publishes, so the test
 // exercises what a consumer actually resolves.
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test } from '@jest/globals';
 
 import {
   ApiException,
@@ -3264,10 +3264,12 @@ describe('debtors linked to firm clients (ADR 0022)', () => {
     expect(Object.keys(error.fields)).toEqual(['client_id']);
   });
 
-  test.each([
+  // Jest's `each` typing takes mutable tuples only, so the pairs are typed
+  // here rather than narrowed with `as const`.
+  test.each<['copyDebtorFromClient' | 'copyDebtorToClient', string]>([
     ['copyDebtorFromClient', 'copy-from-client'],
     ['copyDebtorToClient', 'copy-to-client'],
-  ] as const)('%s POSTs no body to /%s and maps the debtor', async (method, act) => {
+  ])('%s POSTs no body to /%s and maps the debtor', async (method, act) => {
     const recopied = { ...CLIENT_DEBTOR, differs_from_client: [] };
     const stub = stubFetch(() => jsonResponse(recopied, 200));
     const client = new InsolviaApiClient(BASE_URL, {

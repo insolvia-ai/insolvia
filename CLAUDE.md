@@ -56,7 +56,7 @@ backend/    .NET 10 + Postgres: Api · Worker · Admin · Mcp · Filing · Migra
 forms/      official-form field specs (B101, B106*, B107) — data + checker, no build
 seeds/      who exists per environment (dev.json, staging.json) · fixtures/<version>/ — what a seeded case contains
 e2e/        Playwright against deployed environments: flows (signed in; dev, staging) · smoke (no credentials; also prod)
-contract/   the backend's HTTP contract suite (Vitest, by base URL, through the shipped api-client), run offline against the .NET hosts on a throwaway Postgres
+contract/   the backend's HTTP contract suite (Jest, by base URL, through the shipped api-client), run offline against the .NET hosts on a throwaway Postgres
 integration/ the API's integration tier (pytest over HTTPS, signed in through the real pool) — staging after each deploy, or a laptop's local stack
 infra/      Terraform: staging · prod · dev (shared, ci-trust, account-access are in insolvia-services)
 brand/      colors.json · fonts.json · radii.json — Insolvia's palette, typefaces and corners, the ONE place each is written down

@@ -3,8 +3,10 @@
 // Every variable is required and none has a default: a suite that guessed a
 // URL would be a run against a stack nobody chose. contract/scripts/dev-test.sh
 // sets them all for the local .NET stack.
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+// A JSON import rather than a read beside `import.meta.url`: Jest runs this
+// file transpiled to CommonJS (jest.base.js), where `import.meta` does not
+// exist.
+import stackJson from '../../stack/stack.json' with { type: 'json' };
 
 function required(name: string): string {
   const value = process.env[name]?.trim();
@@ -30,9 +32,7 @@ interface StackFile {
 }
 
 /** contract/stack/stack.json — the trust configuration the stack was started with. */
-export const stack: StackFile = JSON.parse(
-  readFileSync(fileURLToPath(new URL('../../stack/stack.json', import.meta.url)), 'utf8'),
-) as StackFile;
+export const stack: StackFile = stackJson;
 
 export const env = {
   apiUrl: required('CONTRACT_API_URL').replace(/\/$/, ''),

@@ -18,8 +18,8 @@
 #
 # UNIT MEANS UNIT. Nothing here needs AWS, a running server, a password, or
 # the network: xUnit in-process for the .NET backend (its data tier starts a
-# throwaway Postgres through Testcontainers, so Docker must be running), Jest
-# and Vitest over mocks. The integration tier is a different script with a
+# throwaway Postgres through Testcontainers, so Docker must be running), and
+# Jest over mocks. The integration tier is a different script with a
 # different name (integration/scripts/dev-test.sh) precisely so that a hook
 # can never accidentally reach for it.
 #
@@ -69,7 +69,7 @@ areas_for_path() {
     apps/insolvia_app/*)                            echo "app" ;;
     apps/insolvia_admin/*)                          echo "portal" ;;
     apps/insolvia_marketing/*)                      echo "marketing" ;;
-    package.json|package-lock.json|tsconfig.base.json|eslint.base.js)
+    package.json|package-lock.json|tsconfig.base.json|eslint.base.js|jest.base.js)
                                                     echo "api-client app" ;;
     # A change to the runner itself is proven by running every suite; a
     # change to the hook config is proven by the hook firing at all.

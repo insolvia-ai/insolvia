@@ -1,7 +1,7 @@
 // The admin service over raw HTTP — all seven routes (ADR 0011): a Google
 // Workspace ID token is the only credential it accepts, and a firm user's
 // Cognito token must die in verification (the cross-issuer 401).
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from '@jest/globals';
 
 import { tag } from '../support/actors.ts';
 import { contractClient } from '../support/client.ts';
@@ -9,7 +9,7 @@ import { env, seeded } from '../support/env.ts';
 import { fixtureCase } from '../support/fixtures.ts';
 import { FIRM, FIRM_USER } from '../support/shapes.ts';
 import { googleIdToken, staffToken } from '../support/tokens.ts';
-import { expectApiError, expectShape, type Spec } from '../support/wire.ts';
+import { expectApiError, expectShape, type Spec, withMessage } from '../support/wire.ts';
 
 interface Answer {
   readonly status: number;
@@ -39,7 +39,7 @@ const ENVELOPE: Spec = { error: 'string', 'message?': 'string', 'fields?': 'obje
 const ADMIN_FIRM: Spec = { ...(FIRM as Record<string, Spec>), userCount: 'integer' };
 
 function refused(answer: Answer, status: number, error: string): Record<string, unknown> {
-  expect(answer.status, JSON.stringify(answer.body)).toBe(status);
+  withMessage(JSON.stringify(answer.body), () => expect(answer.status).toBe(status));
   expectShape(answer.body, ENVELOPE, 'error');
   expect((answer.body as { error: string }).error).toBe(error);
   return answer.body as Record<string, unknown>;
@@ -78,7 +78,7 @@ describe('admin: firm provisioning', () => {
       name,
       admin: { email, firstName: 'First', lastName: 'Admin' },
     });
-    expect(provisioned.status, JSON.stringify(provisioned.body)).toBe(201);
+    withMessage(JSON.stringify(provisioned.body), () => expect(provisioned.status).toBe(201));
     expectShape(provisioned.body, { firm: FIRM, admin: FIRM_USER });
     const { firm, admin: first } = provisioned.body as {
       firm: { id: string; name: string; status: string };
@@ -98,7 +98,7 @@ describe('admin: firm provisioning', () => {
       'ConflictError',
     );
     const invalid = refused(await admin('POST', '/v1/firms', { name: '' }), 400, 'ValidationError');
-    expect(invalid.fields).toBeTypeOf('object');
+    expect(typeof invalid.fields).toBe('object');
     refused(await admin('POST', '/v1/firms', 'not an object'), 400, 'ValidationError');
 
     // The tenant API resolves the new admin into the new firm (one store).

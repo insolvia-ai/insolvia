@@ -1,4 +1,6 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, jest } from "@jest/globals";
+
+import { restoreEnv, stubEnv } from "../../test/env";
 
 import {
   parseWaitlistForm,
@@ -67,11 +69,12 @@ describe("parseWaitlistForm", () => {
     expect(values.email).toBe("not-an-email");
   });
 
-  it.each([
+  // Typed rather than `as const`: Jest's `each` typing takes mutable tuples.
+  it.each<["name" | "firm" | "email", Partial<Record<"name" | "firm" | "email", "">>]>([
     ["name", { name: "" }],
     ["firm", { firm: "" }],
     ["email", { email: "" }],
-  ] as const)("requires %s", (field, override) => {
+  ])("requires %s", (field, override) => {
     const { errors } = parseWaitlistForm(formOf({ ...VALID, ...override }));
 
     expect(errors?.[field]).toBeTruthy();
@@ -171,18 +174,21 @@ describe("parseWaitlistForm", () => {
 
 describe("putWaitlistSubmission", () => {
   afterEach(() => {
-    vi.unstubAllEnvs();
-    vi.unstubAllGlobals();
+    restoreEnv();
   });
 
   // Params are declared even though the body ignores them: that is what gives
   // `mock.calls` a real tuple type, so the assertions below read the request
   // without casting.
   function stubFetch(response: Response | Error) {
-    const fetchMock = vi.fn((_input: string, _init?: RequestInit) =>
+    const fetchMock = jest.fn((_input: string, _init?: RequestInit) =>
       response instanceof Error ? Promise.reject(response) : Promise.resolve(response),
     );
-    vi.stubGlobal("fetch", fetchMock);
+    // The spy is what replaces the global (restoreMocks puts it back); it
+    // forwards to fetchMock, whose typed `mock.calls` the assertions read.
+    jest
+      .spyOn(globalThis, "fetch")
+      .mockImplementation((input, init) => fetchMock(String(input), init));
     return fetchMock;
   }
 
@@ -201,7 +207,7 @@ describe("putWaitlistSubmission", () => {
   }
 
   it("POSTs to the API's /v1/waitlist with the required fields and the host", async () => {
-    vi.stubEnv("INSOLVIA_API_BASE_URL", "https://api.example.test");
+    stubEnv("INSOLVIA_API_BASE_URL", "https://api.example.test");
     const fetchMock = stubFetch(jsonResponse({ id: "wl_123" }, 201));
 
     await putWaitlistSubmission(VALID, "www.example.test");
@@ -221,7 +227,7 @@ describe("putWaitlistSubmission", () => {
   it("omits empty optional fields rather than sending empty strings", async () => {
     // The API's storage convention is omit-when-empty; sending "" would store
     // a meaningless key.
-    vi.stubEnv("INSOLVIA_API_BASE_URL", "https://api.example.test");
+    stubEnv("INSOLVIA_API_BASE_URL", "https://api.example.test");
     const fetchMock = stubFetch(jsonResponse({ id: "wl_123" }, 201));
 
     await putWaitlistSubmission(VALID, "www.example.test");
@@ -232,7 +238,7 @@ describe("putWaitlistSubmission", () => {
   });
 
   it("includes optional fields when they are present", async () => {
-    vi.stubEnv("INSOLVIA_API_BASE_URL", "https://api.example.test");
+    stubEnv("INSOLVIA_API_BASE_URL", "https://api.example.test");
     const fetchMock = stubFetch(jsonResponse({ id: "wl_123" }, 201));
 
     await putWaitlistSubmission(
@@ -246,7 +252,7 @@ describe("putWaitlistSubmission", () => {
   });
 
   it("does not double the slash when the base URL has a trailing one", async () => {
-    vi.stubEnv("INSOLVIA_API_BASE_URL", "https://api.example.test/");
+    stubEnv("INSOLVIA_API_BASE_URL", "https://api.example.test/");
     const fetchMock = stubFetch(jsonResponse({ id: "wl_123" }, 201));
 
     await putWaitlistSubmission(VALID, "www.example.test");
@@ -255,7 +261,7 @@ describe("putWaitlistSubmission", () => {
   });
 
   it("resolves on 201", async () => {
-    vi.stubEnv("INSOLVIA_API_BASE_URL", "https://api.example.test");
+    stubEnv("INSOLVIA_API_BASE_URL", "https://api.example.test");
     stubFetch(jsonResponse({ id: "wl_123" }, 201));
 
     await expect(
@@ -264,7 +270,7 @@ describe("putWaitlistSubmission", () => {
   });
 
   it("raises WaitlistValidationError carrying the API's per-field messages on 400", async () => {
-    vi.stubEnv("INSOLVIA_API_BASE_URL", "https://api.example.test");
+    stubEnv("INSOLVIA_API_BASE_URL", "https://api.example.test");
     stubFetch(jsonResponse({ fields: { email: "Already on the list." } }, 400));
 
     await expect(
@@ -273,7 +279,7 @@ describe("putWaitlistSubmission", () => {
   });
 
   it("falls back to a generic error on a 400 with no fields object", async () => {
-    vi.stubEnv("INSOLVIA_API_BASE_URL", "https://api.example.test");
+    stubEnv("INSOLVIA_API_BASE_URL", "https://api.example.test");
     stubFetch(jsonResponse({ error: "ValidationError" }, 400));
 
     await expect(
@@ -282,7 +288,7 @@ describe("putWaitlistSubmission", () => {
   });
 
   it.each([500, 502, 403])("raises on a %d so the route renders its retry state", async (status) => {
-    vi.stubEnv("INSOLVIA_API_BASE_URL", "https://api.example.test");
+    stubEnv("INSOLVIA_API_BASE_URL", "https://api.example.test");
     stubFetch(new Response("upstream failed", { status }));
 
     await expect(
@@ -291,7 +297,7 @@ describe("putWaitlistSubmission", () => {
   });
 
   it("lets a transport failure propagate untouched", async () => {
-    vi.stubEnv("INSOLVIA_API_BASE_URL", "https://api.example.test");
+    stubEnv("INSOLVIA_API_BASE_URL", "https://api.example.test");
     stubFetch(new TypeError("network down"));
 
     await expect(
@@ -302,9 +308,9 @@ describe("putWaitlistSubmission", () => {
   it("does not call the API at all when the base URL is unset", async () => {
     // Local dev without the API running: the documented behaviour is to log
     // and treat as accepted rather than crash the form.
-    vi.stubEnv("INSOLVIA_API_BASE_URL", "");
+    stubEnv("INSOLVIA_API_BASE_URL", "");
     const fetchMock = stubFetch(jsonResponse({}, 201));
-    vi.spyOn(console, "log").mockImplementation(() => {});
+    jest.spyOn(console, "log").mockImplementation(() => {});
 
     await expect(
       putWaitlistSubmission(VALID, "www.example.test"),
@@ -315,9 +321,9 @@ describe("putWaitlistSubmission", () => {
   it("never logs the visitor's details on success — only the server-generated id", async () => {
     // GLBA-adjacent discipline: this Lambda's logs must not carry PII, and a
     // waitlist row is a real person's name, firm and work email.
-    vi.stubEnv("INSOLVIA_API_BASE_URL", "https://api.example.test");
+    stubEnv("INSOLVIA_API_BASE_URL", "https://api.example.test");
     stubFetch(jsonResponse({ id: "wl_123" }, 201));
-    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    const log = jest.spyOn(console, "log").mockImplementation(() => {});
 
     await putWaitlistSubmission(VALID, "www.example.test");
 

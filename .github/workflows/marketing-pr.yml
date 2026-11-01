@@ -74,7 +74,7 @@ jobs:
         if: steps.filter.outputs.run == 'true'
         run: npm run lint
 
-      # Vitest over the `.server.ts` libraries and the route loaders — the SSR
+      # Jest over the `.server.ts` libraries and the route loaders — the SSR
       # code paths Lighthouse and the RNW grep guard below cannot see, because
       # both only ever inspect the BUILT output. Runs before the build: it is
       # the fastest step here, so a broken loader should not wait on Vite.

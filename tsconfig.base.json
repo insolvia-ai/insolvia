@@ -27,7 +27,7 @@
     "  './models'     — tsc rejects under NodeNext",
     "  './models.js'  — typechecks, then ERR_MODULE_NOT_FOUND under Node",
     "  './models.ts'  — needs this flag; works under tsc, Node >=24 native",
-    "                   type-stripping, Vitest and Metro alike",
+    "                   type-stripping, Jest and Metro alike",
     "Only the third is right, and the second is the dangerous one: it fails at",
     "runtime having passed the typecheck. Requires `noEmit`, set below."
   ],

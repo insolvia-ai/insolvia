@@ -2,7 +2,7 @@
 // filing's staff surface (ADR 0024): the authorization, the credential vault,
 // and the per-filing approval.
 import { ApiReauthenticationRequiredException } from '@insolvia-ai/api-client';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from '@jest/globals';
 
 import { firmAdmin, scratchCase } from '../support/actors.ts';
 import { contractClient } from '../support/client.ts';

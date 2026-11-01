@@ -60,7 +60,7 @@ React Router v7 SSR marketing site for `www.insolvia.ai`. Human docs:
   prod for its own keywords. `app/lib/seo.test.ts` and
   `app/routes/robots-and-sitemap.test.ts` pin this — including that the check
   fails *closed* for an unanticipated host.
-- **Tests are Vitest, colocated, `node` environment** (`npm test`, gated by the
+- **Tests are Jest, colocated, `node` environment** (`npm test`, gated by the
   `Marketing site` job). They cover the SSR halves — the `.server.ts` libraries
   and route `loader`/`action` functions — which is where this app's behaviour
   lives; Lighthouse and the RNW guard only ever inspect the *built* output.
