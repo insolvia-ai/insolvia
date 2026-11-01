@@ -21,7 +21,8 @@ Two layers per form, deliberately:
 | `acroform/<form>.json` | Every AcroForm widget of the official fillable PDF — name, kind, checkbox/radio export states, pages — plus the source URL, the PDF's SHA-256, its printed revision and effective date | Extracted mechanically from the downloaded PDF (pypdf); never hand-edited |
 | `specs/<form>.json` | The curated spec: each *logical* field with its label, type, options, repetition/continuation structure, and which case-data-model entity/attribute feeds it (or that it is derived/constant/unmapped) | Written by hand against the dump and the printed form |
 
-`scripts/check.py` (stdlib-only; `scripts/dev-test.sh` wraps it) ties the two
+The spec tests ([`backend/tests/Insolvia.Forms.Tests/Specs`](../backend/tests/Insolvia.Forms.Tests/Specs),
+xUnit; `scripts/dev-test.sh` runs them, and so does the `Form specs` check) tie the two
 together: every fillable widget in the dump must be claimed by exactly one spec
 field, every claim must resolve, a spec field's type must agree with the widget
 kind it claims, a radio's options must be exactly the PDF's export states, and
@@ -104,7 +105,7 @@ place:
 - B2010 is a notice with nothing to print at all: an empty `fields` list on
   both sides, and the packet ships the court's bytes verbatim.
 
-`scripts/check.py` allows overlay claims only on a form whose dump has no
+The checker allows overlay claims only on a form whose dump has no
 fillable widget — a fillable form is filled through its widgets, never painted
 over — and requires every box name to be unique and every page to exist.
 
@@ -118,7 +119,7 @@ over — and requires every box name to be unique and every page to exist.
   "effective_date": "2015-12-01",
   "signature_pages": [7, 8],    // 1-based PDF pages carrying a "signature"-type
                                  // field's widget — [] when the form has none.
-                                 // check.py derives the same set from the
+                                 // the checker derives the same set from the
                                  // fields below and refuses a mismatch, so
                                  // this stays data the forms engine (13.11's
                                  // signature-page selection) can trust without
@@ -129,7 +130,7 @@ over — and requires every box name to be unique and every page to exist.
       "id": "line_2_gross_wages",         // unique per form, lower_snake dotted
       "part": 2, "line": "2",             // the printed part/line ("part": null = caption)
       "label": "…the printed caption…",
-      "type": "money",                    // see FIELD_TYPES in scripts/check.py
+      "type": "money",                    // see FormSpecChecker.FieldTypes
       "options": [ {"value": "…"} ],      // radio: exactly the PDF export states
       "repeats": {"group": "…", "count": 2, "continuation": "…"},
       "maps_to": { … },                   // exactly one of the four mappings below
