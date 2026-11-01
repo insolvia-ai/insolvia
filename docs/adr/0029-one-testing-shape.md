@@ -72,11 +72,27 @@ offline) made the same kind of assertion and differed only in where they
 pointed. `contract/` is the survivor because it goes through the shipped
 client, and the client is what callers actually run.
 
+**It is TypeScript, run by Jest, and every surface goes through the client
+its callers actually run.** That means our own client where we ship one, and
+the protocol's official SDK where we don't. No spec hand-builds a request to a
+route.
+
+| Surface | Callers run | `contract/` goes through | Coverage gate |
+|---|---|---|---|
+| API | the app's `@insolvia-ai/api-client` | that package, imported by name | every `InsolviaApiClient` method called |
+| Admin | the portal's client, today `apps/insolvia_admin/src/api/client.ts` | **`packages/insolvia_admin_client`**, the portal's client moved out unchanged: a workspace member, unpublished and with no dependencies. The portal takes it as `file:../../packages/insolvia_admin_client`, so the portal itself stays outside the workspace | every admin-client method called |
+| MCP | an agent's MCP SDK (Claude, Cursor, …) | the official TypeScript SDK, `@modelcontextprotocol/sdk`: its `Client` over Streamable HTTP, protocol setup included | every tool the server lists in `tools/list` called |
+
+The portal's client was in-app because it had exactly one consumer;
+`contract/` is the second. The `file:` dependency is not the arrangement
+ADR 0010 removed. That arrangement was one *published* package read from two
+places, which let the two copies disagree. An unpublished package has only
+one version.
+
 - **`offline` is the default target**: the .NET hosts on a throwaway Postgres,
   composed by `contract/scripts/dev-test.sh`, tokens signed by the run's own
   JWKS. It runs on every PR (`Contract (.NET)`) and on any laptop, and the
-  coverage gate — every client method called at least once — is enforced on
-  its full run.
+  coverage gates in the table above are enforced on its full run.
 - **`deployed` is the second target**: a running dev stack or staging, signed
   in by real Cognito SRP as the people in `seeds/<env>.json`, with the
   scratch-case discipline `integration/` had (write only to scratch, undo in
