@@ -23,13 +23,20 @@
 #
 # ── deployed, against THIS MACHINE's dev stack ─────────────────────
 #
-# The API that scripts/dev-up.sh (backend/docker-compose.yml) serves on :8080,
-# signed in over real Cognito SRP to the shared dev pool as the people in
-# seeds/dev.json. What it points at — none of it a default in the suite:
+# The API, admin and MCP hosts that scripts/dev-up.sh (backend/docker-compose.yml)
+# serves on :8080, :8090 and :8788, signed in over real Cognito SRP to the
+# shared dev pool as the people in seeds/dev.json. What it points at — none of
+# it a default in the suite:
 #   CONTRACT_API_URL                http://localhost:8080 unless exported
+#   CONTRACT_ADMIN_URL              http://127.0.0.1:8090 unless exported
+#   CONTRACT_ADMIN_ORIGIN           http://localhost:3100, the portal dev server
+#   CONTRACT_MCP_URL                http://127.0.0.1:8788/mcp unless exported
 #   CONTRACT_AUTH_POOL_ID           AUTH_USER_POOL_ID from backend/.env
 #   CONTRACT_AUTH_CLIENT_ID         AUTH_CLIENT_ID from backend/.env
 #   CONTRACT_AUTH_PORTAL_CLIENT_ID  AUTH_PORTAL_CLIENT_ID from backend/.env
+#   CONTRACT_AUTH_MCP_CLIENT_ID     exported, else AUTH_MCP_INSPECTOR_CLIENT_ID
+#                                   from backend/.env (the MCP Inspector's
+#                                   client, on the MCP server's allowlist)
 #   E2E_TEST_USER_PASSWORD          exported, else DEV_USER_PASSWORD from
 #                                   ~/.config/insolvia/dev.env
 # backend/.env is written by scripts/dev-aws-setup.sh; the local database must
@@ -80,6 +87,13 @@ if [[ "$TARGET" == deployed ]]; then
   read_env() { sed -n "s/^$1=//p" "$BACKEND_ENV" | tail -1; }
   export CONTRACT_TARGET=deployed CONTRACT_ENVIRONMENT=dev
   export CONTRACT_API_URL="${CONTRACT_API_URL:-http://localhost:8080}"
+  export CONTRACT_ADMIN_URL="${CONTRACT_ADMIN_URL:-http://127.0.0.1:8090}"
+  export CONTRACT_ADMIN_ORIGIN="${CONTRACT_ADMIN_ORIGIN:-http://localhost:3100}"
+  export CONTRACT_MCP_URL="${CONTRACT_MCP_URL:-http://127.0.0.1:8788/mcp}"
+  CONTRACT_AUTH_MCP_CLIENT_ID="${CONTRACT_AUTH_MCP_CLIENT_ID:-$(read_env AUTH_MCP_INSPECTOR_CLIENT_ID)}"
+  export CONTRACT_AUTH_MCP_CLIENT_ID
+  [[ -n "$CONTRACT_AUTH_MCP_CLIENT_ID" ]] ||
+    die "AUTH_MCP_INSPECTOR_CLIENT_ID is not in $BACKEND_ENV — re-run ./scripts/dev-aws-setup.sh (or export CONTRACT_AUTH_MCP_CLIENT_ID)."
   CONTRACT_AUTH_POOL_ID="$(read_env AUTH_USER_POOL_ID)"
   CONTRACT_AUTH_CLIENT_ID="$(read_env AUTH_CLIENT_ID)"
   CONTRACT_AUTH_PORTAL_CLIENT_ID="$(read_env AUTH_PORTAL_CLIENT_ID)"
@@ -137,6 +151,8 @@ ISSUER_URL="$AUX/$(stack_value issuerPath)"
 export CONTRACT_API_URL="http://127.0.0.1:$CONTRACT_API_PORT"
 export CONTRACT_ADMIN_URL="http://127.0.0.1:$CONTRACT_ADMIN_PORT"
 export CONTRACT_MCP_URL="http://127.0.0.1:$CONTRACT_MCP_PORT/mcp"
+# The origin admin's CORS must admit: the portal's dev server (local admits loopback).
+export CONTRACT_ADMIN_ORIGIN="http://localhost:3100"
 export CONTRACT_ISSUER_URL="$ISSUER_URL"
 export CONTRACT_SIGNING_KEY="$RUN/signing-key.pem"
 

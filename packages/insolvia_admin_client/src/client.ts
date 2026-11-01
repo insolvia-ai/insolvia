@@ -1,10 +1,11 @@
 /**
  * A small typed client for the admin service's six routes.
  *
- * In-app rather than a published package: it has exactly one consumer, and
- * the api-client package's own lesson (contract pins at the seam) is applied
- * here directly — `client.test.ts` asserts method, URL, headers and body
- * against literal JSON copied from the service's route handlers.
+ * A package rather than in-app because it has two consumers — the portal,
+ * and `contract/`, which proves this same code against the real service
+ * (ADR 0029 rule 2) — and unpublished, so there is only ever one version.
+ * `client.test.ts` asserts method, URL, headers and body against literal
+ * JSON copied from the service's route handlers.
  *
  * The token arrives through a PROVIDER read per request (the same seam the
  * app's client uses), and a 401 raises `AdminUnauthorizedError` so the

@@ -6,12 +6,13 @@
 // deployed target's sign-in inputs.
 //
 // The getters are lazy, so a deployed run never asks for the offline stack's
-// key or its admin and MCP hosts (#583 brings those to the deployed target).
+// signing key, and a run that never touches admin or MCP never asks for
+// their URLs.
 // A JSON import rather than a read beside `import.meta.url`: Jest runs this
 // file transpiled to CommonJS (jest.base.js), where `import.meta` does not
 // exist.
 import stackJson from '../../stack/stack.json' with { type: 'json' };
-import { session } from './session.ts';
+import { deployedInput, session } from './session.ts';
 import { person, TARGET } from './target.ts';
 
 function required(name: string): string {
@@ -55,14 +56,29 @@ export const env = {
     return required('CONTRACT_API_URL').replace(/\/$/, '');
   },
   get adminUrl(): string {
-    return offline('CONTRACT_ADMIN_URL').replace(/\/$/, '');
+    return required('CONTRACT_ADMIN_URL').replace(/\/$/, '');
+  },
+  /**
+   * The admin portal's origin, which the admin service's CORS must admit:
+   * a loopback origin offline and on a dev stack, the portal's own on staging.
+   */
+  get adminPortalOrigin(): string {
+    return required('CONTRACT_ADMIN_ORIGIN').replace(/\/$/, '');
   },
   /** The MCP endpoint itself, path included (`…/mcp`). */
   get mcpUrl(): string {
-    return offline('CONTRACT_MCP_URL').replace(/\/$/, '');
+    return required('CONTRACT_MCP_URL').replace(/\/$/, '');
   },
-  /** The Cognito-shaped issuer the offline stack's API and MCP server trust. */
+  /**
+   * The issuer the API and MCP server trust. Offline, the run's own
+   * Cognito-shaped issuer; deployed, the real pool's, which Cognito names
+   * after the pool (`<region>_<id>`).
+   */
   get issuerUrl(): string {
+    if (TARGET === 'deployed') {
+      const pool = deployedInput('CONTRACT_AUTH_POOL_ID');
+      return `https://cognito-idp.${pool.split('_')[0]}.amazonaws.com/${pool}`;
+    }
     return offline('CONTRACT_ISSUER_URL').replace(/\/$/, '');
   },
   /** PKCS#8 PEM whose public half the offline stack publishes as its JWKS. */

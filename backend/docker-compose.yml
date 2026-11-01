@@ -1,5 +1,5 @@
-# The local .NET stack: Postgres 17, the migrator, then the API and the
-# staff admin service.
+# The local .NET stack: Postgres 17, the migrator, then the API, the staff
+# admin service and the MCP server.
 #
 #   docker compose -f backend/docker-compose.yml up --build
 #   curl http://127.0.0.1:8080/health
@@ -112,6 +112,27 @@ services:
       FIRM_USER_POOL_ID: ${FIRM_USER_POOL_ID:-}
     ports:
       - '127.0.0.1:8090:8090'
+    depends_on:
+      migrator:
+        condition: service_completed_successfully
+
+  # The MCP server on 8788 (its endpoint is http://127.0.0.1:8788/mcp), as
+  # its own role `mcp` — SELECT on cases and firms, candidates only for
+  # writes. AUTH_CLIENT_IDS is the shared dev pool's MCP harness allowlist
+  # (claude + inspector, from backend/.env); unset, every call answers 401.
+  # contract/scripts/dev-test.sh --target deployed signs in through the
+  # inspector's client and calls every tool here.
+  mcp:
+    build:
+      context: .
+      target: mcp-development
+    environment:
+      INSOLVIA_ENV: ${INSOLVIA_ENV:-local}
+      INSOLVIA_DB_CONNECTION_STRING: Host=postgres;Port=5432;Database=insolvia;Username=mcp;Password=insolvia-local-only
+      AUTH_ISSUER_URL: ${AUTH_ISSUER_URL:-}
+      AUTH_CLIENT_IDS: ${AUTH_CLIENT_IDS:-}
+    ports:
+      - '127.0.0.1:8788:8788'
     depends_on:
       migrator:
         condition: service_completed_successfully

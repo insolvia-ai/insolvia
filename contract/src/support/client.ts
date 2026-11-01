@@ -9,13 +9,10 @@
 // - a Proxy notes every public method the suite calls, for the coverage gate
 //   (src/coverage.ts), which fails the run if any method of the class
 //   was never invoked.
-import { appendFileSync } from 'node:fs';
-import { join } from 'node:path';
-
 import { expect } from '@jest/globals';
 import { InsolviaApiClient } from '@insolvia-ai/api-client';
 
-import { coverageDir } from '../coverage.ts';
+import { noteCall } from '../coverage.ts';
 import { env } from './env.ts';
 import { expectShape, type Spec, withMessage } from './wire.ts';
 
@@ -38,11 +35,6 @@ export const CLIENT_METHODS: readonly string[] = Object.getOwnPropertyNames(
 );
 
 const methodSet = new Set(CLIENT_METHODS);
-
-function noteCall(method: string): void {
-  const dir = coverageDir();
-  appendFileSync(join(dir, `${process.pid}.log`), `${method}\n`);
-}
 
 export interface ContractClient {
   readonly api: InsolviaApiClient;
@@ -91,7 +83,7 @@ export function contractClient(token?: string | (() => string)): ContractClient 
       const value: unknown = Reflect.get(target, property, receiver);
       if (typeof property === 'string' && methodSet.has(property) && typeof value === 'function') {
         return (...args: unknown[]) => {
-          noteCall(property);
+          noteCall('api', property);
           // `target`, not the proxy: the class keeps its state in #private
           // fields, which only the real instance carries.
           return (value as (...a: unknown[]) => unknown).apply(target, args);
