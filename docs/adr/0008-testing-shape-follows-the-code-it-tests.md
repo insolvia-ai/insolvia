@@ -1,6 +1,6 @@
 # ADR 0008 — The testing shape follows the code it tests, not one house rule
 
-- **Status:** Accepted
+- **Status:** Accepted — amended by [0029](0029-one-testing-shape.md) (Python and Vitest rows replaced; route-vs-contract rule)
 - **Date:** 2026-08-01
 - **Relates to:** `.claude/skills/insolvia-testing` owns *how* to write a test
   here and must not be restated in this file; issue #40 owns the staging E2E
