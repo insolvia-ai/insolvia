@@ -6,7 +6,7 @@ unit tier proves the rules against memory stores; this proves the parts only
 a deployed environment has — the seeded client's real portal token, the
 presigned PUT into the real case-documents bucket with no encryption header
 (the bucket default is the case key, #392), the API role's HeadObject and
-tag clear on a client's object, and the request row in the real case table.
+tag clear on a client's object, and the request row in the real database.
 
 Scratch discipline. The upload has to land on the case the SEEDED CLIENT is
 bound to — the fixture case — because that binding is the only way a portal

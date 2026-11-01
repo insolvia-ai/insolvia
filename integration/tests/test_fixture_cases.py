@@ -24,9 +24,9 @@ seed wrote it, and since the loader leaves an existing row alone (ADR 0021)
 no re-seed will put it back. Saying "not in this target" there sent the last
 reader to re-seed an environment that was already seeded.
 
-Why content and not the derived id: deriving it needs the case TABLE's name
-(the seeder's first input), which this tier — HTTPS to the API and nothing
-else — deliberately does not hold. And the name check is wanted either way;
+Why content and not the derived id: deriving it is the seeder's business
+(backend/src/Insolvia.Migrator/Seeding/SeedIds.cs), which this tier — HTTPS
+to the API and nothing else — deliberately does not reimplement. And the name check is wanted either way;
 it is the thing that catches a corrupted fixture.
 """
 

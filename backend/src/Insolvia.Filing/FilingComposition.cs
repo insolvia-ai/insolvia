@@ -80,7 +80,7 @@ public static class FilingComposition
 
             return new S3DocumentBlobStore(new AmazonS3Client(s3), bucket);
         });
-        if (config.Environment == "local" && read(SealingKeys.FilingKeyVariable) is not { Length: > 0 } && read("CASE_TABLE_NAME") is not { Length: > 0 })
+        if (config.Environment == "local" && read(SealingKeys.FilingKeyVariable) is not { Length: > 0 })
         {
             services.AddSingleton<IFilingCredentialOpener>(new LocalFilingCredentialOpener());
         }
@@ -96,7 +96,7 @@ public static class FilingComposition
         // its alias, Decrypt only, under the tax-id encryption context — the
         // same key the API sealed under. Locally, with no key named, the local
         // twin the API's local host seals with.
-        if (config.Environment == "local" && read(SealingKeys.CaseKeyVariable) is not { Length: > 0 } && read("CASE_TABLE_NAME") is not { Length: > 0 })
+        if (config.Environment == "local" && read(SealingKeys.CaseKeyVariable) is not { Length: > 0 })
         {
             services.AddSingleton<ITaxIdCipher>(new LocalTaxIdCipher());
         }

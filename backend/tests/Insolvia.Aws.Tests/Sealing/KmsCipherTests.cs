@@ -170,23 +170,6 @@ public sealed class KmsCipherTests
         Assert.Throws<ArgumentException>(() => new KmsFilingCredentialOpener(kms, ""));
     }
 
-    // ── The key aliases ─────────────────────────────────────────────
-
-    [Fact]
-    public void The_case_key_alias_is_derived_from_the_case_table()
-    {
-        Assert.Equal("alias/insolvia-staging-cases", KeyAliases.CaseKey("insolvia-staging-cases"));
-        Assert.Equal("alias/insolvia-dev-0123456789ab-cases", KeyAliases.CaseKey("insolvia-dev-0123456789ab-cases"));
-    }
-
-    [Fact]
-    public void The_vault_names_are_derived_from_the_case_table()
-    {
-        Assert.Equal("insolvia-staging-filing-credentials", KeyAliases.FilingCredentialsName("insolvia-staging-cases"));
-        Assert.Equal("alias/insolvia-dev-0123456789ab-filing-credentials", KeyAliases.FilingCredentialsKey("insolvia-dev-0123456789ab-cases"));
-        Assert.Contains("not an insolvia-<env>-cases", Assert.Throws<ArgumentException>(() => KeyAliases.FilingCredentialsName("insolvia-staging-firms")).Message, StringComparison.Ordinal);
-    }
-
     // ── The local twins ─────────────────────────────────────────────
 
     [Fact]

@@ -39,13 +39,11 @@ data "aws_caller_identity" "current" {}
 # developer's own IAM user is the principal.
 
 locals {
-  # insolvia-<env>-cases — the KEY's alias (`alias/${local.name}`, below). It
-  # was also the DynamoDB case table's name, and the .NET hosts can still
-  # derive the alias from a CASE_TABLE_NAME of that shape
-  # (backend/src/Insolvia.Aws/Sealing/KeyAliases.cs) — though every deployed
-  # environment names it explicitly (insolvia-kms-case-key-alias). The alias
-  # must keep matching `alias/insolvia-*-cases`: SealingKeys refuses any
-  # other, and ci-trust's DenyCaseDataDecryption is written against it.
+  # insolvia-<env>-cases — the KEY's alias (`alias/${local.name}`, below),
+  # which every deployed environment hands its hosts explicitly
+  # (insolvia-kms-case-key-alias). The alias must keep matching
+  # `alias/insolvia-*-cases`: SealingKeys refuses any other, and ci-trust's
+  # DenyCaseDataDecryption is written against it.
   name = "${var.project}-${var.environment}-cases"
 
   # The tax-id envelope's encryption-context purpose (issue 13.12 / #382) —

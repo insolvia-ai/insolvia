@@ -112,8 +112,7 @@ public sealed class WorkerRuntime : IAsyncDisposable
         string? Optional(string name) => read(name) is { Length: > 0 } value ? value : null;
         var bucket = Optional("CASE_DOCUMENT_BUCKET") ?? throw new InvalidOperationException("CASE_DOCUMENT_BUCKET must be set for the worker");
         var caseKey = Optional("INSOLVIA_KMS_CASE_KEY_ALIAS")
-            ?? (Optional("CASE_TABLE_NAME") is { } table ? KeyAliases.CaseKey(table) : null)
-            ?? throw new InvalidOperationException("INSOLVIA_KMS_CASE_KEY_ALIAS (or CASE_TABLE_NAME, which derives it) must be set for the worker");
+            ?? throw new InvalidOperationException("INSOLVIA_KMS_CASE_KEY_ALIAS must be set for the worker");
         var settings = DatabaseSettings.FromEnvironment(read, applicationName: "insolvia-worker");
         var region = Optional("AWS_REGION");
         var kms = region is null ? new AmazonKeyManagementServiceClient() : new AmazonKeyManagementServiceClient(RegionEndpoint.GetBySystemName(region));

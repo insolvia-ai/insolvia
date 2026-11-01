@@ -310,7 +310,8 @@ public sealed class ConfigTests
             ("INSOLVIA_DB_CONNECTION_STRING", "Host=127.0.0.1;Port=1;Database=insolvia;Username=filing;Password=unused"),
             ("CASE_DOCUMENT_BUCKET", "insolvia-staging-case-documents"),
             ("FILING_KILL_SWITCH_PARAMETER", "/insolvia/staging/filing/submissions-enabled"),
-            ("CASE_TABLE_NAME", "insolvia-staging-cases"),
+            ("INSOLVIA_KMS_CASE_KEY_ALIAS", "alias/insolvia-staging-cases"),
+            ("INSOLVIA_KMS_FILING_KEY_ALIAS", "alias/insolvia-staging-filing-credentials"),
             ("AWS_REGION", "us-east-1"));
         var config = FilingConfig.Load(read);
         using var services = FilingComposition.Services(config, read, new CapturingLog());
