@@ -122,7 +122,7 @@ describe_area() {
     app)        echo "apps/insolvia_app        npm run test --workspace (jest)" ;;
     portal)     echo "apps/insolvia_admin      npm test (own lockfile)" ;;
     marketing)  echo "apps/insolvia_marketing  npm test (own lockfile)" ;;
-    forms)      echo "forms/                   forms/scripts/dev-test.sh" ;;
+    forms)      echo "forms/                   forms/scripts/dev-test.sh (the xUnit spec tests, filtered)" ;;
     ci-scripts) echo ".github/scripts/         release-diff-base.test.sh, lambda-environment.test.sh (plain bash)" ;;
   esac
 }
