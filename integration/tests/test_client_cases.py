@@ -1,9 +1,9 @@
-"""A client's cases through the real table (ADR 0022, PR 2): the debtor item
-feeds the `by-client` index, and `GET /v1/firm/clients/<id>/cases` reads it.
+"""A client's cases through the real database (ADR 0022, PR 2): the debtor's
+client link is what `GET /v1/firm/clients/<id>/cases` reads.
 
-What only this tier can answer: that the deployed table HAS the index (a
-Terraform change the unit tier cannot see), that the item the store writes
-carries keys the index accepts, and that the API role may query it.
+What only this tier can answer: that the deployed schema serves that read
+(a migration the unit tier's memory stores cannot see), that the row the
+store writes is the one the read finds, and that the API role may run it.
 
 Scratch discipline: the scratch case is linked to the scratch client as
 Debtor 1 — idempotently, whichever of them already existed — and nothing else
@@ -18,8 +18,8 @@ from typing import Any
 
 from tests.conftest import Api
 
-#: A GSI is eventually consistent; a just-written entry normally appears in
-#: well under a second. Bounded, so a missing index fails rather than hangs.
+#: A just-written link normally reads back at once; the poll is bounded, so a
+#: missing link fails rather than hangs.
 _INDEX_WAIT_SECONDS = 10.0
 
 
@@ -44,8 +44,8 @@ def test_a_case_linked_to_a_client_is_in_that_clients_list(
             break
         time.sleep(0.5)
     assert roles.get(case_id) == "debtor_1", (
-        "the scratch case is not in its client's list — is the by-client "
-        "index applied to this environment's case table?"
+        "the scratch case is not in its client's list — is the client "
+        "link applied in this environment's database?"
     )
 
 

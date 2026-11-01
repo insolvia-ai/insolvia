@@ -54,10 +54,6 @@ public sealed class ConfigTests(WebApplicationFactory<Program> factory) : IClass
         Assert.Contains("INSOLVIA_ENV", Assert.Throws<ArgumentException>(() => Load(("INSOLVIA_ENV", "prod"))).Message, StringComparison.Ordinal);
 
     [Theory]
-    [InlineData("WAITLIST_TABLE_NAME", "insolvia-staging-waitlist")]
-    [InlineData("CASE_TABLE_NAME", "insolvia-staging-cases")]
-    [InlineData("FIRM_TABLE_NAME", "insolvia-staging-firms")]
-    [InlineData("CASE_ACCESS_LOG_TABLE_NAME", "insolvia-staging-case-access-log")]
     [InlineData("CASE_DOCUMENT_BUCKET", "insolvia-staging-case-documents-us-east-1")]
     [InlineData("MAILER_API_URL", "https://mailer-staging.insolvia.ai")]
     [InlineData("AUTH_USER_POOL_ID", "us-east-1_EXAMPLE00")]
@@ -72,10 +68,6 @@ public sealed class ConfigTests(WebApplicationFactory<Program> factory) : IClass
     {
         static string? Field(ApiConfig config, string name) => name switch
         {
-            "WAITLIST_TABLE_NAME" => config.WaitlistTableName,
-            "CASE_TABLE_NAME" => config.CaseTableName,
-            "FIRM_TABLE_NAME" => config.FirmTableName,
-            "CASE_ACCESS_LOG_TABLE_NAME" => config.CaseAccessLogTableName,
             "CASE_DOCUMENT_BUCKET" => config.CaseDocumentBucket,
             "MAILER_API_URL" => config.MailerApiUrl,
             "AUTH_USER_POOL_ID" => config.AuthUserPoolId,

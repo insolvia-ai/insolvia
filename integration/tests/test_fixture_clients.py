@@ -1,11 +1,11 @@
-"""The seeded firm clients through the real tables (ADR 0022 — the spec
+"""The seeded firm clients through the real database (ADR 0022 — the spec
 #409 deferred until a fixture seeded clients).
 
 What only a seeded environment can answer: that a client the loader wrote
-into the real firm table reads back through `/v1/firm/clients`, that the
-case table's debtor copies name it, that the copy still agrees with it
-(`differs_from_client == []`), and that the `by-client` index — a GSI only
-the deployed table has — lists the case under the client.
+into the real database reads back through `/v1/firm/clients`, that the
+case's debtor copies name it, that the copy still agrees with it
+(`differs_from_client == []`), and that the client's case list lists the
+case under the client.
 
 READ-ONLY, like test_fixture_cases.py: the fixture's clients are found by
 following the fixture cases' Debtor 1 and Debtor 2, never created here, so a
@@ -22,8 +22,8 @@ import pytest
 from tests.conftest import Api
 from tests.test_fixture_cases import _find, _fixture_cases
 
-#: A GSI is eventually consistent. The seed ran before the suite, so this is
-#: only ever spent on a missing index — bounded so that fails rather than hangs.
+#: The seed ran before the suite, so this is only ever spent on a missing
+#: link — bounded so that fails rather than hangs.
 _INDEX_WAIT_SECONDS = 10.0
 
 
@@ -85,5 +85,5 @@ def test_each_client_lists_its_fixture_case_in_the_role_it_holds(
             time.sleep(0.5)
         assert roles.get(case_id) == debtor["filing_role"], (
             f"case {case_id} is not in client {client_id}'s list — is the "
-            "by-client index applied to this environment's case table?"
+            "client link applied in this environment's database?"
         )

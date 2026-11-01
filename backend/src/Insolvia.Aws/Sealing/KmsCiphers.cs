@@ -13,7 +13,7 @@ namespace Insolvia.Aws.Sealing;
 /// <c>kms:EncryptionContext:purpose = debtor-tax-id</c>.
 /// </summary>
 /// <param name="kms">The KMS client.</param>
-/// <param name="keyId">The case key — <see cref="KeyAliases.CaseKey"/>.</param>
+/// <param name="keyId">The case key — <see cref="SealingKeys.CaseKeyAlias"/>.</param>
 public sealed class KmsTaxIdCipher(IAmazonKeyManagementService kms, string keyId) : ITaxIdCipher
 {
     private readonly IAmazonKeyManagementService _kms = kms ?? throw new ArgumentNullException(nameof(kms));
@@ -39,7 +39,7 @@ public sealed class KmsTaxIdCipher(IAmazonKeyManagementService kms, string keyId
 /// (ADR 0024).
 /// </summary>
 /// <param name="kms">The KMS client.</param>
-/// <param name="keyId">The vault key — <see cref="KeyAliases.FilingCredentialsKey"/>.</param>
+/// <param name="keyId">The vault key — <see cref="SealingKeys.FilingKeyAlias"/>.</param>
 public sealed class KmsFilingCredentialSealer(IAmazonKeyManagementService kms, string keyId) : IFilingCredentialSealer
 {
     private readonly IAmazonKeyManagementService _kms = kms ?? throw new ArgumentNullException(nameof(kms));
@@ -67,7 +67,7 @@ public sealed class KmsFilingCredentialSealer(IAmazonKeyManagementService kms, s
 /// double every open in the log. The ordering is pinned by a test.
 /// </remarks>
 /// <param name="kms">The KMS client.</param>
-/// <param name="keyId">The vault key — <see cref="KeyAliases.FilingCredentialsKey"/>.</param>
+/// <param name="keyId">The vault key — <see cref="SealingKeys.FilingKeyAlias"/>.</param>
 public sealed class KmsFilingCredentialOpener(IAmazonKeyManagementService kms, string keyId) : IFilingCredentialOpener
 {
     private readonly IAmazonKeyManagementService _kms = kms ?? throw new ArgumentNullException(nameof(kms));

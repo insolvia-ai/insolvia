@@ -1,11 +1,9 @@
-"""Merging two clients through the real tables (ADR 0022, PR 7).
+"""Merging two clients through the real database (ADR 0022, PR 7).
 
 What only this tier can answer: that the merge's three kinds of conditional
-write — the claim over both client rows (a TransactWriteItems of two
-UpdateItems on the FIRM table), the per-case re-point (an UpdateItem plus
-ConditionChecks on the CASE table), and the finishing archive — are
-accepted by the real tables under the running role, and that the
-`by-client` index follows the re-point.
+write — the claim over both client rows, the per-case re-point, and the
+finishing archive — are accepted by the real database under the running
+role, and that the client's case list follows the re-point.
 
 Scratch discipline: the one thing created per run is a second client, which
 the merge archives (clients cannot be deleted — ADR 0022). The scratch

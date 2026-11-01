@@ -1,5 +1,5 @@
 """The per-filing approval over HTTP (ADR 0024 PR 6, guardrail 1), against the
-running API, the real pool and the real case table.
+running API, the real pool and the real database.
 
 What this tier proves, on the suite's scratch case: the route answers the
 basis the screen renders (court, documents in docket order, checklist, fee

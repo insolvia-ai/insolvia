@@ -11,13 +11,10 @@ namespace Insolvia.Aws.Sealing;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Where the values come from.</b> Explicitly, from
-/// <c>INSOLVIA_KMS_CASE_KEY_ALIAS</c> and <c>INSOLVIA_KMS_FILING_KEY_ALIAS</c>
-/// — the names the switch (18.22) will set, because <c>CASE_TABLE_NAME</c>
-/// names a DynamoDB table that stops existing with it. Until then, when a
-/// variable is unset, the alias is DERIVED from <c>CASE_TABLE_NAME</c> exactly
-/// as the Python composers derived it (<see cref="KeyAliases"/>), so today's
-/// Terraform environment needs no new line.
+/// <b>Where the values come from.</b> Only explicitly, from
+/// <c>INSOLVIA_KMS_CASE_KEY_ALIAS</c> and <c>INSOLVIA_KMS_FILING_KEY_ALIAS</c>,
+/// which every deployed host receives from its SSM namespace. Nothing derives
+/// them: an unset variable is a refusal at boot.
 /// </para>
 /// <para>
 /// <b>The values do not change</b>: <c>alias/insolvia-&lt;env&gt;-cases</c> and
@@ -48,23 +45,11 @@ public sealed partial record SealingKeys(string CaseKeyAlias, string FilingKeyAl
     {
         ArgumentNullException.ThrowIfNull(read);
         string? Optional(string name) => read(name) is { Length: > 0 } value ? value : null;
-        var caseTable = Optional("CASE_TABLE_NAME");
-
-        var caseKey = Optional(CaseKeyVariable) ?? (caseTable is null ? null : KeyAliases.CaseKey(caseTable));
-        string? filingKey;
-        try
-        {
-            filingKey = Optional(FilingKeyVariable) ?? (caseTable is null ? null : KeyAliases.FilingCredentialsKey(caseTable));
-        }
-        catch (ArgumentException error)
-        {
-            throw new InvalidOperationException($"{FilingKeyVariable} is unset and CASE_TABLE_NAME cannot derive it: {error.Message}", error);
-        }
-
+        var caseKey = Optional(CaseKeyVariable);
+        var filingKey = Optional(FilingKeyVariable);
         if (caseKey is null || filingKey is null)
         {
-            throw new InvalidOperationException(
-                $"{CaseKeyVariable} and {FilingKeyVariable} (or CASE_TABLE_NAME, which derives both) must be set for the Lambda entrypoint");
+            throw new InvalidOperationException($"{CaseKeyVariable} and {FilingKeyVariable} must be set for the Lambda entrypoint");
         }
 
         if (!CaseKeyShape().IsMatch(caseKey))

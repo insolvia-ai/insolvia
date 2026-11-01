@@ -1,17 +1,17 @@
-"""The case lifecycle through the real tables (issue 14.3 / #355).
+"""The case lifecycle through the real database (issue 14.3 / #355).
 
-What only this tier can answer: that a status move's TransactWriteItems — the
-case record conditioned on the status it was read at, plus its history row —
-is accepted by the real table under the running role; that the archive is a
-second view the real indexes serve (the fill-the-page loop over a filtered
-GSI query); and that copy case's three kinds of write — the collection
+What only this tier can answer: that a status move's transaction — the case
+record conditioned on the status it was read at, plus its history row — is
+accepted by the real database under the running role; that the archive is a
+second view the real database serves (the fill-the-page loop over a filtered
+query); and that copy case's three kinds of write — the collection
 records, the sealed tax ids, the case transaction — land, and that soft
 delete takes the copy out of every read.
 
 Scratch discipline, and the one exception to it. The docket facts and the
 archive are exercised on the scratch case and put back as they were. The
 copy cannot be: copying is opening a case, so EACH RUN LEAVES ONE
-SOFT-DELETED CASE PARTITION behind (the copy, deleted at the end — nothing
+SOFT-DELETED CASE behind (the copy, deleted at the end — nothing
 the product can reach, and nothing the scratch-case lookup can find). That is
 the cost of proving the copy against the real tables, and it is said here so
 nobody mistakes the rows for a leak. The status moves happen on the copy,

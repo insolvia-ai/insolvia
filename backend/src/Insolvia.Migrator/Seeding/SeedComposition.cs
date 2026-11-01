@@ -46,9 +46,9 @@ public sealed record SeedReport(string Environment, string Fixture, bool Check, 
 /// Lambda requires both. Unset, locally only, the committed
 /// <c>seeds/fixtures</c> tree is the source and
 /// <c>INSOLVIA_SEED_DOCUMENT_DIR</c> (default: a temp directory) the target.</description></item>
-/// <item><term>Case key</term><description><c>INSOLVIA_KMS_CASE_KEY_ALIAS</c>,
-/// or in a Lambda <c>alias/insolvia-&lt;env&gt;-cases</c> — the API's own
-/// derivation; locally with neither, the local key the local API opens with.</description></item>
+/// <item><term>Case key</term><description><c>INSOLVIA_KMS_CASE_KEY_ALIAS</c>
+/// → the KMS key the API opens with; a Lambda requires it. Unset, locally
+/// only, the local key the local API opens with.</description></item>
 /// </list>
 /// </remarks>
 public static class SeedComposition
@@ -120,7 +120,7 @@ public static class SeedComposition
             blobs,
             objects,
             new PostgresTaxIdStore(context),
-            Cipher(read, target, isLambda),
+            Cipher(read, isLambda),
             new PostgresClientBindingStore(context));
     }
 
@@ -158,10 +158,16 @@ public static class SeedComposition
         return (blobs, new DirectoryFixtureObjects(fixturesRoot, blobs));
     }
 
-    private static ITaxIdCipher Cipher(Func<string, string?> read, SeedTarget target, bool isLambda)
+    private static ITaxIdCipher Cipher(Func<string, string?> read, bool isLambda)
     {
-        var alias = Optional(read, "INSOLVIA_KMS_CASE_KEY_ALIAS") ?? (isLambda ? KeyAliases.CaseKey(target.CaseTarget) : null);
-        return alias is null ? new LocalTaxIdCipher() : new KmsTaxIdCipher(new AmazonKeyManagementServiceClient(), alias);
+        if (Optional(read, "INSOLVIA_KMS_CASE_KEY_ALIAS") is { } alias)
+        {
+            return new KmsTaxIdCipher(new AmazonKeyManagementServiceClient(), alias);
+        }
+
+        return isLambda
+            ? throw new SeedRefusedException("INSOLVIA_KMS_CASE_KEY_ALIAS must name the case key for a deployed seed")
+            : new LocalTaxIdCipher();
     }
 
     /// <summary>

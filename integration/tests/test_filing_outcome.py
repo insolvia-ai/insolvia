@@ -1,5 +1,5 @@
 """The hand-back resolution route over HTTP (ADR 0024 PR 8), against the
-running API, the real pool and the real case table — on the suite's scratch
+running API, the real pool and the real database — on the suite's scratch
 case only.
 
 What this tier proves: the route is mounted behind its gates (anonymous 401,

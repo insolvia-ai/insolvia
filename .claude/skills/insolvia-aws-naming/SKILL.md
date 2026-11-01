@@ -90,7 +90,7 @@ Most resources are just `[project]-[env]-[component]`. These need more:
 | **CloudWatch alarm** | `[project]-[env]-[component]-[condition]` | `insolvia-prod-mailer-ses-bounce-rate` |
 | **KMS alias** | `alias/[project]-[env]-[component]` | `alias/insolvia-prod-cases` |
 | **Log group** | `/aws/lambda/[function-name]` | derived — never hand-written |
-| **SSM parameter** | `/[project]/[env]/[name]` | `/insolvia/prod/api/case-table-name` |
+| **SSM parameter** | `/[project]/[env]/[name]` | `/insolvia/prod/api/insolvia-kms-case-key-alias` |
 
 **S3 bucket names are globally unique across all of AWS**, which is why they
 alone take a suffix. Use the region code. A short random hash works too, but the

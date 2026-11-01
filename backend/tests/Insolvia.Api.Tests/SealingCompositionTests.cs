@@ -27,11 +27,20 @@ public sealed class SealingCompositionTests(WebApplicationFactory<Program> facto
         ("INSOLVIA_DB_CONNECTION_STRING", "Host=127.0.0.1;Port=1;Database=insolvia;Username=api;Password=unused"),
     ];
 
+    private static readonly Dictionary<string, string> Valid = new(StringComparer.Ordinal)
+    {
+        [SealingKeys.CaseKeyVariable] = "alias/insolvia-staging-cases",
+        [SealingKeys.FilingKeyVariable] = "alias/insolvia-staging-filing-credentials",
+    };
+
     [Fact]
-    public void Inside_lambda_the_ciphers_are_kms_under_the_derived_aliases_and_the_vault_stores_are_postgres()
+    public void Inside_lambda_the_ciphers_are_kms_under_the_named_aliases_and_the_vault_stores_are_postgres()
     {
         IServiceCollection? registered = null;
-        using var lambda = Host(registrations => registered = registrations, ("CASE_TABLE_NAME", "insolvia-staging-cases"));
+        using var lambda = Host(
+            registrations => registered = registrations,
+            (SealingKeys.CaseKeyVariable, "alias/insolvia-staging-cases"),
+            (SealingKeys.FilingKeyVariable, "alias/insolvia-staging-filing-credentials"));
         using var scope = lambda.Services.CreateScope();
         var services = scope.ServiceProvider;
 
@@ -40,19 +49,6 @@ public sealed class SealingCompositionTests(WebApplicationFactory<Program> facto
         Assert.IsType<PostgresFilingCredentialStore>(services.GetRequiredService<IFilingCredentialStore>());
         Assert.IsType<PostgresFilingAuthorizationStore>(services.GetRequiredService<IFilingAuthorizationStore>());
         NoOpener(services, registered);
-    }
-
-    [Fact]
-    public void Explicit_aliases_win_over_the_derivation()
-    {
-        using var lambda = Host(
-            _ => { },
-            ("CASE_TABLE_NAME", "insolvia-staging-cases"),
-            (SealingKeys.CaseKeyVariable, "alias/insolvia-prod-cases"),
-            (SealingKeys.FilingKeyVariable, "alias/insolvia-prod-filing-credentials"));
-
-        Assert.Equal("alias/insolvia-prod-cases", Assert.IsType<KmsTaxIdCipher>(lambda.Services.GetRequiredService<ITaxIdCipher>()).KeyId);
-        Assert.Equal("alias/insolvia-prod-filing-credentials", Assert.IsType<KmsFilingCredentialSealer>(lambda.Services.GetRequiredService<IFilingCredentialSealer>()).KeyId);
     }
 
     [Fact]
@@ -87,18 +83,22 @@ public sealed class SealingCompositionTests(WebApplicationFactory<Program> facto
     public void An_alias_outside_the_protected_shape_is_refused(string name, string value)
     {
         var error = Assert.Throws<InvalidOperationException>(() =>
-            SealingKeys.Load(variable => variable == name ? value : variable == "CASE_TABLE_NAME" ? "insolvia-staging-cases" : null));
+            SealingKeys.Load(variable => variable == name ? value : Valid.GetValueOrDefault(variable)));
 
         Assert.StartsWith(name, error.Message, StringComparison.Ordinal);
     }
 
-    [Fact]
-    public void A_case_table_name_that_cannot_derive_the_vault_key_is_refused()
+    [Theory]
+    [InlineData(SealingKeys.CaseKeyVariable)]
+    [InlineData(SealingKeys.FilingKeyVariable)]
+    public void One_alias_without_the_other_is_refused_and_nothing_derives_it(string present)
     {
+        // CASE_TABLE_NAME was once a fallback that derived both; it names a
+        // DynamoDB table that no longer exists and is not read.
         var error = Assert.Throws<InvalidOperationException>(() =>
-            SealingKeys.Load(variable => variable == "CASE_TABLE_NAME" ? "some-other-table" : null));
+            SealingKeys.Load(variable => variable == present ? Valid[present] : variable == "CASE_TABLE_NAME" ? "insolvia-staging-cases" : null));
 
-        Assert.Contains("CASE_TABLE_NAME cannot derive it", error.Message, StringComparison.Ordinal);
+        Assert.Contains("must be set", error.Message, StringComparison.Ordinal);
     }
 
     /// <summary>

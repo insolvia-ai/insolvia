@@ -179,8 +179,8 @@ module "mcp_service" {
 # Name follows the api_service module's own /insolvia/<env>/api/<kebab-key>
 # convention exactly (see modules/api_service/main.tf's aws_ssm_parameter
 # "config") so the deploy workflow's existing get-parameters-by-path step
-# picks it up and derives it into MAILER_API_URL alongside INSOLVIA_ENV and
-# WAITLIST_TABLE_NAME — no workflow change needed.
+# picks it up and derives it into MAILER_API_URL alongside the namespace's other
+# parameters — no workflow change needed.
 resource "aws_ssm_parameter" "mailer_api_url" {
   name  = "/insolvia/${local.environment}/api/mailer-api-url"
   type  = "String"
@@ -624,11 +624,10 @@ resource "aws_ssm_parameter" "db" {
 # /insolvia/<env>/db/* above (as INSOLVIA_DB_*). Env-level, like the auth and
 # queue parameters, because each value is another module's output.
 #
-# The key aliases are explicit since the switch: the .NET hosts used to be
-# able to derive them from CASE_TABLE_NAME, the name of a DynamoDB table
-# deleted in plan 18.23. backend/src/Insolvia.Aws/Sealing/SealingKeys.cs
-# refuses any value not shaped alias/insolvia-<env>-cases /
-# -filing-credentials, which is also what ci-trust's decrypt denies match.
+# The key aliases are named here and nowhere else: no host derives them.
+# backend/src/Insolvia.Aws/Sealing/SealingKeys.cs refuses an unset alias, and
+# any value not shaped alias/insolvia-<env>-cases / -filing-credentials,
+# which is also what ci-trust's decrypt denies match.
 resource "aws_ssm_parameter" "api_key_aliases" {
   for_each = {
     "insolvia-kms-case-key-alias"   = module.case_store.kms_key_alias
