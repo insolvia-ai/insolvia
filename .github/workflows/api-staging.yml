@@ -24,15 +24,18 @@ name: API · Deploy · Staging
 # `deploy` publishes, shifts the alias and smoke-tests /health. `integration`
 # then re-converges staging's seed (accounts, firms, the fixture case — the
 # migrator Lambda's `seed` command, .github/actions/seed-staging) and runs
-# integration/ against the live API as those people. That suite is a
-# black-box HTTP client (it was written against the Python API and moved out
-# of services/api when 18.23 deleted it, unchanged) — the same tier a
-# developer runs against their local stack with
-# integration/scripts/dev-test.sh. It runs AFTER the shift, so it
-# exercises the version now serving; staging is the proving ground and that
-# window is accepted, exactly as app-staging.yml's e2e job accepts it. Its
-# failure fails this workflow, which is what makes it gate the release's
-# production stage (release.yml `needs`) and the verified-commit status.
+# contract/'s DEPLOYED target against the live API as those people (ADR 0029
+# rule 2): the same suite every PR runs offline, through the shipped
+# api-client, signed in by real Cognito SRP — and the same target a developer
+# runs against their local stack with `contract/scripts/dev-test.sh --target
+# deployed`. It runs AFTER the shift, so it exercises the version now
+# serving; staging is the proving ground and that window is accepted, exactly
+# as app-staging.yml's e2e job accepts it. Its failure fails this workflow,
+# which is what makes it gate the release's production stage (release.yml
+# `needs`) and the verified-commit status. The job keeps its name
+# (`integration`) through #582: release.yml and the verified-commit status
+# read this workflow's result, not the job's, and ADR 0021 still calls this
+# tier "integration".
 
 on:
   # Reusable: release.yml calls this as one leg of a staging
@@ -300,6 +303,10 @@ jobs:
     needs: deploy
     runs-on: ubuntu-latest
     environment: insolvia-staging
+    permissions:
+      id-token: write
+      contents: read
+      packages: read
     steps:
       - uses: actions/checkout@v5
 
@@ -308,26 +315,31 @@ jobs:
           role-arn: ${{ secrets.AWS_ROLE_ARN }}
           migrator-function: ${{ needs.deploy.outputs.migrator_function }}
 
-      # The suite's own pins (integration/requirements.txt): pytest, boto3 for
-      # the unsigned SRP calls, PyJWT. It imports no backend code — it is an
-      # HTTP client. The contract suite (contract/) cannot take this job: it
-      # signs its own tokens, which staging's pool rightly refuses.
-      - uses: actions/setup-python@v5
+      # Node and the root workspace's lockfile: the suite is contract/, which
+      # goes through the shipped @insolvia-ai/api-client (a workspace member).
+      # The root `npm ci` installs the design-system packages from GitHub
+      # Packages, which the lockfile names — hence `packages: read` below.
+      - uses: actions/setup-node@v5
         with:
-          python-version: "3.12"
+          node-version: '24'
+          cache: npm
 
-      - name: Install the integration tier's test toolchain
-        run: pip install -r requirements.txt
-        working-directory: integration
-
-      - name: Integration tier against staging
-        working-directory: integration
+      - name: Install
+        run: npm ci
         env:
-          INSOLVIA_INTEGRATION: "1"
-          INTEGRATION_TARGET: staging
-          INTEGRATION_API_URL: https://${{ needs.deploy.outputs.domain }}
-          INTEGRATION_AUTH_POOL_ID: ${{ needs.deploy.outputs.auth_pool_id }}
-          INTEGRATION_AUTH_CLIENT_ID: ${{ needs.deploy.outputs.auth_client_id }}
-          INTEGRATION_AUTH_PORTAL_CLIENT_ID: ${{ needs.deploy.outputs.auth_portal_client_id }}
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # contract/'s deployed target (contract/src/support/target.ts). It
+      # refuses any CONTRACT_ENVIRONMENT but dev or staging, and signs nobody
+      # in unless /health reports the environment it names. The specs only the
+      # offline stack can express are listed as skipped, by name, with why.
+      - name: Contract suite against staging (deployed target)
+        env:
+          CONTRACT_TARGET: deployed
+          CONTRACT_ENVIRONMENT: staging
+          CONTRACT_API_URL: https://${{ needs.deploy.outputs.domain }}
+          CONTRACT_AUTH_POOL_ID: ${{ needs.deploy.outputs.auth_pool_id }}
+          CONTRACT_AUTH_CLIENT_ID: ${{ needs.deploy.outputs.auth_client_id }}
+          CONTRACT_AUTH_PORTAL_CLIENT_ID: ${{ needs.deploy.outputs.auth_portal_client_id }}
           E2E_TEST_USER_PASSWORD: ${{ secrets.E2E_TEST_USER_PASSWORD }}
-        run: pytest
+        run: npm run contract --workspace @insolvia-ai/contract

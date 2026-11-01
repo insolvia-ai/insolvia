@@ -113,8 +113,8 @@ mcp_auth_client_ids="$(jq -r '.mcp_auth_client_ids.value' <<<"$outputs")"
 #     verification against the shared dev pool. Without them every protected
 #     route answers 401 — the API fails closed rather than waving requests
 #     through when auth is unconfigured.
-#   • AUTH_USER_POOL_ID: not read by compose; integration/scripts/dev-test.sh
-#     signs in against it, and scripts/dev-aws-seed.sh resolves real subjects
+#   • AUTH_USER_POOL_ID: not read by compose; contract/scripts/dev-test.sh
+#     --target deployed signs in against it, and scripts/dev-aws-seed.sh resolves real subjects
 #     from it.
 #   • GOOGLE_CLIENT_ID: the dev Workspace OAuth client the admin service
 #     verifies staff tokens against (the admin portal on :3100).

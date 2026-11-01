@@ -2,8 +2,10 @@
 
 The backend's HTTP contract suite (ADR 0028, plan 18.2). Human docs:
 [`README.md`](README.md). Run: `contract/scripts/dev-test.sh` — the .NET hosts
-on a throwaway Postgres, the only target. CI: `Contract (.NET)` runs exactly
-that.
+on a throwaway Postgres (the **offline** target, the default). CI: `Contract
+(.NET)` runs exactly that. `--target deployed` runs the same specs against a
+running dev stack; `api-staging.yml` runs them against staging after each
+deploy (the integration tier of ADR 0021, folded in here by ADR 0029).
 
 - **It is the wire contract's oracle.** It was proven against the Python
   backend first and the .NET one at the switch, unchanged; since 18.23 deleted
@@ -16,10 +18,10 @@ that.
   shipped client. `support/client.ts` wraps the real class — a recording
   `fetch` (for `wire(status, spec)`) and a Proxy (for the coverage gate). Admin
   and MCP have no client; they are raw HTTP / JSON-RPC.
-- **The coverage gate is the gate.** `src/coverage.setup.ts` reads the method
+- **The coverage gate is the gate.** `src/coverage.ts` reads the method
   list off `InsolviaApiClient.prototype` and fails the run if one was never
   called. A new client method needs a call here in the same PR. A filtered run
-  (`dev-test.sh <filter>`) reports but does not enforce.
+  (`dev-test.sh <filter>`) or a deployed run reports but does not enforce.
 - **Shapes come from `packages/insolvia_api_client/src/models.ts`.** `wire.ts`'s
   `expectShape` is deliberately not exact (extra fields pass) but a missing or
   retyped declared field fails, and an optional field must be ABSENT, never
@@ -31,6 +33,8 @@ that.
   flmb/tampa) and the seeded firm admin are read; writes go to scratch clients
   and cases (`support/actors.ts`, flnb/gainesville). Firm-wide settings a test
   changes (questionnaire, checklist, profile) it restores. Files run serially.
+  The one exception is the seeded client's upload (the only portal binding a
+  deployed stack has); it adds one ad-hoc request and removes what it added.
 - **Tokens are real.** `support/tokens.ts` signs RS256 JWTs with the claims
   Cognito and Google issue; the stack verifies them with the same JWKS
   providers its deployed entrypoints use. Never add a verification bypass to
@@ -42,6 +46,21 @@ that.
   ones the migrator derives (the migrator's `SeedIdTests` reads it too).
   `scripts/aux-server.ts` is the run's JWKS and S3 stand-in, sharing
   `backend/src/Insolvia.Core/Local/DirectoryDocumentBlobStore.cs`'s layout.
+- **Two targets, one set of specs** (`support/target.ts`). Deployed signs in
+  by real SRP as `seeds/<environment>.json`'s people (`support/session.ts`);
+  every input comes from the environment with no defaults, and **there is no
+  production target** — `CONTRACT_ENVIRONMENT` is dev or staging, and
+  `global.setup.ts` checks `/health` agrees before signing anyone in.
+- **A spec that cannot run on a target says why, through `support/gates.ts`**
+  — `offlineOnly(reason)`, `deployedOnly`, `needsSeeded`, `needsBlobUrls` —
+  never an early `return` or an `if (TARGET…)` around assertions. Jest prints
+  each skipped spec by name with its reason. Prefer making a spec run on both:
+  use `seededStaff`/`freshFirmAdmin` rather than minting a token, and a
+  scratch case rather than a fixture.
+- **Scratch is tracked and undone.** `scratchClient`/`scratchCase`
+  (`support/actors.ts`) register what they create; `src/scratch.setup.ts`
+  deletes the cases and archives the clients after each file. Anything else a
+  spec writes on the deployed target it undoes in `finally`.
 - **TypeScript rules are the workspace's**: no build step, `.ts` relative
   imports, `erasableSyntaxOnly`. Gate: `npm run lint`, `npm run typecheck`,
   `npm run format` from the root all cover this directory.

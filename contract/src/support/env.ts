@@ -2,11 +2,17 @@
 //
 // Every variable is required and none has a default: a suite that guessed a
 // URL would be a run against a stack nobody chose. contract/scripts/dev-test.sh
-// sets them all for the local .NET stack.
+// sets them all for the local .NET stack; support/session.ts names the
+// deployed target's sign-in inputs.
+//
+// The getters are lazy, so a deployed run never asks for the offline stack's
+// key or its admin and MCP hosts (#583 brings those to the deployed target).
 // A JSON import rather than a read beside `import.meta.url`: Jest runs this
 // file transpiled to CommonJS (jest.base.js), where `import.meta` does not
 // exist.
 import stackJson from '../../stack/stack.json' with { type: 'json' };
+import { session } from './session.ts';
+import { person, TARGET } from './target.ts';
 
 function required(name: string): string {
   const value = process.env[name]?.trim();
@@ -17,6 +23,16 @@ function required(name: string): string {
     );
   }
   return value;
+}
+
+function offline(name: string): string {
+  if (TARGET !== 'offline') {
+    throw new Error(
+      `${name} belongs to the offline stack; a spec that reads it on the deployed target ` +
+        'must be marked offlineOnly (support/target.ts).',
+    );
+  }
+  return required(name);
 }
 
 interface StackFile {
@@ -31,31 +47,65 @@ interface StackFile {
   readonly accounts: Readonly<Record<string, string>>;
 }
 
-/** contract/stack/stack.json — the trust configuration the stack was started with. */
+/** contract/stack/stack.json — the trust configuration the offline stack was started with. */
 export const stack: StackFile = stackJson;
 
 export const env = {
-  apiUrl: required('CONTRACT_API_URL').replace(/\/$/, ''),
-  adminUrl: required('CONTRACT_ADMIN_URL').replace(/\/$/, ''),
+  get apiUrl(): string {
+    return required('CONTRACT_API_URL').replace(/\/$/, '');
+  },
+  get adminUrl(): string {
+    return offline('CONTRACT_ADMIN_URL').replace(/\/$/, '');
+  },
   /** The MCP endpoint itself, path included (`…/mcp`). */
-  mcpUrl: required('CONTRACT_MCP_URL').replace(/\/$/, ''),
-  /** The Cognito-shaped issuer the stack's API and MCP server trust. */
-  issuerUrl: required('CONTRACT_ISSUER_URL').replace(/\/$/, ''),
-  /** PKCS#8 PEM whose public half the stack publishes as its JWKS. */
-  signingKeyPath: required('CONTRACT_SIGNING_KEY'),
-};
-
-/** The seeded people (seeds/dev.json), by role, with the subjects stack.json gives them. */
-export const seeded = {
-  firmAdmin: { email: 'dev@insolvia.test', subject: account('dev@insolvia.test') },
-  portalClient: {
-    email: 'dev-client@insolvia.test',
-    subject: account('dev-client@insolvia.test'),
+  get mcpUrl(): string {
+    return offline('CONTRACT_MCP_URL').replace(/\/$/, '');
+  },
+  /** The Cognito-shaped issuer the offline stack's API and MCP server trust. */
+  get issuerUrl(): string {
+    return offline('CONTRACT_ISSUER_URL').replace(/\/$/, '');
+  },
+  /** PKCS#8 PEM whose public half the offline stack publishes as its JWKS. */
+  get signingKeyPath(): string {
+    return offline('CONTRACT_SIGNING_KEY');
   },
 };
 
-function account(email: string): string {
+/** A seeded person as a test sees them: who the seed says, and the subject they sign in as. */
+export interface SeededIdentity {
+  readonly handle: string;
+  readonly email: string;
+  readonly firmName: string;
+  readonly subject: string;
+}
+
+function identity(handle: string): SeededIdentity {
+  const who = person(handle);
+  return {
+    handle,
+    email: who.email,
+    firmName: who.firmName,
+    get subject(): string {
+      return subjectOf(handle);
+    },
+  };
+}
+
+/**
+ * The subject a seeded person signs in as. Offline: the one the migrator
+ * derives, which stack.json lists. Deployed: the real pool's, read off the
+ * token the global setup minted.
+ */
+export function subjectOf(handle: string): string {
+  if (TARGET === 'deployed') return session(handle).subject;
+  const email = person(handle).email;
   const subject = stack.accounts[email];
   if (!subject) throw new Error(`contract/stack/stack.json has no account for ${email}`);
   return subject;
 }
+
+/** The seeded firm administrator and portal client, by the seed's handles. */
+export const seeded = {
+  firmAdmin: identity('admin'),
+  portalClient: identity('client'),
+};

@@ -23,7 +23,7 @@ Runnable apps in `apps/`, the API client in `packages/`, the backend in
 | [`apps/insolvia_marketing/`](apps/insolvia_marketing/) | Marketing site for `www.insolvia.ai` — React Router v7, SSR. |
 | [`packages/`](packages/) | The API client (TypeScript) the app ships. |
 | [`backend/`](backend/) | The backend (.NET 10, PostgreSQL, on Lambda): the API and its job worker, `admin`, `mcp` (the remote MCP server), `filing` (the filing worker — ADR 0024), and the migrator. |
-| [`contract/`](contract/) · [`integration/`](integration/) | The backend's HTTP contract suite (offline) and the API's integration tier (signed in, against staging or a local stack). |
+| [`contract/`](contract/) | The backend's HTTP contract suite: offline on every PR, and signed in against staging (after each deploy) or a local stack. |
 | [`infra/`](infra/) | AWS infrastructure (Terraform): `staging`, `prod`, and per-machine `dev`. |
 
 The account-wide AWS layer (DNS, certificate, SES, container registries, the CI

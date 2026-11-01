@@ -75,9 +75,9 @@ constraints these obey come from issue #40; #80 is the first test.
 - **A spec writes only to the suite's scratch case — never to a seeded one.**
   `support/scratch-case.ts` finds-or-opens it (one case, one scratch client,
   per environment: neither can be deleted, so one per run would accumulate).
-  Seeded fixture cases are read-only to this suite: the integration tier finds
-  them by what the seed wrote, and the loader leaves an existing row alone, so
-  a spec that types into one breaks the *next* release's integration run, not
+  Seeded fixture cases are read-only to this suite: the contract suite's deployed target
+  finds them by what the seed wrote, and the loader leaves an existing row alone, so
+  a spec that types into one breaks the *next* release's deployed contract run, not
   its own. Never reach a case with `.first()` on `/cases` and then write.
 - **Do not upload Playwright artifacts from CI, and do not turn traces on
   there.** A trace records `fill()` arguments verbatim — including the password

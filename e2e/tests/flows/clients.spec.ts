@@ -15,7 +15,7 @@ import { signIn } from '../../support/sign-in';
  *
  * WHAT THIS PROVES THAT NOTHING ELSE CAN. The app's jest suite renders the
  * list against a fetch mock; the API's suites prove the `by-client` index and
- * the per-case filter against a memory store and, in the integration tier,
+ * the per-case filter against a memory store and, in the contract suite's deployed target,
  * the real table. Only a browser against a deployed stack proves the whole
  * chain a preparer walks: the directory loads, the search narrows it, the
  * row's case links come from `GET /v1/firm/clients/<id>/cases` through the

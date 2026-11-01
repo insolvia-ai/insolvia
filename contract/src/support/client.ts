@@ -7,7 +7,7 @@
 //   status, raw JSON, field names and types — not just on what the client's
 //   decoder made of it;
 // - a Proxy notes every public method the suite calls, for the coverage gate
-//   (src/coverage.setup.ts), which fails the run if any method of the class
+//   (src/coverage.ts), which fails the run if any method of the class
 //   was never invoked.
 import { appendFileSync } from 'node:fs';
 import { join } from 'node:path';

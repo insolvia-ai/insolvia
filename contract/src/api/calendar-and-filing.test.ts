@@ -1,13 +1,16 @@
 // The calendar (events, deadlines, the subscription feed) and electronic
 // filing's staff surface (ADR 0024): the authorization, the credential vault,
 // and the per-filing approval.
-import { ApiReauthenticationRequiredException } from '@insolvia-ai/api-client';
+import { ApiException, ApiReauthenticationRequiredException } from '@insolvia-ai/api-client';
 import { describe, expect, it } from '@jest/globals';
 
-import { firmAdmin, scratchCase } from '../support/actors.ts';
-import { contractClient } from '../support/client.ts';
+import { SCRATCH_COURT, firmAdmin, freshFirmAdmin, scratchCase } from '../support/actors.ts';
+import { contractClient, type ContractClient } from '../support/client.ts';
+import { claimsOf, refresh } from '../support/cognito-srp.ts';
 import { env, seeded } from '../support/env.ts';
+import { deployedInput, freshSignIn } from '../support/session.ts';
 import { CALENDAR_EVENT } from '../support/shapes.ts';
+import { deployedOnly, offlineOnly } from '../support/gates.ts';
 import { staffToken } from '../support/tokens.ts';
 import { expectApiError, type Spec } from '../support/wire.ts';
 
@@ -113,6 +116,15 @@ describe('the calendar', () => {
   });
 });
 
+/** No authorization in force — any a crashed earlier run left is withdrawn (its credentials with it). */
+async function withdrawLeftovers(admin: ContractClient): Promise<void> {
+  try {
+    await admin.api.withdrawFilingAuthorization();
+  } catch (error) {
+    if (!(error instanceof ApiException && error.statusCode === 404)) throw error;
+  }
+}
+
 describe('electronic filing — the staff surface', () => {
   const AUTHORIZATION: Spec = {
     text: { version: 'string', digest: 'string', text: 'string' },
@@ -130,7 +142,9 @@ describe('electronic filing — the staff surface', () => {
   };
 
   it('authorization → credential → approval refusals → withdrawal', async () => {
-    const admin = firmAdmin();
+    // Signing needs a RECENT sign-in (ADR 0024): deployed, a new SRP sign-in now.
+    const admin = await freshFirmAdmin();
+    await withdrawLeftovers(admin);
     const status = await admin.api.getFilingAuthorization();
     admin.wire(200, AUTHORIZATION);
     expect(status.signature).toBeNull();
@@ -144,16 +158,7 @@ describe('electronic filing — the staff surface', () => {
     };
     await expectApiError(admin.api.enrolFilingCredential(enrolment), 403, 'ForbiddenError');
 
-    // Signing needs a RECENT sign-in: an hour-old auth_time is refused.
-    const stale = contractClient(
-      staffToken(seeded.firmAdmin.subject, { auth_time: Math.floor(Date.now() / 1000) - 3600 }),
-    );
     const text = { version: status.text.version, digest: status.text.digest };
-    await expect(stale.api.signFilingAuthorization(text)).rejects.toBeInstanceOf(
-      ApiReauthenticationRequiredException,
-    );
-    await expectApiError(stale.api.signFilingAuthorization(text), 403, 'ReauthenticationRequired');
-
     await expectApiError(
       admin.api.signFilingAuthorization({ version: text.version, digest: 'stale-digest' }),
       409,
@@ -175,6 +180,7 @@ describe('electronic filing — the staff surface', () => {
     admin.wire(201, CREDENTIAL);
     // The vault never hands a secret back.
     expect(JSON.stringify(admin.last().body)).not.toContain(enrolment.password);
+    expect(JSON.stringify(admin.last().body)).not.toContain(enrolment.totp_seed);
     const credentials = await admin.api.listFilingCredentials();
     admin.wire(200, { credentials: [CREDENTIAL] });
     expect(credentials.map((c) => c.id)).toContain(credential.id);
@@ -184,7 +190,7 @@ describe('electronic filing — the staff surface', () => {
       'ValidationError',
     );
 
-    // Approval: the basis is readable; approving an unready set is refused.
+    // Approval: the basis is what the screen renders, computed from the stores.
     const { caseId } = await scratchCase();
     const view = await admin.api.getFilingApproval(caseId);
     admin.wire(200, {
@@ -203,14 +209,22 @@ describe('electronic filing — the staff surface', () => {
       'approval?': 'object',
       'filing?': 'object',
     });
+    expect(view.basis.scheme).toBe('insolvia-filing-approval/1');
+    expect(view.basis.digest).toHaveLength(64);
+    expect(view.basis.court?.code).toBe(SCRATCH_COURT.court);
+    expect(view.basis.fee.handling).toBe('hand_back_at_payment');
+    const documents = view.basis.documents;
+    expect(documents.map((d) => d.position)).toEqual(documents.map((_d, i) => i + 1));
+    expect(documents[0]?.key).toBe('form/b101');
+    // A scratch case is never complete and never assembled…
     expect(view.basis.ready).toBe(false);
-    expect(view.basis.blockers.length).toBeGreaterThan(0);
+    expect(view.basis.blockers).toContain('packet');
+    // …and with nothing approved there is no approval and no filing.
+    expect(view.approval).toBeUndefined();
+    expect(view.filing).toBeUndefined();
+    // The same read twice is the same digest: it is computed, not minted.
+    expect((await admin.api.getFilingApproval(caseId)).basis.digest).toBe(view.basis.digest);
     await expectApiError(admin.api.approveFiling(caseId, { digest: view.basis.digest }), 409);
-    await expectApiError(
-      stale.api.approveFiling(caseId, { digest: view.basis.digest }),
-      403,
-      'ReauthenticationRequired',
-    );
     await expectApiError(admin.api.cancelFilingApproval(caseId), 409);
     await expectApiError(
       admin.api.resolveFiling(caseId, 'no-such-filing', { outcome: 'not_filed' }),
@@ -222,10 +236,63 @@ describe('electronic filing — the staff surface', () => {
     admin.wire(204);
     await expectApiError(admin.api.revokeFilingCredential(credential.id), 404, 'NotFoundError');
 
-    await admin.api.enrolFilingCredential(enrolment);
+    // Withdrawing destroys every credential and refuses the next enrolment.
+    const second = await admin.api.enrolFilingCredential(enrolment);
     const destroyed = await admin.api.withdrawFilingAuthorization();
     admin.wire(200, { credentials_revoked: 'integer' });
     expect(destroyed).toBe(1);
+    expect((await admin.api.listFilingCredentials()).map((c) => c.id)).not.toContain(second.id);
+    await expectApiError(admin.api.revokeFilingCredential(second.id), 404, 'NotFoundError');
+    expect((await admin.api.getFilingAuthorization()).current).toBe(false);
+    await expectApiError(admin.api.enrolFilingCredential(enrolment), 403, 'ForbiddenError');
     await expectApiError(admin.api.withdrawFilingAuthorization(), 404, 'NotFoundError');
   });
+
+  offlineOnly(
+    'forges an hour-old auth_time with the run’s key; the real pool issues none without waiting out the window',
+  ).it('a stale sign-in can neither sign the authorization nor approve a filing', async () => {
+    const admin = firmAdmin();
+    await withdrawLeftovers(admin);
+    const status = await admin.api.getFilingAuthorization();
+    const stale = contractClient(
+      staffToken(seeded.firmAdmin.subject, { auth_time: Math.floor(Date.now() / 1000) - 3600 }),
+    );
+    const text = { version: status.text.version, digest: status.text.digest };
+    await expect(stale.api.signFilingAuthorization(text)).rejects.toBeInstanceOf(
+      ApiReauthenticationRequiredException,
+    );
+    await expectApiError(stale.api.signFilingAuthorization(text), 403, 'ReauthenticationRequired');
+    expect((await admin.api.getFilingAuthorization()).current).toBe(false);
+
+    const { caseId } = await scratchCase();
+    const digest = (await admin.api.getFilingApproval(caseId)).basis.digest;
+    await expectApiError(
+      stale.api.approveFiling(caseId, { digest }),
+      403,
+      'ReauthenticationRequired',
+    );
+  });
+
+  deployedOnly('a property of the real pool and its app client').it(
+    'a refreshed token keeps the original sign-in’s auth_time',
+    async () => {
+      // What the recent-sign-in check leans on: keeping a session alive never
+      // makes it fresh. Cognito's documented behaviour, checked against this
+      // environment's pool and client (refresh-token rotation on).
+      const signedIn = await freshSignIn('admin');
+      await new Promise((resolve) => setTimeout(resolve, 1500)); // a later second for iat
+      const refreshed = await refresh({
+        poolId: deployedInput('CONTRACT_AUTH_POOL_ID'),
+        clientId: deployedInput('CONTRACT_AUTH_CLIENT_ID'),
+        refreshToken: signedIn.RefreshToken ?? '',
+      });
+      const before = claimsOf(signedIn.AccessToken);
+      const after = claimsOf(refreshed.AccessToken);
+      expect(Number(after.iat)).toBeGreaterThan(Number(before.iat));
+      expect(after.auth_time).toBe(before.auth_time);
+      // …and the API takes the refreshed token.
+      const client = contractClient(refreshed.AccessToken);
+      expect((await client.api.me()).subject).toBe(seeded.firmAdmin.subject);
+    },
+  );
 });

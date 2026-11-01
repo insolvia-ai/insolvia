@@ -39,9 +39,8 @@ Two layers — a shared base plus thin per-package scripts:
 | `apps/insolvia_admin/scripts/dev-setup.sh` | Admin portal | Same shape as marketing (own lockfile, packages auth → `npm ci`); `dev-up.sh` runs Vite on the pinned port 3100 |
 | `apps/insolvia_app/scripts/dev-setup.sh` | Expo app | Shared base → npm workspace install at the repo root; `dev-up.sh` starts the Expo dev server |
 | `backend/scripts/dev-up.sh` | .NET backend (ADR 0028) | `docker compose up --build` on `backend/docker-compose.yml` — Postgres 17 on 55432, the migrator, the API on 8080 and admin on 8090, reading `backend/.env` for the shared pool's ids; `dev-down.sh` stops it (the database volume survives). No `dev-setup.sh`: nothing to set up beyond the SDK and Docker the shared base checks. The plain tools for the rest: `dotnet test Insolvia.slnx` in `backend/` (what `dev-test-unit.sh` runs, after `dotnet format --verify-no-changes`), `dotnet run --project src/Insolvia.<Host>`. See [`backend/README.md`](../backend/README.md) |
-| `contract/scripts/dev-test.sh` | Contract suite (ADR 0028) | The backend's wire contract, offline: a throwaway Postgres migrated and seeded by the real migrator, the API, admin and MCP hosts each as its own role, the Jest suite through the shipped api-client, and the client-coverage gate. Exactly what `Contract (.NET)` runs. See [`contract/README.md`](../contract/README.md) |
+| `contract/scripts/dev-test.sh` | Contract suite (ADR 0028) | The backend's wire contract, offline: a throwaway Postgres migrated and seeded by the real migrator, the API, admin and MCP hosts each as its own role, the Jest suite through the shipped api-client, and the client-coverage gate. Exactly what `Contract (.NET)` runs. `--target deployed` runs the same suite against this machine's RUNNING dev stack instead (`http://localhost:8080`, the shared dev pool's ids from `backend/.env`), signed in by SRP as the people [`seeds/dev.json`](../seeds/dev.json) names — needs `dev-up.sh` running and `scripts/dev-aws-seed.sh` done; the password comes from `E2E_TEST_USER_PASSWORD` or `~/.config/insolvia/dev.env`; no AWS credentials are used. `api-staging.yml` runs that target against staging after every deploy. See [`contract/README.md`](../contract/README.md) |
 | `forms/scripts/dev-test.sh` | Form field specs | Validates `forms/specs/*.json` against the AcroForm dumps in `forms/acroform/` — structure, entity vocabulary, full coverage of every fillable widget in the official PDFs. Stdlib-only Python, no venv and no setup script; exactly what `forms-pr.yml` runs. See [`forms/README.md`](../forms/README.md) |
-| `integration/scripts/dev-test.sh` | API integration tier, against the local stack | Runs `integration/` — the RUNNING API over HTTP, signed in by SRP as the person [`seeds/dev.json`](../seeds/dev.json) names — against `http://localhost:8080` and the shared dev pool (ids from `backend/.env`). Builds `integration/.venv` from its three pins on first use. Needs `scripts/dev-up.sh` running and `scripts/dev-aws-seed.sh` done; the password comes from `E2E_TEST_USER_PASSWORD` or `~/.config/insolvia/dev.env`; no AWS credentials are used. `api-staging.yml` runs the same tier against staging after every deploy |
 | `e2e/scripts/dev-test.sh` | E2E, against local dev | Runs both Playwright projects (`flows`, signed in; `smoke`, no credentials) against `http://localhost:3000` / `:8080` and **this machine's** dev Cognito pool, instead of deployed staging. Needs `scripts/dev-up.sh` running and `scripts/dev-aws-seed.sh` done; the password comes from `E2E_TEST_USER_PASSWORD` if exported, else `~/.config/insolvia/dev.env` — no committed default, the repo is public. The address comes from [`seeds/dev.json`](../seeds/dev.json). `--headed` to watch it, `--project smoke` for the unauthenticated half. The staging run in `app-staging.yml` stays authoritative; `app-prod.yml` runs `smoke` alone against production |
 
 `packages/insolvia_api_client` has no scripts, deliberately: it is an npm
@@ -190,9 +189,8 @@ Notes:
   lands, not before.
 - **Python 3** (any) is for what is left in Python since the backend moved to
   .NET (ADR 0028): the stdlib-only checkers (`forms/scripts/check.py`,
-  `scripts/check-ust-data.py`, `scripts/ingest-ust-data.py`), and two tools
-  with their own throwaway venvs — the brand-mark cutter and the integration
-  tier (`integration/`).
+  `scripts/check-ust-data.py`, `scripts/ingest-ust-data.py`), and one tool
+  with its own throwaway venv — the brand-mark cutter.
 - **The .NET SDK** is the one `backend/global.json` pins; the shared base
   checks it from inside `backend/`, which applies exactly that rule.
 
@@ -384,8 +382,8 @@ How it works:
     route answers 401; `GOOGLE_CLIENT_ID` is the admin service's;
     `INSOLVIA_SEED=false` leaves seeding to `dev-aws-seed.sh` (real subjects).
     The bucket and queue values are for a `dotnet run` of the worker or a host
-    that wants the real AWS adapters; `integration/scripts/dev-test.sh` reads
-    the pool ids from it too.
+    that wants the real AWS adapters; `contract/scripts/dev-test.sh --target
+    deployed` reads the pool ids from it too.
   - `apps/insolvia_app/.env` — Expo loads it automatically and inlines the
     `EXPO_PUBLIC_*` values at build time. Without
     `EXPO_PUBLIC_COGNITO_DOMAIN`/`_CLIENT_ID` the app renders "sign-in is not

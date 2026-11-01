@@ -12,7 +12,7 @@ import { signIn } from '../../support/sign-in';
  *
  *   - The app's jest suite asserts the request body against a fetch mock. It
  *     cannot tell whether the API accepts that body.
- *   - The API's pytest suite runs against an in-memory store. It cannot tell
+ *   - The API's xUnit route tests run against an in-memory store. It cannot tell
  *     whether the database accepts the row.
  *   - The store's own probe runs against a dev table with no auth in front of
  *     it. It cannot tell whether a signed-in user reaches their own case.
@@ -33,8 +33,8 @@ import { signIn } from '../../support/sign-in';
  *     their visible labels
  *
  * IT WRITES ONLY TO THE SUITE'S SCRATCH CASE, and reuses it rather than
- * opening one per run. Never a seeded fixture case: the integration tier
- * finds those by what the seed wrote, and the loader does not repair a row it
+ * opening one per run. Never a seeded fixture case: the contract suite's
+ * deployed target finds those by what the seed wrote, and the loader does not repair a row it
  * finds already present (ADR 0021). Never a fresh case per run: cases and
  * firm clients cannot be deleted, so that fills a table nobody prunes.
  * `support/scratch-case.ts` finds-or-opens the one case, for one scratch
@@ -57,7 +57,7 @@ test.describe('staging intake', () => {
     //
     // This spec used to open the FIRST case on /cases. Since ADR 0022 that is
     // a seeded fixture case, and typing over its Debtor 1 left the fixture
-    // unrecognisable to the integration tier, which finds it by content —
+    // unrecognisable to the contract suite, which finds it by content —
     // the loader leaves an existing row alone, so the damage outlived the run.
     // `openScratchCase` finds (or, on a fresh environment, opens) the one case
     // the browser suite owns, and lands on its overview. Its header comment

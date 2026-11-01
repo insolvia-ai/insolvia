@@ -1,7 +1,7 @@
 // The admin service over raw HTTP — all seven routes (ADR 0011): a Google
 // Workspace ID token is the only credential it accepts, and a firm user's
 // Cognito token must die in verification (the cross-issuer 401).
-import { describe, expect, it } from '@jest/globals';
+import { expect, it } from '@jest/globals';
 
 import { tag } from '../support/actors.ts';
 import { contractClient } from '../support/client.ts';
@@ -9,7 +9,13 @@ import { env, seeded } from '../support/env.ts';
 import { fixtureCase } from '../support/fixtures.ts';
 import { FIRM, FIRM_USER } from '../support/shapes.ts';
 import { googleIdToken, staffToken } from '../support/tokens.ts';
+import { offlineOnly } from '../support/gates.ts';
 import { expectApiError, expectShape, type Spec, withMessage } from '../support/wire.ts';
+
+// The admin service signs in with tokens only the run's own key mints (Google ID
+// tokens for admin, the MCP harness's client for MCP); #583 brings it to the
+// deployed target, through its own client.
+const NOT_YET_DEPLOYED = 'signs with the run’s own key; the deployed admin service target is #583';
 
 interface Answer {
   readonly status: number;
@@ -45,7 +51,7 @@ function refused(answer: Answer, status: number, error: string): Record<string, 
   return answer.body as Record<string, unknown>;
 }
 
-describe('admin: authentication', () => {
+offlineOnly(NOT_YET_DEPLOYED).describe('admin: authentication', () => {
   it('health is public', async () => {
     const answer = await admin('GET', '/health', undefined, null);
     expect(answer.status).toBe(200);
@@ -53,24 +59,27 @@ describe('admin: authentication', () => {
   });
 
   it.each([
-    ['no token', null],
+    ['no token', () => null],
     // The security invariant: a VALID firm-pool access token, signed by a key
     // this service trusts, is still not a staff credential.
-    ['a firm user’s Cognito access token (cross-issuer)', staffToken(seeded.firmAdmin.subject)],
-    ['another Workspace domain', googleIdToken({ hd: 'example.com' })],
-    ['a personal account (no hd)', googleIdToken({ hd: undefined })],
-    ['an unverified email', googleIdToken({ email_verified: false })],
-    ['another audience', googleIdToken({ aud: 'someone-else.apps.googleusercontent.com' })],
-    ['a non-Google issuer', googleIdToken({ iss: env.issuerUrl })],
-    ['an expired token', googleIdToken({ exp: Math.floor(Date.now() / 1000) - 600 })],
+    [
+      'a firm user’s Cognito access token (cross-issuer)',
+      () => staffToken(seeded.firmAdmin.subject),
+    ],
+    ['another Workspace domain', () => googleIdToken({ hd: 'example.com' })],
+    ['a personal account (no hd)', () => googleIdToken({ hd: undefined })],
+    ['an unverified email', () => googleIdToken({ email_verified: false })],
+    ['another audience', () => googleIdToken({ aud: 'someone-else.apps.googleusercontent.com' })],
+    ['a non-Google issuer', () => googleIdToken({ iss: env.issuerUrl })],
+    ['an expired token', () => googleIdToken({ exp: Math.floor(Date.now() / 1000) - 600 })],
   ])('%s is a 401', async (_label, token) => {
-    const answer = await admin('GET', '/v1/firms', undefined, token);
+    const answer = await admin('GET', '/v1/firms', undefined, token());
     const body = refused(answer, 401, 'Unauthorized');
     expect(body.message).toBe('authentication required');
   });
 });
 
-describe('admin: firm provisioning', () => {
+offlineOnly(NOT_YET_DEPLOYED).describe('admin: firm provisioning', () => {
   it('provisions a firm whose first admin can use the API at once', async () => {
     const email = `first-admin-${tag()}@insolvia.test`;
     const name = `Provisioned ${tag()} LLP`;

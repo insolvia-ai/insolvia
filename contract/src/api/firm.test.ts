@@ -4,6 +4,8 @@ import { describe, expect, it } from '@jest/globals';
 
 import { firmAdmin, firmUser, tag } from '../support/actors.ts';
 import { seeded } from '../support/env.ts';
+import { restoreChecklist, restoreQuestionnaire } from '../support/firm-settings.ts';
+import { offlineOnly } from '../support/gates.ts';
 import { ADDRESS, FIRM, FIRM_USER, SIGNATURE_BLOCK } from '../support/shapes.ts';
 import { expectApiError } from '../support/wire.ts';
 
@@ -12,31 +14,41 @@ describe('the firm profile', () => {
     const admin = firmAdmin();
     const firm = await admin.api.getFirm();
     admin.wire(200, FIRM);
-    expect(firm.name).toBe('Dev Firm');
+    expect(firm.name).toBe(seeded.firmAdmin.firmName);
 
-    const updated = await admin.api.updateFirm({
-      defaultCourt: 'flmb',
-      defaultDivision: 'tampa',
-      defaultChapter: 7,
-      letterhead: { name: 'Dev Firm', phone: '555-0100', email: 'office@insolvia.test' },
-    });
-    admin.wire(200, FIRM);
-    expect(updated.defaultChapter).toBe(7);
-    expect(updated.letterhead?.name).toBe('Dev Firm');
+    try {
+      const updated = await admin.api.updateFirm({
+        defaultCourt: 'flmb',
+        defaultDivision: 'tampa',
+        defaultChapter: 7,
+        letterhead: { name: 'Contract & Co', phone: '555-0100', email: 'office@insolvia.test' },
+      });
+      admin.wire(200, FIRM);
+      expect(updated.defaultChapter).toBe(7);
+      expect(updated.letterhead?.name).toBe('Contract & Co');
 
-    await admin.api.updateFirm({
-      defaultCourt: null,
-      defaultDivision: null,
-      defaultChapter: null,
-      letterhead: null,
-    });
-    admin.wire(200, FIRM);
+      await admin.api.updateFirm({
+        defaultCourt: null,
+        defaultDivision: null,
+        defaultChapter: null,
+        letterhead: null,
+      });
+      admin.wire(200, FIRM);
 
-    await expectApiError(
-      admin.api.updateFirm({ defaultChapter: 9 as never }),
-      400,
-      'ValidationError',
-    );
+      await expectApiError(
+        admin.api.updateFirm({ defaultChapter: 9 as never }),
+        400,
+        'ValidationError',
+      );
+    } finally {
+      // Firm-wide, and there is no scratch firm: put it back as it was found.
+      await admin.api.updateFirm({
+        defaultCourt: firm.defaultCourt,
+        defaultDivision: firm.defaultDivision,
+        defaultChapter: firm.defaultChapter,
+        letterhead: firm.letterhead,
+      });
+    }
   });
 
   it('lists the court registry', async () => {
@@ -72,7 +84,9 @@ describe('the firm profile', () => {
 });
 
 describe('the firm’s people', () => {
-  it('adds, edits, lists and removes a colleague — and guards the last admin', async () => {
+  offlineOnly(
+    'adds pool accounts (a real Cognito pool, deployed) and signs in as one with the run’s own key',
+  ).it('adds, edits, lists and removes a colleague — and guards the last admin', async () => {
     const admin = firmAdmin();
     const email = `colleague-${tag()}@insolvia.test`;
     const added = await admin.api.addFirmUser({
@@ -171,27 +185,31 @@ describe('the intake questionnaire', () => {
     admin.wire(200, QUESTIONNAIRE);
     expect(initial.sections.length).toBeGreaterThan(0);
 
-    const sections = initial.sections.map((s) => ({
-      id: s.id,
-      enabled: s.switchable ? false : s.enabled,
-      instructions: 'Contract instructions.',
-    }));
-    const saved = await admin.api.saveFirmQuestionnaire({ sections });
-    admin.wire(200, QUESTIONNAIRE);
-    expect(saved.isDefault).toBe(false);
-    expect(saved.updatedBy).toBe(seeded.firmAdmin.subject);
+    try {
+      const sections = initial.sections.map((s) => ({
+        id: s.id,
+        enabled: s.switchable ? false : s.enabled,
+        instructions: 'Contract instructions.',
+      }));
+      const saved = await admin.api.saveFirmQuestionnaire({ sections });
+      admin.wire(200, QUESTIONNAIRE);
+      expect(saved.isDefault).toBe(false);
+      expect(saved.updatedBy).toBe(seeded.firmAdmin.subject);
 
-    await expectApiError(
-      admin.api.saveFirmQuestionnaire({
-        sections: [{ id: 'nonsense' as never, enabled: true, instructions: null }],
-      }),
-      400,
-      'ValidationError',
-    );
+      await expectApiError(
+        admin.api.saveFirmQuestionnaire({
+          sections: [{ id: 'nonsense' as never, enabled: true, instructions: null }],
+        }),
+        400,
+        'ValidationError',
+      );
 
-    const reset = await admin.api.resetFirmQuestionnaire();
-    admin.wire(200, QUESTIONNAIRE);
-    expect(reset.isDefault).toBe(true);
+      const reset = await admin.api.resetFirmQuestionnaire();
+      admin.wire(200, QUESTIONNAIRE);
+      expect(reset.isDefault).toBe(true);
+    } finally {
+      await restoreQuestionnaire(initial);
+    }
   });
 });
 
@@ -211,25 +229,29 @@ describe('the document checklist', () => {
     admin.wire(200, CHECKLIST);
     expect(initial.defaultItems.length).toBeGreaterThan(0);
 
-    const saved = await admin.api.saveFirmDocumentChecklist({
-      items: [
-        { title: 'Two pay stubs', kind: 'pay_stub', description: 'The most recent two.' },
-        { title: 'Credit report', kind: 'credit_report' },
-      ],
-    });
-    admin.wire(200, CHECKLIST);
-    expect(saved.isDefault).toBe(false);
-    expect(saved.items.map((i) => i.kind)).toEqual(['pay_stub', 'credit_report']);
+    try {
+      const saved = await admin.api.saveFirmDocumentChecklist({
+        items: [
+          { title: 'Two pay stubs', kind: 'pay_stub', description: 'The most recent two.' },
+          { title: 'Credit report', kind: 'credit_report' },
+        ],
+      });
+      admin.wire(200, CHECKLIST);
+      expect(saved.isDefault).toBe(false);
+      expect(saved.items.map((i) => i.kind)).toEqual(['pay_stub', 'credit_report']);
 
-    await expectApiError(
-      admin.api.saveFirmDocumentChecklist({ items: [{ title: '', kind: 'pay_stub' }] }),
-      400,
-      'ValidationError',
-    );
+      await expectApiError(
+        admin.api.saveFirmDocumentChecklist({ items: [{ title: '', kind: 'pay_stub' }] }),
+        400,
+        'ValidationError',
+      );
 
-    const reset = await admin.api.resetFirmDocumentChecklist();
-    admin.wire(200, CHECKLIST);
-    expect(reset.isDefault).toBe(true);
+      const reset = await admin.api.resetFirmDocumentChecklist();
+      admin.wire(200, CHECKLIST);
+      expect(reset.isDefault).toBe(true);
+    } finally {
+      await restoreChecklist(initial);
+    }
   });
 });
 
