@@ -132,12 +132,18 @@ gotchas for one language.
 Playwright is not a second unit runner: it drives a browser against a deployed
 bundle, and nothing else here can.
 
-### 4. Python leaves the repo entirely
+### 4. No Python code of our own
 
-No Python file, no Python test, no Python tool, and no Python on a
-developer's machine or a CI runner for this repo's sake. Since ADR 0028 no
-product code is Python; what is left is four tools and the git-hook framework,
-and every one of them moves.
+This repo maintains no Python: no Python file, no Python test, no Python tool.
+Since ADR 0028 no product code is Python. What is left is three tools, and
+every one of them moves.
+
+**The line is code we maintain, not programs we run.** A third-party tool
+that happens to be written in Python stays. The `pre-commit` framework is one:
+it runs the git hooks, its built-in hooks come from `pre-commit-hooks`, and
+`.pre-commit-config.yaml` is configuration, not code. Python on a developer's
+machine is that tool's dependency, installed with it, and nothing of ours
+runs on it.
 
 **A tool is written in the language of what consumes its output**, so its
 output is checked by tests in that consumer's framework:
@@ -147,7 +153,6 @@ output is checked by tests in that consumer's framework:
 | `forms/scripts/check.py` (the `Form specs` PR check) | An xUnit test in `Insolvia.Forms.Tests` | `Insolvia.Forms.Tests` and `Insolvia.Engines.Tests` already load these specs. |
 | `scripts/ingest-ust-data.py`, `scripts/check-ust-data.py` (the regulatory refresh) | A .NET console tool beside the engines that references `Insolvia.Engines`, with xUnit tests over its parsers fed a recorded spreadsheet | It writes `backend/src/Insolvia.Engines/Regulatory/`. Built on the engine, it validates through `UstData.cs` itself and cannot write a payload the engine would reject. The XLSX is still unzipped and read as XML, with the BCL's `System.IO.Compression` and `XDocument` and no package. `regulatory-refresh.yml` runs it on `setup-dotnet`. |
 | `scripts/render-brand-marks.py` (+ its `.sh` venv wrapper) | TypeScript in `tool/`, beside `render-brand-marks.ts` | The `npm run tokens` pipeline consumes its SVGs, and `tokens:check` gates them. HarfBuzz's own WebAssembly build (`harfbuzzjs`) does the shaping and the glyph outlines, so the geometry comes from the same shaper the Python used. `@resvg/resvg-js` rasterises the favicon and PWA icons. `tool/` stops being dependency-free: two root devDependencies, pinned by the root lockfile. |
-| The `pre-commit` framework (`.pre-commit-config.yaml`), and its Python hooks from `pre-commit-hooks` | **lefthook**, installed as a root devDependency (a prebuilt binary, version pinned by the lockfile), running the same commands at the same two stages | The hooks themselves are already npm, `terraform` and `tflint` commands. Prettier, which parses YAML, covers `check-yaml`. A short Node check takes over end-of-file, trailing whitespace and merge-conflict markers. |
 
 **The port of each tool re-cuts or re-ingests its committed output and shows
 it unchanged**, or explains every difference. For the registry that is a
@@ -158,7 +163,8 @@ normalising number formatting.
 **It is enforced, not remembered.** A guard in CI fails on any tracked `*.py`,
 any `requirements*.txt` or `pyproject.toml`, and any `setup-python` in a
 workflow. Per ADR 0008, a rule that would otherwise live only in prose becomes
-executable. `scripts/dev-setup.sh` stops installing `python3`.
+executable. `scripts/dev-setup.sh` keeps Python only as far as `pre-commit`
+needs it.
 
 ### 5. Bash tests and `terraform test` stay where they are
 
@@ -234,8 +240,8 @@ with them.
 - **`vitest` and `pytest` appear in no manifest, lockfile, config or
   workflow, and no `*.py` file is tracked**, once #578 lands; the
   `insolvia-testing` skill describes the shape above.
-- **#578's item 6 widens** from "port or keep" to four ports: the forms
-  check, the UST tool, the marks cutter, and the git hooks. Each is its own PR
+- **#578's item 6 widens** from "port or keep" to three ports: the forms
+  check, the UST tool and the marks cutter. Each is its own PR
   with its own before-and-after evidence, and the Python guard lands with the
   last of them.
 - **Required check names do not have to change.** `API client`,
@@ -275,15 +281,15 @@ slower, cannot reach host seams (a failing store, a frozen clock), and fails
 far from its cause. Refusals are cheapest and most precise in-process.
 
 **Keep Python as a tooling language** (the UST tool and the marks cutter
-under an exception, with stdlib or their own venv). This draft proposed it, and
-the maintainer rejected it on review. An exception is a second toolchain every
-machine and runner has to carry for three scripts, and it is a door the next
-script walks through. The cost of closing it is the ports above, paid once.
+under an exception, with stdlib or their own venv). This draft proposed it,
+and the maintainer rejected it on review. Those scripts are about 1,200 lines
+of Python this repo would keep maintaining, in a language nothing else here
+is written in, for a team of one. The ports cost once.
 
-**Keep `pre-commit` as an external program.** Rejected with the rest: it is a
-Python program installed by Homebrew, and its built-in hooks are Python
-packages it fetches on first run. lefthook runs the same commands from one
-binary that the lockfile pins.
+**Replace `pre-commit` too, with lefthook.** Weighed and not taken. It would
+remove Python from developer machines, but `pre-commit` is a maintained
+third-party program, not code of ours, so swapping it buys nothing the rule
+above is for.
 
 **Jest with native ESM (`--experimental-vm-modules`).** Rejected: experimental,
 flag-gated on every invocation, and not what `jest-expo` does.
