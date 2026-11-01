@@ -8,8 +8,8 @@ using Insolvia.Core;
 namespace Insolvia.Admin.Http;
 
 /// <summary>
-/// The bytes Flask's <c>jsonify</c> writes, so a route body is comparable
-/// byte for byte with the Python API's (apart from Flask's trailing newline,
+/// The bytes Flask's <c>jsonify</c> writes, so a route body matches the wire
+/// contract byte for byte (apart from Flask's trailing newline,
 /// as <c>/health</c>): keys SORTED at every depth, compact separators, and
 /// <c>ensure_ascii</c> — every character outside printable ASCII escaped as
 /// a lower-case <c>\uXXXX</c>, and <c>&amp;</c>, <c>&lt;</c>, <c>'</c> left alone
@@ -163,7 +163,7 @@ public static class FlaskJson
                         break;
                     default:
                         // Whole numbers only reach a body (chapters, epoch
-                        // seconds, counts); System.Text.Json writes them as Python does.
+                        // seconds, counts); System.Text.Json writes them as jsonify does.
                         builder.Append(value.ToJsonString());
                         break;
                 }
@@ -260,17 +260,50 @@ public static class RequestBodies
 
         using var reader = new StreamReader(request.Body, Encoding.UTF8);
         var text = await reader.ReadToEndAsync(context.RequestAborted).ConfigureAwait(false);
-        JsonNode? parsed;
+        return Parse(text) as JsonObject ?? throw new ValidationException("request body must be a JSON object");
+    }
+
+    /// <summary>The JSON in <paramref name="text"/>, or null when it is not JSON.</summary>
+    /// <remarks>
+    /// Python's json.loads keeps the LAST of a repeated key. A JsonNode parsed
+    /// with duplicates allowed only throws later, when first read (a 500), so
+    /// the tree is rebuilt here, last value winning — as Insolvia.Api's
+    /// RequestBodies does.
+    /// </remarks>
+    /// <param name="text">The body.</param>
+    /// <returns>The tree, or null.</returns>
+    public static JsonNode? Parse(string text)
+    {
         try
         {
-            parsed = JsonNode.Parse(text, documentOptions: new JsonDocumentOptions { AllowDuplicateProperties = true });
+            using var document = JsonDocument.Parse(text, new JsonDocumentOptions { AllowDuplicateProperties = true });
+            return LastWins(document.RootElement);
         }
         catch (Exception error) when (error is JsonException or ArgumentException or InvalidOperationException)
         {
-            parsed = null;
+            return null;
         }
+    }
 
-        return parsed as JsonObject ?? throw new ValidationException("request body must be a JSON object");
+    private static JsonNode? LastWins(JsonElement element)
+    {
+        switch (element.ValueKind)
+        {
+            case JsonValueKind.Object:
+                var obj = new JsonObject();
+                foreach (var property in element.EnumerateObject())
+                {
+                    obj[property.Name] = LastWins(property.Value);
+                }
+
+                return obj;
+            case JsonValueKind.Array:
+                return new JsonArray([.. element.EnumerateArray().Select(LastWins)]);
+            case JsonValueKind.Null:
+                return null;
+            default:
+                return JsonValue.Create(element.Clone());
+        }
     }
 
     // Werkzeug's Request.is_json: application/json, or application/*+json.

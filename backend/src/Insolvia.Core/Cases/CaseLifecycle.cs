@@ -268,7 +268,7 @@ public static class CaseLifecycle
 
         var errors = new Dictionary<string, string>(StringComparer.Ordinal);
         var date = CaseRules.ParseCourtDate(JsonValue.Create(filedAt), "filed_at", errors);
-        if (PyText.Strip(caseNumber).Length == 0)
+        if (TextRules.Strip(caseNumber).Length == 0)
         {
             errors["case_number"] = "A filed case needs its case number.";
         }
@@ -284,7 +284,7 @@ public static class CaseLifecycle
             {
                 Status = CaseStatus.Filed,
                 FiledAt = date,
-                Texts = new Dictionary<string, string?> { ["case_number"] = PyText.Strip(caseNumber) }.ToValueDictionary(),
+                Texts = new Dictionary<string, string?> { ["case_number"] = TextRules.Strip(caseNumber) }.ToValueDictionary(),
             },
             clock);
         return StatusMove(current, after, history, recordedBy, provenance: provenance, filingId: filingId)

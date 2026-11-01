@@ -318,7 +318,7 @@ public static class CaseUploads
         var trace = MeansTestTraces.Trace(caseFile);
         if (trace.Case.Cmi.Problems.Count == 0)
         {
-            Put(32, Money(Py.Dec(trace.Case.Cmi.CombinedMonthlyTotal)));
+            Put(32, Money(Exact.Dec(trace.Case.Cmi.CombinedMonthlyTotal)));
         }
 
         var result = trace.Result;
@@ -365,17 +365,17 @@ public static class CaseUploads
 
         if (columns.TryGetValue("A", out var a))
         {
-            Put(44, Money(Py.Dec(a.MonthlyTotal)));
+            Put(44, Money(Exact.Dec(a.MonthlyTotal)));
         }
 
         if (columns.TryGetValue("B", out var b))
         {
-            Put(45, Money(Py.Dec(b.MonthlyTotal)));
+            Put(45, Money(Exact.Dec(b.MonthlyTotal)));
         }
 
         if (result.Comparison is { } comparison)
         {
-            Put(46, Money(Py.Dec(comparison.AnnualMedian)));
+            Put(46, Money(Exact.Dec(comparison.AnnualMedian)));
             Put(47, comparison.HouseholdSize.ToString(CultureInfo.InvariantCulture));
         }
 
@@ -394,14 +394,14 @@ public static class CaseUploads
         {
             if (lines.TryGetValue(line, out var amount))
             {
-                Put(number, Money(Py.Dec(amount)));
+                Put(number, Money(Exact.Dec(amount)));
             }
         }
 
-        Put(55, Money(Py.Dec(lines.TryGetValue("12", out var vehicle) ? vehicle : lines.GetValueOrDefault("14", "0"))));
+        Put(55, Money(Exact.Dec(lines.TryGetValue("12", out var vehicle) ? vehicle : lines.GetValueOrDefault("14", "0"))));
         if (lines.TryGetValue("11", out var eleven))
         {
-            Put(57, Math.Min((long)decimal.Truncate(Py.Dec(eleven)), 2).ToString(CultureInfo.InvariantCulture));
+            Put(57, Math.Min((long)decimal.Truncate(Exact.Dec(eleven)), 2).ToString(CultureInfo.InvariantCulture));
         }
 
         if (result.DeterminedBy == "unsecured_ratio")
@@ -449,7 +449,7 @@ public static class CaseUploads
             : null;
 
     /// <summary>Python's <c>f"{value:.2f}"</c> — the context's half-even rounding — or blank.</summary>
-    private static string Money(decimal? value) => value is { } amount ? Py.Money(amount, PyRounding.HalfEven) : string.Empty;
+    private static string Money(decimal? value) => value is { } amount ? Exact.Money(amount, Rounding.HalfEven) : string.Empty;
 
     private static string Code(Dictionary<string, string> codes, string? key) => codes.GetValueOrDefault(key ?? string.Empty, string.Empty);
 
@@ -465,7 +465,7 @@ public static class CaseUploads
                 cleaned = cleaned[..^" county".Length];
             }
 
-            return string.Join(' ', PySplit(cleaned));
+            return string.Join(' ', SplitWhitespace(cleaned));
         }
 
         var county = address.County;
@@ -603,7 +603,7 @@ public static class CaseUploads
             }
         }
 
-        var folded = string.Join(' ', PySplit(kept.ToString()));
+        var folded = string.Join(' ', SplitWhitespace(kept.ToString()));
         if (!CaseUploadSpecs.Printable(folded) || folded.Contains('|', StringComparison.Ordinal))
         {
             problems.Add(record, number, "charset", $"{record} field {number} holds a character the file cannot carry");
@@ -614,7 +614,7 @@ public static class CaseUploads
     }
 
     /// <summary>Python's <c>str.split()</c>: on runs of whitespace (Python's set, which adds U+001C-U+001F to .NET's), no empty parts.</summary>
-    private static string[] PySplit(string text) =>
+    private static string[] SplitWhitespace(string text) =>
         text.Split(text.Where(c => char.IsWhiteSpace(c) || c is >= '\x1c' and <= '\x1f').Distinct().ToArray(), StringSplitOptions.RemoveEmptyEntries);
 
     internal sealed class Problems

@@ -35,12 +35,17 @@ public static class AnthropicPolicy
     public const int MaxRetries = 1;
 
     /// <summary>The client every adapter uses. <paramref name="http"/> is the test seam — nothing else changes.</summary>
+    /// <remarks>
+    /// The default <see cref="HttpClient"/> has NO timeout of its own: its
+    /// built-in 100 s would cancel a call well inside <see cref="Timeout"/>,
+    /// which the SDK applies per attempt (its docs warn of exactly this).
+    /// </remarks>
     public static AnthropicClient NewClient(string apiKey, HttpClient? http = null) => new()
     {
         ApiKey = apiKey,
         Timeout = Timeout,
         MaxRetries = MaxRetries,
-        HttpClient = http ?? new HttpClient(),
+        HttpClient = http ?? new HttpClient { Timeout = System.Threading.Timeout.InfiniteTimeSpan },
     };
 
     /// <summary>

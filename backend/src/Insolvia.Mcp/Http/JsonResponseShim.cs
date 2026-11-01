@@ -6,7 +6,7 @@ namespace Insolvia.Mcp.Http;
 
 /// <summary>
 /// The JSON-response mode the C# SDK lacks (research 2026-10-27 § 2.4, gap 1).
-/// The Python server runs <c>json_response=True</c>; SDK 2.3.0 answers every
+/// The contract is the Python SDK's <c>json_response=True</c> mode; SDK 2.3.0 answers every
 /// POST as a <c>text/event-stream</c> carrying one <c>data:</c> event. In
 /// stateless mode with no server-to-client requests that stream always holds
 /// exactly one JSON-RPC message, so this buffers the body and re-emits that

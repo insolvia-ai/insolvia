@@ -53,7 +53,8 @@ public static class FilingComposition
         services.AddInsolviaData(DatabaseSettings.FromEnvironment(read, applicationName: FilingConfig.ServiceName));
         services.AddScoped<IFilingStore>(provider => new PostgresFilingStore(provider.GetRequiredService<InsolviaDbContext>()));
         services.AddScoped<IFilingApprovalStore>(provider => new PostgresFilingApprovalStore(provider.GetRequiredService<InsolviaDbContext>()));
-        services.AddScoped<ICaseStore>(provider => new PostgresCaseStore(provider.GetRequiredService<InsolviaDbContext>(), CursorCodec.FromEnvironment(read)));
+        var cursors = CursorCodec.FromEnvironment(read);
+        services.AddScoped<ICaseStore>(provider => new PostgresCaseStore(provider.GetRequiredService<InsolviaDbContext>(), cursors));
         services.AddScoped<IDebtorStore>(provider => new PostgresDebtorStore(provider.GetRequiredService<InsolviaDbContext>()));
         services.AddScoped<ICaseEntityStore>(provider => new PostgresCaseEntityStore(provider.GetRequiredService<InsolviaDbContext>()));
         services.AddScoped<IDocumentStore>(provider => new PostgresDocumentStore(provider.GetRequiredService<InsolviaDbContext>()));
@@ -115,8 +116,10 @@ public static class FilingComposition
         {
             // The AWS control plane, not a court: this HttpClient reaches SSM
             // alone (FenceTests names this file as the one other HTTP user).
+            // A short timeout: the switch is read right before the final
+            // submit, and a hung read fails closed after seconds, not 100.
             var parameter = config.KillSwitchParameter!;
-            services.AddSingleton<IKillSwitch>(_ => SsmKillSwitch.FromEnvironment(new HttpClient(), parameter, read));
+            services.AddSingleton<IKillSwitch>(_ => SsmKillSwitch.FromEnvironment(new HttpClient { Timeout = TimeSpan.FromSeconds(10) }, parameter, read));
         }
 
         return services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });

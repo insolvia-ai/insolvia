@@ -9,8 +9,8 @@ namespace Insolvia.Data.Concurrency;
 /// The Postgres shape of DynamoDB's conditional write. A store writes
 /// <c>UPDATE … WHERE &lt;key&gt; AND &lt;precondition&gt;</c> as one statement;
 /// zero rows affected means the precondition did not hold (or the row is
-/// gone), and the caller's domain error is thrown — the same error the Python
-/// store raised on <c>ConditionalCheckFailedException</c>.
+/// gone), and the caller's domain error is thrown — the error a DynamoDB
+/// store raised on <c>ConditionalCheckFailedException</c> before the port.
 /// </summary>
 /// <remarks>
 /// Never read-then-write: a <c>SELECT</c> followed by an unconditional

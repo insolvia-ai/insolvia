@@ -2,7 +2,7 @@ namespace Insolvia.Aws.Sealing;
 
 /// <summary>
 /// The two KMS key aliases, DERIVED from the case table's name exactly as the
-/// Python composers derive them (<c>case_key_alias</c>,
+/// Python composers derived them (<c>case_key_alias</c>,
 /// <c>filing_credentials_key_alias</c>) from <c>CASE_TABLE_NAME</c>. Each is one
 /// <c>local.name</c> in its Terraform module, which is what makes this a
 /// derivation rather than a coincidence, and the deploy role's

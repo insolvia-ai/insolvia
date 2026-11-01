@@ -11,7 +11,7 @@ namespace Insolvia.Data.Calendar;
 /// <summary>
 /// The Postgres <see cref="ICalendarEventStore"/> (Python's <c>DynamoDbEventStore</c>)
 /// over <c>calendar_events</c>. The firm's calendar is one range query on
-/// (<c>firm_id</c>, <c>sort_at</c>) — the GSI the Python rode, as an index.
+/// (<c>firm_id</c>, <c>sort_at</c>) — the DynamoDB table's GSI, as an index.
 /// Every write names the scope: a row is found only under its own firm AND
 /// case (or no case), so an id from elsewhere does not resolve.
 /// </summary>

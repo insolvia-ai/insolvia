@@ -3,8 +3,8 @@ namespace Insolvia.Admin.Configuration;
 /// <summary>
 /// The admin service's configuration, parsed once at composition (Python's
 /// <c>AppConfig</c> / <c>load_config</c> in services/admin core/config.py).
-/// The variable names are the Python service's, so one environment drives
-/// either backend; <see cref="Load"/> is the only place that reads them.
+/// The variable names are kept from the Python service, so the existing
+/// environments need no change; <see cref="Load"/> is the only place that reads them.
 /// </summary>
 /// <remarks>
 /// The DynamoDB-era names (<c>FIRM_TABLE_NAME</c>, <c>ADMIN_AUDIT_TABLE_NAME</c>)
@@ -16,7 +16,7 @@ public sealed record AdminConfig
 {
     /// <summary>
     /// The Workspace domain staff tokens must carry in <c>hd</c>. A constant,
-    /// not an environment variable, as in Python: it is decided in this repo,
+    /// not an environment variable: it is decided in this repo,
     /// changes with a code review, and a typo'd variable would lock every
     /// staff member out (or, empty, fail closed into a support mystery).
     /// </summary>

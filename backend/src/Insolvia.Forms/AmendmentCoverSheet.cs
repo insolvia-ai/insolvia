@@ -36,7 +36,7 @@ public static partial class AmendmentCoverSheet
     {
         ArgumentNullException.ThrowIfNull(caseFile);
         ArgumentNullException.ThrowIfNull(amendedReleases);
-        var doc = new PdfDocument();
+        using var doc = new PdfDocument();
         var page = doc.AddPage();
         page.MediaBox = new PdfRectangle(new PdfSharp.Drawing.XPoint(0, 0), new PdfSharp.Drawing.XPoint(PageWidth, PageHeight));
         var font = PdfDraw.AddHelvetica(doc);
@@ -84,7 +84,7 @@ public static partial class AmendmentCoverSheet
         }
 
         ops.AddRange(PdfDraw.TextOps(
-            "Generated " + generatedAt.DateTime.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture) + " UTC",
+            "Generated " + generatedAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture) + " UTC",
             Margin,
             Margin,
             NoteSize,

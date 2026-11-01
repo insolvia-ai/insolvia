@@ -11,8 +11,7 @@ namespace Insolvia.Forms;
 // holds a Debtor.txt to it — the first half of services/api's
 // core/case_upload.py (ADR 0024 build PR 9). The spec is
 // Regulatory/filing/case-upload/<release>/spec.json, embedded byte for byte
-// from services/api's copy (frozen, ADR 0028); CaseUploadSpecTests pins every
-// embedded file to it by sha256 until 18.23 deletes the Python.
+// from services/api's copy (frozen, ADR 0028) before 18.23 deleted it.
 
 /// <summary>One field of one record, as the AO's table lists it (Python's <c>FieldSpec</c>).</summary>
 /// <param name="Number">The 1-based field number.</param>
@@ -149,7 +148,7 @@ public static partial class CaseUploadSpecs
     {
         var applicable = Releases.Where(release => release.EffectiveDate <= asOf).ToList();
         return applicable.Count == 0
-            ? throw new EngineLookupException($"no release of {SeriesId} is effective on {Py.Iso(asOf)}")
+            ? throw new EngineLookupException($"no release of {SeriesId} is effective on {Exact.Iso(asOf)}")
             : applicable[^1];
     }
 
@@ -184,7 +183,7 @@ public static partial class CaseUploadSpecs
 
             if (rawFields[0] is not JsonObject first || first["values"] is not JsonArray firstValues || firstValues.Count != 1 || Text(firstValues[0]) != kind)
             {
-                throw Fail(where, $"{kind} field 1 must be the literal {Py.Repr(kind)}");
+                throw Fail(where, $"{kind} field 1 must be the literal {Exact.Repr(kind)}");
             }
 
             records[kind] = new CaseUploadRecordSpec(
@@ -196,7 +195,7 @@ public static partial class CaseUploadSpecs
 
         var effective = DateOnly.ParseExact(Text(manifest["effective_date"]) ?? string.Empty, "yyyy-MM-dd", CultureInfo.InvariantCulture);
         var sequence = manifest["sequence"] is JsonValue s && s.TryGetValue<int>(out var n) ? n : 1;
-        var releaseId = $"{SeriesId}@{Py.Iso(effective)}" + (sequence == 1 ? string.Empty : $"+{sequence}");
+        var releaseId = $"{SeriesId}@{Exact.Iso(effective)}" + (sequence == 1 ? string.Empty : $"+{sequence}");
         if (raw["accepted_stat_field_counts"] is not JsonArray counts || !counts.Any(c => Int(c) == 80))
         {
             throw Fail(where, "accepted_stat_field_counts must include 80");
@@ -213,7 +212,7 @@ public static partial class CaseUploadSpecs
             records);
     }
 
-    /// <summary>The embedded files, by their path under the regulatory folder (the pin test compares them to the Python copies).</summary>
+    /// <summary>The embedded files, by their path under the regulatory folder.</summary>
     internal static IReadOnlyDictionary<string, byte[]> EmbeddedFiles()
     {
         var assembly = typeof(CaseUploadSpecs).Assembly;
@@ -253,7 +252,7 @@ public static partial class CaseUploadSpecs
 
         if (Int(raw["n"]) != expected)
         {
-            throw Fail(where, $"field {expected} is numbered {Py.Repr(raw["n"])}");
+            throw Fail(where, $"field {expected} is numbered {Exact.Repr(raw["n"])}");
         }
 
         var name = Text(raw["name"]);
@@ -266,18 +265,18 @@ public static partial class CaseUploadSpecs
 
         if (required is null || !Requirements.Contains(required))
         {
-            throw Fail(where, $"field {expected} required={Py.Repr(raw["required"])}");
+            throw Fail(where, $"field {expected} required={Exact.Repr(raw["required"])}");
         }
 
         if (kind is null || !Types.Contains(kind))
         {
-            throw Fail(where, $"field {expected} type={Py.Repr(raw["type"])}");
+            throw Fail(where, $"field {expected} type={Exact.Repr(raw["type"])}");
         }
 
         int? width = null;
         if (raw["width"] is { } rawWidth)
         {
-            width = Int(rawWidth) is { } w && w >= 0 ? w : throw Fail(where, $"field {expected} width={Py.Repr(rawWidth)}");
+            width = Int(rawWidth) is { } w && w >= 0 ? w : throw Fail(where, $"field {expected} width={Exact.Repr(rawWidth)}");
         }
 
         var values = new List<string>();

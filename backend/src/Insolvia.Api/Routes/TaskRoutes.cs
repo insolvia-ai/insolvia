@@ -106,11 +106,9 @@ public sealed class TaskRoutes : IEndpointModule
         }
 
         var store = context.Port<ICaseTaskStore>();
-        var tasks = new List<CaseTask>();
-        foreach (var caseId in await ReachableCaseIdsAsync(context.Cases(), accessor, cancellationToken))
-        {
-            tasks.AddRange((await store.ListForCaseAsync(caseId, cancellationToken)).Where(task => scope == "firm" || task.AssigneeSubject == accessor.Subject));
-        }
+        var reachable = await ReachableCaseIdsAsync(context.Cases(), accessor, cancellationToken);
+        var tasks = (await store.ListForCasesAsync(reachable, cancellationToken))
+            .Where(task => scope == "firm" || task.AssigneeSubject == accessor.Subject);
 
         var today = context.Today();
         var ordered = tasks

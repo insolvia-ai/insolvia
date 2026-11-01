@@ -105,7 +105,7 @@ public sealed class StandardsTests
     {
         var solo = IrsStandards.Resolve(AsOf, [Debtor1], []);
         var pair = IrsStandards.Resolve(AsOf, [Debtor1, Build.Debtor(FilingRole.Debtor2, "d-2")], []);
-        Assert.True(Py.Dec(pair.NationalAllowance!) > Py.Dec(solo.NationalAllowance!));
+        Assert.True(Exact.Dec(pair.NationalAllowance!) > Exact.Dec(solo.NationalAllowance!));
     }
 
     [Fact]

@@ -11,7 +11,7 @@ namespace Insolvia.Engines;
 /// no <c>rounding=</c> argument rounds with the context's default,
 /// <see cref="HalfEven"/>.
 /// </summary>
-public enum PyRounding
+public enum Rounding
 {
     /// <summary><c>ROUND_HALF_UP</c>: a half rounds away from zero (<see cref="MidpointRounding.AwayFromZero"/>).</summary>
     HalfUp,
@@ -27,12 +27,12 @@ public enum PyRounding
 }
 
 /// <summary>
-/// The Python semantics the ported modules lean on, in one place: decimal
-/// quantization and formatting byte-equal to CPython's, <c>repr</c> of a
+/// The exact rules the engines print by, in one place, defined as Python's:
+/// decimal quantization and formatting byte-equal to CPython's, <c>repr</c> of a
 /// string (error messages quote values with it), and <c>str(KeyError)</c>.
 /// These strings end up on filed PDFs and in API bodies, so "close" is wrong.
 /// </summary>
-public static class Py
+public static class Exact
 {
     /// <summary>Two places — Python's <c>Decimal("0.01")</c>.</summary>
     public const int Cents = 2;
@@ -42,14 +42,14 @@ public static class Py
     /// the mode, then carried at exactly <paramref name="places"/> digits
     /// (Python keeps trailing zeros; so does this).
     /// </summary>
-    public static decimal Quantize(decimal value, PyRounding mode, int places = Cents)
+    public static decimal Quantize(decimal value, Rounding mode, int places = Cents)
     {
         var rounded = mode switch
         {
-            PyRounding.HalfUp => Math.Round(value, places, MidpointRounding.AwayFromZero),
-            PyRounding.HalfEven => Math.Round(value, places, MidpointRounding.ToEven),
-            PyRounding.Down => Math.Round(value, places, MidpointRounding.ToZero),
-            PyRounding.Up => RoundUp(value, places),
+            Rounding.HalfUp => Math.Round(value, places, MidpointRounding.AwayFromZero),
+            Rounding.HalfEven => Math.Round(value, places, MidpointRounding.ToEven),
+            Rounding.Down => Math.Round(value, places, MidpointRounding.ToZero),
+            Rounding.Up => RoundUp(value, places),
             _ => throw new ArgumentOutOfRangeException(nameof(mode)),
         };
 
@@ -81,7 +81,7 @@ public static class Py
     }
 
     /// <summary><c>f"{value.quantize(Decimal('0.01'), rounding=mode):f}"</c>.</summary>
-    public static string Money(decimal value, PyRounding mode) => F(Quantize(value, mode));
+    public static string Money(decimal value, Rounding mode) => F(Quantize(value, mode));
 
     /// <summary>
     /// <c>f"{value:,.2f}"</c>: thousands-grouped, two places. Python's format
@@ -89,7 +89,7 @@ public static class Py
     /// </summary>
     public static string Grouped(decimal value)
     {
-        var rounded = Quantize(value, PyRounding.HalfEven);
+        var rounded = Quantize(value, Rounding.HalfEven);
         var negative = rounded < 0 || IsNegativeZero(rounded);
         var text = Math.Abs(rounded).ToString("#,##0.00", CultureInfo.InvariantCulture);
         return negative ? "-" + text : text;

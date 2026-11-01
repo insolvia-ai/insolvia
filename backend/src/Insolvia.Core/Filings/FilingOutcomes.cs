@@ -135,17 +135,17 @@ public static class FilingOutcomes
         if (outcome == ResolutionOutcome.Filed)
         {
             var rawNumber = Json.AsString(body["case_number"]);
-            if (rawNumber is null || PyText.Strip(rawNumber).Length == 0)
+            if (rawNumber is null || TextRules.Strip(rawNumber).Length == 0)
             {
                 errors["case_number"] = "Enter the case number the court's docket shows.";
             }
-            else if (PyText.Length(rawNumber) > 40 || CaseNumbers.Parse(rawNumber, requireOffice: true) is null)
+            else if (TextRules.Length(rawNumber) > 40 || CaseNumbers.Parse(rawNumber, requireOffice: true) is null)
             {
                 errors["case_number"] = "Enter the case number as the docket prints it, e.g. 6:26-bk-10000.";
             }
             else
             {
-                caseNumber = PyText.Strip(rawNumber);
+                caseNumber = TextRules.Strip(rawNumber);
             }
 
             filedAt = FormDate(body["filed_at"]);
@@ -338,7 +338,7 @@ public static class FilingOutcomes
             return null;
         }
 
-        var stripped = PyText.Strip(text);
+        var stripped = TextRules.Strip(text);
         return DateOnly.TryParseExact(stripped, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed)
             && parsed.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) == stripped
             ? parsed

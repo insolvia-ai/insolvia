@@ -21,7 +21,7 @@ namespace Insolvia.Engines.Plans;
 // Rounding, per site: `_money` ROUND_HALF_UP; `_pct` ROUND_HALF_UP; the
 // amortised payment ROUND_UP (so the last payment clears the balance); a pro
 // rata share ROUND_DOWN (the remainder handed out in listing order). Powers are
-// integer exponents (Py.Pow).
+// integer exponents (Exact.Pow).
 
 /// <summary>A figure and where it came from.</summary>
 public sealed record Sourced(decimal Amount, string Source);
@@ -224,14 +224,14 @@ public static class Chapter13Plan
         Sourced? disposable = null;
         if (result?.DisposableIncome is { } income45)
         {
-            disposable = new Sourced(Py.Dec(income45), "the means test's monthly disposable income, B122C-2 line 45 (§ 1325(b)(2))");
+            disposable = new Sourced(Exact.Dec(income45), "the means test's monthly disposable income, B122C-2 line 45 (§ 1325(b)(2))");
         }
 
         var income = B106I.MonthlyIncomeLine12(caseFile);
         var expenses = B106J.MonthlyExpensesLine22c(caseFile);
         var excess = new Sourced(
             Money(income - expenses),
-            $"Schedule J line 23c: 106I line 12 (${Py.Grouped(income)}) less 106J line 22c (${Py.Grouped(expenses)})");
+            $"Schedule J line 23c: 106I line 12 (${Exact.Grouped(income)}) less 106J line 22c (${Exact.Grouped(expenses)})");
         var analysis = ExemptionAnalyzer.Analyse(exemptions, today);
         return new PlanInputs(caseFile)
         {
@@ -247,12 +247,12 @@ public static class Chapter13Plan
     /// <summary>The Chapter 7 trustee's maximum commission on <paramref name="disbursed"/>.</summary>
     public static decimal Section326aCommission(decimal disbursed)
     {
-        var remaining = Py.Max(disbursed, Zero);
+        var remaining = Exact.Max(disbursed, Zero);
         var floor = 0m;
         var total = 0m;
         foreach (var (ceiling, rate) in Section326aTiers)
         {
-            var band = ceiling is { } top ? Py.Min(remaining, top - floor) : remaining;
+            var band = ceiling is { } top ? Exact.Min(remaining, top - floor) : remaining;
             if (band <= 0)
             {
                 break;
@@ -314,7 +314,7 @@ public static class Chapter13Plan
             MonthlyRate(unsecuredRate),
             unsecuredRate,
             null,
-            (targetSource ?? string.Empty) + (unsecuredRate is { } ur ? $", plan.unsecured_interest_rate {Py.F(ur)}% a year" : string.Empty));
+            (targetSource ?? string.Empty) + (unsecuredRate is { } ur ? $", plan.unsecured_interest_rate {Exact.F(ur)}% a year" : string.Empty));
         var trustee = new Payee(
             "trustee",
             "Trustee's fee",
@@ -325,7 +325,7 @@ public static class Chapter13Plan
             0m,
             trusteePct,
             null,
-            trusteePct is { } tp ? $"plan.trustee_percentage {Py.F(tp)}% of every receipt (28 U.S.C. § 586(e))" : "no trustee percentage typed",
+            trusteePct is { } tp ? $"plan.trustee_percentage {Exact.F(tp)}% of every receipt (28 U.S.C. § 586(e))" : "no trustee percentage typed",
             recurring: true);
 
         var surplus = Zero;
@@ -393,26 +393,26 @@ public static class Chapter13Plan
             if (summary.Unpaid > 0)
             {
                 shortfall += summary.Unpaid;
-                reasons.Add($"{summary.Label}: ${Py.Grouped(summary.Unpaid)} is still unpaid after month {term}.");
+                reasons.Add($"{summary.Label}: ${Exact.Grouped(summary.Unpaid)} is still unpaid after month {term}.");
             }
         }
 
         var distributed = Money(classes.Aggregate(Zero, (sum, summary) => sum + (summary.Principal + summary.Interest)));
         var excess = inputs.ScheduleJExcess;
-        decimal? peakPayment = funding.Schedule.Count > 0 ? funding.Schedule.Select(item => item.Payment).Aggregate(Py.Max) : null;
+        decimal? peakPayment = funding.Schedule.Count > 0 ? funding.Schedule.Select(item => item.Payment).Aggregate(Exact.Max) : null;
         bool? exceeds = null;
         if (excess is not null && peakPayment is { } peak)
         {
             exceeds = peak > Money(excess.Amount);
             if (exceeds == true)
             {
-                warnings.Add($"The plan payment (up to ${Py.Grouped(peak)} a month) is more than Schedule J's monthly net income (${Py.Grouped(excess.Amount)}, line 23c) — § 1325(a)(6) asks whether the debtor can make it.");
+                warnings.Add($"The plan payment (up to ${Exact.Grouped(peak)} a month) is more than Schedule J's monthly net income (${Exact.Grouped(excess.Amount)}, line 23c) — § 1325(a)(6) asks whether the debtor can make it.");
             }
         }
 
         if (unsecuredKind == "pot" && surplus > 0)
         {
-            warnings.Add($"${Py.Grouped(surplus)} is left after every class is paid in full — the payment or the term could come down.");
+            warnings.Add($"${Exact.Grouped(surplus)} is left after every class is paid in full — the payment or the term could come down.");
         }
 
         var feasibility = new Feasibility(blocking ? null : reasons.Count == 0, funding.Total, distributed, Money(surplus), Money(shortfall), reasons, excess, exceeds);
@@ -423,7 +423,7 @@ public static class Chapter13Plan
         if (pvRate is { } rate)
         {
             var monthly = MonthlyRate(rate);
-            value = Money(unsecured.PaidByMonth.Aggregate(Zero, (sum, pair) => sum + (pair.Value / Py.Pow(1 + monthly, pair.Key))));
+            value = Money(unsecured.PaidByMonth.Aggregate(Zero, (sum, pair) => sum + (pair.Value / Exact.Pow(1 + monthly, pair.Key))));
         }
         else
         {
@@ -458,7 +458,7 @@ public static class Chapter13Plan
             passes,
             "11 U.S.C. § 1325(a)(4): unsecured creditors receive at least what a Chapter 7 liquidation would pay them"
                 + (pvRate is { } pv
-                    ? $", valued at plan.present_value_rate {Py.F(pv)}% a year"
+                    ? $", valued at plan.present_value_rate {Exact.F(pv)}% a year"
                     : ", compared nominally — type a present-value rate to discount the plan's future payments"));
 
         if (funding.TermMonths is { } termMonths
@@ -574,16 +574,16 @@ public static class Chapter13Plan
     }
 
     // `_money`: ROUND_HALF_UP.
-    internal static decimal Money(decimal value) => Py.Quantize(value, PyRounding.HalfUp);
+    internal static decimal Money(decimal value) => Exact.Quantize(value, Rounding.HalfUp);
 
-    private static string? M(decimal? value) => value is { } present ? Py.F(Money(present)) : null;
+    private static string? M(decimal? value) => value is { } present ? Exact.F(Money(present)) : null;
 
-    private static string? RateText(decimal? value) => value is { } present ? Py.F(present) : null;
+    private static string? RateText(decimal? value) => value is { } present ? Exact.F(present) : null;
 
     private static decimal MonthlyRate(decimal? annualPercent) => annualPercent is { } rate ? rate / Hundred / Twelve : 0m;
 
     // `_pct`: ROUND_HALF_UP.
-    private static decimal? Pct(decimal part, decimal whole) => whole <= 0 ? null : Py.Quantize(part / whole * Hundred, PyRounding.HalfUp);
+    private static decimal? Pct(decimal part, decimal whole) => whole <= 0 ? null : Exact.Quantize(part / whole * Hundred, Rounding.HalfUp);
 
     private static JsonObject RowJson(PayoutRow row) => new()
     {
@@ -822,12 +822,12 @@ public static class Chapter13Plan
 
         if (monthlyRate == 0)
         {
-            return Py.Quantize(principal / months, PyRounding.Up);
+            return Exact.Quantize(principal / months, Rounding.Up);
         }
 
-        var factor = Py.Pow(1 + monthlyRate, months);
+        var factor = Exact.Pow(1 + monthlyRate, months);
         var payment = principal * monthlyRate * factor / (factor - 1);
-        return Py.Quantize(payment, PyRounding.Up);
+        return Exact.Quantize(payment, Rounding.Up);
     }
 
     private static decimal Distribute(int month, decimal available, List<Payee> payees)
@@ -853,7 +853,7 @@ public static class Chapter13Plan
         var handed = Zero;
         foreach (var (payee, due) in dues)
         {
-            var share = Py.Quantize(available * due / totalDue, PyRounding.Down);
+            var share = Exact.Quantize(available * due / totalDue, Rounding.Down);
             shares.Add((payee, share, due));
             handed += share;
         }
@@ -862,7 +862,7 @@ public static class Chapter13Plan
         for (var index = 0; index < shares.Count; index++)
         {
             var (payee, share, due) = shares[index];
-            var extra = Py.Min(remainder, due - share);
+            var extra = Exact.Min(remainder, due - share);
             if (extra > 0)
             {
                 shares[index] = (payee, share + extra, due);
@@ -962,7 +962,7 @@ public static class Chapter13Plan
                 var claimAmount = claim.Amount;
                 if (treatment.CramdownValue is { } typed)
                 {
-                    principal = claimAmount is { } owed ? Py.Min(typed, owed) : typed;
+                    principal = claimAmount is { } owed ? Exact.Min(typed, owed) : typed;
                     source = $"{path}.cramdown_value (§ 506(a), § 1325(a)(5)(B))";
                     if (claimAmount is { } whole && whole > principal)
                     {
@@ -996,7 +996,7 @@ public static class Chapter13Plan
             var payment = fixedPayment ?? Amortised(principal, monthlyRate, term);
             if (rate is { } annual)
             {
-                source += $", {Py.F(annual)}% a year";
+                source += $", {Exact.F(annual)}% a year";
             }
 
             source += fixedPayment is not null ? $"; {path}.monthly_payment" : $"; amortised over {term} months";
@@ -1021,10 +1021,10 @@ public static class Chapter13Plan
 
             var owed = Money(portion * (share ?? Hundred) / Hundred);
             var source = $"claim {claimId}: priority amount"
-                + (share is { } s ? $" at plan.priority_percentage {Py.F(s)}%" : ", paid in full (§ 1322(a)(2))");
+                + (share is { } s ? $" at plan.priority_percentage {Exact.F(s)}%" : ", paid in full (§ 1322(a)(2))");
             if (rate is { } r)
             {
-                source += $", plan.priority_interest_rate {Py.F(r)}% a year";
+                source += $", plan.priority_interest_rate {Exact.F(r)}% a year";
             }
 
             payees.Add(new Payee($"priority:{claimId}", ClaimLabel(caseFile, claim), claimId, null, owed, owed, MonthlyRate(rate), rate, null, source));
@@ -1070,7 +1070,7 @@ public static class Chapter13Plan
                 return (null, null, treatment);
             }
 
-            return (Money(poolTotal * share / Hundred), $"plan.unsecured_percentage {Py.F(share)}% of the unsecured pool", treatment);
+            return (Money(poolTotal * share / Hundred), $"plan.unsecured_percentage {Exact.F(share)}% of the unsecured pool", treatment);
         }
 
         if (treatment == "amount")
@@ -1108,7 +1108,7 @@ public static class Chapter13Plan
         var commission = Section326aCommission(unexemptTotal);
         var other = plan is not null ? Money(plan.Chapter7OtherCosts is { } costs && costs != 0 ? costs : Zero) : Zero;
         var priorityTotal = Money(ClaimsOf(caseFile, ClaimClass.PriorityUnsecured).Aggregate(Zero, (sum, pair) => sum + PriorityPortion(pair.Body)));
-        var available = Money(Py.Max(unexemptTotal - commission - other - priorityTotal, Zero));
+        var available = Money(Exact.Max(unexemptTotal - commission - other - priorityTotal, Zero));
         var (pool, poolWarnings) = Chapter7Pool(caseFile, liens);
         warnings.AddRange(poolWarnings);
         var poolTotal = Money(pool.Aggregate(Zero, (sum, claim) => sum + claim.Amount));
@@ -1181,7 +1181,7 @@ public static class Chapter13Plan
                 return Zero;
             }
 
-            return monthlyPayment is { } payment ? Py.Min(payment, Balance) : Balance;
+            return monthlyPayment is { } payment ? Exact.Min(payment, Balance) : Balance;
         }
 
         public void Pay(int month, decimal amount)
@@ -1194,7 +1194,7 @@ public static class Chapter13Plan
             if (!recurring)
             {
                 Balance -= amount;
-                var toInterest = Py.Min(amount, AccruedUnpaid);
+                var toInterest = Exact.Min(amount, AccruedUnpaid);
                 AccruedUnpaid -= toInterest;
                 Interest += toInterest;
                 Principal += amount - toInterest;
@@ -1215,11 +1215,11 @@ public static class Chapter13Plan
             if (recurring)
             {
                 var owed = (monthlyPayment is { } payment && payment != 0 ? payment : Zero) * term;
-                unpaid = Money(Py.Max(owed - Principal, Zero));
+                unpaid = Money(Exact.Max(owed - Principal, Zero));
             }
             else
             {
-                unpaid = Money(Py.Max(Balance, Zero));
+                unpaid = Money(Exact.Max(Balance, Zero));
             }
 
             return new PayoutRow(key, label, claimId, treatment, Money(Allowed), monthlyPayment, rate, Money(Principal), Money(Interest), FirstMonth, LastMonth, unpaid, source);

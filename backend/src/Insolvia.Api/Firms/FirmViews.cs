@@ -19,13 +19,13 @@ namespace Insolvia.Api.Firms;
 /// <c>firm_summary_json</c>, <c>firm_user_json</c>, <c>firm_user_summary_json</c>,
 /// <c>firm_defaults_json</c>, <c>firm_client_json</c>, <c>library_creditor_json</c>,
 /// <c>questionnaire_json</c> and <c>checklist_json</c>, and /v1/me's body.
-/// Each keeps its Python function's null-versus-absent rule, which differs on
-/// purpose between them (the comment on each says which); key order is
-/// <see cref="FlaskJson"/>'s to sort.
+/// Each keeps the null-versus-absent rule of the function it was ported from,
+/// which differs on purpose between them (the comment on each says which);
+/// key order is <see cref="FlaskJson"/>'s to sort.
 /// </summary>
 /// <remarks>
-/// These belong in Insolvia.Core beside the records, as the Python had them;
-/// they are here because Core was closed to this change (#525).
+/// These belong in Insolvia.Core beside the records; they are here because
+/// Core was closed to this change (#525).
 /// </remarks>
 public static class FirmViews
 {
@@ -307,7 +307,7 @@ public static class FirmViews
         return map;
     }
 
-    // asdict(address), unpruned — each caller prunes at the level Python did.
+    // asdict(address), unpruned — each caller prunes at the level its wire shape needs.
     private static JsonObject AddressOf(Address address) => new()
     {
         ["line1"] = FlaskJson.Text(address.Line1),

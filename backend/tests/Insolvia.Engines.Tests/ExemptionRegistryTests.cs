@@ -63,7 +63,7 @@ public sealed class ExemptionRegistryTests
             Assert.True(dot > 0 && money[..dot].All(char.IsAsciiDigit), money);
             Assert.Equal(2, money[(dot + 1)..].Length);
             Assert.True(money[(dot + 1)..].All(char.IsAsciiDigit), money);
-            Assert.True(Py.Dec(money) > 0);
+            Assert.True(Exact.Dec(money) > 0);
         }
     }
 

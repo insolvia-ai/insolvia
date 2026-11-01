@@ -160,7 +160,7 @@ public static class Questionnaire
             var sectionId = Json.AsString(entry["id"]);
             if (sectionId is null || !ById.TryGetValue(sectionId, out var section))
             {
-                // No trailing period, exactly as the Python message reads.
+                // No trailing period, exactly as the contract's message reads.
                 errors[$"sections.{index}.id"] = "Must be one of " + string.Join(", ", SectionIds);
                 continue;
             }

@@ -55,9 +55,9 @@ public static class ErrorResponses
         ForbiddenException forbidden => (403, ErrorJson("ForbiddenError", forbidden)),
         NotFoundException notFound => (404, ErrorJson("NotFoundError", notFound)),
 
-        // Python answered `error.__class__.__name__`; Python's classes end
-        // in Error where these end in Exception.
-        ApiException other => (400, ErrorJson(PythonClassName(other), other)),
+        // The contract's code is the class name ending in Error (the old
+        // API's `error.__class__.__name__`); these end in Exception.
+        ApiException other => (400, ErrorJson(ErrorCode(other), other)),
         _ => null,
     };
 
@@ -103,14 +103,14 @@ public static class ErrorResponses
     /// substitutes "Exception of type … was thrown.").
     /// </summary>
     /// <param name="error">The exception.</param>
-    /// <returns>Its message as Python rendered it.</returns>
-    public static string PythonMessage(Exception error)
+    /// <returns>Its message as the contract renders it.</returns>
+    public static string MessageOf(Exception error)
     {
         ArgumentNullException.ThrowIfNull(error);
         return error.Message == $"Exception of type '{error.GetType().FullName}' was thrown." ? string.Empty : error.Message;
     }
 
-    private static string PythonClassName(Exception error)
+    private static string ErrorCode(Exception error)
     {
         var name = error.GetType().Name;
         return name.EndsWith("Exception", StringComparison.Ordinal) ? name[..^"Exception".Length] + "Error" : name;
@@ -120,5 +120,5 @@ public static class ErrorResponses
     // apostrophe and an em dash is \u2014, where Utf8JsonWriter's default
     // encoder would write \u0027 and the raw character.
     private static string ErrorJson(string code, Exception error) =>
-        FlaskJson.Serialize(new JsonObject { ["error"] = code, ["message"] = PythonMessage(error) });
+        FlaskJson.Serialize(new JsonObject { ["error"] = code, ["message"] = MessageOf(error) });
 }

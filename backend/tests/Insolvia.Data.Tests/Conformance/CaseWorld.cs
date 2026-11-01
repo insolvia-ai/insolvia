@@ -7,6 +7,7 @@ using Insolvia.Core.Memory;
 using Insolvia.Core.Ports;
 using Insolvia.Core.Provenance;
 using Insolvia.Data.Cases;
+using Insolvia.Data.Concurrency;
 using Insolvia.Data.Firms;
 using Insolvia.Data.Pagination;
 
@@ -35,6 +36,9 @@ internal sealed record CaseStores(
 {
     /// <summary>The filing approvals (#530), over the same state.</summary>
     public required IFilingApprovalStore Approvals { get; init; }
+
+    /// <summary>One transaction around writes through several of these stores (Copy case).</summary>
+    public required IUnitOfWork Work { get; init; }
 }
 
 /// <summary>The memory twins — the oracle.</summary>
@@ -62,6 +66,7 @@ internal sealed class MemoryCaseWorld
             new MemoryPacketStore(cases))
         {
             Approvals = new MemoryFilingApprovalStore(),
+            Work = new MemoryUnitOfWork(),
         };
     }
 
@@ -100,6 +105,7 @@ internal sealed class PostgresCaseWorld(PostgresFixture postgres) : IAsyncDispos
             new PostgresPacketStore(db))
         {
             Approvals = new PostgresFilingApprovalStore(db),
+            Work = new PostgresUnitOfWork(db),
         };
     }
 

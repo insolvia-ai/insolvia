@@ -225,9 +225,9 @@ public sealed class DebtorRoutes : IEndpointModule
     private static string ClientIdOf(JsonObject payload)
     {
         var clientId = Json.AsString(payload["client_id"]);
-        return clientId is null || PyText.Strip(clientId).Length == 0
+        return clientId is null || TextRules.Strip(clientId).Length == 0
             ? throw new FieldValidationException(new Dictionary<string, string> { ["client_id"] = "Choose a client." })
-            : PyText.Strip(clientId);
+            : TextRules.Strip(clientId);
     }
 
     private static Task<TaxIdRef?> ResolveTaxIdAsync(HttpContext context, DebtorDraft draft, Debtor? stored, Case target, CancellationToken cancellationToken) =>

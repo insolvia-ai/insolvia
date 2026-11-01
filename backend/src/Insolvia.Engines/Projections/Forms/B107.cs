@@ -132,7 +132,7 @@ public static class B107
         var spec = release.Field(fieldId);
         if (!spec.PdfNames.Contains(pdfName))
         {
-            throw new EngineKeyException($"{fieldId} claims no PDF field {Py.Repr(pdfName)}");
+            throw new EngineKeyException($"{fieldId} claims no PDF field {Exact.Repr(pdfName)}");
         }
 
         if (spec.PdfNames.Count == 1)
@@ -229,7 +229,7 @@ public static class B107
             var startYear = entry.PeriodStart?.Year ?? year;
             if (!periods.TryGetValue(startYear, out var period))
             {
-                problems.Add($"q4: the form prints income for the filing year and the two before it; a period starting {(entry.PeriodStart is { } start ? Py.Iso(start) : "None")} fits none");
+                problems.Add($"q4: the form prints income for the filing year and the two before it; a period starting {(entry.PeriodStart is { } start ? Exact.Iso(start) : "None")} fits none");
                 continue;
             }
 
@@ -299,7 +299,7 @@ public static class B107
                 {
                     problems.Add(
                         $"q6: the payments to {(string.IsNullOrEmpty(payment.Creditor.Name) ? "a creditor" : payment.Creditor.Name)} "
-                        + $"total {Py.F(total)}, below the {floor.Amount} reporting floor ({floor.Citation}) — question 6 lists "
+                        + $"total {Exact.F(total)}, below the {floor.Amount} reporting floor ({floor.Citation}) — question 6 lists "
                         + "only creditors paid at least the floor; remove the entry or correct the total");
                 }
             }
@@ -372,7 +372,7 @@ public static class B107
             }
             else if (!string.IsNullOrEmpty(benefit.InsiderName) && benefit.InsiderName != name)
             {
-                problems.Add($"q8: the row prints one name box; the entry stores both a recipient ({Py.Repr(name)}) and an insider ({Py.Repr(benefit.InsiderName)})");
+                problems.Add($"q8: the row prints one name box; the entry stores both a recipient ({Exact.Repr(name)}) and an insider ({Exact.Repr(benefit.InsiderName)})");
             }
 
             PutRow(
@@ -654,7 +654,7 @@ public static class B107
                 var mirrored = transfers.Count > 1 ? transfers[1].Date : null;
                 if (date != mirrored)
                 {
-                    problems.Add($"q19: the transfer-date box is the PDF's second widget of Q18 row two's date field and can only repeat its value; {Py.Repr(Py.Iso(date))} differs");
+                    problems.Add($"q19: the transfer-date box is the PDF's second widget of Q18 row two's date field and can only repeat its value; {Exact.Repr(Exact.Iso(date))} differs");
                 }
             }
         }
@@ -676,7 +676,7 @@ public static class B107
                 var zip = account.Institution.Address.PostalCode;
                 if (!string.IsNullOrEmpty(zip) && zip != accounts[0].Institution.Address.PostalCode)
                 {
-                    problems.Add($"q20: row two's ZIP box is the PDF's second widget of row one's and can only repeat its value; {Py.Repr(zip)} differs");
+                    problems.Add($"q20: row two's ZIP box is the PDF's second widget of row one's and can only repeat its value; {Exact.Repr(zip)} differs");
                 }
             }
 
@@ -835,8 +835,8 @@ public static class B107
         var businesses = Entries<BusinessConnection>(caseFile);
         values["q27_gate"] = YesNo(release, "q27_gate", businesses.Count > 0);
 
-        // Python iterates a set here, so its key order is hash order; the
-        // values are the same whatever the order.
+        // The ported code iterated a set here, in hash order; the values are
+        // the same whatever the order.
         foreach (var member in businesses.SelectMany(business => business.Connection).Distinct())
         {
             values[ConnectionBoxes[member]] = new CheckFill();
@@ -877,7 +877,7 @@ public static class B107
                     var second = businesses.Count > 1 ? businesses[1].ToDate : null;
                     if (to != second)
                     {
-                        problems.Add($"q27: row three's To box is the PDF's second widget of row two's and can only repeat its value; {Py.Repr(Py.Iso(to))} differs");
+                        problems.Add($"q27: row three's To box is the PDF's second widget of row two's and can only repeat its value; {Exact.Repr(Exact.Iso(to))} differs");
                     }
                 }
                 else

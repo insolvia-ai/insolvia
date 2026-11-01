@@ -141,7 +141,7 @@ public sealed class MemoryClientBindingStore : IClientBindingStore
         ArgumentNullException.ThrowIfNull(email);
         lock (_gate)
         {
-            var lowered = PyText.Lower(email);
+            var lowered = TextRules.Lower(email);
             var found = _bindings
                 .Where(pair => pair.Key.FirmId == firmId && pair.Value.Email == lowered)
                 .Select(pair => pair.Value)

@@ -162,7 +162,7 @@ internal sealed class CandidateRow
 
     public string? ConfirmedBy { get; set; }
 
-    /// <summary>Kept as the text the domain carries (Python's ISO string).</summary>
+    /// <summary>Kept as the text the domain carries (an ISO 8601 string).</summary>
     public string? ConfirmedAt { get; set; }
 
     public JsonDocument? CorrectedPayload { get; set; }

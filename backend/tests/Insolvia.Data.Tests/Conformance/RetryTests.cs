@@ -1,8 +1,13 @@
+using Insolvia.Core;
 using Insolvia.Core.AccessLog;
+using Insolvia.Core.CaseEntities;
 using Insolvia.Core.Cases;
+using Insolvia.Core.Creditors;
+using Insolvia.Core.Fields;
 using Insolvia.Core.Filings;
 using Insolvia.Core.FirmClients;
 using Insolvia.Core.Jobs;
+using Insolvia.Core.Provenance;
 using Insolvia.Data.AccessLogging;
 using Microsoft.EntityFrameworkCore;
 
@@ -124,6 +129,45 @@ public sealed class RetryTests(PostgresFixture postgres) : CaseConformance
         Assert.Single(_faults.Injected);
         Assert.NotNull(await Plain().Cases.ReadForWorkerAsync(created.Id, Ct));
         Assert.Single(await Plain().Cases.AssigneesAsync(created.Id, Ct));
+    }
+
+    [Fact]
+    public async Task A_case_copy_whose_commit_reply_is_lost_reports_success_and_writes_once()
+    {
+        var copy = Make.Case(NewId());
+        var creditor = Creditor(copy.Id);
+        var stores = Connect();
+        _faults.Plan(Fault.LoseCommitAck);
+
+        // The copy route's unit: the case, then a record the foreign key ties
+        // to it. The case store's own landed check is skipped inside a joined
+        // transaction, so the unit carries it.
+        await stores.Work.RunAsync(
+            async token =>
+            {
+                await stores.Cases.CreateAsync(copy, Make.Assignment(copy), cancellationToken: token);
+                await stores.Entities.CreateAsync(creditor, token);
+            },
+            landed: async token => await stores.Cases.ReadForWorkerAsync(copy.Id, token) is not null,
+            Ct);
+
+        Assert.Single(_faults.Injected);
+        Assert.Equal([creditor.Id], (await Plain().Entities.ListForCaseAsync(copy.Id, CreditorRules.Kind, Ct)).Select(entity => entity.Id));
+    }
+
+    [Fact]
+    public async Task A_case_copy_whose_commit_reply_is_lost_reads_as_its_own_conflict_without_the_check()
+    {
+        var copy = Make.Case(NewId());
+        var stores = Connect();
+        _faults.Plan(Fault.LoseCommitAck);
+
+        // Why the copy route passes landed: the replay meets its own case row.
+        await Assert.ThrowsAsync<InvalidOperationException>(() => stores.Work.RunAsync(
+            token => stores.Cases.CreateAsync(copy, Make.Assignment(copy), cancellationToken: token),
+            cancellationToken: Ct));
+
+        Assert.NotNull(await Plain().Cases.ReadForWorkerAsync(copy.Id, Ct));
     }
 
     [Fact]
@@ -264,6 +308,16 @@ public sealed class RetryTests(PostgresFixture postgres) : CaseConformance
 
     private async Task<int> AccessRowsAsync(string eventId) =>
         await _world.Harness.NewContext().Set<AccessLogRow>().AsNoTracking().CountAsync(row => row.EventId == eventId, Ct);
+
+    private static CaseEntity<CreditorBody> Creditor(string caseId) =>
+        new(
+            CreditorRules.Kind,
+            NewId(),
+            caseId,
+            Opened,
+            Opened,
+            new CreditorBody("Example Bank", new Address("1 Bank Plaza", City: "Tampa", State: "FL", PostalCode: "33602")),
+            new Dictionary<string, ProvenanceEntry> { ["name"] = new(ProvenanceSource.StaffTyped) }.ToValueDictionary());
 
     private static FilingApproval Approval(string caseId) =>
         new(NewId(), NewId(), caseId, Ids.Firm, Ids.Alice, NewId(), NewId(), Digest, NewId(), "flmb", "8", "2026-10-01.1", At, Now - 10, Now + 3600);

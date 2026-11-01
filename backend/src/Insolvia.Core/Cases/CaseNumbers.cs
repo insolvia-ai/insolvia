@@ -26,7 +26,7 @@ public sealed record CaseNumber(string? Office, string Year, string Type, string
             throw new InvalidOperationException("a case number key needs the office");
         }
 
-        return $"{PyText.Lower(PyText.Strip(court))}:{Canonical}";
+        return $"{TextRules.Lower(TextRules.Strip(court))}:{Canonical}";
     }
 
     /// <summary>Whether two printed numbers name the same case within one court — a missing office matches any.</summary>
@@ -69,7 +69,7 @@ public static partial class CaseNumbers
         return new CaseNumber(
             Office: office.Success ? int.Parse(office.Value, CultureInfo.InvariantCulture).ToString(CultureInfo.InvariantCulture) : null,
             Year: year[^2..],
-            Type: PyText.Lower(match.Groups["type"].Success ? match.Groups["type"].Value : DefaultType),
+            Type: TextRules.Lower(match.Groups["type"].Success ? match.Groups["type"].Value : DefaultType),
             Sequence: int.Parse(match.Groups["sequence"].Value, CultureInfo.InvariantCulture).ToString(CultureInfo.InvariantCulture).PadLeft(5, '0'),
             Judge: string.IsNullOrEmpty(judge) ? null : judge.ToUpperInvariant());
     }
@@ -93,7 +93,7 @@ public static partial class CaseNumbers
     public static string? PetitionDate(string filedAt)
     {
         ArgumentNullException.ThrowIfNull(filedAt);
-        var match = FormDate().Match(PyText.Strip(filedAt));
+        var match = FormDate().Match(TextRules.Strip(filedAt));
         return match.Success ? match.Groups[1].Value : null;
     }
 

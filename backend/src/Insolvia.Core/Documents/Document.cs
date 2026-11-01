@@ -173,7 +173,7 @@ public static partial class DocumentRules
             return null;
         }
 
-        if (!Wire.TryParse<DocumentContentType>(PyText.Lower(PyText.Strip(raw)), out var contentType))
+        if (!Wire.TryParse<DocumentContentType>(TextRules.Lower(TextRules.Strip(raw)), out var contentType))
         {
             errors["contentType"] = "That file type is not accepted. Allowed: " + string.Join(", ", Wire.Names<DocumentContentType>()) + ".";
             return null;
@@ -208,14 +208,14 @@ public static partial class DocumentRules
     private static string? ParseFileName(JsonNode? value, Dictionary<string, string> errors)
     {
         var raw = Json.AsString(value);
-        if (raw is null || PyText.Strip(raw).Length == 0)
+        if (raw is null || TextRules.Strip(raw).Length == 0)
         {
             errors["fileName"] = "A file name is required.";
             return null;
         }
 
-        var fileName = PyText.Strip(raw);
-        if (PyText.Length(fileName) > MaxFileName)
+        var fileName = TextRules.Strip(raw);
+        if (TextRules.Length(fileName) > MaxFileName)
         {
             errors["fileName"] = $"Must be {MaxFileName} characters or fewer.";
             return null;

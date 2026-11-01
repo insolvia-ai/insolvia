@@ -30,7 +30,7 @@ public sealed record MedianIncomeTable(IReadOnlyDictionary<string, IReadOnlyList
 
         if (!AnnualMedians.TryGetValue(state.ToUpperInvariant(), out var row))
         {
-            throw new EngineKeyException($"the median income table has no row for {Py.Repr(state)}");
+            throw new EngineKeyException($"the median income table has no row for {Exact.Repr(state)}");
         }
 
         if (householdSize <= 4)
@@ -160,7 +160,7 @@ public sealed record Transportation(
 
         if (!OperatingCostsRegion.TryGetValue(state.ToUpperInvariant(), out var region))
         {
-            throw new EngineKeyException($"no Census region is recorded for state {Py.Repr(state)}");
+            throw new EngineKeyException($"no Census region is recorded for state {Exact.Repr(state)}");
         }
 
         return OperatingCosts[region];
@@ -177,12 +177,12 @@ public sealed record LocalStandards(IReadOnlyList<string> States, IReadOnlyDicti
         if (!Housing.TryGetValue(state.ToUpperInvariant(), out var rows))
         {
             throw new EngineKeyException(
-                $"the local standards carry no housing table for {Py.Repr(state)} (launch states: {string.Join(", ", States)})");
+                $"the local standards carry no housing table for {Exact.Repr(state)} (launch states: {string.Join(", ", States)})");
         }
 
         var normalized = UstData.NormalizeCounty(county);
         return rows.FirstOrDefault(row => UstData.NormalizeCounty(row.County) == normalized)
-            ?? throw new EngineKeyException($"{state}: no housing standard for county {Py.Repr(county)}");
+            ?? throw new EngineKeyException($"{state}: no housing standard for county {Exact.Repr(county)}");
     }
 }
 
@@ -192,17 +192,17 @@ public sealed record Ch13AdminMultipliers(IReadOnlyDictionary<string, string> Mu
     /// <summary>The fraction for a case's district, by the UST's spelling or the courts'.</summary>
     public decimal MultiplierFor(string district)
     {
-        var cleaned = string.Join(' ', Core.PyText.SplitWhitespace(district));
+        var cleaned = string.Join(' ', Core.TextRules.SplitWhitespace(district));
         Multipliers.TryGetValue(cleaned, out var found);
         if (found is null && cleaned != "District of Columbia")
         {
-            var stripped = string.Join(' ', Core.PyText.SplitWhitespace(cleaned.Replace("District of", string.Empty, StringComparison.Ordinal)));
+            var stripped = string.Join(' ', Core.TextRules.SplitWhitespace(cleaned.Replace("District of", string.Empty, StringComparison.Ordinal)));
             Multipliers.TryGetValue(stripped, out found);
         }
 
         if (found is null)
         {
-            throw new EngineKeyException($"the Chapter 13 multiplier table has no district {Py.Repr(district)}");
+            throw new EngineKeyException($"the Chapter 13 multiplier table has no district {Exact.Repr(district)}");
         }
 
         return UstData.Dec(found);
@@ -281,7 +281,7 @@ public static partial class UstData
         var missing = SeriesPayloads.Keys.Where(id => !series.ContainsKey(id)).Order(StringComparer.Ordinal).ToList();
         if (missing.Count > 0)
         {
-            throw new MalformedReleaseException($"the UST registry is missing series: [{string.Join(", ", missing.Select(Py.Repr))}]");
+            throw new MalformedReleaseException($"the UST registry is missing series: [{string.Join(", ", missing.Select(Exact.Repr))}]");
         }
 
         return series;
@@ -292,7 +292,7 @@ public static partial class UstData
 
     /// <summary>A series' releases, oldest first.</summary>
     public static IReadOnlyList<UstRelease> ReleasesOf(string seriesId) =>
-        Registry.TryGetValue(seriesId, out var found) ? found : throw new EngineKeyException($"unknown series {Py.Repr(seriesId)}");
+        Registry.TryGetValue(seriesId, out var found) ? found : throw new EngineKeyException($"unknown series {Exact.Repr(seriesId)}");
 
     /// <summary>The release with the greatest effective date on or before <paramref name="asOf"/>.</summary>
     public static UstRelease PickRelease(IReadOnlyList<UstRelease> candidates, DateOnly asOf) =>
@@ -304,7 +304,7 @@ public static partial class UstData
     /// <summary>That exact release.</summary>
     public static UstRelease Get(string seriesId, string releaseId) =>
         ReleasesOf(seriesId).FirstOrDefault(release => release.ReleaseId == releaseId)
-        ?? throw new EngineKeyException($"series {Py.Repr(seriesId)} has no release {Py.Repr(releaseId)}");
+        ?? throw new EngineKeyException($"series {Exact.Repr(seriesId)} has no release {Exact.Repr(releaseId)}");
 
     /// <summary>Newest by (effective date, sequence).</summary>
     public static UstRelease Latest(string seriesId) => ReleasesOf(seriesId)[^1];
@@ -323,7 +323,7 @@ public static partial class UstData
 
     internal static decimal Dec(string value) => decimal.Parse(value, NumberStyles.Number, CultureInfo.InvariantCulture);
 
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Globalization", "CA1308:Normalize strings to uppercase", Justification = "Python lower-cases the county for matching.")]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Globalization", "CA1308:Normalize strings to uppercase", Justification = "Counties match by their lower-cased name.")]
     internal static string NormalizeCounty(string name)
     {
         ArgumentNullException.ThrowIfNull(name);
@@ -378,7 +378,7 @@ public static partial class UstData
         {
             if (!StatePattern().IsMatch(state))
             {
-                throw Fail(where, $"annual_medians key {Py.Repr(state)} is not a state code");
+                throw Fail(where, $"annual_medians key {Exact.Repr(state)} is not a state code");
             }
 
             medians[state] = MoneyRow(row, where, $"annual_medians.{state}", 4);
@@ -452,12 +452,12 @@ public static partial class UstData
             var text = Core.Json.AsString(value) ?? throw Fail(where, $"{district}: multiplier must be a string");
             if (!decimal.TryParse(text, NumberStyles.Number, CultureInfo.InvariantCulture, out var fraction))
             {
-                throw Fail(where, $"{district}: multiplier {Py.Repr(text)}: [<class 'decimal.ConversionSyntax'>]");
+                throw Fail(where, $"{district}: multiplier {Exact.Repr(text)}: [<class 'decimal.ConversionSyntax'>]");
             }
 
             if (fraction < 0 || fraction >= 1)
             {
-                throw Fail(where, $"{district}: multiplier {Py.Repr(text)} is not a fraction");
+                throw Fail(where, $"{district}: multiplier {Exact.Repr(text)} is not a fraction");
             }
 
             multipliers[district] = text;
@@ -502,7 +502,7 @@ public static partial class UstData
                 var fips = StrField(raw, "fips", where);
                 if (!FipsPattern().IsMatch(fips))
                 {
-                    throw Fail(where, $"{state} {county}: fips {Py.Repr(fips)} is not 5 digits");
+                    throw Fail(where, $"{state} {county}: fips {Exact.Repr(fips)} is not 5 digits");
                 }
 
                 var nonMortgage = MoneyRow(raw["non_mortgage"], where, $"{state} {county} non_mortgage", 5);
@@ -562,7 +562,7 @@ public static partial class UstData
             var state = StrField(rawMsa, "state", where);
             if (!stateSet.Contains(state))
             {
-                throw Fail(where, $"MSA {name} names state {Py.Repr(state)}, not in states");
+                throw Fail(where, $"MSA {name} names state {Exact.Repr(state)}, not in states");
             }
 
             if (rawMsa["counties"] is not JsonArray rawCounties || !rawCounties.All(county => Core.Json.AsString(county) is { Length: > 0 }))
@@ -598,7 +598,7 @@ public static partial class UstData
         var payloadRaw = LoadJson(root, $"{directory}/dataset.json", where);
         if (Core.Json.AsString(payloadRaw["kind"]) != SeriesPayloads[seriesId])
         {
-            throw Fail(where, $"dataset kind {Py.Repr(payloadRaw["kind"])}");
+            throw Fail(where, $"dataset kind {Exact.Repr(payloadRaw["kind"])}");
         }
 
         var verification = ParseVerification(payloadRaw["verification"], where);

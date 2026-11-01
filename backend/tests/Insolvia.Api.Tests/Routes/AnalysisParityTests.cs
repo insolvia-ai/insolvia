@@ -10,7 +10,7 @@ namespace Insolvia.Api.Tests.Routes;
 /// through the whole HTTP pipeline (auth, the permission filters, the store
 /// reads, the engine, FlaskJson), and the response body must be exactly the
 /// bytes Flask's <c>jsonify</c> writes for the output the Python oracle
-/// recorded (Parity/*.expected.json) — or, where the Python route wraps the engine's result, for that
+/// recorded (Parity/*.expected.json) — or, where the route wraps the engine's result, for that
 /// wrapping of it.
 /// </summary>
 public sealed class AnalysisParityTests : IAsyncLifetime, IDisposable

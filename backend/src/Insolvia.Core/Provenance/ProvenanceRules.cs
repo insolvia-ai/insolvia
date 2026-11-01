@@ -436,7 +436,7 @@ public static partial class ProvenanceRules
         // Blank is nobody: kept distinct from absent so "" cannot sneak
         // through a not-null check.
         var confirmedBy = Json.AsString(confirmedByNode);
-        if (confirmedBy is not null && PyText.Strip(confirmedBy).Length == 0)
+        if (confirmedBy is not null && TextRules.Strip(confirmedBy).Length == 0)
         {
             confirmedBy = null;
         }

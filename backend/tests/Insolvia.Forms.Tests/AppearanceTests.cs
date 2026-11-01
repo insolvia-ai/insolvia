@@ -73,7 +73,7 @@ public sealed class AppearanceTests
     [InlineData(1e16, "1e+16")]
     [InlineData(123456789012345.6, "123456789012345.6")]
     [InlineData(23.849999999999998, "23.849999999999998")]
-    public void Floats_print_as_pythons_repr(double value, string text) => Assert.Equal(text, PyNum.FloatRepr(value));
+    public void Floats_print_as_pythons_repr(double value, string text) => Assert.Equal(text, TypedNumber.FloatRepr(value));
 
     [Theory]
     [InlineData(0.15, 0.1)]
@@ -82,17 +82,17 @@ public sealed class AppearanceTests
     [InlineData(2.675, 2.7)]
     [InlineData(15.649999999999999, 15.6)]
     [InlineData(-0.05, -0.1)]
-    public void Round_1_rounds_the_exact_binary_value_half_to_even(double value, double rounded) => Assert.Equal(rounded, PyNum.Round(value, 1));
+    public void Round_1_rounds_the_exact_binary_value_half_to_even(double value, double rounded) => Assert.Equal(rounded, TypedNumber.Round(value, 1));
 
     [Fact]
     public void Python_ints_and_floats_keep_their_types_through_arithmetic()
     {
-        var margin = PyNum.Max(PyNum.Int(1) * PyNum.Int(1), PyNum.Int(1));
+        var margin = TypedNumber.Max(TypedNumber.Int(1) * TypedNumber.Int(1), TypedNumber.Int(1));
 
-        Assert.Equal("2", (PyNum.Int(2) * margin).ToString());
-        Assert.Equal("1.0", PyNum.Max(PyNum.Float(1.0), PyNum.Int(1)).ToString());
-        Assert.Equal("1", PyNum.Max(PyNum.Float(0.5), PyNum.Int(1)).ToString());
-        Assert.Equal("0.5", (PyNum.Int(1) / PyNum.Int(2)).ToString());
-        Assert.Equal("12", PyNum.Round1(PyNum.Int(12)).ToString());
+        Assert.Equal("2", (TypedNumber.Int(2) * margin).ToString());
+        Assert.Equal("1.0", TypedNumber.Max(TypedNumber.Float(1.0), TypedNumber.Int(1)).ToString());
+        Assert.Equal("1", TypedNumber.Max(TypedNumber.Float(0.5), TypedNumber.Int(1)).ToString());
+        Assert.Equal("0.5", (TypedNumber.Int(1) / TypedNumber.Int(2)).ToString());
+        Assert.Equal("12", TypedNumber.Round1(TypedNumber.Int(12)).ToString());
     }
 }

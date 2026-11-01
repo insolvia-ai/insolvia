@@ -180,7 +180,7 @@ public static partial class PetitionReview
             var line = Json.AsString(entry["line"]);
             var message = Json.AsString(entry["message"]);
             if (severity is null || !Severities.Contains(severity) || category is null || !Categories.Contains(category)
-                || form is null || line is null || message is null || PyText.Strip(message).Length == 0)
+                || form is null || line is null || message is null || TextRules.Strip(message).Length == 0)
             {
                 throw new FormatException("review model finding is malformed");
             }
@@ -274,7 +274,7 @@ public static partial class PetitionReview
                 ["sofa_entries"] = Bodies(data.SofaEntries),
             },
         };
-        return PythonJson.Dumps(Scrub(document), sortKeys: true);
+        return AsciiJson.Dumps(Scrub(document), sortKeys: true);
     }
 
     /// <summary>
@@ -391,12 +391,12 @@ public static partial class PetitionReview
 
     private static bool IsBlank(JsonNode? node) => node is null || node is JsonObject { Count: 0 } || node is JsonArray { Count: 0 };
 
-    private static string Cap(string text, int limit) => PyText.Length(text) <= limit ? text : new StringInfoCap(text).Take(limit);
+    private static string Cap(string text, int limit) => TextRules.Length(text) <= limit ? text : new StringInfoCap(text).Take(limit);
 
     [GeneratedRegex(@"\b\d{3}-\d{2}-\d{4}\b")]
     private static partial Regex TaxIdShape();
 
-    // Python slices by code point; a surrogate pair is one character.
+    // Slices by code point (Python's `s[:n]`); a surrogate pair is one character.
     private readonly struct StringInfoCap(string text)
     {
         public string Take(int limit)

@@ -565,7 +565,7 @@ public sealed class MeansTestEngineTests
         Cmi.Window(AsOf),
         [],
         monthly,
-        monthly == "unused" ? monthly : Py.F(Py.Dec(monthly) * 12),
+        monthly == "unused" ? monthly : Exact.F(Exact.Dec(monthly) * 12),
         [],
         []);
 

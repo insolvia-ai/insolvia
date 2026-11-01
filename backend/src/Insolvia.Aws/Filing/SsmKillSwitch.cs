@@ -82,9 +82,11 @@ public sealed class SsmKillSwitch : IKillSwitch
             var value = answer?["Parameter"]?["Value"] is JsonValue text && text.TryGetValue<string>(out var read) ? read : string.Empty;
             return string.Equals(value.Trim(), "true", StringComparison.OrdinalIgnoreCase);
         }
-        catch (Exception error) when (error is HttpRequestException or JsonException or InvalidOperationException or TaskCanceledException)
+        catch (Exception error) when ((error is HttpRequestException or JsonException or InvalidOperationException or TaskCanceledException)
+            && !cancellationToken.IsCancellationRequested)
         {
-            // Unreadable: OFF. Never a cached "on".
+            // Unreadable (a timeout included): OFF. Never a cached "on". The
+            // caller's own cancellation is not a reading, so it propagates.
             return false;
         }
     }

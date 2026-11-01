@@ -137,8 +137,8 @@ internal sealed class AnalysisWorld : IDisposable
             Court = Json.AsString(raw["court"]),
             Division = Json.AsString(raw["division"]),
             ExemptionSet = Wire.TryParse<ExemptionSet>(Json.AsString(raw["exemption_set"]), out var set) ? set : null,
-            FiledAt = Py.ParseIso(Json.AsString(raw["filed_at"])),
-            Meeting341At = Py.ParseIso(Json.AsString(raw["meeting_341_at"])),
+            FiledAt = Exact.ParseIso(Json.AsString(raw["filed_at"])),
+            Meeting341At = Exact.ParseIso(Json.AsString(raw["meeting_341_at"])),
         };
 
         var debtors = new List<Debtor>();

@@ -10,7 +10,7 @@ namespace Insolvia.Api.Tests.Routes;
 
 /// <summary>
 /// The views no route of this slice serves yet — the portal's (18.19) and the
-/// lifecycle's kinds no PATCH can make — pinned to their Python shapes
+/// lifecycle's kinds no PATCH can make — pinned to their wire shapes
 /// (<c>portal_document_json</c>, <c>portal_request_json</c>,
 /// <c>public_status_json</c>, <c>tax_id_json</c>) and ADR 0027's event.
 /// </summary>

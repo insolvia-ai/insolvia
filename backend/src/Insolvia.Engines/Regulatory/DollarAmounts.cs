@@ -40,7 +40,7 @@ public sealed record DollarAmountsRelease(
     /// <summary>The named figure; <see cref="EngineKeyException"/> when the release has none.</summary>
     public DollarAmount Amount(string amountId) =>
         Amounts.FirstOrDefault(amount => amount.AmountId == amountId)
-        ?? throw new EngineKeyException($"{ReleaseId} has no amount {Py.Repr(amountId)}");
+        ?? throw new EngineKeyException($"{ReleaseId} has no amount {Exact.Repr(amountId)}");
 }
 
 /// <summary>The statutory dollar amounts: load, validate, resolve (Python's <c>core/dollar_amounts.py</c>).</summary>
@@ -82,7 +82,7 @@ public static class DollarAmounts
     /// <summary>That exact release — must succeed forever for any id ever pinned.</summary>
     public static DollarAmountsRelease Get(string releaseId) =>
         All.FirstOrDefault(release => release.ReleaseId == releaseId)
-        ?? throw new EngineKeyException($"series {Py.Repr(SeriesId)} has no release {Py.Repr(releaseId)}");
+        ?? throw new EngineKeyException($"series {Exact.Repr(SeriesId)} has no release {Exact.Repr(releaseId)}");
 
     /// <summary>Newest by (effective date, sequence).</summary>
     public static DollarAmountsRelease Latest() => All[^1];

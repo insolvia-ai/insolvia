@@ -175,14 +175,14 @@ public static class ClientBindings
     private static string? ParseDisplayName(JsonNode? value, Dictionary<string, string> errors)
     {
         var raw = Json.AsString(value);
-        if (raw is null || PyText.Strip(raw).Length == 0)
+        if (raw is null || TextRules.Strip(raw).Length == 0)
         {
             errors["displayName"] = "A name is required.";
             return null;
         }
 
-        var name = PyText.Strip(raw);
-        if (PyText.Length(name) > FirmParser.MaxDisplayName)
+        var name = TextRules.Strip(raw);
+        if (TextRules.Length(name) > FirmParser.MaxDisplayName)
         {
             errors["displayName"] = $"Please keep this under {FirmParser.MaxDisplayName} characters.";
             return null;

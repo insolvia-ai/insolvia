@@ -134,7 +134,7 @@ public static partial class FilingCredentialRules
         var raw = FieldParsers.Mapping(payload, "body", errors);
 
         var login = Json.AsString(raw["login"]);
-        if (login is null || !Login().IsMatch(PyText.Strip(login)))
+        if (login is null || !Login().IsMatch(TextRules.Strip(login)))
         {
             errors["login"] = "Enter the PACER username — letters, digits and . _ @ - only, at most 64 characters.";
         }
@@ -144,7 +144,7 @@ public static partial class FilingCredentialRules
         {
             errors["password"] = "Enter the PACER password.";
         }
-        else if (PyText.Length(password) > MaxPassword)
+        else if (TextRules.Length(password) > MaxPassword)
         {
             errors["password"] = $"At most {MaxPassword} characters.";
         }
@@ -183,7 +183,7 @@ public static partial class FilingCredentialRules
             throw new FieldValidationException(errors);
         }
 
-        return new Enrolment(PyText.Strip(login!), new CredentialSecret(password!, seed), chosen.ToValueCollection());
+        return new Enrolment(TextRules.Strip(login!), new CredentialSecret(password!, seed), chosen.ToValueCollection());
     }
 
     /// <summary>
@@ -215,7 +215,7 @@ public static partial class FilingCredentialRules
         }
 
         var existing = await store.ListForAttorneyAsync(firmId, attorneyId, cancellationToken).ConfigureAwait(false);
-        if (existing.Any(credential => PyText.Lower(credential.Login) == PyText.Lower(enrolment.Login)))
+        if (existing.Any(credential => TextRules.Lower(credential.Login) == TextRules.Lower(enrolment.Login)))
         {
             throw new ConflictException("That PACER login is already enrolled — revoke it first to replace it.");
         }
@@ -355,7 +355,7 @@ public static partial class FilingCredentialRules
             .ToJsonString(new JsonSerializerOptions { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping });
 
     /// <summary>Seeds are shown grouped and sometimes lower-case; canonical is upper-case base32, no spaces.</summary>
-    private static string NormaliseSeed(string value) => string.Concat(PyText.SplitWhitespace(value)).ToUpperInvariant();
+    private static string NormaliseSeed(string value) => string.Concat(TextRules.SplitWhitespace(value)).ToUpperInvariant();
 
     /// <summary>
     /// Whether <c>b32decode</c> accepts the seed once re-padded: the regex has

@@ -31,7 +31,7 @@ namespace Insolvia.Data.Firms;
 /// Listings are whole (the port never truncates them) and are ordered in
 /// code with the memory store's comparers, so both stores agree to the byte —
 /// a SQL collation would not match <c>StringComparer.Ordinal</c> or
-/// <c>PyText.Casefold</c>.
+/// <c>TextRules.Casefold</c>.
 /// </summary>
 public sealed class PostgresFirmStore : IFirmStore
 {

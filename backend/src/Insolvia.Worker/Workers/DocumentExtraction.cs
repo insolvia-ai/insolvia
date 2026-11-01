@@ -389,7 +389,7 @@ public static partial class DocumentExtraction
 
     // ── Coercion: defensive by construction ───────────────────────────
 
-    private static string? Text(JsonNode? value) => Json.AsString(value) is { } text && PyText.Strip(text).Length > 0 ? PyText.Strip(text) : null;
+    private static string? Text(JsonNode? value) => Json.AsString(value) is { } text && TextRules.Strip(text).Length > 0 ? TextRules.Strip(text) : null;
 
     private static string? MoneyString(JsonNode? value)
     {
