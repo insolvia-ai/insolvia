@@ -1,6 +1,6 @@
 # ADR 0021 — Four test tiers, each aimed at the environments that can answer it; seed fixtures from one shared bucket
 
-- **Status:** Accepted
+- **Status:** Accepted — amended by [0029](0029-one-testing-shape.md) (the integration tier becomes `contract/`'s deployed target)
 - **Date:** 2026-09-05
 - **Relates to:** [ADR 0008](0008-testing-shape-follows-the-code-it-tests.md)
   owns the *shape* of a suite per area and is unchanged by this; this ADR owns
