@@ -30,7 +30,12 @@ inputs:
       Newline-separated glob patterns, using the same syntax as
       `on.pull_request.paths` (`**` matches across directory separators). Blank
       lines and `#` comment lines are ignored, so a path list keeps the comments
-      that explain why each entry is there.
+      that explain why each entry is there. A pattern starting with `!`
+      excludes: a file counts only when it matches a positive pattern and no
+      `!` pattern, whatever the order (`backend/**` then
+      `!backend/scripts/**`). `*` already crosses `/` here, so `!backend/*.md`
+      excludes Markdown at every depth; `backend/**/*.md` would miss
+      `backend/README.md`, because it needs a directory in between.
     required: true
 
 outputs:
@@ -83,23 +88,33 @@ runs:
         matched=""
         while IFS= read -r file; do
           [ -n "${file}" ] || continue
+          included=false
+          excluded=false
           while IFS= read -r pattern; do
             # Trim surrounding whitespace, then drop blanks and `#` comments.
             pattern="${pattern#"${pattern%%[![:space:]]*}"}"
             pattern="${pattern%"${pattern##*[![:space:]]}"}"
             [ -n "${pattern}" ] || continue
             case "${pattern}" in \#*) continue ;; esac
+            negate=false
+            if [ "${pattern#!}" != "${pattern}" ]; then
+              negate=true
+              pattern="${pattern#!}"
+            fi
             # `case` globs already cross `/`, so `**` and `*` mean the same
             # thing here; normalise so patterns can be copied verbatim from an
             # `on.pull_request.paths:` list.
             case "${file}" in
               ${pattern//\*\*/\*})
-                run=true
-                matched="${file}"
-                break 2
+                if [ "${negate}" = true ]; then excluded=true; else included=true; fi
                 ;;
             esac
           done <<< "${PATTERNS}"
+          if [ "${included}" = true ] && [ "${excluded}" = false ]; then
+            run=true
+            matched="${file}"
+            break
+          fi
         done <<< "${changed}"
 
         if [ "${run}" = true ]; then

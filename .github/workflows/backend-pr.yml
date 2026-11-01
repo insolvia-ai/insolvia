@@ -39,6 +39,11 @@ jobs:
         with:
           paths: |
             backend/**
+            # Not built or tested by this check: the developer scripts, the docs,
+            # and the local compose stack.
+            !backend/scripts/**
+            !backend/*.md
+            !backend/docker-compose.yml
             # The seeder's tests load the committed fixtures, and the
             # migrator images carry them.
             seeds/**
