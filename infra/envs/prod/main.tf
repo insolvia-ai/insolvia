@@ -59,7 +59,7 @@ module "web_hosting" {
   tags                = local.common_tags
 }
 
-# Backend API (#62, #63): ECR + Docker Lambda + HTTP API + waitlist table.
+# Backend API (#62, #63): ECR + Docker Lambda + HTTP API.
 # The cert lookup above is shared with CloudFront on purpose: an API Gateway
 # REGIONAL custom domain needs its cert in the API's own region, and since
 # everything here is us-east-1 the one wildcard cert serves both fronts — no
@@ -130,10 +130,6 @@ module "admin_service" {
   vpc_subnet_ids         = module.network.private_subnet_ids
   vpc_security_group_ids = [module.network.lambda_security_group_id]
   db_cluster_resource_id = module.aurora.cluster_resource_id
-
-  # OFF ahead of the DynamoDB audit table's delete (plan 18.23): the admin
-  # audit is the Postgres admin_audit table since ADR 0028.
-  audit_deletion_protection = false
 
   tags = local.common_tags
 }
@@ -344,47 +340,23 @@ resource "aws_ssm_parameter" "job_queue_url" {
   tags  = local.common_tags
 }
 
-# Case data store (issue 8.2): the first GLBA-scope persistent store — a
-# customer-managed key and the case table behind it. Declared after
+# Case data key (issue 8.2): the customer-managed key for GLBA-scope case data
+# — the debtors' sealed tax ids and the case documents. Declared after
 # module.api_service because it takes that module's execution role name and
-# attaches the table grant onto it from its own side (modules/case_store).
+# attaches the tax-id grant onto it from its own side (modules/case_store).
 #
-# Prod inverts staging's two settings: deletion protection on, and the maximum
-# key deletion window. Scheduling this key's deletion makes every case
-# permanently unreadable — PITR does not help, because the restore is
-# encrypted under the same key — so 30 days of second thoughts is the point.
+# Prod inverts staging's key deletion window: the maximum. Scheduling this
+# key's deletion makes every sealed tax id and document permanently
+# unreadable, so 30 days of second thoughts is the point.
 module "case_store" {
   source = "../../modules/case_store"
 
-  project          = "insolvia"
-  environment      = local.environment
-  api_role_name    = module.api_service.lambda_role_name
-  worker_role_name = module.job_pipeline.worker_role_name
-  # OFF ahead of the delete (plan 18.23): the data is Aurora's since ADR 0028,
-  # and DynamoDB refuses to delete a table with deletion protection on.
-  deletion_protection         = false
+  project                     = "insolvia"
+  environment                 = local.environment
+  api_role_name               = module.api_service.lambda_role_name
+  worker_role_name            = module.job_pipeline.worker_role_name
   key_deletion_window_in_days = 30
   tags                        = local.common_tags
-}
-
-# ── Firms ───────────────────────────────────────────────────────
-# Tenancy: which firm a signed-in user belongs to and what they may do. Takes
-# the case store's key rather than minting one — firm membership decides who
-# reads case data, and one deny should cover both.
-#
-# Both protections ON, and this table earns them more than most: losing it does
-# not lose case data, it locks every member of every firm out of all of it.
-module "firm_store" {
-  source = "../../modules/firm_store"
-
-  project                = "insolvia"
-  environment            = local.environment
-  kms_key_arn            = module.case_store.kms_key_arn
-  point_in_time_recovery = true
-  # OFF ahead of the delete (plan 18.23): the data is Aurora's since ADR 0028,
-  # and DynamoDB refuses to delete a table with deletion protection on.
-  deletion_protection = false
-  tags                = local.common_tags
 }
 
 # ── Filing credentials (ADR 0024, guardrail 3) ──────────────────
@@ -394,21 +366,15 @@ module "firm_store" {
 # it never opens. The worker's role is created here, ahead of services/filing
 # (PR 7), because the key policy must name it.
 #
-# Protections ON and the full 30-day key window — but note what losing this
-# store means, which is different from the case store: every attorney has to
-# re-enrol, nothing a client gave us is lost. PITR is still on, so an
-# accidental revoke-everything is recoverable without asking attorneys again.
+# The full 30-day key window — but note what losing this key means, which is
+# different from the case key: every attorney has to re-enrol, nothing a
+# client gave us is lost. The sealed rows themselves are Aurora's (ADR 0028).
 module "filing_credentials" {
   source = "../../modules/filing_credentials"
 
-  project                = "insolvia"
-  environment            = local.environment
-  table_kms_key_arn      = module.case_store.kms_key_arn
-  api_role_name          = module.api_service.lambda_role_name
-  point_in_time_recovery = true
-  # OFF ahead of the delete (plan 18.23): the data is Aurora's since ADR 0028,
-  # and DynamoDB refuses to delete a table with deletion protection on.
-  deletion_protection         = false
+  project                     = "insolvia"
+  environment                 = local.environment
+  api_role_name               = module.api_service.lambda_role_name
   key_deletion_window_in_days = 30
   tags                        = local.common_tags
 }
@@ -537,9 +503,13 @@ resource "aws_ssm_parameter" "case_document_bucket" {
   tags  = local.common_tags
 }
 
-# Case-data audit trail (issue 8.2): CloudTrail data events on the case table,
-# into an insolvia-<env>-audit bucket under its own key. Declared after
-# module.case_store because it records that module's table.
+# Case-data audit trail (issue 8.2): CloudTrail management events — which is
+# where KMS key use lands, so every seal and open of a tax id or a filing
+# credential, with its encryption context — into an insolvia-<env>-audit
+# bucket under its own key. It recorded DynamoDB data events on the case and
+# vault tables until those were deleted (plan 18.23, ADR 0028); Aurora's
+# rows are not CloudTrail resources, and the hosts' own access log is the
+# application-level record.
 #
 # The key is separate from the case key by necessity as well as design:
 # ci-trust denies the deploy role kms:GenerateDataKey on alias/insolvia-*-cases,
@@ -554,13 +524,6 @@ module "audit_trail" {
 
   project     = "insolvia"
   environment = local.environment
-
-  # The case table, and its indexes via starts_with; the filing-credential
-  # vault's table (ADR 0024, guardrail 3).
-  data_resource_arns = [
-    module.case_store.table_arn,
-    module.filing_credentials.table_arn,
-  ]
 
   # The vault KEY's seals and opens are management events (the module's
   # selector note) — this is what puts them in the retained record.
@@ -579,7 +542,7 @@ module "audit_trail" {
 # module.network and module.aurora.)
 #
 # modules/network: two AZs of private subnets, one fck-nat instance for egress,
-# free S3 and DynamoDB gateway endpoints. modules/aurora: Serverless v2
+# a free S3 gateway endpoint. modules/aurora: Serverless v2
 # PostgreSQL 17 under its own key, 5432 admitted from the Lambda security group
 # only. Prod's minimum capacity is ALSO 0 per the ADR, so it pauses when idle and the first request after a pause takes ~15 seconds to resume. REVISIT AT LAUNCH (ADR 0028 § Data): raise min_capacity to at least 0.5, which turns auto-pause off, before the first real firm. Everything else inverts staging: deletion protection and a final snapshot on, 14 days of PITR, the 30-day key window, and modifications wait for the maintenance window.
 module "network" {
@@ -641,8 +604,8 @@ resource "aws_ssm_parameter" "db" {
 # queue parameters, because each value is another module's output.
 #
 # The key aliases are explicit since the switch: the .NET hosts used to be
-# able to derive them from CASE_TABLE_NAME, which names a DynamoDB table
-# that no host reads now. backend/src/Insolvia.Aws/Sealing/SealingKeys.cs
+# able to derive them from CASE_TABLE_NAME, the name of a DynamoDB table
+# deleted in plan 18.23. backend/src/Insolvia.Aws/Sealing/SealingKeys.cs
 # refuses any value not shaped alias/insolvia-<env>-cases /
 # -filing-credentials, which is also what ci-trust's decrypt denies match.
 resource "aws_ssm_parameter" "api_key_aliases" {

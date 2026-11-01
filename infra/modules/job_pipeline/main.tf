@@ -2,9 +2,9 @@
 # The orchestration half of the pipelines beside the lambdalith (ADR 0015):
 # one SQS queue the API enqueues accepted jobs onto, one image-packaged worker
 # Lambda consuming it, and the DLQ + alarms that make failure loud. The job
-# RECORD lives in the case table (modules/case_store — the worker's grant is
-# attached there, from that module's side, via worker_role_name), and the API
-# is the only status surface a client ever sees.
+# RECORD lives in Aurora (ADR 0028), and the API is the only status surface a
+# client ever sees; the worker's tax-id key grant is attached from
+# modules/case_store's side, via worker_role_name.
 #
 # One instance per environment. In infra/envs/dev the WORKER half is absent
 # (ecr_repository_url = null): there is no Lambda in dev at all, and the
@@ -103,7 +103,7 @@ resource "aws_sqs_queue_redrive_allow_policy" "jobs" {
 
 # ── Worker execution role ───────────────────────────────────────
 # Its own role, not the API's, so the worker's reach is its own: today the
-# queue plus (via modules/case_store, worker_role_name) the case table.
+# queue plus (via modules/case_store, worker_role_name) the tax-id key.
 # Created even in dev? No — the whole worker half is counted out there; the
 # developer's own IAM user is the principal for the poller.
 

@@ -10,7 +10,7 @@
 #   - The admin audit is a Postgres table now (admin_audit, INSERT-only for
 #     the `admin` role — backend/src/Insolvia.Migrator/Grants.cs: an audit
 #     log its own subject can rewrite is not evidence). The DynamoDB audit
-#     table below outlives its grant until 18.23, with the maintainer.
+#     table this module held was deleted in plan 18.23.
 #   - Its one cross-service grant arrives FROM ANOTHER MODULE'S seam:
 #     modules/auth's admin_invite_role_name (AdminCreateUser on the firm pool
 #     — create and RESEND are one action). The firm data is the database,
@@ -46,34 +46,6 @@ locals {
   # anticipated. The last segment tracks the component name above; the deploy
   # workflow's get-parameters-by-path step reads this path literally.
   ssm_prefix = "/${var.project}/${var.environment}/admin-api"
-}
-
-# ── Admin audit table (#178's audit trail) ──────────────────────
-# Who provisioned/suspended/re-invited what: PK FIRM#<id>, SK
-# <recordedAt>#<eventId>, shapes owned by services/admin's core/audit.py.
-# PITR on in every environment that has this module — the table IS the
-# durable record #178 asked for, so "throwaway" never applies to it.
-
-resource "aws_dynamodb_table" "audit" {
-  name         = "${local.name}-audit"
-  billing_mode = "PAY_PER_REQUEST"
-  hash_key     = "PK"
-  range_key    = "SK"
-
-  attribute {
-    name = "PK"
-    type = "S"
-  }
-
-  attribute {
-    name = "SK"
-    type = "S"
-  }
-
-  point_in_time_recovery { enabled = true }
-  server_side_encryption { enabled = true }
-  deletion_protection_enabled = var.audit_deletion_protection
-  tags                        = var.tags
 }
 
 # ── Lambda execution role ───────────────────────────────────────

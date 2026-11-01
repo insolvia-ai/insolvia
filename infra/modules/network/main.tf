@@ -10,10 +10,11 @@
 #     courts). One instance is a single point of failure for egress and ADR 0028
 #     accepts that until the first real firm; the trigger to move to a managed
 #     NAT gateway is in the ADR, not here;
-#   • free GATEWAY endpoints for S3 and DynamoDB, so the heavy traffic (case
-#     documents, and DynamoDB while the tables still exist) never crosses the
-#     NAT. Every other AWS API goes through the NAT; interface endpoints
-#     (~$7/month each) wait for measured traffic.
+#   • a free GATEWAY endpoint for S3, so the heavy traffic (case documents)
+#     never crosses the NAT. Every other AWS API goes through the NAT;
+#     interface endpoints (~$7/month each) wait for measured traffic. (A
+#     DynamoDB gateway endpoint sat beside it until the tables were deleted,
+#     plan 18.23.)
 #
 # NAMING. insolvia-<env>-network is the VPC's Name tag, and -private-<az>,
 # -public, -nat and -lambda hang off it. These are Name TAGS: EC2 has no name
@@ -244,8 +245,8 @@ resource "aws_route_table_association" "private" {
   route_table_id = aws_route_table.private.id
 }
 
-# ── Gateway endpoints (free) ────────────────────────────────────
-# Prefix-list routes added to the private table; no per-hour or per-GB charge.
+# ── Gateway endpoint (free) ─────────────────────────────────────
+# A prefix-list route added to the private table; no per-hour or per-GB charge.
 resource "aws_vpc_endpoint" "s3" {
   vpc_id            = aws_vpc.main.id
   service_name      = "com.amazonaws.${data.aws_region.current.region}.s3"
@@ -255,19 +256,10 @@ resource "aws_vpc_endpoint" "s3" {
   tags = merge(var.tags, { Name = "${local.name}-s3" })
 }
 
-resource "aws_vpc_endpoint" "dynamodb" {
-  vpc_id            = aws_vpc.main.id
-  service_name      = "com.amazonaws.${data.aws_region.current.region}.dynamodb"
-  vpc_endpoint_type = "Gateway"
-  route_table_ids   = [aws_route_table.private.id]
-
-  tags = merge(var.tags, { Name = "${local.name}-dynamodb" })
-}
-
 # ── The Lambda security group ───────────────────────────────────
 # Attached to every backend Lambda in the switch PR. No ingress: a Lambda is
 # only ever called through the Lambda API, never by address. Egress is open
-# (the NAT, the gateway endpoints, Aurora); the database side admits THIS group
+# (the NAT, the S3 gateway endpoint, Aurora); the database side admits THIS group
 # by id (modules/aurora), which is the actual fence.
 resource "aws_security_group" "lambda" {
   name        = "${local.name}-lambda"

@@ -31,11 +31,6 @@ output "http_api_id" {
   value       = aws_apigatewayv2_api.api.id
 }
 
-output "waitlist_table_name" {
-  description = "DynamoDB table behind POST /v1/waitlist."
-  value       = aws_dynamodb_table.waitlist.name
-}
-
 output "ssm_parameter_prefix" {
   description = "SSM namespace holding this environment's API config (/insolvia/<env>/api)."
   value       = local.ssm_prefix

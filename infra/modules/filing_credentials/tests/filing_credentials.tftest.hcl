@@ -20,9 +20,8 @@ mock_provider "aws" {
 }
 
 variables {
-  environment       = "staging"
-  table_kms_key_arn = "arn:aws:kms:us-east-1:111122223333:key/case-key"
-  api_role_name     = "insolvia-staging-api-role"
+  environment   = "staging"
+  api_role_name = "insolvia-staging-api-role"
 }
 
 run "deployed_key_policy_is_pinned" {
@@ -122,11 +121,6 @@ run "deployed_key_policy_is_pinned" {
   assert {
     condition     = aws_kms_alias.vault.name == "alias/insolvia-staging-filing-credentials"
     error_message = "The alias must match ci-trust's DenyFilingCredentialDecryption pattern and the core adapter's derivation."
-  }
-
-  assert {
-    condition     = aws_dynamodb_table.credentials.name == "insolvia-staging-filing-credentials"
-    error_message = "The table name is derived by insolvia_core.adapters.aws.filing_credentials from the case table's."
   }
 
   assert {
