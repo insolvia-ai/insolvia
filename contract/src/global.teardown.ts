@@ -1,9 +1,12 @@
 // Jest's globalTeardown for the coverage gate; coverage.ts says how it works.
-// Throwing here fails the run.
+// Throwing here fails the run. The gate is enforced on a FULL OFFLINE run
+// only (ADR 0029 rule 2): a filtered run cannot cover everything, and the
+// deployed target skips the offline-only specs that call some methods.
 import { readdirSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { clientMethods, coverageDir, isFiltered } from './coverage.ts';
+import { TARGET } from './support/target.ts';
 
 export default function teardown(): void {
   const dir = coverageDir();
@@ -19,6 +22,10 @@ export default function teardown(): void {
   const summary = `client coverage: ${methods.length - uncovered.length}/${methods.length} methods called, ${uncovered.length} uncovered`;
   if (isFiltered()) {
     console.log(`${summary} (filtered run — the gate is not enforced)`);
+    return;
+  }
+  if (TARGET !== 'offline') {
+    console.log(`${summary} (${TARGET} target — the gate is enforced offline only)`);
     return;
   }
   console.log(summary);

@@ -10,7 +10,8 @@ import {
 import { beforeAll, describe, expect, it } from '@jest/globals';
 
 import { firmAdmin, scratchCase } from '../support/actors.ts';
-import { fixtureCase } from '../support/fixtures.ts';
+import { fixtureCase, fixtureCases } from '../support/fixtures.ts';
+import { needsBlobUrls, offlineOnly } from '../support/gates.ts';
 import { expectApiError, type Spec, withMessage } from '../support/wire.ts';
 
 const ENTITY: Spec = {
@@ -130,6 +131,15 @@ describe('what a case computes', () => {
       'content?': 'string',
     });
     expect(matrix.creditorCount).toBeGreaterThan(0);
+    // Every fixture creditor has an address the matrix can print — the seed
+    // loader's cross references resolved to ids that exist in this stack.
+    for (const fixture of await fixtureCases()) {
+      const printed = await admin.api.getCreditorMatrix(fixture.case.id);
+      withMessage(fixture.spec.handle, () => {
+        expect(printed.problems).toEqual([]);
+        expect(printed.creditorCount).toBe(fixture.spec.collections?.creditors?.length ?? 0);
+      });
+    }
 
     const summary = await admin.api.getCaseSummary(chapter13);
     admin.wire(200, {
@@ -193,6 +203,14 @@ describe('what a case computes', () => {
       });
       expect([7, 13]).toContain(test.chapter);
     }
+    // The chapter 13 fixture is above the median over five years, so B122C-2 files.
+    const trace = await admin.api.getCaseMeansTest(chapter13);
+    expect(trace.problems).toEqual([]);
+    expect(trace.outcome).toBe('above_median');
+    expect(trace.chapter13).toMatchObject({
+      commitmentPeriodMonths: 60,
+      disposableIncomeRequired: true,
+    });
   });
 
   it('the chapter 13 plan, and what-if scenarios', async () => {
@@ -214,6 +232,11 @@ describe('what a case computes', () => {
     const plan = await admin.api.getCasePlanCalculation(chapter13);
     admin.wire(200, PLAN);
     expect(plan.planPresent).toBe(true);
+    // The fixture plan is feasible and passes § 1325(a)(4).
+    expect(plan.problems).toEqual([]);
+    expect(plan.feasibility).toMatchObject({ feasible: true });
+    expect(plan.bestInterests).toMatchObject({ passes: true });
+    expect(plan.commitmentPeriod).toMatchObject({ months: 60 });
 
     const [stored] = await admin.api.listCaseEntities(chapter13, 'plans');
     const body = Object.fromEntries(
@@ -232,7 +255,7 @@ describe('what a case computes', () => {
 });
 
 describe('forms, previews, packets and the filing set', () => {
-  it('lists the forms hub and previews one form as a PDF', async () => {
+  needsBlobUrls().it('lists the forms hub and previews one form as a PDF', async () => {
     const admin = firmAdmin();
     const forms = await admin.api.listCaseForms(chapter7);
     admin.wire(200, {
@@ -294,11 +317,39 @@ describe('forms, previews, packets and the filing set', () => {
       checklist: ['object'],
     });
     expect(set.court?.code).toBe('flmb');
+
+    // Every fixture case is served its court's filing set and checklist. The
+    // fixture cases are never assembled here (each run would store another
+    // multi-megabyte packet), so the file checks read "unmeasured".
+    for (const fixture of await fixtureCases()) {
+      const served = await admin.api.getCaseFilingSet(fixture.case.id);
+      withMessage(fixture.spec.handle, () => {
+        expect(served.court?.code).toBe(fixture.spec.court);
+        expect(served.filingMethod).toBe('hand_off');
+        const keys = served.documents.map((d) => (d as { key: string }).key);
+        expect(keys[0]).toBe('form/b101');
+        expect(keys).toContain('creditor_matrix');
+        const b121 = served.documents.find((d) => (d as { key: string }).key === 'form/b121');
+        expect(['restricted', 'not_filed']).toContain((b121 as { handling?: string }).handling);
+        const checklist = new Map(
+          served.checklist.map((item) => {
+            const entry = item as { id: string; status: string };
+            return [entry.id, entry.status];
+          }),
+        );
+        for (const required of ['court', 'packet', 'ssn_statement', 'filing_method']) {
+          expect(checklist.has(required)).toBe(true);
+        }
+        expect(checklist.get('court')).toBe('ready');
+      });
+    }
   });
 });
 
 describe('pipeline jobs', () => {
-  it('accepts a job and reports it queued; refuses an unknown kind', async () => {
+  offlineOnly(
+    'queues real packet assembly on the deployed worker — a multi-megabyte packet per run',
+  ).it('accepts a job and reports it queued; refuses an unknown kind', async () => {
     const admin = firmAdmin();
     const { caseId } = await scratchCase();
     const JOB: Spec = {

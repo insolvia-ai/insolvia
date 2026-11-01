@@ -3,12 +3,21 @@
 // and the firm reviews what arrived.
 import { describe, expect, it } from '@jest/globals';
 
-import { firmAdmin, portalClient, scratchCase, tag } from '../support/actors.ts';
+import {
+  firmAdmin,
+  portalClient,
+  scratchCase,
+  seededPortalClient,
+  tag,
+  tokenOf,
+} from '../support/actors.ts';
+import { contractClient } from '../support/client.ts';
 import { seeded } from '../support/env.ts';
+import { restoreQuestionnaire } from '../support/firm-settings.ts';
 import { fixtureCase } from '../support/fixtures.ts';
 import { DOCUMENT } from '../support/shapes.ts';
-import { contractClient } from '../support/client.ts';
-import { staffToken } from '../support/tokens.ts';
+import { needsBlobUrls, offlineOnly } from '../support/gates.ts';
+import { person } from '../support/target.ts';
 import { expectApiError, expectShape, type Spec } from '../support/wire.ts';
 
 const PDF = new TextEncoder().encode('%PDF-1.4\n% contract suite upload\n%%EOF\n');
@@ -87,8 +96,31 @@ const CANDIDATE: Spec = {
   'client?': { displayName: 'string' },
 };
 
+/**
+ * The case the seed bound the portal client to — found through the case's
+ * client listing, since no portal answer names a case (by design). A
+ * long-lived stack may hold it on an older fixture version's case (a binding
+ * the loader leaves alone, seeds/README.md), so it is looked up, not assumed.
+ */
+async function seededClientCaseId(): Promise<string> {
+  const api = firmAdmin().api;
+  let cursor: string | undefined;
+  do {
+    const page = await api.listCases({ limit: 100, cursor });
+    for (const candidate of page.cases) {
+      if (candidate.court !== 'flmb') continue;
+      const clients = await api.listPortalClients(candidate.id);
+      if (clients.some((c) => c.email === seeded.portalClient.email && c.status !== 'revoked')) {
+        return candidate.id;
+      }
+    }
+    cursor = page.nextCursor;
+  } while (cursor !== undefined);
+  throw new Error(`no case lists the seeded client ${seeded.portalClient.email} as live`);
+}
+
 describe('staff documents', () => {
-  it('upload through the presigned PUT, list, download, and delete', async () => {
+  needsBlobUrls().it('upload through the presigned PUT, list, download, and delete', async () => {
     const admin = firmAdmin();
     const { caseId } = await scratchCase();
 
@@ -159,20 +191,132 @@ describe('staff documents', () => {
 
 describe('the client portal', () => {
   it('a seeded portal client sees their firm and case', async () => {
-    const client = portalClient(seeded.portalClient.subject);
+    const who = person('client');
+    const client = seededPortalClient();
     const me = await client.api.getPortalMe();
-    client.wire(200, PORTAL_ME);
-    expect(me.firm.name).toBe('Dev Firm');
+    const body = client.wire(200, PORTAL_ME) as { case: object };
+    expect(me.firm.name).toBe(who.firmName);
+    expect(me.displayName).toBe(who.displayName);
+    expect(me.roles).toEqual(who.roles);
     expect(me.case.chapter).toBe((await fixtureCase(7)).chapter);
+    // Chapter and stage, and nothing else of the case — not even its id
+    // (ADR 0023 decision 4).
+    expect(client.last().body).not.toHaveProperty('caseId');
+    expect(Object.keys(body.case).sort()).toEqual(['chapter', 'stage']);
     // A staff token is not a portal token, and the reverse holds too.
-    await expectApiError(
-      contractClient(staffToken(seeded.firmAdmin.subject)).api.getPortalMe(),
-      401,
-    );
+    await expectApiError(contractClient(tokenOf('admin')).api.getPortalMe(), 401);
+    await expectApiError(client.api.me(), 401, 'Unauthorized');
     await expectApiError(client.api.listCases(), 401, 'Unauthorized');
   });
 
-  it('invite → answer → request → upload → review → revoke', async () => {
+  it('a section the firm switches off is gone for its client and kept for staff', async () => {
+    const admin = firmAdmin();
+    const client = seededPortalClient();
+    const before = await admin.api.getFirmQuestionnaire();
+    const target = before.sections.find((s) => s.switchable && s.enabled);
+    expect(target).toBeDefined();
+    try {
+      await admin.api.saveFirmQuestionnaire({
+        sections: before.sections.map((s) => ({
+          id: s.id,
+          enabled: s.id === target!.id ? false : s.enabled,
+          instructions: s.instructions,
+        })),
+      });
+      const seen = (await client.api.getPortalQuestionnaire()).sections.map((s) => s.id);
+      expect(seen).not.toContain(target!.id);
+      expect(seen).toContain('personal_information');
+      const staffView = (await admin.api.getFirmQuestionnaire()).sections;
+      expect(staffView.map((s) => s.id)).toEqual(before.sections.map((s) => s.id));
+      expect(staffView.find((s) => s.id === target!.id)?.enabled).toBe(false);
+    } finally {
+      await restoreQuestionnaire(before);
+    }
+    const after = await admin.api.getFirmQuestionnaire();
+    expect(after.isDefault).toBe(before.isDefault);
+    expect(after.sections).toEqual(before.sections);
+  });
+
+  // The one spec that writes on a fixture case, and why: a portal token
+  // reaches a case only through its binding, and the seeded client's is the
+  // only binding a deployed stack has — so this is the one way to prove a
+  // CLIENT's presigned PUT against the real bucket (no encryption header: the
+  // bucket default is the case key, #392) and the API role's check of it. It
+  // adds ONE ad-hoc request (never the checklist) and removes the document and
+  // the request however it ends; what stays is append-only by design (the
+  // access log) or expired by the bucket's lifecycle rule (the object's
+  // noncurrent version). Nothing it does touches what fixtures.ts matches on.
+  needsBlobUrls().it(
+    'the seeded client’s upload satisfies a request on their case, and the case counts it',
+    async () => {
+      const admin = firmAdmin();
+      const client = seededPortalClient();
+      const caseId = await seededClientCaseId();
+      const title = `Contract probe ${tag()}`;
+      const request = await admin.api.addDocumentRequest(caseId, { title, kind: 'bank_statement' });
+      let documentId: string | undefined;
+      try {
+        const before = (await admin.api.listDocumentRequests(caseId)).progress;
+
+        // The client sees the request — and no case id anywhere in the answer.
+        const listed = await client.api.getPortalDocumentRequests();
+        expect(JSON.stringify(client.last().body)).not.toContain(caseId);
+        const seen = listed.requests.find((r) => r.id === request.id);
+        expect(seen).toMatchObject({ title, status: 'requested', uploads: [] });
+
+        const created = await client.api.createPortalDocument({
+          requestId: request.id,
+          fileName: 'contract-client-probe.pdf',
+          contentType: 'application/pdf',
+          byteSize: PDF.byteLength,
+        });
+        documentId = created.document.id;
+        expect(Object.keys(created.upload.headers).map((h) => h.toLowerCase())).not.toContain(
+          'x-amz-server-side-encryption',
+        );
+        const put = await fetch(created.upload.url, {
+          method: created.upload.method,
+          headers: created.upload.headers,
+          body: PDF,
+        });
+        expect(put.status).toBe(200);
+        const completed = await client.api.completePortalDocument(documentId);
+        expect(completed.status).toBe('stored');
+        expect(completed.byteSize).toBe(PDF.byteLength);
+
+        // The request reads received for staff, and the case's progress counts it.
+        const after = await admin.api.listDocumentRequests(caseId);
+        const mine = after.requests.find((r) => r.id === request.id);
+        expect(mine?.status).toBe('received');
+        expect(mine?.documentIds).toEqual([documentId]);
+        expect(after.progress.received).toBe(before.received + 1);
+        expect(after.progress.outstanding).toBe(before.outstanding - 1);
+        expect(after.progress.total).toBe(before.total);
+        // …for the client too…
+        const answered = (await client.api.getPortalDocumentRequests()).requests.find(
+          (r) => r.id === request.id,
+        );
+        expect(answered?.status).toBe('received');
+        expect(answered?.uploads.map((u) => u.id)).toEqual([documentId]);
+        // …and staff see it on the case as the client's, filed under the request's kind.
+        const stored = (await admin.api.listDocuments(caseId)).find((d) => d.id === documentId);
+        expect(stored).toMatchObject({
+          channel: 'client',
+          kind: 'bank_statement',
+          requestId: request.id,
+        });
+      } finally {
+        if (documentId !== undefined) {
+          await admin.api.deleteDocument(caseId, documentId).catch(() => undefined);
+        }
+        await admin.api.deleteDocumentRequest(caseId, request.id).catch(() => undefined);
+      }
+    },
+  );
+
+  offlineOnly(
+    'inviting mints a pool account and mails it; only the run’s own key can sign in as it',
+  ).it('invite → answer → request → upload → review → revoke → re-invite', async () => {
     const admin = firmAdmin();
     const { caseId } = await scratchCase();
 
@@ -282,6 +426,24 @@ describe('the client portal', () => {
     // A reviewed answer is the firm's now: the client can no longer change it.
     await expectApiError(client.api.updatePortalAnswer(answer.id, value), 409);
 
+    // After review the question takes a new answer, and this one is accepted:
+    // it reaches the case only through the queue, carrying the client's
+    // provenance, and the client sees it settled.
+    const again = await client.api.createPortalAnswer({ questionId: question!.id, value });
+    const accepted = await admin.api.reviewExtractionCandidate(caseId, again.id, {
+      action: 'accept',
+    });
+    admin.wire(200, { candidate: CANDIDATE, 'record?': 'object' });
+    expect(accepted.candidate.status).toBe('accepted');
+    const provenance = Object.values(
+      ((accepted.record ?? {}) as { provenance?: Record<string, unknown> }).provenance ?? {},
+    ) as { source?: string; extraction_id?: string }[];
+    const fromAnswer = provenance.filter((entry) => entry.extraction_id === again.id);
+    expect(fromAnswer.length).toBeGreaterThan(0);
+    expect(new Set(fromAnswer.map((entry) => entry.source))).toEqual(new Set(['client_answered']));
+    const settled = await client.api.listPortalAnswers();
+    expect(settled.find((a) => a.id === again.id)?.status).toBe('accepted');
+
     // The firm asks for documents: one by hand, the rest from the checklist.
     const asked = await admin.api.addDocumentRequest(caseId, {
       title: 'Last two pay stubs',
@@ -292,6 +454,8 @@ describe('the client portal', () => {
     const applied = await admin.api.applyDocumentChecklist(caseId);
     admin.wire(200, { requests: [DOCUMENT_REQUEST], progress: PROGRESS, added: 'integer' });
     expect(applied.added).toBeGreaterThan(0);
+    // Once: applying it again adds nothing.
+    expect((await admin.api.applyDocumentChecklist(caseId)).added).toBe(0);
     const requests = await admin.api.listDocumentRequests(caseId);
     admin.wire(200, { requests: [DOCUMENT_REQUEST], progress: PROGRESS });
     const extra = requests.requests.find((r) => r.id !== asked.id)!;
@@ -307,6 +471,7 @@ describe('the client portal', () => {
     );
 
     // The client sees what is asked and uploads against it.
+    const progressBefore = (await admin.api.listDocumentRequests(caseId)).progress;
     const portalRequests = await client.api.getPortalDocumentRequests();
     client.wire(200, {
       requests: [
@@ -363,6 +528,8 @@ describe('the client portal', () => {
     expect(docs.filter((d) => d.channel === 'client')).toHaveLength(2);
     const after = await admin.api.listDocumentRequests(caseId);
     expect(after.requests.find((r) => r.id === asked.id)?.status).toBe('received');
+    expect(after.progress.received).toBe(progressBefore.received + 1);
+    expect(after.progress.outstanding).toBe(progressBefore.outstanding - 1);
 
     await admin.api.deleteDocumentRequest(caseId, extra.id);
     admin.wire(204);
@@ -373,5 +540,16 @@ describe('the client portal', () => {
     admin.wire(200, PORTAL_CLIENT);
     expect(revoked.status).toBe('revoked');
     await expectApiError(client.api.getPortalMe(), 403, 'ForbiddenError');
+
+    // Re-invited, the same address is re-bound as the SAME person, and the
+    // same token works again.
+    const rebound = await admin.api.invitePortalClient(caseId, {
+      email,
+      displayName: 'Portal Client',
+      roles: ['debtor_1'],
+    });
+    expect(rebound.subject).toBe(invited.subject);
+    await client.api.getPortalMe();
+    client.wire(200, PORTAL_ME);
   });
 });

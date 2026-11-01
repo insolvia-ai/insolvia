@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
-# The contract suite against a local stack — offline, no AWS, no sign-in
-# anywhere.
+# The contract suite, on either of its two targets (ADR 0029 rule 2).
 #
-#   contract/scripts/dev-test.sh                    # the .NET stack on Postgres
-#   contract/scripts/dev-test.sh api                # extra args go to jest
+#   contract/scripts/dev-test.sh                    # offline: the .NET stack on a throwaway Postgres
+#   contract/scripts/dev-test.sh api                # extra args go to jest (a filtered run)
+#   contract/scripts/dev-test.sh --target deployed  # this machine's dev stack, signed in for real
 #
-# It:
+# ── offline (the default) ──────────────────────────────────────────
+#
+# No AWS, no sign-in anywhere. It:
 # 1. mints a throwaway RS256 key for this run;
 # 2. starts the stack in the background and waits for every service to answer:
 #    a throwaway Postgres 17 container, migrated and seeded from
@@ -16,11 +18,38 @@
 #    unfiltered run), and stops the stack however that ends.
 #
 # Needs Docker and the .NET SDK (backend/global.json). `--target dotnet` is
-# still accepted, and is the only target: the Python stack this suite was
-# first proven against went with the Python backend (ADR 0028, plan 18.23).
+# still accepted as a name for it: the Python stack this suite was first
+# proven against went with the Python backend (ADR 0028, plan 18.23).
 #
-# To aim the suite at some other stack, skip this script: set the CONTRACT_*
-# variables contract/src/support/env.ts names and run
+# ── deployed, against THIS MACHINE's dev stack ─────────────────────
+#
+# The API that scripts/dev-up.sh (backend/docker-compose.yml) serves on :8080,
+# signed in over real Cognito SRP to the shared dev pool as the people in
+# seeds/dev.json. What it points at — none of it a default in the suite:
+#   CONTRACT_API_URL                http://localhost:8080 unless exported
+#   CONTRACT_AUTH_POOL_ID           AUTH_USER_POOL_ID from backend/.env
+#   CONTRACT_AUTH_CLIENT_ID         AUTH_CLIENT_ID from backend/.env
+#   CONTRACT_AUTH_PORTAL_CLIENT_ID  AUTH_PORTAL_CLIENT_ID from backend/.env
+#   E2E_TEST_USER_PASSWORD          exported, else DEV_USER_PASSWORD from
+#                                   ~/.config/insolvia/dev.env
+# backend/.env is written by scripts/dev-aws-setup.sh; the local database must
+# hold seeds/dev.json with the pool's real subjects (scripts/dev-aws-seed.sh),
+# or the first signed-in spec 403s and names the missing firm. No AWS
+# credentials are needed: sign-in is unsigned Cognito calls, the rest HTTP.
+#
+# Locally the compose API keeps its blob store and sealing keys as twins, so
+# the document and vault specs cross the routes, not a bucket or a KMS key;
+# staging, after every API deploy (api-staging.yml), is where they cross the
+# deployed role.
+#
+# NEVER STAGING FROM A LAPTOP: that needs staging's test password in a
+# developer's shell for a job CI already does on every deploy, so this
+# script aims at dev only. CI sets the CONTRACT_* variables itself and runs
+# `npm run contract --workspace @insolvia-ai/contract` with
+# CONTRACT_TARGET=deployed. There is no production target anywhere.
+#
+# To aim the offline suite at some other stack, skip this script: set the
+# CONTRACT_* variables contract/src/support/env.ts names and run
 # `npm run contract --workspace @insolvia-ai/contract`.
 set -euo pipefail
 
@@ -28,7 +57,7 @@ CONTRACT="$(cd "$(dirname "$0")/.." && pwd)"
 REPO="$(cd "$CONTRACT/.." && pwd)"
 BACKEND="$REPO/backend"
 
-TARGET=dotnet
+TARGET=offline
 JEST_ARGS=()
 while (($#)); do
   case "$1" in
@@ -38,9 +67,42 @@ while (($#)); do
   esac
 done
 case "$TARGET" in
-  dotnet) ;;
-  *) echo "--target must be dotnet (the only stack), got '$TARGET'" >&2; exit 2 ;;
+  offline | dotnet) TARGET=offline ;;
+  deployed) ;;
+  *) echo "--target must be offline or deployed, got '$TARGET'" >&2; exit 2 ;;
 esac
+
+if [[ "$TARGET" == deployed ]]; then
+  BACKEND_ENV="$BACKEND/.env"
+  DEV_ENV_FILE="$HOME/.config/insolvia/dev.env"
+  die() { echo "$*" >&2; exit 1; }
+  [[ -f "$BACKEND_ENV" ]] || die "No $BACKEND_ENV — run ./scripts/dev-aws-setup.sh first."
+  read_env() { sed -n "s/^$1=//p" "$BACKEND_ENV" | tail -1; }
+  export CONTRACT_TARGET=deployed CONTRACT_ENVIRONMENT=dev
+  export CONTRACT_API_URL="${CONTRACT_API_URL:-http://localhost:8080}"
+  CONTRACT_AUTH_POOL_ID="$(read_env AUTH_USER_POOL_ID)"
+  CONTRACT_AUTH_CLIENT_ID="$(read_env AUTH_CLIENT_ID)"
+  CONTRACT_AUTH_PORTAL_CLIENT_ID="$(read_env AUTH_PORTAL_CLIENT_ID)"
+  export CONTRACT_AUTH_POOL_ID CONTRACT_AUTH_CLIENT_ID CONTRACT_AUTH_PORTAL_CLIENT_ID
+  [[ -n "$CONTRACT_AUTH_POOL_ID" && -n "$CONTRACT_AUTH_CLIENT_ID" && -n "$CONTRACT_AUTH_PORTAL_CLIENT_ID" ]] ||
+    die "AUTH_USER_POOL_ID / AUTH_CLIENT_ID / AUTH_PORTAL_CLIENT_ID are not in $BACKEND_ENV — re-run ./scripts/dev-aws-setup.sh."
+  # Credentials: named, never echoed.
+  if [[ -z "${E2E_TEST_USER_PASSWORD:-}" && -f "$DEV_ENV_FILE" ]]; then
+    # shellcheck source=/dev/null
+    source "$DEV_ENV_FILE"
+    E2E_TEST_USER_PASSWORD="${DEV_USER_PASSWORD:-}"
+  fi
+  [[ -n "${E2E_TEST_USER_PASSWORD:-}" ]] ||
+    die "E2E_TEST_USER_PASSWORD is not set and $DEV_ENV_FILE provides no DEV_USER_PASSWORD.
+There is no default on purpose — this repo is public. Use the password you gave
+./scripts/dev-aws-seed.sh for the accounts in seeds/dev.json."
+  export E2E_TEST_USER_PASSWORD
+  curl -sf -o /dev/null --max-time 5 "$CONTRACT_API_URL/health" ||
+    die "Nothing is serving at $CONTRACT_API_URL — start it with ./scripts/dev-up.sh (or ./backend/scripts/dev-up.sh)."
+  echo "contract target: deployed — $CONTRACT_API_URL (seeds/dev.json), pool $CONTRACT_AUTH_POOL_ID"
+  cd "$REPO"
+  exec npm run contract --workspace @insolvia-ai/contract -- "${JEST_ARGS[@]+"${JEST_ARGS[@]}"}"
+fi
 
 RUN="$(mktemp -d "${TMPDIR:-/tmp}/insolvia-contract.XXXXXX")"
 PIDS=()
@@ -86,9 +148,9 @@ export CONTRACT_SIGNING_KEY="$RUN/signing-key.pem"
 DB_PASSWORD=insolvia-contract-only
 ROLE_PASSWORD=insolvia-contract-only
 
-start_dotnet() {
-  command -v docker >/dev/null || { echo "--target dotnet needs Docker" >&2; exit 1; }
-  command -v dotnet >/dev/null || { echo "--target dotnet needs the .NET SDK" >&2; exit 1; }
+start_offline() {
+  command -v docker >/dev/null || { echo "the offline target needs Docker" >&2; exit 1; }
+  command -v dotnet >/dev/null || { echo "the offline target needs the .NET SDK" >&2; exit 1; }
   # Several builds may share a machine; a config watcher per host is noise.
   export DOTNET_hostBuilder__reloadConfigOnChange=false
   export DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1

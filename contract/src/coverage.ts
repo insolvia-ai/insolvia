@@ -2,17 +2,18 @@
 // called by the suite at least once, or the run FAILS.
 //
 // Jest runs it in three places, which this file is shared between:
-// - coverage.setup.ts (globalSetup) makes a per-run directory and hands it to
+// - global.setup.ts (globalSetup) makes a per-run directory and hands it to
 //   the tests through the environment;
 // - every call through the instrumented client (support/client.ts) appends
 //   the method's name to a file in it;
-// - coverage.teardown.ts (globalTeardown) reads them all and compares them
+// - global.teardown.ts (globalTeardown) reads them all and compares them
 //   against the client class's prototype — the list is read from the class
 //   itself, so a method added to the client without a contract test fails
 //   the next run, by name.
 //
 // Skipped when the run was filtered (a path pattern or `-t`), because a
-// partial run cannot cover everything and saying so would be noise.
+// partial run cannot cover everything and saying so would be noise — and on
+// the deployed target, whose offline-only specs are skipped.
 import { InsolviaApiClient } from '@insolvia-ai/api-client';
 
 const DIR = 'CONTRACT_COVERAGE_DIR';

@@ -304,7 +304,7 @@ public sealed class SeedCaseTests : IDisposable
         Assert.Equal([ClientRole.Debtor1], binding.Roles);
         Assert.Equal(BindingStatus.Invited, binding.Status);
 
-        // The password is SET: the integration tier signs the client in with
+        // The password is SET: the contract suite's deployed target signs the client in with
         // no invitation mail in between. And a client is not a firm user.
         Assert.Equal("hunter2ABCDEF", _world.Accounts.Passwords["e2e-client@insolvia.test"]);
         Assert.Null(await _world.Firms.FindUserAsync(subject, Ct));

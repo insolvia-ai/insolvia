@@ -7,7 +7,7 @@ description: >-
 # WHY A SHARED STEP
 #
 # Two post-deploy suites sign in as the people seeds/staging.json names: the
-# API's integration tier (api-staging.yml, after the alias shift) and the
+# contract suite's deployed target (api-staging.yml, after the alias shift) and the
 # browser suite (app-staging.yml, after the CloudFront invalidation). Both need
 # the same accounts, the same firms and the same fixture case to exist, and
 # the loader converges rather than creates, so running it again is a fast

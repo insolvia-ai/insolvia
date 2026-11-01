@@ -20,9 +20,10 @@ wire contract the app depends on.
 npm ci                                          # once, at the repo root
 contract/scripts/dev-test.sh                    # the .NET stack on Postgres: start, run, stop
 contract/scripts/dev-test.sh mcp                # a filtered run (the gate is not enforced)
+contract/scripts/dev-test.sh --target deployed  # against this machine's running dev stack (below)
 ```
 
-No AWS, no sign-in, no network beyond 127.0.0.1. It mints a throwaway
+Offline (the default): no AWS, no sign-in, no network beyond 127.0.0.1. It mints a throwaway
 RS256 key, starts the stack, waits for it, runs the suite, and stops it.
 Ports 18060–18090, overridable with `CONTRACT_*_PORT`.
 `CONTRACT_SHOW_STACK_LOG=1` prints every stack log on a failure.
@@ -36,10 +37,58 @@ hosts — each as its own database role, trusting the key through
 configuration only (`AUTH_ISSUER_URL`; admin's local-only `GOOGLE_JWKS_URL`).
 CI runs exactly this as `Contract (.NET)`
 (`.github/workflows/contract-dotnet-pr.yml`). `--target dotnet` is still
-accepted; the Python target it once chose against went with the Python
-backend.
+accepted as another name for `--target offline`.
 
-## Aim it at another stack
+## The deployed target
+
+The same suite runs against a **running** dev stack or staging, signed in by
+real Cognito SRP as the people `seeds/<environment>.json` names
+(`src/support/session.ts`, `src/support/cognito-srp.ts`). Staging runs it after
+every API deploy (`api-staging.yml`'s `integration` job); on a laptop:
+
+```bash
+backend/scripts/dev-up.sh                       # the compose stack, API on :8080
+scripts/dev-aws-seed.sh                         # once: the seeded people exist in the shared dev pool
+contract/scripts/dev-test.sh --target deployed  # sign in, run, report
+```
+
+The script reads the pool ids from `backend/.env` and the password from
+`E2E_TEST_USER_PASSWORD` or `~/.config/insolvia/dev.env`. It never aims at
+staging — CI does that. **There is no production target**:
+`CONTRACT_ENVIRONMENT` must be `dev` or `staging`, and the global setup
+refuses to sign anyone in unless the API's `/health` reports that environment.
+
+Every input comes from the environment, with no defaults in the suite:
+
+| Variable | What |
+|---|---|
+| `CONTRACT_TARGET` | `deployed` (`offline`, the default, is the stack this script starts) |
+| `CONTRACT_ENVIRONMENT` | `dev` or `staging` — picks `seeds/<environment>.json` |
+| `CONTRACT_API_URL` | the API origin |
+| `CONTRACT_AUTH_POOL_ID` | the Cognito user pool |
+| `CONTRACT_AUTH_CLIENT_ID` | the firm app's client (staff sign in here) |
+| `CONTRACT_AUTH_PORTAL_CLIENT_ID` | the portal's client (portal clients sign in here) |
+| `E2E_TEST_USER_PASSWORD` | the seeded people's password — never in a file here |
+
+What changes on the deployed target:
+
+- **Writes go to scratch only, and are undone.** Scratch clients and cases are
+  tracked and deleted (cases) or archived (clients) after each file
+  (`src/scratch.setup.ts`); firm settings a spec changes are restored in
+  `finally`. Fixture cases are found by their content and never written to —
+  with one documented exception, the seeded client's upload, which deletes
+  what it adds.
+- **Some specs cannot run there, and say so by name.** `src/support/gates.ts`
+  is the one way to mark a spec: `offlineOnly(reason)` (it signs its own
+  tokens, provisions a firm through admin, or waits out a sign-in window),
+  `needsSeeded(...)` (the seed has no second firm, or no unlinked colleague),
+  `needsBlobUrls()` (the dev stack's blob store has no URL to fetch). Jest
+  lists each skipped spec with its reason in brackets. Admin and MCP are
+  offline-only until #583.
+- **The coverage gate is reported, not enforced** — it is enforced only on a
+  full offline run.
+
+## Aim it at another offline stack
 
 Start the stack yourself, then:
 

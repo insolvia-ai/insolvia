@@ -18,8 +18,7 @@ insolvia/
 ├── packages/
 │   └── insolvia_api_client/           @insolvia-ai/api-client
 ├── backend/                           the .NET 10 backend on Aurora PostgreSQL (ADR 0028)
-├── contract/                          the backend's HTTP contract suite (Jest, offline)
-├── integration/                       the API's integration tier (pytest over HTTPS, signed in)
+├── contract/                          the backend's HTTP contract suite (Jest; offline, or deployed and signed in)
 ├── infra/                             Terraform — staging / prod / dev
 ├── tool/                              brand generators (themes, favicon)
 └── docs/                              business plan + runbooks
@@ -161,7 +160,7 @@ real (prod ships when the release run's gate is approved).
 
 | Stage | Jobs | Gate |
 |---|---|---|
-| Staging | `infra-staging.yml` (`mode: apply`) → `migrator-staging.yml` (build, then **invoke the migrator Lambda**: migrate, seed) → changed services, ordered by `needs`; the api leg ends in the **integration tier** and the app leg in the **e2e suite** (both projects), each after re-converging the seed | none — staging *is* `main` |
+| Staging | `infra-staging.yml` (`mode: apply`) → `migrator-staging.yml` (build, then **invoke the migrator Lambda**: migrate, seed) → changed services, ordered by `needs`; the api leg ends in the **contract suite's deployed target** and the app leg in the **e2e suite** (both projects), each after re-converging the seed | none — staging *is* `main` |
 | Evidence | `record` (sha image tags + commit status), `supersede` | none |
 | Production | `promote` → `infra-prod.yml` (`mode: apply`) → `migrator-prod.yml` (promote by digest, invoke: migrate only) → every service, same order; the app leg ends in the **smoke** project against production, a detector | `promote` carries the `insolvia-production` environment |
 
@@ -249,16 +248,15 @@ Four test tiers, each aimed at the environments that can answer it —
 [ADR 0021](../adr/0021-test-tiers-and-seed-fixtures.md) owns the table and the
 `insolvia-testing` skill owns how to write one. In pipeline terms: the **unit**
 tier is every `*-pr.yml` check and the pre-push hook; the **integration** tier
-(`integration/`, the live API over HTTP signed in as a seeded person — a
-black-box pytest client, written against the Python API and run unchanged
-against the .NET one) and the **e2e** suite (`e2e/`, both projects)
+(`contract/`'s deployed target, the live API over HTTP signed in as a seeded
+person through the shipped api-client) and the **e2e** suite (`e2e/`, both projects)
 run inside the staging stage after the deploys they test, seeded by
 `.github/actions/seed-staging` (the migrator Lambda's `seed` command), and
 their failure withholds the `insolvia/staging-release` status; the e2e
 **smoke** project alone runs against production, last, with no credentials.
 Seed data converges on every staging deploy from `seeds/staging.json` plus the
 versioned fixtures in `seeds/fixtures/`, whose bytes live in the shared bucket
-insolvia-services' `infra/envs/shared` owns. The contract suite (`contract/`)
+insolvia-services' `infra/envs/shared` owns. The contract suite's offline target
 is not a staging tier: it signs its own tokens, so it runs against a local
 stack.
 

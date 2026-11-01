@@ -3,13 +3,19 @@
 // protected-resource metadata, the 401 challenge, initialize, the static
 // eight-tool listing, every tool, the error envelope — and the candidate
 // flow across services, proposed here and reviewed through the API.
-import { describe, expect, it } from '@jest/globals';
+import { expect, it } from '@jest/globals';
 
 import { firmAdmin, scratchCase } from '../support/actors.ts';
 import { env, seeded } from '../support/env.ts';
 import { fixtureCase } from '../support/fixtures.ts';
 import { mcpToken, staffToken } from '../support/tokens.ts';
+import { offlineOnly } from '../support/gates.ts';
 import { expectShape, withMessage } from '../support/wire.ts';
+
+// The MCP server signs in with tokens only the run's own key mints (Google ID
+// tokens for admin, the MCP harness's client for MCP); #583 brings it to the
+// deployed target, through its own client.
+const NOT_YET_DEPLOYED = 'signs with the run’s own key; the deployed MCP server target is #583';
 
 const PROTOCOL_VERSION = '2026-07-28';
 const META = {
@@ -116,7 +122,7 @@ const CASE_SHAPE = {
   createdAt: 'string',
 } as const;
 
-describe('transport', () => {
+offlineOnly(NOT_YET_DEPLOYED).describe('transport', () => {
   it('publishes RFC 9728 protected-resource metadata naming the issuer', async () => {
     const url = new URL(env.mcpUrl);
     const response = await fetch(
@@ -162,7 +168,7 @@ describe('transport', () => {
   });
 });
 
-describe('the protocol', () => {
+offlineOnly(NOT_YET_DEPLOYED).describe('the protocol', () => {
   it('server/discover names the supported revisions and the tool capability', async () => {
     // Revision 2026-07-28 has no handshake: discovery is a plain request.
     const response = await rpc('server/discover');
@@ -230,7 +236,7 @@ describe('the protocol', () => {
   });
 });
 
-describe('the eight tools', () => {
+offlineOnly(NOT_YET_DEPLOYED).describe('the eight tools', () => {
   it('whoami names the caller’s firm and permissions', async () => {
     const result = await call('whoami', {});
     expectShape(result.structuredContent, {

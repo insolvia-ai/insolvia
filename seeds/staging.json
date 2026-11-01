@@ -43,8 +43,8 @@
     "",
     "A case's `clients` are debtors bound to it for the client portal (ADR",
     "0023), in the invitation route's own body shape. The loader sets their",
-    "password like everyone else's and sends no invitation mail, so the API's",
-    "integration tier and the portal e2e flow sign in as the client over the",
+    "password like everyone else's and sends no invitation mail, so the contract",
+    "suite's deployed target and the portal e2e flow sign in as the client over the",
     "portal's own app client. A client is never also a firm user."
   ],
   "firms": [

@@ -77,9 +77,9 @@ repos:
       # the same suites again. `always_run` because with no filenames passed
       # the `files:` filter would otherwise decide the hook has nothing to do.
       # Unit only, by construction: nothing it runs needs AWS, a server, a
-      # secret or the network. The integration tier is a differently named
-      # script (integration/scripts/dev-test.sh) so a hook can never reach
-      # for it by accident.
+      # secret or the network. The deployed tier is a separate script and
+      # flag (contract/scripts/dev-test.sh --target deployed) so a hook can
+      # never reach for it by accident.
       - id: unit-tests
         name: unit tests for the areas this push touches (scripts/dev-test-unit.sh)
         entry: scripts/dev-test-unit.sh

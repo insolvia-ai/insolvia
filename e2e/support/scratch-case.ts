@@ -5,11 +5,11 @@ import { expect, type Page } from '@playwright/test';
  * only case a `flows` spec may write to.
  *
  * WHY THIS EXISTS. A signed-in environment is seeded with fixture cases
- * (`seeds/<target>.json`, ADR 0021), and the integration tier finds those by
+ * (`seeds/<target>.json`, ADR 0021), and the contract suite's deployed target finds those by
  * their content — Debtor 1's name among it. `intake-persists.spec.ts` used to
  * open the FIRST case on `/cases` and type over Debtor 1's first name; since
  * ADR 0022 seeded clients, that first case is a fixture case, the loader
- * leaves an existing row alone, and the next release's integration tier could
+ * leaves an existing row alone, and the next release's contract run could
  * not find the fixture it had just seeded. So: no spec writes to a case it did
  * not open itself, and this is the case it opens.
  *
@@ -22,9 +22,9 @@ import { expect, type Page } from '@playwright/test';
  *   - the CLIENT by searching `/clients` for its surname and taking the row
  *     whose link reads exactly "Surname, Given";
  *   - the CASE on that client's record, by its district — a court no fixture
- *     case uses (they are all `flmb`) and the integration tier's own scratch
- *     case does not use either (`flnb`,
- *     `integration/tests/conftest.py`) — and then CONFIRMED by
+ *     case uses (they are all `flmb`) and the contract suite's own scratch
+ *     cases do not use either (`flnb`,
+ *     `contract/src/support/actors.ts`) — and then CONFIRMED by
  *     the case's heading, which names its debtors: Debtor 1's surname is the
  *     scratch client's, and no spec changes it. A case that is not ours is
  *     passed over, never written to.

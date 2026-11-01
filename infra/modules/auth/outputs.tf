@@ -19,7 +19,7 @@ output "web_client_id" {
 
 # The client portal's app client (ADR 0023) — DISJOINT from web_client_id.
 # Envs publish it as /insolvia/<env>/api/auth-portal-client-id and as the
-# `auth_portal_client_id` output the app build and the integration tier read.
+# `auth_portal_client_id` output the app build and the contract suite's deployed target read.
 output "portal_client_id" {
   description = "App client ID for the client portal (authorization-code + PKCE, memory-only sessions)."
   value       = module.contract.portal_client_id

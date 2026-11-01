@@ -251,10 +251,10 @@ jobs:
           emit migrator  "^($shared|backend/src/Insolvia\.Migrator/|seeds/|infra/modules/(migrator|aurora|network)/|\.github/workflows/migrator-staging\.yml)"
           # modules/job_pipeline rides the api leg: the pipeline worker's image
           # (Insolvia.Worker) is built and deployed by api-staging.yml (ADR
-          # 0018). seeds/, the seed action and integration/ ride it too: its
-          # post-deploy integration tier (integration/) signs in as the people
-          # seeds/staging.json names.
-          emit api       "^($shared|backend/src/Insolvia\.(Api|Worker)/|seeds/|integration/|infra/modules/(api_service|job_pipeline)/|\.github/(workflows/api-staging\.yml|actions/seed-staging/))"
+          # 0018). seeds/, the seed action and contract/ ride it too: its
+          # post-deploy integration job runs contract/'s deployed target,
+          # signed in as the people seeds/staging.json names.
+          emit api       "^($shared|backend/src/Insolvia\.(Api|Worker)/|seeds/|contract/|infra/modules/(api_service|job_pipeline)/|\.github/(workflows/api-staging\.yml|actions/seed-staging/))"
           emit admin     "^($shared|apps/insolvia_admin/|backend/src/Insolvia\.Admin/|infra/modules/(admin_service|web_hosting)/|\.github/workflows/admin-staging\.yml)"
           emit marketing '^(apps/insolvia_marketing/|infra/envs/staging/|infra/modules/marketing_site/|\.github/workflows/(marketing-staging|release)\.yml)'
           emit mcp       "^($shared|backend/src/Insolvia\.Mcp/|infra/modules/mcp_service/|\.github/workflows/mcp-staging\.yml)"

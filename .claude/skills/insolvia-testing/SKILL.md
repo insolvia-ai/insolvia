@@ -4,8 +4,7 @@ description: >-
   How Insolvia tests — which shape applies where, where a new test file goes,
   and the per-stack conventions that are easy to get subtly wrong. Use this
   BEFORE writing or changing any test in this repo: an xUnit test under
-  backend/tests, a contract test under contract/, an integration spec under
-  integration/, a Jest test in apps/insolvia_app,
+  backend/tests, a contract test under contract/ (offline or deployed), a Jest test in apps/insolvia_app,
   packages/insolvia_api_client, apps/insolvia_admin or apps/insolvia_marketing, or a Playwright spec under e2e/. Reach for it the moment a task says "add a test",
   "write tests for", "improve coverage", "this needs test coverage", or when you
   have just added an endpoint, a component, a route, or a config value and owe
@@ -31,7 +30,7 @@ runs against which environment. This file owns *how* to write one.
 | **unit** | `packages/insolvia_api_client`, `apps/insolvia_admin`, `apps/insolvia_marketing` (colocated) | Jest (Babel-transpiled; see below) | `npm run test --workspace @insolvia-ai/api-client`; `npm test` in admin and marketing (own lockfiles) | nothing — stubbed `fetch` |
 | **unit**, all of the above at once | — | `scripts/dev-test-unit.sh` | every suite, or the ones a set of files touches; what the **pre-push hook** runs | nothing |
 | **contract** | `contract/src/` | Jest | `contract/scripts/dev-test.sh` (CI: `Contract (.NET)`) | the .NET hosts on a throwaway Postgres, offline, through the shipped api-client — the wire contract's oracle |
-| **integration** | `integration/tests/` | pytest, gated on `INSOLVIA_INTEGRATION=1` | `integration/scripts/dev-test.sh` (dev); `api-staging.yml` (staging) | the RUNNING API over HTTP, signed in by SRP as a seeded person |
+| **integration** (contract, deployed) | `contract/src/` | Jest, `CONTRACT_TARGET=deployed` | `contract/scripts/dev-test.sh --target deployed` (dev); `api-staging.yml` (staging) | the RUNNING API over HTTP, signed in by SRP as a seeded person |
 | **e2e `flows`** | `e2e/tests/flows/` | Playwright | `e2e/scripts/dev-test.sh` (dev); `app-staging.yml` (staging) | a real browser, signed in |
 | **e2e `smoke`** | `e2e/tests/smoke/` | Playwright | same wrappers; `app-prod.yml` (production) | HTTP + a browser, **no credentials** — the only thing that runs on prod |
 | `tool/` | none — gated by `npm run tokens:check` | — | `npm run tokens:check` | — |
@@ -170,10 +169,14 @@ decision.
   export map.
 - A server field rename is *supposed* to break these tests. That is the feature.
 
-## The integration tier (`integration/`)
+## The deployed target (`contract/`, `CONTRACT_TARGET=deployed`)
 
-- **It drives the API over HTTP and nothing in-process.** The `Api` helper in
-  its conftest is the whole client; `as_user("paralegal")` is a real token from
+The same specs as the offline run; [`contract/CLAUDE.md`](../../contract/CLAUDE.md)
+owns the detail (the gates in `support/gates.ts`, scratch teardown in
+`support/actors.ts`).
+
+- **It drives the API over HTTP and nothing in-process.** The shipped
+  api-client is the whole client; `seededStaff('paralegal')` is a real token from
   the real pool. It imports no backend code and reaches no store — a test
   that needs to is a backend test wearing the wrong directory.
 - **Who exists comes from `seeds/<target>.json`, by handle.** A spec that needs
@@ -181,13 +184,13 @@ decision.
   creates them); it never invents an address or a subject.
 - **Scratch discipline.** Cases are only soft-deleted through the API (the
   rows stay), so work
-  inside the one scratch case the conftest finds-or-opens; delete every
-  document you create in teardown; leave a debtor as you found it. A spec that
-  opens a case per run fills a table nobody prunes.
+  inside scratch cases `support/actors.ts` tracks and deletes in teardown;
+  restore any firm setting you change; never write to a fixture case.
 - **A test that passes only on one target is a bug in the test.** Both `dev`
   and `staging` run the same files; branch on the fixture's contents (a
   one-firm fixture cannot express cross-tenant isolation — return early and
-  say so), never on the target name.
+  say so through `needsSeeded`), never on the target name; a spec that
+  genuinely cannot run deployed says so through `offlineOnly(reason)`.
 - **Never a required PR check, never a unit-tier dependency.** It runs after
   the staging alias shift and on a developer's local stack, and its failure
   fails the staging stage. (The contract suite is the offline, per-PR check
@@ -255,7 +258,7 @@ ADR:
 | an API endpoint | the route's backend tests, the api-client contract pin, **and** a `contract/` call |
 | a design-system component | beside it — and remember the `.web`/`.native` leaves are separate files with separate tests |
 | an infra invariant | prefer an executable check (`Insolvia.Architecture.Tests`, a `terraform test`, a workflow guard) over prose |
-| something only a real bucket, pool, database role or the deployed Lambda role can answer | `integration/tests/test_<subject>.py`, through the `Api` helper, inside the scratch case |
+| something only a real bucket, pool, database role or the deployed Lambda role can answer | a `contract/src/` spec through the api-client, inside a scratch case — it runs deployed too |
 | something only a real browser and a real sign-in can answer | `e2e/tests/flows/<subject>.spec.ts` |
 | something a production deploy must announce when broken | `e2e/tests/smoke/<subject>.spec.ts` — no credentials, and it runs on staging first |
 | a person or a case a suite needs to exist | `seeds/<env>.json` (who) and `seeds/fixtures/<version>/` (what) — never a script, never a secret |

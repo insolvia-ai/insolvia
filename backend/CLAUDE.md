@@ -124,9 +124,9 @@ itself is gone, and `git log` before 18.23 has it.
   collection fixture), a fresh database per test (`CreateDatabaseAsync`).
   Needs Docker locally; GitHub's ubuntu runners have it.
 - **Contract:** `contract/` at the repo root, against the hosts on a
-  throwaway Postgres (`contract/scripts/dev-test.sh`).
-- **Integration:** `integration/` at the repo root — signed in through the
-  real pool, against staging after each deploy or a laptop's compose stack.
+  throwaway Postgres (`contract/scripts/dev-test.sh`) — and its deployed
+  target, signed in through the real pool, against staging after each deploy
+  or a laptop's compose stack (`contract/scripts/dev-test.sh --target deployed`).
 
 ## Run it
 

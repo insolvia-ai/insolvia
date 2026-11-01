@@ -39,8 +39,8 @@
     "A case's `clients` are debtors bound to it for the client portal (ADR",
     "0023), in the invitation route's own body shape. Passwordless for the",
     "same reason the dev account is: scripts/dev-aws-seed.sh creates the",
-    "account with this machine's dev password, so the local integration tier",
-    "can sign the client in over SRP against the portal's app client. A",
+    "account with this machine's dev password, so the contract suite's deployed",
+    "target can sign the client in over SRP against the portal's app client. A",
     "client is never also a firm user."
   ],
   "firms": [

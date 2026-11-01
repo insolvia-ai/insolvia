@@ -4,8 +4,8 @@ node_modules/
 dist/
 build/
 
-# Python environments (integration/scripts/dev-test.sh builds one; a checkout
-# that ran the retired Python contract stack still has contract/.venv) —
+# Python environments (the brand-mark cutter builds one; a checkout that ran
+# the retired Python contract or integration stacks still has a .venv there) —
 # gitignored by the global `.venv/` rule. Their site-packages ship JS and JSON
 # nobody here wrote.
 .venv/

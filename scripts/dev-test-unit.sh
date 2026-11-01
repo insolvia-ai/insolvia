@@ -19,9 +19,9 @@
 # UNIT MEANS UNIT. Nothing here needs AWS, a running server, a password, or
 # the network: xUnit in-process for the .NET backend (its data tier starts a
 # throwaway Postgres through Testcontainers, so Docker must be running), and
-# Jest over mocks. The integration tier is a different script with a
-# different name (integration/scripts/dev-test.sh) precisely so that a hook
-# can never accidentally reach for it.
+# Jest over mocks. The deployed tier is a different script with a
+# different flag (contract/scripts/dev-test.sh --target deployed) precisely so
+# that a hook can never accidentally reach for it.
 #
 # THE COMMANDS ARE THE CI COMMANDS. Each area runs the same invocation its
 # `*-pr.yml` job runs — `dotnet format --verify-no-changes` and `dotnet test`

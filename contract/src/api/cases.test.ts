@@ -2,19 +2,81 @@
 // case, its debtors, its lifecycle, who works it, its tasks and its notes.
 import { describe, expect, it } from '@jest/globals';
 
+import type { Debtor } from '@insolvia-ai/api-client';
+
+import type { ContractClient } from '../support/client.ts';
 import {
   SCRATCH_COURT,
+  SCRATCH_DISTRICT,
   firmAdmin,
   firmUser,
   scratchCase,
   scratchClient,
+  seededStaff,
   tag,
+  trackScratchCase,
+  trackScratchClient,
 } from '../support/actors.ts';
-import { seeded } from '../support/env.ts';
+import { seeded, subjectOf } from '../support/env.ts';
+import { fixtureCases } from '../support/fixtures.ts';
 import { CASE, DEBTOR, FIRM_CLIENT, NOTE, TASK } from '../support/shapes.ts';
-import { expectApiError } from '../support/wire.ts';
+import { needsSeeded } from '../support/gates.ts';
+import { PEOPLE, TARGET } from '../support/target.ts';
+import { expectApiError, withMessage } from '../support/wire.ts';
 
 const TYPED = { source: 'staff_typed' } as const;
+
+/** Every case id the admin can list, page by page. */
+async function allCaseIds(options: { archived?: boolean } = {}): Promise<string[]> {
+  const api = firmAdmin().api;
+  const ids: string[] = [];
+  let cursor: string | undefined;
+  do {
+    const page = await api.listCases({ ...options, limit: 100, cursor });
+    ids.push(...page.cases.map((c) => c.id));
+    cursor = page.nextCursor;
+  } while (cursor !== undefined);
+  return ids;
+}
+
+/** Seeded colleagues of the admin who see only the cases they are assigned. */
+const UNLINKED = PEOPLE.filter(
+  (p) =>
+    p.kind === 'staff' &&
+    p.firmName === seeded.firmAdmin.firmName &&
+    !p.accessAllCases &&
+    p.handle !== 'admin',
+);
+
+/**
+ * A colleague who sees only the cases they are assigned (ADR 0009). Offline:
+ * one the suite adds and removes again, signed for with the run's key.
+ * Deployed: the seed's (staging's `paralegal`) — the real pool cannot be
+ * signed in as someone the run just added.
+ */
+async function colleagueWithoutAccess(): Promise<{
+  subject: string;
+  client: ContractClient;
+  done: () => Promise<void>;
+}> {
+  if (TARGET === 'deployed') {
+    const handle = UNLINKED[0]!.handle;
+    return { subject: subjectOf(handle), client: seededStaff(handle), done: async () => {} };
+  }
+  const admin = firmAdmin();
+  const added = await admin.api.addFirmUser({
+    email: `assignee-${tag()}@insolvia.test`,
+    firstName: 'Assigned',
+    lastName: 'Staff',
+    role: 'staff',
+    accessAllCases: false,
+  });
+  return {
+    subject: added.subject,
+    client: firmUser(added.subject),
+    done: () => admin.api.removeFirmUser(added.subject),
+  };
+}
 
 describe('the client directory', () => {
   it('creates, reads, edits, stages, archives and merges firm clients', async () => {
@@ -28,6 +90,7 @@ describe('the client directory', () => {
     });
     admin.wire(201, FIRM_CLIENT);
     expect(created.status).toBe('active');
+    trackScratchClient(created.id);
 
     const read = await admin.api.getFirmClient(created.id);
     admin.wire(200, FIRM_CLIENT);
@@ -52,16 +115,29 @@ describe('the client directory', () => {
     admin.wire(200, { clients: [FIRM_CLIENT] });
     expect(listed.map((c) => c.id)).toContain(created.id);
 
-    const cases = await admin.api.listFirmClientCases(created.id);
+    const noCases = await admin.api.listFirmClientCases(created.id);
     admin.wire(200, { cases: ['object'] });
-    expect(cases).toEqual([]);
+    expect(noCases).toEqual([]);
 
-    // Merge a duplicate into it; the duplicate is archived and points at it.
+    // Merge a duplicate into it; the duplicate is archived and points at it,
+    // and the duplicate's case follows to the survivor with its copied
+    // fields untouched.
     const duplicate = await scratchClient('Dana');
+    const duplicateCase = trackScratchCase(
+      (await admin.api.createCase({ chapter: 7, ...SCRATCH_COURT, clientIds: [duplicate.id] })).id,
+    );
+    const debtor1 = async () =>
+      (await admin.api.listDebtors(duplicateCase)).find((d) => d.filing_role === 'debtor_1');
+    const before = await debtor1();
     const merged = await admin.api.mergeFirmClient(created.id, duplicate.id);
     admin.wire(200, { client: FIRM_CLIENT, merged: FIRM_CLIENT });
     expect(merged.merged.merged_into).toBe(created.id);
     expect(merged.merged.status).toBe('archived');
+    const after = await debtor1();
+    expect(after?.client_id).toBe(created.id);
+    expect(after?.name).toEqual(before?.name);
+    const survivorCases = await admin.api.listFirmClientCases(created.id);
+    expect(survivorCases.map((c) => c.case.id)).toContain(duplicateCase);
     await expectApiError(admin.api.mergeFirmClient(created.id, duplicate.id), 409, 'ConflictError');
     await expectApiError(admin.api.mergeFirmClient(created.id, created.id), 400, 'ValidationError');
 
@@ -76,6 +152,59 @@ describe('the client directory', () => {
   });
 });
 
+describe('the seeded clients', () => {
+  // Read-only: the fixture's clients are found by following the fixture
+  // cases' debtors, never created here.
+  async function seededDebtors(): Promise<{ caseId: string; debtor: Debtor }[]> {
+    const api = firmAdmin().api;
+    const found: { caseId: string; debtor: Debtor }[] = [];
+    for (const fixture of await fixtureCases()) {
+      for (const debtor of await api.listDebtors(fixture.case.id)) {
+        if (debtor.filing_role === 'debtor_1' || debtor.filing_role === 'debtor_2') {
+          found.push({ caseId: fixture.case.id, debtor });
+        }
+      }
+    }
+    expect(found.length).toBeGreaterThan(0);
+    return found;
+  }
+
+  it('every seeded debtor is a copy of a client it still agrees with', async () => {
+    const api = firmAdmin().api;
+    for (const { caseId, debtor } of await seededDebtors()) {
+      withMessage(`${caseId} ${debtor.filing_role}`, () => expect(debtor.client_id).toBeTruthy());
+      const client = await api.getFirmClient(debtor.client_id!);
+      expect(client.status).toBe('active');
+      expect(client.name).toEqual(debtor.name);
+      expect(debtor.differs_from_client).toEqual([]);
+      const copied = Object.entries(debtor.provenance)
+        .filter(([path]) => path.split('.')[0]!.split('[')[0] === 'name')
+        .map(([, entry]) => entry);
+      expect(copied.length).toBeGreaterThan(0);
+      for (const entry of copied) {
+        expect(entry).toEqual({ source: 'client', client_id: debtor.client_id });
+      }
+    }
+  });
+
+  it('the seeded clients are in the firm’s directory', async () => {
+    const listed = (await firmAdmin().api.listFirmClients()).map((c) => c.id);
+    const seededIds = (await seededDebtors()).map(({ debtor }) => debtor.client_id);
+    expect(listed).toEqual(expect.arrayContaining(seededIds));
+  });
+
+  it('each seeded client lists its fixture case in the role it holds', async () => {
+    const api = firmAdmin().api;
+    for (const { caseId, debtor } of await seededDebtors()) {
+      const entries = await api.listFirmClientCases(debtor.client_id!);
+      const roles = new Map(entries.map((e) => [e.case.id, e.filing_role]));
+      withMessage(`client ${debtor.client_id}`, () =>
+        expect(roles.get(caseId)).toBe(debtor.filing_role),
+      );
+    }
+  });
+});
+
 describe('a case, opened from a client', () => {
   it('opens, reads, lists, edits and pages cases', async () => {
     const admin = firmAdmin();
@@ -86,8 +215,11 @@ describe('a case, opened from a client', () => {
       clientIds: [client.id],
     });
     admin.wire(201, CASE);
+    trackScratchCase(opened.id);
     expect(opened.status).toBe('intake');
     expect(opened.court).toBe('flnb');
+    // The printed name is derived from the reference by the registry (#360).
+    expect(opened.district).toBe(SCRATCH_DISTRICT);
     expect(opened.createdBy).toBe(seeded.firmAdmin.subject);
 
     const read = await admin.api.getCase(opened.id);
@@ -115,9 +247,27 @@ describe('a case, opened from a client', () => {
     expect(updated.chapter).toBe(13);
     expect(updated.division).toBe('tallahassee');
     expect(updated.filedAt).toBe('2026-01-15');
+    // Read back from the store, not the response.
+    const reread = await admin.api.getCase(opened.id);
+    expect(reread.chapter).toBe(13);
+    expect(reread.district).toBe(SCRATCH_DISTRICT);
+    expect(reread.updatedAt >= opened.updatedAt).toBe(true);
     const cleared = await admin.api.updateCase(opened.id, { filedAt: null });
     admin.wire(200, CASE);
     expect(cleared.filedAt).toBeUndefined();
+
+    // The docket facts are recorded, then cleared — absent, never null.
+    const docketed = await admin.api.updateCase(opened.id, {
+      judge: 'Hon. Contract Judge',
+      officeFileNumber: 'CON-0001',
+    });
+    admin.wire(200, CASE);
+    expect(docketed.judge).toBe('Hon. Contract Judge');
+    expect(docketed.officeFileNumber).toBe('CON-0001');
+    await admin.api.updateCase(opened.id, { judge: null, officeFileNumber: null });
+    const undocketed = admin.wire(200, CASE);
+    expect(undocketed).not.toHaveProperty('judge');
+    expect(undocketed).not.toHaveProperty('officeFileNumber');
 
     await expectApiError(
       admin.api.createCase({ chapter: 7, court: 'nowhere', division: 'x', clientIds: [client.id] }),
@@ -139,7 +289,7 @@ describe('a case, opened from a client', () => {
 
   it('moves through statuses, keeps its history, archives, copies and deletes', async () => {
     const admin = firmAdmin();
-    const { caseId } = await scratchCase();
+    const { caseId, client } = await scratchCase();
 
     await admin.api.updateCase(caseId, { status: 'ready_to_file' });
     admin.wire(200, CASE);
@@ -160,11 +310,12 @@ describe('a case, opened from a client', () => {
     const archived = await admin.api.setCaseArchived(caseId, true);
     admin.wire(200, CASE);
     expect(archived.archivedBy).toBe(seeded.firmAdmin.subject);
-    const archivedList = await admin.api.listCases({ archived: true, limit: 100 });
-    expect(archivedList.cases.map((c) => c.id)).toContain(caseId);
+    expect(await allCaseIds()).not.toContain(caseId);
+    expect(await allCaseIds({ archived: true })).toContain(caseId);
     const restored = await admin.api.setCaseArchived(caseId, false);
     admin.wire(200, CASE);
     expect(restored.archivedAt).toBeUndefined();
+    expect(await allCaseIds()).toContain(caseId);
 
     // A record on the source, so the copy has a collection to carry: copying
     // an empty case never exercised the order the copy is written in.
@@ -178,42 +329,57 @@ describe('a case, opened from a client', () => {
     expect(copy.status).toBe('intake');
     const copied = await admin.api.listCaseEntities(copy.id, 'creditors');
     expect(copied.map((c) => c.name)).toEqual(['Example Bank']);
+    // The copy's Debtor 1 names its source on every value…
+    const copyDebtor = (await admin.api.listDebtors(copy.id)).find(
+      (d) => d.filing_role === 'debtor_1',
+    );
+    const sources = Object.values(copyDebtor?.provenance ?? {}).map(
+      (entry) => (entry as { copied_from_case_id?: string }).copied_from_case_id,
+    );
+    expect(new Set(sources)).toEqual(new Set([caseId]));
+    // …and the client the copy was opened for stays retained, with no stage.
+    const retained = await admin.api.getFirmClient(client.id);
+    expect(typeof retained.first_retained_at).toBe('string');
+    expect(retained.first_retained_at! <= new Date().toISOString().slice(0, 10)).toBe(true);
+    expect(admin.last().body).not.toHaveProperty('prospect_stage');
 
     await admin.api.deleteCase(copy.id);
     admin.wire(204);
     await expectApiError(admin.api.getCase(copy.id), 404, 'NotFoundError');
     await expectApiError(admin.api.deleteCase(copy.id), 404, 'NotFoundError');
+    expect(await allCaseIds()).not.toContain(copy.id);
+    expect(await allCaseIds({ archived: true })).not.toContain(copy.id);
   });
 
-  it('assigns colleagues, and an unassigned colleague cannot see the case', async () => {
+  needsSeeded(
+    TARGET === 'offline' || UNLINKED.length > 0,
+    'colleague without access to every case',
+  ).it('assigns colleagues, and an unassigned colleague cannot see the case', async () => {
     const admin = firmAdmin();
     const { caseId } = await scratchCase();
-    const colleague = await admin.api.addFirmUser({
-      email: `assignee-${tag()}@insolvia.test`,
-      firstName: 'Assigned',
-      lastName: 'Staff',
-      role: 'staff',
-      accessAllCases: false,
-    });
-    const asColleague = firmUser(colleague.subject);
-    await expectApiError(asColleague.api.getCase(caseId), 404, 'NotFoundError');
+    const colleague = await colleagueWithoutAccess();
+    try {
+      await expectApiError(colleague.client.api.getCase(caseId), 404, 'NotFoundError');
 
-    await admin.api.assignCase(caseId, colleague.subject);
-    admin.wire(204);
-    const assignees = await admin.api.listCaseAssignees(caseId);
-    admin.wire(200, {
-      assignees: [{ subject: 'string', assignedAt: 'string', assignedBy: 'string' }],
-    });
-    expect(assignees.map((a) => a.subject)).toContain(colleague.subject);
-    await asColleague.api.getCase(caseId);
-    asColleague.wire(200, CASE);
+      await admin.api.assignCase(caseId, colleague.subject);
+      admin.wire(204);
+      const assignees = await admin.api.listCaseAssignees(caseId);
+      admin.wire(200, {
+        assignees: [{ subject: 'string', assignedAt: 'string', assignedBy: 'string' }],
+      });
+      expect(assignees.map((a) => a.subject)).toContain(colleague.subject);
+      await colleague.client.api.getCase(caseId);
+      colleague.client.wire(200, CASE);
+      const theirs = await colleague.client.api.listCases({ limit: 100 });
+      expect(theirs.cases.map((c) => c.id)).toContain(caseId);
 
-    await admin.api.unassignCase(caseId, colleague.subject);
-    admin.wire(204);
-    await expectApiError(asColleague.api.getCase(caseId), 404, 'NotFoundError');
-    await expectApiError(admin.api.assignCase(caseId, 'no-such-subject'), 404, 'NotFoundError');
-
-    await admin.api.removeFirmUser(colleague.subject);
+      await admin.api.unassignCase(caseId, colleague.subject);
+      admin.wire(204);
+      await expectApiError(colleague.client.api.getCase(caseId), 404, 'NotFoundError');
+      await expectApiError(admin.api.assignCase(caseId, 'no-such-subject'), 404, 'NotFoundError');
+    } finally {
+      await colleague.done();
+    }
   });
 });
 
@@ -237,6 +403,10 @@ describe('the debtors of a case', () => {
     expect(saved.tax_id).toEqual({ kind: 'ssn', last_four: '4320' });
     // The full number never comes back.
     expect(JSON.stringify(body)).not.toContain('987-65-4320');
+    // A debtor saved with provenance is a debtor read back with it.
+    const reread = (await admin.api.listDebtors(caseId)).find((d) => d.id === saved.id);
+    expect(reread?.name?.given).toBe('Changed');
+    expect(reread?.provenance['name.given']).toMatchObject(TYPED);
 
     await expectApiError(
       admin.api.putDebtor(caseId, 'debtor_1', {
@@ -251,6 +421,24 @@ describe('the debtors of a case', () => {
     admin.wire(200, DEBTOR);
     expect(recopied.name?.given).toBe(client.name.given);
     expect(recopied.differs_from_client).toEqual([]);
+    const fromClient = { source: 'client', client_id: client.id };
+    expect(recopied.provenance['name.given']).toEqual(fromClient);
+    // The questionnaire echoing what it loaded keeps the client's provenance.
+    const SERVER_OWNED = new Set([
+      'id',
+      'case_id',
+      'filing_role',
+      'created_at',
+      'updated_at',
+      'client_id',
+      'differs_from_client',
+    ]);
+    const echo = Object.fromEntries(
+      Object.entries(recopied).filter(([key]) => !SERVER_OWNED.has(key)),
+    );
+    const echoed = await admin.api.putDebtor(caseId, 'debtor_1', echo as never);
+    admin.wire(200, DEBTOR);
+    expect(echoed.provenance['name.given']).toEqual(fromClient);
 
     // …or push the case's copy back to the client.
     await admin.api.putDebtor(caseId, 'debtor_1', {
