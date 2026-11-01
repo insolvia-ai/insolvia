@@ -11,7 +11,7 @@
     // comment owns it).
     "moduleSuffixes": [".web", ""],
     "skipLibCheck": true,
-    "types": ["vite/client", "vitest"],
+    "types": ["vite/client"],
     "noEmit": true,
     "allowImportingTsExtensions": true
   },

@@ -3,13 +3,13 @@
 // protected-resource metadata, the 401 challenge, initialize, the static
 // eight-tool listing, every tool, the error envelope — and the candidate
 // flow across services, proposed here and reviewed through the API.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from '@jest/globals';
 
 import { firmAdmin, scratchCase } from '../support/actors.ts';
 import { env, seeded } from '../support/env.ts';
 import { fixtureCase } from '../support/fixtures.ts';
 import { mcpToken, staffToken } from '../support/tokens.ts';
-import { expectShape } from '../support/wire.ts';
+import { expectShape, withMessage } from '../support/wire.ts';
 
 const PROTOCOL_VERSION = '2026-07-28';
 const META = {
@@ -85,7 +85,7 @@ async function call(
     { name: tool, arguments: args },
     { headers: { 'Mcp-Name': tool }, ...(token === undefined ? {} : { token }) },
   );
-  expect(response.status, JSON.stringify(response.body)).toBe(200);
+  withMessage(JSON.stringify(response.body), () => expect(response.status).toBe(200));
   expectShape(response.body, { jsonrpc: 'string', id: 'integer', result: 'object' });
   const result = (response.body as { result: ToolResult }).result;
   expectShape(result, {
@@ -123,7 +123,10 @@ describe('transport', () => {
       `${url.origin}/.well-known/oauth-protected-resource${url.pathname}`,
     );
     expect(response.status).toBe(200);
-    const metadata = await response.json();
+    const metadata = (await response.json()) as {
+      resource: unknown;
+      authorization_servers: unknown;
+    };
     expectShape(metadata, {
       resource: 'string',
       authorization_servers: ['string'],
@@ -163,7 +166,7 @@ describe('the protocol', () => {
   it('server/discover names the supported revisions and the tool capability', async () => {
     // Revision 2026-07-28 has no handshake: discovery is a plain request.
     const response = await rpc('server/discover');
-    expect(response.status, JSON.stringify(response.body)).toBe(200);
+    withMessage(JSON.stringify(response.body), () => expect(response.status).toBe(200));
     expectShape(response.body, {
       jsonrpc: 'string',
       id: 'integer',
@@ -183,7 +186,7 @@ describe('the protocol', () => {
       },
       { legacy: true },
     );
-    expect(response.status, JSON.stringify(response.body)).toBe(200);
+    withMessage(JSON.stringify(response.body), () => expect(response.status).toBe(200));
     expectShape(response.body, {
       jsonrpc: 'string',
       id: 'integer',
@@ -208,8 +211,10 @@ describe('the protocol', () => {
         outputSchema: 'object',
         annotations: { readOnlyHint: 'boolean' },
       });
-      expect((tool.annotations as { readOnlyHint: boolean }).readOnlyHint, String(tool.name)).toBe(
-        READ_ONLY.has(String(tool.name)),
+      withMessage(String(tool.name), () =>
+        expect((tool.annotations as { readOnlyHint: boolean }).readOnlyHint).toBe(
+          READ_ONLY.has(String(tool.name)),
+        ),
       );
     }
   });
@@ -247,7 +252,7 @@ describe('the eight tools', () => {
     const fixture = await fixtureCase(13);
     const page = await call('list_cases', { limit: 1 });
     expectShape(page.structuredContent, { cases: [CASE_SHAPE], 'nextCursor?': 'string' });
-    expect(page.structuredContent.nextCursor).toBeTypeOf('string');
+    expect(typeof page.structuredContent.nextCursor).toBe('string');
     const next = await call('list_cases', {
       limit: 100,
       cursor: page.structuredContent.nextCursor,

@@ -1,7 +1,7 @@
 // Documents and the client portal (ADR 0023): the firm asks for documents,
 // invites the client, the client answers and uploads through presigned PUTs,
 // and the firm reviews what arrived.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from '@jest/globals';
 
 import { firmAdmin, portalClient, scratchCase, tag } from '../support/actors.ts';
 import { seeded } from '../support/env.ts';

@@ -1,6 +1,6 @@
 // A matter from the directory to an archived case: firm clients, opening a
 // case, its debtors, its lifecycle, who works it, its tasks and its notes.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from '@jest/globals';
 
 import {
   SCRATCH_COURT,
@@ -97,7 +97,7 @@ describe('a case, opened from a client', () => {
     const page = await admin.api.listCases({ limit: 1 });
     admin.wire(200, { cases: [CASE], 'nextCursor?': 'string' });
     expect(page.cases).toHaveLength(1);
-    expect(page.nextCursor).toBeTypeOf('string');
+    expect(typeof page.nextCursor).toBe('string');
     const next = await admin.api.listCases({ limit: 1, cursor: page.nextCursor });
     admin.wire(200, { cases: [CASE], 'nextCursor?': 'string' });
     expect(next.cases[0]?.id).not.toBe(page.cases[0]?.id);
@@ -305,7 +305,7 @@ describe('tasks', () => {
     const done = await admin.api.updateTask(caseId, created.id, { done: true, dueDate: null });
     admin.wire(200, TASK);
     expect(done.done).toBe(true);
-    expect(done.completedAt).toBeTypeOf('string');
+    expect(typeof done.completedAt).toBe('string');
     expect(admin.last().body).not.toHaveProperty('dueDate');
 
     const listed = await admin.api.listTasks(caseId);

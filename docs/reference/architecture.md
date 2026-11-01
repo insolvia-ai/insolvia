@@ -18,7 +18,7 @@ insolvia/
 ├── packages/
 │   └── insolvia_api_client/           @insolvia-ai/api-client
 ├── backend/                           the .NET 10 backend on Aurora PostgreSQL (ADR 0028)
-├── contract/                          the backend's HTTP contract suite (Vitest, offline)
+├── contract/                          the backend's HTTP contract suite (Jest, offline)
 ├── integration/                       the API's integration tier (pytest over HTTPS, signed in)
 ├── infra/                             Terraform — staging / prod / dev
 ├── tool/                              brand generators (themes, favicon)

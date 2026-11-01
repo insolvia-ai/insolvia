@@ -7,11 +7,11 @@ import {
   type CaseEntity,
   type CaseEntityRequest,
 } from '@insolvia-ai/api-client';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from '@jest/globals';
 
 import { firmAdmin, scratchCase } from '../support/actors.ts';
 import { fixtureCase } from '../support/fixtures.ts';
-import { expectApiError, type Spec } from '../support/wire.ts';
+import { expectApiError, type Spec, withMessage } from '../support/wire.ts';
 
 const ENTITY: Spec = {
   id: 'string',
@@ -41,7 +41,7 @@ describe('the generic case collections', () => {
       if (first === undefined) continue;
       const one = await admin.api.getCaseEntity(chapter13, collection, first.id);
       admin.wire(200, ENTITY);
-      expect(one, collection).toEqual(first);
+      withMessage(collection, () => expect(one).toEqual(first));
     }
   });
 

@@ -1,4 +1,6 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it } from "@jest/globals";
+
+import { restoreEnv, stubEnv } from "../../test/env";
 
 import { isPlaceholderSite } from "./site-mode.server";
 
@@ -13,11 +15,11 @@ import { isPlaceholderSite } from "./site-mode.server";
  */
 describe("isPlaceholderSite", () => {
   afterEach(() => {
-    vi.unstubAllEnvs();
+    restoreEnv();
   });
 
   it("is true for the placeholder value", () => {
-    vi.stubEnv("INSOLVIA_SITE_MODE", "placeholder");
+    stubEnv("INSOLVIA_SITE_MODE", "placeholder");
 
     expect(isPlaceholderSite()).toBe(true);
   });
@@ -25,7 +27,7 @@ describe("isPlaceholderSite", () => {
   it.each(["PLACEHOLDER", "Placeholder", "  placeholder  "])(
     "accepts %j — casing and stray whitespace are not a config error worth an outage",
     (value) => {
-      vi.stubEnv("INSOLVIA_SITE_MODE", value);
+      stubEnv("INSOLVIA_SITE_MODE", value);
 
       expect(isPlaceholderSite()).toBe(true);
     },
@@ -38,7 +40,7 @@ describe("isPlaceholderSite", () => {
     ["a typo", "placehodler"],
     ["something unrelated", "true"],
   ])("fails OPEN for %s — serves the real site", (_label, value) => {
-    vi.stubEnv("INSOLVIA_SITE_MODE", value as string);
+    stubEnv("INSOLVIA_SITE_MODE", value as string);
 
     expect(isPlaceholderSite()).toBe(false);
   });

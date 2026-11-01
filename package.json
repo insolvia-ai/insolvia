@@ -30,7 +30,7 @@
     "contract/ IS a member, and has to be: it is the backend's contract suite",
     "(ADR 0028), and it imports @insolvia-ai/api-client by package name so the",
     "client it proves is the shipped one, resolved through the export map. It",
-    "has no third-party dependencies of its own (vitest and typescript come",
+    "has no third-party dependencies of its own (jest and typescript come",
     "from here), so membership puts nothing new on this lockfile."
   ],
   "engines": {
@@ -106,14 +106,19 @@
     "compiler would be a deliberate upgrade of its own, not a default."
   ],
   "devDependencies": {
+    "@babel/core": "^7.29.7",
+    "@babel/plugin-transform-modules-commonjs": "^7.29.7",
+    "@babel/preset-typescript": "^7.29.7",
     "@eslint/js": "^9.17.0",
     "@insolvia-ai/tokens": "^0.5.1",
+    "@jest/globals": "^29.7.0",
     "@types/node": "^24.13.3",
+    "babel-jest": "^29.7.0",
     "eslint": "^9.17.0",
     "globals": "^15.14.0",
+    "jest": "^29.7.0",
     "prettier": "^3.3.3",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.19.0",
-    "vitest": "^4.1.10"
+    "typescript-eslint": "^8.19.0"
   }
 }

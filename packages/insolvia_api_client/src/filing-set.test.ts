@@ -5,7 +5,7 @@
 //
 // The conventions are index.test.ts's: a stubbed fetch, an obviously fake
 // token, the client imported by package name. This repo is public.
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test } from '@jest/globals';
 
 import { ApiException, InsolviaApiClient } from '@insolvia-ai/api-client';
 import type { FetchLike } from '@insolvia-ai/api-client';

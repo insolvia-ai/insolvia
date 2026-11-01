@@ -8,7 +8,7 @@
  */
 
 import { act, cleanup, renderHook } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from '@jest/globals';
 import type { ReactNode } from 'react';
 
 import { SessionProvider, useSession } from './session';
@@ -23,8 +23,8 @@ function wrapper({ children }: { children: ReactNode }) {
   return <SessionProvider>{children}</SessionProvider>;
 }
 
-// Without vitest `globals`, testing-library cannot register its automatic
-// cleanup.
+// Explicit, not left to testing-library's automatic cleanup, which registers
+// only when the runner injects `afterEach` as a global.
 afterEach(cleanup);
 
 describe('the staff session', () => {

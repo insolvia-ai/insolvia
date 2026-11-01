@@ -34,7 +34,8 @@ does not apply. Human docs: [`README.md`](README.md).
 - **`RequireStaff` is a courtesy, never a control** — the admin service
   verifies every request; the guard renders the sign-in screen in place (no
   redirect leaves the page, so there is no return-to to remember).
-- Tests are Vitest: contract pins against literal admin-service JSON, and
+- Tests are Jest (`jest.config.js`; jsdom plus Node's `fetch` and
+  `TextDecoder`, `jest.environment.js`): contract pins against literal admin-service JSON, and
   the sign-in assertions that are checkable nowhere else (this environment's
   client id, the `hd` hint, no `auto_select`). Follow the `insolvia-testing`
   skill.

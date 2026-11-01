@@ -5,8 +5,8 @@ description: >-
   and the per-stack conventions that are easy to get subtly wrong. Use this
   BEFORE writing or changing any test in this repo: an xUnit test under
   backend/tests, a contract test under contract/, an integration spec under
-  integration/, a Jest test in apps/insolvia_app, a Vitest test in
-  packages/insolvia_api_client, or a Playwright spec under e2e/. Reach for it the moment a task says "add a test",
+  integration/, a Jest test in apps/insolvia_app,
+  packages/insolvia_api_client, apps/insolvia_admin or apps/insolvia_marketing, or a Playwright spec under e2e/. Reach for it the moment a task says "add a test",
   "write tests for", "improve coverage", "this needs test coverage", or when you
   have just added an endpoint, a component, a route, or a config value and owe
   it a test. Also read it before proposing a coverage threshold, a new test
@@ -28,9 +28,9 @@ runs against which environment. This file owns *how* to write one.
 |---|---|---|---|---|
 | **unit** (incl. route and data) | `backend/tests/Insolvia.<Project>.Tests/` | xUnit v3 | `cd backend && dotnet test Insolvia.slnx` (CI: `Backend (.NET)`, after `dotnet format --verify-no-changes`) | nothing remote — memory twins; route tests in-process through `WebApplicationFactory`; the data tier a throwaway Postgres via Testcontainers (needs Docker) |
 | **unit** | `apps/insolvia_app` (colocated) | Jest (`jest-expo`) | `npm test --workspace apps/insolvia_app` | nothing — mocks |
-| **unit** | `packages/insolvia_api_client`, `apps/insolvia_admin` (colocated) | Vitest | `npm run test --workspace <pkg>` / `npm test` | nothing — stubbed `fetch` |
+| **unit** | `packages/insolvia_api_client`, `apps/insolvia_admin`, `apps/insolvia_marketing` (colocated) | Jest (Babel-transpiled; see below) | `npm run test --workspace @insolvia-ai/api-client`; `npm test` in admin and marketing (own lockfiles) | nothing — stubbed `fetch` |
 | **unit**, all of the above at once | — | `scripts/dev-test-unit.sh` | every suite, or the ones a set of files touches; what the **pre-push hook** runs | nothing |
-| **contract** | `contract/src/` | Vitest | `contract/scripts/dev-test.sh` (CI: `Contract (.NET)`) | the .NET hosts on a throwaway Postgres, offline, through the shipped api-client — the wire contract's oracle |
+| **contract** | `contract/src/` | Jest | `contract/scripts/dev-test.sh` (CI: `Contract (.NET)`) | the .NET hosts on a throwaway Postgres, offline, through the shipped api-client — the wire contract's oracle |
 | **integration** | `integration/tests/` | pytest, gated on `INSOLVIA_INTEGRATION=1` | `integration/scripts/dev-test.sh` (dev); `api-staging.yml` (staging) | the RUNNING API over HTTP, signed in by SRP as a seeded person |
 | **e2e `flows`** | `e2e/tests/flows/` | Playwright | `e2e/scripts/dev-test.sh` (dev); `app-staging.yml` (staging) | a real browser, signed in |
 | **e2e `smoke`** | `e2e/tests/smoke/` | Playwright | same wrappers; `app-prod.yml` (production) | HTTP + a browser, **no credentials** — the only thing that runs on prod |
@@ -128,6 +128,30 @@ testing half.
   regenerated to make a red test green.
 - **`Insolvia.Architecture.Tests` is not editable to make your change pass.**
   If it fails, your layering is wrong. Fix the layering.
+
+## Jest outside the app (api-client, contract, admin, marketing)
+
+One runner for all TypeScript, at the major `jest-expo` requires
+([ADR 0029](../../docs/adr/0029-one-testing-shape.md) rule 3). The workspace
+members spread the root `jest.base.js`; admin and marketing state their own
+`jest.config.js`, because they are outside the workspace.
+
+- **Import the API from `@jest/globals`** (`describe`, `it`, `expect`, `jest`)
+  rather than relying on injected globals, so `tsc` and ESLint see real
+  bindings.
+- **ESM is transpiled to CommonJS by Babel.** Never add
+  `--experimental-vm-modules`. Code a test loads must not read `import.meta`:
+  move the read into its own module and map it (admin's
+  `build-environment.ts`), or import the JSON (`contract/src/support/env.ts`).
+- **`expect` takes one argument.** To say which exchange or field failed, wrap
+  the assertion: `withMessage(label, () => expect(x).toBe(y))`
+  (`contract/src/support/wire.ts`).
+- **`process.env` is saved and restored by hand** — marketing's
+  `test/env.ts` (`stubEnv` / `restoreEnv`); there is no `stubEnv` in Jest.
+  Replace a global function with `jest.spyOn(globalThis, 'fetch')`, which
+  `restoreMocks` (or `jest.restoreAllMocks()`) puts back.
+- **`it.each` takes mutable tuples.** Type the table (`it.each<[A, B]>([...])`)
+  instead of `as const`.
 
 ## The api-client contract pin
 

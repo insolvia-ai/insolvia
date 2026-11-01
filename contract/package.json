@@ -11,7 +11,7 @@
     "",
     "`test` needs a running stack and the CONTRACT_* variables",
     "(src/support/env.ts). contract/scripts/dev-test.sh starts the local",
-    ".NET stack and supplies them, which is why `test` is NOT `vitest run`",
+    ".NET stack and supplies them, which is why `test` is NOT `jest`",
     "under the root's fan-out: a bare `npm test` at the root must not fail",
     "for want of a backend. Run `npm run contract --workspace",
     "@insolvia-ai/contract` from the script, or the script itself."
@@ -19,7 +19,7 @@
   "scripts": {
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json",
-    "contract": "vitest run"
+    "contract": "jest"
   },
   "dependencies": {
     "@insolvia-ai/api-client": "*"

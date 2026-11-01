@@ -16,7 +16,7 @@ lint, typecheck, test.
 - Every endpoint added to the API gets a hand-written method here **and** a
   contract test alongside it.
 - **No dependencies, runtime or dev.** Platform `fetch`, no HTTP library;
-  `vitest`/`typescript`/`eslint`/`prettier` come from the workspace root.
+  `jest`/`typescript`/`eslint`/`prettier` come from the workspace root.
 - **No build step** — `package.json` exports `./src/index.ts`, which Metro and
   Node >=24 consume directly. Write relative imports with a literal `.ts`
   extension (`from './models.ts'`); the `//allowImportingTsExtensions` comment

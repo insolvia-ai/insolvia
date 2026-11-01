@@ -5,7 +5,7 @@
  * shape, exactly one of these fails, naming the divergence.
  */
 
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, jest } from '@jest/globals';
 
 import { AdminClient, AdminApiError, AdminUnauthorizedError } from './client';
 
@@ -20,25 +20,25 @@ function jsonResponse(body: unknown, status = 200) {
 }
 
 afterEach(() => {
-  vi.restoreAllMocks();
+  jest.restoreAllMocks();
 });
 
 describe('authentication seam', () => {
   it('refuses to send at all without a token — expiry means re-authenticate', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch');
+    const fetchMock = jest.spyOn(globalThis, 'fetch');
     await expect(clientWithToken(null).listFirms()).rejects.toBeInstanceOf(AdminUnauthorizedError);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('maps a 401 to AdminUnauthorizedError', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ error: 'Unauthorized' }, 401));
+    jest.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ error: 'Unauthorized' }, 401));
     await expect(clientWithToken().listFirms()).rejects.toBeInstanceOf(AdminUnauthorizedError);
   });
 });
 
 describe('the six routes', () => {
   it('GET /v1/firms with the bearer header', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+    const fetchMock = jest.spyOn(globalThis, 'fetch').mockResolvedValue(
       // Literal shape from list_firms_route: firm_json + userCount.
       jsonResponse({
         firms: [
@@ -68,7 +68,7 @@ describe('the six routes', () => {
   });
 
   it('POST /v1/firms with the provision body', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+    const fetchMock = jest.spyOn(globalThis, 'fetch').mockResolvedValue(
       jsonResponse(
         {
           firm: {
@@ -113,7 +113,7 @@ describe('the six routes', () => {
   });
 
   it('PATCH /v1/firms/<id> carries only the status', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+    const fetchMock = jest.spyOn(globalThis, 'fetch').mockResolvedValue(
       jsonResponse({
         id: 'f-1',
         name: 'Example',
@@ -132,12 +132,12 @@ describe('the six routes', () => {
   });
 
   it('GET /v1/firms/<id>/users unwraps the users array', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ users: [] }));
+    jest.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ users: [] }));
     await expect(clientWithToken().listFirmUsers('f-1')).resolves.toEqual([]);
   });
 
   it('POST resend-invite accepts the 204', async () => {
-    const fetchMock = vi
+    const fetchMock = jest
       .spyOn(globalThis, 'fetch')
       .mockResolvedValue(new Response(null, { status: 204 }));
     await clientWithToken().resendInvite('f-1', 'sub-1');
@@ -147,7 +147,7 @@ describe('the six routes', () => {
   });
 
   it('surfaces field errors from a validation 400', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+    jest.spyOn(globalThis, 'fetch').mockResolvedValue(
       jsonResponse({ error: 'ValidationError', fields: { name: 'A name is required.' } }, 400),
     );
     await expect(
@@ -162,7 +162,7 @@ describe('the six routes', () => {
   });
 
   it('surfaces the 409 message the duplicate-address path answers', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+    jest.spyOn(globalThis, 'fetch').mockResolvedValue(
       jsonResponse(
         {
           error: 'ConflictError',

@@ -12,11 +12,12 @@
 import { appendFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { expect } from '@jest/globals';
 import { InsolviaApiClient } from '@insolvia-ai/api-client';
-import { expect, inject } from 'vitest';
 
+import { coverageDir } from '../coverage.ts';
 import { env } from './env.ts';
-import { expectShape, type Spec } from './wire.ts';
+import { expectShape, type Spec, withMessage } from './wire.ts';
 
 export interface Exchange {
   readonly method: string;
@@ -39,7 +40,7 @@ export const CLIENT_METHODS: readonly string[] = Object.getOwnPropertyNames(
 const methodSet = new Set(CLIENT_METHODS);
 
 function noteCall(method: string): void {
-  const dir = inject('coverageDir');
+  const dir = coverageDir();
   appendFileSync(join(dir, `${process.pid}.log`), `${method}\n`);
 }
 
@@ -110,7 +111,9 @@ export function contractClient(token?: string | (() => string)): ContractClient 
     last,
     wire(status, spec) {
       const exchange = last();
-      expect(exchange.status, `${exchange.method} ${exchange.path}`).toBe(status);
+      withMessage(`${exchange.method} ${exchange.path}`, () =>
+        expect(exchange.status).toBe(status),
+      );
       if (spec !== undefined)
         expectShape(exchange.body, spec, `${exchange.method} ${exchange.path}`);
       return exchange.body;

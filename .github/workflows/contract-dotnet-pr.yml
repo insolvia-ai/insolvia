@@ -48,6 +48,7 @@ jobs:
             seeds/**
             package.json
             package-lock.json
+            jest.base.js
             .github/workflows/contract-dotnet-pr.yml
             .github/actions/changed-paths/action.yml
 

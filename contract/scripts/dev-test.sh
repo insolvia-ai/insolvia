@@ -3,7 +3,7 @@
 # anywhere.
 #
 #   contract/scripts/dev-test.sh                    # the .NET stack on Postgres
-#   contract/scripts/dev-test.sh api                # extra args go to vitest
+#   contract/scripts/dev-test.sh api                # extra args go to jest
 #
 # It:
 # 1. mints a throwaway RS256 key for this run;
@@ -12,7 +12,7 @@
 #    seeds/dev.json by the real migrator; contract/scripts/aux-server.ts for
 #    the JWKS and the blob URLs; then the API, admin and MCP hosts, each as
 #    its own database role;
-# 3. runs the Vitest suite against it (the coverage gate is enforced on an
+# 3. runs the Jest suite against it (the coverage gate is enforced on an
 #    unfiltered run), and stops the stack however that ends.
 #
 # Needs Docker and the .NET SDK (backend/global.json). `--target dotnet` is
@@ -29,12 +29,12 @@ REPO="$(cd "$CONTRACT/.." && pwd)"
 BACKEND="$REPO/backend"
 
 TARGET=dotnet
-VITEST_ARGS=()
+JEST_ARGS=()
 while (($#)); do
   case "$1" in
     --target) TARGET="${2:-}"; shift 2 ;;
     --target=*) TARGET="${1#--target=}"; shift ;;
-    *) VITEST_ARGS+=("$1"); shift ;;
+    *) JEST_ARGS+=("$1"); shift ;;
   esac
 done
 case "$TARGET" in
@@ -200,7 +200,7 @@ echo "contract stack ($TARGET) ready"
 
 cd "$REPO"
 status=0
-npm run contract --workspace @insolvia-ai/contract -- "${VITEST_ARGS[@]+"${VITEST_ARGS[@]}"}" || status=$?
+npm run contract --workspace @insolvia-ai/contract -- "${JEST_ARGS[@]+"${JEST_ARGS[@]}"}" || status=$?
 if [[ $status -ne 0 && -n "${CONTRACT_SHOW_STACK_LOG:-}" ]]; then
   show_logs
 fi

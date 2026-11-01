@@ -14,7 +14,7 @@ import {
   ApiUnauthorizedException,
   ApiValidationException,
 } from '@insolvia-ai/api-client';
-import { expect } from 'vitest';
+import { expect } from '@jest/globals';
 
 type Leaf = 'string' | 'number' | 'integer' | 'boolean' | 'object' | 'array' | 'any' | 'null';
 /**
@@ -67,11 +67,25 @@ function check(value: unknown, spec: Spec, path: string, problems: string[]): vo
   }
 }
 
+/**
+ * Runs `assertion` and, when it fails, puts `message` in front of the
+ * matcher's own report. Jest's `expect` takes one argument; this is how an
+ * assertion here says which exchange, field or tool it was about.
+ */
+export function withMessage<T>(message: string, assertion: () => T): T {
+  try {
+    return assertion();
+  } catch (failure) {
+    if (failure instanceof Error) failure.message = `${message}\n\n${failure.message}`;
+    throw failure;
+  }
+}
+
 /** Fails with every mismatch at once, each naming its JSON path. */
 export function expectShape(value: unknown, spec: Spec, label = '$'): void {
   const problems: string[] = [];
   check(value, spec, label, problems);
-  expect(problems, `wire shape of ${label}`).toEqual([]);
+  withMessage(`wire shape of ${label}`, () => expect(problems).toEqual([]));
 }
 
 export interface ErrorEnvelope {
@@ -97,24 +111,26 @@ export async function expectApiError(
   } catch (thrown) {
     caught = thrown;
   }
-  expect(caught, `expected a ${status} refusal, but the call succeeded`).toBeInstanceOf(
-    ApiException,
+  withMessage(`expected a ${status} refusal, but the call succeeded`, () =>
+    expect(caught).toBeInstanceOf(ApiException),
   );
   const failure = caught as ApiException;
-  expect(failure.statusCode, failure.body).toBe(status);
+  withMessage(failure.body, () => expect(failure.statusCode).toBe(status));
   if (status === 401) {
     expect(failure).toBeInstanceOf(ApiUnauthorizedException);
     expect((failure as ApiUnauthorizedException).source).toBe('server');
   }
   const body = JSON.parse(failure.body) as ErrorEnvelope;
   expectShape(body, ENVELOPE, 'error');
-  expect(body.message !== undefined || body.fields !== undefined, failure.body).toBe(true);
+  withMessage(failure.body, () =>
+    expect(body.message !== undefined || body.fields !== undefined).toBe(true),
+  );
   if (body.fields !== undefined) {
     expect(failure).toBeInstanceOf(ApiValidationException);
     for (const [name, message] of Object.entries(body.fields)) {
-      expect(typeof message, `fields.${name}`).toBe('string');
+      withMessage(`fields.${name}`, () => expect(typeof message).toBe('string'));
     }
   }
-  if (error !== undefined) expect(body.error, failure.body).toBe(error);
+  if (error !== undefined) withMessage(failure.body, () => expect(body.error).toBe(error));
   return body;
 }
