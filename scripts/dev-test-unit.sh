@@ -51,7 +51,7 @@ ok()   { printf '%s[ ok ]%s %s\n' "$c_green" "$c_reset" "$*"; }
 die()  { printf '%s[fail]%s %s\n' "$c_red" "$c_reset" "$*" >&2; exit 1; }
 
 # Every area, in the order they run.
-ALL_AREAS="backend api-client app portal marketing forms ci-scripts"
+ALL_AREAS="backend api-client admin-client app portal marketing forms ci-scripts"
 
 # ── Which areas a path can break ────────────────────────────────────────────
 # One line per path family; an area listed twice is run once. Kept broad on
@@ -66,11 +66,12 @@ areas_for_path() {
     forms/*)                                        echo "forms" ;;
     .github/scripts/*|.github/workflows/release.yml) echo "ci-scripts" ;;
     packages/insolvia_api_client/*)                 echo "api-client app" ;;
+    packages/insolvia_admin_client/*)               echo "admin-client portal" ;;
     apps/insolvia_app/*)                            echo "app" ;;
     apps/insolvia_admin/*)                          echo "portal" ;;
     apps/insolvia_marketing/*)                      echo "marketing" ;;
     package.json|package-lock.json|tsconfig.base.json|eslint.base.js|jest.base.js)
-                                                    echo "api-client app" ;;
+                                                    echo "api-client admin-client app" ;;
     # A change to the runner itself is proven by running every suite; a
     # change to the hook config is proven by the hook firing at all.
     scripts/dev-test-unit.sh)                       echo "$ALL_AREAS" ;;
@@ -106,6 +107,7 @@ run_area() {
   case "$1" in
     backend)    dotnet_suite ;;
     api-client) node_workspace_suite api-client @insolvia-ai/api-client ;;
+    admin-client) node_workspace_suite admin-client @insolvia-ai/admin-client ;;
     app)        node_workspace_suite app apps/insolvia_app ;;
     portal)     node_standalone_suite portal apps/insolvia_admin apps/insolvia_admin/scripts/dev-setup.sh ;;
     marketing)  node_standalone_suite marketing apps/insolvia_marketing apps/insolvia_marketing/scripts/dev-setup.sh ;;
@@ -119,6 +121,7 @@ describe_area() {
   case "$1" in
     backend)    echo "backend/                 dotnet format --verify-no-changes, dotnet test (xUnit)" ;;
     api-client) echo "packages/insolvia_api_client  npm run test --workspace" ;;
+    admin-client) echo "packages/insolvia_admin_client  npm run test --workspace" ;;
     app)        echo "apps/insolvia_app        npm run test --workspace (jest)" ;;
     portal)     echo "apps/insolvia_admin      npm test (own lockfile)" ;;
     marketing)  echo "apps/insolvia_marketing  npm test (own lockfile)" ;;

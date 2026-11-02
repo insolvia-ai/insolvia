@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Alert, Button, Card, Field, Input } from '@insolvia-ai/design-system';
 
-import { AdminApiError, AdminUnauthorizedError } from '../api/client';
+import { AdminApiError, AdminUnauthorizedError } from '@insolvia-ai/admin-client';
 import { useClient } from '../api/use-client';
 import { useSession } from '../session/session';
 

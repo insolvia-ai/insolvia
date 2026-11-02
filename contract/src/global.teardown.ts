@@ -1,38 +1,54 @@
-// Jest's globalTeardown for the coverage gate; coverage.ts says how it works.
-// Throwing here fails the run. The gate is enforced on a FULL OFFLINE run
-// only (ADR 0029 rule 2): a filtered run cannot cover everything, and the
+// Jest's globalTeardown for the coverage gates; coverage.ts says how they
+// work. Throwing here fails the run. The gates are enforced on a FULL OFFLINE
+// run only (ADR 0029 rule 2): a filtered run cannot cover everything, and the
 // deployed target skips the offline-only specs that call some methods.
-import { readdirSync, readFileSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
+import { rmSync } from 'node:fs';
 
-import { clientMethods, coverageDir, isFiltered } from './coverage.ts';
+import { adminClientMethods, clientMethods, coverageDir, isFiltered, readRun } from './coverage.ts';
 import { TARGET } from './support/target.ts';
+
+interface Gate {
+  readonly summary: string;
+  readonly failure: string | null;
+}
+
+function gate(label: string, unit: string, all: readonly string[], called: Set<string>): Gate {
+  const uncovered = all.filter((name) => !called.has(name));
+  return {
+    summary: `${label} coverage: ${all.length - uncovered.length}/${all.length} ${unit} called, ${uncovered.length} uncovered`,
+    failure: uncovered.length === 0 ? null : `${uncovered.length} ${unit}: ${uncovered.join(', ')}`,
+  };
+}
 
 export default function teardown(): void {
   const dir = coverageDir();
-  const called = new Set<string>();
-  for (const file of readdirSync(dir)) {
-    for (const line of readFileSync(join(dir, file), 'utf8').split('\n')) {
-      if (line) called.add(line);
-    }
-  }
+  const { called, listedTools } = readRun(dir);
   rmSync(dir, { recursive: true, force: true });
-  const methods = clientMethods();
-  const uncovered = methods.filter((name) => !called.has(name));
-  const summary = `client coverage: ${methods.length - uncovered.length}/${methods.length} methods called, ${uncovered.length} uncovered`;
-  if (isFiltered()) {
-    console.log(`${summary} (filtered run — the gate is not enforced)`);
-    return;
-  }
-  if (TARGET !== 'offline') {
-    console.log(`${summary} (${TARGET} target — the gate is enforced offline only)`);
-    return;
-  }
-  console.log(summary);
-  if (uncovered.length > 0) {
+
+  const gates: Gate[] = [
+    gate('client', 'methods', clientMethods(), called.api),
+    gate('admin-client', 'methods', adminClientMethods(), called.admin),
+    listedTools === null
+      ? {
+          summary: 'mcp tool coverage: tools/list was never called',
+          failure: 'tools/list was never called, so no tool list to check against',
+        }
+      : gate('mcp tool', 'tools', [...listedTools].sort(), called.mcp),
+  ];
+
+  const note = isFiltered()
+    ? ' (filtered run — the gate is not enforced)'
+    : TARGET !== 'offline'
+      ? ` (${TARGET} target — the gate is enforced offline only)`
+      : '';
+  for (const { summary } of gates) console.log(`${summary}${note}`);
+  if (note) return;
+
+  const failures = gates.flatMap((g) => (g.failure === null ? [] : [g.failure]));
+  if (failures.length > 0) {
     throw new Error(
-      `the contract suite never called ${uncovered.length} InsolviaApiClient ` +
-        `method(s): ${uncovered.join(', ')}. Every public client method needs a ` +
+      `the contract suite never exercised ${failures.join('; ')}. Every public method of ` +
+        'InsolviaApiClient and AdminClient, and every tool the MCP server lists, needs a ' +
         'contract test (contract/CLAUDE.md).',
     );
   }

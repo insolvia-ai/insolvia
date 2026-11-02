@@ -7,7 +7,7 @@
 
 import { afterEach, describe, expect, it, jest } from '@jest/globals';
 
-import { AdminClient, AdminApiError, AdminUnauthorizedError } from './client';
+import { AdminClient, AdminApiError, AdminUnauthorizedError } from './client.ts';
 
 const BASE = 'http://127.0.0.1:8090';
 
@@ -147,9 +147,11 @@ describe('the six routes', () => {
   });
 
   it('surfaces field errors from a validation 400', async () => {
-    jest.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ error: 'ValidationError', fields: { name: 'A name is required.' } }, 400),
-    );
+    jest
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(
+        jsonResponse({ error: 'ValidationError', fields: { name: 'A name is required.' } }, 400),
+      );
     await expect(
       clientWithToken().provisionFirm({
         name: '',

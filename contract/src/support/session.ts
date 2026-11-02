@@ -17,6 +17,9 @@
 //   CONTRACT_AUTH_CLIENT_ID         the staff app's client
 //   CONTRACT_AUTH_PORTAL_CLIENT_ID  the client portal's (ADR 0023)
 //   E2E_TEST_USER_PASSWORD          the seeded people's shared password
+//   CONTRACT_AUTH_MCP_CLIENT_ID     an MCP harness's client (the inspector's),
+//                                   read only by a run that reaches the MCP
+//                                   specs (mcpSignIn below)
 import { type AuthenticationResult, claimsOf, signIn, SignInError } from './cognito-srp.ts';
 import { PEOPLE, person, type SeededPerson } from './target.ts';
 
@@ -43,12 +46,30 @@ export function deployedInput(name: string): string {
 /** A new SRP sign-in for one seeded person, through the app client their kind uses. */
 export async function freshSignIn(handle: string): Promise<AuthenticationResult> {
   const who: SeededPerson = person(handle);
+  return signInThrough(
+    handle,
+    who.kind === 'client' ? 'CONTRACT_AUTH_PORTAL_CLIENT_ID' : 'CONTRACT_AUTH_CLIENT_ID',
+  );
+}
+
+/**
+ * A new SRP sign-in for one seeded firm user through an MCP harness's app
+ * client — the token an agent's harness holds after the person signs in
+ * there. The MCP server admits it only if that client is on its allowlist
+ * (AUTH_CLIENT_IDS), which is what the deployed MCP specs prove. Made per
+ * test file rather than in the global setup, so a run that never reaches
+ * the MCP specs (api-staging.yml's) never needs the input.
+ */
+export async function mcpSignIn(handle: string): Promise<AuthenticationResult> {
+  return signInThrough(handle, 'CONTRACT_AUTH_MCP_CLIENT_ID');
+}
+
+async function signInThrough(handle: string, clientInput: string): Promise<AuthenticationResult> {
+  const who: SeededPerson = person(handle);
   try {
     return await signIn({
       poolId: deployedInput('CONTRACT_AUTH_POOL_ID'),
-      clientId: deployedInput(
-        who.kind === 'client' ? 'CONTRACT_AUTH_PORTAL_CLIENT_ID' : 'CONTRACT_AUTH_CLIENT_ID',
-      ),
+      clientId: deployedInput(clientInput),
       email: who.email,
       password: deployedInput('E2E_TEST_USER_PASSWORD'),
     });

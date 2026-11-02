@@ -3,7 +3,7 @@ import { BrowserRouter, Link, Navigate, Route, Routes } from 'react-router';
 import { Button } from '@insolvia-ai/design-system';
 
 import { config } from './config/environment';
-import { AdminClient } from './api/client';
+import { AdminClient } from '@insolvia-ai/admin-client';
 import { SessionProvider, useSession } from './session/session';
 import { ClientContext } from './api/use-client';
 import { FirmDetailScreen } from './screens/firm-detail';

@@ -38,6 +38,7 @@ jobs:
         with:
           paths: |
             apps/insolvia_admin/**
+            packages/insolvia_admin_client/**
             .github/workflows/admin-pr.yml
             .github/actions/changed-paths/action.yml
 
@@ -48,7 +49,9 @@ jobs:
 
       # Own lockfile, own install — deliberately outside the npm workspace,
       # like marketing: this `npm ci` from a clean registry is what proves the
-      # published design-system install works.
+      # published design-system install works. Its one local dependency,
+      # @insolvia-ai/admin-client, is `file:../../packages/insolvia_admin_client`
+      # in this same checkout, so the build compiles the client the portal ships.
       - name: Install
         if: steps.filter.outputs.run == 'true'
         run: npm ci
@@ -83,3 +86,58 @@ jobs:
             echo "::error::react-native leaked into the admin portal bundle"
             exit 1
           fi
+
+  # The portal's client as a package (ADR 0029 rule 2): its own format, lint,
+  # typecheck and Jest suite, from the ROOT workspace it is a member of. The
+  # portal job above proves the portal builds against it; this proves the
+  # package itself. Not a required check — the `Admin portal` job is.
+  client:
+    name: Admin client
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - id: filter
+        uses: ./.github/actions/changed-paths
+        with:
+          paths: |
+            packages/insolvia_admin_client/**
+            package.json
+            package-lock.json
+            tsconfig.base.json
+            eslint.base.js
+            jest.base.js
+            .prettierrc
+            .prettierignore
+            .github/workflows/admin-pr.yml
+            .github/actions/changed-paths/action.yml
+
+      - uses: actions/setup-node@v5
+        if: steps.filter.outputs.run == 'true'
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Install
+        if: steps.filter.outputs.run == 'true'
+        run: npm ci
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Format check
+        if: steps.filter.outputs.run == 'true'
+        run: npx prettier --check packages/insolvia_admin_client
+
+      - name: Lint
+        if: steps.filter.outputs.run == 'true'
+        run: npm run lint --workspace @insolvia-ai/admin-client
+
+      - name: Typecheck
+        if: steps.filter.outputs.run == 'true'
+        run: npm run typecheck --workspace @insolvia-ai/admin-client
+
+      - name: Test
+        if: steps.filter.outputs.run == 'true'
+        run: npm run test --workspace @insolvia-ai/admin-client

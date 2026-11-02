@@ -103,6 +103,7 @@ google_admin_client_id="$(jq -r '.google_admin_client_id.value' <<<"$outputs")"
 job_queue_url="$(jq -r '.job_queue_url.value' <<<"$outputs")"
 filing_queue_url="$(jq -r '.filing_queue_url.value' <<<"$outputs")"
 mcp_auth_client_ids="$(jq -r '.mcp_auth_client_ids.value' <<<"$outputs")"
+mcp_inspector_client_id="$(jq -r '.mcp_client_ids_by_harness.value.inspector' <<<"$outputs")"
 
 # ── Wire the local backend at the shared pool ───────────────────
 # Mechanism: docker compose auto-reads backend/.env for VARIABLE SUBSTITUTION
@@ -122,7 +123,10 @@ mcp_auth_client_ids="$(jq -r '.mcp_auth_client_ids.value' <<<"$outputs")"
 #     scripts/dev-aws-seed.sh is the seeder once a pool is wired — with the
 #     people's REAL subjects, which a derived local seed would contradict.
 #   • AUTH_CLIENT_IDS: the MCP harness allowlist (this pool's claude +
-#     inspector clients), for `dotnet run --project src/Insolvia.Mcp`.
+#     inspector clients), for the compose MCP server on :8788.
+#   • AUTH_MCP_INSPECTOR_CLIENT_ID: one of those, not read by compose;
+#     contract/scripts/dev-test.sh --target deployed signs the seeded admin in
+#     through it, the token an MCP Inspector session would hold.
 #   • CASE_DOCUMENT_BUCKET / JOB_QUEUE_URL / FILING_QUEUE_URL: this machine's
 #     own bucket and queues, for a `dotnet run` of the worker or a host that
 #     wants the real AWS adapters (`set -a; source backend/.env; set +a`).
@@ -136,6 +140,7 @@ upsert_env "$backend_env" AUTH_USER_POOL_ID "$pool_id"
 upsert_env "$backend_env" GOOGLE_CLIENT_ID "$google_admin_client_id"
 upsert_env "$backend_env" INSOLVIA_SEED "false"
 upsert_env "$backend_env" AUTH_CLIENT_IDS "$mcp_auth_client_ids"
+upsert_env "$backend_env" AUTH_MCP_INSPECTOR_CLIENT_ID "$mcp_inspector_client_id"
 upsert_env "$backend_env" CASE_DOCUMENT_BUCKET "$document_bucket"
 upsert_env "$backend_env" JOB_QUEUE_URL "$job_queue_url"
 upsert_env "$backend_env" FILING_QUEUE_URL "$filing_queue_url"

@@ -32,6 +32,7 @@
     "test": "jest"
   },
   "dependencies": {
+    "@insolvia-ai/admin-client": "file:../../packages/insolvia_admin_client",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-router": "^7.18.1"
