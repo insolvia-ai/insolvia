@@ -3,7 +3,7 @@
 # Shared developer / CI toolchain bootstrap for the Insolvia monorepo.
 #
 # Installs the cross-cutting tools every package needs (Terraform, tflint, AWS
-# CLI, jq, Node.js, Watchman, Python 3, the .NET SDK) with Homebrew on BOTH macOS and
+# CLI, jq, Node.js, Watchman, the .NET SDK, pre-commit) with Homebrew on BOTH macOS and
 # Linux. Package-specific setup lives in per-package scripts, e.g.
 # apps/insolvia_app/scripts/dev-setup.sh (the Expo app).
 #
@@ -27,9 +27,10 @@
 #     bundler) uses it to watch the source tree; without it Metro falls back to
 #     Node's own recursive fs watching, which is slower and hits the macOS
 #     open-file limit on a tree this size.
-#   - Python:   any python3. No service is Python since ADR 0028 (plan
-#     18.23); what still is: the brand-mark cutter
-#     (scripts/render-brand-marks.sh, its own venv) and pre-commit.
+#   - Python:   not installed on its own. Nothing of ours is Python (ADR 0029
+#     rule 4; app-pr.yml guards it). The one Python program here is
+#     pre-commit, a third-party tool, and Homebrew's formula brings the
+#     interpreter it runs on.
 #   - .NET SDK: 10.0, as backend/global.json pins it (the .NET backend, ADR
 #     0028). Checked against that file below, not here.
 #
@@ -151,7 +152,6 @@ brew_ensure aws       awscli
 brew_ensure jq        jq
 brew_ensure node      node
 brew_ensure watchman  watchman
-brew_ensure python3   python
 brew_ensure dotnet    dotnet
 
 # Node version floor (the OS may already ship a newer/older node than brew's).

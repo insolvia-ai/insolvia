@@ -5,7 +5,7 @@ namespace Insolvia.UstTool.Tests;
 
 // The ingester, end to end on the recordings: what it writes for a period
 // already in the registry is the committed release, byte for byte — the
-// same files the Python wrote.
+// same files the Python wrote, but for the converter the notes name.
 public sealed class IngestTests
 {
     private static IngestArgs Args(string period, string effective, string? msaFile = null) =>
@@ -41,7 +41,7 @@ public sealed class IngestTests
         var release = await Ingest.LocalAsync(
             Args("20260715", "2026-07-15", Path.Combine(Recordings.FixturesDirectory, "20260715", "msa-counties.json")),
             Recordings.Fetcher(new Dictionary<string, string> { ["housing_util_standards_FIPS.xlsx"] = "housing_util_standards_FIPS.trimmed.xlsx" }));
-        var committed = JsonNode.Parse(Recordings.Committed("ust/irs-local-standards/2026-07-15/dataset.json"))!.AsObject();
+        var committed = JsonNode.Parse(Recordings.CommittedAsIngestedNow("ust/irs-local-standards/2026-07-15/dataset.json"))!.AsObject();
 
         // Transportation (the whole table), the scope and the prose: identical.
         foreach (var key in new[] { "kind", "verification", "sources", "states", "transportation", "notes" })
@@ -165,10 +165,27 @@ public sealed class IngestTests
         Assert.Contains("ust/irs-national-standards", error.Message, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("census-median-family-income/2026-04-01")]
+    [InlineData("irs-national-standards/2026-07-15")]
+    [InlineData("irs-local-standards/2026-07-15")]
+    [InlineData("ch13-admin-multipliers/2026-07-15")]
+    public void A_committed_release_names_the_converter_that_wrote_it_and_a_new_one_names_this_tool(string releasePath)
+    {
+        var committed = Recordings.Committed($"ust/{releasePath}/dataset.json");
+        var now = Recordings.CommittedAsIngestedNow($"ust/{releasePath}/dataset.json");
+
+        Assert.Contains(Ingest.FormerConverter, committed, StringComparison.Ordinal);
+        Assert.DoesNotContain(Ingest.FormerConverter, now, StringComparison.Ordinal);
+        Assert.Contains(Ingest.ConvertedBy, now, StringComparison.Ordinal);
+    }
+
     private static void AssertCommitted(string releasePath, UstReleaseFiles release)
     {
         Assert.Equal(Recordings.Committed($"ust/{releasePath}/manifest.json"), PythonJson.Dumps(release.Manifest));
-        Assert.Equal(Recordings.Committed($"ust/{releasePath}/dataset.json"), PythonJson.Dumps(release.Dataset));
+        // Byte for byte but for the converter's name in the notes, which the
+        // committed release keeps as the Python wrote it.
+        Assert.Equal(Recordings.CommittedAsIngestedNow($"ust/{releasePath}/dataset.json"), PythonJson.Dumps(release.Dataset));
     }
 
     private sealed class TempDirectory : IDisposable

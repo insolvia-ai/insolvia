@@ -58,6 +58,17 @@ internal static partial class Ingest
     public const string LocalSeries = UstData.LocalStandardsSeries;
     public const string Ch13Series = UstData.Ch13MultipliersSeries;
 
+    /// <summary>
+    /// What a release's <c>notes</c> say converted it. The releases committed
+    /// before #585 name the Python script this replaced
+    /// (<see cref="FormerConverter"/>) and keep it: they are history, and a
+    /// re-ingest of one differs from it in this name only.
+    /// </summary>
+    public const string ConvertedBy = "the UST tool (backend/src/Insolvia.UstTool)";
+
+    /// <summary>The converter the releases committed before #585 name.</summary>
+    public const string FormerConverter = "scripts/ingest-ust-data.py";
+
     // The launch set (ADR 0017): the local-standards payload is scoped to
     // these states because nothing downstream computes for any other state —
     // the exemptions registry draws the same line. Widening the launch set
@@ -500,7 +511,7 @@ internal static partial class Ingest
                 + "above 4 add the excess-person figure per person — 12x the "
                 + "monthly amount in 11 U.S.C. 707(b)(7)(A)(iii), which "
                 + "code/dollar-amounts carries. Converted mechanically by "
-                + "scripts/ingest-ust-data.py from the UST XLSX (sha256 in the "
+                + ConvertedBy + " from the UST XLSX (sha256 in the "
                 + "manifest).",
         };
         var manifest = ManifestFor(
@@ -549,7 +560,7 @@ internal static partial class Ingest
                 + "(line 30's optional additional allowance); and the "
                 + "out-of-pocket health care allowance per person (line 7), "
                 + "under 65 / 65 and older. Converted mechanically by "
-                + "scripts/ingest-ust-data.py (sha256s: manifest and sources).",
+                + ConvertedBy + " (sha256s: manifest and sources).",
         };
         var manifest = ManifestFor(
             NationalSeries, args, url, Sha256(data),
@@ -657,7 +668,7 @@ internal static partial class Ingest
                 + "region with MSA overrides whose county lists the UST publishes "
                 + "only on its region HTML pages. All three launch states are in "
                 + "the South region. Converted mechanically by "
-                + "scripts/ingest-ust-data.py.",
+                + ConvertedBy + ".",
         };
         var manifest = ManifestFor(
             LocalSeries, args, housingUrl, Sha256(housingData),
@@ -693,7 +704,7 @@ internal static partial class Ingest
                 + "(§ 707(b)(2)(A)(ii)(III); B122A-2 line 36 multiplies the "
                 + "projected plan payment by this figure). District names are the "
                 + $"UST's own ('Middle Florida'). {sourceNote}. Converted "
-                + "mechanically by scripts/ingest-ust-data.py.",
+                + "mechanically by " + ConvertedBy + ".",
         };
         var manifest = ManifestFor(
             Ch13Series, args, url, Sha256(data),
