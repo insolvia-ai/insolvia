@@ -66,7 +66,7 @@ React Router v7 SSR marketing site for `www.insolvia.ai`. Human docs:
   lives; Lighthouse and the RNW guard only ever inspect the *built* output.
   There is no jsdom environment yet: add one when the first component test
   arrives, not before. Shape and conventions:
-  [ADR 0008](../../docs/adr/0008-testing-shape-follows-the-code-it-tests.md)
+  [ADR 0029](../../docs/adr/0029-one-testing-shape.md)
   and the `insolvia-testing` skill.
 - **A test under `app/routes/` is a ROUTE unless `routes.ts` excludes it.**
   `flatRoutes()` turns every file in that directory into a route module, and

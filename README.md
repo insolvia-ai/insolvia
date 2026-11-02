@@ -36,7 +36,7 @@ repository, [`insolvia-ai/insolvia-services`](https://github.com/insolvia-ai/ins
 
 The `scripts/` directory is the toolchain — prefer it over hand-running `npm` or
 `npx expo`. One-time system setup (Homebrew installs Terraform, AWS CLI, Node,
-the .NET SDK, Python for a few stdlib checkers), idempotent and re-runnable:
+the .NET SDK, pre-commit), idempotent and re-runnable:
 
 ```bash
 ./scripts/dev-setup.sh          # add --check to report without installing

@@ -26,7 +26,7 @@ installing).
 
 | Want to… | Run |
 |---|---|
-| Install the shared toolchain (Terraform, tflint, AWS CLI, jq, Node ≥24, Watchman, Python 3, the .NET SDK `backend/global.json` pins) | `scripts/dev-setup.sh` |
+| Install the shared toolchain (Terraform, tflint, AWS CLI, jq, Node ≥24, Watchman, pre-commit, the .NET SDK `backend/global.json` pins) | `scripts/dev-setup.sh` |
 | Make a `read:packages` token available so `npm ci` can pull `@insolvia-ai/design-system` | `scripts/github-packages-auth.sh` |
 
 ## Run everything at once
@@ -59,8 +59,8 @@ install covers it.
 
 ## Test
 
-Four tiers, each a directory, each aimed at fixed environments — the
-`insolvia-testing` skill says how to write one, ADR 0021 says which runs where.
+One owner per level, each aimed at fixed environments — the
+`insolvia-testing` skill says how to write one, ADR 0029 says which runs where.
 
 | Want to… | Run |
 |---|---|
@@ -69,7 +69,8 @@ Four tiers, each a directory, each aimed at fixed environments — the
 | The **contract** suite: the .NET hosts on a throwaway Postgres, through each surface's real client (api-client, admin client, MCP SDK), with their coverage gates | `contract/scripts/dev-test.sh [jest path pattern or -t name]` |
 | The **contract** suite's deployed target against this machine's local stack (HTTP, signed in by SRP; no AWS credentials) | `contract/scripts/dev-test.sh --target deployed [jest filter]` — needs `dev-up.sh` running and `dev-aws-seed.sh` done |
 | The browser suite against this machine's dev stack — both projects, or `--project smoke` for the unauthenticated half | `e2e/scripts/dev-test.sh [--headed] [playwright args]` |
-| The same tiers against **staging** or the smoke project against **production** | never from a laptop — `api-staging.yml`, `app-staging.yml` and `app-prod.yml` run them after each deploy |
+| The admin portal's browser flow, offline over the contract stack (no AWS, no password) | `e2e/scripts/admin-offline-test.sh [playwright args]` — Docker, the .NET SDK, `npm ci` in `e2e/` and `apps/insolvia_admin/` |
+| The same suites against **staging** or the smoke project against **production** | never from a laptop — `api-staging.yml`, `app-staging.yml` and `app-prod.yml` run them after each deploy |
 
 The design system and the design tokens are **not in this repo** at all; they
 live in `insolvia-ai/design-system` and install from GitHub Packages. If an

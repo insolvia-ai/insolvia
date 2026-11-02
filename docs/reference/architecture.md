@@ -16,9 +16,12 @@ insolvia/
 │   │       └── theme.ts               StyleSheet helpers over the tokens
 │   └── insolvia_marketing/            React Router v7 + Vite, SSR
 ├── packages/
-│   └── insolvia_api_client/           @insolvia-ai/api-client
+│   ├── insolvia_api_client/           @insolvia-ai/api-client
+│   └── insolvia_admin_client/         @insolvia-ai/admin-client — the admin portal's client (unpublished)
 ├── backend/                           the .NET 10 backend on Aurora PostgreSQL (ADR 0028)
 ├── contract/                          the backend's HTTP contract suite (Jest; offline, or deployed and signed in)
+├── e2e/                               Playwright: flows and smoke against deployed envs; the admin portal's flow offline
+├── seeds/                             who exists per environment, and the versioned fixture cases
 ├── infra/                             Terraform — staging / prod / dev
 ├── tool/                              brand generators (themes, favicon)
 └── docs/                              business plan + runbooks
@@ -244,21 +247,23 @@ catches syntax and type errors but can never show what a change would *do*.
 
 ### What each stage asserts
 
-Four test tiers, each aimed at the environments that can answer it —
-[ADR 0021](../adr/0021-test-tiers-and-seed-fixtures.md) owns the table and the
-`insolvia-testing` skill owns how to write one. In pipeline terms: the **unit**
-tier is every `*-pr.yml` check and the pre-push hook; the **integration** tier
-(`contract/`'s deployed target, the live API over HTTP signed in as a seeded
-person through the shipped api-client) and the **e2e** suite (`e2e/`, both projects)
-run inside the staging stage after the deploys they test, seeded by
-`.github/actions/seed-staging` (the migrator Lambda's `seed` command), and
-their failure withholds the `insolvia/staging-release` status; the e2e
-**smoke** project alone runs against production, last, with no credentials.
-Seed data converges on every staging deploy from `seeds/staging.json` plus the
-versioned fixtures in `seeds/fixtures/`, whose bytes live in the shared bucket
-insolvia-services' `infra/envs/shared` owns. The contract suite's offline target
-is not a staging tier: it signs its own tokens, so it runs against a local
-stack.
+Each level of testing has one owner and a fixed set of environments —
+[ADR 0029](../adr/0029-one-testing-shape.md) owns the table (amending
+[ADR 0021](../adr/0021-test-tiers-and-seed-fixtures.md)'s tiers) and the
+`insolvia-testing` skill owns how to write one. In pipeline terms: every
+`*-pr.yml` check and the pre-push hook run the **unit**, **data** and
+**in-process route** levels, and `Contract (.NET)` runs `contract/`'s
+**offline** target (the .NET hosts on a throwaway Postgres, tokens signed by
+the run's own keys). `contract/`'s **deployed** target (the live API, admin
+and MCP over HTTP through each surface's real client, signed in as a seeded
+person) and the e2e **flows** and **smoke** projects run inside the staging
+stage after the deploys they test, seeded by `.github/actions/seed-staging`
+(the migrator Lambda's `seed` command), and their failure withholds the
+`insolvia/staging-release` status; the e2e **smoke** project alone runs
+against production, last, with no credentials. Seed data converges on every
+staging deploy from `seeds/staging.json` plus the versioned fixtures in
+`seeds/fixtures/`, whose bytes live in the shared bucket insolvia-services'
+`infra/envs/shared` owns.
 
 ### Production promotes; it does not rebuild
 
@@ -345,23 +350,22 @@ last paragraph of this section.
 ### Required status checks
 
 Red CI blocks a merge to `main`. The `protect-main` ruleset requires these
-job `name:` values (matrix legs get a `(leg)` suffix) — every `*-pr.yml` job,
+job `name:` values (matrix legs get a `(leg)` suffix) — every `*-pr.yml` gate,
 so a new PR gate is not finished until it is on this list. **18.23 deleted the
 five Python checks' workflows** (`API service`, `Admin service`,
-`MCP service`, `Filing worker`, `Core package`): if any is still on the
-ruleset, every PR waits on a status nobody reports, so they come off with
-`scripts/update-ruleset.sh remove "<name>"` (ADR 0028 § Consequences).
-`Contract (.NET)` runs on every PR and is not yet required; adding it is one
-`scripts/update-ruleset.sh add`.
+`MCP service`, `Filing worker`, `Core package`), and they are off the ruleset
+(ADR 0028 § Consequences). ADR 0029's moves (Jest everywhere, the forms check
+as xUnit, `integration/` into `contract/`) renamed no check.
 
 | Check name | Workflow |
 |---|---|
-| `App` | `app-pr.yml` |
+| `App` | `app-pr.yml` — also the guard against tracked Python (ADR 0029 rule 4) |
 | `Admin portal` | `admin-pr.yml` |
 | `API client` | `api-client-pr.yml` |
 | `Backend (.NET)` | `backend-pr.yml` — the backend that deploys (ADR 0028) |
 | `Cognito branding` | `branding-pr.yml` — the brand drift gate (ADR 0020); the name outlived Cognito, see the workflow's header |
-| `Form specs` | `forms-pr.yml` |
+| `Contract (.NET)` | `contract-dotnet-pr.yml` — `contract/`'s offline target and its coverage gates (ADR 0029 rule 2) |
+| `Form specs` | `forms-pr.yml` — the xUnit spec tests in `Insolvia.Forms.Tests` |
 | `Marketing site` | `marketing-pr.yml` |
 | `Terraform validate (staging)` | `shared-infra-plan.yml` |
 | `Terraform validate (prod)` | `shared-infra-plan.yml` |
@@ -370,7 +374,13 @@ ruleset, every PR waits on a status nobody reports, so they come off with
 missing from the ruleset until 2026-10-13 although their workflows already said they were
 required — `scripts/update-ruleset.sh show` is the check, not this table.
 
-`Terraform validate (dev)` runs alongside the two above but is deliberately
+Two PR jobs run on every PR and are **not** required, by decision:
+`Admin client` (`admin-pr.yml` — the portal's client package on its own; the
+`Admin portal` job, which builds the portal against it, is the gate) and
+`Admin portal flow (offline)` (`admin-flow-pr.yml` — a Playwright flow, and
+e2e flows stay out of the required set; see the workflow's header).
+
+`Terraform validate (dev)` runs alongside the two `Terraform validate` checks above but is deliberately
 **not** required — dev is never applied by CI, so it exists for coverage rather
 than as a gate. The reasoning is in `shared-infra-plan.yml`'s matrix comment.
 `Mailer service` and `Terraform validate (shared)` left this list when the

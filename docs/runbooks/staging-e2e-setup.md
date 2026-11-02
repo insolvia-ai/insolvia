@@ -146,7 +146,7 @@ upload. Until this has run, the seed step fails naming the missing object.
 ## Then: prove it end to end
 
 Trigger a staging deploy — merge to `main`, or dispatch **API · Deploy ·
-Staging** and **App · Deploy · Staging** — and watch the `integration` job and
+Staging** and **App · Deploy · Staging** — and watch the `integration` job (the contract suite's deployed target) and
 the `e2e` job. The seed step runs before each suite, so a provisioning problem
 fails there with a named error rather than as a mystery assertion afterwards.
 
@@ -174,7 +174,7 @@ recognising on sight:
 | Seed step: `AccessDenied` on `cognito-idp:AdminCreateUser` | Step 1 has not been done, or `staging_user_pool_arn` is empty in `ci-trust` — the grant is conditional on it, so the statement is simply absent. |
 | Seed step: `AccessDenied` on `s3:PutObject`, or on `s3:GetObject` from the fixture bucket | Step 1 has not been re-applied since the case grants were added to `ci-trust`. |
 | Seed step: `refusing: … the copy of objects/… did not land` or `NoSuchKey` | Step 3 has not been done for this fixture version, or insolvia-services' `infra/envs/shared` has not applied the bucket yet. |
-| Integration: `could not sign in as 'admin': … NotAuthorized` | The password secret and the pool disagree — a rotation that only half landed — or the account is not CONFIRMED. If the seed step was green, suspect the former. |
+| Contract (deployed): `could not sign in as 'admin': … NotAuthorized` | The password secret and the pool disagree — a rotation that only half landed — or the account is not CONFIRMED. If the seed step was green, suspect the former. |
 | Seed step: `refusing: fixture references ${E2E_TEST_USER_PASSWORD}` | The secret is unset, **or** the job lost its `environment: insolvia-staging` key — an environment-scoped secret resolves to an empty string in silence when the environment is missing or borrowed (`infra/CLAUDE.md`). |
 | Seed step: `InvalidPasswordException` | The stored password no longer meets the pool policy. Re-run step 2. |
 | Suite: `No user with handle 'x' in …/seeds/staging.json` | A spec names a handle the fixture does not define. Add the person to the fixture, or fix the handle. |

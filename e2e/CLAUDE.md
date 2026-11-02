@@ -1,10 +1,13 @@
 # `e2e/` — agent rules
 
-Post-deploy tests against **real environments**. Human docs:
+Post-deploy tests against **real environments**, plus one offline flow for
+the admin portal (last bullet). Human docs:
 [`README.md`](README.md). Setup runbook:
 [`../docs/runbooks/staging-e2e-setup.md`](../docs/runbooks/staging-e2e-setup.md).
-The tiers and which environment each runs against:
-[ADR 0021](../docs/adr/0021-test-tiers-and-seed-fixtures.md). The design
+The levels and which environment each runs against:
+[ADR 0029](../docs/adr/0029-one-testing-shape.md), amending
+[ADR 0021](../docs/adr/0021-test-tiers-and-seed-fixtures.md); how to write a
+spec: the `insolvia-testing` skill. The design
 constraints these obey come from issue #40; #80 is the first test.
 
 - **Two projects, by what they may hold.** `tests/flows/` signs in as a seeded
@@ -42,7 +45,8 @@ constraints these obey come from issue #40; #80 is the first test.
   before "tidying" this in.
 - **Never a required PR check.** These run post-deploy in `app-staging.yml` —
   the last staging leg of `release.yml` — and `app-prod.yml`, not in any
-  `*-pr.yml`. Slow, environment-dependent E2E stays out of the required set
+  `*-pr.yml` (the offline admin flow, last bullet, is the one exception, and
+  it is not required either). Slow, environment-dependent E2E stays out of the required set
   (`docs/reference/architecture.md` § Required status checks); adding it there
   would put staging's availability on the merge path for every PR. Changing
   the required set at all goes through `scripts/update-ruleset.sh` and the
@@ -92,3 +96,13 @@ constraints these obey come from issue #40; #80 is the first test.
   contract. The smoke project's one text selector — the footer's
   `Insolvia · <Label> · <host> · <stamp>` line — is a contract with
   `app-shell.tsx` for the same reason.
+- **The admin portal's flow is the one offline spec, and it has its own
+  config.** `tests/admin/` runs only through `playwright.admin.config.ts`, via
+  `scripts/admin-offline-test.sh`: the portal served locally over
+  `contract/`'s throwaway .NET stack, Google's sign-in stood in for inside the
+  browser (`support/google-identity-stand-in.ts`), because staff sign-in
+  cannot be automated on a deployed environment (ADR 0029 § Staff sign-in).
+  Because it needs no environment it runs on every PR (`admin-flow-pr.yml`),
+  but it is still an e2e flow, so it is **never required** — and never fold it
+  into `Contract (.NET)`, which is required. Never point it at a deployed
+  portal, and never let the stand-in leave the local composition.

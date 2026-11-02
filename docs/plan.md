@@ -261,10 +261,12 @@ PRs 1–9 — is recorded in those tables and the PRs, not repeated here.
    column prints blank; a seed drift report (`seed load --check` naming
    fixture fields changed after seeding) — whether the loader may repair
    them reverses ADR 0021's "existing rows are left alone", so it is the
-   maintainer's call. The portal integration tests write to the seeded
-   client's fixture case (bindings, answers, requests) and clean up, but
-   accepted and withdrawn answers stay in its review queue on every staging
-   run — seed a portal client bound to a scratch case of its own instead.
+   maintainer's call. The pytest portal tests that left answers in the
+   seeded client's review queue are gone (folded into `contract/`, #589);
+   one deployed contract spec still writes to that client's fixture case (an
+   ad-hoc request and an upload, removed in teardown) because it is the only
+   binding a deployed stack has — seed a portal client bound to a scratch
+   case of its own instead.
 5. **ADR 0023's binding owner** — the maintainer's call. 0023 § Decision says
    the portal binding moves from the case to the client record once 0022
    lands; 0022 has landed and the binding is still case-keyed

@@ -9,6 +9,14 @@ deploy, and `admin-staging.yml` and `mcp-staging.yml` run `src/admin` and
 `src/mcp` after theirs (the integration tier of ADR 0021, folded in here by
 ADR 0029).
 
+- **It owns the happy path; route tests own refusals** (ADR 0029 rule 1). A
+  spec here proves what a caller of the shipped client relies on: each client
+  method's happy path, the wire shape it parses, and tenancy as the client
+  sees it. Every auth-matrix cell, validation error, error mapping and edge
+  case is an xUnit route test in `backend/tests`. An error belongs here only
+  where the client's own mapping is under test, once per exception class. A
+  PR that touches an assertion duplicated at both levels deletes the wrong
+  copy and says so in its test-count report.
 - **It is the wire contract's oracle.** It was proven against the Python
   backend first and the .NET one at the switch, unchanged; since 18.23 deleted
   the Python it is what keeps the wire from drifting. So assert the **wire** —

@@ -45,7 +45,7 @@ tests/  one Insolvia.<Project>.Tests per project, plus Insolvia.Architecture.Tes
 ```
 
 [`CLAUDE.md`](CLAUDE.md) has the layering rules, the data tier's rules and
-the test tiers.
+the test levels.
 
 ## Images
 
