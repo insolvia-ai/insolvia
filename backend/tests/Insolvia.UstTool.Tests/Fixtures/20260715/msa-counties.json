@@ -1,0 +1,84 @@
+{
+  "Atlanta": {
+    "state": "GA",
+    "counties": [
+      "Barrow",
+      "Bartow",
+      "Butts",
+      "Carroll",
+      "Cherokee",
+      "Clayton",
+      "Cobb",
+      "Coweta",
+      "Dawson",
+      "DeKalb",
+      "Douglas",
+      "Fayette",
+      "Forsyth",
+      "Fulton",
+      "Gwinnett",
+      "Haralson",
+      "Heard",
+      "Henry",
+      "Jasper",
+      "Lumpkin",
+      "Meriwether",
+      "Morgan",
+      "Newton",
+      "Paulding",
+      "Pickens",
+      "Pike",
+      "Rockdale",
+      "Spalding",
+      "Walton"
+    ]
+  },
+  "Dallas-Ft. Worth": {
+    "state": "TX",
+    "counties": [
+      "Collin",
+      "Dallas",
+      "Denton",
+      "Ellis",
+      "Hunt",
+      "Johnson",
+      "Kaufman",
+      "Parker",
+      "Rockwall",
+      "Tarrant",
+      "Wise"
+    ]
+  },
+  "Houston": {
+    "state": "TX",
+    "counties": [
+      "Austin",
+      "Brazoria",
+      "Chambers",
+      "Fort Bend",
+      "Galveston",
+      "Harris",
+      "Liberty",
+      "Montgomery",
+      "San Jacinto",
+      "Waller"
+    ]
+  },
+  "Miami": {
+    "state": "FL",
+    "counties": [
+      "Broward",
+      "Miami-Dade",
+      "Palm Beach"
+    ]
+  },
+  "Tampa": {
+    "state": "FL",
+    "counties": [
+      "Hernando",
+      "Hillsborough",
+      "Pasco",
+      "Pinellas"
+    ]
+  }
+}

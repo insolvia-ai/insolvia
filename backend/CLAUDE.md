@@ -17,6 +17,7 @@ itself is gone, and `git log` before 18.23 has it.
 | `Insolvia.Forms` — pure: the PDF engine, which fills what Engines projects | `Core`, `Engines` |
 | `Insolvia.Data` (EF Core, Postgres), `Insolvia.Aws` (SDK adapters) | `Core` |
 | hosts: `Api`, `Worker`, `Admin`, `Mcp`, `Filing`, `Migrator` | any library above; **never another host** |
+| tools: `UstTool` — run by a developer or CI, never deployed (no Dockerfile stage) | the pure libraries it needs (`Core`, `Engines`); never `Data`, `Aws` or a host |
 
 - **No AWS and no EF in Core, Engines or Forms.** A port (interface) lives in
   Core; its adapter lives in `Data` or `Aws`; a host wires them. The

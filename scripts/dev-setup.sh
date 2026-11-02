@@ -28,9 +28,8 @@
 #     Node's own recursive fs watching, which is slower and hits the macOS
 #     open-file limit on a tree this size.
 #   - Python:   any python3. No service is Python since ADR 0028 (plan
-#     18.23); what still is: stdlib-only UST checkers
-#     (scripts/check-ust-data.py, scripts/ingest-ust-data.py), and the
-#     brand-mark cutter (scripts/render-brand-marks.sh, its own venv).
+#     18.23); what still is: the brand-mark cutter
+#     (scripts/render-brand-marks.sh, its own venv) and pre-commit.
 #   - .NET SDK: 10.0, as backend/global.json pins it (the .NET backend, ADR
 #     0028). Checked against that file below, not here.
 #
