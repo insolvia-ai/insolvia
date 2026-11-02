@@ -86,15 +86,21 @@ const server = createServer((req, res) => {
   const url = new URL(req.url ?? '/', `http://127.0.0.1:${port}`);
   if (corsOrigin && req.headers.origin === corsOrigin) {
     res.setHeader('Access-Control-Allow-Origin', corsOrigin);
-    res.setHeader('Access-Control-Expose-Headers', 'ETag');
+    res.setHeader('Access-Control-Expose-Headers', 'etag');
     res.setHeader('Vary', 'Origin');
   }
   void (async () => {
     if (req.method === 'OPTIONS' && corsOrigin && req.headers.origin === corsOrigin) {
-      // The preflight a browser sends before a PUT with a non-simple
-      // Content-Type (application/pdf). The PUT itself is still checked below.
-      res.setHeader('Access-Control-Allow-Methods', 'GET, PUT');
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+      // The preflight a browser sends before the PUT. The allowed headers are
+      // the case-documents bucket's own CORS rule
+      // (infra/modules/case_documents/main.tf), so a header the app starts
+      // sending fails here before it fails on staging. The PUT itself is
+      // still checked below.
+      res.setHeader('Access-Control-Allow-Methods', 'PUT, GET');
+      res.setHeader(
+        'Access-Control-Allow-Headers',
+        'content-type, content-length, x-amz-server-side-encryption, x-amz-tagging',
+      );
       send(res, 204);
       return;
     }
