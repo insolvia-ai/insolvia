@@ -38,6 +38,13 @@ internal static class Recordings
     public static string Committed(string relative) => File.ReadAllText(Path.Combine(RegistryRoot, relative));
 
     /// <summary>
+    /// A committed release as the tool writes it today: the Python wrote the
+    /// committed ones, and their <c>notes</c> name it as the converter.
+    /// </summary>
+    public static string CommittedAsIngestedNow(string relative) =>
+        Committed(relative).Replace(Ingest.FormerConverter, Ingest.ConvertedBy, StringComparison.Ordinal);
+
+    /// <summary>
     /// A minimal workbook for the reader's edge cases: each sheet is its rows'
     /// XML, the shared strings are written as given (rich text runs and all).
     /// </summary>
