@@ -131,7 +131,18 @@ public sealed class InsolviaTool : McpServerTool
         };
     }
 
-    /// <summary>A domain refusal: <c>{error: {code, message, fields?}}</c>, <c>isError: true</c>.</summary>
+    /// <summary>
+    /// A domain refusal: <c>isError: true</c>, and <c>{error: {code, message, fields?}}</c>
+    /// as the text block's JSON — never as <c>structuredContent</c>.
+    /// </summary>
+    /// <remarks>
+    /// The spec (2025-11-25 and 2026-07-28 alike) says structured content MUST
+    /// conform to the tool's <c>outputSchema</c>, with no exception for errors,
+    /// and its tool-error example is <c>content</c> alone. The envelope matches
+    /// no output schema, so a client that validates — the TypeScript SDK's
+    /// <c>callTool</c> once it has listed the tools — turned every refusal into
+    /// a -32602. The text is still the same JSON, so the code stays machine-readable.
+    /// </remarks>
     /// <param name="code">One of <see cref="Codes"/>.</param>
     /// <param name="message">The message.</param>
     /// <param name="fields">Per-field messages, keyed by path.</param>
@@ -154,7 +165,6 @@ public sealed class InsolviaTool : McpServerTool
         return new CallToolResult
         {
             Content = [new TextContentBlock { Text = ToolResultJson.Dumps(body) }],
-            StructuredContent = JsonSerializer.SerializeToElement(body),
             IsError = true,
         };
     }

@@ -13,12 +13,13 @@
 // - the transport's `fetch` records each HTTP response, so a spec can read
 //   what the SDK itself does not surface — the 401's WWW-Authenticate
 //   challenge, through the SDK's own parser;
-// - `call` and `listTools` note each tool called and the server's listing,
-//   for the mcp coverage gate (src/coverage.ts): every listed tool called.
+// - `call`, `refuse` and `listTools` note each tool called and the server's
+//   listing, for the mcp coverage gate (src/coverage.ts): every listed tool
+//   called.
 import { expect } from '@jest/globals';
 import { Client } from '@modelcontextprotocol/sdk/client';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import { CallToolResultSchema, type Tool } from '@modelcontextprotocol/sdk/types.js';
+import type { Tool } from '@modelcontextprotocol/sdk/types.js';
 
 import { noteCall, noteToolListing } from '../coverage.ts';
 import { env, seeded } from './env.ts';
@@ -45,8 +46,8 @@ export interface McpConnection {
   call(tool: string, args: Record<string, unknown>): Promise<ToolResult>;
   /**
    * `tools/call` that the server must refuse with `code` in its error
-   * envelope; returns the envelope. See REFUSALS below for why this is not
-   * `callTool`.
+   * envelope; returns the envelope. Through `callTool` after `tools/list`,
+   * as an agent calls — see REFUSALS below.
    */
   refuse(
     tool: string,
@@ -81,6 +82,7 @@ export async function connectMcp(
   const transport = transportFor(token, responses);
   const client = new Client({ name: 'insolvia-contract', version: '0' });
   await client.connect(transport);
+  let listed: Promise<unknown> | undefined;
   return {
     client,
     transport,
@@ -99,11 +101,12 @@ export async function connectMcp(
     },
     async refuse(tool, args, code) {
       noteCall('mcp', tool);
-      const result = (await client.request(
-        { method: 'tools/call', params: { name: tool, arguments: args } },
-        CallToolResultSchema,
-      )) as ToolResult;
-      return expectRefusal(bothForms(tool, result), code);
+      // The SDK caches each tool's output validator from the listing; list
+      // first so callTool checks the refusal as an agent's harness would.
+      listed ??= client.listTools();
+      await listed;
+      const result = await client.callTool({ name: tool, arguments: args });
+      return expectRefusal(result as unknown as RefusalResult, code);
     },
     close: () => client.close(),
   };
@@ -121,16 +124,20 @@ function bothForms(tool: string, result: ToolResult): ToolResult {
   return result;
 }
 
-// REFUSALS go through the SDK's generic `request` for `tools/call`, not
-// `callTool`. Once a client has listed the tools, `callTool` (SDK 1.32.2)
-// validates `structuredContent` against the tool's `outputSchema` even on
-// an `isError` result — its own comment says it should not — and this
-// server's refusals carry `{"error": {...}}` there, which no output schema
-// declares. So a TypeScript-SDK harness that lists first (the MCP Inspector
-// does) sees every refusal as a -32602 instead of the envelope. Found by
-// #583; the server-side fix is its own change, because it moves the wire.
-// `request` is the same transport, handshake and result schema, minus that
-// one check.
+// REFUSALS carry no `structuredContent`: `isError`, and the envelope
+// `{"error": {code, message, fields?}}` as the text block's JSON — the
+// spec's tool-error shape, since structured content MUST match the tool's
+// outputSchema and no output schema declares the envelope. Once a client has
+// listed the tools, `callTool` (SDK 1.32.2) validates any `structuredContent`
+// it gets against that schema, error or not; when the server put the
+// envelope there, every refusal reached such a harness (the MCP Inspector,
+// most agents) as a -32602. `refuse` lists first, so it would again.
+interface RefusalResult {
+  readonly isError?: boolean;
+  readonly structuredContent?: unknown;
+  readonly content: readonly { type: string; text: string }[];
+}
+
 let deployedToken: Promise<string> | undefined;
 
 /**
@@ -145,15 +152,20 @@ export async function mcpTokenOfFirmAdmin(): Promise<string> {
 }
 
 /** A tool result that must be a refusal with `code` in the error envelope. */
-export function expectRefusal(
-  result: ToolResult,
+function expectRefusal(
+  result: RefusalResult,
   code: string,
 ): { code: string; message: string; fields?: Record<string, string> } {
-  withMessage(JSON.stringify(result.structuredContent), () => expect(result.isError).toBe(true));
-  expectShape(result.structuredContent, {
+  withMessage(JSON.stringify(result), () => {
+    expect(result.isError).toBe(true);
+    expect(result).not.toHaveProperty('structuredContent');
+    expectShape(result.content, [{ type: 'string', text: 'string' }]);
+  });
+  const envelope: unknown = JSON.parse(result.content[0]!.text);
+  expectShape(envelope, {
     error: { code: 'string', message: 'string', 'fields?': 'object' },
   });
-  const error = (result.structuredContent as { error: { code: string } }).error;
+  const error = (envelope as { error: { code: string } }).error;
   withMessage(JSON.stringify(error), () => expect(error.code).toBe(code));
   return error as { code: string; message: string; fields?: Record<string, string> };
 }

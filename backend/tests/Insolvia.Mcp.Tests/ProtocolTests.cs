@@ -163,10 +163,35 @@ public sealed class ProtocolTests : IDisposable
     {
         await _host.SeededAsync();
         var result = (await _host.CallAsync("get_case", new JsonObject { ["caseId"] = "no-such-case" }, Auth())).Result;
-        Assert.True((bool)result["isError"]!);
-        var error = result["structuredContent"]!["error"]!;
+        var error = Reply.Refusal(result);
         Assert.Equal("not_found", (string?)error["code"]);
         Assert.False(string.IsNullOrEmpty((string?)error["message"]));
+    }
+
+    [Fact]
+    public async Task A_refusal_is_content_only_so_it_passes_an_output_schema_check()
+    {
+        // The whole result, pinned: structured content MUST match the tool's
+        // outputSchema (spec § Output Schema, no exception for errors), so a
+        // refusal carries none — its envelope is the text block, as the spec's
+        // tool-error example has it. With `structuredContent: {error}` the
+        // TypeScript SDK's callTool answered -32602 instead of the refusal.
+        await _host.SeededAsync();
+        var result = (await _host.CallAsync("get_case", new JsonObject { ["caseId"] = string.Empty }, Auth())).Result.AsObject();
+
+        // Every 2026-07-28 result's envelope, pinned by the protocol tests above.
+        result.Remove("resultType");
+        result.Remove("_meta");
+        var expected = new JsonObject
+        {
+            ["content"] = new JsonArray(new JsonObject
+            {
+                ["type"] = "text",
+                ["text"] = "{\"error\": {\"code\": \"validation_failed\", \"message\": \"caseId is required\"}}",
+            }),
+            ["isError"] = true,
+        };
+        Assert.True(JsonNode.DeepEquals(expected, result), result.ToJsonString());
     }
 
     [Fact]
@@ -175,7 +200,7 @@ public sealed class ProtocolTests : IDisposable
         await _host.SeededAsync();
         await _host.Firms.UpdateUserAsync(MakeUser(isAdmin: false, accessAllCases: false, permissions: new Dictionary<Feature, PermissionLevel>()), Ct);
         var result = (await _host.CallAsync("list_cases", [], Auth())).Result;
-        Assert.Equal("permission_denied", (string?)result["structuredContent"]!["error"]!["code"]);
+        Assert.Equal("permission_denied", (string?)Reply.Refusal(result)["code"]);
     }
 
     [Fact]
@@ -191,7 +216,7 @@ public sealed class ProtocolTests : IDisposable
                 ["proposals"] = new JsonArray(new JsonObject { ["entityType"] = "creditors", ["payload"] = new JsonObject { ["name"] = 42 } }),
             },
             Auth())).Result;
-        var error = result["structuredContent"]!["error"]!;
+        var error = Reply.Refusal(result);
         Assert.Equal("validation_failed", (string?)error["code"]);
         Assert.True(error["fields"]!.AsObject().ContainsKey("proposals[0].payload.name"));
     }
@@ -411,8 +436,9 @@ public sealed class ProtocolTests : IDisposable
         Assert.NotEqual(true, (bool?)(await _host.CallAsync("list_cases", [], Auth())).Result["isError"]);
         await _host.Firms.UpdateUserAsync(MakeUser(isAdmin: true, status: FirmUserStatus.Disabled), Ct);
         var refused = (await _host.CallAsync("list_cases", [], Auth())).Result;
-        Assert.Equal("permission_denied", (string?)refused["structuredContent"]!["error"]!["code"]);
-        Assert.Equal("your account is not active in a firm", (string?)refused["structuredContent"]!["error"]!["message"]);
+        var error = Reply.Refusal(refused);
+        Assert.Equal("permission_denied", (string?)error["code"]);
+        Assert.Equal("your account is not active in a firm", (string?)error["message"]);
 
         // whoami answers the fact instead of refusing.
         var who = (await _host.CallAsync("whoami", [], Auth())).Result;
