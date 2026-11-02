@@ -4,6 +4,13 @@
 //   CONTRACT_AUX_PORT=18060 CONTRACT_JWKS=<run>/jwks.json \
 //   CONTRACT_BLOB_DIR=<run>/blobs node contract/scripts/aux-server.ts
 //
+// The developer compose stack (backend/docker-compose.yml) runs the same file
+// as its blob twin, with no CONTRACT_JWKS — blobs only, the dev pool's real
+// JWKS being Cognito's — and AUX_CORS_ORIGIN set to the app's origin, because
+// there the PUT comes from a BROWSER on another port, as it does to S3 behind
+// the bucket's CORS rule. The contract run sets neither: Node's fetch needs no
+// CORS, and a header nobody reads changes nothing.
+//
 // - GET <issuerPath>/.well-known/jwks.json — what HttpJwksProvider.ForIssuer
 //   derives for the Cognito-shaped issuer the API and MCP hosts trust;
 // - GET /google/certs — the admin host's GOOGLE_JWKS_URL (local only);
@@ -30,12 +37,20 @@ function required(name: string): string {
 }
 
 const port = Number(required('CONTRACT_AUX_PORT'));
-const jwks = readFileSync(required('CONTRACT_JWKS'));
 const blobRoot = resolve(required('CONTRACT_BLOB_DIR'));
-const stack = JSON.parse(
-  readFileSync(fileURLToPath(new URL('../stack/stack.json', import.meta.url)), 'utf8'),
-) as { issuerPath: string };
-const jwksPaths = new Set([`/${stack.issuerPath}/.well-known/jwks.json`, '/google/certs']);
+// Unset: blobs only (the compose stack). Set: the run's keys as well.
+const jwksFile = process.env.CONTRACT_JWKS?.trim();
+const jwks = jwksFile ? readFileSync(jwksFile) : undefined;
+const jwksPaths = new Set<string>();
+if (jwks) {
+  const stack = JSON.parse(
+    readFileSync(fileURLToPath(new URL('../stack/stack.json', import.meta.url)), 'utf8'),
+  ) as { issuerPath: string };
+  jwksPaths.add(`/${stack.issuerPath}/.well-known/jwks.json`).add('/google/certs');
+}
+// The one origin a browser may PUT from, as the bucket's CORS rule names the
+// app's. Exact match, never `*`.
+const corsOrigin = process.env.AUX_CORS_ORIGIN?.trim() || undefined;
 const CONTENT_TYPE_SUFFIX = '.content-type';
 
 mkdirSync(blobRoot, { recursive: true });
@@ -69,12 +84,31 @@ function body(req: IncomingMessage): Promise<Buffer> {
 
 const server = createServer((req, res) => {
   const url = new URL(req.url ?? '/', `http://127.0.0.1:${port}`);
+  if (corsOrigin && req.headers.origin === corsOrigin) {
+    res.setHeader('Access-Control-Allow-Origin', corsOrigin);
+    res.setHeader('Access-Control-Expose-Headers', 'etag');
+    res.setHeader('Vary', 'Origin');
+  }
   void (async () => {
+    if (req.method === 'OPTIONS' && corsOrigin && req.headers.origin === corsOrigin) {
+      // The preflight a browser sends before the PUT. The allowed headers are
+      // the case-documents bucket's own CORS rule
+      // (infra/modules/case_documents/main.tf), so a header the app starts
+      // sending fails here before it fails on staging. The PUT itself is
+      // still checked below.
+      res.setHeader('Access-Control-Allow-Methods', 'PUT, GET');
+      res.setHeader(
+        'Access-Control-Allow-Headers',
+        'content-type, content-length, x-amz-server-side-encryption, x-amz-tagging',
+      );
+      send(res, 204);
+      return;
+    }
     if (req.method === 'GET' && url.pathname === '/health') {
       send(res, 200, '{"status":"ok"}', 'application/json');
       return;
     }
-    if (req.method === 'GET' && jwksPaths.has(url.pathname)) {
+    if (req.method === 'GET' && jwks && jwksPaths.has(url.pathname)) {
       send(res, 200, jwks, 'application/json');
       return;
     }
@@ -117,6 +151,10 @@ const server = createServer((req, res) => {
   });
 });
 
-server.listen(port, '127.0.0.1', () => {
-  console.log(`contract aux server :${port} (jwks, blobs in ${blobRoot})`);
+// 127.0.0.1 unless told otherwise: inside a container the published port
+// reaches it only on 0.0.0.0, and the container's own port mapping is what
+// keeps it on this machine (backend/docker-compose.yml binds 127.0.0.1).
+const host = process.env.AUX_LISTEN_HOST?.trim() || '127.0.0.1';
+server.listen(port, host, () => {
+  console.log(`contract aux server :${port} (${jwks ? 'jwks, ' : ''}blobs in ${blobRoot})`);
 });

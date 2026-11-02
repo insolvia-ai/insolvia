@@ -62,9 +62,17 @@ public sealed class DirectoryDocumentBlobStore(string root, Uri? baseUrl = null)
     /// <inheritdoc />
     public Task DeleteAsync(string storageRef, CancellationToken cancellationToken = default)
     {
+        // S3's DeleteObject answers success for a key that was never written —
+        // an upload abandoned before its PUT, say — and so does this. File.Delete
+        // already ignores a missing file, but not a missing directory, and the
+        // ref's directory exists only once something was written under it.
         var path = Resolve(storageRef);
-        File.Delete(path);
-        File.Delete(path + ContentTypeSuffix);
+        if (Directory.Exists(Path.GetDirectoryName(path)))
+        {
+            File.Delete(path);
+            File.Delete(path + ContentTypeSuffix);
+        }
+
         return Task.CompletedTask;
     }
 
