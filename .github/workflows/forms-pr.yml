@@ -2,8 +2,11 @@ name: Form specs · PR
 
 # Validates forms/specs/*.json against forms/acroform/*.json — structure,
 # entity vocabulary, and full coverage of every fillable widget in the official
-# PDFs. See forms/README.md; the checker is stdlib-only Python, so this job
-# needs no install step.
+# PDFs. See forms/README.md. The checks are xUnit tests in
+# backend/tests/Insolvia.Forms.Tests/Specs (ADR 0029 rule 4), run filtered by
+# forms/scripts/dev-test.sh, the same command a laptop runs. The job name is
+# what `protect-main` matches: renaming it is a ruleset change
+# (insolvia-branch-protection skill).
 #
 # No `on.pull_request.paths:` filter, matching every other *-pr.yml — see
 # `.github/actions/changed-paths/action.yml`: if this job ever becomes a
@@ -30,9 +33,24 @@ jobs:
         with:
           paths: |
             forms/**
+            # The checks themselves, and the project that builds them.
+            backend/tests/Insolvia.Forms.Tests/**
             .github/workflows/forms-pr.yml
             .github/actions/changed-paths/action.yml
 
+      - uses: actions/setup-dotnet@v5
+        if: steps.filter.outputs.run == 'true'
+        with:
+          # The exact SDK backend/global.json pins, so CI and a laptop agree.
+          global-json-file: backend/global.json
+          cache: true
+          cache-dependency-path: backend/**/packages.lock.json
+
       - name: Check form specs
         if: steps.filter.outputs.run == 'true'
-        run: python3 forms/scripts/check.py
+        env:
+          DOTNET_NOLOGO: 'true'
+          DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+        # Locked-mode restore, as backend-pr.yml's: a dependency change must
+        # arrive with its packages.lock.json diff.
+        run: forms/scripts/dev-test.sh -p:RestoreLockedMode=true --configuration Release

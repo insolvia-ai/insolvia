@@ -4,7 +4,9 @@
        test_filing_set, test_case_summary, test_forms_hub,
        test_amendment_cover_sheet and test_form_templates' template half, test_case_upload;
        and the .NET goldens (Goldens/*.json), whose field read-backs equal
-       the Python goldens' they replaced (18.23). -->
+       the Python goldens' they replaced (18.23).
+       Specs/ is the `Form specs` check (forms/scripts/check.py, ported
+       in #585): forms/specs against forms/acroform, read from the checkout. -->
   <ItemGroup>
     <ProjectReference Include="../../src/Insolvia.Forms/Insolvia.Forms.csproj" />
   </ItemGroup>
