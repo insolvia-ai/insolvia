@@ -59,7 +59,7 @@ e2e/        Playwright against deployed environments: flows (signed in; dev, sta
 contract/   the backend's HTTP contract suite (Jest, by base URL, through the shipped api-client) — offline against the .NET hosts on a throwaway Postgres (every PR), or deployed: signed in through the real pool, against staging after each deploy or a laptop's dev stack
 infra/      Terraform: staging · prod · dev (shared, ci-trust, account-access are in insolvia-services)
 brand/      colors.json · fonts.json · radii.json — Insolvia's palette, typefaces and corners, the ONE place each is written down
-tool/       brand-palette.ts · render-brand-theme.ts · render-brand-marks.ts
+tool/       brand-palette.ts · render-brand-theme.ts · render-brand-marks.ts (colours the marks) · cut-brand-marks.ts (cuts them)
 docs/       plan.md · reference/ · runbooks/ · adr/ · business/
 ```
 
