@@ -1,7 +1,7 @@
 # ADR 0029 — One testing shape: xUnit, Jest, Playwright and `terraform test`; route tests and contract tests split the API between them
 
 - **Status:** Accepted 2026-11-01 ([#578](https://github.com/insolvia-ai/insolvia/issues/578)). The maintainer revised it on review: no Python code of our own (not a tooling exception); outside-in specs go through the client callers run; `pre-commit` stays.
-- **Date:** 2026-11-01
+- **Date:** 2026-11-01. Amended 2026-11-02: no signed-in smoke on production ([#584](https://github.com/insolvia-ai/insolvia/issues/584); see [Amendments](#amendments)).
 - **Relates to:** [#578](https://github.com/insolvia-ai/insolvia/issues/578)
   carries the work this decides, item by item.
   **Amends [ADR 0008](0008-testing-shape-follows-the-code-it-tests.md)** — its
@@ -202,9 +202,9 @@ So:
   seeded person obtains by SRP; #578's item 4 verifies that, and falls back to
   the signed-out checks above if they do not.
 
-**Whether production gets a signed-in read-only smoke check** is #578's
-item 5 to decide, against ADR 0021's reasons for refusing one; it records the
-outcome as an amendment here either way.
+**Production gets no signed-in smoke check**, read-only or otherwise. #578's
+item 5 weighed it against ADR 0021's reasons; the outcome and the conditions
+that would reopen it are under [Amendments](#amendments).
 
 ## Context
 
@@ -297,3 +297,80 @@ flag-gated on every invocation, and not what `jest-expo` does.
 **An automated Google sign-in for a staff test identity.** Rejected above: a
 real Workspace credential in a public repo's pipeline, against a sign-in page
 built to stop exactly this.
+
+## Amendments
+
+### 2026-11-02 — production gets no signed-in smoke, read-only or not ([#584](https://github.com/insolvia-ai/insolvia/issues/584))
+
+**Decision: no.** ADR 0021's rule, "nothing signed-in ever runs against
+production", stands unamended. Production stays covered by the credential-free
+`smoke` project alone.
+
+**A read-only check is what was weighed.** It would be a seeded person who
+signs in to production by SRP, opens their own firm's case list and one case,
+and writes nothing. Each of ADR 0021's three reasons was re-tested against
+that narrower shape. Each one still holds.
+
+- **A production test identity.** Read-only changes what the check *does*, not
+  what the identity *is*. That identity is a real user in the production pool,
+  and its password sits in a CI secret on a public repository's pipeline. The
+  pool's managed login and password policy cannot tell it from a person: it can
+  be phished, leaked from a misconfigured job, or reused. Its blast radius is
+  whatever its grants allow, not what the spec happens to call. Nothing in the
+  API enforces "read-only" for a firm user, so the restriction exists only in
+  the spec's source.
+- **Tenancy rows in production.** For the check to have anything to read, the
+  identity needs a firm and a case. Someone has to write them, either the seed
+  loader (which refuses production by design, `seeds/README.md`) or a person
+  by hand. Either way, production would hold a firm that is not a customer.
+  Every firm-wide count, billing figure, export and support query would then
+  have to know to exclude it, forever. Writing it once by hand is a manual act
+  on production that this repo has never needed.
+- **A guarantee that it can never reach a real firm's data.** The guarantee on
+  offer is the tenancy check itself: firm A's token cannot read firm B's case.
+  Using that check to justify a production identity means trusting the very
+  control that a regression would break. A smoke account is the first
+  principal to benefit if tenancy ever regresses. No independent second fence
+  exists, such as a production read replica or a separate role, and building
+  one is a security-posture project, not a testing change. ADR 0021 said the
+  same thing, and nothing has changed since.
+
+**What production loses by this.** Ranked by how likely a signed-in check
+would catch something the existing tests miss:
+
+| A signed-in prod check would see | Already covered by |
+|---|---|
+| The deployed bundle, build stamp and sign-in hand-off (client id, callback, PKCE) | `smoke` on production (`app-prod.yml`) |
+| The API refusing anonymous calls and strangers' origins | `smoke` on production |
+| The deployed role's grants, the store, the routes | `contract/`'s deployed target on staging, against a role built from the same Terraform module (ADR 0029 rule 2) |
+| Signed-in journeys | `flows` on staging, which gates promotion (`release.yml`) |
+| **A grant, a parameter or a pool setting that differs only in production** | **nothing.** This is the real gap. |
+
+**That last row is a drift problem, and the answer is to stop the drift.**
+Staging and production are built from the same modules with per-environment
+variables. A difference that breaks only production is a difference in those
+variables, or a manual change made outside Terraform, so the fix belongs in
+the plan. A signed-in probe would find the break only after it shipped, and
+only on the paths that probe happens to walk.
+
+**What would reopen this.** Revisit it when all three of the following can be
+answered *without* the test changing the security posture:
+
+1. **An identity that cannot be a firm user.** For example, a principal class
+   of its own that the API serves on a short read-only allowlist and refuses
+   on everything else, enforced by the host (as ADR 0011 does for staff), not
+   by the spec.
+2. **Data that is not a firm.** A synthetic tenant that the product itself
+   models and excludes, rather than a firm everyone downstream must remember to
+   filter out.
+3. **A second fence.** A database role or a grant that physically cannot
+   read another firm's rows, so that a tenancy regression does not hand the
+   probe real data.
+
+Or revisit it when a **synthetic production monitor** is wanted for its own
+sake (uptime and latency of signed-in paths after launch). That is ADR 0021's
+trigger, still the right one, and the work above would be part of that
+monitor's design, not of a test tier.
+
+**What it does on each environment:** nothing changes. Local and staging run
+what they ran, and production runs `smoke` alone.
