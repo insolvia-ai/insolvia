@@ -22,5 +22,5 @@
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["playwright.config.ts", "support/**/*.ts", "tests/**/*.ts"]
+  "include": ["playwright.config.ts", "playwright.admin.config.ts", "support/**/*.ts", "tests/**/*.ts"]
 }

@@ -1,0 +1,92 @@
+name: Admin portal flow (offline) · PR
+
+# The admin portal driven in a browser over the contract suite's throwaway
+# .NET stack — exactly what a laptop runs, `e2e/scripts/admin-offline-test.sh`:
+# sign in (Google stood in for inside the browser only), provision a firm,
+# re-invite its administrator. No deployed environment, no AWS, no secret:
+# the only token it uses is signed by a key the run mints and deletes.
+#
+# NEVER A REQUIRED CHECK. It is an e2e flow, and e2e flows stay out of the
+# required set (e2e/CLAUDE.md, docs/reference/architecture.md). Unlike the
+# deployed flows it needs no environment, so it CAN run on every PR — that is
+# all this workflow does. Do not fold it into `Contract (.NET)`, which is a
+# candidate required check: a browser flow inside it would become required by
+# the back door when that job does.
+#
+# The `steps.filter` guard keeps an unrelated PR cheap, as everywhere else.
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  # The portal's `npm ci` installs @insolvia-ai/design-system from GitHub Packages.
+  packages: read
+
+jobs:
+  admin-flow:
+    name: Admin portal flow (offline)
+    runs-on: ubuntu-latest
+    env:
+      DOTNET_NOLOGO: 'true'
+      DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - id: filter
+        uses: ./.github/actions/changed-paths
+        with:
+          paths: |
+            # The portal and the client it ships.
+            apps/insolvia_admin/**
+            packages/insolvia_admin_client/**
+            # The stack it runs over.
+            backend/**
+            !backend/scripts/**
+            !backend/*.md
+            !backend/docker-compose.yml
+            contract/scripts/**
+            contract/stack/**
+            contract/src/support/jwt.ts
+            seeds/**
+            # The flow.
+            e2e/**
+            .github/workflows/admin-flow-pr.yml
+            .github/actions/changed-paths/action.yml
+
+      - uses: actions/setup-dotnet@v5
+        if: steps.filter.outputs.run == 'true'
+        with:
+          global-json-file: backend/global.json
+
+      - uses: actions/setup-node@v5
+        if: steps.filter.outputs.run == 'true'
+        with:
+          node-version: '24'
+
+      - name: Install the portal
+        if: steps.filter.outputs.run == 'true'
+        working-directory: apps/insolvia_admin
+        run: npm ci
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install the e2e suite
+        if: steps.filter.outputs.run == 'true'
+        working-directory: e2e
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Restore
+        if: steps.filter.outputs.run == 'true'
+        run: dotnet restore backend/Insolvia.slnx --locked-mode
+
+      # No trace, no screenshot and no artifact upload: the suite's rule for
+      # CI (e2e/playwright.config.ts), kept here although nothing secret is typed.
+      - name: Admin portal flow
+        if: steps.filter.outputs.run == 'true'
+        run: e2e/scripts/admin-offline-test.sh
+        env:
+          CONTRACT_SHOW_STACK_LOG: '1'
