@@ -47,6 +47,19 @@ public sealed class DirectoryDocumentBlobStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task Deleting_what_was_never_written_succeeds_as_s3_does()
+    {
+        // A document whose browser PUT never arrived has a row but no object,
+        // and no directory either. Deleting it must not throw (it was a 500
+        // from DELETE /v1/cases/{id}/documents/{id} on a laptop).
+        var blobs = new DirectoryDocumentBlobStore(_root);
+
+        await blobs.DeleteAsync(Ref, Ct);
+
+        Assert.Null(await blobs.StatAsync(Ref, Ct));
+    }
+
+    [Fact]
     public async Task A_write_lands_with_its_content_type_beside_it_and_reads_back()
     {
         var blobs = new DirectoryDocumentBlobStore(_root);
