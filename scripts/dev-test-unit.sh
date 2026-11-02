@@ -59,6 +59,11 @@ ALL_AREAS="backend api-client admin-client app portal marketing forms ci-scripts
 # PR after the push that was supposed to catch it.
 areas_for_path() {
   case "$1" in
+    # What no suite reads, first, so an area's own docs and dev scripts do
+    # not pay for its tests: Markdown anywhere (a CLAUDE.md or README.md
+    # inside an area; no test loads one), and the backend's dev-only files —
+    # the same three exclusions backend-pr.yml's filter makes.
+    *.md|backend/scripts/*|backend/docker-compose.yml) echo "" ;;
     # The .NET backend (ADR 0028): one solution, one suite. The migrator's
     # seeder tests load seeds/, and SeedIdTests reads the contract stack's
     # accounts — the same paths backend-pr.yml's filter names.
