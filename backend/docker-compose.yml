@@ -26,8 +26,19 @@
 # developer puts in it, and is reachable from this machine alone. Deployed
 # environments use IAM database authentication, never a password from here.
 #
-# Data lives in the named volume `insolvia-backend-pgdata`;
-# `docker compose -f backend/docker-compose.yml down -v` wipes it.
+# Data lives in the named volume `insolvia-backend-pgdata`, document bytes in
+# `insolvia-backend-blobs`; `docker compose -f backend/docker-compose.yml
+# down -v` wipes both.
+#
+# DOCUMENT BYTES. A deployed API presigns S3 URLs and the browser PUTs the
+# file straight to the bucket. Here the `blobs` service stands in for the
+# bucket: it is contract/scripts/aux-server.ts in its blobs-only mode, the
+# same server the contract stack uses, sharing one directory (the volume) with
+# the API's DirectoryDocumentBlobStore (INSOLVIA_LOCAL_BLOB_*, honoured only
+# for INSOLVIA_ENV=local outside Lambda). Without it the API falls back to its
+# memory twin, whose memory+s3:// URLs no browser can follow — so upload,
+# download and every PDF preview failed on a laptop. No AWS credentials enter
+# any container.
 name: insolvia-backend
 
 services:
@@ -69,8 +80,14 @@ services:
       INSOLVIA_DB_ROLE_PASSWORD: insolvia-local-only
       INSOLVIA_ENV: ${INSOLVIA_ENV:-local}
       INSOLVIA_SEED: ${INSOLVIA_SEED:-true}
+      # The fixture cases' sample documents land where the API reads them.
+      INSOLVIA_SEED_DOCUMENT_DIR: /blobs
+    volumes:
+      - blobs:/blobs
     depends_on:
       postgres:
+        condition: service_healthy
+      blobs:
         condition: service_healthy
 
   api:
@@ -92,11 +109,47 @@ services:
       # Unset records mail in memory. http://host.docker.internal:8026 is the
       # local mailer scripts/dev-up.sh starts from an insolvia-services checkout.
       MAILER_API_URL: ${MAILER_API_URL:-}
+      # The blob twin (see the header). The directory is shared with `blobs`;
+      # the URL is what the API writes into each capability, so it is the
+      # address the BROWSER reaches, not a container name.
+      INSOLVIA_LOCAL_BLOB_DIR: /blobs
+      INSOLVIA_LOCAL_BLOB_URL: http://localhost:8070
+    volumes:
+      - blobs:/blobs
     ports:
       - '127.0.0.1:8080:8080'
     depends_on:
       migrator:
         condition: service_completed_successfully
+      blobs:
+        condition: service_healthy
+
+  # The bucket's stand-in on 8070 (see the header). It runs as root only to
+  # open the volume up: the API and the migrator write into it as the .NET
+  # images' non-root user, and the API deletes what the browser uploaded, so
+  # files and directories are made world-writable (umask 000). That is a
+  # local-only volume on a port bound to 127.0.0.1. AUX_CORS_ORIGIN is the
+  # app's dev server, the one origin allowed to PUT — as the bucket's CORS
+  # rule names the deployed app's.
+  blobs:
+    image: node:24-alpine
+    working_dir: /aux
+    command: ['sh', '-c', 'umask 000 && chmod 0777 /blobs && exec node /aux/aux-server.ts']
+    environment:
+      CONTRACT_AUX_PORT: '8070'
+      CONTRACT_BLOB_DIR: /blobs
+      AUX_CORS_ORIGIN: http://localhost:3000
+      AUX_LISTEN_HOST: 0.0.0.0
+    volumes:
+      - ../contract/scripts/aux-server.ts:/aux/aux-server.ts:ro
+      - blobs:/blobs
+    ports:
+      - '127.0.0.1:8070:8070'
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:8070/health']
+      interval: 2s
+      timeout: 3s
+      retries: 15
 
   # The staff admin service on 8090, as its own role `admin` (firms, firm
   # users, the append-only audit). GOOGLE_CLIENT_ID unset fails every staff
@@ -140,3 +193,5 @@ services:
 volumes:
   pgdata:
     name: insolvia-backend-pgdata
+  blobs:
+    name: insolvia-backend-blobs
