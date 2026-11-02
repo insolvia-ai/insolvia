@@ -122,6 +122,59 @@ jobs:
           fi
           echo "No EAS references in tracked files."
 
+      # ── No Python of our own ──────────────────────────────────────────────
+      #
+      # ADR 0029 rule 4: a tool is written in the language of what consumes
+      # its output — C# beside the backend, TypeScript beside the apps and the
+      # brand files. The last Python left in #585 (the forms check, the UST
+      # ingest and freshness check, the brand-mark cutter), and this keeps it
+      # from coming back by default: a stray script, a requirements file, or a
+      # workflow installing an interpreter to run one.
+      #
+      # In this job for the reason the EAS guard is, and like it NOT behind
+      # `steps.filter`: `App` is a required check that reports on every PR,
+      # and a guard on the whole tree cannot be scoped to the app's paths.
+      #
+      # `pre-commit` is Python and stays: it is a third-party framework the
+      # developer installs (scripts/dev-setup.sh), not code of ours, and
+      # .pre-commit-config.yaml is none of the three things matched here.
+      - name: Guard — no Python of our own (ADR 0029)
+        run: |
+          set -euo pipefail
+
+          files="$(git ls-files)"
+          if [ -z "$files" ]; then
+            echo "::error::git ls-files returned nothing — refusing to report this guard as passed." >&2
+            exit 1
+          fi
+
+          fail=0
+
+          # 1. Python source, and the two files that declare Python
+          #    dependencies.
+          if found="$(printf '%s\n' "$files" \
+              | grep -E '\.py$|(^|/)requirements[^/]*\.txt$|(^|/)pyproject\.toml$' || true)"; [ -n "$found" ]; then
+            echo "::error::Python committed (ADR 0029 rule 4 — write the tool in the language of what consumes its output):"
+            printf '%s\n' "$found" | sed 's/^/  /'
+            fail=1
+          fi
+
+          # 2. A workflow or composite action that installs an interpreter.
+          #    Bracket-escaped, as in the EAS self-check, so this step's own
+          #    source does not match.
+          if found="$(printf '%s\n' "$files" | grep -E '^\.github/.*\.ya?ml$' | tr '\n' '\0' \
+              | xargs -0 -r grep -HnE 'actions/setup-pytho[n]' || true)"; [ -n "$found" ]; then
+            echo "::error::A workflow sets up Python (ADR 0029 rule 4):"
+            printf '%s\n' "$found" | sed 's/^/  /'
+            fail=1
+          fi
+
+          if [ "$fail" -ne 0 ]; then
+            echo "::error::If Python is genuinely the right language for a new tool, that is an amendment to ADR 0029 — not a green check." >&2
+            exit 1
+          fi
+          echo "No Python of our own in tracked files."
+
       - id: filter
         uses: ./.github/actions/changed-paths
         with:

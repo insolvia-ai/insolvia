@@ -68,9 +68,10 @@ __pycache__/
 .venv/
 venv/
 *.egg-info/
-# The disposable toolchain scripts/render-brand-marks.sh builds to cut the
-# wordmark and icon out of the display face. Anchored: it is one known path,
-# not a licence for any `.cache` anywhere.
+# Where the retired Python brand-mark cutter kept its venv (the cutter is
+# tool/cut-brand-marks.ts now). Still ignored so a checkout that ran it does
+# not show the leftover; delete it freely. Anchored: one known path, not a
+# licence for any `.cache` anywhere.
 /.cache/
 
 # ── Node (the npm workspace + the version-gated React packages) ─
