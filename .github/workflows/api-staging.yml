@@ -333,6 +333,9 @@ jobs:
       # refuses any CONTRACT_ENVIRONMENT but dev or staging, and signs nobody
       # in unless /health reports the environment it names. The specs only the
       # offline stack can express are listed as skipped, by name, with why.
+      # Scoped to src/api: admin and MCP specs run in their own legs
+      # (admin-staging.yml, mcp-staging.yml), which hold their inputs. A whole-
+      # suite run here throws on their missing CONTRACT_* inputs.
       - name: Contract suite against staging (deployed target)
         env:
           CONTRACT_TARGET: deployed
@@ -342,4 +345,4 @@ jobs:
           CONTRACT_AUTH_CLIENT_ID: ${{ needs.deploy.outputs.auth_client_id }}
           CONTRACT_AUTH_PORTAL_CLIENT_ID: ${{ needs.deploy.outputs.auth_portal_client_id }}
           E2E_TEST_USER_PASSWORD: ${{ secrets.E2E_TEST_USER_PASSWORD }}
-        run: npm run contract --workspace @insolvia-ai/contract
+        run: npm run contract --workspace @insolvia-ai/contract -- src/api
