@@ -11,6 +11,7 @@
     <Project Path="src/Insolvia.Mcp/Insolvia.Mcp.csproj" />
     <Project Path="src/Insolvia.Filing/Insolvia.Filing.csproj" />
     <Project Path="src/Insolvia.Migrator/Insolvia.Migrator.csproj" />
+    <Project Path="src/Insolvia.UstTool/Insolvia.UstTool.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Insolvia.Architecture.Tests/Insolvia.Architecture.Tests.csproj" />
@@ -25,5 +26,6 @@
     <Project Path="tests/Insolvia.Mcp.Tests/Insolvia.Mcp.Tests.csproj" />
     <Project Path="tests/Insolvia.Filing.Tests/Insolvia.Filing.Tests.csproj" />
     <Project Path="tests/Insolvia.Migrator.Tests/Insolvia.Migrator.Tests.csproj" />
+    <Project Path="tests/Insolvia.UstTool.Tests/Insolvia.UstTool.Tests.csproj" />
   </Folder>
 </Solution>

@@ -14,7 +14,7 @@
        rules, and each form release's spec, AcroForm dump and manifest (the
        template PDFs ship with Insolvia.Forms). This directory is the
        canonical registry: a release is a reviewed PR here, and
-       scripts/ingest-ust-data.py writes the UST series into it. Logical
+       the UST tool (src/Insolvia.UstTool) writes the UST series into it. Logical
        names keep the paths under the folder. -->
   <ItemGroup>
     <EmbeddedResource Include="Regulatory/**/*.json" LogicalName="Insolvia.Engines.Regulatory/%(RecursiveDir)%(Filename)%(Extension)" />

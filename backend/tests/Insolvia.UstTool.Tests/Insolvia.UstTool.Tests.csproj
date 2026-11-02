@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Tests for the UST tool's parsers and its two commands, offline: the
+       spreadsheets are recordings of the UST's own files (Fixtures/, public
+       domain — 17 U.S.C. § 105), and the expected outputs are the committed
+       registry releases they were ingested into. -->
+  <ItemGroup>
+    <ProjectReference Include="../../src/Insolvia.UstTool/Insolvia.UstTool.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Fixtures/**/*" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

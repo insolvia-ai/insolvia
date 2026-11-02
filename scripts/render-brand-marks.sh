@@ -12,9 +12,8 @@
 #   ./scripts/render-brand-marks.sh          # re-cut
 #   npm run tokens                           # then colour them per consumer
 #
-# WHY A VENV. Every other Python script in this directory is stdlib-only so a
-# fresh clone can run it with bare python3 — see the note at the top of
-# ingest-ust-data.py. Cutting type cannot be: it needs a shaping engine
+# WHY A VENV. This is the last Python tool of ours (ADR 0029 rule 4 moves it
+# to TypeScript); the others were stdlib-only. Cutting type cannot be: it needs a shaping engine
 # (HarfBuzz, for the font's own kerning), a font toolkit, a rasteriser and an
 # image library. All four are pip wheels with no system libraries behind them,
 # so the venv is self-contained and disposable. It lives under .cache/, which

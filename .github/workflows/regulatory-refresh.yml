@@ -2,12 +2,13 @@ name: Regulatory data · refresh check
 
 # The scheduled tripwire for the UST means-testing datasets and the § 104
 # dollar-amount horizon (issue #99; effective-dating.md "The refresh
-# process"). scripts/check-ust-data.py compares the UST's current period
-# against the committed registry; a difference means the product would
-# compute means tests on stale data, so the failure must reach a HUMAN —
-# this workflow opens (or comments on) a tracking issue rather than dying in
-# a log. The checker is stdlib-only Python and runs identically on a
-# developer machine: `python3 scripts/check-ust-data.py`.
+# process"). The UST tool's `check` command (backend/src/Insolvia.UstTool,
+# .NET on the engine itself — ADR 0029 rule 4) compares the UST's current
+# period against the committed registry; a difference means the product
+# would compute means tests on stale data, so the failure must reach a
+# HUMAN — this workflow opens (or comments on) a tracking issue rather than
+# dying in a log. It runs identically on a developer machine:
+# `dotnet run --project backend/src/Insolvia.UstTool -- check`.
 #
 # Weekly is deliberate: the UST posts 2-4 updates a year with effective
 # dates weeks out, so a week's detection latency still leaves time to ingest
@@ -31,11 +32,30 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      - uses: actions/setup-dotnet@v5
+        with:
+          # The exact SDK backend/global.json pins, so CI and a laptop agree.
+          global-json-file: backend/global.json
+
+      # Built in its own step, so the check's log (which becomes the issue
+      # body) is the tool's output alone. A build failure fails the job, and
+      # the next step alerts on it like any other failure to verify.
+      - name: Build the UST tool
+        env:
+          DOTNET_NOLOGO: 'true'
+          DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+        run: |
+          dotnet restore backend/src/Insolvia.UstTool --locked-mode
+          dotnet build backend/src/Insolvia.UstTool --configuration Release --no-restore
+
       - name: Check the UST means-testing data against the registry
         id: check
+        env:
+          DOTNET_NOLOGO: 'true'
+          DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
         run: |
           set +e
-          python3 scripts/check-ust-data.py 2>&1 | tee check.log
+          dotnet run --project backend/src/Insolvia.UstTool --configuration Release --no-build -- check 2>&1 | tee check.log
           code=${PIPESTATUS[0]}
           echo "exit_code=$code" >> "$GITHUB_OUTPUT"
           exit "$code"
@@ -46,7 +66,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           title="Regulatory data staleness: UST means-testing datasets"
-          body="$(printf 'scripts/check-ust-data.py failed on %s (run %s).\n\n```\n%s\n```\n\nIngest with scripts/ingest-ust-data.py and open a release PR — see docs/reference/effective-dating.md, "The refresh process".' \
+          body="$(printf 'The UST tool'"'"'s check failed on %s (run %s).\n\n```\n%s\n```\n\nIngest with the UST tool (backend/src/Insolvia.UstTool, see scripts/README.md) and open a release PR — see docs/reference/effective-dating.md, "The refresh process".' \
             "$(date -u +%Y-%m-%d)" \
             "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
             "$(cat check.log)")"

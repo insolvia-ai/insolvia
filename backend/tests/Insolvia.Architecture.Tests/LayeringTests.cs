@@ -15,6 +15,11 @@ namespace Insolvia.Architecture.Tests;
 //                     an amendment to ADR 0028's layout made in 18.8 (#519)
 //   Data, Aws         reference Core only
 //   hosts             may reference any library; never another host
+//   tools             reference the pure libraries only (Core, Engines,
+//                     Forms); run by a developer or CI, never deployed, so
+//                     never Data, Aws or a host — UstTool writes the
+//                     regulatory registry and validates it through Engines
+//                     (#585)
 //
 // Only hosts reference Data or Aws, which follows from the lines above: no
 // library is allowed them. The filing worker shares the API's approval and
@@ -23,6 +28,11 @@ namespace Insolvia.Architecture.Tests;
 public sealed class LayeringTests
 {
     private static readonly string[] Hosts = ["Api", "Worker", "Admin", "Mcp", "Filing", "Migrator"];
+
+    private static readonly Dictionary<string, string[]> ToolAllowed = new(StringComparer.Ordinal)
+    {
+        ["UstTool"] = ["Core", "Engines"],
+    };
 
     private static readonly Dictionary<string, string[]> LibraryAllowed = new(StringComparer.Ordinal)
     {
@@ -58,7 +68,7 @@ public sealed class LayeringTests
     [Fact]
     public void Every_source_project_is_named_by_the_rule()
     {
-        var known = LibraryAllowed.Keys.Concat(Hosts).Order(StringComparer.Ordinal);
+        var known = LibraryAllowed.Keys.Concat(Hosts).Concat(ToolAllowed.Keys).Order(StringComparer.Ordinal);
 
         Assert.Equal(known, SourceProjectNames().Order(StringComparer.Ordinal));
     }
@@ -69,7 +79,7 @@ public sealed class LayeringTests
     {
         var references = ProjectReferences(project);
 
-        if (LibraryAllowed.TryGetValue(project, out var allowed))
+        if (LibraryAllowed.TryGetValue(project, out var allowed) || ToolAllowed.TryGetValue(project, out allowed))
         {
             Assert.All(references, reference => Assert.Contains(reference, allowed));
         }
