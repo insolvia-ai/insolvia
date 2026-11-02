@@ -34,6 +34,9 @@ The tiers: [ADR 0021](../docs/adr/0021-test-tiers-and-seed-fixtures.md).
 | `tests/flows/full-case.spec.ts` | One case front to back: the debtor's address via the client record → the overview counts it → documents → the forms hub lists the Chapter 7 set and renders a form to PDF → the filing set orders it for the court and holds it on the petition, linking to the fix. Never presses "Assemble" (a queued job). |
 | `tests/flows/documents.spec.ts` | A document request asked for, set aside and withdrawn; a file uploaded from the browser to the bucket, downloaded byte-identical and deleted. Each test sweeps an earlier failed run's leftovers first, so nothing accumulates. |
 | `tests/flows/means-test.spec.ts` | One income moved across the median: the verdict follows (no presumption → presumption arises) and survives a reload. |
+| `playwright.admin.config.ts` | A separate config for the admin portal's flow — no target, no password, nothing deployed. `npx playwright test` never reads it. |
+| `support/google-identity-stand-in.ts` | Answers Google's sign-in script inside the browser with a button that returns an ID token signed by the offline stack's per-run key. Only that throwaway stack trusts the key; no host or deployed config knows the stand-in exists. |
+| `tests/admin/provision-and-invite.spec.ts` | Staff sign in to the admin portal, provision a firm, find its administrator under People, re-send the invitation. Offline only. |
 | `tests/smoke/app.spec.ts` | The shell, the footer's environment label and build stamp, the SPA rewrite, the sign-in hand-off (client id, callback, PKCE, the managed-login form) — without a password. |
 | `tests/smoke/api.spec.ts` | `/health` names the environment; an anonymous protected call is a 401, not a 500; CORS admits the app's origin and refuses a stranger's. |
 | `tests/smoke/marketing.spec.ts` | The home page serves; the indexing policy is the right one for a non-production host. Skipped by name when no marketing URL is given. |
@@ -70,6 +73,14 @@ exported `E2E_TEST_USER_PASSWORD`; the address comes from `seeds/dev.json`.
 Credentials have **no default** and the run fails at config load, naming the
 variable, if none is available. The marketing checks skip locally — a dev
 stack has no marketing site of its own.
+
+The admin portal's flow needs neither the dev stack nor a password. It runs
+over the contract suite's throwaway stack, and the PR workflow
+`admin-flow-pr.yml` runs the same command. That check is not required.
+
+```bash
+./e2e/scripts/admin-offline-test.sh        # Docker + the .NET SDK; npm ci in e2e/ and apps/insolvia_admin/
+```
 
 ## Two things to know before changing a test
 

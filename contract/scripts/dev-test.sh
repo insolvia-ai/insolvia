@@ -4,6 +4,7 @@
 #   contract/scripts/dev-test.sh                    # offline: the .NET stack on a throwaway Postgres
 #   contract/scripts/dev-test.sh api                # extra args go to jest (a filtered run)
 #   contract/scripts/dev-test.sh --target deployed  # this machine's dev stack, signed in for real
+#   contract/scripts/dev-test.sh --exec CMD         # offline stack up, then CMD instead of Jest
 #
 # ── offline (the default) ──────────────────────────────────────────
 #
@@ -16,6 +17,11 @@
 #    its own database role;
 # 3. runs the Jest suite against it (the coverage gate is enforced on an
 #    unfiltered run), and stops the stack however that ends.
+#
+# `--exec CMD` swaps step 3 for CMD, run by bash with the same CONTRACT_*
+# variables exported. It is how another suite borrows this stack without a
+# copy of it: e2e/scripts/admin-offline-test.sh drives the admin portal
+# against it.
 #
 # Needs Docker and the .NET SDK (backend/global.json). `--target dotnet` is
 # still accepted as a name for it: the Python stack this suite was first
@@ -66,8 +72,10 @@ BACKEND="$REPO/backend"
 
 TARGET=offline
 JEST_ARGS=()
+EXEC=""
 while (($#)); do
   case "$1" in
+    --exec) EXEC="${2:?--exec needs a command}"; shift 2 ;;
     --target) TARGET="${2:-}"; shift 2 ;;
     --target=*) TARGET="${1#--target=}"; shift ;;
     *) JEST_ARGS+=("$1"); shift ;;
@@ -78,6 +86,11 @@ case "$TARGET" in
   deployed) ;;
   *) echo "--target must be offline or deployed, got '$TARGET'" >&2; exit 2 ;;
 esac
+
+if [[ "$TARGET" == deployed && -n "$EXEC" ]]; then
+  echo "--exec runs against the offline stack only" >&2
+  exit 2
+fi
 
 if [[ "$TARGET" == deployed ]]; then
   BACKEND_ENV="$BACKEND/.env"
@@ -278,6 +291,10 @@ echo "contract stack ($TARGET) ready"
 
 cd "$REPO"
 status=0
+if [[ -n "$EXEC" ]]; then
+  bash -c "$EXEC" || status=$?
+  exit $status
+fi
 npm run contract --workspace @insolvia-ai/contract -- "${JEST_ARGS[@]+"${JEST_ARGS[@]}"}" || status=$?
 if [[ $status -ne 0 && -n "${CONTRACT_SHOW_STACK_LOG:-}" ]]; then
   show_logs
