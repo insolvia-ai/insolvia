@@ -72,9 +72,9 @@ public sealed class ArgumentTests : IDisposable
     {
         await _host.SeededAsync();
         var result = (await _host.CallAsync(tool, JsonNode.Parse(arguments)!.AsObject(), McpHost.Auth())).Result;
-        Assert.True((bool)result["isError"]!);
-        Assert.Equal("validation_failed", (string?)result["structuredContent"]!["error"]!["code"]);
-        Assert.Equal(message, (string?)result["structuredContent"]!["error"]!["message"]);
+        var error = Reply.Refusal(result);
+        Assert.Equal("validation_failed", (string?)error["code"]);
+        Assert.Equal(message, (string?)error["message"]);
         Assert.Equal(
             $"{{\"error\": {{\"code\": \"validation_failed\", \"message\": \"{message}\"}}}}",
             (string?)result["content"]![0]!["text"]);
@@ -93,8 +93,9 @@ public sealed class ArgumentTests : IDisposable
         var args = new JsonObject { ["caseId"] = found.Id, ["candidateId"] = candidateId };
         await _host.CallAsync("withdraw_proposal", args, McpHost.Auth());
         var again = (await _host.CallAsync("withdraw_proposal", (JsonObject)args.DeepClone(), McpHost.Auth())).Result;
-        Assert.Equal("conflict", (string?)again["structuredContent"]!["error"]!["code"]);
-        Assert.Equal("candidate has already been reviewed (status: withdrawn)", (string?)again["structuredContent"]!["error"]!["message"]);
+        var error = Reply.Refusal(again);
+        Assert.Equal("conflict", (string?)error["code"]);
+        Assert.Equal("candidate has already been reviewed (status: withdrawn)", (string?)error["message"]);
     }
 
     [Fact]

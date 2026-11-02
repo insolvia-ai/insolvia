@@ -163,4 +163,19 @@ internal sealed record Reply(HttpStatusCode Status, string ContentType, string W
 
     /// <summary>A tools/call's <c>result</c>.</summary>
     public JsonNode Result => Json["result"]!;
+
+    /// <summary>
+    /// A domain refusal's <c>{code, message, fields?}</c>: <c>isError</c>, no
+    /// <c>structuredContent</c> (it would fail the tool's <c>outputSchema</c>),
+    /// and the envelope as the text block's JSON.
+    /// </summary>
+    /// <param name="result">A tools/call's <c>result</c>.</param>
+    /// <returns>The envelope's <c>error</c>.</returns>
+    public static JsonNode Refusal(JsonNode result)
+    {
+        Assert.True((bool)result["isError"]!, result.ToJsonString());
+        Assert.False(result.AsObject().ContainsKey("structuredContent"), result.ToJsonString());
+        var text = (string)Assert.Single(result["content"]!.AsArray())!["text"]!;
+        return JsonNode.Parse(text)!["error"]!;
+    }
 }

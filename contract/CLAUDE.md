@@ -29,8 +29,9 @@ ADR 0029).
     does: the CORS preflight, a request with no credential, `/health`.
   - MCP: the official `@modelcontextprotocol/sdk` `Client` over Streamable
     HTTP, `connect()` (the handshake) included — `support/mcp.ts`. Refusals
-    go through the SDK's `request`, not `callTool`: its REFUSALS comment
-    says why. The 2026-07-28 transport no TypeScript SDK speaks yet is
+    go through `callTool` after `tools/list`, which checks a result against
+    the tool's `outputSchema`; its REFUSALS comment says why that pins the
+    server's content-only refusal. The 2026-07-28 transport no TypeScript SDK speaks yet is
     `Insolvia.Mcp.Tests`' `ProtocolTests`.
 - **The coverage gates are the gate.** `src/coverage.ts` fails the run if a
   method of `InsolviaApiClient.prototype` or `AdminClient.prototype` was never

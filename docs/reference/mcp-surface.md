@@ -48,9 +48,10 @@ Protocol facts below were verified against the MCP specification, revision
 - **Tools only.** No MCP resources, prompts, or subscriptions in v1. Tool
   support is the one capability every harness has; resource support is uneven.
   Revisit after 12.5 if a harness turns out to want documents as resources.
-- **Every tool returns `structuredContent`** conforming to its `outputSchema`,
-  plus the serialized JSON as a text block (the spec's backwards-compatibility
-  SHOULD). Read-only tools carry `readOnlyHint: true` annotations; nothing on
+- **Every successful tool result carries `structuredContent`** conforming to
+  its `outputSchema`, plus the serialized JSON as a text block (the spec's
+  backwards-compatibility SHOULD). A refusal carries the text block alone
+  (§ Error vocabulary). Read-only tools carry `readOnlyHint: true` annotations; nothing on
   this surface is destructive, so no tool carries `destructiveHint`.
 
 ## Identity and authorization — the seam 12.2 implements
@@ -336,7 +337,7 @@ Three layers, matching where the spec puts each failure:
 |---|---|---|
 | HTTP | transport auth | 401 invalid/expired token (+ `WWW-Authenticate` with `resource_metadata`); 403 `insufficient_scope` (OAuth scope, not firm permissions) |
 | JSON-RPC protocol errors | the call was malformed | unknown tool (−32602), unparseable arguments, unsupported protocol version, header mismatch (−32020) |
-| Tool execution errors | the domain said no | `isError: true`, content = the message, `structuredContent.error` below |
+| Tool execution errors | the domain said no | `isError: true`, the text block = the envelope below as JSON, no `structuredContent` |
 
 Domain failures reuse `insolvia_core.errors` — the tool layer maps exception
 classes to machine-readable codes exactly as the API layer maps them to
@@ -344,8 +345,15 @@ statuses, so the reasoning each class's docstring carries (anti-oracle 404,
 honest 403, retryable 409) governs both surfaces:
 
 ```
-structuredContent on error: { error: { code, message, fields? } }
+text block on error: { "error": { code, message, fields? } }
 ```
+
+The envelope is never `structuredContent`: the spec says structured content
+MUST conform to the tool's `outputSchema`, with no exception for errors, and
+no output schema declares it. A client that validates — the TypeScript SDK's
+`callTool` once it has listed the tools — turned every refusal into a −32602
+while the server put it there. Pinned by
+`ProtocolTests.A_refusal_is_content_only_so_it_passes_an_output_schema_check`.
 
 | `insolvia_core.errors` | code | Semantics carried over |
 |---|---|---|
