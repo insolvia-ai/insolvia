@@ -21,9 +21,9 @@
     "id from someone else's environment.",
     "",
     "EVERY VALUE IS SYNTHETIC. Nothing here describes a real person, a",
-    "real employer or a real account. `seed capture` refuses a source",
-    "that is not a dev stack for exactly this reason, and a review of a",
-    "diff to this file should ask the same question."
+    "real employer or a real account. A new version is curated by hand,",
+    "so a review of a diff to this file is the check: ask that question",
+    "of every value."
   ],
   "version": "v1",
   "cases": [

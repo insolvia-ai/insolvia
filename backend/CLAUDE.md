@@ -116,10 +116,16 @@ itself is gone, and `git log` before 18.23 has it.
   token (`INSOLVIA_DB_*`, `DatabaseSettings`). Only the migrator connects as
   the superuser / RDS master, because only it creates roles.
 
-## Test tiers
+## Test levels
+
+The levels and who owns what: [ADR 0029](../docs/adr/0029-one-testing-shape.md);
+how to write each: the `insolvia-testing` skill.
 
 - **Unit / route:** xUnit v3. Route tests run in-process through
-  `WebApplicationFactory<Program>` (`tests/Insolvia.Api.Tests`).
+  `WebApplicationFactory<Program>` (`tests/Insolvia.Api.Tests`). They own
+  every **refusal** — the auth matrix, validation, error mapping, edge cases,
+  host seams; `contract/` owns the happy path, the wire shape and tenancy
+  (ADR 0029 rule 1). An assertion goes to one of them, not both.
 - **Data:** a real Postgres 17 through Testcontainers — never an in-memory
   EF provider. One container per test assembly (`PostgresFixture`, a
   collection fixture), a fresh database per test (`CreateDatabaseAsync`).
