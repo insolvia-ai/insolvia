@@ -53,20 +53,8 @@ VOLUME="insolvia-backend-pgdata"
 require_command docker
 
 bucket=""
-if [[ "$DOCUMENTS" -eq 1 ]]; then
-  for command in aws jq terraform; do require_command "$command"; done
-  load_machine_id false
-  load_aws_identity
-  terraform_init
-  outputs="$(terraform_output_json)"
-  output_machine_id="$(jq -r '.machine_id.value' <<<"$outputs")"
-  [[ "$output_machine_id" == "$MACHINE_ID" ]] ||
-    die "Terraform state belongs to machine '$output_machine_id', not '$MACHINE_ID'."
-  # Paranoid ownership check: the bucket must carry THIS machine's prefix.
-  bucket="$(jq -r '.case_document_bucket.value // empty' <<<"$outputs")"
-  [[ "$bucket" == "$RESOURCE_PREFIX-case-documents-"* ]] ||
-    die "Refusing reset: document bucket '$bucket' does not carry this machine's prefix ($RESOURCE_PREFIX)."
-fi
+[[ "$DOCUMENTS" -eq 0 ]] ||
+  die "--documents emptied this machine's S3 bucket, which no longer exists. Local document bytes live in the insolvia-backend-blobs volume."
 
 printf '\nThis will clear development data on this machine:\n'
 printf '  Database:   docker volume %s (backend/docker-compose.yml)\n' "$VOLUME"

@@ -1,13 +1,11 @@
 #!/usr/bin/env bash
 #
-# Provision this machine's isolated Insolvia development resources in AWS
-# (infra/envs/dev: a case-document bucket, the job and filing queues, the
-# keys) and wire the local backend and the app at the ONE shared development
-# pool (insolvia-services', ADR 0026 — its sign-in page's style too), read
-# through SSM. The database is NOT here: it is the Postgres of
-# backend/docker-compose.yml (ADR 0028). This script checks the pool exists,
-# applies this machine's own stack, and writes backend/.env and
-# apps/insolvia_app/.env.
+# Wire the local backend and the app at the ONE shared development pool
+# (insolvia-services', ADR 0026), read through SSM. Everything else runs on
+# this machine: the database, document bytes and queues are the local twins of
+# backend/docker-compose.yml. The per-machine AWS stack (infra/envs/dev) was
+# torn down on 2026-11-05 and is no longer applied here; see
+# docs/runbooks/aws-paused.md.
 #
 #   ./scripts/dev-aws-setup.sh               # uses the default AWS profile
 #   ./scripts/dev-aws-setup.sh --check       # verify, change nothing
@@ -35,7 +33,7 @@ while [[ $# -gt 0 ]]; do
   shift
 done
 
-for command in aws jq terraform; do require_command "$command"; done
+for command in aws jq; do require_command "$command"; done
 if [[ "$CHECK_ONLY" -eq 1 ]]; then
   load_machine_id false
 else
@@ -47,63 +45,31 @@ log "AWS account: $AWS_ACCOUNT_ID"
 log "AWS principal: $AWS_PRINCIPAL_ARN"
 log "Machine ID: $MACHINE_ID"
 log "Resource prefix: $RESOURCE_PREFIX"
-log "Terraform state: s3://$STATE_BUCKET/$STATE_KEY"
+
+load_dev_pool_contract
+aws_dev cognito-idp describe-user-pool --user-pool-id "$POOL_ID" >/dev/null ||
+  die "Development Cognito pool '$POOL_ID' is unavailable."
 
 if [[ "$CHECK_ONLY" -eq 1 ]]; then
-  require_shared_pool
-  state_json="$(aws_dev s3 cp "s3://$STATE_BUCKET/$STATE_KEY" -)" ||
-    die "Terraform state is missing. Run ./scripts/dev-aws-setup.sh --profile $AWS_PROFILE_VALUE."
-  [[ "$(jq -r '.outputs.machine_id.value // empty' <<<"$state_json")" == "$MACHINE_ID" ]] ||
-    die "Terraform state does not match this machine ID."
-  pool_id="$(jq -r '.outputs.auth_user_pool_id.value // empty' <<<"$state_json")"
-  issuer_url="$(jq -r '.outputs.auth_issuer_url.value // empty' <<<"$state_json")"
-  document_bucket="$(jq -r '.outputs.case_document_bucket.value // empty' <<<"$state_json")"
-  job_queue_url="$(jq -r '.outputs.job_queue_url.value // empty' <<<"$state_json")"
-  filing_queue_url="$(jq -r '.outputs.filing_queue_url.value // empty' <<<"$state_json")"
-  [[ -n "$document_bucket" && -n "$pool_id" && -n "$issuer_url" && -n "$job_queue_url" && -n "$filing_queue_url" ]] ||
-    die "Terraform state is missing required development outputs."
-  aws_dev s3api head-bucket --bucket "$document_bucket" >/dev/null ||
-    die "Development case document bucket '$document_bucket' is unavailable."
-  aws_dev cognito-idp describe-user-pool --user-pool-id "$pool_id" >/dev/null ||
-    die "Development Cognito pool '$pool_id' is unavailable."
-  aws_dev sqs get-queue-attributes --queue-url "$job_queue_url" --attribute-names QueueArn >/dev/null ||
-    die "Development job queue '$job_queue_url' is unavailable."
-  aws_dev sqs get-queue-attributes --queue-url "$filing_queue_url" --attribute-names QueueArn >/dev/null ||
-    die "Development filing queue '$filing_queue_url' is unavailable."
   if [[ ! -f "$BACKEND_ENV" ]] ||
-    ! grep -q "^AUTH_ISSUER_URL=$issuer_url\$" "$BACKEND_ENV" ||
-    ! grep -q "^AUTH_USER_POOL_ID=$pool_id\$" "$BACKEND_ENV" ||
+    ! grep -q "^AUTH_ISSUER_URL=$ISSUER_URL\$" "$BACKEND_ENV" ||
+    ! grep -q "^AUTH_USER_POOL_ID=$POOL_ID\$" "$BACKEND_ENV" ||
     ! grep -q "^AUTH_CLIENT_ID=." "$BACKEND_ENV" ||
     ! grep -q "^AUTH_PORTAL_CLIENT_ID=." "$BACKEND_ENV"; then
     die "backend/.env is missing or stale. Run setup without --check."
   fi
-  ok "Per-machine AWS resources and backend/.env are ready."
+  ok "The shared dev pool and backend/.env are ready."
   exit 0
 fi
 
-# This root reads the shared pool's contract at plan time, so check it exists
-# first and fail by name. On a machine set up before ADR 0026 the plan also
-# DESTROYS the old per-machine pool, which the shared one replaces (run
-# scripts/dev-aws-seed.sh afterwards).
-require_shared_pool
-
-terraform_init
-apply_args=(apply -input=false "${TF_VARS[@]}")
-[[ "$AUTO_APPROVE" -eq 1 ]] && apply_args+=(-auto-approve)
-terraform -chdir="$TF_DIR" "${apply_args[@]}"
-
-outputs="$(terraform_output_json)"
-document_bucket="$(jq -r '.case_document_bucket.value' <<<"$outputs")"
-pool_id="$(jq -r '.auth_user_pool_id.value' <<<"$outputs")"
-web_client_id="$(jq -r '.auth_web_client_id.value' <<<"$outputs")"
-portal_client_id="$(jq -r '.auth_portal_client_id.value' <<<"$outputs")"
-auth_domain="$(jq -r '.auth_domain.value' <<<"$outputs")"
-issuer_url="$(jq -r '.auth_issuer_url.value' <<<"$outputs")"
-google_admin_client_id="$(jq -r '.google_admin_client_id.value' <<<"$outputs")"
-job_queue_url="$(jq -r '.job_queue_url.value' <<<"$outputs")"
-filing_queue_url="$(jq -r '.filing_queue_url.value' <<<"$outputs")"
-mcp_auth_client_ids="$(jq -r '.mcp_auth_client_ids.value' <<<"$outputs")"
-mcp_inspector_client_id="$(jq -r '.mcp_client_ids_by_harness.value.inspector' <<<"$outputs")"
+pool_id="$POOL_ID"
+web_client_id="$WEB_CLIENT_ID"
+portal_client_id="$PORTAL_CLIENT_ID"
+auth_domain="$AUTH_DOMAIN"
+issuer_url="$ISSUER_URL"
+google_admin_client_id="$GOOGLE_ADMIN_CLIENT_ID_DEFAULT"
+mcp_auth_client_ids="$MCP_AUTH_CLIENT_IDS"
+mcp_inspector_client_id="$MCP_INSPECTOR_CLIENT_ID"
 
 # ── Wire the local backend at the shared pool ───────────────────
 # Mechanism: docker compose auto-reads backend/.env for VARIABLE SUBSTITUTION
@@ -127,10 +93,9 @@ mcp_inspector_client_id="$(jq -r '.mcp_client_ids_by_harness.value.inspector' <<
 #   • AUTH_MCP_INSPECTOR_CLIENT_ID: one of those, not read by compose;
 #     contract/scripts/dev-test.sh --target deployed signs the seeded admin in
 #     through it, the token an MCP Inspector session would hold.
-#   • CASE_DOCUMENT_BUCKET / JOB_QUEUE_URL / FILING_QUEUE_URL: this machine's
-#     own bucket and queues, for a `dotnet run` of the worker or a host that
-#     wants the real AWS adapters (`set -a; source backend/.env; set +a`).
-#     The compose stack keeps its local twins and does not read them.
+#   • CASE_DOCUMENT_BUCKET / JOB_QUEUE_URL / FILING_QUEUE_URL are removed: the
+#     bucket and queues they named no longer exist, and the compose stack
+#     uses its local twins.
 backend_env="$BACKEND_ENV"
 upsert_env "$backend_env" INSOLVIA_ENV "local"
 upsert_env "$backend_env" AUTH_ISSUER_URL "$issuer_url"
@@ -141,9 +106,9 @@ upsert_env "$backend_env" GOOGLE_CLIENT_ID "$google_admin_client_id"
 upsert_env "$backend_env" INSOLVIA_SEED "false"
 upsert_env "$backend_env" AUTH_CLIENT_IDS "$mcp_auth_client_ids"
 upsert_env "$backend_env" AUTH_MCP_INSPECTOR_CLIENT_ID "$mcp_inspector_client_id"
-upsert_env "$backend_env" CASE_DOCUMENT_BUCKET "$document_bucket"
-upsert_env "$backend_env" JOB_QUEUE_URL "$job_queue_url"
-upsert_env "$backend_env" FILING_QUEUE_URL "$filing_queue_url"
+for key in CASE_DOCUMENT_BUCKET JOB_QUEUE_URL FILING_QUEUE_URL; do
+  remove_env "$backend_env" "$key"
+done
 upsert_env "$backend_env" AWS_DEFAULT_REGION "$AWS_REGION_VALUE"
 
 # ── Wire the Expo app at the same pool ──────────────────────────
@@ -169,7 +134,7 @@ upsert_env "$app_env" EXPO_PUBLIC_COGNITO_CLIENT_ID "$web_client_id"
 # says "sign-in is not configured" and the staff app is unaffected.
 upsert_env "$app_env" EXPO_PUBLIC_COGNITO_PORTAL_CLIENT_ID "$portal_client_id"
 
-ok "AWS development resources are ready; backend/.env and apps/insolvia_app/.env were updated."
+ok "The shared dev pool is wired; backend/.env and apps/insolvia_app/.env were updated."
 
 printf '\nThe shared dev pool:\n'
 printf '  User pool id:      %s\n' "$pool_id"
