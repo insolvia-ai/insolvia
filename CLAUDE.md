@@ -1,5 +1,7 @@
 # Insolvia — agent guide
 
+> **AWS is paused (2026-11-05).** There is no staging or production, and development is local. Deploy workflows are disabled; do not re-enable them or apply Terraform. See [docs/runbooks/aws-paused.md](docs/runbooks/aws-paused.md).
+
 Bankruptcy case-prep & e-filing: one monorepo on AWS. The app is
 **React Native on Expo** (`apps/insolvia_app`), the marketing site is React
 Router v7 + Vite (`apps/insolvia_marketing`), the backend is **.NET 10 on

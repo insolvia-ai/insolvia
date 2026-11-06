@@ -82,7 +82,7 @@
 #
 # The split follows one question: does the step need to know the shape of our
 # data? Not here. This file resolves an ENVIRONMENT — the machine id, the pool
-# id in this machine's Terraform state, and AWS credentials an SDK can read
+# id in the shared pool's SSM contract, and AWS credentials an SDK can read
 # (dev-aws-common.sh). Building rows does need the shape, so that is the
 # migrator, next to the code owning it.
 #
@@ -90,7 +90,7 @@
 #
 # DEV ONLY, and not parameterised on purpose. A script that creates accounts
 # and could be pointed at the prod pool by changing one argument is a script
-# that eventually is. The pool comes from THIS machine's Terraform state and
+# that eventually is. The pool comes from the SSM contract and
 # must be the shared dev pool by name; the database is the compose one on
 # 127.0.0.1. Staging is seeded by the
 # .github/actions/seed-staging step its deploy workflows share, and prod is
@@ -130,7 +130,7 @@ while [[ $# -gt 0 ]]; do
   shift
 done
 
-for command in aws jq terraform; do require_command "$command"; done
+for command in aws jq; do require_command "$command"; done
 
 FIXTURE="$REPO_ROOT/seeds/dev.json"
 [[ -f "$FIXTURE" ]] || die "No fixture at $FIXTURE."
@@ -140,12 +140,10 @@ require_command docker
 
 load_machine_id false
 load_aws_identity
-terraform_init
-outputs="$(terraform_output_json)"
-
-POOL_ID="$(jq -r '.auth_user_pool_id.value // empty' <<<"$outputs")"
-[[ -n "$POOL_ID" ]] ||
-  die "No auth_user_pool_id in this machine's Terraform state. Run ./scripts/dev-aws-setup.sh first."
+export AWS_REGION="$AWS_REGION_VALUE"
+# The migrator's .NET SDK cannot read an `aws login` session.
+export_temporary_aws_credentials
+load_dev_pool_contract
 [[ "$POOL_ID" =~ ^[a-z0-9-]+_[A-Za-z0-9]+$ ]] ||
   die "'$POOL_ID' does not look like a Cognito user pool id — refusing to continue."
 pool_name="$(aws_dev cognito-idp describe-user-pool --user-pool-id "$POOL_ID" \

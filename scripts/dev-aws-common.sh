@@ -154,6 +154,28 @@ require_shared_pool() {
     die "The shared development pool's contract ($SHARED_CONTRACT_PATH/*) does not exist yet. It is insolvia-services' infra/envs/dev; from a checkout of that repository, run scripts/apply-dev-auth.sh once (insolvia-services' docs/runbooks/auth-state-migration.md § Shared dev pool), then re-run this."
 }
 
+# Read the pool's contract into shell variables. Since the 2026-11-05 AWS
+# teardown there is no per-machine stack, so this contract, not Terraform
+# output, is where every dev script learns the pool.
+GOOGLE_ADMIN_CLIENT_ID_DEFAULT="925851246989-tttlgepq8mjfhmtlkmgikrtv4kskv0pk.apps.googleusercontent.com"
+
+dev_contract_value() {
+  aws_dev ssm get-parameter --name "$SHARED_CONTRACT_PATH/$1" --query Parameter.Value --output text
+}
+
+load_dev_pool_contract() {
+  require_shared_pool
+  POOL_ID="$(dev_contract_value user-pool-id)"
+  WEB_CLIENT_ID="$(dev_contract_value client-id)"
+  PORTAL_CLIENT_ID="$(dev_contract_value portal-client-id)"
+  AUTH_DOMAIN="$(dev_contract_value domain)"
+  ISSUER_URL="$(dev_contract_value issuer-url)"
+  local mcp_clients
+  mcp_clients="$(dev_contract_value mcp-client-ids)"
+  MCP_AUTH_CLIENT_IDS="$(jq -r '[.[]] | join(",")' <<<"$mcp_clients")"
+  MCP_INSPECTOR_CLIENT_ID="$(jq -r '.inspector' <<<"$mcp_clients")"
+}
+
 # ── Local env-file editing ──────────────────────────────────────
 # upsert/remove helpers hoisted here because dev-aws-destroy.sh also uses
 # remove_env to unwind the wiring.
