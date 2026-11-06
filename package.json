@@ -87,8 +87,8 @@
     ],
     "lint:tool": "cd tool && eslint .",
     "typecheck:tool": "tsc -p tool/tsconfig.json",
-    "format": "prettier --check apps/insolvia_app contract packages/insolvia_admin_client packages/insolvia_api_client tool",
-    "format:write": "prettier --write apps/insolvia_app contract packages/insolvia_admin_client packages/insolvia_api_client tool",
+    "format": "prettier --check apps/insolvia_app backend/local-auth contract packages/insolvia_admin_client packages/insolvia_api_client tool",
+    "format:write": "prettier --write apps/insolvia_app backend/local-auth contract packages/insolvia_admin_client packages/insolvia_api_client tool",
     "//app": [
       "The app's own scripts (`build`, `web`, `lint`, `typecheck`, `test`) live in",
       "apps/insolvia_app/package.json and are a contract with app-*.yml. These two",

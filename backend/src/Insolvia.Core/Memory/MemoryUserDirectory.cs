@@ -8,7 +8,12 @@ namespace Insolvia.Core.Memory;
 /// address CASE-INSENSITIVELY, as the real pool does. It sends no invitation:
 /// there is no mail here.
 /// </summary>
-public sealed class MemoryUserDirectory : IUserDirectory
+/// <param name="subjectFor">
+/// How an address becomes a subject. Null mints a uuid. A developer's stack
+/// passes <see cref="Local.LocalSubjects.For"/>, so an invited person can sign
+/// in through <c>backend/local-auth</c> as the subject created here.
+/// </param>
+public sealed class MemoryUserDirectory(Func<string, string>? subjectFor = null) : IUserDirectory
 {
     private readonly Lock _gate = new();
     private readonly Dictionary<string, string> _subjects = new(StringComparer.Ordinal);
@@ -59,7 +64,7 @@ public sealed class MemoryUserDirectory : IUserDirectory
                 throw new ConflictException("that email address already has an Insolvia account");
             }
 
-            var subject = Guid.NewGuid().ToString();
+            var subject = subjectFor?.Invoke(email) ?? Guid.NewGuid().ToString();
             _subjects[email] = subject;
             return Task.FromResult(subject);
         }

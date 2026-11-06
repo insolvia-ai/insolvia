@@ -143,7 +143,8 @@ export interface EnvironmentInfo {
  *
  * `domain` is an **origin**, scheme included and no trailing slash
  * (`https://…amazoncognito.com`); `/oauth2/authorize`, `/oauth2/token` and
- * `/logout` hang off it.
+ * `/logout` hang off it. A `local` build may name `http://localhost:<port>`,
+ * the stand-in `backend/local-auth` serves (ADR 0030).
  */
 export interface AuthConfig {
   readonly domain: string;
@@ -182,8 +183,9 @@ export interface AuthConfig {
 export function resolveAuthConfig(
   rawDomain: string | undefined = process.env.EXPO_PUBLIC_COGNITO_DOMAIN,
   rawClientId: string | undefined = process.env.EXPO_PUBLIC_COGNITO_CLIENT_ID,
+  env: AppEnvironment = appEnvironment,
 ): AuthConfig | null {
-  return authConfigFrom(rawDomain, rawClientId);
+  return authConfigFrom(rawDomain, rawClientId, env);
 }
 
 /**
@@ -196,8 +198,9 @@ export function resolveAuthConfig(
 function authConfigFrom(
   rawDomain: string | undefined,
   rawClientId: string | undefined,
+  env: AppEnvironment,
 ): AuthConfig | null {
-  const domain = normalizeAuthDomain(rawDomain);
+  const domain = normalizeAuthDomain(rawDomain, env);
   const clientId = rawClientId?.trim() ?? '';
   if (domain === null || clientId === '') {
     return null;
@@ -224,8 +227,9 @@ function authConfigFrom(
 export function resolvePortalAuthConfig(
   rawDomain: string | undefined = process.env.EXPO_PUBLIC_COGNITO_DOMAIN,
   rawClientId: string | undefined = process.env.EXPO_PUBLIC_COGNITO_PORTAL_CLIENT_ID,
+  env: AppEnvironment = appEnvironment,
 ): AuthConfig | null {
-  return authConfigFrom(rawDomain, rawClientId);
+  return authConfigFrom(rawDomain, rawClientId, env);
 }
 
 /**
@@ -237,12 +241,16 @@ export function resolvePortalAuthConfig(
  * one. Accepting both and settling on `https://<host>` here means no call site
  * has to guess, and a stray trailing slash cannot produce `//oauth2/token`.
  * Anything not `https:` is rejected — an OAuth code exchange over plaintext
- * would put a refresh token on the wire.
+ * would put a refresh token on the wire. The one exception is loopback on a
+ * `local` build, where nothing leaves the machine.
  */
-function normalizeAuthDomain(raw: string | undefined): string | null {
+function normalizeAuthDomain(raw: string | undefined, env: AppEnvironment): string | null {
   const trimmed = raw?.trim().replace(/\/+$/, '') ?? '';
   if (trimmed === '') {
     return null;
+  }
+  if (env === 'local' && /^http:\/\/localhost:\d+$/.test(trimmed)) {
+    return trimmed;
   }
   if (trimmed.startsWith('https://')) {
     return trimmed.length > 'https://'.length ? trimmed : null;

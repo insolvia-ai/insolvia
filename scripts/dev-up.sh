@@ -21,11 +21,10 @@
 #
 # WHAT LOCAL ACTUALLY MEANS HERE. The database is Postgres 17 in Docker
 # (backend/docker-compose.yml) — the production engine, offline (ADR 0028).
-# There is no fake Cognito: the app signs in against the REAL shared dev pool,
-# whose ids scripts/dev-aws-setup.sh writes into backend/.env and
-# apps/insolvia_app/.env, and scripts/dev-aws-seed.sh creates the account and
-# seeds its firm into the local database. Without those two, everything still
-# starts, and every signed-in route answers 401.
+# Sign-in is backend/local-auth, a Cognito stand-in in the same compose stack
+# (ADR 0030), so nothing here needs AWS. scripts/dev-local-setup.sh writes its
+# ids into backend/.env and apps/insolvia_app/.env. Without that, everything
+# still starts, and every signed-in route answers 401.
 #
 set -euo pipefail
 
@@ -189,7 +188,7 @@ preflight() {
   # saying out loud, because "every protected route 401s" reads as a bug
   # rather than a setup gap.
   grep -qs '^AUTH_ISSUER_URL=.' "$REPO_ROOT/backend/.env" ||
-    warn "backend/.env has no AUTH_ISSUER_URL — protected routes will answer 401 and the app cannot sign in. Run ./scripts/dev-aws-setup.sh, then ./scripts/dev-aws-seed.sh."
+    warn "backend/.env has no AUTH_ISSUER_URL — protected routes will answer 401 and the app cannot sign in. Run ./scripts/dev-local-setup.sh."
 
   if [[ ! -d "$REPO_ROOT/node_modules" ]]; then
     warn "root node_modules missing — run ./apps/insolvia_app/scripts/dev-setup.sh (the app resolves through the root workspace)."
@@ -344,10 +343,10 @@ banner() {
   # seeds the firm, which covers the failure that is easier to miss: an
   # account gets you PAST sign-in, and every route then answers 403 until the
   # firm exists. That failure looks like a broken build, not a missing step.
-  printf '\n%s  Sign in at http://localhost:3000 — the shared dev Cognito pool.%s\n' "$c_dim" "$c_reset"
-  printf '%s  No account yet (there is no sign-up screen by design), or signed in%s\n' "$c_dim" "$c_reset"
-  printf '%s  but everything 403s? One script creates the account and its firm:%s\n' "$c_dim" "$c_reset"
-  printf '%s      ./scripts/dev-aws-seed.sh%s\n' "$c_dim" "$c_reset"
+  printf '\n%s  Sign in at http://localhost:3000 — local sign-in, no password, no AWS.%s\n' "$c_dim" "$c_reset"
+  printf '%s  Signed in but everything 403s? That address has no firm: pick a seeded%s\n' "$c_dim" "$c_reset"
+  printf '%s  person on the sign-in page. Not configured yet? Run:%s\n' "$c_dim" "$c_reset"
+  printf '%s      ./scripts/dev-local-setup.sh%s\n' "$c_dim" "$c_reset"
   # The portal is the odd one out: no Cognito, no account script — staff sign
   # in with their own @insolvia.ai Google Workspace account. And name the
   # split explicitly: someone WILL open 8090 in a browser expecting the admin

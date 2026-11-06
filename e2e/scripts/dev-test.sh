@@ -88,6 +88,10 @@ if [[ -z "${E2E_TEST_USER_PASSWORD:-}" && -f "$DEV_ENV_FILE" ]]; then
   source "$DEV_ENV_FILE"
   E2E_TEST_USER_PASSWORD="${DEV_USER_PASSWORD:-}"
 fi
+# backend/local-auth checks no password (ADR 0030), so there is none to supply.
+if [[ -z "${E2E_TEST_USER_PASSWORD:-}" ]] && grep -qs '^EXPO_PUBLIC_COGNITO_DOMAIN=http://localhost' "$APP_ENV"; then
+  E2E_TEST_USER_PASSWORD=ignored-by-local-auth
+fi
 export E2E_TEST_USER_PASSWORD
 [[ -n "${E2E_TEST_USER_PASSWORD:-}" ]] ||
   die "E2E_TEST_USER_PASSWORD is not set and $DEV_ENV_FILE provides no DEV_USER_PASSWORD.
@@ -107,7 +111,10 @@ export E2E_TARGET=dev
 read_env() { sed -n "s/^$1=//p" "$APP_ENV" | tail -1; }
 if [[ -z "${E2E_COGNITO_DOMAIN:-}" ]]; then
   E2E_COGNITO_DOMAIN="$(read_env EXPO_PUBLIC_COGNITO_DOMAIN)"
-  [[ -n "$E2E_COGNITO_DOMAIN" ]] || die "EXPO_PUBLIC_COGNITO_DOMAIN is not in $APP_ENV — re-run ./scripts/dev-aws-setup.sh."
+  [[ -n "$E2E_COGNITO_DOMAIN" ]] || die "EXPO_PUBLIC_COGNITO_DOMAIN is not in $APP_ENV — run ./scripts/dev-local-setup.sh."
+  # The suite compares this to a hostname; local-auth's value is an origin.
+  E2E_COGNITO_DOMAIN="${E2E_COGNITO_DOMAIN#http://}"
+  E2E_COGNITO_DOMAIN="${E2E_COGNITO_DOMAIN%%:*}"
 fi
 if [[ -z "${E2E_COGNITO_CLIENT_ID:-}" ]]; then
   E2E_COGNITO_CLIENT_ID="$(read_env EXPO_PUBLIC_COGNITO_CLIENT_ID)"

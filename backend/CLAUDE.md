@@ -133,7 +133,8 @@ how to write each: the `insolvia-testing` skill.
 - **Contract:** `contract/` at the repo root, against the hosts on a
   throwaway Postgres (`contract/scripts/dev-test.sh`) — and its deployed
   target, signed in through the real pool, against staging after each deploy
-  or a laptop's compose stack (`contract/scripts/dev-test.sh --target deployed`).
+  (`contract/scripts/dev-test.sh --target deployed`; paused with AWS, and it
+  cannot run against `local-auth`, which has no SRP).
 
 ## Run it
 
@@ -151,9 +152,13 @@ INSOLVIA_DB_ROLE_PASSWORD=insolvia-local-only \
   dotnet run --project src/Insolvia.Migrator      # migrate the compose database by hand
 ```
 
-Compose reads `backend/.env` (`scripts/dev-aws-setup.sh` writes it: the
-shared dev pool's ids, so the app can sign in; `INSOLVIA_SEED=false`, because
-`scripts/dev-aws-seed.sh` then seeds with the pool's real subjects). The CI
+Compose reads `backend/.env`. `scripts/dev-local-setup.sh` writes it: the
+`local-auth` issuer and client ids, so the app signs in with no AWS
+([ADR 0030](../docs/adr/0030-local-sign-in-replaces-the-dev-pool.md)). A new
+database seeds itself (`INSOLVIA_SEED=true`). A database seeded from the old
+pool keeps its data, and the script sets `INSOLVIA_SEED=false` and lists its
+people in `LOCAL_AUTH_SUBJECTS`. Test the server with
+`node --test backend/local-auth/server.test.ts`. The CI
 check is `Backend (.NET)` in `.github/workflows/backend-pr.yml`;
 `scripts/dev-test-unit.sh` maps any `backend/` change to the same format and
 test steps.

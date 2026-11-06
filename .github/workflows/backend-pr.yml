@@ -62,6 +62,18 @@ jobs:
           cache: true
           cache-dependency-path: backend/**/packages.lock.json
 
+      # backend/local-auth is the Cognito stand-in the compose stack runs (ADR
+      # 0030). Plain Node, no install: node:test and type stripping are built in.
+      - uses: actions/setup-node@v5
+        if: steps.filter.outputs.run == 'true'
+        with:
+          node-version: "24"
+
+      - name: Test local sign-in
+        if: steps.filter.outputs.run == 'true'
+        run: node --test backend/local-auth/server.test.ts
+        working-directory: .
+
       - name: Restore
         if: steps.filter.outputs.run == 'true'
         # --locked-mode: a dependency change must arrive with its

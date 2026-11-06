@@ -23,6 +23,13 @@ public sealed class ConfigTests
     }
 
     [Fact]
+    public void The_local_jwks_url_is_honoured_locally_only()
+    {
+        Assert.Equal(new Uri("http://local-auth:8071/keys"), Load(("AUTH_JWKS_URL", "http://local-auth:8071/keys")).LocalAuthJwksUrl);
+        Assert.Null(Load(("INSOLVIA_ENV", "staging"), ("AUTH_JWKS_URL", "http://attacker.test/keys")).LocalAuthJwksUrl);
+    }
+
+    [Fact]
     public void Defaults_are_local_and_unconfigured()
     {
         var config = Load();

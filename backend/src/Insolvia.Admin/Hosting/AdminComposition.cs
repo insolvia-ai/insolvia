@@ -6,6 +6,7 @@ using Insolvia.Admin.Routes;
 using Insolvia.Aws.Cognito;
 using Insolvia.Aws.Jwks;
 using Insolvia.Core.Auth;
+using Insolvia.Core.Local;
 using Insolvia.Core.Memory;
 using Insolvia.Core.Ports;
 using Insolvia.Data;
@@ -93,7 +94,7 @@ public static class AdminComposition
         }
         else
         {
-            builder.Services.AddSingleton<IUserDirectory, MemoryUserDirectory>();
+            builder.Services.AddSingleton<IUserDirectory>(_ => new MemoryUserDirectory(config.LocalDerivedSubjects ? LocalSubjects.For : null));
         }
 
         // Constructed once so its key cache lives as long as the process;

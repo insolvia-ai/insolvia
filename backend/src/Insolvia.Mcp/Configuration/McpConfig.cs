@@ -37,6 +37,15 @@ public sealed record McpConfig
     public string? AuthIssuerUrl { get; init; }
 
     /// <summary>
+    /// <c>AUTH_JWKS_URL</c>, honoured LOCALLY ONLY (<c>INSOLVIA_ENV=local</c>, and
+    /// ignored inside Lambda by the composition): where to fetch the issuer's keys
+    /// when a container cannot reach the issuer's own address. The browser knows
+    /// <c>backend/local-auth</c> as localhost and a container does not (ADR 0030).
+    /// The issuer check is unchanged.
+    /// </summary>
+    public Uri? LocalAuthJwksUrl { get; init; }
+
+    /// <summary>
     /// The allowlist of MCP app client ids a token may name — one
     /// pre-registered client per harness, DISJOINT from the app's client id
     /// (ADR 0016): the audience check Cognito's aud-less access tokens cannot
@@ -68,9 +77,19 @@ public sealed record McpConfig
             throw new ValidationException($"INSOLVIA_ENV must be one of {string.Join(", ", Environments)}, got '{environment}'");
         }
 
+        Uri? localAuthJwks = null;
+        if (environment == "local" && Read("AUTH_JWKS_URL") is { } jwksText)
+        {
+            if (!Uri.TryCreate(jwksText, UriKind.Absolute, out localAuthJwks) || localAuthJwks.Scheme is not ("http" or "https"))
+            {
+                throw new ValidationException($"AUTH_JWKS_URL must be an absolute http(s) URL, got '{jwksText}'");
+            }
+        }
+
         return new McpConfig
         {
             Environment = environment,
+            LocalAuthJwksUrl = localAuthJwks,
             AuthIssuerUrl = Read("AUTH_ISSUER_URL"),
             AuthClientIds = ClientIds(Read("AUTH_CLIENT_IDS")),
             ResourceUrl = Read("MCP_RESOURCE_URL") ?? ResourceUrls[environment],

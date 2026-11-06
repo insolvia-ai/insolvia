@@ -15,6 +15,7 @@ Two layers — a shared base plus thin per-package scripts:
 | `scripts/dev-up.sh` | Whole system | Brings the backend (Postgres, the migrator, the API on 8080 and admin on 8090 — `backend/scripts/dev-up.sh`), mailer, app, admin portal and marketing site up together in one terminal by delegating to each area's own `dev-up.sh` (the mailer's from a sibling insolvia-services checkout — skipped, with the API recording mail in memory, when there is none); prefixed logs, and one Ctrl-C that runs every `dev-down.sh`. Takes no arguments — to run one part, run that part's own script |
 | `scripts/dev-down.sh` | Whole system | Stops everything `dev-up.sh` starts — containers included — for when Ctrl-C never got the chance: a closed terminal, a killed process, or a stack started from **another checkout** (ports and compose project names are machine-global, so one machine runs one stack). Delegates to each area's `dev-down.sh`; idempotent, and also what `dev-up.sh`'s own Ctrl-C trap runs |
 | `scripts/github-packages-auth.sh` | Shared base (npm consumers) | Ensures a `read:packages` token is available as `NODE_AUTH_TOKEN` so `npm ci` can install `@insolvia-ai/design-system` from GitHub Packages. Reuses the current `gh` token when it already can; only starts `gh auth refresh` (a browser login) when there is a terminal to finish it in |
+| `scripts/dev-local-setup.sh` | Per-machine local wiring | Writes `backend/.env` and the app's `.env` for local sign-in ([ADR 0030](../docs/adr/0030-local-sign-in-replaces-the-dev-pool.md)). Needs no AWS. Keeps a database seeded from the old pool by passing its people to `local-auth` as `LOCAL_AUTH_SUBJECTS`. |
 | `scripts/dev-aws-setup.sh` | Per-machine AWS layer | Provisions this machine's isolated dev resources (`infra/envs/dev`: the document bucket, the job and filing queues, the keys) — sign-in is the one shared dev pool, insolvia-services' (style included), read through SSM (ADR 0026) — and writes `backend/.env` (the pool's ids, the Google client id, `INSOLVIA_SEED=false`, the bucket and queues) **and `apps/insolvia_app/.env`**; `--check` verifies |
 | `scripts/dev-test-unit.sh` | Unit tier (whole repo) | Runs every **unit** suite — `dotnet format --verify-no-changes` + `dotnet test` for `backend/` (its data tier starts a Postgres through Testcontainers, so Docker must be running), Jest per JS one, the form-spec xUnit tests (`forms/scripts/dev-test.sh`), the plain-bash tests of `.github/scripts/release-diff-base.sh` (the rule that picks which staging legs a release deploys) and `.github/scripts/lambda-environment.sh` (the one derivation of every backend Lambda's environment) — or only the suites a set of files can break (`--list` shows the mapping). **What the pre-push hook runs** (`.pre-commit-config.yaml`); with no arguments it is the "did I break anything anywhere" question before a PR. Unit means unit: nothing it runs needs AWS, a running server, a secret or the network. An affected area whose toolchain is missing FAILS naming its setup script rather than skipping — a hook that skips passes on exactly the machine that was never set up |
 | `scripts/dev-fixture.sh` | Seed fixtures (shared bucket) | `publish v1` copies a committed fixture version ([`seeds/fixtures/v1/`](../seeds/fixtures/v1/)) into the account's shared fixture bucket, idempotently by digest — the .NET migrator's `seed-publish`, run with `dotnet run`. Curating a fixture is a human act, so it never runs in CI: the staging migrator reads the bucket and never writes it. There is no `capture` since 18.23 (it was the Python seeder over the DynamoDB dev tables): a new version is curated by hand, `seeds/README.md` says how |
@@ -77,10 +78,10 @@ repairs itself at the start of the first session in it. To do it by hand:
 ```
 
 **The per-machine `.env` files are lost the same way**, and repaired the same
-way. `dev-aws-setup.sh` writes this machine's dev wiring into two gitignored
+way. `dev-local-setup.sh` writes this machine's dev wiring into two gitignored
 files (`backend/.env`, `apps/insolvia_app/.env`), and a worktree starts with
 none of them. The failure is quieter than the skills one: the app's dev server
-boots with no Cognito domain and shows "Sign-in is not configured", and the
+boots with no auth domain and shows "Sign-in is not configured", and the
 API answers every signed-in route with 401. The
 same `SessionStart` hook runs `dev-env-files.sh --link`, which symlinks each
 file from the primary checkout — a link, not a copy, so a re-provision there
@@ -281,7 +282,7 @@ its only browser-friendly URL and everything else 404s or wants a Google
 token — and **the browsable staff UI is the portal on 3100**.
 
 **Every area owns both halves.** `dev-up.sh` knows how to start that area — the
-backend's runs its compose stack, the app's pins port 3000 because Cognito
+backend's runs its compose stack, the app's pins port 3000 because sign-in
 registers that exact origin. `dev-down.sh` knows how
 to stop it, which is not the same as killing the process that started it:
 compose containers outlive their `up`, and a stray `npx` grandchild keeps
@@ -296,30 +297,26 @@ recovery cannot drift apart. To stop just one area, run that area's script.
 
 Two things worth knowing:
 
-- **You need an account and a firm before the app is usable, and one script
-  makes both.** The hosted UI has no sign-up link and is not going to grow one
-  — every pool sets `allow_admin_create_user_only`, because a public sign-up
-  form on a bankruptcy-filing platform is an invitation to junk accounts. And
-  an account only gets you past sign-in: the account lives in Cognito, firm
-  membership lives in the database, and without the firm `/v1/me` reports no firm
-  and everything else answers 403 — which reads as a broken build rather than
-  a missing step. `./scripts/dev-aws-seed.sh` does both in order. The first
-  run prompts for a password (no echo) and offers to save it to
-  `~/.config/insolvia/dev.env` (chmod 600, outside the repo tree — this repo
-  is public and an in-tree `.env` has been committed here once already); with
-  the file in place, later runs and `e2e/scripts/dev-test.sh` need no prompt
-  and no export. `dev-aws-reset.sh` wipes the local database (the firm with
-  it) — so re-run the seed script after every reset.
-- **Sign-in needs `dev-aws-setup.sh` to have run.** The database is local
-  (Postgres in Docker) but there is no fake Cognito: the app signs in against
-  the real shared dev pool, whose ids setup writes into `backend/.env` and the
-  app's `.env`. Without them everything starts and preflight warns that every
-  signed-in route will answer 401.
+- **Run `./scripts/dev-local-setup.sh` once per machine.** It writes the two
+  `.env` files, and needs no AWS. Sign-in then goes through the `local-auth`
+  service in the compose stack
+  ([ADR 0030](../docs/adr/0030-local-sign-in-replaces-the-dev-pool.md)): pick a
+  seeded person on the page or type any address. There are no passwords. Without
+  the files everything starts and preflight warns that every signed-in route
+  will answer 401.
+- **The seeded people are the ones with a firm.** The migrator seeds
+  [`seeds/dev.json`](../seeds/dev.json) into a new database. Any other address
+  signs in, but firm membership lives in the database, so `/v1/me` reports no
+  firm and everything else answers 403. Restarting `local-auth` signs everyone
+  out.
 - **The first run of the day is slow.** The backend's compose stack builds its images and
   Vite does its cold dependency scan, concurrently. The readiness wait is sized
   for that; a service still missing at the end says so and keeps trying.
 
 ## Per-machine AWS development resources
+
+**Paused.** AWS is torn down ([`docs/runbooks/aws-paused.md`](../docs/runbooks/aws-paused.md)),
+so none of this runs today. It stays for when AWS comes back.
 
 The database is **not** here: local development runs Postgres 17 in Docker
 (`backend/docker-compose.yml`, ADR 0028), migrated by the real migrator and

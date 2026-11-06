@@ -77,6 +77,22 @@ public sealed record ApiConfig
     public string? AuthPortalClientId { get; init; }
 
     /// <summary>
+    /// <c>AUTH_JWKS_URL</c>, honoured LOCALLY ONLY (<c>INSOLVIA_ENV=local</c>, and
+    /// ignored inside Lambda by the composition): where to fetch the issuer's keys
+    /// when a container cannot reach the issuer's own address. The browser knows
+    /// <c>backend/local-auth</c> as localhost and a container does not (ADR 0030).
+    /// The issuer check is unchanged.
+    /// </summary>
+    public Uri? LocalAuthJwksUrl { get; init; }
+
+    /// <summary>
+    /// <c>INSOLVIA_LOCAL_SUBJECTS=derived</c>, honoured LOCALLY ONLY: invited
+    /// people get <see cref="Core.Local.LocalSubjects"/>'s subject, the one
+    /// <c>backend/local-auth</c> signs them in as.
+    /// </summary>
+    public bool LocalDerivedSubjects { get; init; }
+
+    /// <summary>
     /// <c>INSOLVIA_LOCAL_BLOB_DIR</c> and <c>INSOLVIA_LOCAL_BLOB_URL</c>, honoured
     /// LOCALLY ONLY (<c>INSOLVIA_ENV=local</c>, and stripped inside Lambda by
     /// the composition): a directory for the document bytes and the local
@@ -125,9 +141,20 @@ public sealed record ApiConfig
             localBlobs = new LocalBlobSettings(directory, url);
         }
 
+        Uri? localAuthJwks = null;
+        if (environment.Name == "local" && Optional("AUTH_JWKS_URL") is { } jwksText)
+        {
+            if (!Uri.TryCreate(jwksText, UriKind.Absolute, out localAuthJwks) || localAuthJwks.Scheme is not ("http" or "https"))
+            {
+                throw new ArgumentException($"AUTH_JWKS_URL must be an absolute http(s) URL, got '{jwksText}'.", nameof(read));
+            }
+        }
+
         return new ApiConfig
         {
             LocalBlobs = localBlobs,
+            LocalAuthJwksUrl = localAuthJwks,
+            LocalDerivedSubjects = environment.Name == "local" && Optional("INSOLVIA_LOCAL_SUBJECTS") == "derived",
             Environment = environment,
             AuthUserPoolId = Optional("AUTH_USER_POOL_ID"),
             CaseDocumentBucket = Optional("CASE_DOCUMENT_BUCKET"),

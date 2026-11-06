@@ -64,6 +64,13 @@ public sealed record AdminConfig
     /// </summary>
     public Uri? LocalJwksUrl { get; init; }
 
+    /// <summary>
+    /// <c>INSOLVIA_LOCAL_SUBJECTS=derived</c>, honoured LOCALLY ONLY: a firm's
+    /// first administrator gets the subject <c>backend/local-auth</c> signs them
+    /// in as (ADR 0030).
+    /// </summary>
+    public bool LocalDerivedSubjects { get; init; }
+
     /// <summary>The exact origins CORS echoes in this environment.</summary>
     public IReadOnlyList<string> CorsAllowedOrigins { get; init; } = [];
 
@@ -96,6 +103,7 @@ public sealed record AdminConfig
         return new AdminConfig
         {
             Environment = environment,
+            LocalDerivedSubjects = environment.Name == "local" && Optional("INSOLVIA_LOCAL_SUBJECTS") == "derived",
             FirmUserPoolId = Optional("FIRM_USER_POOL_ID"),
             GoogleClientId = Optional("GOOGLE_CLIENT_ID"),
             LocalJwksUrl = jwks,

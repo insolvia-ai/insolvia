@@ -12,13 +12,10 @@
 # Port 8080 is the API's everywhere (ADR 0028, § Local). scripts/dev-up.sh
 # runs this file through backend/scripts/dev-up.sh.
 #
-# backend/.env (written by scripts/dev-aws-setup.sh, gitignored) feeds the
-# ${VAR:-default} substitutions below: the shared dev pool's issuer and
-# client ids, so the app on :3000 signs in against this API, and
-# INSOLVIA_SEED=false, because scripts/dev-aws-seed.sh is then the seeder
-# (with the pool's REAL subjects). Without the file every value is empty: the
-# protected routes fail closed (401) and the migrator seeds derived subjects
-# for an offline look at the admin portal.
+# backend/.env (written by scripts/dev-local-setup.sh, gitignored) feeds the
+# ${VAR:-default} substitutions below: the `local-auth` issuer and client ids,
+# so the app on :3000 signs in against this API with no AWS (ADR 0030). Without
+# the file every value is empty and the protected routes fail closed (401).
 #
 # Postgres listens on 127.0.0.1:55432, not 5432, so it never collides with a
 # Postgres already installed on the machine. The credentials are fixed,
@@ -64,11 +61,9 @@ services:
   #
   # It then SEEDS seeds/dev.json and the fixture versions it names (as the
   # `migrator` role; INSOLVIA_SEED=false skips it), and a second `up` writes
-  # nothing. With no pool named the people's subjects are derived from their
-  # addresses — rows for the admin portal to show, nobody to sign in as; run
-  # the seeder by hand with AUTH_USER_POOL_ID for the shared dev pool
-  # (backend/CLAUDE.md). The seeds arrive as a named build context: seeds/ is
-  # outside this directory.
+  # nothing. The people's subjects are derived from their addresses, which is
+  # what `local-auth` signs them in as (ADR 0030). The seeds arrive as a named
+  # build context: seeds/ is outside this directory.
   migrator:
     build:
       context: .
@@ -101,11 +96,15 @@ services:
       # the Postgres stores (ApiComposition); the user directory, sealing keys
       # and blob store stay local twins.
       INSOLVIA_DB_CONNECTION_STRING: Host=postgres;Port=5432;Database=insolvia;Username=api;Password=insolvia-local-only
-      # Token verification against the shared dev pool (public values, from
+      # Token verification against `local-auth` (public values, from
       # backend/.env). Unset fails CLOSED: every protected route answers 401.
+      # AUTH_JWKS_URL is the keys' address from inside this network, because
+      # the issuer is the address the BROWSER uses.
       AUTH_ISSUER_URL: ${AUTH_ISSUER_URL:-}
+      AUTH_JWKS_URL: ${AUTH_JWKS_URL:-}
       AUTH_CLIENT_ID: ${AUTH_CLIENT_ID:-}
       AUTH_PORTAL_CLIENT_ID: ${AUTH_PORTAL_CLIENT_ID:-}
+      INSOLVIA_LOCAL_SUBJECTS: ${INSOLVIA_LOCAL_SUBJECTS:-}
       # Unset records mail in memory. http://host.docker.internal:8026 is the
       # local mailer scripts/dev-up.sh starts from an insolvia-services checkout.
       MAILER_API_URL: ${MAILER_API_URL:-}
@@ -151,6 +150,31 @@ services:
       timeout: 3s
       retries: 15
 
+  # The Cognito hosted domain's stand-in on 8071 (ADR 0030): sign-in with no
+  # AWS. Bound to 127.0.0.1 because it checks no password. LOCAL_AUTH_SUBJECTS
+  # keeps people a real pool created in an existing database
+  # (scripts/dev-local-setup.sh writes it).
+  local-auth:
+    image: node:24-alpine
+    working_dir: /app
+    command: ['node', '/app/server.ts']
+    environment:
+      LOCAL_AUTH_PORT: '8071'
+      LOCAL_AUTH_PUBLIC_URL: http://localhost:8071
+      LOCAL_AUTH_LISTEN_HOST: 0.0.0.0
+      LOCAL_AUTH_SEED_FILE: /app/dev.json
+      LOCAL_AUTH_SUBJECTS: ${LOCAL_AUTH_SUBJECTS:-}
+    volumes:
+      - ./local-auth/server.ts:/app/server.ts:ro
+      - ../seeds/dev.json:/app/dev.json:ro
+    ports:
+      - '127.0.0.1:8071:8071'
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:8071/health']
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
   # The staff admin service on 8090, as its own role `admin` (firms, firm
   # users, the append-only audit). GOOGLE_CLIENT_ID unset fails every staff
   # route closed; FIRM_USER_POOL_ID unset mints subjects and mails nothing.
@@ -163,6 +187,7 @@ services:
       INSOLVIA_DB_CONNECTION_STRING: Host=postgres;Port=5432;Database=insolvia;Username=admin;Password=insolvia-local-only
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       FIRM_USER_POOL_ID: ${FIRM_USER_POOL_ID:-}
+      INSOLVIA_LOCAL_SUBJECTS: ${INSOLVIA_LOCAL_SUBJECTS:-}
     ports:
       - '127.0.0.1:8090:8090'
     depends_on:
@@ -171,10 +196,8 @@ services:
 
   # The MCP server on 8788 (its endpoint is http://127.0.0.1:8788/mcp), as
   # its own role `mcp` — SELECT on cases and firms, candidates only for
-  # writes. AUTH_CLIENT_IDS is the shared dev pool's MCP harness allowlist
-  # (claude + inspector, from backend/.env); unset, every call answers 401.
-  # contract/scripts/dev-test.sh --target deployed signs in through the
-  # inspector's client and calls every tool here.
+  # writes. AUTH_CLIENT_IDS is the MCP harness allowlist (from backend/.env);
+  # unset, every call answers 401.
   mcp:
     build:
       context: .
@@ -183,6 +206,7 @@ services:
       INSOLVIA_ENV: ${INSOLVIA_ENV:-local}
       INSOLVIA_DB_CONNECTION_STRING: Host=postgres;Port=5432;Database=insolvia;Username=mcp;Password=insolvia-local-only
       AUTH_ISSUER_URL: ${AUTH_ISSUER_URL:-}
+      AUTH_JWKS_URL: ${AUTH_JWKS_URL:-}
       AUTH_CLIENT_IDS: ${AUTH_CLIENT_IDS:-}
     ports:
       - '127.0.0.1:8788:8788'

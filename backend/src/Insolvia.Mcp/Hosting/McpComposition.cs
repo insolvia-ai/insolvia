@@ -127,7 +127,7 @@ public static class McpComposition
             var issuer = config.AuthIssuerUrl;
             builder.Services.AddSingleton<IJwksProvider>(services => new HttpJwksProvider(
                 new HttpClient(),
-                HttpJwksProvider.ForIssuer(issuer),
+                (isLambda ? null : config.LocalAuthJwksUrl) ?? HttpJwksProvider.ForIssuer(issuer),
                 clock: services.GetRequiredService<TimeProvider>()));
         }
 

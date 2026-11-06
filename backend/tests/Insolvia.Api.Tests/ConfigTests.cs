@@ -24,6 +24,32 @@ public sealed class ConfigTests(WebApplicationFactory<Program> factory) : IClass
         Assert.Equal("http://localhost:3000", config.AppOrigin);
     }
 
+    [Fact]
+    public void The_local_auth_settings_are_honoured_locally()
+    {
+        var config = Load(("AUTH_JWKS_URL", "http://local-auth:8071/keys"), ("INSOLVIA_LOCAL_SUBJECTS", "derived"));
+
+        Assert.Equal(new Uri("http://local-auth:8071/keys"), config.LocalAuthJwksUrl);
+        Assert.True(config.LocalDerivedSubjects);
+    }
+
+    [Theory]
+    [InlineData("staging")]
+    [InlineData("production")]
+    public void A_deployed_environment_ignores_the_local_auth_settings(string environment)
+    {
+        var config = Load(("INSOLVIA_ENV", environment), ("AUTH_JWKS_URL", "http://attacker.test/keys"), ("INSOLVIA_LOCAL_SUBJECTS", "derived"));
+
+        Assert.Null(config.LocalAuthJwksUrl);
+        Assert.False(config.LocalDerivedSubjects);
+    }
+
+    [Fact]
+    public void A_malformed_local_jwks_url_is_refused()
+    {
+        Assert.Throws<ArgumentException>(() => Load(("AUTH_JWKS_URL", "not a url")));
+    }
+
     [Theory]
     [InlineData("local")]
     [InlineData("staging")]

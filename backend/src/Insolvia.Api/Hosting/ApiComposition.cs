@@ -196,7 +196,7 @@ public static class ApiComposition
             var issuer = config.AuthIssuerUrl;
             builder.Services.AddSingleton<IJwksProvider>(services => new HttpJwksProvider(
                 new HttpClient(),
-                HttpJwksProvider.ForIssuer(issuer),
+                (isLambda ? null : config.LocalAuthJwksUrl) ?? HttpJwksProvider.ForIssuer(issuer),
                 clock: services.GetRequiredService<TimeProvider>()));
         }
 
@@ -234,7 +234,7 @@ public static class ApiComposition
         if (!isLambda)
         {
             // Mints a subject where Cognito would; sends no invitation.
-            builder.Services.AddSingleton<IUserDirectory, MemoryUserDirectory>();
+            builder.Services.AddSingleton<IUserDirectory>(_ => new MemoryUserDirectory(config.LocalDerivedSubjects ? LocalSubjects.For : null));
 
             // The deterministic local keys — the ones the migrator's local
             // seed seals with. Still a SEALER only: the development host is no

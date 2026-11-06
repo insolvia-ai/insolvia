@@ -39,9 +39,11 @@ installing).
 
 `dev-up.sh` delegates to the per-area `dev-up.sh`/`dev-down.sh` pairs below
 rather than duplicating them — which is also why it has no `--only`: to run one
-part, run that part's own script. The database is local (Postgres in Docker);
-sign-in is not — without `dev-aws-setup.sh` (which writes `backend/.env`) and
-`dev-aws-seed.sh` everything starts but every signed-in route answers 401.
+part, run that part's own script. The database and sign-in are both local
+(Postgres and `local-auth` in Docker, ADR 0030). Without `dev-local-setup.sh`,
+which writes `backend/.env` and the app's `.env`, everything starts but every
+signed-in route answers 401. AWS is paused (`docs/runbooks/aws-paused.md`), so
+the `dev-aws-*` rows below do not apply until it returns.
 
 ## Run a package locally
 
@@ -67,7 +69,7 @@ One owner per level, each aimed at fixed environments — the
 | Run every **unit** suite in the repo, or only those a set of files can break (what the **pre-push hook** runs; `--list` shows the mapping) | `scripts/dev-test-unit.sh [files…]` |
 | The backend's full gate (exactly its PR check) | `cd backend && dotnet format Insolvia.slnx --verify-no-changes && dotnet test Insolvia.slnx` (Docker running: the data tier uses Testcontainers) |
 | The **contract** suite: the .NET hosts on a throwaway Postgres, through each surface's real client (api-client, admin client, MCP SDK), with their coverage gates | `contract/scripts/dev-test.sh [jest path pattern or -t name]` |
-| The **contract** suite's deployed target against this machine's local stack (HTTP, signed in by SRP; no AWS credentials) | `contract/scripts/dev-test.sh --target deployed [jest filter]` — needs `dev-up.sh` running and `dev-aws-seed.sh` done |
+| The **contract** suite's deployed target against this machine's local stack (HTTP, signed in by SRP; no AWS credentials) | `contract/scripts/dev-test.sh --target deployed [jest filter]` — needs a real pool, so paused with AWS: `local-auth` has no SRP |
 | The browser suite against this machine's dev stack — both projects, or `--project smoke` for the unauthenticated half | `e2e/scripts/dev-test.sh [--headed] [playwright args]` |
 | The admin portal's browser flow, offline over the contract stack (no AWS, no password) | `e2e/scripts/admin-offline-test.sh [playwright args]` — Docker, the .NET SDK, `npm ci` in `e2e/` and `apps/insolvia_admin/` |
 | The same suites against **staging** or the smoke project against **production** | never from a laptop — `api-staging.yml`, `app-staging.yml` and `app-prod.yml` run them after each deploy |

@@ -79,6 +79,8 @@ public sealed class HostTests(WebApplicationFactory<Program> factory) : IClassFi
 
         // The local key override is a LOCAL affordance: staging ignores it.
         Assert.Null(config.LocalJwksUrl);
+        Assert.False(AdminConfig.Load(name => name switch { "INSOLVIA_ENV" => "staging", "INSOLVIA_LOCAL_SUBJECTS" => "derived", _ => null }).LocalDerivedSubjects);
+        Assert.True(AdminConfig.Load(name => name == "INSOLVIA_LOCAL_SUBJECTS" ? "derived" : null).LocalDerivedSubjects);
         Assert.Equal(
             new Uri("http://127.0.0.1:9999/jwks.json"),
             AdminConfig.Load(name => name == "GOOGLE_JWKS_URL" ? "http://127.0.0.1:9999/jwks.json" : null).LocalJwksUrl);

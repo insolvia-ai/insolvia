@@ -7,8 +7,8 @@
 #   ./backend/scripts/dev-up.sh
 #   curl http://127.0.0.1:8080/health
 #
-# Compose reads backend/.env (scripts/dev-aws-setup.sh writes it) for the
-# shared dev pool's ids and the admin portal's Google client id; the compose
+# Compose reads backend/.env (scripts/dev-local-setup.sh writes it) for the
+# local-auth ids and the admin portal's Google client id; the compose
 # file's header says what each value does and what happens without it. No AWS
 # credentials enter the containers: token verification needs only the pool's
 # public JWKS, and the blob store and sealing keys are local twins.
@@ -27,7 +27,7 @@ if ! command -v docker >/dev/null 2>&1; then
 fi
 
 [[ -f "$BACKEND_DIR/.env" ]] ||
-  printf '\033[1;33m[warn]\033[0m backend/.env is missing — protected routes will answer 401. Run ./scripts/dev-aws-setup.sh to wire the shared dev pool.\n' >&2
+  printf '\033[1;33m[warn]\033[0m backend/.env is missing — protected routes will answer 401. Run ./scripts/dev-local-setup.sh to wire local sign-in.\n' >&2
 
 cd "$BACKEND_DIR"
 # exec keeps this PID, which is what scripts/dev-up.sh watches.

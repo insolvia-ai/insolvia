@@ -16,6 +16,12 @@ public sealed class SeedIdTests
     private const string Case = "31e88549-1116-5d78-96ca-145e66c4b12f";
 
     [Fact]
+    public void A_local_subject_is_the_derived_id_it_always_was()
+    {
+        Assert.Equal(SeedIds.Derive("local-account", "dev@insolvia.test"), LocalSeedAccounts.SubjectFor("dev@insolvia.test"));
+    }
+
+    [Fact]
     public void A_case_id_is_pythons()
     {
         Assert.Equal(Case, SeedIds.Derive("insolvia-staging-cases", Firm, "v4", "chapter-7-sample"));

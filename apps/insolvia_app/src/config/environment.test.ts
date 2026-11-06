@@ -100,6 +100,19 @@ describe('resolveAuthConfig', () => {
     expect(resolveAuthConfig(`https://${domain}`, clientId)?.domain).toBe(`https://${domain}`);
   });
 
+  it('accepts the loopback stand-in on a local build only', () => {
+    const local = 'http://localhost:8071';
+    expect(resolveAuthConfig(local, clientId, 'local')?.domain).toBe(local);
+    expect(resolveAuthConfig(local, clientId, 'staging')).toBeNull();
+    expect(resolveAuthConfig(local, clientId, 'production')).toBeNull();
+    expect(resolvePortalAuthConfig(local, clientId, 'production')).toBeNull();
+  });
+
+  it('accepts no other plaintext host on a local build', () => {
+    expect(resolveAuthConfig('http://localhost.evil.test:8071', clientId, 'local')).toBeNull();
+    expect(resolveAuthConfig('http://192.168.1.5:8071', clientId, 'local')).toBeNull();
+  });
+
   it('rejects a non-https scheme rather than repairing it', () => {
     // An OAuth code exchange over plaintext puts a refresh token on the wire.
     expect(resolveAuthConfig(`http://${domain}`, clientId)).toBeNull();

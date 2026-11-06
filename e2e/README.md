@@ -3,8 +3,8 @@
 Playwright (Chromium) tests that drive **real deployed environments** over the
 public internet, in two projects:
 
-- **`flows`** — signs in through the Cognito hosted UI as a seeded person and
-  drives the app. Runs against **staging** in `.github/workflows/app-staging.yml`
+- **`flows`** — signs in through the hosted sign-in page (Cognito's when
+  deployed, `local-auth`'s on a laptop) as a seeded person and drives the app. Runs against **staging** in `.github/workflows/app-staging.yml`
   after the S3 sync and the CloudFront invalidation, and against a developer's
   own dev stack. Its failure fails the staging run, which is what makes it gate
   the `insolvia/staging-release` status and therefore production promotion.
@@ -67,10 +67,11 @@ cd e2e && npm ci && npm run browser   # once; browser = playwright chromium
 ```
 
 The wrapper needs `scripts/dev-up.sh` running (the app on :3000, the API on
-:8080) and `scripts/dev-aws-seed.sh` done. The password comes from
-`~/.config/insolvia/dev.env` (which the seed script offers to write) or an
-exported `E2E_TEST_USER_PASSWORD`; the address comes from `seeds/dev.json`.
-Credentials have **no default** and the run fails at config load, naming the
+:8080) and `scripts/dev-local-setup.sh` done. The address comes from
+`seeds/dev.json`. `local-auth` ignores the password, so the wrapper supplies a
+placeholder when the auth domain is localhost. Against a real pool the password
+comes from `~/.config/insolvia/dev.env` or an exported
+`E2E_TEST_USER_PASSWORD`, and the run fails at config load, naming the
 variable, if none is available. The marketing checks skip locally — a dev
 stack has no marketing site of its own.
 

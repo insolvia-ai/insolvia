@@ -12,7 +12,7 @@ right now.**
 | Route53 zone `insolvia.ai` and the domain registration | Domain routing. The zone holds the Google Workspace mail records (MX, SPF, DKIM, verification) |
 | Wildcard ACM certificate | Free, and `dev-auth.insolvia.ai` needs it |
 | SES identity `insolvia.ai` and its DNS | Free, and keeps the sending domain verified |
-| Cognito pool `insolvia-dev-users`, `dev-auth.insolvia.ai`, and `/insolvia/dev/auth/*` in SSM | Local sign-in. There is no local stand-in yet |
+| Cognito pool `insolvia-dev-users`, `dev-auth.insolvia.ai`, and `/insolvia/dev/auth/*` in SSM | Not needed for local work since [ADR 0030](../adr/0030-local-sign-in-replaces-the-dev-pool.md). It can go when you choose; it costs nothing |
 | IAM user and admin group | Account access |
 | `insolvia-shared-terraform-state-us-east-1` | Terraform state for what remains |
 

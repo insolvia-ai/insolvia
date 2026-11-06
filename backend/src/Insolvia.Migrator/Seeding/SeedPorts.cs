@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using Insolvia.Core.Local;
 using Insolvia.Core.Ports;
 
 namespace Insolvia.Migrator.Seeding;
@@ -77,14 +78,13 @@ public sealed record SeedStores(
 /// <see cref="ISeedAccounts"/> with no identity provider at all — a developer's
 /// compose database with no pool named (<c>AUTH_USER_POOL_ID</c> unset).
 /// Every address resolves to a subject DERIVED from it, so a second load finds
-/// the same people; nobody can sign in as one, which is the truth about a
-/// database no pool knows. Point the seeder at the shared dev pool to seed
-/// people who can.
+/// the same people, and <c>backend/local-auth</c> signs each one in as that
+/// same subject (ADR 0030).
 /// </summary>
 public sealed class LocalSeedAccounts : ISeedAccounts
 {
     /// <summary>The subject an address resolves to.</summary>
-    public static string SubjectFor(string email) => SeedIds.Derive("local-account", email);
+    public static string SubjectFor(string email) => LocalSubjects.For(email);
 
     /// <inheritdoc />
     public Task<string> SubjectOfAsync(string email, CancellationToken cancellationToken = default) => Task.FromResult(SubjectFor(email));

@@ -50,7 +50,7 @@ derives a client's id like a case's, writes it before the case, and refuses
 a fixture whose Debtor 1 or Debtor 2 names none; `v1`–`v3` are therefore
 not loadable any more. Their rows are the pre-client data the migrator's
 `purge-pre-client` command deletes (dry run unless `--apply`) —
-`scripts/dev-aws-seed.sh` runs it before every load, and a second run
+`scripts/dev-aws-seed.sh` ran it before every load, and a second run
 deletes nothing. Staging and prod were wiped at the switch (ADR 0028), so
 neither holds any. (A fixture case's `clients` in `seeds/<env>.json` are
 something else: portal logins, ADR 0023.)
