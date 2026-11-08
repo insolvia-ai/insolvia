@@ -225,6 +225,8 @@ loses its tables and keeps its bucket, queues and key.
 
 ### Repository layout
 
+> **Amended by [ADR 0030](0030-fewer-backend-projects.md) (2026-11-08):** Engines and Forms merged into Core, and Data and Aws into Infrastructure, keeping their namespaces; their tests merged with them. The block below is the layout as first decided.
+
 ```
 backend/
   Insolvia.slnx · Directory.Build.props · Directory.Packages.props · global.json

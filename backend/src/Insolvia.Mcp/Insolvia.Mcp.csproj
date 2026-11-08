@@ -15,8 +15,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../Insolvia.Core/Insolvia.Core.csproj" />
-    <ProjectReference Include="../Insolvia.Data/Insolvia.Data.csproj" />
-    <ProjectReference Include="../Insolvia.Aws/Insolvia.Aws.csproj" />
+    <ProjectReference Include="../Insolvia.Infrastructure/Insolvia.Infrastructure.csproj" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Insolvia.Mcp.Tests" />

@@ -32,8 +32,8 @@ write a test at each level.
 
 | Level | Where | Framework | Owns | Local | CI |
 |---|---|---|---|---|---|
-| **Unit** | `backend/tests/Insolvia.<Project>.Tests/`; TypeScript colocated in `apps/insolvia_app`, `packages/insolvia_api_client`, `packages/insolvia_admin_client`, `apps/insolvia_admin`, `apps/insolvia_marketing` | xUnit v3; Jest 29 (`jest-expo` in the app, `babel-jest` elsewhere) | logic, components, each client's request/response mapping against a stubbed `fetch` | `scripts/dev-test-unit.sh` (every suite, or the ones a set of files can break — what the **pre-push hook** runs); per unit `dotnet test` / `npm test` | every PR (`Backend (.NET)`, `App`, `API client`, `Admin client`, `Admin portal`, `Marketing site`) |
-| **Data** | `backend/tests/Insolvia.Data.Tests/` | xUnit + Testcontainers Postgres 17 | the stores, migrations and grants | `cd backend && dotnet test Insolvia.slnx` (Docker running) | every PR (`Backend (.NET)`) |
+| **Unit** | `backend/tests/Insolvia.Core.Tests/` (its `Engines/` and `Forms/` too), `Insolvia.Infrastructure.Tests/Aws/`, `Insolvia.<Host>.Tests/`; TypeScript colocated in `apps/insolvia_app`, `packages/insolvia_api_client`, `packages/insolvia_admin_client`, `apps/insolvia_admin`, `apps/insolvia_marketing` | xUnit v3; Jest 29 (`jest-expo` in the app, `babel-jest` elsewhere) | logic, components, each client's request/response mapping against a stubbed `fetch` | `scripts/dev-test-unit.sh` (every suite, or the ones a set of files can break — what the **pre-push hook** runs); per unit `dotnet test` / `npm test` | every PR (`Backend (.NET)`, `App`, `API client`, `Admin client`, `Admin portal`, `Marketing site`) |
+| **Data** | `backend/tests/Insolvia.Infrastructure.Tests/Data/` (the migrator's in `Migrator/`) | xUnit + Testcontainers Postgres 17 | the stores, migrations and grants | `cd backend && dotnet test Insolvia.slnx` (Docker running) | every PR (`Backend (.NET)`) |
 | **API, in-process** | `backend/tests/Insolvia.<Host>.Tests/Routes/` | xUnit, `WebApplicationFactory` | **refusals**: auth, validation, error paths, edge cases, anything needing a host seam | same | every PR (`Backend (.NET)`) |
 | **API, outside-in** | `contract/src/{api,admin,mcp}/` | Jest, through each surface's real client | **the happy path** of each client method, the wire shape, tenancy as the client sees it | `contract/scripts/dev-test.sh` (offline); `--target deployed` against a dev stack | offline on every PR (`Contract (.NET)`); deployed on staging after the API, admin and MCP deploys |
 | **UI flows** | `e2e/tests/flows/`; the admin portal's in `e2e/tests/admin/` | Playwright | the journeys no lower level can prove | `e2e/scripts/dev-test.sh` (dev stack); `e2e/scripts/admin-offline-test.sh` (admin, over the offline stack) | `flows` on staging after deploy (`app-staging.yml`); the admin flow on every PR (`admin-flow-pr.yml`, not required) |
@@ -116,7 +116,7 @@ the testing half.
   a test — tests run in parallel.
 - **Fake at the port.** `Insolvia.Core` defines the interfaces; its memory
   twins implement them, and every Postgres store must pass the same
-  conformance suite as its twin (`Insolvia.Data.Tests/Conformance`). A new
+  conformance suite as its twin (`Insolvia.Infrastructure.Tests/Data/Conformance`). A new
   external dependency gets a port and a twin, not an inline mock. There is
   deliberately **no mocking library** in `Directory.Packages.props`.
 - **Route tests go through the real pipeline** — `WebApplicationFactory`
@@ -341,14 +341,14 @@ ADR:
 | You changed | Test goes |
 |---|---|
 | a domain rule or an engine | `backend/tests/Insolvia.<Core\|Engines>.Tests/`, pure, table-driven |
-| a store | the conformance suite both the twin and the Postgres store run (`Insolvia.Data.Tests/Conformance`) |
+| a store | the conformance suite both the twin and the Postgres store run (`Insolvia.Infrastructure.Tests/Data/Conformance`) |
 | a route's refusals, validation or error mapping | `backend/tests/Insolvia.<Host>.Tests/Routes/`, through `WebApplicationFactory` |
 | a new API endpoint | its route tests (refusals), the api-client pin, **and** a happy-path call in `contract/src/api` |
 | an admin route, or an `AdminClient` method | its route tests, `packages/insolvia_admin_client`'s pin, **and** a call in `contract/src/admin` (its gate counts every method) |
 | an MCP tool | `Insolvia.Mcp.Tests`, **and** a call in `contract/src/mcp` through the SDK (its gate requires every listed tool) |
 | tenancy — who may see whose data, as the client sees it | `contract/src/api/tenancy.test.ts` |
 | a form spec | `forms/scripts/dev-test.sh` (the xUnit spec tests) gates it |
-| a new AWS-touching adapter | a port in `Insolvia.Core`, a twin beside it, the adapter in `Insolvia.Aws` with its transport faked |
+| a new AWS-touching adapter | a port in `Insolvia.Core`, a twin beside it, the adapter in `Insolvia.Infrastructure` (`Aws/`) with its transport faked |
 | an app component | beside it, `<name>.test.tsx`, rendered, queried by role |
 | an app route | beside the screen, via `renderRouter` |
 | an admin-portal or marketing module | beside it, Jest |

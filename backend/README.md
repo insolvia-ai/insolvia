@@ -39,9 +39,10 @@ run `./scripts/dev-aws-setup.sh` (writes `backend/.env`) and
 ```
 Insolvia.slnx  global.json  Directory.Build.props  Directory.Packages.props
 Dockerfile  docker-compose.yml
-src/    Insolvia.Core · Engines · Forms · Data · Aws          libraries
-        Insolvia.Api · Worker · Admin · Mcp · Filing · Migrator   hosts
-tests/  one Insolvia.<Project>.Tests per project, plus Insolvia.Architecture.Tests
+src/    Insolvia.Core (Engines/, Forms/) · Infrastructure (Data/, Aws/)   libraries
+        Insolvia.Api · Worker · Admin · Mcp · Filing · Migrator           hosts
+        Insolvia.UstTool                                                   a tool, never deployed
+tests/  Insolvia.Core.Tests · Infrastructure.Tests (+ the migrator's) · one per other host and the tool
 ```
 
 [`CLAUDE.md`](CLAUDE.md) has the layering rules, the data tier's rules and

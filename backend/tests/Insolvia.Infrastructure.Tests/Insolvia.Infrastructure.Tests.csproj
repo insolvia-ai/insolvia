@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The adapters' tests (ADR 0030), one folder per part:
+       - Data/: the data tier, against a real Postgres 17 in Docker
+         (Testcontainers): one container per test run, one fresh database per
+         test;
+       - Migrator/: the migrator, against the same container. Roles are
+         cluster-wide, so these share Data/'s `postgres` collection and run
+         serially with it;
+       - Aws/: the AWS adapters, offline.
+       It references the migrator (a host), and through it Infrastructure. -->
+  <ItemGroup>
+    <PackageReference Include="Testcontainers.PostgreSql" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/Insolvia.Infrastructure/Insolvia.Infrastructure.csproj" />
+    <ProjectReference Include="../../src/Insolvia.Migrator/Insolvia.Migrator.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The cross-language sealed-data fixtures (written by the Python generator before 18.23; now frozen evidence). -->
+    <None Include="Aws/Fixtures/*.json" Link="Fixtures/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

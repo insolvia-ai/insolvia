@@ -150,17 +150,6 @@
         "resolved": "1.0.2",
         "contentHash": "clcAZGAb8sbtIuynOPiZkpHLdSb3RGxHJjSPyecgRh55fFY0KynqA7GEtrVL/sAUgO9jvC0IMhPXBRcJuFWrAA=="
       },
-      "insolvia.aws": {
-        "type": "Project",
-        "dependencies": {
-          "AWSSDK.CognitoIdentityProvider": "[4.0.106.2, )",
-          "AWSSDK.Core": "[4.0.102.14, )",
-          "AWSSDK.KeyManagementService": "[4.0.101, )",
-          "AWSSDK.S3": "[4.0.104.3, )",
-          "AWSSDK.SQS": "[4.0.100.17, )",
-          "Insolvia.Core": "[1.0.0, )"
-        }
-      },
       "insolvia.core": {
         "type": "Project",
         "dependencies": {
@@ -169,10 +158,15 @@
           "System.Security.Cryptography.Pkcs": "[10.0.14, )"
         }
       },
-      "insolvia.data": {
+      "insolvia.infrastructure": {
         "type": "Project",
         "dependencies": {
+          "AWSSDK.CognitoIdentityProvider": "[4.0.106.2, )",
+          "AWSSDK.Core": "[4.0.102.14, )",
+          "AWSSDK.KeyManagementService": "[4.0.101, )",
           "AWSSDK.RDS": "[4.0.107.2, )",
+          "AWSSDK.S3": "[4.0.104.3, )",
+          "AWSSDK.SQS": "[4.0.100.17, )",
           "EFCore.NamingConventions": "[10.0.1, )",
           "Insolvia.Core": "[1.0.0, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )"

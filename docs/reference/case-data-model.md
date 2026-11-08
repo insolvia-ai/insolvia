@@ -11,8 +11,8 @@ store that holds it is chosen in the encrypted-case-store work, not here.
 > `backend/src/Insolvia.Core/Cases`, `insolvia_core.tax_ids` is
 > `Insolvia.Core/TaxIds`, and so on; the API's calculators
 > (`core/means_test.py`, `core/chapter13_plan.py`, …) are
-> `backend/src/Insolvia.Engines`, the Case Upload and filing-set code
-> `backend/src/Insolvia.Forms`. The rules each names are unchanged.
+> `backend/src/Insolvia.Core/Engines`, the Case Upload and filing-set code
+> `backend/src/Insolvia.Core/Forms`. The rules each names are unchanged.
 
 Three consumers pull in different directions, and every decision below is a
 trade between them:

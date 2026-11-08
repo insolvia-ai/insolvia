@@ -1,6 +1,6 @@
 # ADR 0030 — The backend keeps one project per deployable and one per purity boundary, not one per folder
 
-- **Status:** Proposed 2026-11-08.
+- **Status:** Accepted 2026-11-08 — built in the same PR ([#604](https://github.com/insolvia-ai/insolvia/pull/604)).
 - **Date:** 2026-11-08.
 - **Relates to:** **Amends [ADR 0028](0028-backend-moves-to-dotnet-and-postgres.md)**,
   only its *Repository layout* section (the five libraries and "one test
@@ -138,8 +138,8 @@ aliases and a `Program` that no reader can tell apart.
   `insolvia-testing` and `insolvia-new-package` skills (they name
   `Insolvia.Architecture.Tests`) and the Dockerfile's restore `COPY` lines.
   ADR 0028's layout block keeps its text and gets an "amended by 0030" note.
-- **It lands in two PRs, each green on its own.** Each one reports the test
-  count before and after, and the counts must match:
+- **It lands as two commits, each green on its own.** Each one reports the
+  test count before and after, and the counts must match:
   1. `Core` absorbs `Engines` and `Forms`. `Core.Tests` absorbs their tests
      and `Architecture.Tests`. `UstTool` drops its `Engines` reference.
   2. `Data` and `Aws` become `Infrastructure`. `Infrastructure.Tests`

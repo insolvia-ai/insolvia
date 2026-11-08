@@ -33,7 +33,7 @@ Python `capture` that read one out of a dev stack was not ported, 18.23) and
 published with `scripts/dev-fixture.sh publish <version>` after its PR
 merges. A debtor's tax id is typed from the SSA's never-issued block, never
 copied from anywhere (the API only ever shows its last four anyway).
-The migrator's tests (`backend/tests/Insolvia.Migrator.Tests`) load
+The migrator's tests (`backend/tests/Insolvia.Infrastructure.Tests/Migrator`) load
 `dev.json` and `staging.json`, with every version they name — so a fixture
 that would not load fails `Backend (.NET)` on the PR, not the next staging
 deploy. **The staging seed runs from the migrator IMAGE**: `seeds/` is a

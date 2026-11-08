@@ -136,7 +136,7 @@ before you touch anything:
 | **touching the official-form field specs** — form fields, revisions, the forms engine's input | [`forms/CLAUDE.md`](forms/CLAUDE.md) — the AcroForm dumps are ground truth; `forms/scripts/dev-test.sh` gates every edit |
 | touching Terraform state / naming / deploy order | [`docs/reference/terraform.md`](docs/reference/terraform.md) |
 | doing one-time AWS/GitHub bootstrap | [insolvia-services' `docs/runbooks/aws-bootstrap.md`](https://github.com/insolvia-ai/insolvia-services/blob/main/docs/runbooks/aws-bootstrap.md) |
-| working on mail / SES — the mailer is in insolvia-services; this repo only calls it (the API's mailer client, `backend/src/Insolvia.Aws/Mailer`) | [`docs/reference/email.md`](https://github.com/insolvia-ai/insolvia-services/blob/main/docs/reference/email.md) · [`docs/runbooks/ses-production-access.md`](https://github.com/insolvia-ai/insolvia-services/blob/main/docs/runbooks/ses-production-access.md) — both in insolvia-services |
+| working on mail / SES — the mailer is in insolvia-services; this repo only calls it (the API's mailer client, `backend/src/Insolvia.Infrastructure/Aws/Mailer`) | [`docs/reference/email.md`](https://github.com/insolvia-ai/insolvia-services/blob/main/docs/reference/email.md) · [`docs/runbooks/ses-production-access.md`](https://github.com/insolvia-ai/insolvia-services/blob/main/docs/runbooks/ses-production-access.md) — both in insolvia-services |
 | **adding, moving, or rewriting anything in `docs/`** | [`docs/CLAUDE.md`](docs/CLAUDE.md) — four kinds, one per directory; and what belongs in a skill instead |
 | looking for any other runbook | [`docs/README.md`](docs/README.md) |
 

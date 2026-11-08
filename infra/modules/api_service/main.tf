@@ -457,7 +457,7 @@ resource "aws_ssm_parameter" "unsubscribe_secret" {
 }
 
 # ── Pagination cursor key (ADR 0028, plan 18.9) ─────────────────
-# The HMAC key keyset cursors are bound with (backend/src/Insolvia.Data/
+# The HMAC key keyset cursors are bound with (backend/src/Insolvia.Infrastructure/Data/
 # Pagination/CursorCodec.cs; base64). Unset, the codec falls back to a
 # constant written in this public repository: cursors stay bound to their
 # query but become forgeable. Generated, for the unsubscribe key's reason

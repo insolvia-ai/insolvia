@@ -8,31 +8,36 @@ the Python was deleted in 18.23. Comments that name a Python module
 (`core/x.py`, `services/api/...`) record where a port came from; the module
 itself is gone, and `git log` before 18.23 has it.
 
-## Layering — pinned by `tests/Insolvia.Architecture.Tests`
+## Layering — pinned by `tests/Insolvia.Core.Tests/Architecture`
 
 | Project | May reference |
 |---|---|
-| `Insolvia.Core` — domain + ports | nothing in the solution |
-| `Insolvia.Engines` — pure: calculation engines and form projections | `Core` |
-| `Insolvia.Forms` — pure: the PDF engine, which fills what Engines projects | `Core`, `Engines` |
-| `Insolvia.Data` (EF Core, Postgres), `Insolvia.Aws` (SDK adapters) | `Core` |
-| hosts: `Api`, `Worker`, `Admin`, `Mcp`, `Filing`, `Migrator` | any library above; **never another host** |
-| tools: `UstTool` — run by a developer or CI, never deployed (no Dockerfile stage) | the pure libraries it needs (`Core`, `Engines`); never `Data`, `Aws` or a host |
+| `Insolvia.Core` — pure: the domain and ports (`Insolvia.Core.*`), the calculation engines and form projections (`Engines/`, `Insolvia.Engines.*`), the PDF engine (`Forms/`, `Insolvia.Forms.*`) | nothing in the solution |
+| `Insolvia.Infrastructure` — the adapters: EF Core and the Postgres stores (`Data/`, `Insolvia.Data.*`), the AWS SDK adapters (`Aws/`, `Insolvia.Aws.*`) | `Core` |
+| hosts: `Api`, `Worker`, `Admin`, `Mcp`, `Filing`, `Migrator` | `Core`, `Infrastructure`; **never another host** |
+| tools: `UstTool` — run by a developer or CI, never deployed (no Dockerfile stage) | `Core`; never `Infrastructure` or a host |
 
-- **No AWS and no EF in Core, Engines or Forms.** A port (interface) lives in
-  Core; its adapter lives in `Data` or `Aws`; a host wires them. The
-  architecture test also refuses `AWSSDK.*`, `Amazon.*`, EF Core and Npgsql
-  packages in those three.
+- **A project exists only as a separate deployable or a boundary the
+  compiler must enforce** ([ADR 0030](../docs/adr/0030-fewer-backend-projects.md)).
+  A new concern is a folder and a namespace in an existing project; say in
+  the PR which reason a new project meets.
+- **Namespaces follow folders, not assemblies.** `src/Insolvia.Core/Engines/`
+  is `Insolvia.Engines.*`; `src/Insolvia.Infrastructure/Data/` is
+  `Insolvia.Data.*`. Embedded resources keep their `Insolvia.Engines.…` /
+  `Insolvia.Forms.…` logical names.
+- **No AWS and no EF in Core.** A port (interface) lives in Core; its adapter
+  lives in `Infrastructure`; a host wires them. The architecture test also
+  refuses `AWSSDK.*`, `Amazon.*`, EF Core and Npgsql packages in Core.
 - Code the filing worker shares with the API (approval, digest) goes in
-  `Forms` or `Core`, never in `Api`.
-- A new project needs a `tests/<Name>.Tests` project and a line in
-  `Insolvia.slnx`, and the rule above must name it. The test fails until all
-  three are done.
+  `Core`, never in `Api`.
+- A new project needs a test project (`TestProjectOf` in the layering test
+  maps each project to one), a line in `Insolvia.slnx`, and the rule above
+  must name it. The test fails until all three are done.
 
 ## Rules that are easy to get wrong
 
 - **Money is `decimal`**, never `double`; Postgres `numeric`. The engines'
-  parity outputs (`tests/Insolvia.Engines.Tests/Parity/*.expected.json`,
+  parity outputs (`tests/Insolvia.Core.Tests/Engines/Parity/*.expected.json`,
   captured from the Python oracle) pin Decimal-exact results; a deliberate
   change edits them in the same PR.
 - Timestamps are `DateTimeOffset` / `timestamptz`; court dates are `DateOnly`
@@ -49,10 +54,10 @@ itself is gone, and `git log` before 18.23 has it.
 - One deployable unit, one Dockerfile target. A host gets its stage when it
   gets a handler, and `backend-pr.yml` builds it in the same PR.
 
-## The data tier — `Insolvia.Data` and `Insolvia.Migrator`
+## The data tier — `Insolvia.Infrastructure/Data` and `Insolvia.Migrator`
 
 - **One context, `InsolviaDbContext`, one schema, `insolvia`.** An entity
-  joins the model through an `IEntityTypeConfiguration<T>` in `Insolvia.Data`
+  joins the model through an `IEntityTypeConfiguration<T>` in `Insolvia.Infrastructure`
   (picked up by assembly scan); nobody edits the context to add a table. Its
   conventions are the rules above made mechanical: snake_case names,
   `DateTimeOffset` → `timestamptz` (written as UTC), `decimal` → `numeric`,
@@ -61,7 +66,7 @@ itself is gone, and `git log` before 18.23 has it.
 - **Adding a migration:** change the model, then
   ```bash
   cd backend && dotnet tool restore
-  dotnet ef migrations add <PascalCaseName> --project src/Insolvia.Data --startup-project src/Insolvia.Migrator --output-dir Migrations
+  dotnet ef migrations add <PascalCaseName> --project src/Insolvia.Infrastructure --startup-project src/Insolvia.Migrator --output-dir Data/Migrations --namespace Insolvia.Data.Migrations
   ```
   and commit the migration, its `.Designer.cs` and the updated snapshot
   together. `ModelTests.The_real_model_has_no_change_that_a_migration_does_not_capture`
@@ -99,7 +104,7 @@ itself is gone, and `git log` before 18.23 has it.
   - `InsertOnceAsync` handles its own: a generated key's conflict on a replay
     counts as done (no read — the waitlist and admin audit roles cannot read
     their tables); a key callers compete for passes `alsoMatching:`.
-  - `RetryTests` (Data.Tests) injects both faults through `FaultInjector`;
+  - `RetryTests` (Infrastructure.Tests) injects both faults through `FaultInjector`;
     a new write with a `landed` check gets a lost-ack test there.
 - **Listings page by keyset** (`Pagination/`): a `Keyset<TRow, TKey>` with a
   total order and a name that includes everything that changes the rows

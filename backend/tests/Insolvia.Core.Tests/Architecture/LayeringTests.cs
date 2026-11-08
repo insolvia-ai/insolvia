@@ -10,14 +10,18 @@ namespace Insolvia.Architecture.Tests;
 //                     AWS, no EF. It holds the domain (Insolvia.Core.*), the
 //                     engines and projections (Engines/, Insolvia.Engines.*)
 //                     and the PDF engine (Forms/, Insolvia.Forms.*)
-//   Data, Aws         reference Core only
+//   Infrastructure    references Core only: the adapters behind Core's
+//                     ports — EF Core and the Postgres stores (Data/,
+//                     Insolvia.Data.*) and the AWS SDK adapters (Aws/,
+//                     Insolvia.Aws.*)
 //   hosts             may reference any library; never another host
 //   tools             reference the pure library only (Core); run by a
-//                     developer or CI, never deployed, so never Data, Aws or
-//                     a host — UstTool writes the regulatory registry and
-//                     validates it through the engines (#585)
+//                     developer or CI, never deployed, so never
+//                     Infrastructure or a host — UstTool writes the
+//                     regulatory registry and validates it through the
+//                     engines (#585)
 //
-// Only hosts reference Data or Aws, which follows from the lines above: no
+// Only hosts reference Infrastructure, which follows from the lines above: no
 // library is allowed them. The filing worker shares the API's approval and
 // digest code through Core, never through Api, which is what the hosts line
 // enforces.
@@ -33,8 +37,7 @@ public sealed class LayeringTests
     private static readonly Dictionary<string, string[]> LibraryAllowed = new(StringComparer.Ordinal)
     {
         ["Core"] = [],
-        ["Data"] = ["Core"],
-        ["Aws"] = ["Core"],
+        ["Infrastructure"] = ["Core"],
     };
 
     // Where each source project's tests live (ADR 0030): a test project per
@@ -42,14 +45,13 @@ public sealed class LayeringTests
     private static readonly Dictionary<string, string> TestProjectOf = new(StringComparer.Ordinal)
     {
         ["Core"] = "Core",
-        ["Data"] = "Data",
-        ["Aws"] = "Aws",
+        ["Infrastructure"] = "Infrastructure",
         ["Api"] = "Api",
         ["Worker"] = "Worker",
         ["Admin"] = "Admin",
         ["Mcp"] = "Mcp",
         ["Filing"] = "Filing",
-        ["Migrator"] = "Migrator",
+        ["Migrator"] = "Infrastructure",
         ["UstTool"] = "UstTool",
     };
 
@@ -102,7 +104,7 @@ public sealed class LayeringTests
 
     [Theory]
     [MemberData(nameof(SourceProjects))]
-    public void Only_hosts_reference_Data_or_Aws(string project)
+    public void Only_hosts_reference_Infrastructure(string project)
     {
         if (Hosts.Contains(project))
         {
@@ -111,8 +113,7 @@ public sealed class LayeringTests
 
         var references = ProjectReferences(project);
 
-        Assert.DoesNotContain("Data", references);
-        Assert.DoesNotContain("Aws", references);
+        Assert.DoesNotContain("Infrastructure", references);
     }
 
     [Theory]
