@@ -114,7 +114,7 @@ npx skills add <owner/repo> --skill <name> --agent universal --agent claude-code
 ```
 
 To remove one, delete its entry from `skills-lock.json` (and its
-`.claude/skills/<name>` line in `.gitignore`, for a mattpocock skill) and
+`.claude/skills/<name>` line in `.gitignore`, for a skill listed there by name) and
 commit. Every `dev-skills.sh` run except `--check` then deletes anything on
 disk the lock no longer lists, so the uninstall reaches each machine at its
 next session rather than living in the lock alone; `--check` names the
