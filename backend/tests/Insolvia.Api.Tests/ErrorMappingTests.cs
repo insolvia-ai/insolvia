@@ -1,7 +1,7 @@
 using Insolvia.Api.Logging;
 using Insolvia.Api.Tests.Support;
-using Insolvia.Core;
-using Insolvia.Core.Auth;
+using Insolvia.Domain;
+using Insolvia.Domain.Auth;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Logging;
 using static Insolvia.Api.Tests.Support.HttpAssert;

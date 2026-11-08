@@ -1,8 +1,8 @@
-using Insolvia.Core.Memory;
-using Insolvia.Core.Ports;
 using Insolvia.Data.AccessLogging;
 using Insolvia.Data.Cases;
 using Insolvia.Data.Firms;
+using Insolvia.Domain.Memory;
+using Insolvia.Domain.Ports;
 using Insolvia.Mcp.Tests.Support;
 using Insolvia.Mcp.Tools;
 using Microsoft.Extensions.DependencyInjection;

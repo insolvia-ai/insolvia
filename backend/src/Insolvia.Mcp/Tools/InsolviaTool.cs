@@ -1,8 +1,8 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using Insolvia.Core;
-using Insolvia.Core.Access;
-using Insolvia.Core.Ports;
+using Insolvia.Domain;
+using Insolvia.Domain.Access;
+using Insolvia.Domain.Ports;
 using Insolvia.Mcp.Auth;
 using Insolvia.Mcp.Logging;
 using Insolvia.Mcp.Views;

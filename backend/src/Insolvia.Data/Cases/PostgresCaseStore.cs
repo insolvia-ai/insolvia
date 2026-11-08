@@ -1,13 +1,13 @@
-using Insolvia.Core;
-using Insolvia.Core.Access;
-using Insolvia.Core.Cases;
-using Insolvia.Core.Clients;
-using Insolvia.Core.Debtors;
-using Insolvia.Core.Ports;
 using Insolvia.Data.Concurrency;
 using Insolvia.Data.Firms;
 using Insolvia.Data.Pagination;
 using Insolvia.Data.Storage;
+using Insolvia.Domain;
+using Insolvia.Domain.Access;
+using Insolvia.Domain.Cases;
+using Insolvia.Domain.Clients;
+using Insolvia.Domain.Debtors;
+using Insolvia.Domain.Ports;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Query;
 
@@ -15,7 +15,7 @@ namespace Insolvia.Data.Cases;
 
 /// <summary>
 /// The Postgres <see cref="ICaseStore"/> (Python's <c>DynamoDbCaseStore</c>),
-/// held to <see cref="Core.Memory.MemoryCaseStore"/> by the conformance suite.
+/// held to <see cref="Insolvia.Domain.Memory.MemoryCaseStore"/> by the conformance suite.
 /// <list type="bullet">
 /// <item><b>Create</b> — the case, its creator's assignment and its debtors
 /// in ONE transaction, each linked client locked <c>FOR SHARE</c> and checked

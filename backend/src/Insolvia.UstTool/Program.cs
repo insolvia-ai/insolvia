@@ -22,7 +22,7 @@ using Insolvia.UstTool;
 // of justice.gov: re-ingest a recording, or work offline.
 //
 // After an ingest, edit the manifest's `notes` if anything about the source
-// was odd, then run `dotnet test tests/Insolvia.Engines.Tests` in backend/ —
+// was odd, then run `dotnet test tests/Insolvia.Domain.Engines.Tests` in backend/ —
 // UstDataTests validates every committed release, and `Backend (.NET)` fails
 // the PR on a malformed one. (The tool has already loaded it through the
 // engine before writing it.)
@@ -174,7 +174,7 @@ static string RegistryRoot()
     {
         for (var dir = new DirectoryInfo(start); dir is not null; dir = dir.Parent)
         {
-            var candidate = Path.Combine(dir.FullName, "backend", "src", "Insolvia.Engines", "Regulatory");
+            var candidate = Path.Combine(dir.FullName, "backend", "src", "Insolvia.Domain", "Engines", "Regulatory");
             if (Directory.Exists(candidate))
             {
                 return candidate;
@@ -182,5 +182,5 @@ static string RegistryRoot()
         }
     }
 
-    throw new IngestException("no backend/src/Insolvia.Engines/Regulatory above this directory; pass --out-root/--registry");
+    throw new IngestException("no backend/src/Insolvia.Domain/Engines/Regulatory above this directory; pass --out-root/--registry");
 }

@@ -365,7 +365,7 @@ as xUnit, `integration/` into `contract/`) renamed no check.
 | `Backend (.NET)` | `backend-pr.yml` — the backend that deploys (ADR 0028) |
 | `Cognito branding` | `branding-pr.yml` — the brand drift gate (ADR 0020); the name outlived Cognito, see the workflow's header |
 | `Contract (.NET)` | `contract-dotnet-pr.yml` — `contract/`'s offline target and its coverage gates (ADR 0029 rule 2) |
-| `Form specs` | `forms-pr.yml` — the xUnit spec tests in `Insolvia.Forms.Tests` |
+| `Form specs` | `forms-pr.yml` — the xUnit spec tests in `Insolvia.Domain.Tests/Forms/Specs` |
 | `Marketing site` | `marketing-pr.yml` |
 | `Terraform validate (staging)` | `shared-infra-plan.yml` |
 | `Terraform validate (prod)` | `shared-infra-plan.yml` |

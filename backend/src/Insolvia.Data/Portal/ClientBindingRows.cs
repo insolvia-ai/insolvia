@@ -1,6 +1,6 @@
-using Insolvia.Core.Clients;
 using Insolvia.Data.Firms;
 using Insolvia.Data.Storage;
+using Insolvia.Domain.Clients;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 

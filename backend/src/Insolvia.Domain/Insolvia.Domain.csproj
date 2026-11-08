@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The domain (ADR 0030): ports and entities at the root (Insolvia.Domain.*),
+       the pure calculation engines and form projections under Engines/
+       (Insolvia.Domain.Engines.*), and the PDF engine under Forms/ (Insolvia.Domain.Forms.*).
+       Namespaces follow those folders, not this assembly's name. Pure:
+       references nothing in the solution; no AWS SDK, no EF Core, no Npgsql. -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" />
+    <!-- PDFsharp is used ONLY as a PDF object model by Forms/; the appearance
+         streams are a port of pypdf 6.16.2's generator. -->
+    <PackageReference Include="PDFsharp" />
+    <PackageReference Include="System.Security.Cryptography.Pkcs" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Insolvia.Domain.Tests" />
+  </ItemGroup>
+  <!-- Regulatory files ship in the artifact (ADR 0014). Logical names keep the
+       paths under each folder, and keep the prefixes they had when Engines
+       and Forms were assemblies of their own, so no lookup changed.
+       - Regulatory/: the court registry the case domain validates a court
+         against; Agreements/: the filing-authorization text an attorney signs.
+       - Engines/Regulatory/: the canonical registry — dollar amounts,
+         UST/IRS/Census series, exemption schemes, legal holidays, deadline
+         rules, and each form release's spec, AcroForm dump and manifest. A
+         release is a reviewed PR here; the UST tool (src/Insolvia.UstTool)
+         writes the UST series into it.
+       - Forms/Templates/: the official template PDFs (TemplatePdfs re-hashes
+         each against its manifest's source.sha256 on load);
+         Forms/Pdf/FontData.json: pypdf's core-font metrics and glyph list;
+         Forms/Regulatory/: the AO's Case Upload specification as data. -->
+  <ItemGroup>
+    <EmbeddedResource Include="Regulatory/**/*.json" LogicalName="Insolvia.Domain.Regulatory/%(RecursiveDir)%(Filename)%(Extension)" />
+    <EmbeddedResource Include="Agreements/**/*.txt" LogicalName="Insolvia.Domain.Agreements/%(RecursiveDir)%(Filename)%(Extension)" />
+    <EmbeddedResource Include="Engines/Regulatory/**/*.json" LogicalName="Insolvia.Domain.Engines.Regulatory/%(RecursiveDir)%(Filename)%(Extension)" />
+    <EmbeddedResource Include="Forms/Templates/**/*.pdf" LogicalName="Insolvia.Domain.Forms.Templates/%(RecursiveDir)%(Filename)%(Extension)" />
+    <EmbeddedResource Include="Forms/Pdf/FontData.json" LogicalName="Insolvia.Domain.Forms.FontData.json" />
+    <EmbeddedResource Include="Forms/Regulatory/**/*.json" LogicalName="Insolvia.Domain.Forms.Regulatory/%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+</Project>

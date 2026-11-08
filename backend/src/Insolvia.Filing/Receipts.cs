@@ -1,8 +1,8 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
-using Insolvia.Core;
-using Insolvia.Core.Documents;
+using Insolvia.Domain;
+using Insolvia.Domain.Documents;
 
 namespace Insolvia.Filing;
 
@@ -10,7 +10,7 @@ namespace Insolvia.Filing;
 /// What the worker keeps once the court confirmed a filing (from
 /// <c>core/receipt.py</c>): the court's confirmation page VERBATIM as a blob
 /// (not a case Document — HTML is outside the documents allowlist), and the
-/// one-page receipt PDF (<see cref="Forms.FilingReceipt"/>) as a
+/// one-page receipt PDF (<see cref="Insolvia.Domain.Forms.FilingReceipt"/>) as a
 /// <c>court_notice</c> Document — born stored, its id derived from the
 /// filing so a redelivery finds the first run's row instead of writing a second.
 /// </summary>
@@ -57,7 +57,7 @@ public static partial class Receipts
     public static string ReceiptDocumentId(string filingId) => Uuid5(Namespace, "receipt:" + filingId);
 
     /// <summary>The receipt's Document record: stored, at the filing's prefix, under the derived id.</summary>
-    public static Document ReceiptDocument(Core.Filings.Filing filing, byte[] content, TimeProvider? clock = null)
+    public static Document ReceiptDocument(Insolvia.Domain.Filings.Filing filing, byte[] content, TimeProvider? clock = null)
     {
         ArgumentNullException.ThrowIfNull(filing);
         ArgumentNullException.ThrowIfNull(content);

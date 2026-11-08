@@ -3,8 +3,8 @@ using System.Text.Json.Nodes;
 using Insolvia.Api.Mail;
 using Insolvia.Api.Tests.Support;
 using Insolvia.Api.Waitlist;
-using Insolvia.Core;
 using Insolvia.Data.Waitlist;
+using Insolvia.Domain;
 
 namespace Insolvia.Api.Tests.Routes;
 

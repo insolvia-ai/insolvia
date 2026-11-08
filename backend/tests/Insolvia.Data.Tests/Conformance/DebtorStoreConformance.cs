@@ -1,13 +1,13 @@
-using Insolvia.Core;
-using Insolvia.Core.Debtors;
-using Insolvia.Core.Fields;
-using Insolvia.Core.Provenance;
-using Insolvia.Core.TaxIds;
+using Insolvia.Domain;
+using Insolvia.Domain.Debtors;
+using Insolvia.Domain.Fields;
+using Insolvia.Domain.Provenance;
+using Insolvia.Domain.TaxIds;
 
 namespace Insolvia.Data.Tests.Conformance;
 
 /// <summary>
-/// What every <see cref="Core.Ports.IDebtorStore"/> must do: once-only create,
+/// What every <see cref="Insolvia.Domain.Ports.IDebtorStore"/> must do: once-only create,
 /// the link's three refusals in the contract's order (role_taken, client_taken,
 /// client_unavailable), the merge's repoint, and the race of one client
 /// linked to two roles at once.
@@ -195,7 +195,7 @@ public abstract class DebtorStoreConformance : CaseConformance
     }
 }
 
-/// <summary>The oracle: <see cref="Core.Memory.MemoryDebtorStore"/>.</summary>
+/// <summary>The oracle: <see cref="Insolvia.Domain.Memory.MemoryDebtorStore"/>.</summary>
 public sealed class MemoryDebtorStoreConformance : DebtorStoreConformance
 {
     private readonly MemoryCaseWorld _world = new();

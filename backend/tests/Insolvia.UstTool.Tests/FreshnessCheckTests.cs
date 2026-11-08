@@ -1,5 +1,5 @@
 using System.Text;
-using Insolvia.Engines.Regulatory;
+using Insolvia.Domain.Engines.Regulatory;
 using Insolvia.UstTool.Tests.Support;
 
 namespace Insolvia.UstTool.Tests;

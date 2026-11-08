@@ -44,11 +44,18 @@ description: >-
 
 ## Backend project or host (.NET — not a workspace member)
 
-Lives in `backend/` as `src/Insolvia.<Name>/` with a matching
-`tests/Insolvia.<Name>.Tests/`, both listed in `backend/Insolvia.slnx`, and
-named in `tests/Insolvia.Architecture.Tests`' layering rule — the test fails
-until all of that is done ([`backend/CLAUDE.md`](../../../backend/CLAUDE.md)
-owns the rule). Package versions go in `Directory.Packages.props`; commit the
+**First ask whether it should be a project at all.** A backend project exists
+only as a separate deployable or a boundary the compiler must enforce
+([ADR 0030](../../../docs/adr/0030-three-backend-layers.md)); a new library
+concern is a folder and a namespace in the layer it belongs to:
+`Insolvia.Domain` (business logic, pure), `Insolvia.Data` (data access) or
+`Insolvia.Platform` (platform services).
+
+A project that passes lives in `backend/` as `src/Insolvia.<Name>/` with a
+test project, both listed in `backend/Insolvia.slnx`, and named in the
+layering rule and its `TestProjectOf` map
+(`tests/Insolvia.Domain.Tests/Architecture`) — the test fails until all of that
+is done ([`backend/CLAUDE.md`](../../../backend/CLAUDE.md) owns the rule). Package versions go in `Directory.Packages.props`; commit the
 `packages.lock.json` it generates. A new **host** (a deployable unit) also
 gets its own `backend/Dockerfile` target, a build line in `backend-pr.yml`, a
 `<name>-<env>.yml` deploy pair, a leg in `release.yml`, and its ECR repository

@@ -1,13 +1,13 @@
 using System.Globalization;
 using System.Text.Json.Nodes;
-using Insolvia.Core;
-using Insolvia.Core.Candidates;
-using Insolvia.Core.CaseEntities;
-using Insolvia.Core.Cases;
-using Insolvia.Core.Debtors;
-using Insolvia.Core.Documents;
-using Insolvia.Core.FirmClients;
-using Insolvia.Core.Provenance;
+using Insolvia.Domain;
+using Insolvia.Domain.Candidates;
+using Insolvia.Domain.CaseEntities;
+using Insolvia.Domain.Cases;
+using Insolvia.Domain.Debtors;
+using Insolvia.Domain.Documents;
+using Insolvia.Domain.FirmClients;
+using Insolvia.Domain.Provenance;
 
 namespace Insolvia.Mcp.Views;
 
@@ -19,7 +19,7 @@ namespace Insolvia.Mcp.Views;
 /// the member order and absent-versus-null rule of the function it was ported from.
 /// </summary>
 /// <remarks>
-/// These belong in Insolvia.Core beside the records, where the API's case
+/// These belong in Insolvia.Domain beside the records, where the API's case
 /// routes would share them; they are here because Core was closed to this
 /// change (#532), the same position Insolvia.Api's
 /// <c>FirmViews</c> is in. Moving both into Core is one mechanical PR.

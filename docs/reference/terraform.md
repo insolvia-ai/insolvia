@@ -336,7 +336,7 @@ The tax-id statements are the one place a role touches the key without a
 call that does not carry `purpose = debtor-tax-id` is denied, and a call that
 does can only be the envelope the hosts designed (`TaxIdKeyUse`). Every
 deployed host is told the alias explicitly (`insolvia-kms-case-key-alias`),
-and `backend/src/Insolvia.Aws/Sealing/SealingKeys.cs` refuses one not shaped
+and `backend/src/Insolvia.Platform/Sealing/SealingKeys.cs` refuses one not shaped
 `alias/insolvia-<env>-cases` — the shape ci-trust's deny matches.
 `infra/envs/dev` needs no grant: the developer's own IAM user reaches the key
 through the key policy's root delegation.

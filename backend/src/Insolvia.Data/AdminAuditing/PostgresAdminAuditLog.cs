@@ -1,7 +1,7 @@
-using Insolvia.Core.AdminAudit;
-using Insolvia.Core.Ports;
 using Insolvia.Data.Firms;
 using Insolvia.Data.Storage;
+using Insolvia.Domain.AdminAudit;
+using Insolvia.Domain.Ports;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 

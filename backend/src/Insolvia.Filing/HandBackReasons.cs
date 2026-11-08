@@ -1,5 +1,5 @@
 using System.Collections.Frozen;
-using Insolvia.Core.Filings;
+using Insolvia.Domain.Filings;
 
 namespace Insolvia.Filing;
 
@@ -74,5 +74,5 @@ public static class HandBackReasons
         return new HandBackNote(reason, stage.ToWireState(), entry.Title, entry.Action, courtSaid);
     }
 
-    private static string ToWireState(this FilingState state) => Core.Wire.ToWire(state);
+    private static string ToWireState(this FilingState state) => Insolvia.Domain.Wire.ToWire(state);
 }

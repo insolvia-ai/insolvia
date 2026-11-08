@@ -1,7 +1,7 @@
-using Insolvia.Core.AdminAudit;
-using Insolvia.Core.Memory;
-using Insolvia.Core.Ports;
 using Insolvia.Data.AdminAuditing;
+using Insolvia.Domain.AdminAudit;
+using Insolvia.Domain.Memory;
+using Insolvia.Domain.Ports;
 using Microsoft.EntityFrameworkCore;
 
 namespace Insolvia.Data.Tests.Conformance;

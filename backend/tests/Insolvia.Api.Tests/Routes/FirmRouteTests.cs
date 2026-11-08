@@ -1,8 +1,8 @@
 using System.Text.Json.Nodes;
 using Insolvia.Api.Http;
 using Insolvia.Api.Tests.Support;
-using Insolvia.Core.Firms;
-using Insolvia.Core.Ports;
+using Insolvia.Domain.Firms;
+using Insolvia.Domain.Ports;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Insolvia.Api.Tests.Routes;
@@ -289,7 +289,7 @@ public sealed class FirmRouteTests : IAsyncLifetime, IDisposable
         var expected = new JsonObject();
         foreach (var (feature, level) in Permissions.DefaultFor(FirmRole.Staff))
         {
-            expected[Core.Wire.ToWire(feature)] = Core.Wire.ToWire(level);
+            expected[Insolvia.Domain.Wire.ToWire(feature)] = Insolvia.Domain.Wire.ToWire(level);
         }
 
         Assert.True(JsonNode.DeepEquals(expected, body["permissions"]));

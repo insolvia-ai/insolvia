@@ -1,8 +1,8 @@
-using Insolvia.Core;
-using Insolvia.Core.Filings;
-using Insolvia.Core.Ports;
 using Insolvia.Data.Concurrency;
 using Insolvia.Data.Storage;
+using Insolvia.Domain;
+using Insolvia.Domain.Filings;
+using Insolvia.Domain.Ports;
 using Microsoft.EntityFrameworkCore;
 
 namespace Insolvia.Data.Cases;
@@ -10,7 +10,7 @@ namespace Insolvia.Data.Cases;
 /// <summary>
 /// The Postgres <see cref="IFilingApprovalStore"/> (Python's
 /// <c>DynamoDbFilingApprovalStore</c>), held to
-/// <see cref="Core.Memory.MemoryFilingApprovalStore"/> by the conformance
+/// <see cref="Insolvia.Domain.Memory.MemoryFilingApprovalStore"/> by the conformance
 /// suite. The conditions are the guardrail, each in a statement's WHERE:
 /// <list type="bullet">
 /// <item><c>create</c> — ONE transaction: the approval's INSERT (its key

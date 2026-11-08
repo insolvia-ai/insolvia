@@ -1,6 +1,6 @@
 using Insolvia.Api.Tests.Support;
-using Insolvia.Core;
-using Insolvia.Core.Firms;
+using Insolvia.Domain;
+using Insolvia.Domain.Firms;
 
 namespace Insolvia.Api.Tests.Routes;
 
@@ -535,7 +535,7 @@ public sealed class FirmClientRouteTests : IAsyncLifetime, IDisposable
     public async Task A_merge_with_no_debtor_store_composed_is_a_500_and_moves_nothing()
     {
         // The Lambda composes no debtor store until 18.11 ports it.
-        using var world = new FirmWorld(services: services => Microsoft.Extensions.DependencyInjection.Extensions.ServiceCollectionDescriptorExtensions.RemoveAll<Core.Ports.IDebtorClientLinks>(services));
+        using var world = new FirmWorld(services: services => Microsoft.Extensions.DependencyInjection.Extensions.ServiceCollectionDescriptorExtensions.RemoveAll<Insolvia.Domain.Ports.IDebtorClientLinks>(services));
         await (await world.WithFirmsAsync()).WithAsync(FirmWorld.Member(Admin, isAdmin: true));
         var keep = (await world.Post("/v1/firm/clients", """{"name": {"given": "Jordan"}}""", Admin)).Str("id");
         var dupe = (await world.Post("/v1/firm/clients", """{"name": {"given": "Jordy"}}""", Admin)).Str("id");

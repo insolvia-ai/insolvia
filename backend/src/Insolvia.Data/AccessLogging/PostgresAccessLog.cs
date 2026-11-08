@@ -1,6 +1,6 @@
-using Insolvia.Core.AccessLog;
-using Insolvia.Core.Ports;
 using Insolvia.Data.Storage;
+using Insolvia.Domain.AccessLog;
+using Insolvia.Domain.Ports;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 

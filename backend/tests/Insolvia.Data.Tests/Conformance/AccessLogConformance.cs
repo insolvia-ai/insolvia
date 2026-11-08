@@ -1,7 +1,7 @@
-using Insolvia.Core.AccessLog;
-using Insolvia.Core.Memory;
-using Insolvia.Core.Ports;
 using Insolvia.Data.AccessLogging;
+using Insolvia.Domain.AccessLog;
+using Insolvia.Domain.Memory;
+using Insolvia.Domain.Ports;
 using Microsoft.EntityFrameworkCore;
 
 namespace Insolvia.Data.Tests.Conformance;

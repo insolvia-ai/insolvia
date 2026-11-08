@@ -1,18 +1,18 @@
 using System.Text.Json.Nodes;
 using Insolvia.Api.Http;
-using Insolvia.Core;
-using Insolvia.Core.CaseEntities;
-using Insolvia.Core.Cases;
-using Insolvia.Core.CaseTasks;
-using Insolvia.Core.Clients;
-using Insolvia.Core.Courts;
-using Insolvia.Core.Debtors;
-using Insolvia.Core.DocumentRequests;
-using Insolvia.Core.Documents;
-using Insolvia.Core.Events;
-using Insolvia.Core.Notes;
-using Insolvia.Core.Provenance;
-using Insolvia.Core.TaxIds;
+using Insolvia.Domain;
+using Insolvia.Domain.CaseEntities;
+using Insolvia.Domain.Cases;
+using Insolvia.Domain.CaseTasks;
+using Insolvia.Domain.Clients;
+using Insolvia.Domain.Courts;
+using Insolvia.Domain.Debtors;
+using Insolvia.Domain.DocumentRequests;
+using Insolvia.Domain.Documents;
+using Insolvia.Domain.Events;
+using Insolvia.Domain.Notes;
+using Insolvia.Domain.Provenance;
+using Insolvia.Domain.TaxIds;
 
 namespace Insolvia.Api.Cases;
 

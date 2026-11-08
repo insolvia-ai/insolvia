@@ -1,9 +1,9 @@
-using Insolvia.Core;
-using Insolvia.Core.Debtors;
-using Insolvia.Core.Ports;
 using Insolvia.Data.Concurrency;
 using Insolvia.Data.Firms;
 using Insolvia.Data.Storage;
+using Insolvia.Domain;
+using Insolvia.Domain.Debtors;
+using Insolvia.Domain.Ports;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 
@@ -11,7 +11,7 @@ namespace Insolvia.Data.Cases;
 
 /// <summary>
 /// The Postgres <see cref="IDebtorStore"/> (Python's <c>DynamoDbDebtorStore</c>),
-/// held to <see cref="Core.Memory.MemoryDebtorStore"/> by the conformance suite.
+/// held to <see cref="Insolvia.Domain.Memory.MemoryDebtorStore"/> by the conformance suite.
 /// <list type="bullet">
 /// <item><c>create</c>'s <c>attribute_not_exists(SK)</c> is the primary key
 /// (case, role); <c>put</c> is an upsert.</item>

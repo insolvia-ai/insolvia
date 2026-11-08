@@ -4,11 +4,11 @@ using Insolvia.Api.Auth;
 using Insolvia.Api.Filing;
 using Insolvia.Api.Hosting;
 using Insolvia.Api.Http;
-using Insolvia.Core;
-using Insolvia.Core.FilingAuthorizations;
-using Insolvia.Core.FilingCredentials;
-using Insolvia.Core.Firms;
-using Insolvia.Core.Ports;
+using Insolvia.Domain;
+using Insolvia.Domain.FilingAuthorizations;
+using Insolvia.Domain.FilingCredentials;
+using Insolvia.Domain.Firms;
+using Insolvia.Domain.Ports;
 
 namespace Insolvia.Api.Routes;
 

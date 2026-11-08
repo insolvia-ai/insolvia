@@ -2,9 +2,9 @@ using Insolvia.Api.Auth;
 using Insolvia.Api.Firms;
 using Insolvia.Api.Hosting;
 using Insolvia.Api.Http;
-using Insolvia.Core.DocumentRequests;
-using Insolvia.Core.Firms;
-using Insolvia.Core.Questionnaires;
+using Insolvia.Domain.DocumentRequests;
+using Insolvia.Domain.Firms;
+using Insolvia.Domain.Questionnaires;
 
 namespace Insolvia.Api.Routes;
 

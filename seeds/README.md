@@ -14,7 +14,7 @@ before the switch converges on the same records.
 |---|---|---|
 | `dev.json` | Who exists on a developer's machine — the dev account's firm — and which fixture case it holds, with the portal client bound to it ([ADR 0023](../docs/adr/0023-client-portal-identity-and-isolation.md)) | `scripts/dev-aws-seed.sh` (real subjects from the shared dev pool, after `dev-aws-setup.sh`), or — with no `backend/.env` — `docker compose up` in `backend/` (subjects derived from the addresses: rows, nobody to sign in as) |
 | `staging.json` | Who exists in staging — three people across two firms, so cross-tenant isolation is testable — which fixture case they hold, and the portal client bound to it | the staging migrator Lambda: once per release in the migrator leg (`migrator-staging.yml`, `{}` = migrate then seed), and again as `{"command": "seed"}` from `.github/actions/seed-staging` before the contract suite's deployed target and the browser suite |
-| `fixtures/<version>/cases.json` | What each fixture case contains: chapter, court and division (a reference into the court registry, `backend/src/Insolvia.Core/Regulatory/courts`), debtors, collection items, documents — in the API's own request-body shapes, with `{"$ref": "claims/<handle>"}` wherever one record names another (a fixture publishes no ids) | the loader, when an environment fixture names one of its cases |
+| `fixtures/<version>/cases.json` | What each fixture case contains: chapter, court and division (a reference into the court registry, `backend/src/Insolvia.Domain/Regulatory/courts`), debtors, collection items, documents — in the API's own request-body shapes, with `{"$ref": "claims/<handle>"}` wherever one record names another (a fixture publishes no ids) | the loader, when an environment fixture names one of its cases |
 | `fixtures/<version>/manifest.json` | Every sample document's size and sha256 | the loader, to verify a copy landed as published |
 | `fixtures/<version>/objects/` | The sample documents themselves — small, synthetic, committed | `scripts/dev-fixture.sh publish` (the migrator's `seed-publish`), which copies them into the shared fixture bucket the staging loader copies from server-side (created by insolvia-services' `infra/envs/shared`); locally the loader reads this committed tree directly |
 
@@ -33,7 +33,7 @@ Python `capture` that read one out of a dev stack was not ported, 18.23) and
 published with `scripts/dev-fixture.sh publish <version>` after its PR
 merges. A debtor's tax id is typed from the SSA's never-issued block, never
 copied from anywhere (the API only ever shows its last four anyway).
-The migrator's tests (`backend/tests/Insolvia.Migrator.Tests`) load
+The migrator's tests (`backend/tests/Insolvia.Data.Tests/Migrator`) load
 `dev.json` and `staging.json`, with every version they name — so a fixture
 that would not load fails `Backend (.NET)` on the PR, not the next staging
 deploy. **The staging seed runs from the migrator IMAGE**: `seeds/` is a

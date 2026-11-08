@@ -1,5 +1,5 @@
 using System.Security.Cryptography;
-using Insolvia.Core.Ports;
+using Insolvia.Domain.Ports;
 
 namespace Insolvia.Migrator.Seeding;
 

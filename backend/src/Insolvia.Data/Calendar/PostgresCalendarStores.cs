@@ -1,9 +1,9 @@
-using Insolvia.Core;
-using Insolvia.Core.Events;
-using Insolvia.Core.Ports;
 using Insolvia.Data.Cases;
 using Insolvia.Data.Concurrency;
 using Insolvia.Data.Storage;
+using Insolvia.Domain;
+using Insolvia.Domain.Events;
+using Insolvia.Domain.Ports;
 using Microsoft.EntityFrameworkCore;
 
 namespace Insolvia.Data.Calendar;

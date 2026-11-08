@@ -1,13 +1,13 @@
-using Insolvia.Core;
-using Insolvia.Core.Access;
-using Insolvia.Core.Cases;
-using Insolvia.Core.Clients;
-using Insolvia.Core.Debtors;
+using Insolvia.Domain;
+using Insolvia.Domain.Access;
+using Insolvia.Domain.Cases;
+using Insolvia.Domain.Clients;
+using Insolvia.Domain.Debtors;
 
 namespace Insolvia.Data.Tests.Conformance;
 
 /// <summary>
-/// What every <see cref="Core.Ports.ICaseStore"/> must do, against the memory twin and
+/// What every <see cref="Insolvia.Domain.Ports.ICaseStore"/> must do, against the memory twin and
 /// Postgres: the create transaction and its client conditions, the access
 /// rule on every read, the two listings and their cursors, the status
 /// compare-and-swap, and the lifecycle write (ADR 0027) with each of its
@@ -400,7 +400,7 @@ public abstract class CaseStoreConformance : CaseConformance
             Ids.Alice)!;
 }
 
-/// <summary>The oracle: <see cref="Core.Memory.MemoryCaseStore"/> against its own suite.</summary>
+/// <summary>The oracle: <see cref="Insolvia.Domain.Memory.MemoryCaseStore"/> against its own suite.</summary>
 public sealed class MemoryCaseStoreConformance : CaseStoreConformance
 {
     private readonly MemoryCaseWorld _world = new();

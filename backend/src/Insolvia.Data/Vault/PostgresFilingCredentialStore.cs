@@ -1,9 +1,9 @@
-using Insolvia.Core;
-using Insolvia.Core.FilingCredentials;
-using Insolvia.Core.Ports;
-using Insolvia.Core.TaxIds;
 using Insolvia.Data.Concurrency;
 using Insolvia.Data.Storage;
+using Insolvia.Domain;
+using Insolvia.Domain.FilingCredentials;
+using Insolvia.Domain.Ports;
+using Insolvia.Domain.TaxIds;
 using Microsoft.EntityFrameworkCore;
 
 namespace Insolvia.Data.Vault;

@@ -1,4 +1,4 @@
-using Insolvia.Aws.Mailer;
+using Insolvia.Platform.Mailer;
 
 namespace Insolvia.Api.Mail;
 
@@ -29,7 +29,7 @@ public sealed record OutboundEmail(
 /// address (Python's <c>Mailer</c> port, core/ports.py).
 /// </summary>
 /// <remarks>
-/// It belongs in Insolvia.Core.Ports; it is here because Core was closed to
+/// It belongs in Insolvia.Domain.Ports; it is here because Core was closed to
 /// this change (#525). When it moves, <see cref="SigV4MailerClient"/>
 /// implements it directly and <see cref="SigV4Mailer"/> goes away.
 /// </remarks>

@@ -1,8 +1,8 @@
 using System.Text.Json.Nodes;
 using Insolvia.Api.Tests.Support;
-using Insolvia.Core;
-using Insolvia.Core.AccessLog;
-using Insolvia.Core.Memory;
+using Insolvia.Domain;
+using Insolvia.Domain.AccessLog;
+using Insolvia.Domain.Memory;
 using static Insolvia.Api.Tests.Support.CaseWorld;
 
 namespace Insolvia.Api.Tests.Routes;
@@ -459,7 +459,7 @@ public sealed class CaseLifecycleRouteTests : IAsyncLifetime, IDisposable
 
         var copied = Assert.Single((await _world.Get($"/v1/cases/{copyId}/debtors")).Object["debtors"]!.AsArray())!.AsObject();
         Assert.Equal("""{"kind":"ssn","last_four":"4321"}""", Http.FlaskJson.Serialize(copied["tax_id"]));
-        var items = _world.Service<Core.Ports.ITaxIdStore>() as MemoryTaxIdStore;
+        var items = _world.Service<Insolvia.Domain.Ports.ITaxIdStore>() as MemoryTaxIdStore;
         Assert.Equal(new[] { source, copyId }.Order(StringComparer.Ordinal), items!.Items.Keys.Select(key => key.CaseId).Order(StringComparer.Ordinal));
     }
 

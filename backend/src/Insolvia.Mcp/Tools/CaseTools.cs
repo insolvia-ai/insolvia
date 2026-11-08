@@ -1,13 +1,13 @@
 using System.Text.Json.Nodes;
-using Insolvia.Core;
-using Insolvia.Core.Access;
-using Insolvia.Core.AccessLog;
-using Insolvia.Core.Candidates;
-using Insolvia.Core.CaseEntities;
-using Insolvia.Core.Cases;
-using Insolvia.Core.FirmClients;
-using Insolvia.Core.Firms;
-using Insolvia.Core.Ports;
+using Insolvia.Domain;
+using Insolvia.Domain.Access;
+using Insolvia.Domain.AccessLog;
+using Insolvia.Domain.Candidates;
+using Insolvia.Domain.CaseEntities;
+using Insolvia.Domain.Cases;
+using Insolvia.Domain.FirmClients;
+using Insolvia.Domain.Firms;
+using Insolvia.Domain.Ports;
 using Insolvia.Mcp.Views;
 
 namespace Insolvia.Mcp.Tools;

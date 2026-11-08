@@ -1,17 +1,17 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using Insolvia.Core;
-using Insolvia.Core.Candidates;
-using Insolvia.Core.CaseEntities;
-using Insolvia.Core.CaseTasks;
-using Insolvia.Core.Creditors;
-using Insolvia.Core.DocumentRequests;
-using Insolvia.Core.Documents;
-using Insolvia.Core.Fields;
-using Insolvia.Core.Notes;
-using Insolvia.Core.Ports;
-using Insolvia.Core.Provenance;
-using Insolvia.Core.TaxIds;
+using Insolvia.Domain;
+using Insolvia.Domain.Candidates;
+using Insolvia.Domain.CaseEntities;
+using Insolvia.Domain.CaseTasks;
+using Insolvia.Domain.Creditors;
+using Insolvia.Domain.DocumentRequests;
+using Insolvia.Domain.Documents;
+using Insolvia.Domain.Fields;
+using Insolvia.Domain.Notes;
+using Insolvia.Domain.Ports;
+using Insolvia.Domain.Provenance;
+using Insolvia.Domain.TaxIds;
 
 namespace Insolvia.Data.Tests.Conformance;
 

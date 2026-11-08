@@ -1,7 +1,7 @@
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
-using Insolvia.Core;
 using Insolvia.Data.Waitlist;
+using Insolvia.Domain;
 
 namespace Insolvia.Api.Waitlist;
 

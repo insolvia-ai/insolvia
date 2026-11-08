@@ -1,19 +1,19 @@
 using Amazon;
 using Amazon.KeyManagementService;
 using Amazon.S3;
-using Insolvia.Aws.Documents;
-using Insolvia.Aws.Filing;
-using Insolvia.Aws.Sealing;
-using Insolvia.Core.Ports;
 using Insolvia.Data;
 using Insolvia.Data.AccessLogging;
 using Insolvia.Data.Cases;
 using Insolvia.Data.Connections;
 using Insolvia.Data.Pagination;
 using Insolvia.Data.Vault;
+using Insolvia.Domain.Ports;
 using Insolvia.Filing.Drivers;
 using Insolvia.Filing.Fence;
 using Insolvia.Filing.Http;
+using Insolvia.Platform.Documents;
+using Insolvia.Platform.Filing;
+using Insolvia.Platform.Sealing;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Insolvia.Filing;

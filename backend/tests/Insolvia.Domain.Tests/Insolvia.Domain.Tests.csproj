@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The pure assembly's tests (ADR 0030), one folder per part of it:
+       - the root: Insolvia.Domain, translated from packages/insolvia_core/tests/unit;
+       - Engines/: the engines' unit suites, and the parity tests against the
+         Python oracle's output (Parity/*.expected.json, captured before 18.23);
+       - Forms/: the PDF engine's suites and the .NET goldens; Forms/Specs is
+         the `Form specs` check (forms/specs against forms/acroform);
+       - Architecture/: the layering rule. It reads the project files
+         themselves rather than compiled assemblies: the compiler drops a
+         reference no code uses yet.
+       Files copy to the output paths they had when each part was its own
+       test project, so the suites' lookups did not change. -->
+  <ItemGroup>
+    <ProjectReference Include="../../src/Insolvia.Domain/Insolvia.Domain.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Engines/Parity/*.json" Link="Parity/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Engines/Goldens/**/*" Link="Goldens/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Forms/Goldens/*.json" Link="Goldens/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Forms/Fixtures/*" Link="Fixtures/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <!-- The Python backend's Debtor.txt for the four parity case files, captured before 18.23. -->
+    <None Include="Forms/Parity/debtor-txt/*.txt" Link="DebtorTxt/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <!-- The Forms suite reads the parity case files from CaseFiles/. -->
+    <None Include="Engines/Parity/*.case.json" Link="CaseFiles/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

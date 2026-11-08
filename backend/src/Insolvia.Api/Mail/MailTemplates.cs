@@ -1,5 +1,5 @@
 using System.Text;
-using Insolvia.Core;
+using Insolvia.Domain;
 
 namespace Insolvia.Api.Mail;
 

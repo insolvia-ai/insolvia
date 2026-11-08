@@ -1,10 +1,10 @@
 using System.Text.Json.Nodes;
-using Insolvia.Core.Access;
-using Insolvia.Core.AccessLog;
-using Insolvia.Core.Cases;
-using Insolvia.Core.Firms;
-using Insolvia.Core.Memory;
-using Insolvia.Core.Ports;
+using Insolvia.Domain.Access;
+using Insolvia.Domain.AccessLog;
+using Insolvia.Domain.Cases;
+using Insolvia.Domain.Firms;
+using Insolvia.Domain.Memory;
+using Insolvia.Domain.Ports;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Insolvia.Api.Tests.Support;

@@ -1,15 +1,15 @@
-using Insolvia.Core.Cases;
-using Insolvia.Core.Filings;
-using Insolvia.Core.Ports;
 using Insolvia.Data.Concurrency;
 using Insolvia.Data.Storage;
+using Insolvia.Domain.Cases;
+using Insolvia.Domain.Filings;
+using Insolvia.Domain.Ports;
 using Microsoft.EntityFrameworkCore;
 
 namespace Insolvia.Data.Cases;
 
 /// <summary>
 /// The Postgres <see cref="IFilingStore"/> (Python's <c>DynamoDbFilingStore</c>),
-/// held to <see cref="Core.Memory.MemoryFilingStore"/> by the conformance
+/// held to <see cref="Insolvia.Domain.Memory.MemoryFilingStore"/> by the conformance
 /// suite. Every write is conditional, and the conditions are the idempotency:
 /// <list type="bullet">
 /// <item><c>claim</c> — <c>attribute_not_exists(PK)</c>: the primary key;

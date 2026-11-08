@@ -76,7 +76,7 @@ jobs:
         if: steps.filter.outputs.run == 'true'
         run: dotnet build Insolvia.slnx --configuration Release --no-restore
 
-      # The data-tier suites (Data.Tests, Migrator.Tests) start a postgres:17
+      # The data-tier suite (Infrastructure.Tests: Data/ and Migrator/) starts a postgres:17
       # container through Testcontainers, on the Docker the runner ships with.
       - name: Test
         if: steps.filter.outputs.run == 'true'

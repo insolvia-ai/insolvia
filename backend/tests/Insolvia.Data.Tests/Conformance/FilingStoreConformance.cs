@@ -1,10 +1,10 @@
-using Insolvia.Core.Cases;
-using Insolvia.Core.Filings;
+using Insolvia.Domain.Cases;
+using Insolvia.Domain.Filings;
 
 namespace Insolvia.Data.Tests.Conformance;
 
 /// <summary>
-/// What every <see cref="Core.Ports.IFilingStore"/> must do (ADR 0024 PR 7/8):
+/// What every <see cref="Insolvia.Domain.Ports.IFilingStore"/> must do (ADR 0024 PR 7/8):
 /// a claim once, each transition from the state and attempt it read, a
 /// resolution once — and, with a filed case, the case's move into filed and
 /// its lifecycle event in the SAME write, refused as a whole when the case
@@ -216,7 +216,7 @@ public abstract class FilingStoreConformance : CaseConformance
         filing with { State = state, UpdatedAt = Claimed.AddMinutes(5), History = [.. filing.History, new FilingStep(state, Claimed.AddMinutes(5))] };
 }
 
-/// <summary>The oracle: <see cref="Core.Memory.MemoryFilingStore"/>.</summary>
+/// <summary>The oracle: <see cref="Insolvia.Domain.Memory.MemoryFilingStore"/>.</summary>
 public sealed class MemoryFilingStoreConformance : FilingStoreConformance
 {
     private readonly MemoryCaseWorld _world = new();

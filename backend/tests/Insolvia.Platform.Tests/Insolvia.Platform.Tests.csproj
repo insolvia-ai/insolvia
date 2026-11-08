@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Unit tests for Insolvia.Platform, offline: each adapter's transport faked. -->
+  <ItemGroup>
+    <ProjectReference Include="../../src/Insolvia.Platform/Insolvia.Platform.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The cross-language sealed-data fixtures (written by the Python generator before 18.23; now frozen evidence). -->
+    <None Include="Fixtures/*.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

@@ -1,10 +1,10 @@
 using Insolvia.Api.Cases;
 using Insolvia.Api.Http;
-using Insolvia.Core.Cases;
-using Insolvia.Core.Clients;
-using Insolvia.Core.DocumentRequests;
-using Insolvia.Core.Documents;
-using Insolvia.Core.TaxIds;
+using Insolvia.Domain.Cases;
+using Insolvia.Domain.Clients;
+using Insolvia.Domain.DocumentRequests;
+using Insolvia.Domain.Documents;
+using Insolvia.Domain.TaxIds;
 
 namespace Insolvia.Api.Tests.Routes;
 

@@ -4,14 +4,14 @@ using Amazon.KeyManagementService;
 using Amazon.S3;
 using Amazon.SQS;
 using Amazon.SQS.Model;
-using Insolvia.Aws.Documents;
-using Insolvia.Aws.Sealing;
-using Insolvia.Core.Ports;
 using Insolvia.Data;
 using Insolvia.Data.AccessLogging;
 using Insolvia.Data.Cases;
 using Insolvia.Data.Connections;
 using Insolvia.Data.Pagination;
+using Insolvia.Domain.Ports;
+using Insolvia.Platform.Documents;
+using Insolvia.Platform.Sealing;
 using Insolvia.Worker.Anthropic;
 using Insolvia.Worker.Workers;
 using Microsoft.EntityFrameworkCore;
@@ -67,9 +67,9 @@ public sealed record WorkerComposition(IDocumentBlobStore Blobs, ITaxIdCipher Ta
         ArgumentNullException.ThrowIfNull(stores);
         return new Dictionary<string, JobWorker>(JobDispatch.PureWorkers, StringComparer.Ordinal)
         {
-            [Core.Jobs.JobRules.PacketAssemblyKind] = PacketAssemblyWorker.For(new PacketAssemblyDeps(stores.Cases, stores.Debtors, stores.Entities, stores.Packets, Blobs, stores.AccessLog, stores.TaxIds, TaxIdCipher) { Clock = Clock, Log = Log }),
-            [Core.Jobs.JobRules.PetitionReviewKind] = PetitionReview.For(new PetitionReviewDeps(stores.Cases, stores.Debtors, stores.Entities, stores.Packets, stores.AccessLog, stores.TaxIds, TaxIdCipher, ReviewModel) { Clock = Clock, Log = Log }),
-            [Core.Jobs.JobRules.DocumentExtractionKind] = DocumentExtraction.For(new DocumentExtractionDeps(stores.Cases, stores.Documents, Blobs, stores.Candidates, stores.AccessLog, ExtractionModel) { Clock = Clock, Log = Log }),
+            [Insolvia.Domain.Jobs.JobRules.PacketAssemblyKind] = PacketAssemblyWorker.For(new PacketAssemblyDeps(stores.Cases, stores.Debtors, stores.Entities, stores.Packets, Blobs, stores.AccessLog, stores.TaxIds, TaxIdCipher) { Clock = Clock, Log = Log }),
+            [Insolvia.Domain.Jobs.JobRules.PetitionReviewKind] = PetitionReview.For(new PetitionReviewDeps(stores.Cases, stores.Debtors, stores.Entities, stores.Packets, stores.AccessLog, stores.TaxIds, TaxIdCipher, ReviewModel) { Clock = Clock, Log = Log }),
+            [Insolvia.Domain.Jobs.JobRules.DocumentExtractionKind] = DocumentExtraction.For(new DocumentExtractionDeps(stores.Cases, stores.Documents, Blobs, stores.Candidates, stores.AccessLog, ExtractionModel) { Clock = Clock, Log = Log }),
         };
     }
 

@@ -1,10 +1,10 @@
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
-using Insolvia.Core.AccessLog;
-using Insolvia.Core.Jobs;
-using Insolvia.Core.Memory;
-using Insolvia.Forms;
-using Insolvia.Forms.Tests.Support;
+using Insolvia.Domain.AccessLog;
+using Insolvia.Domain.Forms;
+using Insolvia.Domain.Forms.Tests.Support;
+using Insolvia.Domain.Jobs;
+using Insolvia.Domain.Memory;
 using Insolvia.Worker.Tests.Support;
 using Insolvia.Worker.Workers;
 

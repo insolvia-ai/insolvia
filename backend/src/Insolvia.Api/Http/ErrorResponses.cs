@@ -1,6 +1,6 @@
 using System.Text.Json.Nodes;
-using Insolvia.Core;
-using Insolvia.Core.Auth;
+using Insolvia.Domain;
+using Insolvia.Domain.Auth;
 
 namespace Insolvia.Api.Http;
 

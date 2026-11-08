@@ -17,7 +17,7 @@
     <None Include="Fixtures/*.json" CopyToOutputDirectory="PreserveNewest" />
     <!-- The analysis routes' end-to-end parity: the Python oracle's own case
          files and outputs, owned by the Engines tests (Parity/*.json). -->
-    <None Include="../Insolvia.Engines.Tests/Parity/*.json" LinkBase="Parity" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../Insolvia.Domain.Tests/Engines/Parity/*.json" LinkBase="Parity" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/Insolvia.Api/Insolvia.Api.csproj" />
@@ -30,8 +30,8 @@
   </ItemGroup>
   <ItemGroup>
     <!-- The reference case the end-to-end test assembles, read in place. -->
-    <None Include="../Insolvia.Engines.Tests/Parity/reference-ch7.case.json" Link="CaseFiles/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
-    <Compile Include="../Insolvia.Forms.Tests/Support/CaseFiles.cs" Link="Support/CaseFiles.cs" />
-    <Compile Include="../Insolvia.Forms.Tests/Support/CaseDatas.cs" Link="Support/CaseDatas.cs" />
+    <None Include="../Insolvia.Domain.Tests/Engines/Parity/reference-ch7.case.json" Link="CaseFiles/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <Compile Include="../Insolvia.Domain.Tests/Forms/Support/CaseFiles.cs" Link="Support/CaseFiles.cs" />
+    <Compile Include="../Insolvia.Domain.Tests/Forms/Support/CaseDatas.cs" Link="Support/CaseDatas.cs" />
   </ItemGroup>
 </Project>

@@ -1,8 +1,8 @@
 using System.Text.Json.Nodes;
-using Insolvia.Core;
-using Insolvia.Core.Cases;
-using Insolvia.Core.Jobs;
-using Insolvia.Core.Packets;
+using Insolvia.Domain;
+using Insolvia.Domain.Cases;
+using Insolvia.Domain.Jobs;
+using Insolvia.Domain.Packets;
 
 namespace Insolvia.Data.Tests.Conformance;
 

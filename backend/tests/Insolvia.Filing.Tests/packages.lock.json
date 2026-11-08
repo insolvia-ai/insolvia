@@ -564,28 +564,9 @@
         "type": "Project",
         "dependencies": {
           "Amazon.Lambda.AspNetCoreServer.Hosting": "[2.2.1, )",
-          "Insolvia.Aws": "[1.0.0, )",
-          "Insolvia.Core": "[1.0.0, )",
           "Insolvia.Data": "[1.0.0, )",
-          "Insolvia.Engines": "[1.0.0, )",
-          "Insolvia.Forms": "[1.0.0, )"
-        }
-      },
-      "insolvia.aws": {
-        "type": "Project",
-        "dependencies": {
-          "AWSSDK.CognitoIdentityProvider": "[4.0.106.2, )",
-          "AWSSDK.Core": "[4.0.102.14, )",
-          "AWSSDK.KeyManagementService": "[4.0.101, )",
-          "AWSSDK.S3": "[4.0.104.3, )",
-          "AWSSDK.SQS": "[4.0.100.17, )",
-          "Insolvia.Core": "[1.0.0, )"
-        }
-      },
-      "insolvia.core": {
-        "type": "Project",
-        "dependencies": {
-          "Microsoft.IdentityModel.JsonWebTokens": "[8.14.0, )"
+          "Insolvia.Domain": "[1.0.0, )",
+          "Insolvia.Platform": "[1.0.0, )"
         }
       },
       "insolvia.data": {
@@ -593,14 +574,16 @@
         "dependencies": {
           "AWSSDK.RDS": "[4.0.107.2, )",
           "EFCore.NamingConventions": "[10.0.1, )",
-          "Insolvia.Core": "[1.0.0, )",
+          "Insolvia.Domain": "[1.0.0, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )"
         }
       },
-      "insolvia.engines": {
+      "insolvia.domain": {
         "type": "Project",
         "dependencies": {
-          "Insolvia.Core": "[1.0.0, )"
+          "Microsoft.IdentityModel.JsonWebTokens": "[8.14.0, )",
+          "PDFsharp": "[6.2.4, 6.2.4]",
+          "System.Security.Cryptography.Pkcs": "[10.0.14, )"
         }
       },
       "insolvia.filing": {
@@ -608,19 +591,20 @@
         "dependencies": {
           "Amazon.Lambda.Core": "[3.3.0, )",
           "Amazon.Lambda.RuntimeSupport": "[2.2.0, )",
-          "Insolvia.Aws": "[1.0.0, )",
-          "Insolvia.Core": "[1.0.0, )",
           "Insolvia.Data": "[1.0.0, )",
-          "Insolvia.Forms": "[1.0.0, )"
+          "Insolvia.Domain": "[1.0.0, )",
+          "Insolvia.Platform": "[1.0.0, )"
         }
       },
-      "insolvia.forms": {
+      "insolvia.platform": {
         "type": "Project",
         "dependencies": {
-          "Insolvia.Core": "[1.0.0, )",
-          "Insolvia.Engines": "[1.0.0, )",
-          "PDFsharp": "[6.2.4, 6.2.4]",
-          "System.Security.Cryptography.Pkcs": "[10.0.14, )"
+          "AWSSDK.CognitoIdentityProvider": "[4.0.106.2, )",
+          "AWSSDK.Core": "[4.0.102.14, )",
+          "AWSSDK.KeyManagementService": "[4.0.101, )",
+          "AWSSDK.S3": "[4.0.104.3, )",
+          "AWSSDK.SQS": "[4.0.100.17, )",
+          "Insolvia.Domain": "[1.0.0, )"
         }
       },
       "Amazon.Lambda.AspNetCoreServer.Hosting": {

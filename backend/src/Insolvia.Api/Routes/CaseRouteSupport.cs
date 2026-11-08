@@ -1,8 +1,8 @@
 using Insolvia.Api.Auth;
-using Insolvia.Core;
-using Insolvia.Core.AccessLog;
-using Insolvia.Core.Cases;
-using Insolvia.Core.Ports;
+using Insolvia.Domain;
+using Insolvia.Domain.AccessLog;
+using Insolvia.Domain.Cases;
+using Insolvia.Domain.Ports;
 
 namespace Insolvia.Api.Routes;
 

@@ -3,9 +3,9 @@ using Insolvia.Api.Auth;
 using Insolvia.Api.Firms;
 using Insolvia.Api.Hosting;
 using Insolvia.Api.Http;
-using Insolvia.Core;
-using Insolvia.Core.Firms;
-using Insolvia.Core.LibraryCreditors;
+using Insolvia.Domain;
+using Insolvia.Domain.Firms;
+using Insolvia.Domain.LibraryCreditors;
 
 namespace Insolvia.Api.Routes;
 

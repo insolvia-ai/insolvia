@@ -1,10 +1,10 @@
 using System.Security.Cryptography;
 using System.Text.Json.Nodes;
-using Insolvia.Core.AccessLog;
-using Insolvia.Core.Cases;
-using Insolvia.Core.Jobs;
-using Insolvia.Core.Ports;
-using Insolvia.Forms;
+using Insolvia.Domain.AccessLog;
+using Insolvia.Domain.Cases;
+using Insolvia.Domain.Forms;
+using Insolvia.Domain.Jobs;
+using Insolvia.Domain.Ports;
 
 namespace Insolvia.Worker.Workers;
 

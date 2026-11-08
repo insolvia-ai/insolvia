@@ -1,4 +1,4 @@
-using Insolvia.Core;
+using Insolvia.Domain;
 
 namespace Insolvia.Filing;
 
@@ -103,7 +103,7 @@ public sealed record FilingConfig
 
 /// <summary>The local kill switch: a fixed answer (<c>FILING_SUBMISSIONS_ENABLED</c>), never composed deployed.</summary>
 /// <param name="enabled">Whether submissions are on.</param>
-public sealed class StaticKillSwitch(bool enabled) : Core.Ports.IKillSwitch
+public sealed class StaticKillSwitch(bool enabled) : Insolvia.Domain.Ports.IKillSwitch
 {
     /// <summary>The answer — tests flip it mid-run.</summary>
     public bool Enabled { get; set; } = enabled;

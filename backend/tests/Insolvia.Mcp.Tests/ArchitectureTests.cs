@@ -1,7 +1,7 @@
 using System.Reflection;
 using System.Text.Json.Nodes;
-using Insolvia.Core.Debtors;
-using Insolvia.Core.Ports;
+using Insolvia.Domain.Debtors;
+using Insolvia.Domain.Ports;
 using Insolvia.Mcp.Tests.Support;
 using Insolvia.Mcp.Tools;
 using static Insolvia.Mcp.Tests.Support.World;
@@ -16,7 +16,7 @@ namespace Insolvia.Mcp.Tests;
 /// </summary>
 public sealed class ArchitectureTests
 {
-    private static readonly string[] Forbidden = ["ModelContextProtocol", "Insolvia.Data", "Insolvia.Aws", "Microsoft.AspNetCore", "Amazon."];
+    private static readonly string[] Forbidden = ["ModelContextProtocol", "Insolvia.Data", "Insolvia.Platform", "Microsoft.AspNetCore", "Amazon."];
 
     private static readonly string[] WriteVerbs =
         ["Create", "Put", "Update", "Delete", "Add", "Remove", "Link", "Assign", "Unassign", "Record", "Set", "Mark", "Claim", "Finish", "Release"];
@@ -76,7 +76,7 @@ public sealed class ArchitectureTests
 
         Assert.Empty(writes);
         Assert.Equal(2, (await stores.Candidates.ListForCaseAsync(found.Id, Ct)).Count);
-        Assert.Single(await stores.Entities.ListForCaseAsync(found.Id, Core.CaseEntities.CaseCollections.ByCollection["creditors"], Ct));
+        Assert.Single(await stores.Entities.ListForCaseAsync(found.Id, Insolvia.Domain.CaseEntities.CaseCollections.ByCollection["creditors"], Ct));
     }
 
     private static T Guarded<T>(T inner, List<string> writes)

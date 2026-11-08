@@ -72,13 +72,13 @@
     <PackageVersion Include="AWSSDK.CognitoIdentityProvider" Version="4.0.106.2" />
   </ItemGroup>
   <ItemGroup Label="Identity">
-    <!-- Token verification in Insolvia.Core: the signature check IS the domain
+    <!-- Token verification in Insolvia.Domain: the signature check IS the domain
          rule (auth.py's one PyJWT exception, carried over). Fetching a key is
          a port; Core never makes the HTTP call. -->
     <PackageVersion Include="Microsoft.IdentityModel.JsonWebTokens" Version="8.14.0" />
   </ItemGroup>
   <ItemGroup Label="PDF">
-    <!-- The PDF object model under Insolvia.Forms (ADR 0028 § Libraries).
+    <!-- The PDF object model under Insolvia.Domain.Forms (ADR 0028 § Libraries).
          6.2.4 is the LAST MIT release: PDFsharp 6.5.0 and later are
          AGPL-3.0-only or commercial (2026-10-14). Upgrading past it is a
          licensing decision, not a dependency bump — never float it. -->

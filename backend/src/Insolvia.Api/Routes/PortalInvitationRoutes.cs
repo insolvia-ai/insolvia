@@ -6,12 +6,12 @@ using Insolvia.Api.Http;
 using Insolvia.Api.Logging;
 using Insolvia.Api.Mail;
 using Insolvia.Api.Portal;
-using Insolvia.Core;
-using Insolvia.Core.Access;
-using Insolvia.Core.AccessLog;
-using Insolvia.Core.Clients;
-using Insolvia.Core.Firms;
-using Insolvia.Core.Ports;
+using Insolvia.Domain;
+using Insolvia.Domain.Access;
+using Insolvia.Domain.AccessLog;
+using Insolvia.Domain.Clients;
+using Insolvia.Domain.Firms;
+using Insolvia.Domain.Ports;
 
 namespace Insolvia.Api.Routes;
 

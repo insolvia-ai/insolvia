@@ -4,10 +4,10 @@ using System.Text.Json.Nodes;
 using Insolvia.Admin.Auth;
 using Insolvia.Admin.Firms;
 using Insolvia.Admin.Http;
-using Insolvia.Core;
-using Insolvia.Core.AdminAudit;
-using Insolvia.Core.Firms;
-using Insolvia.Core.Ports;
+using Insolvia.Domain;
+using Insolvia.Domain.AdminAudit;
+using Insolvia.Domain.Firms;
+using Insolvia.Domain.Ports;
 
 namespace Insolvia.Admin.Routes;
 

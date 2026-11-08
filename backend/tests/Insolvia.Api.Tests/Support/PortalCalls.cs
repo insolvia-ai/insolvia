@@ -1,4 +1,4 @@
-using Insolvia.Core.Firms;
+using Insolvia.Domain.Firms;
 
 namespace Insolvia.Api.Tests.Support;
 

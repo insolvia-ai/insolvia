@@ -1,8 +1,8 @@
 using System.Security.Claims;
 using System.Text.Encodings.Web;
-using Insolvia.Core;
-using Insolvia.Core.Auth;
-using Insolvia.Core.Ports;
+using Insolvia.Domain;
+using Insolvia.Domain.Auth;
+using Insolvia.Domain.Ports;
 using Insolvia.Mcp.Configuration;
 using Insolvia.Mcp.Logging;
 using Microsoft.AspNetCore.Authentication;

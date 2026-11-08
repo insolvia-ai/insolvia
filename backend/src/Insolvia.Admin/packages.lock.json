@@ -85,7 +85,24 @@
         "resolved": "1.0.2",
         "contentHash": "clcAZGAb8sbtIuynOPiZkpHLdSb3RGxHJjSPyecgRh55fFY0KynqA7GEtrVL/sAUgO9jvC0IMhPXBRcJuFWrAA=="
       },
-      "insolvia.aws": {
+      "insolvia.data": {
+        "type": "Project",
+        "dependencies": {
+          "AWSSDK.RDS": "[4.0.107.2, )",
+          "EFCore.NamingConventions": "[10.0.1, )",
+          "Insolvia.Domain": "[1.0.0, )",
+          "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )"
+        }
+      },
+      "insolvia.domain": {
+        "type": "Project",
+        "dependencies": {
+          "Microsoft.IdentityModel.JsonWebTokens": "[8.14.0, )",
+          "PDFsharp": "[6.2.4, 6.2.4]",
+          "System.Security.Cryptography.Pkcs": "[10.0.14, )"
+        }
+      },
+      "insolvia.platform": {
         "type": "Project",
         "dependencies": {
           "AWSSDK.CognitoIdentityProvider": "[4.0.106.2, )",
@@ -93,22 +110,7 @@
           "AWSSDK.KeyManagementService": "[4.0.101, )",
           "AWSSDK.S3": "[4.0.104.3, )",
           "AWSSDK.SQS": "[4.0.100.17, )",
-          "Insolvia.Core": "[1.0.0, )"
-        }
-      },
-      "insolvia.core": {
-        "type": "Project",
-        "dependencies": {
-          "Microsoft.IdentityModel.JsonWebTokens": "[8.14.0, )"
-        }
-      },
-      "insolvia.data": {
-        "type": "Project",
-        "dependencies": {
-          "AWSSDK.RDS": "[4.0.107.2, )",
-          "EFCore.NamingConventions": "[10.0.1, )",
-          "Insolvia.Core": "[1.0.0, )",
-          "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )"
+          "Insolvia.Domain": "[1.0.0, )"
         }
       },
       "Amazon.Lambda.Core": {
@@ -235,6 +237,21 @@
           "Microsoft.EntityFrameworkCore.Relational": "[10.0.4, 11.0.0)",
           "Npgsql": "10.0.3"
         }
+      },
+      "PDFsharp": {
+        "type": "CentralTransitive",
+        "requested": "[6.2.4, 6.2.4]",
+        "resolved": "6.2.4",
+        "contentHash": "GhTr9F1uOYXHCIEOB5PXIgqn5a8WLsJL2m0eewTA0IvY1j6N4HGXHKKmEyB90/N6vrjmYamf41V9zbmdW2HY3g==",
+        "dependencies": {
+          "System.Security.Cryptography.Pkcs": "8.0.1"
+        }
+      },
+      "System.Security.Cryptography.Pkcs": {
+        "type": "CentralTransitive",
+        "requested": "[10.0.14, )",
+        "resolved": "10.0.14",
+        "contentHash": "Wz+IgL2xpg8KJ4i2VWj6uz1PmZNu4Q0Ljlwd73P9Vze5NcOBtctLii3itV0PB2MpOqwqDEGfB6RCdv94A4E5yQ=="
       }
     }
   }

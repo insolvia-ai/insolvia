@@ -2,13 +2,13 @@ using System.Text.Json.Nodes;
 using Insolvia.Api.Auth;
 using Insolvia.Api.Hosting;
 using Insolvia.Api.Http;
-using Insolvia.Core;
-using Insolvia.Core.AccessLog;
-using Insolvia.Core.Courts;
-using Insolvia.Core.Documents;
-using Insolvia.Core.Firms;
-using Insolvia.Core.Ports;
-using Insolvia.Forms;
+using Insolvia.Domain;
+using Insolvia.Domain.AccessLog;
+using Insolvia.Domain.Courts;
+using Insolvia.Domain.Documents;
+using Insolvia.Domain.Firms;
+using Insolvia.Domain.Forms;
+using Insolvia.Domain.Ports;
 
 namespace Insolvia.Api.Routes;
 
@@ -48,7 +48,7 @@ public sealed class FormsHubRoutes : IEndpointModule
     /// short form key a hub row carries; a task anchored to a series this case
     /// does not file simply never matches a row.
     /// </summary>
-    internal static Dictionary<string, int> OpenTaskCounts(IEnumerable<Core.CaseTasks.CaseTask> tasks)
+    internal static Dictionary<string, int> OpenTaskCounts(IEnumerable<Insolvia.Domain.CaseTasks.CaseTask> tasks)
     {
         var counts = new Dictionary<string, int>(StringComparer.Ordinal);
         foreach (var task in tasks)

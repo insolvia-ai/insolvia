@@ -1,6 +1,6 @@
 using System.Net;
 using System.Text.Json.Nodes;
-using Insolvia.Core;
+using Insolvia.Domain;
 using Insolvia.Mcp.Configuration;
 using Insolvia.Mcp.Http;
 using Insolvia.Mcp.Tests.Support;

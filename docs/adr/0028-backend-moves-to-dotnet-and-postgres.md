@@ -225,6 +225,8 @@ loses its tables and keeps its bucket, queues and key.
 
 ### Repository layout
 
+> **Amended by [ADR 0030](0030-three-backend-layers.md) (2026-11-08):** Core, Engines and Forms became `Insolvia.Domain`; Data stays `Insolvia.Data`; Aws became `Insolvia.Platform`; namespaces follow the new names. The block below is the layout as first decided.
+
 ```
 backend/
   Insolvia.slnx · Directory.Build.props · Directory.Packages.props · global.json

@@ -1,8 +1,8 @@
-using Insolvia.Core;
-using Insolvia.Core.Events;
-using Insolvia.Core.Memory;
-using Insolvia.Core.Ports;
 using Insolvia.Data.Calendar;
+using Insolvia.Domain;
+using Insolvia.Domain.Events;
+using Insolvia.Domain.Memory;
+using Insolvia.Domain.Ports;
 
 namespace Insolvia.Data.Tests.Conformance;
 

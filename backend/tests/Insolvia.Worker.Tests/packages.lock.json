@@ -280,7 +280,24 @@
           "xunit.v3.runner.common": "[3.2.2]"
         }
       },
-      "insolvia.aws": {
+      "insolvia.data": {
+        "type": "Project",
+        "dependencies": {
+          "AWSSDK.RDS": "[4.0.107.2, )",
+          "EFCore.NamingConventions": "[10.0.1, )",
+          "Insolvia.Domain": "[1.0.0, )",
+          "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )"
+        }
+      },
+      "insolvia.domain": {
+        "type": "Project",
+        "dependencies": {
+          "Microsoft.IdentityModel.JsonWebTokens": "[8.14.0, )",
+          "PDFsharp": "[6.2.4, 6.2.4]",
+          "System.Security.Cryptography.Pkcs": "[10.0.14, )"
+        }
+      },
+      "insolvia.platform": {
         "type": "Project",
         "dependencies": {
           "AWSSDK.CognitoIdentityProvider": "[4.0.106.2, )",
@@ -288,37 +305,7 @@
           "AWSSDK.KeyManagementService": "[4.0.101, )",
           "AWSSDK.S3": "[4.0.104.3, )",
           "AWSSDK.SQS": "[4.0.100.17, )",
-          "Insolvia.Core": "[1.0.0, )"
-        }
-      },
-      "insolvia.core": {
-        "type": "Project",
-        "dependencies": {
-          "Microsoft.IdentityModel.JsonWebTokens": "[8.14.0, )"
-        }
-      },
-      "insolvia.data": {
-        "type": "Project",
-        "dependencies": {
-          "AWSSDK.RDS": "[4.0.107.2, )",
-          "EFCore.NamingConventions": "[10.0.1, )",
-          "Insolvia.Core": "[1.0.0, )",
-          "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )"
-        }
-      },
-      "insolvia.engines": {
-        "type": "Project",
-        "dependencies": {
-          "Insolvia.Core": "[1.0.0, )"
-        }
-      },
-      "insolvia.forms": {
-        "type": "Project",
-        "dependencies": {
-          "Insolvia.Core": "[1.0.0, )",
-          "Insolvia.Engines": "[1.0.0, )",
-          "PDFsharp": "[6.2.4, 6.2.4]",
-          "System.Security.Cryptography.Pkcs": "[10.0.14, )"
+          "Insolvia.Domain": "[1.0.0, )"
         }
       },
       "insolvia.worker": {
@@ -327,11 +314,9 @@
           "Amazon.Lambda.Core": "[3.3.0, )",
           "Amazon.Lambda.RuntimeSupport": "[2.2.0, )",
           "Anthropic": "[13.3.0, 13.3.0]",
-          "Insolvia.Aws": "[1.0.0, )",
-          "Insolvia.Core": "[1.0.0, )",
           "Insolvia.Data": "[1.0.0, )",
-          "Insolvia.Engines": "[1.0.0, )",
-          "Insolvia.Forms": "[1.0.0, )"
+          "Insolvia.Domain": "[1.0.0, )",
+          "Insolvia.Platform": "[1.0.0, )"
         }
       },
       "Amazon.Lambda.Core": {

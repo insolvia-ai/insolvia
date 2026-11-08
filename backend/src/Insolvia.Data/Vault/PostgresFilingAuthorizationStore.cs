@@ -1,8 +1,8 @@
-using Insolvia.Core;
-using Insolvia.Core.FilingAuthorizations;
-using Insolvia.Core.Ports;
 using Insolvia.Data.Concurrency;
 using Insolvia.Data.Storage;
+using Insolvia.Domain;
+using Insolvia.Domain.FilingAuthorizations;
+using Insolvia.Domain.Ports;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 

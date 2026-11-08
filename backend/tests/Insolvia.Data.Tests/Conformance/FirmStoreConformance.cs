@@ -1,12 +1,12 @@
-using Insolvia.Core.DocumentRequests;
-using Insolvia.Core.Fields;
-using Insolvia.Core.FirmClients;
-using Insolvia.Core.Firms;
-using Insolvia.Core.LibraryCreditors;
-using Insolvia.Core.Memory;
-using Insolvia.Core.Ports;
-using Insolvia.Core.Questionnaires;
 using Insolvia.Data.Firms;
+using Insolvia.Domain.DocumentRequests;
+using Insolvia.Domain.Fields;
+using Insolvia.Domain.FirmClients;
+using Insolvia.Domain.Firms;
+using Insolvia.Domain.LibraryCreditors;
+using Insolvia.Domain.Memory;
+using Insolvia.Domain.Ports;
+using Insolvia.Domain.Questionnaires;
 
 namespace Insolvia.Data.Tests.Conformance;
 

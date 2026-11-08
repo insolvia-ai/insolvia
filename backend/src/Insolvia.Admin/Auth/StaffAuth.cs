@@ -1,8 +1,8 @@
 using Insolvia.Admin.Configuration;
 using Insolvia.Admin.Logging;
-using Insolvia.Core;
-using Insolvia.Core.Auth;
-using Insolvia.Core.Ports;
+using Insolvia.Domain;
+using Insolvia.Domain.Auth;
+using Insolvia.Domain.Ports;
 
 namespace Insolvia.Admin.Auth;
 

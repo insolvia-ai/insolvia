@@ -1,8 +1,8 @@
-using Insolvia.Core.AccessLog;
-using Insolvia.Core.Cases;
-using Insolvia.Core.Documents;
-using Insolvia.Core.Filings;
-using Insolvia.Core.Ports;
+using Insolvia.Domain.AccessLog;
+using Insolvia.Domain.Cases;
+using Insolvia.Domain.Documents;
+using Insolvia.Domain.Filings;
+using Insolvia.Domain.Ports;
 using Insolvia.Filing.Drivers;
 using Insolvia.Filing.Http;
 using Insolvia.Filing.Tests.FakeCourt;
@@ -171,7 +171,7 @@ public sealed class FilingAgainstTheFakeTests : IAsyncLifetime
 
         var stored = await _world.FilingAsync(approval);
         Assert.Equal((state, reason), (result.Outcome, result.Reason));
-        Assert.Equal(state, Core.Wire.ToWire(stored.State));
+        Assert.Equal(state, Insolvia.Domain.Wire.ToWire(stored.State));
         Assert.Equal((reason, "packet"), (stored.HandBack!.Reason, stored.HandBack.Link));
         Assert.NotEmpty(stored.HandBack.Action);
         Assert.Equal(submissions, _court.Submissions);

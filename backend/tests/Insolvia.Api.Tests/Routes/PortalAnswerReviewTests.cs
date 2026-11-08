@@ -1,11 +1,11 @@
 using System.Text.Json.Nodes;
 using Insolvia.Api.Tests.Support;
-using Insolvia.Core;
-using Insolvia.Core.Candidates;
-using Insolvia.Core.Clients;
-using Insolvia.Core.Ports;
-using Insolvia.Core.Questionnaires;
-using Insolvia.Core.Questions;
+using Insolvia.Domain;
+using Insolvia.Domain.Candidates;
+using Insolvia.Domain.Clients;
+using Insolvia.Domain.Ports;
+using Insolvia.Domain.Questionnaires;
+using Insolvia.Domain.Questions;
 using static Insolvia.Api.Tests.Support.CaseWorld;
 
 namespace Insolvia.Api.Tests.Routes;

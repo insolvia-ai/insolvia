@@ -1,13 +1,13 @@
-using Insolvia.Core;
-using Insolvia.Core.Claims;
-using Insolvia.Core.Debtors;
-using Insolvia.Core.DocumentRequests;
-using Insolvia.Core.Fields;
-using Insolvia.Core.FirmClients;
-using Insolvia.Core.Firms;
-using Insolvia.Core.LibraryCreditors;
-using Insolvia.Core.Questionnaires;
 using Insolvia.Data.Storage;
+using Insolvia.Domain;
+using Insolvia.Domain.Claims;
+using Insolvia.Domain.Debtors;
+using Insolvia.Domain.DocumentRequests;
+using Insolvia.Domain.Fields;
+using Insolvia.Domain.FirmClients;
+using Insolvia.Domain.Firms;
+using Insolvia.Domain.LibraryCreditors;
+using Insolvia.Domain.Questionnaires;
 
 namespace Insolvia.Data.Firms;
 

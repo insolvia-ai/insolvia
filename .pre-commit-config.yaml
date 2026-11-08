@@ -16,9 +16,9 @@ repos:
       # S.D. Tex.'s ends in padding blank lines — so neither fixer may touch
       # them (their directory's .gitattributes does the same for git).
       - id: end-of-file-fixer
-        exclude: ^backend/tests/Insolvia\.Engines\.Tests/Goldens/creditor_matrix/.*\.txt$
+        exclude: ^backend/tests/Insolvia\.Domain\.Tests/Engines/Goldens/creditor_matrix/.*\.txt$
       - id: trailing-whitespace
-        exclude: ^backend/tests/Insolvia\.Engines\.Tests/Goldens/creditor_matrix/.*\.txt$
+        exclude: ^backend/tests/Insolvia\.Domain\.Tests/Engines/Goldens/creditor_matrix/.*\.txt$
       - id: check-yaml
       - id: check-merge-conflict
 

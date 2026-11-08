@@ -625,7 +625,7 @@ resource "aws_ssm_parameter" "db" {
 # queue parameters, because each value is another module's output.
 #
 # The key aliases are named here and nowhere else: no host derives them.
-# backend/src/Insolvia.Aws/Sealing/SealingKeys.cs refuses an unset alias, and
+# backend/src/Insolvia.Platform/Sealing/SealingKeys.cs refuses an unset alias, and
 # any value not shaped alias/insolvia-<env>-cases / -filing-credentials,
 # which is also what ci-trust's decrypt denies match.
 resource "aws_ssm_parameter" "api_key_aliases" {

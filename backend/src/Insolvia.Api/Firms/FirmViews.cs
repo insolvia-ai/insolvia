@@ -1,16 +1,16 @@
 using System.Text.Json.Nodes;
 using Insolvia.Api.Http;
-using Insolvia.Core;
-using Insolvia.Core.Access;
-using Insolvia.Core.Auth;
-using Insolvia.Core.Claims;
-using Insolvia.Core.Debtors;
-using Insolvia.Core.DocumentRequests;
-using Insolvia.Core.Fields;
-using Insolvia.Core.FirmClients;
-using Insolvia.Core.Firms;
-using Insolvia.Core.LibraryCreditors;
-using Insolvia.Core.Questionnaires;
+using Insolvia.Domain;
+using Insolvia.Domain.Access;
+using Insolvia.Domain.Auth;
+using Insolvia.Domain.Claims;
+using Insolvia.Domain.Debtors;
+using Insolvia.Domain.DocumentRequests;
+using Insolvia.Domain.Fields;
+using Insolvia.Domain.FirmClients;
+using Insolvia.Domain.Firms;
+using Insolvia.Domain.LibraryCreditors;
+using Insolvia.Domain.Questionnaires;
 
 namespace Insolvia.Api.Firms;
 
@@ -24,7 +24,7 @@ namespace Insolvia.Api.Firms;
 /// key order is <see cref="FlaskJson"/>'s to sort.
 /// </summary>
 /// <remarks>
-/// These belong in Insolvia.Core beside the records; they are here because
+/// These belong in Insolvia.Domain beside the records; they are here because
 /// Core was closed to this change (#525).
 /// </remarks>
 public static class FirmViews
@@ -239,7 +239,7 @@ public static class FirmViews
         ["isDefault"] = config is null,
         ["updatedAt"] = config is null ? null : FlaskJson.Micros(config.UpdatedAt),
         ["updatedBy"] = FlaskJson.Text(config?.UpdatedBy),
-        ["sections"] = new JsonArray([.. Core.Questionnaires.Questionnaire.Resolve(config).Select(resolved => (JsonNode?)new JsonObject
+        ["sections"] = new JsonArray([.. Insolvia.Domain.Questionnaires.Questionnaire.Resolve(config).Select(resolved => (JsonNode?)new JsonObject
         {
             ["id"] = resolved.Section.Id,
             ["title"] = resolved.Section.Title,

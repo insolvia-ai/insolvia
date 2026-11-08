@@ -1,4 +1,4 @@
-using Insolvia.Core.Ports;
+using Insolvia.Domain.Ports;
 using Insolvia.Filing.Tests.FakeCourt;
 using Insolvia.Filing.Tests.Support;
 
@@ -30,11 +30,11 @@ public sealed class EndToEndTranscriptTests
         var filing = await world.FilingAsync(approval);
         var filed = (await world.CaseAsync())!;
         var recorded = (await world.Service<ICaseStore>().LifecycleAsync(world.CaseId, TestContext.Current.CancellationToken))[^1];
-        output.WriteLine($"delivery 1 -> {first.Outcome}; states {string.Join(" > ", filing.History.Select(s => Core.Wire.ToWire(s.State)))}");
-        var reads = world.AccessLog.Events.Where(e => e.Action == Core.AccessLog.AccessAction.TaxIdRead).Select(e => $"{e.FilingRole}/{e.Purpose}");
+        output.WriteLine($"delivery 1 -> {first.Outcome}; states {string.Join(" > ", filing.History.Select(s => Insolvia.Domain.Wire.ToWire(s.State)))}");
+        var reads = world.AccessLog.Events.Where(e => e.Action == Insolvia.Domain.AccessLog.AccessAction.TaxIdRead).Select(e => $"{e.FilingRole}/{e.Purpose}");
         output.WriteLine($"court: sign-ins {court.SignIns}, uploads {court.Uploads} (Case Upload files accepted: {court.CaseUploads}; docket {string.Join(", ", filing.Confirmation!.DocketEntries.Take(2))}, …), submissions {court.Submissions}; case number {filing.Confirmation.CaseNumber}; receipt document {filing.ReceiptDocumentId}");
         output.WriteLine($"taxid.read rows: {string.Join(", ", reads)}");
-        output.WriteLine($"case: status {Core.Wire.ToWire(filed.Status)}, number {filed.CaseNumber}, petition date {filed.FiledAt:yyyy-MM-dd}; lifecycle event {Core.Wire.ToWire(recorded.Kind)} -> {Core.Wire.ToWire(recorded.ToStatus!.Value)}, chapter {recorded.Chapter}, filing {recorded.FilingId}, by {recorded.RecordedBy} ({Core.Wire.ToWire(recorded.Provenance)})");
+        output.WriteLine($"case: status {Insolvia.Domain.Wire.ToWire(filed.Status)}, number {filed.CaseNumber}, petition date {filed.FiledAt:yyyy-MM-dd}; lifecycle event {Insolvia.Domain.Wire.ToWire(recorded.Kind)} -> {Insolvia.Domain.Wire.ToWire(recorded.ToStatus!.Value)}, chapter {recorded.Chapter}, filing {recorded.FilingId}, by {recorded.RecordedBy} ({Insolvia.Domain.Wire.ToWire(recorded.Provenance)})");
 
         var second = await world.RunAsync(body);
         output.WriteLine($"delivery 2 -> {second.Outcome} ({second.Reason}); court submissions still {court.Submissions}");

@@ -1,8 +1,8 @@
 using System.Text.Json.Nodes;
 using Insolvia.Admin.Http;
-using Insolvia.Core;
-using Insolvia.Core.Fields;
-using Insolvia.Core.Firms;
+using Insolvia.Domain;
+using Insolvia.Domain.Fields;
+using Insolvia.Domain.Firms;
 
 namespace Insolvia.Admin.Firms;
 

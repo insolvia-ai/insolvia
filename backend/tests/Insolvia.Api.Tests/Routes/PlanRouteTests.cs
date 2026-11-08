@@ -1,8 +1,8 @@
 using System.Globalization;
 using System.Text.Json.Nodes;
 using Insolvia.Api.Tests.Support;
-using Insolvia.Core.CaseEntities;
-using Insolvia.Core.Plans;
+using Insolvia.Domain.CaseEntities;
+using Insolvia.Domain.Plans;
 using static Insolvia.Api.Tests.Support.CaseWorld;
 
 namespace Insolvia.Api.Tests.Routes;

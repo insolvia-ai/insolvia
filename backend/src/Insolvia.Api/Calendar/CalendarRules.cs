@@ -3,9 +3,9 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
-using Insolvia.Core;
-using Insolvia.Core.Events;
-using Insolvia.Core.Fields;
+using Insolvia.Domain;
+using Insolvia.Domain.Events;
+using Insolvia.Domain.Fields;
 
 namespace Insolvia.Api.Calendar;
 

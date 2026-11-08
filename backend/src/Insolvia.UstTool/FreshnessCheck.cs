@@ -1,6 +1,6 @@
 using System.Text;
 using System.Text.RegularExpressions;
-using Insolvia.Engines.Regulatory;
+using Insolvia.Domain.Engines.Regulatory;
 
 namespace Insolvia.UstTool;
 

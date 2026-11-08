@@ -1,7 +1,7 @@
 using System.Net;
 using System.Text.Json.Nodes;
-using Insolvia.Core.Debtors;
-using Insolvia.Core.Firms;
+using Insolvia.Domain.Debtors;
+using Insolvia.Domain.Firms;
 using Insolvia.Mcp.Tests.Support;
 using static Insolvia.Mcp.Tests.Support.World;
 
@@ -30,7 +30,7 @@ public sealed class ProtocolTests : IDisposable
 
     private static Dictionary<string, string> Auth(string? token = null) => McpHost.Auth(token);
 
-    private async Task<Core.Cases.Case> SeedCaseAsync() => await World.SeedCaseAsync(_host.Cases);
+    private async Task<Insolvia.Domain.Cases.Case> SeedCaseAsync() => await World.SeedCaseAsync(_host.Cases);
 
     // ── transport auth ──────────────────────────────────────────────
 
@@ -65,7 +65,7 @@ public sealed class ProtocolTests : IDisposable
     [Fact]
     public async Task An_expired_token_is_a_401()
     {
-        var reply = await _host.RpcAsync("tools/list", headers: Auth(Token(expiresIn: -60 - Core.Auth.TokenVerification.ClockSkewSeconds)));
+        var reply = await _host.RpcAsync("tools/list", headers: Auth(Token(expiresIn: -60 - Insolvia.Domain.Auth.TokenVerification.ClockSkewSeconds)));
         Assert.Equal(HttpStatusCode.Unauthorized, reply.Status);
     }
 

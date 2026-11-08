@@ -8,31 +8,44 @@ the Python was deleted in 18.23. Comments that name a Python module
 (`core/x.py`, `services/api/...`) record where a port came from; the module
 itself is gone, and `git log` before 18.23 has it.
 
-## Layering — pinned by `tests/Insolvia.Architecture.Tests`
+## Layering — pinned by `tests/Insolvia.Domain.Tests/Architecture`
 
-| Project | May reference |
-|---|---|
-| `Insolvia.Core` — domain + ports | nothing in the solution |
-| `Insolvia.Engines` — pure: calculation engines and form projections | `Core` |
-| `Insolvia.Forms` — pure: the PDF engine, which fills what Engines projects | `Core`, `Engines` |
-| `Insolvia.Data` (EF Core, Postgres), `Insolvia.Aws` (SDK adapters) | `Core` |
-| hosts: `Api`, `Worker`, `Admin`, `Mcp`, `Filing`, `Migrator` | any library above; **never another host** |
-| tools: `UstTool` — run by a developer or CI, never deployed (no Dockerfile stage) | the pure libraries it needs (`Core`, `Engines`); never `Data`, `Aws` or a host |
+Three layers ([ADR 0030](../docs/adr/0030-three-backend-layers.md)):
 
-- **No AWS and no EF in Core, Engines or Forms.** A port (interface) lives in
-  Core; its adapter lives in `Data` or `Aws`; a host wires them. The
+| Layer | Project | May reference |
+|---|---|---|
+| business logic | `Insolvia.Domain` — pure: entities, rules and ports; the calculation engines and form projections (`Engines/`); the PDF engine (`Forms/`) | nothing in the solution |
+| data access | `Insolvia.Data` — EF Core, the migrations, the Postgres stores | `Domain` |
+| platform services | `Insolvia.Platform` — document storage, sealing, the job queues, the user directory, mail, sign-in keys | `Domain` |
+| API (and the workers) | hosts: `Api`, `Worker`, `Admin`, `Mcp`, `Filing`, `Migrator` | `Domain`, `Data`, `Platform`; **never another host** |
+| — | tools: `UstTool` — run by a developer or CI, never deployed (no Dockerfile stage) | `Domain`; never `Data`, `Platform` or a host |
+
+- **Name a project for its role, never for a vendor or a product word.** No
+  `Aws`, no `Integrations` (that word means third-party systems such as
+  CM/ECF), no `Core`/`Common`. A provider's name belongs on the class that
+  implements a port (`S3DocumentBlobStore`, `KmsCiphers`), where a second
+  provider's class would sit beside it.
+- **Namespaces match the project and folder**: `src/Insolvia.Domain/Engines/`
+  is `Insolvia.Domain.Engines.*`, and a test project's namespaces are the
+  source namespace plus `.Tests` (`Insolvia.Domain.Engines.Tests`), so the
+  code under test is in scope without a `using`.
+- **No cloud SDK and no EF in Domain.** A port (interface) lives in Domain;
+  its implementation lives in `Data` or `Platform`; a host wires them. The
   architecture test also refuses `AWSSDK.*`, `Amazon.*`, EF Core and Npgsql
-  packages in those three.
+  packages in Domain.
+- A new concern is a folder and a namespace in the layer it belongs to, not a
+  new project. A new project must be a new deployable or a boundary the
+  compiler has to enforce; say in the PR which.
 - Code the filing worker shares with the API (approval, digest) goes in
-  `Forms` or `Core`, never in `Api`.
-- A new project needs a `tests/<Name>.Tests` project and a line in
-  `Insolvia.slnx`, and the rule above must name it. The test fails until all
-  three are done.
+  `Domain`, never in `Api`.
+- A new project needs a test project (`TestProjectOf` in the layering test
+  maps each project to one), a line in `Insolvia.slnx`, and the rule above
+  must name it. The test fails until all three are done.
 
 ## Rules that are easy to get wrong
 
 - **Money is `decimal`**, never `double`; Postgres `numeric`. The engines'
-  parity outputs (`tests/Insolvia.Engines.Tests/Parity/*.expected.json`,
+  parity outputs (`tests/Insolvia.Domain.Tests/Engines/Parity/*.expected.json`,
   captured from the Python oracle) pin Decimal-exact results; a deliberate
   change edits them in the same PR.
 - Timestamps are `DateTimeOffset` / `timestamptz`; court dates are `DateOnly`
@@ -49,7 +62,7 @@ itself is gone, and `git log` before 18.23 has it.
 - One deployable unit, one Dockerfile target. A host gets its stage when it
   gets a handler, and `backend-pr.yml` builds it in the same PR.
 
-## The data tier — `Insolvia.Data` and `Insolvia.Migrator`
+## The data access layer — `Insolvia.Data` and `Insolvia.Migrator`
 
 - **One context, `InsolviaDbContext`, one schema, `insolvia`.** An entity
   joins the model through an `IEntityTypeConfiguration<T>` in `Insolvia.Data`

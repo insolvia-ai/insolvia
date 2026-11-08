@@ -1,11 +1,11 @@
 using System.Text.Json;
-using Insolvia.Core.Candidates;
-using Insolvia.Core.Debtors;
-using Insolvia.Core.DocumentRequests;
-using Insolvia.Core.Documents;
-using Insolvia.Core.TaxIds;
 using Insolvia.Data.Firms;
 using Insolvia.Data.Storage;
+using Insolvia.Domain.Candidates;
+using Insolvia.Domain.Debtors;
+using Insolvia.Domain.DocumentRequests;
+using Insolvia.Domain.Documents;
+using Insolvia.Domain.TaxIds;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 

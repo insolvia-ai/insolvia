@@ -1,4 +1,4 @@
-using Insolvia.Core;
+using Insolvia.Domain;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace Insolvia.Data.Storage;

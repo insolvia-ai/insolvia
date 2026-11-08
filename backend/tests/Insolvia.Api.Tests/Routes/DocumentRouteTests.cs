@@ -1,10 +1,10 @@
 using Insolvia.Api.Tests.Support;
-using Insolvia.Core.AccessLog;
-using Insolvia.Core.DocumentRequests;
-using Insolvia.Core.Documents;
-using Insolvia.Core.Firms;
-using Insolvia.Core.Memory;
-using Insolvia.Core.Ports;
+using Insolvia.Domain.AccessLog;
+using Insolvia.Domain.DocumentRequests;
+using Insolvia.Domain.Documents;
+using Insolvia.Domain.Firms;
+using Insolvia.Domain.Memory;
+using Insolvia.Domain.Ports;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using static Insolvia.Api.Tests.Support.CaseWorld;
 
@@ -410,7 +410,7 @@ public sealed class DocumentRouteTests : IAsyncLifetime, IDisposable
         Assert.Equal(200, (await Complete(caseId, documentId)).Status);
 
         var job = Assert.Single(await Jobs.ListForCaseAsync(caseId, HttpAssert.Ct));
-        Assert.Equal(Core.Jobs.JobRules.DocumentExtractionKind, job.Kind);
+        Assert.Equal(Insolvia.Domain.Jobs.JobRules.DocumentExtractionKind, job.Kind);
         Assert.Equal(documentId, job.DocumentId);
         Assert.Equal(Alice, job.CreatedBy);
         Assert.Equal(documentId, Assert.Single(Sender.Messages)["documentId"]!.GetValue<string>());
@@ -443,7 +443,7 @@ public sealed class DocumentRouteTests : IAsyncLifetime, IDisposable
 
         // The wedged row is failed, so a later accept starts clean.
         var job = Assert.Single(await Jobs.ListForCaseAsync(caseId, HttpAssert.Ct));
-        Assert.Equal(Core.Jobs.JobStatus.Failed, job.Status);
+        Assert.Equal(Insolvia.Domain.Jobs.JobStatus.Failed, job.Status);
         Assert.Equal("enqueue_failed", job.Failure!.Category);
     }
 

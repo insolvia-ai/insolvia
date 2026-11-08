@@ -1,15 +1,15 @@
-using Insolvia.Core;
-using Insolvia.Core.Candidates;
-using Insolvia.Core.CaseEntities;
-using Insolvia.Core.Cases;
-using Insolvia.Core.CaseTasks;
-using Insolvia.Core.Debtors;
-using Insolvia.Core.DocumentRequests;
-using Insolvia.Core.Documents;
-using Insolvia.Core.Filings;
-using Insolvia.Core.Provenance;
-using Insolvia.Core.TaxIds;
 using Insolvia.Data.Storage;
+using Insolvia.Domain;
+using Insolvia.Domain.Candidates;
+using Insolvia.Domain.CaseEntities;
+using Insolvia.Domain.Cases;
+using Insolvia.Domain.CaseTasks;
+using Insolvia.Domain.Debtors;
+using Insolvia.Domain.DocumentRequests;
+using Insolvia.Domain.Documents;
+using Insolvia.Domain.Filings;
+using Insolvia.Domain.Provenance;
+using Insolvia.Domain.TaxIds;
 
 namespace Insolvia.Data.Cases;
 

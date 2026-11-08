@@ -4,15 +4,15 @@ using Insolvia.Api.Filing;
 using Insolvia.Api.Hosting;
 using Insolvia.Api.Http;
 using Insolvia.Api.Logging;
-using Insolvia.Core;
-using Insolvia.Core.AccessLog;
-using Insolvia.Core.Auth;
-using Insolvia.Core.Cases;
-using Insolvia.Core.Courts;
-using Insolvia.Core.Filings;
-using Insolvia.Core.Firms;
-using Insolvia.Core.Ports;
-using Insolvia.Forms;
+using Insolvia.Domain;
+using Insolvia.Domain.AccessLog;
+using Insolvia.Domain.Auth;
+using Insolvia.Domain.Cases;
+using Insolvia.Domain.Courts;
+using Insolvia.Domain.Filings;
+using Insolvia.Domain.Firms;
+using Insolvia.Domain.Forms;
+using Insolvia.Domain.Ports;
 
 namespace Insolvia.Api.Routes;
 

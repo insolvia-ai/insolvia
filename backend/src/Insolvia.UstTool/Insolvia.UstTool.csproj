@@ -3,7 +3,7 @@
        (scripts/ingest-ust-data.py and scripts/check-ust-data.py, ported in
        #585 — ADR 0029 rule 4). Run by a developer (its ingest command) and by
        regulatory-refresh.yml (its check command); never deployed, so no Dockerfile stage. It writes
-       Insolvia.Engines/Regulatory/ust/ and validates every release through
+       Insolvia.Domain/Engines/Regulatory/ust/ and validates every release through
        the engine's own UstData loader before writing it, so it cannot write
        a payload the engine would refuse. BCL only: the XLSX is a zip of XML
        (System.IO.Compression, XDocument), the network is HttpClient. -->
@@ -11,8 +11,7 @@
     <OutputType>Exe</OutputType>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="../Insolvia.Core/Insolvia.Core.csproj" />
-    <ProjectReference Include="../Insolvia.Engines/Insolvia.Engines.csproj" />
+    <ProjectReference Include="../Insolvia.Domain/Insolvia.Domain.csproj" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Insolvia.UstTool.Tests" />

@@ -15,7 +15,7 @@ downstream of them:
   every read and write, exactly as the API does for the app.
 
 > **Module names below are the Python originals** (`insolvia_core.auth`,
-> `insolvia_core.errors`, …), ported one for one into `backend/src/Insolvia.Core`
+> `insolvia_core.errors`, …), ported one for one into `backend/src/Insolvia.Domain`
 > and the MCP host `backend/src/Insolvia.Mcp` (ADR 0028) and deleted in 18.23.
 > The surface they describe is unchanged — `contract/src/mcp` pins it.
 - **A case belongs to a firm** ([ADR 0009](../adr/0009-a-case-belongs-to-a-firm.md)):

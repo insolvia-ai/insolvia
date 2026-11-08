@@ -1,9 +1,9 @@
 using Insolvia.Api.Routes;
 using Insolvia.Api.Tests.Support;
-using Insolvia.Core.AccessLog;
-using Insolvia.Core.Courts;
-using Insolvia.Core.Ports;
-using Insolvia.Forms;
+using Insolvia.Domain.AccessLog;
+using Insolvia.Domain.Courts;
+using Insolvia.Domain.Forms;
+using Insolvia.Domain.Ports;
 using static Insolvia.Api.Tests.Support.CaseWorld;
 
 namespace Insolvia.Api.Tests.Routes;

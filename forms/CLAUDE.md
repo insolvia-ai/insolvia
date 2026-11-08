@@ -12,7 +12,7 @@ before editing anything here.
 - **`specs/*.json` is the curated layer** — labels, types, repetition, entity
   mappings. Every change must keep `forms/scripts/dev-test.sh` green — the
   spec tests in
-  [`backend/tests/Insolvia.Forms.Tests/Specs`](../backend/tests/Insolvia.Forms.Tests/Specs),
+  [`backend/tests/Insolvia.Domain.Tests/Forms/Specs`](../backend/tests/Insolvia.Domain.Tests/Forms/Specs),
   run filtered: they enforce that every PDF widget is claimed exactly once and
   that radios list the PDF's exact export states.
 - **The entity vocabulary mirrors
