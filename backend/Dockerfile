@@ -44,8 +44,6 @@ WORKDIR /src
 # packages.lock.json: the image gets exactly the reviewed dependency graph.
 COPY global.json Directory.Build.props Directory.Packages.props .editorconfig Insolvia.slnx ./
 COPY src/Insolvia.Core/*.csproj src/Insolvia.Core/packages.lock.json src/Insolvia.Core/
-COPY src/Insolvia.Engines/*.csproj src/Insolvia.Engines/packages.lock.json src/Insolvia.Engines/
-COPY src/Insolvia.Forms/*.csproj src/Insolvia.Forms/packages.lock.json src/Insolvia.Forms/
 COPY src/Insolvia.Data/*.csproj src/Insolvia.Data/packages.lock.json src/Insolvia.Data/
 COPY src/Insolvia.Aws/*.csproj src/Insolvia.Aws/packages.lock.json src/Insolvia.Aws/
 COPY src/Insolvia.Api/*.csproj src/Insolvia.Api/packages.lock.json src/Insolvia.Api/

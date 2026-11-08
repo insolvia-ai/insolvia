@@ -3,52 +3,62 @@ using System.Xml.Linq;
 namespace Insolvia.Architecture.Tests;
 
 // The successor of services/api's test_architecture.py (ADR 0028, § Repository
-// layout). The rule, in one place:
+// layout, amended by ADR 0030). A project exists because it is a separate
+// deployable or a boundary the compiler must enforce. The rule, in one place:
 //
-//   Core              references nothing in the solution
-//   Engines           references Core only (pure: no I/O, no AWS, no EF)
-//   Forms             references Core and Engines (pure) — the form
-//                     projections live in Engines, because the calculation
-//                     engines and the projections import each other (the
-//                     Chapter 13 plan reads Schedules I/J, B113 runs the
-//                     plan), and the PDF engine fills what they project;
-//                     an amendment to ADR 0028's layout made in 18.8 (#519)
+//   Core              references nothing in the solution; pure: no I/O, no
+//                     AWS, no EF. It holds the domain (Insolvia.Core.*), the
+//                     engines and projections (Engines/, Insolvia.Engines.*)
+//                     and the PDF engine (Forms/, Insolvia.Forms.*)
 //   Data, Aws         reference Core only
 //   hosts             may reference any library; never another host
-//   tools             reference the pure libraries only (Core, Engines,
-//                     Forms); run by a developer or CI, never deployed, so
-//                     never Data, Aws or a host — UstTool writes the
-//                     regulatory registry and validates it through Engines
-//                     (#585)
+//   tools             reference the pure library only (Core); run by a
+//                     developer or CI, never deployed, so never Data, Aws or
+//                     a host — UstTool writes the regulatory registry and
+//                     validates it through the engines (#585)
 //
 // Only hosts reference Data or Aws, which follows from the lines above: no
 // library is allowed them. The filing worker shares the API's approval and
-// digest code through Forms and Core, never through Api, which is what the
-// last line enforces.
+// digest code through Core, never through Api, which is what the hosts line
+// enforces.
 public sealed class LayeringTests
 {
     private static readonly string[] Hosts = ["Api", "Worker", "Admin", "Mcp", "Filing", "Migrator"];
 
     private static readonly Dictionary<string, string[]> ToolAllowed = new(StringComparer.Ordinal)
     {
-        ["UstTool"] = ["Core", "Engines"],
+        ["UstTool"] = ["Core"],
     };
 
     private static readonly Dictionary<string, string[]> LibraryAllowed = new(StringComparer.Ordinal)
     {
         ["Core"] = [],
-        ["Engines"] = ["Core"],
-        ["Forms"] = ["Core", "Engines"],
         ["Data"] = ["Core"],
         ["Aws"] = ["Core"],
     };
 
-    // Packages that make a project impure. Core, Engines and Forms are the
-    // domain: no cloud SDK, no ORM, no database driver.
+    // Where each source project's tests live (ADR 0030): a test project per
+    // project, except where projects were merged and their suites with them.
+    private static readonly Dictionary<string, string> TestProjectOf = new(StringComparer.Ordinal)
+    {
+        ["Core"] = "Core",
+        ["Data"] = "Data",
+        ["Aws"] = "Aws",
+        ["Api"] = "Api",
+        ["Worker"] = "Worker",
+        ["Admin"] = "Admin",
+        ["Mcp"] = "Mcp",
+        ["Filing"] = "Filing",
+        ["Migrator"] = "Migrator",
+        ["UstTool"] = "UstTool",
+    };
+
+    // Packages that make a project impure. Core is the domain: no cloud SDK,
+    // no ORM, no database driver.
     private static readonly string[] ImpurePackagePrefixes =
         ["AWSSDK.", "Amazon.", "Microsoft.EntityFrameworkCore", "Npgsql"];
 
-    private static readonly string[] PureProjects = ["Core", "Engines", "Forms"];
+    private static readonly string[] PureProjects = ["Core"];
 
     private static readonly string[] ProjectDirectories = ["src", "tests"];
 
@@ -137,9 +147,10 @@ public sealed class LayeringTests
 
     [Theory]
     [MemberData(nameof(SourceProjects))]
-    public void Every_source_project_has_its_own_test_project(string project)
+    public void Every_source_project_has_a_test_project(string project)
     {
-        var testProject = Path.Combine(BackendRoot, "tests", $"Insolvia.{project}.Tests", $"Insolvia.{project}.Tests.csproj");
+        Assert.True(TestProjectOf.TryGetValue(project, out var tests), $"{project} is not in TestProjectOf");
+        var testProject = Path.Combine(BackendRoot, "tests", $"Insolvia.{tests}.Tests", $"Insolvia.{tests}.Tests.csproj");
 
         Assert.True(File.Exists(testProject), $"missing {Path.GetRelativePath(BackendRoot, testProject)}");
         Assert.Contains(

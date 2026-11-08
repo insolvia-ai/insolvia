@@ -14,7 +14,7 @@ internal static class Recordings
 {
     public static string FixturesDirectory { get; } = Path.Combine(AppContext.BaseDirectory, "Fixtures");
 
-    /// <summary>backend/src/Insolvia.Engines/Regulatory in this checkout.</summary>
+    /// <summary>backend/src/Insolvia.Core/Engines/Regulatory in this checkout.</summary>
     public static string RegistryRoot { get; } = FindRegistryRoot();
 
     public static string Accessed => "2026-09-04";
@@ -81,13 +81,13 @@ internal static class Recordings
     {
         for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir is not null; dir = dir.Parent)
         {
-            var candidate = Path.Combine(dir.FullName, "src", "Insolvia.Engines", "Regulatory");
+            var candidate = Path.Combine(dir.FullName, "src", "Insolvia.Core", "Engines", "Regulatory");
             if (Directory.Exists(candidate))
             {
                 return candidate;
             }
         }
 
-        throw new DirectoryNotFoundException($"no src/Insolvia.Engines/Regulatory above {AppContext.BaseDirectory}");
+        throw new DirectoryNotFoundException($"no src/Insolvia.Core/Engines/Regulatory above {AppContext.BaseDirectory}");
     }
 }

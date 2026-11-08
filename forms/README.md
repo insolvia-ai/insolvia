@@ -21,7 +21,7 @@ Two layers per form, deliberately:
 | `acroform/<form>.json` | Every AcroForm widget of the official fillable PDF — name, kind, checkbox/radio export states, pages — plus the source URL, the PDF's SHA-256, its printed revision and effective date | Extracted mechanically from the downloaded PDF (pypdf); never hand-edited |
 | `specs/<form>.json` | The curated spec: each *logical* field with its label, type, options, repetition/continuation structure, and which case-data-model entity/attribute feeds it (or that it is derived/constant/unmapped) | Written by hand against the dump and the printed form |
 
-The spec tests ([`backend/tests/Insolvia.Forms.Tests/Specs`](../backend/tests/Insolvia.Forms.Tests/Specs),
+The spec tests ([`backend/tests/Insolvia.Core.Tests/Forms/Specs`](../backend/tests/Insolvia.Core.Tests/Forms/Specs),
 xUnit; `scripts/dev-test.sh` runs them, and so does the `Form specs` check) tie the two
 together: every fillable widget in the dump must be claimed by exactly one spec
 field, every claim must resolve, a spec field's type must agree with the widget

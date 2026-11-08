@@ -28,7 +28,7 @@ public sealed class GoldenTests
     private static string GoldenPath(string form) => Path.Combine(AppContext.BaseDirectory, "Goldens", $"{form}.json");
 
     private static string SourceGoldenPath(string form) =>
-        Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "Goldens", $"{form}.json"));
+        Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "Forms", "Goldens", $"{form}.json"));
 
     private static byte[] Filled(string series, out FormRelease release)
     {

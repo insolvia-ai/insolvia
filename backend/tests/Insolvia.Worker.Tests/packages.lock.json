@@ -294,7 +294,9 @@
       "insolvia.core": {
         "type": "Project",
         "dependencies": {
-          "Microsoft.IdentityModel.JsonWebTokens": "[8.14.0, )"
+          "Microsoft.IdentityModel.JsonWebTokens": "[8.14.0, )",
+          "PDFsharp": "[6.2.4, 6.2.4]",
+          "System.Security.Cryptography.Pkcs": "[10.0.14, )"
         }
       },
       "insolvia.data": {
@@ -306,21 +308,6 @@
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )"
         }
       },
-      "insolvia.engines": {
-        "type": "Project",
-        "dependencies": {
-          "Insolvia.Core": "[1.0.0, )"
-        }
-      },
-      "insolvia.forms": {
-        "type": "Project",
-        "dependencies": {
-          "Insolvia.Core": "[1.0.0, )",
-          "Insolvia.Engines": "[1.0.0, )",
-          "PDFsharp": "[6.2.4, 6.2.4]",
-          "System.Security.Cryptography.Pkcs": "[10.0.14, )"
-        }
-      },
       "insolvia.worker": {
         "type": "Project",
         "dependencies": {
@@ -329,9 +316,7 @@
           "Anthropic": "[13.3.0, 13.3.0]",
           "Insolvia.Aws": "[1.0.0, )",
           "Insolvia.Core": "[1.0.0, )",
-          "Insolvia.Data": "[1.0.0, )",
-          "Insolvia.Engines": "[1.0.0, )",
-          "Insolvia.Forms": "[1.0.0, )"
+          "Insolvia.Data": "[1.0.0, )"
         }
       },
       "Amazon.Lambda.Core": {

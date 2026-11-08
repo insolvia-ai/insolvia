@@ -1,8 +1,6 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/Insolvia.Core/Insolvia.Core.csproj" />
-    <Project Path="src/Insolvia.Engines/Insolvia.Engines.csproj" />
-    <Project Path="src/Insolvia.Forms/Insolvia.Forms.csproj" />
     <Project Path="src/Insolvia.Data/Insolvia.Data.csproj" />
     <Project Path="src/Insolvia.Aws/Insolvia.Aws.csproj" />
     <Project Path="src/Insolvia.Api/Insolvia.Api.csproj" />
@@ -14,10 +12,7 @@
     <Project Path="src/Insolvia.UstTool/Insolvia.UstTool.csproj" />
   </Folder>
   <Folder Name="/tests/">
-    <Project Path="tests/Insolvia.Architecture.Tests/Insolvia.Architecture.Tests.csproj" />
     <Project Path="tests/Insolvia.Core.Tests/Insolvia.Core.Tests.csproj" />
-    <Project Path="tests/Insolvia.Engines.Tests/Insolvia.Engines.Tests.csproj" />
-    <Project Path="tests/Insolvia.Forms.Tests/Insolvia.Forms.Tests.csproj" />
     <Project Path="tests/Insolvia.Data.Tests/Insolvia.Data.Tests.csproj" />
     <Project Path="tests/Insolvia.Aws.Tests/Insolvia.Aws.Tests.csproj" />
     <Project Path="tests/Insolvia.Api.Tests/Insolvia.Api.Tests.csproj" />

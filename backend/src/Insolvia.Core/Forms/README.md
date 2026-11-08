@@ -1,7 +1,7 @@
-# Insolvia.Forms
+# Insolvia.Forms — `src/Insolvia.Core/Forms/`
 
-The PDF engine of the .NET backend (plan 18.16, [ADR 0028 § Libraries](../../../docs/adr/0028-backend-moves-to-dotnet-and-postgres.md)):
-it fills what `Insolvia.Engines` projects into the official court templates,
+The PDF engine of the .NET backend (plan 18.16, [ADR 0028 § Libraries](../../../../docs/adr/0028-backend-moves-to-dotnet-and-postgres.md)):
+it fills what `Insolvia.Engines` (`../Engines/`) projects into the official court templates,
 draws the flat forms, stamps and measures the output, and assembles the
 packet, the filing set and the approval digest. Pure — bytes in, bytes out;
 storing a packet is the worker's job (18.17).
@@ -76,7 +76,7 @@ pypdf cannot fill them either.
 
 ## The goldens and the parity gate
 
-- `tests/Insolvia.Forms.Tests/Goldens/<form>.json` — the .NET goldens:
+- `tests/Insolvia.Core.Tests/Forms/Goldens/<form>.json` — the .NET goldens:
   release, the sha256 of the .NET output (re-baselined from pypdf's, as ADR
   0028 accepts), and the field read-back. `GoldenTests` also holds the
   read-back, which was checked equal to the Python goldens' (pypdf's)
@@ -88,7 +88,7 @@ pypdf cannot fill them either.
   case files, compared on fields, widget states, appearance-stream bytes,
   official pages, text runs and PDFium pixels). It retired with the Python
   in 18.23; the goldens above are what holds the engine now.
-- `tests/Insolvia.Forms.Tests/Parity/debtor-txt/` — the Case Upload oracle:
+- `tests/Insolvia.Core.Tests/Forms/Parity/debtor-txt/` — the Case Upload oracle:
   the Python backend's Debtor.txt for the same four case files;
   `CaseUploadParityTests` asserts the .NET file is byte-identical. A
   deliberate format change edits these files in the same PR.

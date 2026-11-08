@@ -3,7 +3,7 @@ name: Form specs · PR
 # Validates forms/specs/*.json against forms/acroform/*.json — structure,
 # entity vocabulary, and full coverage of every fillable widget in the official
 # PDFs. See forms/README.md. The checks are xUnit tests in
-# backend/tests/Insolvia.Forms.Tests/Specs (ADR 0029 rule 4), run filtered by
+# backend/tests/Insolvia.Core.Tests/Forms/Specs (ADR 0029 rule 4), run filtered by
 # forms/scripts/dev-test.sh, the same command a laptop runs. The job name is
 # what `protect-main` matches: renaming it is a ruleset change
 # (insolvia-branch-protection skill).
@@ -34,7 +34,8 @@ jobs:
           paths: |
             forms/**
             # The checks themselves, and the project that builds them.
-            backend/tests/Insolvia.Forms.Tests/**
+            backend/tests/Insolvia.Core.Tests/Forms/**
+            backend/tests/Insolvia.Core.Tests/Insolvia.Core.Tests.csproj
             .github/workflows/forms-pr.yml
             .github/actions/changed-paths/action.yml
 

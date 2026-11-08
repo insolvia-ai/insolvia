@@ -46,7 +46,7 @@ description: >-
 
 Lives in `backend/` as `src/Insolvia.<Name>/` with a matching
 `tests/Insolvia.<Name>.Tests/`, both listed in `backend/Insolvia.slnx`, and
-named in `tests/Insolvia.Architecture.Tests`' layering rule — the test fails
+named in the layering rule (`tests/Insolvia.Core.Tests/Architecture`) — the test fails
 until all of that is done ([`backend/CLAUDE.md`](../../../backend/CLAUDE.md)
 owns the rule). Package versions go in `Directory.Packages.props`; commit the
 `packages.lock.json` it generates. A new **host** (a deployable unit) also

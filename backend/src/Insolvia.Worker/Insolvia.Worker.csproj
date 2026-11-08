@@ -17,8 +17,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../Insolvia.Core/Insolvia.Core.csproj" />
-    <ProjectReference Include="../Insolvia.Engines/Insolvia.Engines.csproj" />
-    <ProjectReference Include="../Insolvia.Forms/Insolvia.Forms.csproj" />
     <ProjectReference Include="../Insolvia.Data/Insolvia.Data.csproj" />
     <ProjectReference Include="../Insolvia.Aws/Insolvia.Aws.csproj" />
   </ItemGroup>

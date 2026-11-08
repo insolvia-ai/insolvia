@@ -11,8 +11,8 @@
     <!-- The Python adapters' captured requests: the bodies the C# SDK must send. -->
     <None Include="Fixtures/Anthropic/*.json" Link="AnthropicFixtures/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <!-- The reference cases the Forms suite assembles, read in place. -->
-    <None Include="../Insolvia.Engines.Tests/Parity/*.case.json" Link="CaseFiles/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
-    <Compile Include="../Insolvia.Forms.Tests/Support/CaseFiles.cs" Link="Support/CaseFiles.cs" />
-    <Compile Include="../Insolvia.Forms.Tests/Support/CaseDatas.cs" Link="Support/CaseDatas.cs" />
+    <None Include="../Insolvia.Core.Tests/Engines/Parity/*.case.json" Link="CaseFiles/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <Compile Include="../Insolvia.Core.Tests/Forms/Support/CaseFiles.cs" Link="Support/CaseFiles.cs" />
+    <Compile Include="../Insolvia.Core.Tests/Forms/Support/CaseDatas.cs" Link="Support/CaseDatas.cs" />
   </ItemGroup>
 </Project>

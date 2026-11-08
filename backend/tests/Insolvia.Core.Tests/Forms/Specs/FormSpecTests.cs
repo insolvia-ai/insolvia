@@ -49,8 +49,10 @@ public sealed class FormSpecTests(ITestOutputHelper output)
     {
         for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir is not null; dir = dir.Parent)
         {
-            var candidate = Path.Combine(dir.FullName, "forms", "specs");
-            if (Directory.Exists(candidate))
+            // Both folders, not just specs/: on a case-insensitive file system
+            // this suite's own Forms/Specs/ folder would match "forms/specs".
+            var forms = Path.Combine(dir.FullName, "forms");
+            if (Directory.Exists(Path.Combine(forms, "specs")) && Directory.Exists(Path.Combine(forms, "acroform")))
             {
                 return Path.Combine(dir.FullName, "forms");
             }

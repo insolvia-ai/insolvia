@@ -81,7 +81,7 @@ proves the same client against the real host.
 
 1. **Push it down.** Verify the behaviour at the cheapest level that can
    observe it. A rule about *references* belongs in
-   `Insolvia.Architecture.Tests`, not in a route test.
+   the layering test (`Insolvia.Core.Tests/Architecture`), not in a route test.
 2. **Ask what would catch this in production.** If `tsc --strict`, the C#
    compiler with warnings as errors and nullable on, or ESLint already makes
    the failure impossible, the test is noise. Static analysis is the base
@@ -131,9 +131,9 @@ the testing half.
   behaviour change edits them in the same PR, reviewed value by value — never
   regenerated to make a red test green.
 - **The form specs are checked here too.** `forms/scripts/dev-test.sh` runs
-  `Insolvia.Forms.Tests/Specs` filtered (the `Form specs` check); a forms
+  `Insolvia.Core.Tests/Forms/Specs` filtered (the `Form specs` check); a forms
   edit is gated by it.
-- **`Insolvia.Architecture.Tests` is not editable to make your change pass.**
+- **The layering test (`Insolvia.Core.Tests/Architecture`) is not editable to make your change pass.**
   If it fails, your layering is wrong. Fix the layering.
 
 ## Jest — every TypeScript unit, and `contract/`
@@ -353,7 +353,7 @@ ADR:
 | an app route | beside the screen, via `renderRouter` |
 | an admin-portal or marketing module | beside it, Jest |
 | a design-system component | not here — [`insolvia-ai/design-system`](https://github.com/insolvia-ai/design-system), where the `.web`/`.native` leaves have separate tests |
-| an infra invariant | a `terraform test` in the module, or another executable check (`Insolvia.Architecture.Tests`, a workflow guard) over prose |
+| an infra invariant | a `terraform test` in the module, or another executable check (the layering test, a workflow guard) over prose |
 | a script under `.github/scripts/` | `<name>.test.sh` beside it |
 | something only a real bucket, pool, database role or the deployed Lambda role can answer | a `contract/src/` spec through the client, inside a scratch case — it runs deployed too |
 | something only a real browser and a real sign-in can answer | `e2e/tests/flows/<subject>.spec.ts` (`e2e/tests/admin/` for the admin portal) |
