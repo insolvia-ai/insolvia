@@ -1,9 +1,9 @@
 using System.Globalization;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
-using static Insolvia.Engines.Regulatory.ReleaseParsing;
+using static Insolvia.Domain.Engines.Regulatory.ReleaseParsing;
 
-namespace Insolvia.Engines.Regulatory;
+namespace Insolvia.Domain.Engines.Regulatory;
 
 // The UST means-testing datasets: loader and resolution for the `ust/*` series
 // (from core/ust_data.py). The local-standards payload is scoped to the launch
@@ -192,11 +192,11 @@ public sealed record Ch13AdminMultipliers(IReadOnlyDictionary<string, string> Mu
     /// <summary>The fraction for a case's district, by the UST's spelling or the courts'.</summary>
     public decimal MultiplierFor(string district)
     {
-        var cleaned = string.Join(' ', Core.TextRules.SplitWhitespace(district));
+        var cleaned = string.Join(' ', Insolvia.Domain.TextRules.SplitWhitespace(district));
         Multipliers.TryGetValue(cleaned, out var found);
         if (found is null && cleaned != "District of Columbia")
         {
-            var stripped = string.Join(' ', Core.TextRules.SplitWhitespace(cleaned.Replace("District of", string.Empty, StringComparison.Ordinal)));
+            var stripped = string.Join(' ', Insolvia.Domain.TextRules.SplitWhitespace(cleaned.Replace("District of", string.Empty, StringComparison.Ordinal)));
             Multipliers.TryGetValue(stripped, out found);
         }
 
@@ -449,7 +449,7 @@ public static partial class UstData
                 throw Fail(where, "multiplier district name missing");
             }
 
-            var text = Core.Json.AsString(value) ?? throw Fail(where, $"{district}: multiplier must be a string");
+            var text = Insolvia.Domain.Json.AsString(value) ?? throw Fail(where, $"{district}: multiplier must be a string");
             if (!decimal.TryParse(text, NumberStyles.Number, CultureInfo.InvariantCulture, out var fraction))
             {
                 throw Fail(where, $"{district}: multiplier {Exact.Repr(text)}: [<class 'decimal.ConversionSyntax'>]");
@@ -470,12 +470,12 @@ public static partial class UstData
     {
         if (payload["states"] is not JsonArray rawStates
             || rawStates.Count == 0
-            || !rawStates.All(state => Core.Json.AsString(state) is { } text && StatePattern().IsMatch(text)))
+            || !rawStates.All(state => Insolvia.Domain.Json.AsString(state) is { } text && StatePattern().IsMatch(text)))
         {
             throw Fail(where, "states must be a non-empty list of state codes");
         }
 
-        var states = rawStates.Select(state => Core.Json.AsString(state)!).ToList();
+        var states = rawStates.Select(state => Insolvia.Domain.Json.AsString(state)!).ToList();
         var stateSet = states.ToHashSet(StringComparer.Ordinal);
         if (payload["housing_utilities"] is not JsonObject rawHousing || !rawHousing.Select(pair => pair.Key).ToHashSet(StringComparer.Ordinal).SetEquals(stateSet))
         {
@@ -565,7 +565,7 @@ public static partial class UstData
                 throw Fail(where, $"MSA {name} names state {Exact.Repr(state)}, not in states");
             }
 
-            if (rawMsa["counties"] is not JsonArray rawCounties || !rawCounties.All(county => Core.Json.AsString(county) is { Length: > 0 }))
+            if (rawMsa["counties"] is not JsonArray rawCounties || !rawCounties.All(county => Insolvia.Domain.Json.AsString(county) is { Length: > 0 }))
             {
                 throw Fail(where, $"MSA {name}: counties must be a list of names");
             }
@@ -574,7 +574,7 @@ public static partial class UstData
                 Money(rawMsa["one_car"], where, $"MSA {name} one_car"),
                 Money(rawMsa["two_cars"], where, $"MSA {name} two_cars"),
                 state,
-                [.. rawCounties.Select(county => Core.Json.AsString(county)!)]));
+                [.. rawCounties.Select(county => Insolvia.Domain.Json.AsString(county)!)]));
         }
 
         var transportation = new Transportation(
@@ -596,7 +596,7 @@ public static partial class UstData
         var manifestNotes = ManifestNotes(manifest, where);
 
         var payloadRaw = LoadJson(root, $"{directory}/dataset.json", where);
-        if (Core.Json.AsString(payloadRaw["kind"]) != SeriesPayloads[seriesId])
+        if (Insolvia.Domain.Json.AsString(payloadRaw["kind"]) != SeriesPayloads[seriesId])
         {
             throw Fail(where, $"dataset kind {Exact.Repr(payloadRaw["kind"])}");
         }

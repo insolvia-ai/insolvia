@@ -1,6 +1,6 @@
-using Insolvia.Core.Events;
+using Insolvia.Domain.Events;
 
-namespace Insolvia.Core.Ports;
+namespace Insolvia.Domain.Ports;
 
 /// <summary>
 /// Persists calendar events (issue 14.6 / #358; Python's <c>EventStore</c>) —

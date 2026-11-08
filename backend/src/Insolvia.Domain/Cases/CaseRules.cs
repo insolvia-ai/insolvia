@@ -3,10 +3,10 @@ using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using Insolvia.Core.Courts;
-using Insolvia.Core.Fields;
+using Insolvia.Domain.Courts;
+using Insolvia.Domain.Fields;
 
-namespace Insolvia.Core.Cases;
+namespace Insolvia.Domain.Cases;
 
 /// <summary>
 /// Case validation, identity and the lifecycle's rules (from <c>cases.py</c>).

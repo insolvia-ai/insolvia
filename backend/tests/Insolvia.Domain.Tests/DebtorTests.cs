@@ -1,13 +1,13 @@
 using System.Text.Json.Nodes;
-using Insolvia.Core.CaseEntities;
-using Insolvia.Core.Debtors;
-using Insolvia.Core.Fields;
-using Insolvia.Core.Memory;
-using Insolvia.Core.Ports;
-using Insolvia.Core.Provenance;
-using Insolvia.Core.TaxIds;
+using Insolvia.Domain.CaseEntities;
+using Insolvia.Domain.Debtors;
+using Insolvia.Domain.Fields;
+using Insolvia.Domain.Memory;
+using Insolvia.Domain.Ports;
+using Insolvia.Domain.Provenance;
+using Insolvia.Domain.TaxIds;
 
-namespace Insolvia.Core.Tests;
+namespace Insolvia.Domain.Tests;
 
 /// <summary>The debtor record, translated from test_debtors.py.</summary>
 public sealed class DebtorTests

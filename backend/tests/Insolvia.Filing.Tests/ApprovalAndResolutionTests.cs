@@ -1,10 +1,10 @@
 using System.Text.Json.Nodes;
 using Insolvia.Api.Tests.Support;
-using Insolvia.Core.AccessLog;
-using Insolvia.Core.Cases;
-using Insolvia.Core.Debtors;
-using Insolvia.Core.Filings;
-using Insolvia.Core.Ports;
+using Insolvia.Domain.AccessLog;
+using Insolvia.Domain.Cases;
+using Insolvia.Domain.Debtors;
+using Insolvia.Domain.Filings;
+using Insolvia.Domain.Ports;
 using Insolvia.Filing.Tests.FakeCourt;
 using Insolvia.Filing.Tests.Support;
 

@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace Insolvia.Core.AccessLog;
+namespace Insolvia.Domain.AccessLog;
 
 /// <summary>
 /// What happened (Python's <c>ACTIONS</c>). Kept COARSE — that an access

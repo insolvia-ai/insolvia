@@ -1,7 +1,7 @@
 using Insolvia.Api.Calendar;
 using Insolvia.Api.Tests.Support;
-using Insolvia.Core.Events;
-using Insolvia.Core.Firms;
+using Insolvia.Domain.Events;
+using Insolvia.Domain.Firms;
 using static Insolvia.Api.Tests.Support.CaseWorld;
 
 namespace Insolvia.Api.Tests.Routes;
@@ -10,7 +10,7 @@ namespace Insolvia.Api.Tests.Routes;
 /// test_event_routes.py: events at case and firm scope, the calendar window,
 /// and the ICS feed with its token. The cast: Alice admin; Dana sees every
 /// case with <c>events: view_only</c>; Bob linked-only; Greg with events hidden;
-/// Carol the other firm. The deadlines come from Insolvia.Engines' rule
+/// Carol the other firm. The deadlines come from Insolvia.Domain.Engines' rule
 /// table through the case PATCH's hook.
 /// </summary>
 public sealed class EventRouteTests : IAsyncLifetime, IDisposable
@@ -276,7 +276,7 @@ public sealed class EventRouteTests : IAsyncLifetime, IDisposable
     public async Task The_session_feed_is_an_ics_attachment_that_is_never_cached()
     {
         var caseId = await _world.OpenCaseIdAsync();
-        var today = Insolvia.Core.Clock.Today();
+        var today = Insolvia.Domain.Clock.Today();
         await Add(caseId, $$"""{"title": "Hearing", "start": "{{Http.FlaskJson.Date(today.AddDays(3))}}"}""");
 
         var feed = await _world.Get("/v1/me/calendar.ics");
@@ -295,7 +295,7 @@ public sealed class EventRouteTests : IAsyncLifetime, IDisposable
     public async Task A_feed_token_opens_the_feed_and_only_that_users_feed()
     {
         var caseId = await _world.OpenCaseIdAsync();
-        await Add(caseId, $$"""{"title": "Hearing", "start": "{{Http.FlaskJson.Date(Insolvia.Core.Clock.Today().AddDays(1))}}"}""");
+        await Add(caseId, $$"""{"title": "Hearing", "start": "{{Http.FlaskJson.Date(Insolvia.Domain.Clock.Today().AddDays(1))}}"}""");
 
         var minted = await _world.Post("/v1/me/calendar-token", null);
         var token = minted.Str("token")!;
@@ -366,7 +366,7 @@ public sealed class CalendarRulesTests
     [Fact]
     public void A_title_and_a_start_are_required()
     {
-        var error = Assert.Throws<Insolvia.Core.FieldValidationException>(() => CalendarRules.Parse(new System.Text.Json.Nodes.JsonObject()));
+        var error = Assert.Throws<Insolvia.Domain.FieldValidationException>(() => CalendarRules.Parse(new System.Text.Json.Nodes.JsonObject()));
 
         Assert.Equal(["start", "title"], error.Fields.Keys.Order(StringComparer.Ordinal));
     }
@@ -399,7 +399,7 @@ public sealed class CalendarRulesTests
     [InlineData("""{"title": "x", "start": "2026-01-01", "attendees": "00000000-0000-4000-8000-00000000a11c"}""", "attendees")]
     public void A_bad_event_is_refused_naming_the_field(string body, string field)
     {
-        var error = Assert.Throws<Insolvia.Core.FieldValidationException>(() => Parse(body));
+        var error = Assert.Throws<Insolvia.Domain.FieldValidationException>(() => Parse(body));
 
         Assert.Contains(field, error.Fields.Keys);
     }
@@ -416,8 +416,8 @@ public sealed class CalendarRulesTests
     public void A_dismissal_body_is_the_one_flag_alone(string body, bool expected)
     {
         Assert.Equal(expected, CalendarRules.ParseDismissal(System.Text.Json.Nodes.JsonNode.Parse(body)!.AsObject()));
-        Assert.Throws<Insolvia.Core.FieldValidationException>(() => CalendarRules.ParseDismissal(System.Text.Json.Nodes.JsonNode.Parse("""{"dismissed": true, "title": "x"}""")!.AsObject()));
-        Assert.Throws<Insolvia.Core.FieldValidationException>(() => CalendarRules.ParseDismissal(System.Text.Json.Nodes.JsonNode.Parse("""{"dismissed": "yes"}""")!.AsObject()));
+        Assert.Throws<Insolvia.Domain.FieldValidationException>(() => CalendarRules.ParseDismissal(System.Text.Json.Nodes.JsonNode.Parse("""{"dismissed": true, "title": "x"}""")!.AsObject()));
+        Assert.Throws<Insolvia.Domain.FieldValidationException>(() => CalendarRules.ParseDismissal(System.Text.Json.Nodes.JsonNode.Parse("""{"dismissed": "yes"}""")!.AsObject()));
     }
 
     [Fact]
@@ -429,7 +429,7 @@ public sealed class CalendarRulesTests
 
         Assert.Equal((original.Id, original.CaseId, original.CreatedBy, original.CreatedAt), (replaced.Id, replaced.CaseId, replaced.CreatedBy, replaced.CreatedAt));
         Assert.Equal(("Moved", false), (replaced.Title, replaced.AllDay));
-        Assert.Throws<Insolvia.Core.ValidationException>(() => CalendarRules.Replace(original with { RuleId = "rule" }, Parse("""{"title": "x", "start": "2026-03-02"}""")));
+        Assert.Throws<Insolvia.Domain.ValidationException>(() => CalendarRules.Replace(original with { RuleId = "rule" }, Parse("""{"title": "x", "start": "2026-03-02"}""")));
     }
 
     [Fact]
@@ -510,11 +510,11 @@ public sealed class CalendarRulesTests
         Assert.DoesNotContain(plain, fourth.Put);
     }
 
-    private static Insolvia.Core.Cases.Case Filed(DateOnly filedAt) =>
-        new("00000000-0000-4000-8000-0000000ca5e1", Firm, Alice, 7, "Middle District of Florida", Insolvia.Core.Cases.CaseStatus.Filed, FirmWorld.Seeded, FirmWorld.Seeded) { FiledAt = filedAt };
+    private static Insolvia.Domain.Cases.Case Filed(DateOnly filedAt) =>
+        new("00000000-0000-4000-8000-0000000ca5e1", Firm, Alice, 7, "Middle District of Florida", Insolvia.Domain.Cases.CaseStatus.Filed, FirmWorld.Seeded, FirmWorld.Seeded) { FiledAt = filedAt };
 
-    private static IReadOnlyList<Insolvia.Engines.Deadlines.GeneratedDeadline> Generate(Insolvia.Core.Cases.Case target) =>
-        Insolvia.Engines.Deadlines.DeadlineEngine.Generate(target, Insolvia.Engines.Deadlines.DeadlineRules.Resolve(target.FiledAt!.Value), Insolvia.Engines.Deadlines.LegalHolidays.Resolve(target.FiledAt!.Value));
+    private static IReadOnlyList<Insolvia.Domain.Engines.Deadlines.GeneratedDeadline> Generate(Insolvia.Domain.Cases.Case target) =>
+        Insolvia.Domain.Engines.Deadlines.DeadlineEngine.Generate(target, Insolvia.Domain.Engines.Deadlines.DeadlineRules.Resolve(target.FiledAt!.Value), Insolvia.Domain.Engines.Deadlines.LegalHolidays.Resolve(target.FiledAt!.Value));
 
     private static EventDraft Parse(string body) => CalendarRules.Parse(System.Text.Json.Nodes.JsonNode.Parse(body)!.AsObject());
 }

@@ -1,10 +1,10 @@
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json.Nodes;
-using Insolvia.Core;
-using Insolvia.Core.Debtors;
-using Insolvia.Core.Firms;
-using Insolvia.Core.Ports;
+using Insolvia.Domain;
+using Insolvia.Domain.Debtors;
+using Insolvia.Domain.Firms;
+using Insolvia.Domain.Ports;
 using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace Insolvia.Api.Tests.Support;
@@ -30,7 +30,7 @@ internal sealed class FirmWorld : IDisposable
 
     public AuthHost Host { get; }
 
-    public Core.Memory.MemoryFirmStore Firms => Host.Firms;
+    public Insolvia.Domain.Memory.MemoryFirmStore Firms => Host.Firms;
 
     public static FirmUser Member(
         string subject,

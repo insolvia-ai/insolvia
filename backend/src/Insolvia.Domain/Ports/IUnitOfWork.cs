@@ -1,4 +1,4 @@
-namespace Insolvia.Core.Ports;
+namespace Insolvia.Domain.Ports;
 
 /// <summary>
 /// One transaction around writes a route makes through SEVERAL stores — what

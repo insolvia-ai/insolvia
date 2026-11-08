@@ -1,7 +1,7 @@
 using System.Security.Cryptography;
-using Insolvia.Engines.Projections;
+using Insolvia.Domain.Engines.Projections;
 
-namespace Insolvia.Forms.Tests;
+namespace Insolvia.Domain.Forms.Tests;
 
 // The template-PDF half of test_form_templates.py: every release ships its
 // template, and it hashes to the manifest's source.sha256 — the court's own
@@ -36,7 +36,7 @@ public sealed class TemplateFileTests
     {
         var release = FormTemplates.Latest("form/b101") with { SourceSha256 = new string('0', 64) };
 
-        var error = Assert.Throws<Engines.MalformedReleaseException>(() => TemplatePdfs.For(release));
+        var error = Assert.Throws<Insolvia.Domain.Engines.MalformedReleaseException>(() => TemplatePdfs.For(release));
 
         Assert.Contains("is not the official PDF", error.Message, StringComparison.Ordinal);
     }

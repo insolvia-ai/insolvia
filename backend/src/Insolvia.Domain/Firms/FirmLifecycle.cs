@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
 
-namespace Insolvia.Core.Firms;
+namespace Insolvia.Domain.Firms;
 
 /// <summary>
 /// Construction and the state transitions of firms and firm users (from

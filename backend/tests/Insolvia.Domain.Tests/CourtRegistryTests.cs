@@ -1,7 +1,7 @@
 using System.Text.Json.Nodes;
-using Insolvia.Core.Courts;
+using Insolvia.Domain.Courts;
 
-namespace Insolvia.Core.Tests;
+namespace Insolvia.Domain.Tests;
 
 /// <summary>
 /// The court registry (issue #360), translated from test_courts.py: the real

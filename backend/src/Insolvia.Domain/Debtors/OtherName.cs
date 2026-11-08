@@ -1,9 +1,9 @@
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
-using Insolvia.Core.Fields;
-using Insolvia.Core.Provenance;
+using Insolvia.Domain.Fields;
+using Insolvia.Domain.Provenance;
 
-namespace Insolvia.Core.Debtors;
+namespace Insolvia.Domain.Debtors;
 
 // The two pieces of debtors.py the FIRM side needs before the case half is
 // ported (18.7): the 8-year alias row and its parser, which a firm client's

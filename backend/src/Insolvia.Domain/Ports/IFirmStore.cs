@@ -1,10 +1,10 @@
-using Insolvia.Core.DocumentRequests;
-using Insolvia.Core.FirmClients;
-using Insolvia.Core.Firms;
-using Insolvia.Core.LibraryCreditors;
-using Insolvia.Core.Questionnaires;
+using Insolvia.Domain.DocumentRequests;
+using Insolvia.Domain.FirmClients;
+using Insolvia.Domain.Firms;
+using Insolvia.Domain.LibraryCreditors;
+using Insolvia.Domain.Questionnaires;
 
-namespace Insolvia.Core.Ports;
+namespace Insolvia.Domain.Ports;
 
 /// <summary>
 /// Firms, the people in them, and everything else that lives at firm scope:

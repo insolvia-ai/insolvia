@@ -2,13 +2,13 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
-using Insolvia.Core.AccessLog;
-using Insolvia.Core.Fields;
-using Insolvia.Core.FilingAuthorizations;
-using Insolvia.Core.Ports;
-using Insolvia.Core.TaxIds;
+using Insolvia.Domain.AccessLog;
+using Insolvia.Domain.Fields;
+using Insolvia.Domain.FilingAuthorizations;
+using Insolvia.Domain.Ports;
+using Insolvia.Domain.TaxIds;
 
-namespace Insolvia.Core.FilingCredentials;
+namespace Insolvia.Domain.FilingCredentials;
 
 // The attorney's CM/ECF credential vault (ADR 0024, guardrail 3; from
 // filing_credentials.py) — the DOMAIN half. The seal and the open are ports

@@ -1,8 +1,7 @@
-using Insolvia.Core;
-using Insolvia.Core.MeansTest;
-using Insolvia.Engines.Regulatory;
+using Insolvia.Domain.Engines.Regulatory;
+using Insolvia.Domain.MeansTest;
 
-namespace Insolvia.Engines.MeansTest;
+namespace Insolvia.Domain.Engines.MeansTest;
 
 // The means-test engine — rule-based, effective-dated, pure (from
 // core/means_test.py, issues #101, #365): § 707(b) for a Chapter 7 case

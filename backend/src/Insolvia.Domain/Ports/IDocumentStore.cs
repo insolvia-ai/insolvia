@@ -1,6 +1,6 @@
-using Insolvia.Core.Documents;
+using Insolvia.Domain.Documents;
 
-namespace Insolvia.Core.Ports;
+namespace Insolvia.Domain.Ports;
 
 /// <summary>
 /// Persists document METADATA rows — never the bytes (issue 8.6; Python's

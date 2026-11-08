@@ -1,6 +1,6 @@
 using System.Text.Json.Nodes;
 
-namespace Insolvia.Forms.Tests.Specs;
+namespace Insolvia.Domain.Forms.Tests.Specs;
 
 // The `Form specs` check (forms-pr.yml, forms/scripts/dev-test.sh): every
 // committed forms/specs/*.json against its forms/acroform/*.json dump, read

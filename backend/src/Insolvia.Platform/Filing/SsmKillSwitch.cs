@@ -3,10 +3,10 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Amazon.Runtime.Credentials;
-using Insolvia.Aws.Signing;
-using Insolvia.Core.Ports;
+using Insolvia.Domain.Ports;
+using Insolvia.Platform.Signing;
 
-namespace Insolvia.Aws.Filing;
+namespace Insolvia.Platform.Filing;
 
 /// <summary>
 /// The environment kill switch as an SSM parameter (Python's

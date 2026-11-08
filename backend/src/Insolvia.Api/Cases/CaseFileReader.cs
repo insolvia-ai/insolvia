@@ -1,20 +1,20 @@
-using Insolvia.Core.Assets;
-using Insolvia.Core.CaseEntities;
-using Insolvia.Core.Cases;
-using Insolvia.Core.Claims;
-using Insolvia.Core.Codebtors;
-using Insolvia.Core.ContractLeases;
-using Insolvia.Core.Creditors;
-using Insolvia.Core.Exemptions;
-using Insolvia.Core.Expenses;
-using Insolvia.Core.Income;
-using Insolvia.Core.MeansTest;
-using Insolvia.Core.Petitions;
-using Insolvia.Core.Plans;
-using Insolvia.Core.Ports;
-using Insolvia.Core.Sofa;
-using Insolvia.Engines.Exemptions;
-using Insolvia.Engines.Projections;
+using Insolvia.Domain.Assets;
+using Insolvia.Domain.CaseEntities;
+using Insolvia.Domain.Cases;
+using Insolvia.Domain.Claims;
+using Insolvia.Domain.Codebtors;
+using Insolvia.Domain.ContractLeases;
+using Insolvia.Domain.Creditors;
+using Insolvia.Domain.Engines.Exemptions;
+using Insolvia.Domain.Engines.Projections;
+using Insolvia.Domain.Exemptions;
+using Insolvia.Domain.Expenses;
+using Insolvia.Domain.Income;
+using Insolvia.Domain.MeansTest;
+using Insolvia.Domain.Petitions;
+using Insolvia.Domain.Plans;
+using Insolvia.Domain.Ports;
+using Insolvia.Domain.Sofa;
 
 namespace Insolvia.Api.Cases;
 

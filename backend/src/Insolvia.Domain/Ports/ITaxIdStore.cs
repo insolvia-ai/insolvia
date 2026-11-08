@@ -1,6 +1,6 @@
-using Insolvia.Core.TaxIds;
+using Insolvia.Domain.TaxIds;
 
-namespace Insolvia.Core.Ports;
+namespace Insolvia.Domain.Ports;
 
 /// <summary>
 /// Persists the sealed tax-id items (Python's <c>TaxIdStore</c>).

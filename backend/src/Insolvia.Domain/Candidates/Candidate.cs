@@ -1,9 +1,9 @@
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
-using Insolvia.Core.CaseEntities;
-using Insolvia.Core.Debtors;
+using Insolvia.Domain.CaseEntities;
+using Insolvia.Domain.Debtors;
 
-namespace Insolvia.Core.Candidates;
+namespace Insolvia.Domain.Candidates;
 
 // A candidate: a proposed case record awaiting a person's review
 // (mcp-surface.md; case-data-model.md's extraction_candidate; from

@@ -1,6 +1,6 @@
 using System.Text.Json;
 using Amazon.S3;
-using Insolvia.Core;
+using Insolvia.Domain;
 using Insolvia.Migrator.Purge;
 using Insolvia.Migrator.Seeding;
 

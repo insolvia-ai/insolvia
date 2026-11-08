@@ -1,12 +1,12 @@
 using System.Text;
 using System.Text.Json.Nodes;
-using Insolvia.Core;
-using Insolvia.Core.AccessLog;
-using Insolvia.Core.Candidates;
-using Insolvia.Core.Cases;
-using Insolvia.Core.Documents;
-using Insolvia.Core.Jobs;
-using Insolvia.Core.Memory;
+using Insolvia.Domain;
+using Insolvia.Domain.AccessLog;
+using Insolvia.Domain.Candidates;
+using Insolvia.Domain.Cases;
+using Insolvia.Domain.Documents;
+using Insolvia.Domain.Jobs;
+using Insolvia.Domain.Memory;
 using Insolvia.Worker.Workers;
 
 namespace Insolvia.Worker.Tests;

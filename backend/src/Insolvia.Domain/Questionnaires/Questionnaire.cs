@@ -1,7 +1,7 @@
 using System.Text.Json.Nodes;
-using Insolvia.Core.Fields;
+using Insolvia.Domain.Fields;
 
-namespace Insolvia.Core.Questionnaires;
+namespace Insolvia.Domain.Questionnaires;
 
 /// <summary>
 /// One catalogue entry. <see cref="Covers"/> is for staff;

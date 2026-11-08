@@ -1,14 +1,14 @@
-using Insolvia.Core;
-using Insolvia.Core.AccessLog;
-using Insolvia.Core.CaseEntities;
-using Insolvia.Core.Cases;
-using Insolvia.Core.Creditors;
-using Insolvia.Core.Fields;
-using Insolvia.Core.Filings;
-using Insolvia.Core.FirmClients;
-using Insolvia.Core.Jobs;
-using Insolvia.Core.Provenance;
 using Insolvia.Data.AccessLogging;
+using Insolvia.Domain;
+using Insolvia.Domain.AccessLog;
+using Insolvia.Domain.CaseEntities;
+using Insolvia.Domain.Cases;
+using Insolvia.Domain.Creditors;
+using Insolvia.Domain.Fields;
+using Insolvia.Domain.Filings;
+using Insolvia.Domain.FirmClients;
+using Insolvia.Domain.Jobs;
+using Insolvia.Domain.Provenance;
 using Microsoft.EntityFrameworkCore;
 
 namespace Insolvia.Data.Tests.Conformance;

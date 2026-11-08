@@ -1,11 +1,11 @@
 using System.Security.Cryptography;
-using Insolvia.Engines.Projections;
-using Insolvia.Forms.Tests.Support;
+using Insolvia.Domain.Engines.Projections;
+using Insolvia.Domain.Forms.Tests.Support;
 using PdfSharp.Pdf;
 using PdfSharp.Pdf.IO;
-using static Insolvia.Forms.Pdf.PdfObjects;
+using static Insolvia.Domain.Forms.Pdf.PdfObjects;
 
-namespace Insolvia.Forms.Tests;
+namespace Insolvia.Domain.Forms.Tests;
 
 // test_form_fill.py's behaviour tests, translated: partial fills, the
 // broken-group escape hatch, every structural refusal, the flat forms'

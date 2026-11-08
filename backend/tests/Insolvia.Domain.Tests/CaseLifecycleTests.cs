@@ -1,16 +1,16 @@
 using System.Text.Json.Nodes;
-using Insolvia.Core.Access;
-using Insolvia.Core.CaseEntities;
-using Insolvia.Core.Cases;
-using Insolvia.Core.Clients;
-using Insolvia.Core.Creditors;
-using Insolvia.Core.Debtors;
-using Insolvia.Core.Fields;
-using Insolvia.Core.Memory;
-using Insolvia.Core.Provenance;
-using static Insolvia.Core.Tests.CaseFixtures;
+using Insolvia.Domain.Access;
+using Insolvia.Domain.CaseEntities;
+using Insolvia.Domain.Cases;
+using Insolvia.Domain.Clients;
+using Insolvia.Domain.Creditors;
+using Insolvia.Domain.Debtors;
+using Insolvia.Domain.Fields;
+using Insolvia.Domain.Memory;
+using Insolvia.Domain.Provenance;
+using static Insolvia.Domain.Tests.CaseFixtures;
 
-namespace Insolvia.Core.Tests;
+namespace Insolvia.Domain.Tests;
 
 /// <summary>The case lifecycle (#355), translated from test_case_lifecycle.py.</summary>
 public sealed class CaseLifecycleTests

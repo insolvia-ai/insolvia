@@ -1,7 +1,7 @@
-using Insolvia.Core.FilingAuthorizations;
-using Insolvia.Core.Ports;
+using Insolvia.Domain.FilingAuthorizations;
+using Insolvia.Domain.Ports;
 
-namespace Insolvia.Core.Memory;
+namespace Insolvia.Domain.Memory;
 
 /// <summary>
 /// The in-memory <see cref="IFilingAuthorizationStore"/>: the current item per

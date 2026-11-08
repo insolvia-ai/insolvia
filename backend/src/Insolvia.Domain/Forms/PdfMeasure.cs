@@ -2,9 +2,9 @@ using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 using PdfSharp.Pdf;
 using PdfSharp.Pdf.IO;
-using static Insolvia.Forms.Pdf.PdfObjects;
+using static Insolvia.Domain.Forms.Pdf.PdfObjects;
 
-namespace Insolvia.Forms;
+namespace Insolvia.Domain.Forms;
 
 /// <summary>
 /// What a packet's files measure (from <c>core/pdf_measure.py</c>) — the

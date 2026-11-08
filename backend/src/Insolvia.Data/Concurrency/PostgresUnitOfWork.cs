@@ -1,4 +1,4 @@
-using Insolvia.Core.Ports;
+using Insolvia.Domain.Ports;
 
 namespace Insolvia.Data.Concurrency;
 

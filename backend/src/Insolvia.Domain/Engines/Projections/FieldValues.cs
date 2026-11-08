@@ -1,13 +1,12 @@
 using System.Collections;
 using System.Text.Json.Nodes;
-using Insolvia.Core;
 
-namespace Insolvia.Engines.Projections;
+namespace Insolvia.Domain.Engines.Projections;
 
 // What a projection hands the fill engine (from core/form_fill.py's value
 // types): one fill per single-widget field, or per-PDF-name fills for a
 // repeated field (two debtor columns, table rows). The engine itself — the
-// PDF half — is Insolvia.Forms'; these are plain values.
+// PDF half — is Insolvia.Domain.Forms'; these are plain values.
 
 /// <summary>What a field id maps to: one fill, or one fill per PDF name.</summary>
 public abstract record FieldEntry

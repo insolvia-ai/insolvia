@@ -1,6 +1,6 @@
 using System.Text.Json.Nodes;
 
-namespace Insolvia.Core.Ports;
+namespace Insolvia.Domain.Ports;
 
 /// <summary>What the review model answers: which model ran, and the raw structured output (still to be validated).</summary>
 public sealed record ReviewModelResult(string Model, JsonObject Raw);

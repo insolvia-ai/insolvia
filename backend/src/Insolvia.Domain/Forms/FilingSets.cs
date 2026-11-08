@@ -1,10 +1,9 @@
-using Insolvia.Core;
-using Insolvia.Core.Cases;
-using Insolvia.Core.Courts;
-using Insolvia.Engines;
-using Insolvia.Engines.CreditorMatrix;
+using Insolvia.Domain.Cases;
+using Insolvia.Domain.Courts;
+using Insolvia.Domain.Engines;
+using Insolvia.Domain.Engines.CreditorMatrix;
 
-namespace Insolvia.Forms;
+namespace Insolvia.Domain.Forms;
 
 /// <summary>One PDF check of a file: size, text layer or page size, and its outcome (<c>pass</c>, <c>fail</c>, <c>warn</c>, <c>unmeasured</c>).</summary>
 public sealed record FilingCheck(string Check, string Outcome, string Message);
@@ -321,7 +320,7 @@ public static class FilingSets
         string[] facts =
         [
             @case.CaseNumber is { Length: > 0 } number ? $"Case number {number}." : "No case number is recorded yet.",
-            @case.FiledAt is { } filed ? $"Filed {Engines.Exact.Iso(filed)}." : "No filing date is recorded yet.",
+            @case.FiledAt is { } filed ? $"Filed {Insolvia.Domain.Engines.Exact.Iso(filed)}." : "No filing date is recorded yet.",
         ];
         return new ChecklistItem(
             "filed",

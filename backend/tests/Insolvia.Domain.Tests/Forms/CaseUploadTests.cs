@@ -2,16 +2,15 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using Insolvia.Core;
-using Insolvia.Core.AccessLog;
-using Insolvia.Core.Courts;
-using Insolvia.Core.Fields;
-using Insolvia.Core.Memory;
-using Insolvia.Core.Ports;
-using Insolvia.Core.TaxIds;
-using Insolvia.Forms.Tests.Support;
+using Insolvia.Domain.AccessLog;
+using Insolvia.Domain.Courts;
+using Insolvia.Domain.Fields;
+using Insolvia.Domain.Forms.Tests.Support;
+using Insolvia.Domain.Memory;
+using Insolvia.Domain.Ports;
+using Insolvia.Domain.TaxIds;
 
-namespace Insolvia.Forms.Tests;
+namespace Insolvia.Domain.Forms.Tests;
 
 // test_case_upload.py, translated (ADR 0024 build PR 9): Debtor.txt for the
 // reference case validates against the encoded AO spec, every kind of fault
@@ -93,10 +92,10 @@ public sealed class CaseUploadTests
         var spec = JsonNode.Parse(files["filing/case-upload/2022-03-01/spec.json"])!.AsObject();
         spec["records"]!["debt"]!["fields"]!.AsArray().RemoveAt(20);
 
-        var error = Assert.Throws<Engines.MalformedReleaseException>(() => CaseUploadSpecs.Load("2022-03-01", manifest, spec.ToJsonString()));
+        var error = Assert.Throws<Insolvia.Domain.Engines.MalformedReleaseException>(() => CaseUploadSpecs.Load("2022-03-01", manifest, spec.ToJsonString()));
 
         Assert.Equal("malformed case-upload spec 2022-03-01: debt must have 21 fields", error.Message);
-        Assert.Throws<Engines.EngineLookupException>(() => CaseUploadSpecs.Resolve(new DateOnly(2022, 2, 28)));
+        Assert.Throws<Insolvia.Domain.Engines.EngineLookupException>(() => CaseUploadSpecs.Resolve(new DateOnly(2022, 2, 28)));
     }
 
     // ── The done-when: the reference case validates ──
@@ -426,7 +425,7 @@ public sealed class CaseUploadTests
 }
 
 // The Case Upload half of the parity gate: Debtor.txt for the four parity
-// case files, built by Insolvia.Forms, byte-identical to what the Python
+// case files, built by Insolvia.Domain.Forms, byte-identical to what the Python
 // backend's case_upload.build_debtor_txt wrote before 18.23 deleted it
 // (committed as Parity/debtor-txt/<case>.Debtor.txt) — encoding, line
 // endings, delimiters and blanks included.

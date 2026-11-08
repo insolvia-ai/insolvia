@@ -1,12 +1,12 @@
 using System.Text.RegularExpressions;
 
-namespace Insolvia.Aws.Sealing;
+namespace Insolvia.Platform.Sealing;
 
 /// <summary>
 /// The two KMS key aliases the deployed API seals under: the case key
 /// (debtor tax ids) and the vault key (filing credentials). The API SEALS
 /// under both and opens tax ids only — it never composes an
-/// <see cref="Core.Ports.IFilingCredentialOpener"/>, and the vault key's policy
+/// <see cref="Insolvia.Domain.Ports.IFilingCredentialOpener"/>, and the vault key's policy
 /// refuses it Decrypt in any case (ADR 0024, ADR 0028 § Data).
 /// </summary>
 /// <remarks>

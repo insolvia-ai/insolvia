@@ -3,7 +3,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
-namespace Insolvia.Engines;
+namespace Insolvia.Domain.Engines;
 
 /// <summary>
 /// Python's <c>decimal.quantize</c> rounding modes, named as Python names them.
@@ -226,7 +226,7 @@ public static class Exact
     private static string NumberRepr(JsonValue scalar)
     {
         var raw = scalar.ToJsonString();
-        if (Core.Json.TryGetWholeNumber(scalar, out var whole))
+        if (Insolvia.Domain.Json.TryGetWholeNumber(scalar, out var whole))
         {
             return whole.ToString(CultureInfo.InvariantCulture);
         }

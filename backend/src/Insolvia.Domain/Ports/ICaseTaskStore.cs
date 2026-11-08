@@ -1,6 +1,6 @@
-using Insolvia.Core.CaseTasks;
+using Insolvia.Domain.CaseTasks;
 
-namespace Insolvia.Core.Ports;
+namespace Insolvia.Domain.Ports;
 
 /// <summary>
 /// Persists case tasks (issue #356; Python's <c>TaskStore</c>). Case-scoped.

@@ -1,4 +1,4 @@
-namespace Insolvia.Engines.Tests;
+namespace Insolvia.Domain.Engines.Tests;
 
 // The Python semantics the ports lean on, pinned against what CPython's
 // decimal module answers (each expectation below is the Python REPL's):

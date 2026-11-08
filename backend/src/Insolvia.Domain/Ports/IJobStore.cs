@@ -1,6 +1,6 @@
-using Insolvia.Core.Jobs;
+using Insolvia.Domain.Jobs;
 
-namespace Insolvia.Core.Ports;
+namespace Insolvia.Domain.Ports;
 
 /// <summary>
 /// Persists pipeline job records (Python's <c>JobStore</c>; ADR 0018). A job is

@@ -1,8 +1,8 @@
 using System.Text.Json.Nodes;
-using Insolvia.Core.Debtors;
-using Insolvia.Core.Fields;
+using Insolvia.Domain.Debtors;
+using Insolvia.Domain.Fields;
 
-namespace Insolvia.Core.FirmClients;
+namespace Insolvia.Domain.FirmClients;
 
 /// <summary>
 /// Parsing, the transitions and the directory order of firm clients (from

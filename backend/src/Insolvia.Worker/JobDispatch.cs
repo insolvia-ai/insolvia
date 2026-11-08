@@ -1,8 +1,8 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using Insolvia.Core;
-using Insolvia.Core.Jobs;
-using Insolvia.Core.Ports;
+using Insolvia.Domain;
+using Insolvia.Domain.Jobs;
+using Insolvia.Domain.Ports;
 
 namespace Insolvia.Worker;
 

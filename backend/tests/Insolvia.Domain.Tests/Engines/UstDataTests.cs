@@ -1,7 +1,7 @@
 using System.Text.Json.Nodes;
-using Insolvia.Engines.Regulatory;
+using Insolvia.Domain.Engines.Regulatory;
 
-namespace Insolvia.Engines.Tests;
+namespace Insolvia.Domain.Engines.Tests;
 
 // Translated from services/api/tests/unit/test_ust_data.py: the committed
 // registry swept and pinned to the UST's own tables, the resolution

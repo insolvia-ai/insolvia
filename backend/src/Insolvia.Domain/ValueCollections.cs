@@ -2,7 +2,7 @@ using System.Collections;
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
 
-namespace Insolvia.Core;
+namespace Insolvia.Domain;
 
 /// <summary>
 /// An immutable list with VALUE equality — the C# shape of a Python tuple on

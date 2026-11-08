@@ -1,8 +1,8 @@
-using Insolvia.Core.Cases;
-using Insolvia.Core.Filings;
-using Insolvia.Core.Memory;
+using Insolvia.Domain.Cases;
+using Insolvia.Domain.Filings;
+using Insolvia.Domain.Memory;
 
-namespace Insolvia.Core.Tests;
+namespace Insolvia.Domain.Tests;
 
 /// <summary>The electronic filing record and its memory store, translated from test_filings.py.</summary>
 public sealed class FilingTests

@@ -3,7 +3,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Insolvia.Api.Auth;
-using Insolvia.Core;
+using Insolvia.Domain;
 
 namespace Insolvia.Api.Http;
 

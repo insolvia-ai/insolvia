@@ -1,12 +1,12 @@
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
-using Insolvia.Core.Candidates;
-using Insolvia.Core.CaseEntities;
-using Insolvia.Core.Clients;
-using Insolvia.Core.Debtors;
-using Insolvia.Core.Questionnaires;
+using Insolvia.Domain.Candidates;
+using Insolvia.Domain.CaseEntities;
+using Insolvia.Domain.Clients;
+using Insolvia.Domain.Debtors;
+using Insolvia.Domain.Questionnaires;
 
-namespace Insolvia.Core.Questions;
+namespace Insolvia.Domain.Questions;
 
 // The portal questionnaire's QUESTIONS and the answers a client gives (ADR
 // 0023 PR 4; from questions.py). An answer is a CANDIDATE — the client

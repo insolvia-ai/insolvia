@@ -1,6 +1,6 @@
-using Insolvia.Core.Filings;
+using Insolvia.Domain.Filings;
 
-namespace Insolvia.Core.Ports;
+namespace Insolvia.Domain.Ports;
 
 /// <summary>
 /// Persists the attorney's per-filing approvals (Python's

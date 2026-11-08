@@ -3,7 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 
-namespace Insolvia.Forms.Tests.Specs;
+namespace Insolvia.Domain.Forms.Tests.Specs;
 
 /// <summary>
 /// forms/scripts/check.py, ported (#585): validates one forms/specs/*.json

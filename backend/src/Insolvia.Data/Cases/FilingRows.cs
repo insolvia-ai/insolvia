@@ -1,6 +1,6 @@
 using System.Text.Json;
-using Insolvia.Core.Filings;
 using Insolvia.Data.Storage;
+using Insolvia.Domain.Filings;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 

@@ -1,9 +1,9 @@
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
-using Insolvia.Core.Fields;
-using Insolvia.Core.Ports;
+using Insolvia.Domain.Fields;
+using Insolvia.Domain.Ports;
 
-namespace Insolvia.Core.Firms;
+namespace Insolvia.Domain.Firms;
 
 /// <summary>
 /// The firm domain's request parsers (from <c>firms.py</c>). Wire field names

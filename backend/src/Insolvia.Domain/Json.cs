@@ -1,7 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
-namespace Insolvia.Core;
+namespace Insolvia.Domain;
 
 /// <summary>
 /// Python's <c>isinstance</c> checks, over a parsed JSON body. The domain's

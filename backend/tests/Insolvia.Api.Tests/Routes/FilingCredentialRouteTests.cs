@@ -1,12 +1,12 @@
 using System.Text.Json.Nodes;
 using Insolvia.Api.Tests.Support;
-using Insolvia.Aws.Sealing;
-using Insolvia.Core.AccessLog;
-using Insolvia.Core.FilingAuthorizations;
-using Insolvia.Core.FilingCredentials;
-using Insolvia.Core.Firms;
-using Insolvia.Core.Memory;
-using Insolvia.Core.Ports;
+using Insolvia.Domain.AccessLog;
+using Insolvia.Domain.FilingAuthorizations;
+using Insolvia.Domain.FilingCredentials;
+using Insolvia.Domain.Firms;
+using Insolvia.Domain.Memory;
+using Insolvia.Domain.Ports;
+using Insolvia.Platform.Sealing;
 
 namespace Insolvia.Api.Tests.Routes;
 

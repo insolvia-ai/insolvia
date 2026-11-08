@@ -1,8 +1,8 @@
 using System.Text.Json.Nodes;
-using Insolvia.Core.CaseEntities;
-using Insolvia.Core.Fields;
+using Insolvia.Domain.CaseEntities;
+using Insolvia.Domain.Fields;
 
-namespace Insolvia.Core.Codebtors;
+namespace Insolvia.Domain.Codebtors;
 
 /// <summary>
 /// A 106H codebtor row (from <c>codebtors.py</c>). The form asks WHICH debt

@@ -1,11 +1,11 @@
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
-using Insolvia.Core.AccessLog;
-using Insolvia.Core.Debtors;
-using Insolvia.Core.Fields;
-using Insolvia.Core.Ports;
+using Insolvia.Domain.AccessLog;
+using Insolvia.Domain.Debtors;
+using Insolvia.Domain.Fields;
+using Insolvia.Domain.Ports;
 
-namespace Insolvia.Core.TaxIds;
+namespace Insolvia.Domain.TaxIds;
 
 // The debtor's tax identifier (issue 13.12 / #382; from tax_ids.py) — the
 // DOMAIN half: what is stored, the shape rules, the write and the logged

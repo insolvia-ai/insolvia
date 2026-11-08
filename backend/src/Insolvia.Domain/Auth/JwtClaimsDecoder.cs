@@ -4,7 +4,7 @@ using System.Text.Json.Nodes;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 
-namespace Insolvia.Core.Auth;
+namespace Insolvia.Domain.Auth;
 
 /// <summary>What PyJWT's <c>decode</c> raised, as the categories the profiles map.</summary>
 internal enum JwtFailure

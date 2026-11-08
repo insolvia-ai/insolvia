@@ -1,8 +1,8 @@
-using Insolvia.Engines.Liens;
-using Insolvia.Engines.Projections;
-using Insolvia.Engines.Projections.Forms;
+using Insolvia.Domain.Engines.Liens;
+using Insolvia.Domain.Engines.Projections;
+using Insolvia.Domain.Engines.Projections.Forms;
 
-namespace Insolvia.Forms;
+namespace Insolvia.Domain.Forms;
 
 /// <summary>
 /// The money, as decimals (from <c>case_summary.CaseTotals</c>). Every

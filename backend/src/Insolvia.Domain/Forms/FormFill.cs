@@ -1,12 +1,12 @@
 using System.Text;
-using Insolvia.Engines;
-using Insolvia.Engines.Projections;
-using Insolvia.Forms.Pdf;
+using Insolvia.Domain.Engines;
+using Insolvia.Domain.Engines.Projections;
+using Insolvia.Domain.Forms.Pdf;
 using PdfSharp.Pdf;
 using PdfSharp.Pdf.IO;
-using static Insolvia.Forms.Pdf.PdfObjects;
+using static Insolvia.Domain.Forms.Pdf.PdfObjects;
 
-namespace Insolvia.Forms;
+namespace Insolvia.Domain.Forms;
 
 /// <summary>
 /// The deterministic fill engine (from <c>core/form_fill.py</c>): a release
@@ -20,7 +20,7 @@ namespace Insolvia.Forms;
 /// decision. The engine's refusals are structural: an unknown field id, an
 /// export state the PDF does not declare, a district not in the dropdown, a
 /// value longer than the box's own character cap, and — new with this port —
-/// text the form's own font cannot encode (Insolvia.Forms' README, quirk 3).
+/// text the form's own font cannot encode (Insolvia.Domain.Forms' README, quirk 3).
 /// </remarks>
 public static class FormFill
 {
@@ -199,7 +199,7 @@ public static class FormFill
 
     private static void ValidateOne(FieldSpec spec, Widget widget, FieldFill fill, List<string> problems)
     {
-        var where = $"{spec.Id} -> {Engines.Exact.Repr(widget.Name)}";
+        var where = $"{spec.Id} -> {Insolvia.Domain.Engines.Exact.Repr(widget.Name)}";
         switch (fill)
         {
             case TextFill text when !TextTypes.Contains(spec.Type):
@@ -218,7 +218,7 @@ public static class FormFill
                 problems.Add($"{where}: Option on a {spec.Type} field");
                 break;
             case OptionFill option when !widget.States.Contains(option.Export):
-                problems.Add($"{where}: export {Engines.Exact.Repr(option.Export)} is not one of the PDF's states {ReprList(widget.States.Order(StringComparer.Ordinal))}");
+                problems.Add($"{where}: export {Insolvia.Domain.Engines.Exact.Repr(option.Export)} is not one of the PDF's states {ReprList(widget.States.Order(StringComparer.Ordinal))}");
                 break;
             case WidgetStatesFill states:
                 if (spec.Type is not ("radio" or "checkbox"))
@@ -231,7 +231,7 @@ public static class FormFill
                     {
                         if (!widget.States.Contains(state))
                         {
-                            problems.Add($"{where}: state {Engines.Exact.Repr(state)} is not one of the PDF's states {ReprList(widget.States.Order(StringComparer.Ordinal))}");
+                            problems.Add($"{where}: state {Insolvia.Domain.Engines.Exact.Repr(state)} is not one of the PDF's states {ReprList(widget.States.Order(StringComparer.Ordinal))}");
                         }
                     }
                 }
@@ -262,18 +262,18 @@ public static class FormFill
 
         if (widget.MaxLen is { } maxLen && Pdf.CodePoints.Length(fill.Value) > maxLen)
         {
-            problems.Add($"{where}: {Engines.Exact.Repr(fill.Value)} is longer than the PDF's {maxLen}-character box — it would be truncated");
+            problems.Add($"{where}: {Insolvia.Domain.Engines.Exact.Repr(fill.Value)} is longer than the PDF's {maxLen}-character box — it would be truncated");
         }
 
         if (widget.Kind == "choice" && !widget.ChoiceOptions.Contains(fill.Value))
         {
-            problems.Add($"{where}: {Engines.Exact.Repr(fill.Value)} is not an option of the {Engines.Exact.Repr(widget.Name)} dropdown");
+            problems.Add($"{where}: {Insolvia.Domain.Engines.Exact.Repr(fill.Value)} is not an option of the {Insolvia.Domain.Engines.Exact.Repr(widget.Name)} dropdown");
         }
     }
 
     private static void ValidateBox(FieldSpec spec, OverlayBox box, FieldFill fill, List<string> problems)
     {
-        var where = $"{spec.Id} -> {Engines.Exact.Repr(box.Name)}";
+        var where = $"{spec.Id} -> {Insolvia.Domain.Engines.Exact.Repr(box.Name)}";
         switch (fill)
         {
             case TextFill when !TextTypes.Contains(spec.Type):
@@ -308,14 +308,14 @@ public static class FormFill
 
         if (!CanEncodeCp1252(fill.Value))
         {
-            problems.Add($"{where}: {Engines.Exact.Repr(fill.Value)} has a character Helvetica cannot draw");
+            problems.Add($"{where}: {Insolvia.Domain.Engines.Exact.Repr(fill.Value)} has a character Helvetica cannot draw");
             return;
         }
 
         var width = HelveticaWidth(fill.Value, box.Size ?? OverlayFontSize);
         if (width > box.W + 0.01)
         {
-            problems.Add($"{where}: {Engines.Exact.Repr(fill.Value)} is {FormatWhole(width)} points wide; the printed space is {FormatWhole(box.W)}");
+            problems.Add($"{where}: {Insolvia.Domain.Engines.Exact.Repr(fill.Value)} is {FormatWhole(width)} points wide; the printed space is {FormatWhole(box.W)}");
         }
     }
 
@@ -336,7 +336,7 @@ public static class FormFill
     }
 
     /// <summary>Python's <c>repr(list_of_str)</c>.</summary>
-    internal static string ReprList(IEnumerable<string> items) => "[" + string.Join(", ", items.Select(Engines.Exact.Repr)) + "]";
+    internal static string ReprList(IEnumerable<string> items) => "[" + string.Join(", ", items.Select(Insolvia.Domain.Engines.Exact.Repr)) + "]";
 
     // --- the AcroForm write ------------------------------------------------------
 
@@ -382,11 +382,11 @@ public static class FormFill
             }
             catch (UnencodableTextException error)
             {
-                problems.Add($"{fieldId} -> {Engines.Exact.Repr(name)}: {Engines.Exact.Repr(value)} has a character the form's {error.FontName} font cannot draw ({Engines.Exact.Repr(error.Characters)})");
+                problems.Add($"{fieldId} -> {Insolvia.Domain.Engines.Exact.Repr(name)}: {Insolvia.Domain.Engines.Exact.Repr(value)} has a character the form's {error.FontName} font cannot draw ({Insolvia.Domain.Engines.Exact.Repr(error.Characters)})");
             }
             catch (FontNotSupportedException error)
             {
-                problems.Add($"{fieldId} -> {Engines.Exact.Repr(name)}: {error.Message}");
+                problems.Add($"{fieldId} -> {Insolvia.Domain.Engines.Exact.Repr(name)}: {error.Message}");
             }
         }
 
@@ -408,7 +408,7 @@ public static class FormFill
         {
             // pypdf writes a button parent's /V as a TEXT string "(/On)";
             // the spec (12.7.4.2) says a name. Corrected here on purpose —
-            // Insolvia.Forms' README, quirk 1.
+            // Insolvia.Domain.Forms' README, quirk 1.
             field.Elements["/V"] = new PdfName(value);
             var normal = Dict(Dict(widget.Elements["/AP"])?.Elements["/N"])
                 ?? throw new InvalidOperationException("button without /AP /N");

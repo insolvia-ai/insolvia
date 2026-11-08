@@ -1,8 +1,8 @@
 using System.Globalization;
 using System.Text.Json.Nodes;
-using static Insolvia.Engines.Regulatory.ReleaseParsing;
+using static Insolvia.Domain.Engines.Regulatory.ReleaseParsing;
 
-namespace Insolvia.Engines.Regulatory;
+namespace Insolvia.Domain.Engines.Regulatory;
 
 /// <summary>
 /// One named statutory figure — what a form floor or a means-test threshold
@@ -103,7 +103,7 @@ public static class DollarAmounts
             throw Fail(where, "a statutory dollar amount may never be unverified");
         }
 
-        var notes = Notes(raw, where);
+        var notes = ReleaseParsing.Notes(raw, where);
         return new DollarAmount(
             AmountId: amountId,
             Citation: StrField(raw, "citation", where),

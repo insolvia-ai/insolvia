@@ -1,5 +1,5 @@
 using Insolvia.Api.Tests.Support;
-using Insolvia.Core.Firms;
+using Insolvia.Domain.Firms;
 
 namespace Insolvia.Api.Tests.Routes;
 

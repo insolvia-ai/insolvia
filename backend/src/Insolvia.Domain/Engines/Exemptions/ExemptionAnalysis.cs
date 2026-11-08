@@ -1,17 +1,16 @@
 using System.Text.Json.Nodes;
-using Insolvia.Core;
-using Insolvia.Core.Assets;
-using Insolvia.Core.Cases;
-using Insolvia.Core.Claims;
-using Insolvia.Core.Debtors;
-using Insolvia.Core.Exemptions;
-using Insolvia.Core.Petitions;
-using Insolvia.Core.Sofa;
-using Insolvia.Engines.Liens;
-using Insolvia.Engines.Projections;
-using Insolvia.Engines.Regulatory;
+using Insolvia.Domain.Assets;
+using Insolvia.Domain.Cases;
+using Insolvia.Domain.Claims;
+using Insolvia.Domain.Debtors;
+using Insolvia.Domain.Engines.Liens;
+using Insolvia.Domain.Engines.Projections;
+using Insolvia.Domain.Engines.Regulatory;
+using Insolvia.Domain.Exemptions;
+using Insolvia.Domain.Petitions;
+using Insolvia.Domain.Sofa;
 
-namespace Insolvia.Engines.Exemptions;
+namespace Insolvia.Domain.Engines.Exemptions;
 
 // The Schedule C workbench's arithmetic (from core/exemption_analysis.py,
 // issue #346): which exemptions the case may claim, what it has claimed

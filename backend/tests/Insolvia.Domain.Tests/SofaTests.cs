@@ -1,8 +1,8 @@
 using System.Text.Json.Nodes;
-using Insolvia.Core.CaseEntities;
-using Insolvia.Core.Sofa;
+using Insolvia.Domain.CaseEntities;
+using Insolvia.Domain.Sofa;
 
-namespace Insolvia.Core.Tests;
+namespace Insolvia.Domain.Tests;
 
 /// <summary>The Statement of Financial Affairs, translated from test_sofa.py.</summary>
 public sealed class SofaTests

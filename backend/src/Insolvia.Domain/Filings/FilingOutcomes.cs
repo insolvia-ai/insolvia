@@ -1,11 +1,11 @@
 using System.Globalization;
 using System.Text.Json.Nodes;
-using Insolvia.Core.AccessLog;
-using Insolvia.Core.Cases;
-using Insolvia.Core.Documents;
-using Insolvia.Core.Ports;
+using Insolvia.Domain.AccessLog;
+using Insolvia.Domain.Cases;
+using Insolvia.Domain.Documents;
+using Insolvia.Domain.Ports;
 
-namespace Insolvia.Core.Filings;
+namespace Insolvia.Domain.Filings;
 
 /// <summary>A parsed resolution body.</summary>
 /// <param name="Outcome">What the docket shows.</param>

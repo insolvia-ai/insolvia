@@ -1,11 +1,11 @@
-using Insolvia.Core.DocumentRequests;
-using Insolvia.Core.FirmClients;
-using Insolvia.Core.Firms;
-using Insolvia.Core.LibraryCreditors;
-using Insolvia.Core.Ports;
-using Insolvia.Core.Questionnaires;
+using Insolvia.Domain.DocumentRequests;
+using Insolvia.Domain.FirmClients;
+using Insolvia.Domain.Firms;
+using Insolvia.Domain.LibraryCreditors;
+using Insolvia.Domain.Ports;
+using Insolvia.Domain.Questionnaires;
 
-namespace Insolvia.Core.Memory;
+namespace Insolvia.Domain.Memory;
 
 /// <summary>
 /// The in-memory <see cref="IFirmStore"/> — for tests and a local server, and

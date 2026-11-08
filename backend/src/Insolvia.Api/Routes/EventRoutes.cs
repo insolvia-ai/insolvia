@@ -6,12 +6,12 @@ using Insolvia.Api.Calendar;
 using Insolvia.Api.Cases;
 using Insolvia.Api.Hosting;
 using Insolvia.Api.Http;
-using Insolvia.Core;
-using Insolvia.Core.Access;
-using Insolvia.Core.AccessLog;
-using Insolvia.Core.Events;
-using Insolvia.Core.Firms;
-using Insolvia.Core.Ports;
+using Insolvia.Domain;
+using Insolvia.Domain.Access;
+using Insolvia.Domain.AccessLog;
+using Insolvia.Domain.Events;
+using Insolvia.Domain.Firms;
+using Insolvia.Domain.Ports;
 
 namespace Insolvia.Api.Routes;
 

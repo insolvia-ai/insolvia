@@ -3,14 +3,14 @@ using Insolvia.Api.Auth;
 using Insolvia.Api.Cases;
 using Insolvia.Api.Hosting;
 using Insolvia.Api.Http;
-using Insolvia.Core;
-using Insolvia.Core.AccessLog;
-using Insolvia.Core.CaseEntities;
-using Insolvia.Core.Cases;
-using Insolvia.Core.Firms;
-using Insolvia.Core.Notes;
-using Insolvia.Core.Ports;
-using Insolvia.Core.Provenance;
+using Insolvia.Domain;
+using Insolvia.Domain.AccessLog;
+using Insolvia.Domain.CaseEntities;
+using Insolvia.Domain.Cases;
+using Insolvia.Domain.Firms;
+using Insolvia.Domain.Notes;
+using Insolvia.Domain.Ports;
+using Insolvia.Domain.Provenance;
 
 namespace Insolvia.Api.Routes;
 

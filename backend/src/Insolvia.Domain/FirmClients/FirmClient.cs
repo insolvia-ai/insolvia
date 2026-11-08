@@ -1,8 +1,8 @@
 using System.Text.Json.Serialization;
-using Insolvia.Core.Debtors;
-using Insolvia.Core.Fields;
+using Insolvia.Domain.Debtors;
+using Insolvia.Domain.Fields;
 
-namespace Insolvia.Core.FirmClients;
+namespace Insolvia.Domain.FirmClients;
 
 /// <summary>A directory entry's status. Archiving is its own act, never a side effect of an edit.</summary>
 public enum FirmClientStatus

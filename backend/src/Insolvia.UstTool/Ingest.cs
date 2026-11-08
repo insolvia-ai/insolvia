@@ -2,8 +2,8 @@ using System.Globalization;
 using System.Security.Cryptography;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
-using Insolvia.Engines;
-using Insolvia.Engines.Regulatory;
+using Insolvia.Domain.Engines;
+using Insolvia.Domain.Engines.Regulatory;
 
 namespace Insolvia.UstTool;
 

@@ -1,11 +1,11 @@
 using System.Text;
 using System.Text.Json.Nodes;
-using Insolvia.Forms.Pdf;
+using Insolvia.Domain.Forms.Pdf;
 using PdfSharp.Pdf;
 using PdfSharp.Pdf.IO;
-using static Insolvia.Forms.Pdf.PdfObjects;
+using static Insolvia.Domain.Forms.Pdf.PdfObjects;
 
-namespace Insolvia.Forms.Tests;
+namespace Insolvia.Domain.Forms.Tests;
 
 // The appearance generator against pypdf on what no court form exercises:
 // Fixtures/edge.pdf (written by Parity/edge_fixture.py) carries list boxes,

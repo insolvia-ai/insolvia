@@ -1,11 +1,11 @@
-using Insolvia.Core.MeansTest;
-using Insolvia.Core.Plans;
-using Insolvia.Engines.Projections;
-using Insolvia.Engines.Projections.Forms;
-using Insolvia.Engines.Tests.Support;
-using static Insolvia.Engines.Tests.Support.Projected;
+using Insolvia.Domain.Engines.Projections;
+using Insolvia.Domain.Engines.Projections.Forms;
+using Insolvia.Domain.Engines.Tests.Support;
+using Insolvia.Domain.MeansTest;
+using Insolvia.Domain.Plans;
+using static Insolvia.Domain.Engines.Tests.Support.Projected;
 
-namespace Insolvia.Engines.Tests;
+namespace Insolvia.Domain.Engines.Tests;
 
 // Translated from services/api/tests/unit/test_form_projections.py — the
 // means-test forms (B122A-1/A-2, B122C-1/C-2) and B113, the Chapter 13 plan,

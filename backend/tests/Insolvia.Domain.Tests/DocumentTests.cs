@@ -1,7 +1,7 @@
 using System.Text.Json.Nodes;
-using Insolvia.Core.Documents;
+using Insolvia.Domain.Documents;
 
-namespace Insolvia.Core.Tests;
+namespace Insolvia.Domain.Tests;
 
 /// <summary>Document metadata, translated from test_documents.py.</summary>
 public sealed class DocumentTests

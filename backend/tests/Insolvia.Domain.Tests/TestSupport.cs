@@ -1,7 +1,7 @@
 using System.Text.Json.Nodes;
-using Insolvia.Core.Ports;
+using Insolvia.Domain.Ports;
 
-namespace Insolvia.Core.Tests;
+namespace Insolvia.Domain.Tests;
 
 /// <summary>Helpers shared by the translated suites. Every identifier is obviously fake: this repo is public.</summary>
 internal static class Ids

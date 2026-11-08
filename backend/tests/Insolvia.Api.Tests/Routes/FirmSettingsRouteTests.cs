@@ -1,8 +1,8 @@
 using System.Text.Json.Nodes;
 using Insolvia.Api.Tests.Support;
-using Insolvia.Core.DocumentRequests;
-using Insolvia.Core.Firms;
-using Insolvia.Core.Questionnaires;
+using Insolvia.Domain.DocumentRequests;
+using Insolvia.Domain.Firms;
+using Insolvia.Domain.Questionnaires;
 
 namespace Insolvia.Api.Tests.Routes;
 

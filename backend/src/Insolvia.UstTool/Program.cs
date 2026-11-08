@@ -22,7 +22,7 @@ using Insolvia.UstTool;
 // of justice.gov: re-ingest a recording, or work offline.
 //
 // After an ingest, edit the manifest's `notes` if anything about the source
-// was odd, then run `dotnet test tests/Insolvia.Engines.Tests` in backend/ —
+// was odd, then run `dotnet test tests/Insolvia.Domain.Engines.Tests` in backend/ —
 // UstDataTests validates every committed release, and `Backend (.NET)` fails
 // the PR on a malformed one. (The tool has already loaded it through the
 // engine before writing it.)

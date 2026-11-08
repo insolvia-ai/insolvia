@@ -1,8 +1,8 @@
 using System.Text.Json.Nodes;
-using Insolvia.Core.Fields;
-using Insolvia.Core.Provenance;
+using Insolvia.Domain.Fields;
+using Insolvia.Domain.Provenance;
 
-namespace Insolvia.Core.CaseEntities;
+namespace Insolvia.Domain.CaseEntities;
 
 /// <summary>
 /// A list of rows with client-chosen addressable ids, unique per list — the

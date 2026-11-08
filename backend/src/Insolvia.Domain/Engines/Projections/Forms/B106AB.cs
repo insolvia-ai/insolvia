@@ -1,8 +1,7 @@
-using Insolvia.Core;
-using Insolvia.Core.Assets;
-using static Insolvia.Engines.Projections.ProjectionHelpers;
+using Insolvia.Domain.Assets;
+using static Insolvia.Domain.Engines.Projections.ProjectionHelpers;
 
-namespace Insolvia.Engines.Projections.Forms;
+namespace Insolvia.Domain.Engines.Projections.Forms;
 
 /// <summary>
 /// B106A/B @ 2015-12-01 (revision 12/15) — Schedule A/B's mapping (from

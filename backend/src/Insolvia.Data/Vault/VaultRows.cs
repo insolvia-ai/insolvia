@@ -1,7 +1,7 @@
-using Insolvia.Core.FilingAuthorizations;
-using Insolvia.Core.FilingCredentials;
 using Insolvia.Data.Firms;
 using Insolvia.Data.Storage;
+using Insolvia.Domain.FilingAuthorizations;
+using Insolvia.Domain.FilingCredentials;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 

@@ -2,8 +2,8 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using Insolvia.Core.Jobs;
-using Insolvia.Core.Ports;
+using Insolvia.Domain.Jobs;
+using Insolvia.Domain.Ports;
 using Insolvia.Worker.Anthropic;
 using Insolvia.Worker.Workers;
 

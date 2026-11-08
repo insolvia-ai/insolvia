@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!-- The pure assembly's tests (ADR 0030), one folder per part of it:
-       - the root: Insolvia.Core, translated from packages/insolvia_core/tests/unit;
+       - the root: Insolvia.Domain, translated from packages/insolvia_core/tests/unit;
        - Engines/: the engines' unit suites, and the parity tests against the
          Python oracle's output (Parity/*.expected.json, captured before 18.23);
        - Forms/: the PDF engine's suites and the .NET goldens; Forms/Specs is

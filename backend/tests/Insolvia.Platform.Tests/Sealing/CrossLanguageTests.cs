@@ -1,8 +1,8 @@
 using System.Text;
 using Amazon.KeyManagementService.Model;
-using Insolvia.Aws.Sealing;
+using Insolvia.Platform.Sealing;
 
-namespace Insolvia.Aws.Tests.Sealing;
+namespace Insolvia.Platform.Tests.Sealing;
 
 /// <summary>
 /// THE CROSS-LANGUAGE PROOF (plan 18.12: "an envelope sealed by Python opens

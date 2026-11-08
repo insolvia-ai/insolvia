@@ -11,7 +11,7 @@
 #   --db          also read /insolvia/<env>/db/{endpoint,port,database-name}
 #                 as INSOLVIA_DB_ENDPOINT / _PORT / _DATABASE_NAME — the
 #                 database contract modules/aurora's parameters publish, in
-#                 the names backend/src/Insolvia.Infrastructure/Data/Connections/
+#                 the names backend/src/Insolvia.Data/Connections/
 #                 DatabaseSettings.cs reads (this is where the infra's
 #                 /db/<kebab> naming and the backend's INSOLVIA_DB_* meet)
 #   --db-master   also INSOLVIA_DB_MASTER_SECRET_ARN (the migrator only — an

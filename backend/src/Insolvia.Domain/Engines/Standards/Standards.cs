@@ -1,8 +1,8 @@
-using Insolvia.Core.Debtors;
-using Insolvia.Core.Expenses;
-using Insolvia.Engines.Regulatory;
+using Insolvia.Domain.Debtors;
+using Insolvia.Domain.Engines.Regulatory;
+using Insolvia.Domain.Expenses;
 
-namespace Insolvia.Engines.Standards;
+namespace Insolvia.Domain.Engines.Standards;
 
 /// <summary>Where to look the standards up, and how many people they cover.</summary>
 public sealed record HouseholdJurisdiction(string State, string County, int HouseholdSize, string Source);

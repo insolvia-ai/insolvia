@@ -1,9 +1,9 @@
 using System.Net;
 using System.Text.Json.Nodes;
-using Insolvia.Aws.Mailer;
-using Insolvia.Aws.Signing;
+using Insolvia.Platform.Mailer;
+using Insolvia.Platform.Signing;
 
-namespace Insolvia.Aws.Tests;
+namespace Insolvia.Platform.Tests;
 
 /// <summary>
 /// test_mailer_client.py's SigV4 half: the URL, the signature, the contract

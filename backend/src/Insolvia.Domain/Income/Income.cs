@@ -1,9 +1,9 @@
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
-using Insolvia.Core.CaseEntities;
-using Insolvia.Core.Fields;
+using Insolvia.Domain.CaseEntities;
+using Insolvia.Domain.Fields;
 
-namespace Insolvia.Core.Income;
+namespace Insolvia.Domain.Income;
 
 // From income.py: 106I's employment and income summary, and the dated income
 // history behind the means test (§ 101(10A)) — per-paycheck records and dated

@@ -1,11 +1,11 @@
-using Insolvia.Core.Debtors;
-using Insolvia.Core.Fields;
-using Insolvia.Core.Income;
-using Insolvia.Core.MeansTest;
-using Insolvia.Engines.MeansTest;
-using Insolvia.Engines.Tests.Support;
+using Insolvia.Domain.Debtors;
+using Insolvia.Domain.Engines.MeansTest;
+using Insolvia.Domain.Engines.Tests.Support;
+using Insolvia.Domain.Fields;
+using Insolvia.Domain.Income;
+using Insolvia.Domain.MeansTest;
 
-namespace Insolvia.Engines.Tests;
+namespace Insolvia.Domain.Engines.Tests;
 
 // Translated from services/api/tests/unit/test_cmi.py: known-answer checks
 // for the § 101(10A) CMI derivation — arithmetic a reviewer can redo on paper.

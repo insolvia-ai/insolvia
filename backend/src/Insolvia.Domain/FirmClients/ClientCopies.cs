@@ -1,11 +1,11 @@
 using System.Text.Json.Nodes;
-using Insolvia.Core.CaseEntities;
-using Insolvia.Core.Cases;
-using Insolvia.Core.Debtors;
-using Insolvia.Core.Fields;
-using Insolvia.Core.Provenance;
+using Insolvia.Domain.CaseEntities;
+using Insolvia.Domain.Cases;
+using Insolvia.Domain.Debtors;
+using Insolvia.Domain.Fields;
+using Insolvia.Domain.Provenance;
 
-namespace Insolvia.Core.FirmClients;
+namespace Insolvia.Domain.FirmClients;
 
 /// <summary>
 /// The copy of a client's identity onto a case, and back (ADR 0022; the four

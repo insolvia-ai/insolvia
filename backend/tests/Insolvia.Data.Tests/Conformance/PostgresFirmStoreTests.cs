@@ -1,7 +1,7 @@
-using Insolvia.Core;
-using Insolvia.Core.FirmClients;
-using Insolvia.Core.Firms;
 using Insolvia.Data.Firms;
+using Insolvia.Domain;
+using Insolvia.Domain.FirmClients;
+using Insolvia.Domain.Firms;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 

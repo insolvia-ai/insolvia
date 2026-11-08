@@ -1,9 +1,9 @@
 using System.Security.Cryptography;
 using Amazon.KeyManagementService;
 using Amazon.KeyManagementService.Model;
-using Insolvia.Core.TaxIds;
+using Insolvia.Domain.TaxIds;
 
-namespace Insolvia.Aws.Sealing;
+namespace Insolvia.Platform.Sealing;
 
 /// <summary>
 /// The two KMS verbs every sealed value goes through, as the Python adapters

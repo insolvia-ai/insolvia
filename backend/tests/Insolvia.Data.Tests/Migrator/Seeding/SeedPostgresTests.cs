@@ -1,5 +1,5 @@
-using Insolvia.Core.Local;
 using Insolvia.Data.Tests;
+using Insolvia.Domain.Local;
 using Insolvia.Migrator.Seeding;
 using Npgsql;
 

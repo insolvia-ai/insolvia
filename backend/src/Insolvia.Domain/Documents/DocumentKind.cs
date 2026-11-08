@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace Insolvia.Core.Documents;
+namespace Insolvia.Domain.Documents;
 
 /// <summary>
 /// What a document is (Python's <c>documents.KINDS</c>). Here first because a

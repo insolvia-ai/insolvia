@@ -1,6 +1,6 @@
-using Insolvia.Core.Clients;
+using Insolvia.Domain.Clients;
 
-namespace Insolvia.Core.Ports;
+namespace Insolvia.Domain.Ports;
 
 /// <summary>
 /// Which case a client-portal subject may reach (ADR 0023). Three kinds of

@@ -1,6 +1,6 @@
-using Insolvia.Core.CaseEntities;
+using Insolvia.Domain.CaseEntities;
 
-namespace Insolvia.Core.Ports;
+namespace Insolvia.Domain.Ports;
 
 /// <summary>
 /// Persists the generic case collections (issue #249; Python's

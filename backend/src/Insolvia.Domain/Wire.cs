@@ -2,7 +2,7 @@ using System.Collections.Frozen;
 using System.Reflection;
 using System.Text.Json.Serialization;
 
-namespace Insolvia.Core;
+namespace Insolvia.Domain;
 
 /// <summary>
 /// The wire string of every domain enum. The contract spells these as string

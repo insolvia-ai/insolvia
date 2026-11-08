@@ -1,9 +1,8 @@
-using Insolvia.Core;
-using Insolvia.Core.Assets;
-using Insolvia.Core.Claims;
-using Insolvia.Engines.Projections;
+using Insolvia.Domain.Assets;
+using Insolvia.Domain.Claims;
+using Insolvia.Domain.Engines.Projections;
 
-namespace Insolvia.Engines.Tests.Support;
+namespace Insolvia.Domain.Engines.Tests.Support;
 
 /// <summary>The helpers the translated test_form_projections.py cases share.</summary>
 internal static class Projected

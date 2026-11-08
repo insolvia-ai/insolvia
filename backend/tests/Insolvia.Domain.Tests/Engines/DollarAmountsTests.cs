@@ -1,7 +1,7 @@
 using System.Text.Json.Nodes;
-using Insolvia.Engines.Regulatory;
+using Insolvia.Domain.Engines.Regulatory;
 
-namespace Insolvia.Engines.Tests;
+namespace Insolvia.Domain.Engines.Tests;
 
 // Translated from services/api/tests/unit/test_dollar_amounts.py: the loader
 // against malformed releases (built as an in-memory tree, the tmp_path of the

@@ -1,8 +1,8 @@
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
-using Insolvia.Core.Documents;
+using Insolvia.Domain.Documents;
 
-namespace Insolvia.Core.DocumentRequests;
+namespace Insolvia.Domain.DocumentRequests;
 
 /// <summary>
 /// One document asked of a case's client (ADR 0023 PR 5 / #364; the CASE half

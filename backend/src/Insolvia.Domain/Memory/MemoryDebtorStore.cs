@@ -1,7 +1,7 @@
-using Insolvia.Core.Debtors;
-using Insolvia.Core.Ports;
+using Insolvia.Domain.Debtors;
+using Insolvia.Domain.Ports;
 
-namespace Insolvia.Core.Memory;
+namespace Insolvia.Domain.Memory;
 
 /// <summary>
 /// The in-memory <see cref="IDebtorStore"/> (Python's <c>MemoryDebtorStore</c>),

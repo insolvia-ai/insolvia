@@ -1,9 +1,9 @@
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
-using Insolvia.Core.CaseEntities;
-using Insolvia.Core.Fields;
+using Insolvia.Domain.CaseEntities;
+using Insolvia.Domain.Fields;
 
-namespace Insolvia.Core.Expenses;
+namespace Insolvia.Domain.Expenses;
 
 /// <summary>106J's household header — one per household (from <c>expenses.py</c>).</summary>
 public sealed record HouseholdBody(

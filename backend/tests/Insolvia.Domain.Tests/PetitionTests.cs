@@ -1,6 +1,6 @@
-using Insolvia.Core.Petitions;
+using Insolvia.Domain.Petitions;
 
-namespace Insolvia.Core.Tests;
+namespace Insolvia.Domain.Tests;
 
 /// <summary>B101's entities, translated from test_petitions.py.</summary>
 public sealed class PetitionTests

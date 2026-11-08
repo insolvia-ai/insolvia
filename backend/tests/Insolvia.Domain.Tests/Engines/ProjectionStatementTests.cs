@@ -1,13 +1,13 @@
-using Insolvia.Core.Codebtors;
-using Insolvia.Core.Expenses;
-using Insolvia.Core.Fields;
-using Insolvia.Core.Petitions;
-using Insolvia.Core.Sofa;
-using Insolvia.Engines.Projections;
-using Insolvia.Engines.Tests.Support;
-using static Insolvia.Engines.Tests.Support.Projected;
+using Insolvia.Domain.Codebtors;
+using Insolvia.Domain.Engines.Projections;
+using Insolvia.Domain.Engines.Tests.Support;
+using Insolvia.Domain.Expenses;
+using Insolvia.Domain.Fields;
+using Insolvia.Domain.Petitions;
+using Insolvia.Domain.Sofa;
+using static Insolvia.Domain.Engines.Tests.Support.Projected;
 
-namespace Insolvia.Engines.Tests;
+namespace Insolvia.Domain.Engines.Tests;
 
 // Translated from services/api/tests/unit/test_form_projections.py — B121,
 // B2010, B2030, Schedules H, J, J-2, the summary, the declaration and B107,

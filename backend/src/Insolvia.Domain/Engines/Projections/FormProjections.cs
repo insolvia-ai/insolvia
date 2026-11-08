@@ -1,6 +1,6 @@
-using Insolvia.Engines.Projections.Forms;
+using Insolvia.Domain.Engines.Projections.Forms;
 
-namespace Insolvia.Engines.Projections;
+namespace Insolvia.Domain.Engines.Projections;
 
 /// <summary>
 /// The projection registry (from <c>form_projections/__init__.py</c>): case

@@ -1,9 +1,9 @@
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
-using Insolvia.Core.CaseEntities;
-using Insolvia.Core.Fields;
+using Insolvia.Domain.CaseEntities;
+using Insolvia.Domain.Fields;
 
-namespace Insolvia.Core.Sofa;
+namespace Insolvia.Domain.Sofa;
 
 // From sofa.py: the Statement of Financial Affairs (Form 107) — one generic
 // collection, one entry per answered row, typed by `entry_type`, whose

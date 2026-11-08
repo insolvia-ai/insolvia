@@ -46,14 +46,15 @@ description: >-
 
 **First ask whether it should be a project at all.** A backend project exists
 only as a separate deployable or a boundary the compiler must enforce
-([ADR 0030](../../../docs/adr/0030-fewer-backend-projects.md)); a new library
-concern is a folder and a namespace inside `Insolvia.Core` (pure) or
-`Insolvia.Infrastructure` (adapters).
+([ADR 0030](../../../docs/adr/0030-three-backend-layers.md)); a new library
+concern is a folder and a namespace in the layer it belongs to:
+`Insolvia.Domain` (business logic, pure), `Insolvia.Data` (data access) or
+`Insolvia.Platform` (platform services).
 
 A project that passes lives in `backend/` as `src/Insolvia.<Name>/` with a
 test project, both listed in `backend/Insolvia.slnx`, and named in the
 layering rule and its `TestProjectOf` map
-(`tests/Insolvia.Core.Tests/Architecture`) — the test fails until all of that
+(`tests/Insolvia.Domain.Tests/Architecture`) — the test fails until all of that
 is done ([`backend/CLAUDE.md`](../../../backend/CLAUDE.md) owns the rule). Package versions go in `Directory.Packages.props`; commit the
 `packages.lock.json` it generates. A new **host** (a deployable unit) also
 gets its own `backend/Dockerfile` target, a build line in `backend-pr.yml`, a

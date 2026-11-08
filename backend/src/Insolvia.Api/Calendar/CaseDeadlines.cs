@@ -1,9 +1,9 @@
 using Insolvia.Api.Routes;
-using Insolvia.Core;
-using Insolvia.Core.Cases;
-using Insolvia.Core.Events;
-using Insolvia.Core.Ports;
-using Insolvia.Engines.Deadlines;
+using Insolvia.Domain;
+using Insolvia.Domain.Cases;
+using Insolvia.Domain.Engines.Deadlines;
+using Insolvia.Domain.Events;
+using Insolvia.Domain.Ports;
 
 namespace Insolvia.Api.Calendar;
 

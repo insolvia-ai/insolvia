@@ -1,9 +1,8 @@
-using Insolvia.Core;
-using Insolvia.Core.Debtors;
-using Insolvia.Core.Income;
-using Insolvia.Core.MeansTest;
+using Insolvia.Domain.Debtors;
+using Insolvia.Domain.Income;
+using Insolvia.Domain.MeansTest;
 
-namespace Insolvia.Engines.MeansTest;
+namespace Insolvia.Domain.Engines.MeansTest;
 
 // Current Monthly Income under § 101(10A) — the figure the means test keys off
 // (from core/cmi.py, issue #100). Deterministic over the dated income

@@ -1,8 +1,8 @@
-using Insolvia.Core.Filings;
-using Insolvia.Forms.Pdf;
+using Insolvia.Domain.Filings;
+using Insolvia.Domain.Forms.Pdf;
 using PdfSharp.Pdf;
 
-namespace Insolvia.Forms;
+namespace Insolvia.Domain.Forms;
 
 /// <summary>
 /// The one-page "Court filing receipt" the filing worker keeps with the case

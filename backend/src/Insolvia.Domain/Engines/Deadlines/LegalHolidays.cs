@@ -1,8 +1,8 @@
 using System.Text.Json.Nodes;
-using Insolvia.Engines.Regulatory;
-using static Insolvia.Engines.Regulatory.ReleaseParsing;
+using Insolvia.Domain.Engines.Regulatory;
+using static Insolvia.Domain.Engines.Regulatory.ReleaseParsing;
 
-namespace Insolvia.Engines.Deadlines;
+namespace Insolvia.Domain.Engines.Deadlines;
 
 // Legal holidays and Rule 9006(a) day counting (from core/legal_holidays.py,
 // issue 14.6 / #358). The § 6103(a) list is data in the registry
@@ -185,7 +185,7 @@ public static class LegalHolidays
             throw Fail(where, "rule missing");
         }
 
-        if (!Core.Json.TryGetWholeNumber(rule["month"], out var month) || month is < 1 or > 12)
+        if (!Insolvia.Domain.Json.TryGetWholeNumber(rule["month"], out var month) || month is < 1 or > 12)
         {
             throw Fail(where, "rule.month must be 1-12");
         }
@@ -200,7 +200,7 @@ public static class LegalHolidays
                 throw Fail(where, "rule names both a day and a weekday");
             }
 
-            if (!Core.Json.TryGetWholeNumber(day, out var dayNumber) || dayNumber is < 1 or > 31)
+            if (!Insolvia.Domain.Json.TryGetWholeNumber(day, out var dayNumber) || dayNumber is < 1 or > 31)
             {
                 throw Fail(where, "rule.day must be 1-31");
             }
@@ -208,18 +208,18 @@ public static class LegalHolidays
             return new HolidayRule(holidayId, StrField(raw, "name", where), StrField(raw, "citation", where), (int)month, (int)dayNumber, null, null);
         }
 
-        var weekday = Array.IndexOf(WeekdayNames, Core.Json.AsString(weekdayName));
+        var weekday = Array.IndexOf(WeekdayNames, Insolvia.Domain.Json.AsString(weekdayName));
         if (weekday < 0)
         {
             throw Fail(where, "rule.weekday must name a weekday");
         }
 
         int ordinal;
-        if (Core.Json.AsString(ordinalRaw) == "last")
+        if (Insolvia.Domain.Json.AsString(ordinalRaw) == "last")
         {
             ordinal = -1;
         }
-        else if (Core.Json.TryGetWholeNumber(ordinalRaw, out var number) && number is >= 1 and <= 5)
+        else if (Insolvia.Domain.Json.TryGetWholeNumber(ordinalRaw, out var number) && number is >= 1 and <= 5)
         {
             ordinal = (int)number;
         }
@@ -243,7 +243,7 @@ public static class LegalHolidays
             throw Fail(where, "observance needs saturday and sunday");
         }
 
-        if (Core.Json.AsString(saturday["shift"]) != "friday_before" || Core.Json.AsString(sunday["shift"]) != "monday_after")
+        if (Insolvia.Domain.Json.AsString(saturday["shift"]) != "friday_before" || Insolvia.Domain.Json.AsString(sunday["shift"]) != "monday_after")
         {
             throw Fail(where, "unsupported observance shift");
         }

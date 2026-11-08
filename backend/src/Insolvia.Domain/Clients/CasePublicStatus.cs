@@ -1,6 +1,6 @@
-using Insolvia.Core.Cases;
+using Insolvia.Domain.Cases;
 
-namespace Insolvia.Core.Clients;
+namespace Insolvia.Domain.Clients;
 
 /// <summary>
 /// What a CLIENT may read of their case: its chapter and its stage — and

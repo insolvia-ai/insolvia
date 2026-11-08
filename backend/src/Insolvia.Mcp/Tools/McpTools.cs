@@ -1,4 +1,4 @@
-using Insolvia.Core.Candidates;
+using Insolvia.Domain.Candidates;
 
 namespace Insolvia.Mcp.Tools;
 

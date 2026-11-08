@@ -129,7 +129,7 @@ by host (the per-module sections below keep their history):
   `WITH rds_iam` on every run.
 - **The database contract** is `/insolvia/<env>/db/{endpoint,port,database-name,cluster-resource-id,master-secret-arn}`
   (env root). `.github/scripts/lambda-environment.sh` maps it to the
-  `INSOLVIA_DB_*` names `backend/src/Insolvia.Infrastructure/Data` reads — the one place the
+  `INSOLVIA_DB_*` names `backend/src/Insolvia.Data` reads — the one place the
   infra's kebab naming and the backend's variable names meet — and passes the
   master secret's ARN to the migrator alone. `AWS_REGION` is never published:
   Lambda reserves it and sets it itself.
@@ -336,7 +336,7 @@ The tax-id statements are the one place a role touches the key without a
 call that does not carry `purpose = debtor-tax-id` is denied, and a call that
 does can only be the envelope the hosts designed (`TaxIdKeyUse`). Every
 deployed host is told the alias explicitly (`insolvia-kms-case-key-alias`),
-and `backend/src/Insolvia.Infrastructure/Aws/Sealing/SealingKeys.cs` refuses one not shaped
+and `backend/src/Insolvia.Platform/Sealing/SealingKeys.cs` refuses one not shaped
 `alias/insolvia-<env>-cases` — the shape ci-trust's deny matches.
 `infra/envs/dev` needs no grant: the developer's own IAM user reaches the key
 through the key policy's root delegation.

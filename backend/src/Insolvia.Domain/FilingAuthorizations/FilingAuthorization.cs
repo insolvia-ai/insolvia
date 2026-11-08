@@ -3,11 +3,11 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
-using Insolvia.Core.AccessLog;
-using Insolvia.Core.Auth;
-using Insolvia.Core.Ports;
+using Insolvia.Domain.AccessLog;
+using Insolvia.Domain.Auth;
+using Insolvia.Domain.Ports;
 
-namespace Insolvia.Core.FilingAuthorizations;
+namespace Insolvia.Domain.FilingAuthorizations;
 
 // An attorney's signed authorization for Insolvia to file on their behalf
 // (ADR 0024, guardrail 2; from filing_authorization.py). The text ships in
@@ -67,7 +67,7 @@ public static class FilingAuthorizationRules
         return Texts.GetOrAdd(version, static name =>
         {
             var assembly = typeof(FilingAuthorizationRules).Assembly;
-            using var stream = assembly.GetManifestResourceStream($"Insolvia.Core.Agreements/filing-authorization/{name}.txt")
+            using var stream = assembly.GetManifestResourceStream($"Insolvia.Domain.Agreements/filing-authorization/{name}.txt")
                 ?? throw new FileNotFoundException($"no authorization text '{name}'");
             using var reader = new StreamReader(stream, Encoding.UTF8);
             return reader.ReadToEnd();

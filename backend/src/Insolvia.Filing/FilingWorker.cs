@@ -1,16 +1,16 @@
 using System.IO.Compression;
 using System.Security.Cryptography;
-using Insolvia.Core;
-using Insolvia.Core.AccessLog;
-using Insolvia.Core.Cases;
-using Insolvia.Core.Documents;
-using Insolvia.Core.FilingCredentials;
-using Insolvia.Core.Filings;
-using Insolvia.Core.Ports;
+using Insolvia.Domain;
+using Insolvia.Domain.AccessLog;
+using Insolvia.Domain.Cases;
+using Insolvia.Domain.Documents;
+using Insolvia.Domain.FilingCredentials;
+using Insolvia.Domain.Filings;
+using Insolvia.Domain.Forms;
+using Insolvia.Domain.Ports;
 using Insolvia.Filing.Drivers;
 using Insolvia.Filing.Fence;
 using Insolvia.Filing.Http;
-using Insolvia.Forms;
 
 namespace Insolvia.Filing;
 
@@ -173,7 +173,7 @@ public static class FilingWorker
         }
 
         var now = Clock.NowMillis(deps.Clock);
-        var claimed = new Core.Filings.Filing(
+        var claimed = new Insolvia.Domain.Filings.Filing(
             approval.FilingId,
             approval.CaseId,
             approval.ApprovalId,
@@ -518,14 +518,14 @@ public static class FilingWorker
 
         public FilingApproval Approval { get; } = approval;
 
-        public Core.Filings.Filing? Filing { get; set; }
+        public Insolvia.Domain.Filings.Filing? Filing { get; set; }
 
         /// <summary>
         /// Advance the record, conditional on the state and attempt this run
         /// last saw — and, with <paramref name="filedCase"/>, file the case in
         /// the same transaction. False when anything else moved first.
         /// </summary>
-        public async Task<bool> MoveAsync(FilingState state, Func<Core.Filings.Filing, Core.Filings.Filing>? change = null, LifecycleWrite? filedCase = null, CancellationToken cancellationToken = default)
+        public async Task<bool> MoveAsync(FilingState state, Func<Insolvia.Domain.Filings.Filing, Insolvia.Domain.Filings.Filing>? change = null, LifecycleWrite? filedCase = null, CancellationToken cancellationToken = default)
         {
             var current = Filing!;
             if (!FilingRules.MayTransition(current.State, state))

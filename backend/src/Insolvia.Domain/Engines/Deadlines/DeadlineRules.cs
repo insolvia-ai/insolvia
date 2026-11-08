@@ -1,8 +1,8 @@
 using System.Text.Json.Nodes;
-using Insolvia.Engines.Regulatory;
-using static Insolvia.Engines.Regulatory.ReleaseParsing;
+using Insolvia.Domain.Engines.Regulatory;
+using static Insolvia.Domain.Engines.Regulatory.ReleaseParsing;
 
-namespace Insolvia.Engines.Deadlines;
+namespace Insolvia.Domain.Engines.Deadlines;
 
 // The deadline rule table: loader and resolution for `code/deadline-rules`
 // (from core/deadline_rules.py, issue 14.6 / #358). Which deadlines, from which
@@ -122,7 +122,7 @@ public static class DeadlineRules
 
     private static int Count(JsonNode? value, string where, string key, int minimum)
     {
-        if (!Core.Json.TryGetWholeNumber(value, out var number) || number < minimum)
+        if (!Insolvia.Domain.Json.TryGetWholeNumber(value, out var number) || number < minimum)
         {
             throw Fail(where, $"{key} must be a whole number >= {minimum}");
         }
@@ -137,7 +137,7 @@ public static class DeadlineRules
             return null;
         }
 
-        var text = Core.Json.AsString(value);
+        var text = Insolvia.Domain.Json.AsString(value);
         if (text is null || !Anchors.Contains(text))
         {
             throw Fail(where, $"{key} must be one of {string.Join(", ", Anchors)}");
@@ -164,7 +164,7 @@ public static class DeadlineRules
         var chapters = new List<int>();
         foreach (var chapter in chaptersRaw)
         {
-            if (!Core.Json.TryGetWholeNumber(chapter, out var number))
+            if (!Insolvia.Domain.Json.TryGetWholeNumber(chapter, out var number))
             {
                 throw Fail(where, "chapters must be numbers");
             }
@@ -232,7 +232,7 @@ public static class DeadlineRules
         }
 
         var verificationRaw = StrField(raw, "verification", where);
-        if (!Core.Wire.TryParse<Verification>(verificationRaw, out var verification))
+        if (!Insolvia.Domain.Wire.TryParse<Verification>(verificationRaw, out var verification))
         {
             throw Fail(where, $"verification {Exact.Repr(verificationRaw)}");
         }

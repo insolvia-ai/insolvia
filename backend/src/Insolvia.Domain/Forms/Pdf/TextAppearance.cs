@@ -1,9 +1,9 @@
 using System.Text;
 using PdfSharp.Pdf;
 using PdfSharp.Pdf.Advanced;
-using static Insolvia.Forms.Pdf.PdfObjects;
+using static Insolvia.Domain.Forms.Pdf.PdfObjects;
 
-namespace Insolvia.Forms.Pdf;
+namespace Insolvia.Domain.Forms.Pdf;
 
 /// <summary>
 /// The text appearance stream of a text or choice widget — a port of pypdf
@@ -25,7 +25,7 @@ namespace Insolvia.Forms.Pdf;
 /// Refused, where pypdf's answer is not one to copy: text the font's own
 /// encoding cannot draw — pypdf then tries other code pages in a Python set's
 /// hash order (so the same input can render differently in two processes) or
-/// prints "?" — and composite or Type3 fonts. See Insolvia.Forms' README.
+/// prints "?" — and composite or Type3 fonts. See Insolvia.Domain.Forms' README.
 /// </remarks>
 internal static class TextAppearance
 {
@@ -159,7 +159,7 @@ internal static class TextAppearance
             // pypdf replaces the existing /N OBJECT in place. The court PDFs
             // share one /N among a field's widgets (B106D's "Debtor 1" on
             // three pages), so the last widget's box wins for all of them —
-            // kept on purpose (Insolvia.Forms' README, quirk 2).
+            // kept on purpose (Insolvia.Domain.Forms' README, quirk 2).
             var elements = stream.Elements.Keys.Select(key => (key, stream.Elements[key])).ToList();
             target.Stream = null!;
             target.Elements.Clear();

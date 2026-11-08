@@ -1,8 +1,8 @@
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
-using Insolvia.Core.Firms;
+using Insolvia.Domain.Firms;
 
-namespace Insolvia.Core.Clients;
+namespace Insolvia.Domain.Clients;
 
 /// <summary>
 /// The filing roles a portal binding may answer for. <c>non_filing_spouse</c>

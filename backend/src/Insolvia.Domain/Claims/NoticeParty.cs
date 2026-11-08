@@ -1,8 +1,8 @@
 using System.Text.Json.Nodes;
-using Insolvia.Core.Fields;
-using Insolvia.Core.Provenance;
+using Insolvia.Domain.Fields;
+using Insolvia.Domain.Provenance;
 
-namespace Insolvia.Core.Claims;
+namespace Insolvia.Domain.Claims;
 
 // The piece of claims.py the FIRM side needs before the case half is ported
 // (18.7): a library creditor's additional notice parties are "the same shape

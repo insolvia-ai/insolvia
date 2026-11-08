@@ -1,4 +1,4 @@
-namespace Insolvia.Core.Ports;
+namespace Insolvia.Domain.Ports;
 
 /// <summary>
 /// The two questions the FIRM side asks of the court registry (Python's

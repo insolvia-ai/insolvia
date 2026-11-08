@@ -1,6 +1,6 @@
 using System.Xml.Linq;
 
-namespace Insolvia.Architecture.Tests;
+namespace Insolvia.Domain.Tests.Architecture;
 
 // The successor of services/api's test_architecture.py (ADR 0028, § Repository
 // layout, amended by ADR 0030). Three layers, each project named for its role,

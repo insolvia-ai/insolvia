@@ -1,6 +1,6 @@
-using Insolvia.Core.Access;
-using Insolvia.Core.Firms;
-using Insolvia.Core.Ports;
+using Insolvia.Domain.Access;
+using Insolvia.Domain.Firms;
+using Insolvia.Domain.Ports;
 using Insolvia.Mcp.Logging;
 
 namespace Insolvia.Mcp.Auth;

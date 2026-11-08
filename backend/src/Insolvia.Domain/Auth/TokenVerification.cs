@@ -3,7 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.IdentityModel.Tokens;
 
-namespace Insolvia.Core.Auth;
+namespace Insolvia.Domain.Auth;
 
 /// <summary>
 /// Cognito access-token and Google ID-token verification (ported from

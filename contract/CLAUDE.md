@@ -69,7 +69,7 @@ ADR 0029).
   people's subjects are the one exception, and `stack/stack.json` lists the
   ones the migrator derives (the migrator's `SeedIdTests` reads it too).
   `scripts/aux-server.ts` is the run's JWKS and S3 stand-in, sharing
-  `backend/src/Insolvia.Core/Local/DirectoryDocumentBlobStore.cs`'s layout.
+  `backend/src/Insolvia.Domain/Local/DirectoryDocumentBlobStore.cs`'s layout.
 - **Two targets, one set of specs** (`support/target.ts`). Deployed signs in
   by real SRP as `seeds/<environment>.json`'s people (`support/session.ts`);
   every input comes from the environment with no defaults, and **there is no

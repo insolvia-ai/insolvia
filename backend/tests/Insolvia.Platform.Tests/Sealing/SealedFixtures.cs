@@ -1,9 +1,9 @@
 using System.Text.Json.Nodes;
 using Amazon.KeyManagementService;
-using Insolvia.Aws.Sealing;
-using Insolvia.Core.TaxIds;
+using Insolvia.Domain.TaxIds;
+using Insolvia.Platform.Sealing;
 
-namespace Insolvia.Aws.Tests.Sealing;
+namespace Insolvia.Platform.Tests.Sealing;
 
 /// <summary>One case of Fixtures/python-sealed.json (or dotnet-sealed.json) — the schema the Python generator wrote before 18.23.</summary>
 internal sealed record SealedCase(

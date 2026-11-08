@@ -1,7 +1,7 @@
 using System.Collections.Frozen;
 using System.Text.Json.Serialization;
 
-namespace Insolvia.Core.Filings;
+namespace Insolvia.Domain.Filings;
 
 // The electronic filing record (ADR 0024 PR 7/8; from filings.py): one run
 // of the filing worker against one approval, its state machine and history,

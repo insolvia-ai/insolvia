@@ -1,16 +1,15 @@
 using System.Text.Json.Nodes;
-using Insolvia.Core;
-using Insolvia.Core.AccessLog;
-using Insolvia.Core.Auth;
-using Insolvia.Core.Cases;
-using Insolvia.Core.Courts;
-using Insolvia.Core.FilingAuthorizations;
-using Insolvia.Core.FilingCredentials;
-using Insolvia.Core.Filings;
-using Insolvia.Core.Firms;
-using Insolvia.Core.Ports;
+using Insolvia.Domain.AccessLog;
+using Insolvia.Domain.Auth;
+using Insolvia.Domain.Cases;
+using Insolvia.Domain.Courts;
+using Insolvia.Domain.FilingAuthorizations;
+using Insolvia.Domain.FilingCredentials;
+using Insolvia.Domain.Filings;
+using Insolvia.Domain.Firms;
+using Insolvia.Domain.Ports;
 
-namespace Insolvia.Forms;
+namespace Insolvia.Domain.Forms;
 
 /// <summary>The caller may not approve this filing (403): not an attorney, or no openable court login of their own.</summary>
 public sealed class ApprovalNotPermittedException : ForbiddenException

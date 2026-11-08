@@ -1,7 +1,7 @@
-using Insolvia.Core.Candidates;
-using Insolvia.Core.Ports;
+using Insolvia.Domain.Candidates;
+using Insolvia.Domain.Ports;
 
-namespace Insolvia.Core.Memory;
+namespace Insolvia.Domain.Memory;
 
 /// <summary>
 /// The in-memory <see cref="ICandidateStore"/>. Keyed by (case, id); the update

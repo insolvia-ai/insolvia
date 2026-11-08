@@ -1,7 +1,7 @@
-using Insolvia.Core.Claims;
-using static Insolvia.Engines.Projections.ProjectionHelpers;
+using Insolvia.Domain.Claims;
+using static Insolvia.Domain.Engines.Projections.ProjectionHelpers;
 
-namespace Insolvia.Engines.Projections.Forms;
+namespace Insolvia.Domain.Engines.Projections.Forms;
 
 /// <summary>
 /// B106G @ 2015-12-01 — Schedule G's mapping (from <c>form_projections/b106g.py</c>):

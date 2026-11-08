@@ -1,16 +1,16 @@
 using System.Text.Json.Nodes;
-using Insolvia.Core;
-using Insolvia.Core.Access;
-using Insolvia.Core.CaseEntities;
-using Insolvia.Core.Claims;
-using Insolvia.Core.Clients;
-using Insolvia.Core.Creditors;
-using Insolvia.Core.Debtors;
-using Insolvia.Core.Documents;
-using Insolvia.Core.FirmClients;
-using Insolvia.Core.Income;
-using Insolvia.Core.Memory;
-using Insolvia.Core.TaxIds;
+using Insolvia.Domain;
+using Insolvia.Domain.Access;
+using Insolvia.Domain.CaseEntities;
+using Insolvia.Domain.Claims;
+using Insolvia.Domain.Clients;
+using Insolvia.Domain.Creditors;
+using Insolvia.Domain.Debtors;
+using Insolvia.Domain.Documents;
+using Insolvia.Domain.FirmClients;
+using Insolvia.Domain.Income;
+using Insolvia.Domain.Memory;
+using Insolvia.Domain.TaxIds;
 using Insolvia.Migrator.Seeding;
 using static Insolvia.Migrator.Tests.Seeding.SeedWorld;
 
@@ -42,7 +42,7 @@ public sealed class SeedCaseTests : IDisposable
         // parser derives the printed district from it.
         Assert.Equal(("flmb", "tampa"), (found.Court, found.Division));
         Assert.Equal("Middle District of Florida", found.District);
-        Assert.Equal(Core.Cases.CaseStatus.Intake, found.Status);
+        Assert.Equal(Insolvia.Domain.Cases.CaseStatus.Intake, found.Status);
 
         var debtor = (await _world.Debtors.GetAsync(found.Id, FilingRole.Debtor1, Ct))!;
         Assert.Equal("Sample", debtor.Body.Name.Given);

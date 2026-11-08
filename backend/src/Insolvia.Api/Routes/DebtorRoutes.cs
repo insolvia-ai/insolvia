@@ -3,15 +3,15 @@ using Insolvia.Api.Auth;
 using Insolvia.Api.Cases;
 using Insolvia.Api.Hosting;
 using Insolvia.Api.Http;
-using Insolvia.Core;
-using Insolvia.Core.Access;
-using Insolvia.Core.AccessLog;
-using Insolvia.Core.Cases;
-using Insolvia.Core.Debtors;
-using Insolvia.Core.FirmClients;
-using Insolvia.Core.Firms;
-using Insolvia.Core.Ports;
-using Insolvia.Core.TaxIds;
+using Insolvia.Domain;
+using Insolvia.Domain.Access;
+using Insolvia.Domain.AccessLog;
+using Insolvia.Domain.Cases;
+using Insolvia.Domain.Debtors;
+using Insolvia.Domain.FirmClients;
+using Insolvia.Domain.Firms;
+using Insolvia.Domain.Ports;
+using Insolvia.Domain.TaxIds;
 
 namespace Insolvia.Api.Routes;
 

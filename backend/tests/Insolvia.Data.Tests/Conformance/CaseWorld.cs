@@ -1,15 +1,15 @@
-using Insolvia.Core;
-using Insolvia.Core.Access;
-using Insolvia.Core.Cases;
-using Insolvia.Core.Debtors;
-using Insolvia.Core.FirmClients;
-using Insolvia.Core.Memory;
-using Insolvia.Core.Ports;
-using Insolvia.Core.Provenance;
 using Insolvia.Data.Cases;
 using Insolvia.Data.Concurrency;
 using Insolvia.Data.Firms;
 using Insolvia.Data.Pagination;
+using Insolvia.Domain;
+using Insolvia.Domain.Access;
+using Insolvia.Domain.Cases;
+using Insolvia.Domain.Debtors;
+using Insolvia.Domain.FirmClients;
+using Insolvia.Domain.Memory;
+using Insolvia.Domain.Ports;
+using Insolvia.Domain.Provenance;
 
 namespace Insolvia.Data.Tests.Conformance;
 

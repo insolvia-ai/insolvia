@@ -2,7 +2,7 @@ using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 
-namespace Insolvia.Aws.Signing;
+namespace Insolvia.Platform.Signing;
 
 /// <summary>A set of AWS credentials, the session token included when they are temporary.</summary>
 /// <param name="AccessKeyId">The access key id.</param>

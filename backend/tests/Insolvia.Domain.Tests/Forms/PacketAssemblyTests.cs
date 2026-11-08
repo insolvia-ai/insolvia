@@ -1,15 +1,15 @@
 using System.Security.Cryptography;
-using Insolvia.Core.Cases;
-using Insolvia.Core.Claims;
-using Insolvia.Core.Expenses;
-using Insolvia.Core.Income;
-using Insolvia.Core.Plans;
-using Insolvia.Engines.CreditorMatrix;
-using Insolvia.Engines.Projections;
-using Insolvia.Engines.Regulatory;
-using Insolvia.Forms.Tests.Support;
+using Insolvia.Domain.Cases;
+using Insolvia.Domain.Claims;
+using Insolvia.Domain.Engines.CreditorMatrix;
+using Insolvia.Domain.Engines.Projections;
+using Insolvia.Domain.Engines.Regulatory;
+using Insolvia.Domain.Expenses;
+using Insolvia.Domain.Forms.Tests.Support;
+using Insolvia.Domain.Income;
+using Insolvia.Domain.Plans;
 
-namespace Insolvia.Forms.Tests;
+namespace Insolvia.Domain.Forms.Tests;
 
 // test_packet_assembly.py's pure half, translated: the gate, which forms a
 // case files, the render and the zip, output options and amendments. The
@@ -218,10 +218,10 @@ public sealed class PacketAssemblyTests
     [Fact]
     public void A_subset_renders_only_those_forms_and_an_unfiled_one_is_a_problem()
     {
-        var subset = Assembled(Ch7, new OutputOptions { Forms = Core.ValueCollections.Create(["b101", "b106d"]) });
+        var subset = Assembled(Ch7, new OutputOptions { Forms = Insolvia.Domain.ValueCollections.Create(["b101", "b106d"]) });
         Assert.Equal(["01-b101.pdf", "06-b106d.pdf", CreditorMatrices.MatrixFileName], subset.Parts.Select(p => p.Name));
 
-        Assert.Contains(Refused(Ch7, new OutputOptions { Forms = Core.ValueCollections.Create(["b106j2"]) }), p => p.Source == "form/b106j2");
+        Assert.Contains(Refused(Ch7, new OutputOptions { Forms = Insolvia.Domain.ValueCollections.Create(["b106j2"]) }), p => p.Source == "form/b106j2");
     }
 
     [Fact]
@@ -244,6 +244,6 @@ public sealed class PacketAssemblyTests
         Assert.Equal(amended.Assets.Count, PacketAssembly.FilteredForRender(amended, "form/b106c").Assets.Count);
         Assert.False(PacketAssembly.PrintsB121(new OutputOptions { AmendedOnly = true }));
         Assert.True(PacketAssembly.PrintsB121(new OutputOptions()));
-        Assert.False(PacketAssembly.PrintsB121(new OutputOptions { Forms = Core.ValueCollections.Create(["b101"]) }));
+        Assert.False(PacketAssembly.PrintsB121(new OutputOptions { Forms = Insolvia.Domain.ValueCollections.Create(["b101"]) }));
     }
 }

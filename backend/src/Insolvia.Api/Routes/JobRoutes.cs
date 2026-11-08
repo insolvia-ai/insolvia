@@ -2,15 +2,15 @@ using System.Text.Json.Nodes;
 using Insolvia.Api.Auth;
 using Insolvia.Api.Hosting;
 using Insolvia.Api.Http;
-using Insolvia.Core;
-using Insolvia.Core.AccessLog;
-using Insolvia.Core.Documents;
-using Insolvia.Core.Firms;
-using Insolvia.Core.Jobs;
-using Insolvia.Core.Ports;
-using Insolvia.Engines.Liens;
-using Insolvia.Engines.Projections;
-using Insolvia.Forms;
+using Insolvia.Domain;
+using Insolvia.Domain.AccessLog;
+using Insolvia.Domain.Documents;
+using Insolvia.Domain.Engines.Liens;
+using Insolvia.Domain.Engines.Projections;
+using Insolvia.Domain.Firms;
+using Insolvia.Domain.Forms;
+using Insolvia.Domain.Jobs;
+using Insolvia.Domain.Ports;
 
 namespace Insolvia.Api.Routes;
 
@@ -195,18 +195,18 @@ public sealed class CaseSummaryRoutes : IEndpointModule
     /// <summary>Money as STRINGS, never JSON numbers — a double would not carry 1234.05 unchanged.</summary>
     internal static JsonObject TotalsJson(CaseTotals totals) => new()
     {
-        ["realEstate"] = Engines.Exact.F(totals.RealEstate),
-        ["personalProperty"] = Engines.Exact.F(totals.PersonalProperty),
-        ["assets"] = Engines.Exact.F(totals.Assets),
-        ["totalExempt"] = Engines.Exact.F(totals.TotalExempt),
-        ["totalNonExempt"] = Engines.Exact.F(totals.TotalNonExempt),
-        ["secured"] = Engines.Exact.F(totals.Secured),
-        ["priorityUnsecured"] = Engines.Exact.F(totals.PriorityUnsecured),
-        ["nonpriorityUnsecured"] = Engines.Exact.F(totals.NonpriorityUnsecured),
-        ["liabilities"] = Engines.Exact.F(totals.Liabilities),
-        ["monthlyIncome"] = Engines.Exact.F(totals.MonthlyIncome),
-        ["monthlyExpenses"] = Engines.Exact.F(totals.MonthlyExpenses),
-        ["monthlyExcess"] = Engines.Exact.F(totals.MonthlyExcess),
+        ["realEstate"] = Insolvia.Domain.Engines.Exact.F(totals.RealEstate),
+        ["personalProperty"] = Insolvia.Domain.Engines.Exact.F(totals.PersonalProperty),
+        ["assets"] = Insolvia.Domain.Engines.Exact.F(totals.Assets),
+        ["totalExempt"] = Insolvia.Domain.Engines.Exact.F(totals.TotalExempt),
+        ["totalNonExempt"] = Insolvia.Domain.Engines.Exact.F(totals.TotalNonExempt),
+        ["secured"] = Insolvia.Domain.Engines.Exact.F(totals.Secured),
+        ["priorityUnsecured"] = Insolvia.Domain.Engines.Exact.F(totals.PriorityUnsecured),
+        ["nonpriorityUnsecured"] = Insolvia.Domain.Engines.Exact.F(totals.NonpriorityUnsecured),
+        ["liabilities"] = Insolvia.Domain.Engines.Exact.F(totals.Liabilities),
+        ["monthlyIncome"] = Insolvia.Domain.Engines.Exact.F(totals.MonthlyIncome),
+        ["monthlyExpenses"] = Insolvia.Domain.Engines.Exact.F(totals.MonthlyExpenses),
+        ["monthlyExcess"] = Insolvia.Domain.Engines.Exact.F(totals.MonthlyExcess),
     };
 
     private static async Task<IResult> SummaryAsync(HttpContext context, string caseId, CancellationToken cancellationToken)

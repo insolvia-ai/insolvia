@@ -1,9 +1,9 @@
 using System.Text.Json.Nodes;
-using Insolvia.Core.Cases;
-using Insolvia.Engines.Deadlines;
-using Insolvia.Engines.Regulatory;
+using Insolvia.Domain.Cases;
+using Insolvia.Domain.Engines.Deadlines;
+using Insolvia.Domain.Engines.Regulatory;
 
-namespace Insolvia.Engines.Tests;
+namespace Insolvia.Domain.Engines.Tests;
 
 // Translated from services/api/tests/unit/test_legal_holidays.py: Rule
 // 9006(a) day counting worked by hand against a calendar, and the loader.

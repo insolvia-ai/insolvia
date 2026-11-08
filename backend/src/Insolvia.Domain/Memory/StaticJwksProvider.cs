@@ -1,8 +1,8 @@
-using Insolvia.Core.Auth;
-using Insolvia.Core.Ports;
+using Insolvia.Domain.Auth;
+using Insolvia.Domain.Ports;
 using Microsoft.IdentityModel.Tokens;
 
-namespace Insolvia.Core.Memory;
+namespace Insolvia.Domain.Memory;
 
 /// <summary>
 /// A fixed <c>{kid: key}</c> map — the tests' and local development's

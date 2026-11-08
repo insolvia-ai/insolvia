@@ -1,6 +1,6 @@
 using System.Globalization;
 
-namespace Insolvia.Forms.Pdf;
+namespace Insolvia.Domain.Forms.Pdf;
 
 /// <summary>
 /// A Python number — an <c>int</c> or a <c>float</c> — with Python's

@@ -1,10 +1,10 @@
 using System.Text.Json.Nodes;
-using Insolvia.Core.Candidates;
-using Insolvia.Core.CaseTasks;
-using Insolvia.Core.Documents;
-using Insolvia.Core.Memory;
+using Insolvia.Domain.Candidates;
+using Insolvia.Domain.CaseTasks;
+using Insolvia.Domain.Documents;
+using Insolvia.Domain.Memory;
 
-namespace Insolvia.Core.Tests;
+namespace Insolvia.Domain.Tests;
 
 /// <summary>Case tasks, translated from test_tasks.py.</summary>
 public sealed class CaseTaskTests

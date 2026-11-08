@@ -4,9 +4,9 @@ using System.Text;
 using Amazon.KeyManagementService;
 using Amazon.KeyManagementService.Model;
 using Amazon.Runtime;
-using Insolvia.Aws.Sealing;
+using Insolvia.Platform.Sealing;
 
-namespace Insolvia.Aws.Tests.Sealing;
+namespace Insolvia.Platform.Tests.Sealing;
 
 /// <summary>
 /// <c>GenerateDataKey</c> / <c>Decrypt</c> as KMS answers them, with no

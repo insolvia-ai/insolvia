@@ -1,6 +1,6 @@
-using Insolvia.Core.AdminAudit;
+using Insolvia.Domain.AdminAudit;
 
-namespace Insolvia.Core.Ports;
+namespace Insolvia.Domain.Ports;
 
 /// <summary>
 /// The admin service's append-only record of staff mutations (ADR 0011;

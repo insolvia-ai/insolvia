@@ -1,8 +1,8 @@
 using System.Text.Json;
 using PdfSharp.Pdf;
-using static Insolvia.Forms.Pdf.PdfObjects;
+using static Insolvia.Domain.Forms.Pdf.PdfObjects;
 
-namespace Insolvia.Forms.Pdf;
+namespace Insolvia.Domain.Forms.Pdf;
 
 /// <summary>A font's metrics, as pypdf 6.16.2's <c>FontDescriptor</c> holds them.</summary>
 internal sealed record FontDescriptor(string Name, double Ascent, double Descent, int Flags, IReadOnlyList<double> BBox)
@@ -333,7 +333,7 @@ internal static class FontData
 
     private static Loaded Load()
     {
-        using var stream = typeof(FontData).Assembly.GetManifestResourceStream("Insolvia.Forms.FontData.json")
+        using var stream = typeof(FontData).Assembly.GetManifestResourceStream("Insolvia.Domain.Forms.FontData.json")
             ?? throw new InvalidOperationException("FontData.json is not embedded");
         using var json = JsonDocument.Parse(stream);
         var root = json.RootElement;

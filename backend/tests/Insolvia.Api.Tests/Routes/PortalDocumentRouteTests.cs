@@ -1,8 +1,8 @@
 using System.Text.Json.Nodes;
 using Insolvia.Api.Tests.Support;
-using Insolvia.Core.AccessLog;
-using Insolvia.Core.Memory;
-using Insolvia.Core.Ports;
+using Insolvia.Domain.AccessLog;
+using Insolvia.Domain.Memory;
+using Insolvia.Domain.Ports;
 
 namespace Insolvia.Api.Tests.Routes;
 
@@ -208,8 +208,8 @@ public sealed class PortalDocumentRouteTests : IAsyncLifetime, IDisposable
     {
         // Pay stubs are extractable: the staff upload proves the trigger is
         // live in this host, so the client's silence is the channel.
-        var jobs = _world.Service<Core.Ports.IJobStore>();
-        var sender = (Core.Memory.MemoryJobSender)_world.Service<Core.Ports.IJobSender>();
+        var jobs = _world.Service<Insolvia.Domain.Ports.IJobStore>();
+        var sender = (Insolvia.Domain.Memory.MemoryJobSender)_world.Service<Insolvia.Domain.Ports.IJobSender>();
         var stubs = ByTitle((await ApplyChecklistAsync(_caseId))["requests"]!, "Pay stubs for the last six months");
 
         await ClientUploadAsync(stubs.Str("id")!);

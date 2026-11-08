@@ -1,19 +1,18 @@
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
-using Insolvia.Core;
-using Insolvia.Core.Cases;
-using Insolvia.Core.Courts;
-using Insolvia.Core.Debtors;
-using Insolvia.Core.Fields;
-using Insolvia.Core.Petitions;
-using Insolvia.Core.Ports;
-using Insolvia.Engines;
-using Insolvia.Engines.MeansTest;
-using Insolvia.Engines.Projections;
-using Insolvia.Engines.Projections.Forms;
+using Insolvia.Domain.Cases;
+using Insolvia.Domain.Courts;
+using Insolvia.Domain.Debtors;
+using Insolvia.Domain.Engines;
+using Insolvia.Domain.Engines.MeansTest;
+using Insolvia.Domain.Engines.Projections;
+using Insolvia.Domain.Engines.Projections.Forms;
+using Insolvia.Domain.Fields;
+using Insolvia.Domain.Petitions;
+using Insolvia.Domain.Ports;
 
-namespace Insolvia.Forms;
+namespace Insolvia.Domain.Forms;
 
 /// <summary>
 /// The built file (Python's <c>CaseUploadFile</c>). Its bytes stay out of

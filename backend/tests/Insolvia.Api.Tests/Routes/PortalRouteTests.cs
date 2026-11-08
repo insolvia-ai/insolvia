@@ -1,8 +1,8 @@
 using System.Text.RegularExpressions;
 using Insolvia.Api.Auth;
 using Insolvia.Api.Tests.Support;
-using Insolvia.Core.AccessLog;
-using Insolvia.Core.Firms;
+using Insolvia.Domain.AccessLog;
+using Insolvia.Domain.Firms;
 using static Insolvia.Api.Tests.Support.CaseWorld;
 
 namespace Insolvia.Api.Tests.Routes;

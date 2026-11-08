@@ -1,8 +1,8 @@
 using System.Text.Json.Nodes;
-using Insolvia.Core.Claims;
-using Insolvia.Core.Fields;
+using Insolvia.Domain.Claims;
+using Insolvia.Domain.Fields;
 
-namespace Insolvia.Core.LibraryCreditors;
+namespace Insolvia.Domain.LibraryCreditors;
 
 /// <summary>
 /// One firm's reusable creditor record (issue 13.9 / #350; from

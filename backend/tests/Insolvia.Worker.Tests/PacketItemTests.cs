@@ -1,7 +1,7 @@
 using System.Text.Json.Nodes;
-using Insolvia.Core;
-using Insolvia.Core.Packets;
-using Insolvia.Forms;
+using Insolvia.Domain;
+using Insolvia.Domain.Forms;
+using Insolvia.Domain.Packets;
 
 namespace Insolvia.Worker.Tests;
 

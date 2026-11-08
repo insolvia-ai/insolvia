@@ -1,7 +1,7 @@
-using Insolvia.Core.AccessLog;
-using Insolvia.Core.Ports;
+using Insolvia.Domain.AccessLog;
+using Insolvia.Domain.Ports;
 
-namespace Insolvia.Core.Memory;
+namespace Insolvia.Domain.Memory;
 
 /// <summary>
 /// The in-memory <see cref="IAccessLog"/>. Unlike the real one it KEEPS what

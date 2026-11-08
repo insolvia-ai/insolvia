@@ -1,7 +1,7 @@
-using Insolvia.Core.Documents;
-using Insolvia.Core.Memory;
+using Insolvia.Domain.Documents;
+using Insolvia.Domain.Memory;
 
-namespace Insolvia.Core.Tests;
+namespace Insolvia.Domain.Tests;
 
 /// <summary>
 /// The memory blob store's contract. test_document_blobs.py is the S3

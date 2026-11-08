@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace Insolvia.Core.Firms;
+namespace Insolvia.Domain.Firms;
 
 /// <summary>
 /// A job title, and NOT a level of access: it drives the DEFAULT permission

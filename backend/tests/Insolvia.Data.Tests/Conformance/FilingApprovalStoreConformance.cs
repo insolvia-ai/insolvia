@@ -1,10 +1,10 @@
-using Insolvia.Core;
-using Insolvia.Core.Filings;
+using Insolvia.Domain;
+using Insolvia.Domain.Filings;
 
 namespace Insolvia.Data.Tests.Conformance;
 
 /// <summary>
-/// What every <see cref="Core.Ports.IFilingApprovalStore"/> must do (ADR 0024,
+/// What every <see cref="Insolvia.Domain.Ports.IFilingApprovalStore"/> must do (ADR 0024,
 /// guardrail 1): one live approval per case through the pointer, a pending
 /// one superseded in the same write, single use (pending, same digest,
 /// unexpired) — and of two racing consumers, or two racing approvals from one
@@ -124,7 +124,7 @@ public abstract class FilingApprovalStoreConformance : CaseConformance
         new(NewId(), NewId(), caseId, Ids.Firm, Ids.Alice, NewId(), NewId(), Digest, NewId(), "flmb", "8", "2026-10-01.1", At, Now - 10, Now + 3600);
 }
 
-/// <summary>The oracle: <see cref="Core.Memory.MemoryFilingApprovalStore"/>.</summary>
+/// <summary>The oracle: <see cref="Insolvia.Domain.Memory.MemoryFilingApprovalStore"/>.</summary>
 public sealed class MemoryFilingApprovalStoreConformance : FilingApprovalStoreConformance
 {
     private readonly MemoryCaseWorld _world = new();

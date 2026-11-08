@@ -1,7 +1,7 @@
 using System.Text.Json.Nodes;
 using Insolvia.Api.Tests.Support;
-using Insolvia.Core.AccessLog;
-using Insolvia.Core.Firms;
+using Insolvia.Domain.AccessLog;
+using Insolvia.Domain.Firms;
 using static Insolvia.Api.Tests.Support.CaseWorld;
 
 namespace Insolvia.Api.Tests.Routes;

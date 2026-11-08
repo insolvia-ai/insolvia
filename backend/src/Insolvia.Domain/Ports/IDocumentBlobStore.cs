@@ -1,6 +1,6 @@
-using Insolvia.Core.Documents;
+using Insolvia.Domain.Documents;
 
-namespace Insolvia.Core.Ports;
+namespace Insolvia.Domain.Ports;
 
 /// <summary>
 /// Mints the short-lived, single-object capabilities that move the bytes, and

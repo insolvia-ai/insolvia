@@ -1,6 +1,6 @@
-using Insolvia.Core.FilingAuthorizations;
+using Insolvia.Domain.FilingAuthorizations;
 
-namespace Insolvia.Core.Ports;
+namespace Insolvia.Domain.Ports;
 
 /// <summary>
 /// Persists attorneys' signed authorizations (Python's

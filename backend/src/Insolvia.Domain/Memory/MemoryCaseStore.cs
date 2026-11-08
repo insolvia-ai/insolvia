@@ -1,10 +1,10 @@
-using Insolvia.Core.Access;
-using Insolvia.Core.Cases;
-using Insolvia.Core.Clients;
-using Insolvia.Core.Debtors;
-using Insolvia.Core.Ports;
+using Insolvia.Domain.Access;
+using Insolvia.Domain.Cases;
+using Insolvia.Domain.Clients;
+using Insolvia.Domain.Debtors;
+using Insolvia.Domain.Ports;
 
-namespace Insolvia.Core.Memory;
+namespace Insolvia.Domain.Memory;
 
 /// <summary>
 /// The in-memory <see cref="ICaseStore"/> (Python's <c>MemoryCaseStore</c>). It

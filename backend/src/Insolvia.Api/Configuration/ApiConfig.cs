@@ -11,7 +11,7 @@ namespace Insolvia.Api.Configuration;
 /// <c>source.get(NAME) or None</c>.</para>
 /// <para>The stores are Postgres (<c>INSOLVIA_DB_*</c>, owned by
 /// Insolvia.Data) and the KMS key aliases are
-/// <see cref="Aws.Sealing.SealingKeys"/>'; neither is read here.</para>
+/// <see cref="Insolvia.Platform.Sealing.SealingKeys"/>'; neither is read here.</para>
 /// </remarks>
 public sealed record ApiConfig
 {

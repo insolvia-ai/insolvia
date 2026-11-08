@@ -2,11 +2,11 @@ using System.Globalization;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 
-namespace Insolvia.Core.Filings;
+namespace Insolvia.Domain.Filings;
 
 // The attorney's per-filing approval (ADR 0024 build PR 6, guardrail 1; the
 // record half of services/api core/filing_approval.py). The rules that read
-// the filing set — approve, consume, the digest — are Insolvia.Forms'
+// the filing set — approve, consume, the digest — are Insolvia.Domain.Forms'
 // FilingApprovals, because the basis is a Forms computation; the record, its
 // store's port and the filing job's wire contract are here, where the filing
 // worker and the API both reach them.

@@ -1,6 +1,6 @@
-using Insolvia.Core.Ports;
+using Insolvia.Domain.Ports;
 
-namespace Insolvia.Core.Memory;
+namespace Insolvia.Domain.Memory;
 
 /// <summary>
 /// The memory twin of <see cref="IUnitOfWork"/>: runs the work, with no

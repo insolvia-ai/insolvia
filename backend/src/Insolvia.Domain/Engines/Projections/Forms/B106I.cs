@@ -1,9 +1,9 @@
 using System.Text.RegularExpressions;
-using Insolvia.Core.Debtors;
-using Insolvia.Core.Income;
-using static Insolvia.Engines.Projections.ProjectionHelpers;
+using Insolvia.Domain.Debtors;
+using Insolvia.Domain.Income;
+using static Insolvia.Domain.Engines.Projections.ProjectionHelpers;
 
-namespace Insolvia.Engines.Projections.Forms;
+namespace Insolvia.Domain.Engines.Projections.Forms;
 
 /// <summary>
 /// B106I @ 2015-12-01 — Schedule I's mapping (from <c>form_projections/b106i.py</c>):

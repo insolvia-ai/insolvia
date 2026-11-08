@@ -1,10 +1,10 @@
 using System.Text.Json.Nodes;
-using Insolvia.Core.Candidates;
-using Insolvia.Core.Clients;
-using Insolvia.Core.Questionnaires;
-using Insolvia.Core.Questions;
+using Insolvia.Domain.Candidates;
+using Insolvia.Domain.Clients;
+using Insolvia.Domain.Questionnaires;
+using Insolvia.Domain.Questions;
 
-namespace Insolvia.Core.Tests;
+namespace Insolvia.Domain.Tests;
 
 /// <summary>The portal's questions and a client's answers, translated from test_questions.py.</summary>
 public sealed class QuestionTests

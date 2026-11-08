@@ -118,8 +118,8 @@ owns that decision and its trade-offs; the mechanics are:
 ```
 
 - A registry root lives beside the code that reads it (today that means
-  `backend/src/Insolvia.Core/Engines/Regulatory`, with the template PDFs and the
-  filing series in `Insolvia.Forms` and the courts in `Insolvia.Core`) and is
+  `backend/src/Insolvia.Domain/Engines/Regulatory`, with the template PDFs and the
+  filing series in `Insolvia.Domain.Forms` and the courts in `Insolvia.Domain`) and is
   embedded in the assembly that ships in each image, so local, staging and prod read identical data by construction — no
   per-environment seeding, no drift.
 - **Append-only is an invariant, not a habit:** a merged release directory is

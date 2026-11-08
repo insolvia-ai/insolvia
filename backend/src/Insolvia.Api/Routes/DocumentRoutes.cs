@@ -3,13 +3,13 @@ using Insolvia.Api.Auth;
 using Insolvia.Api.Cases;
 using Insolvia.Api.Hosting;
 using Insolvia.Api.Http;
-using Insolvia.Core;
-using Insolvia.Core.AccessLog;
-using Insolvia.Core.DocumentRequests;
-using Insolvia.Core.Documents;
-using Insolvia.Core.Firms;
-using Insolvia.Core.Jobs;
-using Insolvia.Core.Ports;
+using Insolvia.Domain;
+using Insolvia.Domain.AccessLog;
+using Insolvia.Domain.DocumentRequests;
+using Insolvia.Domain.Documents;
+using Insolvia.Domain.Firms;
+using Insolvia.Domain.Jobs;
+using Insolvia.Domain.Ports;
 
 namespace Insolvia.Api.Routes;
 

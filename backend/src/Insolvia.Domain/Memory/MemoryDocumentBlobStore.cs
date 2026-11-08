@@ -1,9 +1,9 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Security.Cryptography;
-using Insolvia.Core.Documents;
-using Insolvia.Core.Ports;
+using Insolvia.Domain.Documents;
+using Insolvia.Domain.Ports;
 
-namespace Insolvia.Core.Memory;
+namespace Insolvia.Domain.Memory;
 
 /// <summary>One capability the memory blob store handed out — the terms the real one binds into a signature.</summary>
 public sealed record MintedUrl(string Method, string StorageRef, int ExpiresIn, string? ContentType = null, long? ByteSize = null, string? Tag = null);

@@ -1,15 +1,15 @@
 using System.Text.Json.Nodes;
 using Amazon.KeyManagementService;
 using Amazon.KeyManagementService.Model;
-using Insolvia.Aws.Sealing;
-using Insolvia.Core.AccessLog;
-using Insolvia.Core.FilingAuthorizations;
-using Insolvia.Core.FilingCredentials;
-using Insolvia.Core.Memory;
-using Insolvia.Core.Ports;
-using Insolvia.Core.TaxIds;
+using Insolvia.Domain.AccessLog;
+using Insolvia.Domain.FilingAuthorizations;
+using Insolvia.Domain.FilingCredentials;
+using Insolvia.Domain.Memory;
+using Insolvia.Domain.Ports;
+using Insolvia.Domain.TaxIds;
+using Insolvia.Platform.Sealing;
 
-namespace Insolvia.Aws.Tests.Sealing;
+namespace Insolvia.Platform.Tests.Sealing;
 
 /// <summary>
 /// The KMS ciphers against a recording fake KMS — translated from the KMS

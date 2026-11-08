@@ -1,11 +1,11 @@
 using System.Security.Cryptography;
 using System.Text.Json.Nodes;
-using Insolvia.Core.AccessLog;
-using Insolvia.Core.FilingAuthorizations;
-using Insolvia.Core.FilingCredentials;
-using Insolvia.Core.Memory;
+using Insolvia.Domain.AccessLog;
+using Insolvia.Domain.FilingAuthorizations;
+using Insolvia.Domain.FilingCredentials;
+using Insolvia.Domain.Memory;
 
-namespace Insolvia.Core.Tests;
+namespace Insolvia.Domain.Tests;
 
 /// <summary>
 /// The CM/ECF credential vault, translated from test_filing_credentials.py.

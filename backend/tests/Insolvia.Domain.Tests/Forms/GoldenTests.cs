@@ -2,11 +2,11 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using Insolvia.Engines.Projections;
-using Insolvia.Forms.Tests.Support;
+using Insolvia.Domain.Engines.Projections;
+using Insolvia.Domain.Forms.Tests.Support;
 using PdfSharp.Pdf.IO;
 
-namespace Insolvia.Forms.Tests;
+namespace Insolvia.Domain.Forms.Tests;
 
 // The fill engine's goldens (test_form_fill.py's, re-baselined): every form
 // filled with the full-coverage synthetic values and pinned two ways —

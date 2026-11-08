@@ -1,9 +1,9 @@
-using Insolvia.Core.Access;
-using Insolvia.Core.AccessLog;
-using Insolvia.Core.Clients;
-using Insolvia.Core.Firms;
+using Insolvia.Domain.Access;
+using Insolvia.Domain.AccessLog;
+using Insolvia.Domain.Clients;
+using Insolvia.Domain.Firms;
 
-namespace Insolvia.Core.Tests;
+namespace Insolvia.Domain.Tests;
 
 // Translated from test_clients.py: the portal binding (ADR 0023) — what an
 // invitation may say and which bindings a new one narrows. Its item-shape

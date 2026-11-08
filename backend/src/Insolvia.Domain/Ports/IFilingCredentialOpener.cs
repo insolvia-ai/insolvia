@@ -1,6 +1,6 @@
-using Insolvia.Core.TaxIds;
+using Insolvia.Domain.TaxIds;
 
-namespace Insolvia.Core.Ports;
+namespace Insolvia.Domain.Ports;
 
 /// <summary>
 /// OPENS a sealed credential — the filing worker's half. MUST throw under any

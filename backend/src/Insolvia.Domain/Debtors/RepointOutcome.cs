@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace Insolvia.Core.Debtors;
+namespace Insolvia.Domain.Debtors;
 
 /// <summary>
 /// What re-pointing one case's debtor from a merged client to its survivor

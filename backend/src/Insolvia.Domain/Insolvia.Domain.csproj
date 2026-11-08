@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- The domain (ADR 0030): ports and entities at the root (Insolvia.Core.*),
+  <!-- The domain (ADR 0030): ports and entities at the root (Insolvia.Domain.*),
        the pure calculation engines and form projections under Engines/
-       (Insolvia.Engines.*), and the PDF engine under Forms/ (Insolvia.Forms.*).
+       (Insolvia.Domain.Engines.*), and the PDF engine under Forms/ (Insolvia.Domain.Forms.*).
        Namespaces follow those folders, not this assembly's name. Pure:
        references nothing in the solution; no AWS SDK, no EF Core, no Npgsql. -->
   <ItemGroup>
@@ -29,11 +29,11 @@
          Forms/Pdf/FontData.json: pypdf's core-font metrics and glyph list;
          Forms/Regulatory/: the AO's Case Upload specification as data. -->
   <ItemGroup>
-    <EmbeddedResource Include="Regulatory/**/*.json" LogicalName="Insolvia.Core.Regulatory/%(RecursiveDir)%(Filename)%(Extension)" />
-    <EmbeddedResource Include="Agreements/**/*.txt" LogicalName="Insolvia.Core.Agreements/%(RecursiveDir)%(Filename)%(Extension)" />
-    <EmbeddedResource Include="Engines/Regulatory/**/*.json" LogicalName="Insolvia.Engines.Regulatory/%(RecursiveDir)%(Filename)%(Extension)" />
-    <EmbeddedResource Include="Forms/Templates/**/*.pdf" LogicalName="Insolvia.Forms.Templates/%(RecursiveDir)%(Filename)%(Extension)" />
-    <EmbeddedResource Include="Forms/Pdf/FontData.json" LogicalName="Insolvia.Forms.FontData.json" />
-    <EmbeddedResource Include="Forms/Regulatory/**/*.json" LogicalName="Insolvia.Forms.Regulatory/%(RecursiveDir)%(Filename)%(Extension)" />
+    <EmbeddedResource Include="Regulatory/**/*.json" LogicalName="Insolvia.Domain.Regulatory/%(RecursiveDir)%(Filename)%(Extension)" />
+    <EmbeddedResource Include="Agreements/**/*.txt" LogicalName="Insolvia.Domain.Agreements/%(RecursiveDir)%(Filename)%(Extension)" />
+    <EmbeddedResource Include="Engines/Regulatory/**/*.json" LogicalName="Insolvia.Domain.Engines.Regulatory/%(RecursiveDir)%(Filename)%(Extension)" />
+    <EmbeddedResource Include="Forms/Templates/**/*.pdf" LogicalName="Insolvia.Domain.Forms.Templates/%(RecursiveDir)%(Filename)%(Extension)" />
+    <EmbeddedResource Include="Forms/Pdf/FontData.json" LogicalName="Insolvia.Domain.Forms.FontData.json" />
+    <EmbeddedResource Include="Forms/Regulatory/**/*.json" LogicalName="Insolvia.Domain.Forms.Regulatory/%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>
 </Project>

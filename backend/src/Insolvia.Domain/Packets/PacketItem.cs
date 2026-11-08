@@ -1,11 +1,11 @@
 using System.Text.Json.Nodes;
 
-namespace Insolvia.Core.Packets;
+namespace Insolvia.Domain.Packets;
 
 /// <summary>
 /// An assembled packet's metadata as the packet store holds it (Python's
 /// <c>packet_item</c>) — the bytes are in the bucket. The domain record with
-/// its typed output options is <c>Insolvia.Forms.Packet</c>; this is its
+/// its typed output options is <c>Insolvia.Domain.Forms.Packet</c>; this is its
 /// storage shape, so the port can live here without Core knowing the forms
 /// engine. <see cref="Options"/> is the stored <c>output_options_json</c>
 /// (null on a packet written before options existed — the plain filing set);

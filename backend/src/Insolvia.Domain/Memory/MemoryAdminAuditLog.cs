@@ -1,7 +1,7 @@
-using Insolvia.Core.AdminAudit;
-using Insolvia.Core.Ports;
+using Insolvia.Domain.AdminAudit;
+using Insolvia.Domain.Ports;
 
-namespace Insolvia.Core.Memory;
+namespace Insolvia.Domain.Memory;
 
 /// <summary>
 /// The in-memory <see cref="IAdminAuditLog"/>. <see cref="Events"/> is public

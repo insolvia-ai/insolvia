@@ -1,13 +1,13 @@
 using System.Text.Json.Nodes;
 using Insolvia.Api.Tests.Support;
-using Insolvia.Core.AccessLog;
-using Insolvia.Core.Candidates;
-using Insolvia.Core.CaseEntities;
-using Insolvia.Core.Claims;
-using Insolvia.Core.Creditors;
-using Insolvia.Core.Firms;
-using Insolvia.Core.Ports;
-using Insolvia.Core.Provenance;
+using Insolvia.Domain.AccessLog;
+using Insolvia.Domain.Candidates;
+using Insolvia.Domain.CaseEntities;
+using Insolvia.Domain.Claims;
+using Insolvia.Domain.Creditors;
+using Insolvia.Domain.Firms;
+using Insolvia.Domain.Ports;
+using Insolvia.Domain.Provenance;
 using static Insolvia.Api.Tests.Support.CaseWorld;
 
 namespace Insolvia.Api.Tests.Routes;

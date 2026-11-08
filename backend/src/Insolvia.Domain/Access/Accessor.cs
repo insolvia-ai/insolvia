@@ -1,8 +1,8 @@
-using Insolvia.Core.Cases;
-using Insolvia.Core.Clients;
-using Insolvia.Core.Firms;
+using Insolvia.Domain.Cases;
+using Insolvia.Domain.Clients;
+using Insolvia.Domain.Firms;
 
-namespace Insolvia.Core.Access;
+namespace Insolvia.Domain.Access;
 
 /// <summary>
 /// An authenticated caller whose firm has been resolved (from <c>access.py</c>).

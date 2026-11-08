@@ -1,7 +1,7 @@
-using Insolvia.Core.Ports;
-using Insolvia.Core.TaxIds;
+using Insolvia.Domain.Ports;
+using Insolvia.Domain.TaxIds;
 
-namespace Insolvia.Core.Memory;
+namespace Insolvia.Domain.Memory;
 
 /// <summary>
 /// The in-memory <see cref="ITaxIdStore"/>. Keyed by (case, ref) — location plus

@@ -1,6 +1,6 @@
-using Insolvia.Core.AccessLog;
+using Insolvia.Domain.AccessLog;
 
-namespace Insolvia.Core.Ports;
+namespace Insolvia.Domain.Ports;
 
 /// <summary>
 /// Append-only record of who read or changed which case, client, credential

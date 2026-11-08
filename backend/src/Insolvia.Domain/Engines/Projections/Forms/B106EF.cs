@@ -1,8 +1,7 @@
-using Insolvia.Core;
-using Insolvia.Core.Claims;
-using static Insolvia.Engines.Projections.ProjectionHelpers;
+using Insolvia.Domain.Claims;
+using static Insolvia.Domain.Engines.Projections.ProjectionHelpers;
 
-namespace Insolvia.Engines.Projections.Forms;
+namespace Insolvia.Domain.Engines.Projections.Forms;
 
 /// <summary>
 /// B106E/F @ 2015-12-01 (revision 12/15) — Schedule E/F's mapping (from
@@ -96,7 +95,7 @@ public static class B106EF
         for (var index = 0; index < parties.Count; index++)
         {
             var (claim, party) = parties[index];
-            var address = party.Address ?? new Core.Fields.Address();
+            var address = party.Address ?? new Insolvia.Domain.Fields.Address();
             RowFill(release, values, "notify.name", index, TextOrNone(party.Name), problems);
             foreach (var (fieldId, part) in new[] { ("notify.street", address.Line1), ("notify.street2", address.Line2), ("notify.city", address.City), ("notify.state", address.State), ("notify.zip", address.PostalCode) })
             {

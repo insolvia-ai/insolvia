@@ -1,12 +1,12 @@
-using Insolvia.Core.Clients;
-using Insolvia.Core.DocumentRequests;
-using Insolvia.Core.FirmClients;
-using Insolvia.Core.Firms;
-using Insolvia.Core.LibraryCreditors;
-using Insolvia.Core.Memory;
-using Insolvia.Core.Questionnaires;
+using Insolvia.Domain.Clients;
+using Insolvia.Domain.DocumentRequests;
+using Insolvia.Domain.FirmClients;
+using Insolvia.Domain.Firms;
+using Insolvia.Domain.LibraryCreditors;
+using Insolvia.Domain.Memory;
+using Insolvia.Domain.Questionnaires;
 
-namespace Insolvia.Core.Tests;
+namespace Insolvia.Domain.Tests;
 
 // Translated from the MEMORY half of test_firm_store.py, plus the memory-store
 // tests of test_client_funnel.py, test_questionnaire's store tests (in

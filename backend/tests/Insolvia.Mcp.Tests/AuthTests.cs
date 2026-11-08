@@ -1,7 +1,7 @@
 using System.Net;
 using System.Security.Cryptography;
-using Insolvia.Core.Firms;
-using Insolvia.Core.Memory;
+using Insolvia.Domain.Firms;
+using Insolvia.Domain.Memory;
 using Insolvia.Mcp.Auth;
 using Insolvia.Mcp.Tests.Support;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -42,11 +42,11 @@ public sealed class AuthTests
                 ["proposals"] = new System.Text.Json.Nodes.JsonArray(new System.Text.Json.Nodes.JsonObject { ["entityType"] = "creditors", ["payload"] = new System.Text.Json.Nodes.JsonObject { ["name"] = "Example Bank" } }),
             },
             McpHost.Auth(Token(clientId: SecondClientId)));
-        var stored = await ((MemoryCandidateStore)host.Services.GetService(typeof(Core.Ports.ICandidateStore))!).ListForCaseAsync(found.Id, Ct);
+        var stored = await ((MemoryCandidateStore)host.Services.GetService(typeof(Insolvia.Domain.Ports.ICandidateStore))!).ListForCaseAsync(found.Id, Ct);
         var candidate = Assert.Single(stored);
         Assert.Equal(SecondClientId, candidate.Origin.ClientId);
         Assert.Equal(Subject, candidate.Origin.Subject);
-        Assert.Equal(Core.Candidates.OriginChannel.Mcp, candidate.Origin.Channel);
+        Assert.Equal(Insolvia.Domain.Candidates.OriginChannel.Mcp, candidate.Origin.Channel);
     }
 
     [Fact]
@@ -64,7 +64,7 @@ public sealed class AuthTests
         foreach (var token in new[]
         {
             "not-a-jwt",
-            Token(expiresIn: -60 - Core.Auth.TokenVerification.ClockSkewSeconds),
+            Token(expiresIn: -60 - Insolvia.Domain.Auth.TokenVerification.ClockSkewSeconds),
             Token(issuer: Issuer + "x"),
             Token(tokenUse: "id"),
             Token(kid: "unknown-key"),

@@ -1,14 +1,14 @@
 using System.Net.Http.Headers;
 using System.Text.Json;
 using Amazon.Runtime.Credentials;
-using Insolvia.Aws.Signing;
+using Insolvia.Platform.Signing;
 
-namespace Insolvia.Aws.Mailer;
+namespace Insolvia.Platform.Mailer;
 
 /// <summary>
 /// One transactional message, as the mailer's contract names its fields
 /// (Python's <c>OutboundEmail</c>, which the API's port carries; this is the
-/// adapter's own copy so Insolvia.Aws needs nothing from a host).
+/// adapter's own copy so Insolvia.Platform needs nothing from a host).
 /// </summary>
 /// <param name="Category">One of the mailer's allow-listed categories for <c>insolvia_api</c>.</param>
 /// <param name="MessageClass">Always <c>transactional</c> today.</param>

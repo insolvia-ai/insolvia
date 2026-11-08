@@ -1,7 +1,7 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
 
-namespace Insolvia.Core.Cases;
+namespace Insolvia.Domain.Cases;
 
 /// <summary>
 /// The identifying parts of a court case number (from <c>case_numbers.py</c>).

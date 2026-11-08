@@ -1,12 +1,12 @@
-using Insolvia.Core;
-using Insolvia.Core.DocumentRequests;
-using Insolvia.Core.FirmClients;
-using Insolvia.Core.Firms;
-using Insolvia.Core.LibraryCreditors;
-using Insolvia.Core.Ports;
-using Insolvia.Core.Questionnaires;
 using Insolvia.Data.Concurrency;
 using Insolvia.Data.Storage;
+using Insolvia.Domain;
+using Insolvia.Domain.DocumentRequests;
+using Insolvia.Domain.FirmClients;
+using Insolvia.Domain.Firms;
+using Insolvia.Domain.LibraryCreditors;
+using Insolvia.Domain.Ports;
+using Insolvia.Domain.Questionnaires;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 
@@ -14,7 +14,7 @@ namespace Insolvia.Data.Firms;
 
 /// <summary>
 /// The Postgres <see cref="IFirmStore"/> (Python's <c>DynamoDbFirmStore</c>),
-/// held to <see cref="Core.Memory.MemoryFirmStore"/> by the conformance suite.
+/// held to <see cref="Insolvia.Domain.Memory.MemoryFirmStore"/> by the conformance suite.
 /// Every DynamoDB condition is the <c>WHERE</c> of one statement, and every
 /// <c>TransactWriteItems</c> is one transaction:
 /// <list type="bullet">

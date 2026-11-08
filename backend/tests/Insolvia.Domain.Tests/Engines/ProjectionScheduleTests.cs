@@ -1,15 +1,14 @@
-using Insolvia.Core;
-using Insolvia.Core.Assets;
-using Insolvia.Core.Cases;
-using Insolvia.Core.Claims;
-using Insolvia.Core.Debtors;
-using Insolvia.Core.Exemptions;
-using Insolvia.Core.Fields;
-using Insolvia.Engines.Projections;
-using Insolvia.Engines.Tests.Support;
-using static Insolvia.Engines.Tests.Support.Projected;
+using Insolvia.Domain.Assets;
+using Insolvia.Domain.Cases;
+using Insolvia.Domain.Claims;
+using Insolvia.Domain.Debtors;
+using Insolvia.Domain.Engines.Projections;
+using Insolvia.Domain.Engines.Tests.Support;
+using Insolvia.Domain.Exemptions;
+using Insolvia.Domain.Fields;
+using static Insolvia.Domain.Engines.Tests.Support.Projected;
 
-namespace Insolvia.Engines.Tests;
+namespace Insolvia.Domain.Engines.Tests;
 
 // Translated from services/api/tests/unit/test_form_projections.py — the
 // targeted mappings for B101 and Schedules A/B, C, D, E/F, G and B108, over

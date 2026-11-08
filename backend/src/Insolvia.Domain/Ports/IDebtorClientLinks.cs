@@ -1,6 +1,6 @@
-using Insolvia.Core.Debtors;
+using Insolvia.Domain.Debtors;
 
-namespace Insolvia.Core.Ports;
+namespace Insolvia.Domain.Ports;
 
 /// <summary>
 /// The three things a client merge asks of the debtor store (Python's

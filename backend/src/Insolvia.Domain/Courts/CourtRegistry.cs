@@ -2,9 +2,9 @@ using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
-using Insolvia.Core.Ports;
+using Insolvia.Domain.Ports;
 
-namespace Insolvia.Core.Courts;
+namespace Insolvia.Domain.Courts;
 
 /// <summary>
 /// The court registry: the committed <c>courts/us-bankruptcy</c> releases,
@@ -18,7 +18,7 @@ public sealed class CourtRegistry : ICourtRegistry
     /// <summary>The series id.</summary>
     public const string SeriesId = "courts/us-bankruptcy";
 
-    private const string ResourcePrefix = "Insolvia.Core.Regulatory/";
+    private const string ResourcePrefix = "Insolvia.Domain.Regulatory/";
 
     private static readonly Lazy<CourtRegistry> ShippedRegistry = new(() => new CourtRegistry(CourtRegistryLoader.Load(EmbeddedFiles())));
 

@@ -1,9 +1,9 @@
 using Amazon.SQS;
 using Amazon.SQS.Model;
-using Insolvia.Core.Filings;
-using Insolvia.Core.Ports;
+using Insolvia.Domain.Filings;
+using Insolvia.Domain.Ports;
 
-namespace Insolvia.Aws.Filing;
+namespace Insolvia.Platform.Filing;
 
 /// <summary>
 /// The <see cref="IFilingJobSender"/> on the filing worker's own SQS queue

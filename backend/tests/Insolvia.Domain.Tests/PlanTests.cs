@@ -1,9 +1,9 @@
 using System.Globalization;
 using System.Text.Json.Nodes;
-using Insolvia.Core.Fields;
-using Insolvia.Core.Plans;
+using Insolvia.Domain.Fields;
+using Insolvia.Domain.Plans;
 
-namespace Insolvia.Core.Tests;
+namespace Insolvia.Domain.Tests;
 
 /// <summary>The Chapter 13 plan proposal, translated from test_plans.py.</summary>
 public sealed class PlanTests

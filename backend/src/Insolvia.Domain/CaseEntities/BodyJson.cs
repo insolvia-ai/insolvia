@@ -3,7 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 
-namespace Insolvia.Core.CaseEntities;
+namespace Insolvia.Domain.CaseEntities;
 
 /// <summary>
 /// A record body as plain nested JSON — Python's <c>dataclasses.asdict</c>

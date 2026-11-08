@@ -1,9 +1,9 @@
 using System.Text.Json.Nodes;
-using Insolvia.Core.Auth;
-using Insolvia.Core.Ports;
+using Insolvia.Domain.Auth;
+using Insolvia.Domain.Ports;
 using Microsoft.IdentityModel.Tokens;
 
-namespace Insolvia.Aws.Jwks;
+namespace Insolvia.Platform.Jwks;
 
 /// <summary>
 /// The pool's JWKS, fetched over HTTPS and cached (issue #79; Python's

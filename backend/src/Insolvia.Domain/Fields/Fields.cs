@@ -2,7 +2,7 @@ using System.Globalization;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 
-namespace Insolvia.Core.Fields;
+namespace Insolvia.Domain.Fields;
 
 // Ported from insolvia_core/fields.py: the scalar and structured field
 // parsers every entity shares. SHAPE AND TYPE ONLY, absent values accepted

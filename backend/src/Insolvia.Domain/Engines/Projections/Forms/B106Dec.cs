@@ -1,8 +1,8 @@
-using Insolvia.Core.Debtors;
-using Insolvia.Core.Petitions;
-using static Insolvia.Engines.Projections.ProjectionHelpers;
+using Insolvia.Domain.Debtors;
+using Insolvia.Domain.Petitions;
+using static Insolvia.Domain.Engines.Projections.ProjectionHelpers;
 
-namespace Insolvia.Engines.Projections.Forms;
+namespace Insolvia.Domain.Engines.Projections.Forms;
 
 /// <summary>
 /// B106Dec @ 2015-12-01 — the schedules declaration (from

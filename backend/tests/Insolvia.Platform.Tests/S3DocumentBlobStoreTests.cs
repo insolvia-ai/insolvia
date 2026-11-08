@@ -3,10 +3,10 @@ using System.Web;
 using Amazon;
 using Amazon.Runtime;
 using Amazon.S3;
-using Insolvia.Aws.Documents;
-using Insolvia.Core.Documents;
+using Insolvia.Domain.Documents;
+using Insolvia.Platform.Documents;
 
-namespace Insolvia.Aws.Tests;
+namespace Insolvia.Platform.Tests;
 
 /// <summary>
 /// The S3 blob adapter (adapters/aws/document_blobs.py, whose Python tests ran

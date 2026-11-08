@@ -1,8 +1,8 @@
-using Insolvia.Core.Cases;
-using Insolvia.Core.Filings;
-using Insolvia.Core.Ports;
+using Insolvia.Domain.Cases;
+using Insolvia.Domain.Filings;
+using Insolvia.Domain.Ports;
 
-namespace Insolvia.Core.Memory;
+namespace Insolvia.Domain.Memory;
 
 /// <summary>
 /// The in-memory <see cref="IFilingStore"/>. A write that files the case does

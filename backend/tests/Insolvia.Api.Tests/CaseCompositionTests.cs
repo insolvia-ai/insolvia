@@ -1,8 +1,8 @@
 using Insolvia.Api.Configuration;
-using Insolvia.Core.Local;
-using Insolvia.Core.Memory;
-using Insolvia.Core.Ports;
 using Insolvia.Data.Cases;
+using Insolvia.Domain.Local;
+using Insolvia.Domain.Memory;
+using Insolvia.Domain.Ports;
 using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace Insolvia.Api.Tests;
@@ -76,7 +76,7 @@ public sealed class CaseCompositionTests(WebApplicationFactory<Program> factory)
 
         // No pool, no KMS, no bucket on a laptop: the local twins.
         Assert.IsType<MemoryUserDirectory>(services.GetRequiredService<IUserDirectory>());
-        Assert.IsType<Insolvia.Aws.Sealing.LocalTaxIdCipher>(services.GetRequiredService<ITaxIdCipher>());
+        Assert.IsType<Insolvia.Platform.Sealing.LocalTaxIdCipher>(services.GetRequiredService<ITaxIdCipher>());
         Assert.IsType<DirectoryDocumentBlobStore>(services.GetRequiredService<IDocumentBlobStore>());
     }
 
@@ -110,7 +110,7 @@ public sealed class CaseCompositionTests(WebApplicationFactory<Program> factory)
             host.UseSetting("INSOLVIA_LOCAL_BLOB_URL", "http://127.0.0.1:18060");
         });
 
-        Assert.IsType<Insolvia.Aws.Documents.S3DocumentBlobStore>(lambda.Services.GetRequiredService<IDocumentBlobStore>());
+        Assert.IsType<Insolvia.Platform.Documents.S3DocumentBlobStore>(lambda.Services.GetRequiredService<IDocumentBlobStore>());
     }
 
     [Fact]

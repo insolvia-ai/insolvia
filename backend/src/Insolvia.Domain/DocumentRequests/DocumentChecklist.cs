@@ -1,8 +1,8 @@
 using System.Text.Json.Nodes;
-using Insolvia.Core.Documents;
-using Insolvia.Core.Fields;
+using Insolvia.Domain.Documents;
+using Insolvia.Domain.Fields;
 
-namespace Insolvia.Core.DocumentRequests;
+namespace Insolvia.Domain.DocumentRequests;
 
 /// <summary>
 /// One document a firm asks for. <see cref="Kind"/> is what an upload against

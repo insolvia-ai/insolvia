@@ -1,20 +1,20 @@
-using Insolvia.Core.Assets;
-using Insolvia.Core.Cases;
-using Insolvia.Core.Claims;
-using Insolvia.Core.Codebtors;
-using Insolvia.Core.ContractLeases;
-using Insolvia.Core.Creditors;
-using Insolvia.Core.Exemptions;
-using Insolvia.Core.Expenses;
-using Insolvia.Core.Income;
-using Insolvia.Core.MeansTest;
-using Insolvia.Core.Petitions;
-using Insolvia.Core.Plans;
-using Insolvia.Core.Ports;
-using Insolvia.Core.Sofa;
-using Insolvia.Core.TaxIds;
+using Insolvia.Domain.Assets;
+using Insolvia.Domain.Cases;
+using Insolvia.Domain.Claims;
+using Insolvia.Domain.Codebtors;
+using Insolvia.Domain.ContractLeases;
+using Insolvia.Domain.Creditors;
+using Insolvia.Domain.Exemptions;
+using Insolvia.Domain.Expenses;
+using Insolvia.Domain.Income;
+using Insolvia.Domain.MeansTest;
+using Insolvia.Domain.Petitions;
+using Insolvia.Domain.Plans;
+using Insolvia.Domain.Ports;
+using Insolvia.Domain.Sofa;
+using Insolvia.Domain.TaxIds;
 
-namespace Insolvia.Forms;
+namespace Insolvia.Domain.Forms;
 
 /// <summary>
 /// The two store reads every assembler shares (from <c>packet_assembly.py</c>'s
@@ -87,7 +87,7 @@ public static class CaseDataReads
             var digits = await TaxIdRules.ReadAsync(debtor.TaxId, data.Case.FirmId, data.Case.Id, debtor.FilingRole, principal, purpose, cipher, taxIdStore, accessLog, cancellationToken).ConfigureAwait(false);
             if (digits is not null)
             {
-                disclosed[Core.Wire.ToWire(debtor.FilingRole)] = digits;
+                disclosed[Insolvia.Domain.Wire.ToWire(debtor.FilingRole)] = digits;
             }
         }
 

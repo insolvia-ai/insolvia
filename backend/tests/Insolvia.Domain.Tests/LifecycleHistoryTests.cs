@@ -1,7 +1,7 @@
-using Insolvia.Core.Cases;
-using static Insolvia.Core.Tests.CaseFixtures;
+using Insolvia.Domain.Cases;
+using static Insolvia.Domain.Tests.CaseFixtures;
 
-namespace Insolvia.Core.Tests;
+namespace Insolvia.Domain.Tests;
 
 /// <summary>
 /// ADR 0027's lifecycle history (#506 row 2), built in .NET first: the one

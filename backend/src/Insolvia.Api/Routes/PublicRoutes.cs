@@ -4,8 +4,8 @@ using Insolvia.Api.Hosting;
 using Insolvia.Api.Http;
 using Insolvia.Api.Mail;
 using Insolvia.Api.Waitlist;
-using Insolvia.Core;
 using Insolvia.Data.Waitlist;
+using Insolvia.Domain;
 
 namespace Insolvia.Api.Routes;
 

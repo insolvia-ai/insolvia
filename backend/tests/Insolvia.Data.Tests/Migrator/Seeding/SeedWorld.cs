@@ -1,8 +1,8 @@
 using System.Security.Cryptography;
 using System.Text.Json.Nodes;
-using Insolvia.Aws.Sealing;
-using Insolvia.Core.Memory;
+using Insolvia.Domain.Memory;
 using Insolvia.Migrator.Seeding;
+using Insolvia.Platform.Sealing;
 
 namespace Insolvia.Migrator.Tests.Seeding;
 
@@ -242,7 +242,7 @@ internal sealed class SeedWorld : IDisposable
     }
 
     /// <summary>The one fixture case, read with no access rule, at the id the local target derives.</summary>
-    public async Task<Core.Cases.Case?> TheCaseAsync(string environment = "local")
+    public async Task<Insolvia.Domain.Cases.Case?> TheCaseAsync(string environment = "local")
     {
         var subject = Accounts.Subjects["e2e-admin@insolvia.test"];
         var firmId = (await Firms.FindUserAsync(subject, Ct))!.FirmId;

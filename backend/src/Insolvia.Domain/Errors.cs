@@ -1,4 +1,4 @@
-namespace Insolvia.Core;
+namespace Insolvia.Domain;
 
 // The expected-failure hierarchy, ported from insolvia_core/errors.py. The
 // API maps each type to a status code; the reasons each one exists (and why

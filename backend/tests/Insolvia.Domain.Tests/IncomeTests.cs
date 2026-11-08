@@ -1,7 +1,7 @@
 using System.Text.Json.Nodes;
-using Insolvia.Core.Income;
+using Insolvia.Domain.Income;
 
-namespace Insolvia.Core.Tests;
+namespace Insolvia.Domain.Tests;
 
 /// <summary>The dated income history, translated from test_income.py.</summary>
 public sealed class IncomeTests

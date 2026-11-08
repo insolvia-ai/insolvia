@@ -1,15 +1,15 @@
 using System.Text.Json.Nodes;
-using Insolvia.Core.Assets;
-using Insolvia.Core.CaseEntities;
-using Insolvia.Core.Claims;
-using Insolvia.Core.Codebtors;
-using Insolvia.Core.ContractLeases;
-using Insolvia.Core.Creditors;
-using Insolvia.Core.Exemptions;
-using Insolvia.Core.Expenses;
-using Insolvia.Core.Provenance;
+using Insolvia.Domain.Assets;
+using Insolvia.Domain.CaseEntities;
+using Insolvia.Domain.Claims;
+using Insolvia.Domain.Codebtors;
+using Insolvia.Domain.ContractLeases;
+using Insolvia.Domain.Creditors;
+using Insolvia.Domain.Exemptions;
+using Insolvia.Domain.Expenses;
+using Insolvia.Domain.Provenance;
 
-namespace Insolvia.Core.Tests;
+namespace Insolvia.Domain.Tests;
 
 /// <summary>The machinery every case collection shares, translated from test_case_entities.py.</summary>
 public sealed class CaseEntityTests

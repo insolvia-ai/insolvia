@@ -1,5 +1,5 @@
 using System.Text.Json.Nodes;
-using Insolvia.Core.Jobs;
+using Insolvia.Domain.Jobs;
 
 namespace Insolvia.Worker;
 

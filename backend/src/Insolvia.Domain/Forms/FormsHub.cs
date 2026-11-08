@@ -1,12 +1,11 @@
 using System.Globalization;
 using System.Text.Json.Nodes;
-using Insolvia.Core;
-using Insolvia.Core.Cases;
-using Insolvia.Core.Claims;
-using Insolvia.Engines;
-using Insolvia.Engines.Projections;
+using Insolvia.Domain.Cases;
+using Insolvia.Domain.Claims;
+using Insolvia.Domain.Engines;
+using Insolvia.Domain.Engines.Projections;
 
-namespace Insolvia.Forms;
+namespace Insolvia.Domain.Forms;
 
 /// <summary>The hub row's one number: an item count (Schedules A/B-H) or a dollar total (I, J).</summary>
 public sealed record FormMetric(string Kind, string Value);
@@ -105,8 +104,8 @@ public static class FormsHub
             ["form/b106ef"] = new("count", Count(ProjectionHelpers.ClaimsOf(caseFile, ClaimClass.PriorityUnsecured, ClaimClass.NonpriorityUnsecured).Count)),
             ["form/b106g"] = new("count", Count(data.ContractLeases.Count)),
             ["form/b106h"] = new("count", Count(data.Codebtors.Count + data.CommunityHouseholdMembers.Count)),
-            ["form/b106i"] = new("total", Engines.Exact.F(totals.MonthlyIncome)),
-            ["form/b106j"] = new("total", Engines.Exact.F(totals.MonthlyExpenses)),
+            ["form/b106i"] = new("total", Insolvia.Domain.Engines.Exact.F(totals.MonthlyIncome)),
+            ["form/b106j"] = new("total", Insolvia.Domain.Engines.Exact.F(totals.MonthlyExpenses)),
         };
     }
 
@@ -130,7 +129,7 @@ public static class FormsHub
             catch (EngineLookupException error)
             {
                 (title, officialNumber, form) = (string.Empty, string.Empty, seriesId["form/".Length..]);
-                problems = [.. problems, new PacketProblem(seriesId, null, string.Empty, Engines.Exact.Str(error))];
+                problems = [.. problems, new PacketProblem(seriesId, null, string.Empty, Insolvia.Domain.Engines.Exact.Str(error))];
             }
 
             summaries.Add(new FormSummary(seriesId, form, title, officialNumber, metrics.GetValueOrDefault(seriesId), problems));
@@ -185,7 +184,7 @@ public static class FormsHub
         }
         catch (EngineLookupException error)
         {
-            return (null, [new PacketProblem(seriesId, null, string.Empty, Engines.Exact.Str(error))]);
+            return (null, [new PacketProblem(seriesId, null, string.Empty, Insolvia.Domain.Engines.Exact.Str(error))]);
         }
 
         FieldValues values;

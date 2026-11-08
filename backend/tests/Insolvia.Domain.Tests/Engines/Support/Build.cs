@@ -1,10 +1,10 @@
 using System.Text.Json.Nodes;
-using Insolvia.Core.CaseEntities;
-using Insolvia.Core.Cases;
-using Insolvia.Core.Debtors;
-using Insolvia.Core.Fields;
+using Insolvia.Domain.CaseEntities;
+using Insolvia.Domain.Cases;
+using Insolvia.Domain.Debtors;
+using Insolvia.Domain.Fields;
 
-namespace Insolvia.Engines.Tests.Support;
+namespace Insolvia.Domain.Engines.Tests.Support;
 
 /// <summary>The record builders the translated suites share — every identifier obviously fake (this repo is public).</summary>
 internal static class Build

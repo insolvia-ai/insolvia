@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace Insolvia.Core.Auth;
+namespace Insolvia.Domain.Auth;
 
 /// <summary>
 /// Why verification failed, at a granularity that is safe to log: a category

@@ -1,12 +1,12 @@
 using System.Text;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
-using Insolvia.Engines.Projections;
+using Insolvia.Domain.Engines.Projections;
 using PdfSharp.Pdf;
 using PdfSharp.Pdf.IO;
-using static Insolvia.Forms.Pdf.PdfObjects;
+using static Insolvia.Domain.Forms.Pdf.PdfObjects;
 
-namespace Insolvia.Forms.Tests.Support;
+namespace Insolvia.Domain.Forms.Tests.Support;
 
 /// <summary>
 /// The goldens' reader (test_form_fill.py's <c>read_form</c>), on PDFsharp:

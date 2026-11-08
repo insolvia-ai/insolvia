@@ -1,8 +1,8 @@
 using System.Text;
 using PdfSharp.Pdf;
-using static Insolvia.Forms.Pdf.PdfObjects;
+using static Insolvia.Domain.Forms.Pdf.PdfObjects;
 
-namespace Insolvia.Forms;
+namespace Insolvia.Domain.Forms;
 
 /// <summary>
 /// Raw content-stream text drawing (from <c>core/pdf_draw.py</c>), shared by

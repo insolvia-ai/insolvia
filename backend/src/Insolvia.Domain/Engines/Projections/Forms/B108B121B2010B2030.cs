@@ -1,13 +1,12 @@
 using System.Text.RegularExpressions;
-using Insolvia.Core;
-using Insolvia.Core.Claims;
-using Insolvia.Core.Debtors;
-using Insolvia.Core.Petitions;
-using Insolvia.Core.TaxIds;
-using Insolvia.Engines.Liens;
-using static Insolvia.Engines.Projections.ProjectionHelpers;
+using Insolvia.Domain.Claims;
+using Insolvia.Domain.Debtors;
+using Insolvia.Domain.Engines.Liens;
+using Insolvia.Domain.Petitions;
+using Insolvia.Domain.TaxIds;
+using static Insolvia.Domain.Engines.Projections.ProjectionHelpers;
 
-namespace Insolvia.Engines.Projections.Forms;
+namespace Insolvia.Domain.Engines.Projections.Forms;
 
 /// <summary>
 /// B108 @ 2015-12-01 — the Statement of Intention (from <c>form_projections/b108.py</c>):

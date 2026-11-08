@@ -1,9 +1,9 @@
 using System.Text.Json.Nodes;
-using Insolvia.Core.Assets;
-using Insolvia.Core.Claims;
-using Insolvia.Engines.Projections;
+using Insolvia.Domain.Assets;
+using Insolvia.Domain.Claims;
+using Insolvia.Domain.Engines.Projections;
 
-namespace Insolvia.Engines.Liens;
+namespace Insolvia.Domain.Engines.Liens;
 
 // The lien arithmetic (from core/liens.py, issue #345): what each secured claim
 // is secured by, how much of it the collateral covers, and what each asset

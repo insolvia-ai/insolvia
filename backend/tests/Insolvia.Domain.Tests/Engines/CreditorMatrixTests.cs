@@ -1,12 +1,12 @@
 using System.Text;
 using System.Text.Json.Nodes;
-using Insolvia.Core.Courts;
-using Insolvia.Core.Creditors;
-using Insolvia.Core.Fields;
-using Insolvia.Engines.CreditorMatrix;
-using Insolvia.Engines.Tests.Support;
+using Insolvia.Domain.Courts;
+using Insolvia.Domain.Creditors;
+using Insolvia.Domain.Engines.CreditorMatrix;
+using Insolvia.Domain.Engines.Tests.Support;
+using Insolvia.Domain.Fields;
 
-namespace Insolvia.Engines.Tests;
+namespace Insolvia.Domain.Engines.Tests;
 
 // Translated from services/api/tests/unit/test_creditor_matrix.py: the court
 // format rules, what the generator refuses, district variance read from the

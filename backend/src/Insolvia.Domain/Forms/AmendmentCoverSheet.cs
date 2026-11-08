@@ -1,11 +1,11 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
-using Insolvia.Core.Debtors;
-using Insolvia.Engines.Projections;
-using Insolvia.Forms.Pdf;
+using Insolvia.Domain.Debtors;
+using Insolvia.Domain.Engines.Projections;
+using Insolvia.Domain.Forms.Pdf;
 using PdfSharp.Pdf;
 
-namespace Insolvia.Forms;
+namespace Insolvia.Domain.Forms;
 
 /// <summary>
 /// The amendment cover sheet (from <c>core/amendment_cover_sheet.py</c>,

@@ -1,8 +1,8 @@
 using System.Security.Cryptography;
 using Amazon.KeyManagementService.Model;
-using Insolvia.Core.TaxIds;
+using Insolvia.Domain.TaxIds;
 
-namespace Insolvia.Aws.Tests.Sealing;
+namespace Insolvia.Platform.Tests.Sealing;
 
 /// <summary>
 /// Every Python-sealed fixture, tampered with every way that matters, is

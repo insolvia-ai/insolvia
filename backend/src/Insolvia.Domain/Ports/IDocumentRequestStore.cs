@@ -1,6 +1,6 @@
-using Insolvia.Core.DocumentRequests;
+using Insolvia.Domain.DocumentRequests;
 
-namespace Insolvia.Core.Ports;
+namespace Insolvia.Domain.Ports;
 
 /// <summary>
 /// Persists a case's document requests (ADR 0023 PR 5; Python's

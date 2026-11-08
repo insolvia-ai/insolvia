@@ -1,11 +1,11 @@
 using System.Text.Json.Nodes;
-using Insolvia.Core.Assets;
-using Insolvia.Core.Claims;
-using Insolvia.Engines.Liens;
-using Insolvia.Engines.Projections;
-using Insolvia.Engines.Tests.Support;
+using Insolvia.Domain.Assets;
+using Insolvia.Domain.Claims;
+using Insolvia.Domain.Engines.Liens;
+using Insolvia.Domain.Engines.Projections;
+using Insolvia.Domain.Engines.Tests.Support;
 
-namespace Insolvia.Engines.Tests;
+namespace Insolvia.Domain.Engines.Tests;
 
 // Translated from services/api/tests/unit/test_liens.py: the lien arithmetic,
 // each case a file of just assets and claims, every subtraction visible by eye.

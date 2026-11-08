@@ -1,4 +1,4 @@
-using Insolvia.Core.FirmClients;
+using Insolvia.Domain.FirmClients;
 using Microsoft.EntityFrameworkCore;
 
 namespace Insolvia.Data.Firms;

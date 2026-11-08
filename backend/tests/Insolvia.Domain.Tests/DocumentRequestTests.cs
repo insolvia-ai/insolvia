@@ -1,8 +1,8 @@
-using Insolvia.Core.DocumentRequests;
-using Insolvia.Core.Documents;
-using Insolvia.Core.Memory;
+using Insolvia.Domain.DocumentRequests;
+using Insolvia.Domain.Documents;
+using Insolvia.Domain.Memory;
 
-namespace Insolvia.Core.Tests;
+namespace Insolvia.Domain.Tests;
 
 /// <summary>
 /// The CASE half of document requests, translated from

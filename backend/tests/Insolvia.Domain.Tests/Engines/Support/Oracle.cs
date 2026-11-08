@@ -1,15 +1,15 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using Insolvia.Core.Plans;
-using Insolvia.Engines.CreditorMatrix;
-using Insolvia.Engines.Exemptions;
-using Insolvia.Engines.Liens;
-using Insolvia.Engines.MeansTest;
-using Insolvia.Engines.Plans;
-using Insolvia.Engines.Projections;
-using Insolvia.Engines.Standards;
+using Insolvia.Domain.Engines.CreditorMatrix;
+using Insolvia.Domain.Engines.Exemptions;
+using Insolvia.Domain.Engines.Liens;
+using Insolvia.Domain.Engines.MeansTest;
+using Insolvia.Domain.Engines.Plans;
+using Insolvia.Domain.Engines.Projections;
+using Insolvia.Domain.Engines.Standards;
+using Insolvia.Domain.Plans;
 
-namespace Insolvia.Engines.Tests.Support;
+namespace Insolvia.Domain.Engines.Tests.Support;
 
 /// <summary>
 /// Produces, for one case file, exactly the document the Python oracle

@@ -1,9 +1,9 @@
 using Amazon.SQS;
 using Amazon.SQS.Model;
-using Insolvia.Core.Jobs;
-using Insolvia.Core.Ports;
+using Insolvia.Domain.Jobs;
+using Insolvia.Domain.Ports;
 
-namespace Insolvia.Aws.Jobs;
+namespace Insolvia.Platform.Jobs;
 
 /// <summary>
 /// The enqueue side of the pipeline (Python's <c>SqsJobQueue</c>; ADR 0018).

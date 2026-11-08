@@ -2,7 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using PdfSharp.Pdf;
 
-namespace Insolvia.Forms.Pdf;
+namespace Insolvia.Domain.Forms.Pdf;
 
 /// <summary>
 /// Same input, same bytes. PDFsharp 6.2.4 stamps every save with a fresh

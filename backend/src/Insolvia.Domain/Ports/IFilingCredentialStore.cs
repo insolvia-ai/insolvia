@@ -1,6 +1,6 @@
-using Insolvia.Core.FilingCredentials;
+using Insolvia.Domain.FilingCredentials;
 
-namespace Insolvia.Core.Ports;
+namespace Insolvia.Domain.Ports;
 
 /// <summary>
 /// Persists the vault's credentials (Python's <c>FilingCredentialStore</c>).

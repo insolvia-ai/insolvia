@@ -1,9 +1,9 @@
-using Insolvia.Core.Debtors;
-using Insolvia.Core.FirmClients;
-using Insolvia.Core.Memory;
-using Insolvia.Core.Ports;
+using Insolvia.Domain.Debtors;
+using Insolvia.Domain.FirmClients;
+using Insolvia.Domain.Memory;
+using Insolvia.Domain.Ports;
 
-namespace Insolvia.Core.Tests;
+namespace Insolvia.Domain.Tests;
 
 /// <summary>
 /// The real <see cref="MemoryDebtorStore"/> (18.7), with the two affordances
@@ -58,23 +58,23 @@ internal sealed class RacingFirmStore(MemoryFirmStore inner) : IFirmStore
 {
     public bool FinishTwice { get; set; }
 
-    public Task CreateFirmAsync(Insolvia.Core.Firms.Firm firm, CancellationToken cancellationToken = default) => inner.CreateFirmAsync(firm, cancellationToken);
+    public Task CreateFirmAsync(Insolvia.Domain.Firms.Firm firm, CancellationToken cancellationToken = default) => inner.CreateFirmAsync(firm, cancellationToken);
 
-    public Task<Insolvia.Core.Firms.Firm?> GetFirmAsync(string firmId, CancellationToken cancellationToken = default) => inner.GetFirmAsync(firmId, cancellationToken);
+    public Task<Insolvia.Domain.Firms.Firm?> GetFirmAsync(string firmId, CancellationToken cancellationToken = default) => inner.GetFirmAsync(firmId, cancellationToken);
 
-    public Task<IReadOnlyList<Insolvia.Core.Firms.Firm>> ListFirmsAsync(CancellationToken cancellationToken = default) => inner.ListFirmsAsync(cancellationToken);
+    public Task<IReadOnlyList<Insolvia.Domain.Firms.Firm>> ListFirmsAsync(CancellationToken cancellationToken = default) => inner.ListFirmsAsync(cancellationToken);
 
-    public Task<Insolvia.Core.Firms.Firm?> UpdateFirmAsync(Insolvia.Core.Firms.Firm firm, CancellationToken cancellationToken = default) => inner.UpdateFirmAsync(firm, cancellationToken);
+    public Task<Insolvia.Domain.Firms.Firm?> UpdateFirmAsync(Insolvia.Domain.Firms.Firm firm, CancellationToken cancellationToken = default) => inner.UpdateFirmAsync(firm, cancellationToken);
 
-    public Task AddUserAsync(Insolvia.Core.Firms.FirmUser user, CancellationToken cancellationToken = default) => inner.AddUserAsync(user, cancellationToken);
+    public Task AddUserAsync(Insolvia.Domain.Firms.FirmUser user, CancellationToken cancellationToken = default) => inner.AddUserAsync(user, cancellationToken);
 
-    public Task<Insolvia.Core.Firms.FirmUser?> GetUserAsync(string firmId, string subject, CancellationToken cancellationToken = default) => inner.GetUserAsync(firmId, subject, cancellationToken);
+    public Task<Insolvia.Domain.Firms.FirmUser?> GetUserAsync(string firmId, string subject, CancellationToken cancellationToken = default) => inner.GetUserAsync(firmId, subject, cancellationToken);
 
-    public Task<Insolvia.Core.Firms.FirmUser?> FindUserAsync(string subject, CancellationToken cancellationToken = default) => inner.FindUserAsync(subject, cancellationToken);
+    public Task<Insolvia.Domain.Firms.FirmUser?> FindUserAsync(string subject, CancellationToken cancellationToken = default) => inner.FindUserAsync(subject, cancellationToken);
 
-    public Task<IReadOnlyList<Insolvia.Core.Firms.FirmUser>> ListUsersAsync(string firmId, CancellationToken cancellationToken = default) => inner.ListUsersAsync(firmId, cancellationToken);
+    public Task<IReadOnlyList<Insolvia.Domain.Firms.FirmUser>> ListUsersAsync(string firmId, CancellationToken cancellationToken = default) => inner.ListUsersAsync(firmId, cancellationToken);
 
-    public Task<Insolvia.Core.Firms.FirmUser?> UpdateUserAsync(Insolvia.Core.Firms.FirmUser user, CancellationToken cancellationToken = default) => inner.UpdateUserAsync(user, cancellationToken);
+    public Task<Insolvia.Domain.Firms.FirmUser?> UpdateUserAsync(Insolvia.Domain.Firms.FirmUser user, CancellationToken cancellationToken = default) => inner.UpdateUserAsync(user, cancellationToken);
 
     public Task<bool> RemoveUserAsync(string firmId, string subject, CancellationToken cancellationToken = default) => inner.RemoveUserAsync(firmId, subject, cancellationToken);
 

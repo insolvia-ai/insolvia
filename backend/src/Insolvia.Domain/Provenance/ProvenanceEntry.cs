@@ -1,7 +1,7 @@
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 
-namespace Insolvia.Core.Provenance;
+namespace Insolvia.Domain.Provenance;
 
 /// <summary>
 /// Who supplied a value. Order is Python's <c>SOURCES</c> tuple — it is the

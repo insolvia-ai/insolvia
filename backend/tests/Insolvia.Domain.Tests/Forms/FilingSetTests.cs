@@ -1,12 +1,11 @@
 using System.Text;
-using Insolvia.Core;
-using Insolvia.Core.Cases;
-using Insolvia.Core.Courts;
-using Insolvia.Engines.CreditorMatrix;
-using Insolvia.Forms.Tests.Support;
+using Insolvia.Domain.Cases;
+using Insolvia.Domain.Courts;
+using Insolvia.Domain.Engines.CreditorMatrix;
+using Insolvia.Domain.Forms.Tests.Support;
 using PdfSharp.Pdf;
 
-namespace Insolvia.Forms.Tests;
+namespace Insolvia.Domain.Forms.Tests;
 
 // test_filing_set.py and test_packets.py, translated, with the measurements
 // (pdf_measure) and the approval digest (filing_approval's basis): the

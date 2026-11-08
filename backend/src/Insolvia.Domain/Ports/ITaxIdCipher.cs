@@ -1,6 +1,6 @@
-using Insolvia.Core.TaxIds;
+using Insolvia.Domain.TaxIds;
 
-namespace Insolvia.Core.Ports;
+namespace Insolvia.Domain.Ports;
 
 /// <summary>
 /// Seals and opens one tax identifier under the case key (Python's

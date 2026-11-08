@@ -1,19 +1,19 @@
-using Insolvia.Core.Assets;
-using Insolvia.Core.Cases;
-using Insolvia.Core.Claims;
-using Insolvia.Core.Codebtors;
-using Insolvia.Core.ContractLeases;
-using Insolvia.Core.Creditors;
-using Insolvia.Core.Debtors;
-using Insolvia.Core.Exemptions;
-using Insolvia.Core.Expenses;
-using Insolvia.Core.Income;
-using Insolvia.Core.MeansTest;
-using Insolvia.Core.Petitions;
-using Insolvia.Core.Plans;
-using Insolvia.Core.Sofa;
+using Insolvia.Domain.Assets;
+using Insolvia.Domain.Cases;
+using Insolvia.Domain.Claims;
+using Insolvia.Domain.Codebtors;
+using Insolvia.Domain.ContractLeases;
+using Insolvia.Domain.Creditors;
+using Insolvia.Domain.Debtors;
+using Insolvia.Domain.Exemptions;
+using Insolvia.Domain.Expenses;
+using Insolvia.Domain.Income;
+using Insolvia.Domain.MeansTest;
+using Insolvia.Domain.Petitions;
+using Insolvia.Domain.Plans;
+using Insolvia.Domain.Sofa;
 
-namespace Insolvia.Engines.Projections;
+namespace Insolvia.Domain.Engines.Projections;
 
 /// <summary>
 /// Everything a projection reads, in presentation order (from

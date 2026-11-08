@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace Insolvia.Core.Courts;
+namespace Insolvia.Domain.Courts;
 
 // The court registry's records (from courts.py; issue #360 / 14.8): what a
 // district record needs for a filing — identity, divisions with their CM/ECF

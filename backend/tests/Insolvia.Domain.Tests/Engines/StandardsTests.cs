@@ -1,9 +1,9 @@
-using Insolvia.Core.Debtors;
-using Insolvia.Core.Expenses;
-using Insolvia.Engines.Standards;
-using Insolvia.Engines.Tests.Support;
+using Insolvia.Domain.Debtors;
+using Insolvia.Domain.Engines.Standards;
+using Insolvia.Domain.Engines.Tests.Support;
+using Insolvia.Domain.Expenses;
 
-namespace Insolvia.Engines.Tests;
+namespace Insolvia.Domain.Engines.Tests;
 
 // Translated from services/api/tests/unit/test_standards.py: the household
 // jurisdiction derivation and the standards lookup, and their degrade paths.

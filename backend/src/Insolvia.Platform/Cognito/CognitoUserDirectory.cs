@@ -1,9 +1,9 @@
 using Amazon.CognitoIdentityProvider;
 using Amazon.CognitoIdentityProvider.Model;
-using Insolvia.Core;
-using Insolvia.Core.Ports;
+using Insolvia.Domain;
+using Insolvia.Domain.Ports;
 
-namespace Insolvia.Aws.Cognito;
+namespace Insolvia.Platform.Cognito;
 
 /// <summary>
 /// <see cref="IUserDirectory"/> backed by the environment's firm Cognito pool

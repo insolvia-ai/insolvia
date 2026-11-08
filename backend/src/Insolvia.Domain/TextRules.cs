@@ -1,7 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Text;
 
-namespace Insolvia.Core;
+namespace Insolvia.Domain;
 
 /// <summary>
 /// The handful of Python <c>str</c> behaviours the domain's rules lean on,

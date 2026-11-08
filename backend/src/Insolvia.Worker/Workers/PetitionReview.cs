@@ -2,16 +2,16 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
-using Insolvia.Core;
-using Insolvia.Core.AccessLog;
-using Insolvia.Core.CaseEntities;
-using Insolvia.Core.Cases;
-using Insolvia.Core.Debtors;
-using Insolvia.Core.Jobs;
-using Insolvia.Core.Ports;
-using Insolvia.Engines.CreditorMatrix;
-using Insolvia.Engines.Projections;
-using Insolvia.Forms;
+using Insolvia.Domain;
+using Insolvia.Domain.AccessLog;
+using Insolvia.Domain.CaseEntities;
+using Insolvia.Domain.Cases;
+using Insolvia.Domain.Debtors;
+using Insolvia.Domain.Engines.CreditorMatrix;
+using Insolvia.Domain.Engines.Projections;
+using Insolvia.Domain.Forms;
+using Insolvia.Domain.Jobs;
+using Insolvia.Domain.Ports;
 
 namespace Insolvia.Worker.Workers;
 

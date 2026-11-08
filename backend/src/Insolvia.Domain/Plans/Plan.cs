@@ -1,9 +1,9 @@
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
-using Insolvia.Core.CaseEntities;
-using Insolvia.Core.Fields;
+using Insolvia.Domain.CaseEntities;
+using Insolvia.Domain.Fields;
 
-namespace Insolvia.Core.Plans;
+namespace Insolvia.Domain.Plans;
 
 // From plans.py: the Chapter 13 plan's PROPOSAL (issue 16.2 / #366), one per
 // case. Its figures are the calculator's, never stored.

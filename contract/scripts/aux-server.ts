@@ -15,7 +15,7 @@
 //   derives for the Cognito-shaped issuer the API and MCP hosts trust;
 // - GET /google/certs — the admin host's GOOGLE_JWKS_URL (local only);
 // - PUT/GET /blobs/<ref, escaped whole>?method=… — the capabilities the
-//   API's DirectoryDocumentBlobStore (backend/src/Insolvia.Core/Local) mints
+//   API's DirectoryDocumentBlobStore (backend/src/Insolvia.Domain/Local) mints
 //   over the SAME directory: an object at <dir>/<ref>, its content type at
 //   <dir>/<ref>.content-type. A PUT is refused, as S3 would refuse it, unless
 //   its Content-Type and byte count are the ones bound into the URL.

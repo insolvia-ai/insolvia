@@ -1,8 +1,8 @@
 using Insolvia.Api.Configuration;
-using Insolvia.Aws.Sealing;
-using Insolvia.Core.Memory;
-using Insolvia.Core.Ports;
 using Insolvia.Data.Vault;
+using Insolvia.Domain.Memory;
+using Insolvia.Domain.Ports;
+using Insolvia.Platform.Sealing;
 using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace Insolvia.Api.Tests;

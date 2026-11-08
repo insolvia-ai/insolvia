@@ -6,8 +6,8 @@ namespace Insolvia.Data.Waitlist;
 
 // The marketing site's waitlist (services/api core/waitlist.py and its two
 // adapters). The port, the record and the memory twin live HERE rather than in
-// Insolvia.Core only because Core was closed to this change (#525, while the
-// case domain landed there): they move to Core.Ports / Core.Memory unchanged
+// Insolvia.Domain only because Core was closed to this change (#525, while the
+// case domain landed there): they move to Insolvia.Domain.Ports / Insolvia.Domain.Memory unchanged
 // when it opens, and nothing outside this file names their namespace but the
 // API's composition and its tests.
 

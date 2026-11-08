@@ -1,8 +1,8 @@
 using System.Text.Json.Nodes;
-using Insolvia.Engines.Projections;
-using Insolvia.Engines.Projections.Forms;
+using Insolvia.Domain.Engines.Projections;
+using Insolvia.Domain.Engines.Projections.Forms;
 
-namespace Insolvia.Engines.MeansTest;
+namespace Insolvia.Domain.Engines.MeansTest;
 
 /// <summary>One run of the test for the screen: the inputs as the engine read them, the outcome when reached, and every reason it was not.</summary>
 public sealed record MeansTestTrace(

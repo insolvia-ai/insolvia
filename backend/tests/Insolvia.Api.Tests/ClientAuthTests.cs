@@ -2,8 +2,8 @@ using System.Text.Json.Nodes;
 using Insolvia.Api.Auth;
 using Insolvia.Api.Logging;
 using Insolvia.Api.Tests.Support;
-using Insolvia.Core.AccessLog;
-using Insolvia.Core.Clients;
+using Insolvia.Domain.AccessLog;
+using Insolvia.Domain.Clients;
 using Microsoft.AspNetCore.Mvc.Testing;
 using static Insolvia.Api.Tests.Support.HttpAssert;
 

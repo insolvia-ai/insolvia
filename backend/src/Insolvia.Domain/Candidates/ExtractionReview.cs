@@ -1,14 +1,14 @@
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
-using Insolvia.Core.CaseEntities;
-using Insolvia.Core.Cases;
-using Insolvia.Core.Clients;
-using Insolvia.Core.Debtors;
-using Insolvia.Core.Provenance;
-using Insolvia.Core.Questionnaires;
-using Insolvia.Core.Questions;
+using Insolvia.Domain.CaseEntities;
+using Insolvia.Domain.Cases;
+using Insolvia.Domain.Clients;
+using Insolvia.Domain.Debtors;
+using Insolvia.Domain.Provenance;
+using Insolvia.Domain.Questionnaires;
+using Insolvia.Domain.Questions;
 
-namespace Insolvia.Core.Candidates;
+namespace Insolvia.Domain.Candidates;
 
 /// <summary>One validated review request.</summary>
 /// <param name="Accept">Accept (true) or reject.</param>

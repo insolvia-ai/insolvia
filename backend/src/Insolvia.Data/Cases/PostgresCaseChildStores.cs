@@ -1,13 +1,13 @@
-using Insolvia.Core;
-using Insolvia.Core.Candidates;
-using Insolvia.Core.CaseEntities;
-using Insolvia.Core.CaseTasks;
-using Insolvia.Core.DocumentRequests;
-using Insolvia.Core.Documents;
-using Insolvia.Core.Ports;
-using Insolvia.Core.TaxIds;
 using Insolvia.Data.Concurrency;
 using Insolvia.Data.Storage;
+using Insolvia.Domain;
+using Insolvia.Domain.Candidates;
+using Insolvia.Domain.CaseEntities;
+using Insolvia.Domain.CaseTasks;
+using Insolvia.Domain.DocumentRequests;
+using Insolvia.Domain.Documents;
+using Insolvia.Domain.Ports;
+using Insolvia.Domain.TaxIds;
 using Microsoft.EntityFrameworkCore;
 
 namespace Insolvia.Data.Cases;

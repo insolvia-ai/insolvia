@@ -1,11 +1,11 @@
-using Insolvia.Core.Assets;
-using Insolvia.Core.Cases;
-using Insolvia.Core.Debtors;
-using Insolvia.Core.Exemptions;
-using Insolvia.Engines.Regulatory;
-using static Insolvia.Engines.Projections.ProjectionHelpers;
+using Insolvia.Domain.Assets;
+using Insolvia.Domain.Cases;
+using Insolvia.Domain.Debtors;
+using Insolvia.Domain.Engines.Regulatory;
+using Insolvia.Domain.Exemptions;
+using static Insolvia.Domain.Engines.Projections.ProjectionHelpers;
 
-namespace Insolvia.Engines.Projections.Forms;
+namespace Insolvia.Domain.Engines.Projections.Forms;
 
 /// <summary>
 /// B106C @ 2025-04-01 (revision 04/25) — Schedule C's mapping (from

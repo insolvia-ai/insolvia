@@ -2,11 +2,11 @@ using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json.Nodes;
-using Insolvia.Aws.Jwks;
-using Insolvia.Core.Auth;
+using Insolvia.Domain.Auth;
+using Insolvia.Platform.Jwks;
 using Microsoft.IdentityModel.Tokens;
 
-namespace Insolvia.Aws.Tests;
+namespace Insolvia.Platform.Tests;
 
 // Translated from packages/insolvia_core tests/unit/test_jwks_provider.py.
 // Where the Python monkeypatched `_fetch`, these put a fake handler under

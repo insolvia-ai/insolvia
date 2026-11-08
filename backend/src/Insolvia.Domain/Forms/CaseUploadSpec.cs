@@ -3,9 +3,9 @@ using System.Numerics;
 using System.Text;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
-using Insolvia.Engines;
+using Insolvia.Domain.Engines;
 
-namespace Insolvia.Forms;
+namespace Insolvia.Domain.Forms;
 
 // The Case Upload specification as data, its loader and the validator that
 // holds a Debtor.txt to it — the first half of services/api's
@@ -123,7 +123,7 @@ public static partial class CaseUploadSpecs
     /// <summary>Each record type's field count.</summary>
     public static readonly IReadOnlyList<(string Kind, int Count)> RecordFieldCounts = [("stat", 80), ("debt", 21), ("alas", 8)];
 
-    private const string ResourcePrefix = "Insolvia.Forms.Regulatory/";
+    private const string ResourcePrefix = "Insolvia.Domain.Forms.Regulatory/";
     private const string SeriesPath = "filing/case-upload/";
 
     private static readonly string[] PartyRoles = ["db", "jdb"];

@@ -1,8 +1,8 @@
 using System.Text.Json.Nodes;
-using Insolvia.Core;
-using Insolvia.Core.AccessLog;
-using Insolvia.Core.Debtors;
-using Insolvia.Core.Firms;
+using Insolvia.Domain;
+using Insolvia.Domain.AccessLog;
+using Insolvia.Domain.Debtors;
+using Insolvia.Domain.Firms;
 using Insolvia.Mcp.Tests.Support;
 using Insolvia.Mcp.Tools;
 using static Insolvia.Mcp.Tests.Support.World;
@@ -16,9 +16,9 @@ namespace Insolvia.Mcp.Tests;
 /// </summary>
 public sealed class ToolTests
 {
-    private static readonly Core.Access.Accessor Admin = MakeAccessor(isAdmin: true);
+    private static readonly Insolvia.Domain.Access.Accessor Admin = MakeAccessor(isAdmin: true);
 
-    private static readonly Core.Access.Accessor Viewer = MakeAccessor(
+    private static readonly Insolvia.Domain.Access.Accessor Viewer = MakeAccessor(
         isAdmin: false,
         accessAllCases: true,
         permissions: new Dictionary<Feature, PermissionLevel>
@@ -28,17 +28,17 @@ public sealed class ToolTests
             [Feature.Documents] = PermissionLevel.ViewOnly,
         });
 
-    private static readonly Core.Access.Accessor Stripped = MakeAccessor(isAdmin: false, accessAllCases: true, permissions: new Dictionary<Feature, PermissionLevel>());
+    private static readonly Insolvia.Domain.Access.Accessor Stripped = MakeAccessor(isAdmin: false, accessAllCases: true, permissions: new Dictionary<Feature, PermissionLevel>());
 
-    private static readonly Core.Access.Accessor OtherFirm = MakeAccessor(isAdmin: true, firmId: OtherFirmId);
+    private static readonly Insolvia.Domain.Access.Accessor OtherFirm = MakeAccessor(isAdmin: true, firmId: OtherFirmId);
 
-    private static readonly Core.Access.Accessor IntakeOnly = MakeAccessor(
+    private static readonly Insolvia.Domain.Access.Accessor IntakeOnly = MakeAccessor(
         isAdmin: false,
         accessAllCases: true,
         permissions: new Dictionary<Feature, PermissionLevel> { [Feature.Cases] = PermissionLevel.ViewOnly, [Feature.Intake] = PermissionLevel.AddEdit });
 
     // No intake at all: `clients` is the first entity type not under it.
-    private static readonly Core.Access.Accessor ClientReader = MakeAccessor(
+    private static readonly Insolvia.Domain.Access.Accessor ClientReader = MakeAccessor(
         isAdmin: false,
         accessAllCases: true,
         permissions: new Dictionary<Feature, PermissionLevel> { [Feature.Cases] = PermissionLevel.ViewOnly, [Feature.Clients] = PermissionLevel.ViewOnly });
@@ -244,7 +244,7 @@ public sealed class ToolTests
 
     // A case with two linked clients, plus a third client in the same firm
     // that this case does not name.
-    private async Task<(Core.Cases.Case Case, Core.FirmClients.FirmClient First, Core.FirmClients.FirmClient Second, Core.FirmClients.FirmClient Stranger)> JointCaseAsync()
+    private async Task<(Insolvia.Domain.Cases.Case Case, Insolvia.Domain.FirmClients.FirmClient First, Insolvia.Domain.FirmClients.FirmClient Second, Insolvia.Domain.FirmClients.FirmClient Stranger)> JointCaseAsync()
     {
         await _stores.Firms.CreateFirmAsync(MakeFirm(), Ct);
         var found = await SeedCaseAsync(_stores.Cases);
@@ -451,7 +451,7 @@ public sealed class ToolTests
         // case's creditor collection empty until a human accepts it.
         var found = await SeedCaseAsync(_stores.Cases);
         await Tools.ProposeCaseRecordsAsync(Admin, found.Id, new JsonArray(Proposal()), "c", Ct);
-        Assert.Empty(await _stores.Entities.ListForCaseAsync(found.Id, Core.CaseEntities.CaseCollections.ByCollection["creditors"], Ct));
+        Assert.Empty(await _stores.Entities.ListForCaseAsync(found.Id, Insolvia.Domain.CaseEntities.CaseCollections.ByCollection["creditors"], Ct));
         Assert.Single(await _stores.Candidates.ListForCaseAsync(found.Id, Ct));
     }
 

@@ -1,6 +1,6 @@
-using Insolvia.Core.Cases;
+using Insolvia.Domain.Cases;
 
-namespace Insolvia.Core.Tests;
+namespace Insolvia.Domain.Tests;
 
 /// <summary>Reading CM/ECF case numbers, translated from test_case_numbers.py.</summary>
 public sealed class CaseNumberTests

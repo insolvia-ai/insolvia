@@ -1,7 +1,7 @@
 using System.Text.Json.Nodes;
-using Insolvia.Core.Provenance;
+using Insolvia.Domain.Provenance;
 
-namespace Insolvia.Core.Tests;
+namespace Insolvia.Domain.Tests;
 
 // Translated from packages/insolvia_core/tests/unit/test_provenance.py: the
 // two invariants from docs/reference/case-data-model.md and the path walker

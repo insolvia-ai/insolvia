@@ -1,10 +1,10 @@
-using Insolvia.Core;
-using Insolvia.Core.FilingAuthorizations;
-using Insolvia.Core.FilingCredentials;
-using Insolvia.Core.Memory;
-using Insolvia.Core.Ports;
-using Insolvia.Core.TaxIds;
 using Insolvia.Data.Vault;
+using Insolvia.Domain;
+using Insolvia.Domain.FilingAuthorizations;
+using Insolvia.Domain.FilingCredentials;
+using Insolvia.Domain.Memory;
+using Insolvia.Domain.Ports;
+using Insolvia.Domain.TaxIds;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 

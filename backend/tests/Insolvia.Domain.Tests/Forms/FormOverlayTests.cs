@@ -1,12 +1,11 @@
 using System.Text;
 using System.Text.Json.Nodes;
-using Insolvia.Core;
-using Insolvia.Engines.Projections;
-using Insolvia.Forms.Tests.Support;
+using Insolvia.Domain.Engines.Projections;
+using Insolvia.Domain.Forms.Tests.Support;
 using PdfSharp.Pdf;
 using PdfSharp.Pdf.IO;
 
-namespace Insolvia.Forms.Tests;
+namespace Insolvia.Domain.Forms.Tests;
 
 // test_form_overlay.py, translated: the options model and its parsing, the
 // /s/ signature and amended-caption augmentations, page selection and the

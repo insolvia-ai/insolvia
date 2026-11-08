@@ -1,8 +1,8 @@
-using Insolvia.Core.CaseEntities;
-using Insolvia.Core.Debtors;
-using Insolvia.Core.Provenance;
+using Insolvia.Domain.CaseEntities;
+using Insolvia.Domain.Debtors;
+using Insolvia.Domain.Provenance;
 
-namespace Insolvia.Core.Cases;
+namespace Insolvia.Domain.Cases;
 
 /// <summary>
 /// Everything a Copy case writes: the case and its copier's assignment (one

@@ -1,7 +1,7 @@
-using Insolvia.Core.Clients;
-using Insolvia.Core.Ports;
+using Insolvia.Domain.Clients;
+using Insolvia.Domain.Ports;
 
-namespace Insolvia.Core.Memory;
+namespace Insolvia.Domain.Memory;
 
 /// <summary>
 /// The in-memory <see cref="IClientBindingStore"/>. Enforces the two

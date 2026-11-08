@@ -1,6 +1,6 @@
-using Insolvia.Core.Firms;
+using Insolvia.Domain.Firms;
 
-namespace Insolvia.Core.Tests;
+namespace Insolvia.Domain.Tests;
 
 // Translated from test_firms.py: the firm domain's entities, parsing and
 // permissions. The stored-item and API-representation tests are not here —

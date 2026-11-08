@@ -1,15 +1,15 @@
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
-using Insolvia.Engines.Regulatory;
+using Insolvia.Domain.Engines.Regulatory;
 
-namespace Insolvia.Engines.Projections;
+namespace Insolvia.Domain.Engines.Projections;
 
 // The form template registry's field half (from core/form_templates.py): each
 // release's spec.json (the curated logical fields, their types and exact radio
 // export states) and acroform.json (the machine-extracted widget dump), loaded
 // and validated by the rules of the loader it was ported from. The template PDF itself, and
 // the check that it hashes to the manifest's sha256, belong to the fill engine
-// (Insolvia.Forms, 18.16), which ships the PDFs; a projection never needs the
+// (Insolvia.Domain.Forms, 18.16), which ships the PDFs; a projection never needs the
 // bytes, only which fields exist and which widget states they take.
 
 /// <summary>One AcroForm field of the official PDF, as the dump recorded it.</summary>
@@ -175,7 +175,7 @@ public static partial class FormTemplates
         var numbers = new List<int>();
         foreach (var item in list)
         {
-            if (!Core.Json.TryGetWholeNumber(item, out var number))
+            if (!Insolvia.Domain.Json.TryGetWholeNumber(item, out var number))
             {
                 throw new MalformedReleaseException(problem());
             }
@@ -188,12 +188,12 @@ public static partial class FormTemplates
 
     private static List<string> StringList(JsonNode? value, Func<string> problem)
     {
-        if (value is not JsonArray list || !list.All(item => Core.Json.AsString(item) is not null))
+        if (value is not JsonArray list || !list.All(item => Insolvia.Domain.Json.AsString(item) is not null))
         {
             throw new MalformedReleaseException(problem());
         }
 
-        return [.. list.Select(item => Core.Json.AsString(item)!)];
+        return [.. list.Select(item => Insolvia.Domain.Json.AsString(item)!)];
     }
 
     private static Dictionary<string, Widget> Widgets(JsonObject dump, string where)
@@ -227,7 +227,7 @@ public static partial class FormTemplates
             int? maxLen = null;
             if (raw["max_len"] is { } maxLenNode)
             {
-                if (!Core.Json.TryGetWholeNumber(maxLenNode, out var number) || number < 1)
+                if (!Insolvia.Domain.Json.TryGetWholeNumber(maxLenNode, out var number) || number < 1)
                 {
                     throw Fail(where, $"{Exact.Repr(name)}: max_len must be a positive integer");
                 }
@@ -304,12 +304,12 @@ public static partial class FormTemplates
             }
 
             var mapsTo = item["maps_to_value"];
-            if (mapsTo is not null && Core.Json.AsString(mapsTo) is null)
+            if (mapsTo is not null && Insolvia.Domain.Json.AsString(mapsTo) is null)
             {
                 throw Fail(where, $"{fieldId}: maps_to_value must be a string");
             }
 
-            parsed.Add(new OptionSpec(StrField(item, "value", where), Core.Json.AsString(mapsTo)));
+            parsed.Add(new OptionSpec(StrField(item, "value", where), Insolvia.Domain.Json.AsString(mapsTo)));
         }
 
         return parsed;
@@ -317,7 +317,7 @@ public static partial class FormTemplates
 
     private static double Number(JsonNode? value, string where, string what)
     {
-        if (!Core.Json.TryGetNumber(value, out var number) || number < 0)
+        if (!Insolvia.Domain.Json.TryGetNumber(value, out var number) || number < 0)
         {
             throw Fail(where, $"{what} must be a non-negative number");
         }
@@ -351,7 +351,7 @@ public static partial class FormTemplates
                 throw Fail(where, $"overlay box {Exact.Repr(name)} claimed twice");
             }
 
-            if (!Core.Json.TryGetWholeNumber(item["page"], out var page) || page < 1 || page > pageCount)
+            if (!Insolvia.Domain.Json.TryGetWholeNumber(item["page"], out var page) || page < 1 || page > pageCount)
             {
                 throw Fail(where, $"{fieldId}: overlay box {Exact.Repr(name)} page is not on the PDF");
             }
@@ -399,13 +399,13 @@ public static partial class FormTemplates
         int? part = null;
         if (raw["part"] is { } partNode)
         {
-            part = Core.Json.TryGetWholeNumber(partNode, out var partNumber) ? (int)partNumber : throw Fail(where, $"{fieldId}: part must be an integer or null");
+            part = Insolvia.Domain.Json.TryGetWholeNumber(partNode, out var partNumber) ? (int)partNumber : throw Fail(where, $"{fieldId}: part must be an integer or null");
         }
 
         var lineNode = raw["line"];
-        var line = lineNode is null ? null : Core.Json.AsString(lineNode) ?? throw Fail(where, $"{fieldId}: line must be a string or null");
+        var line = lineNode is null ? null : Insolvia.Domain.Json.AsString(lineNode) ?? throw Fail(where, $"{fieldId}: line must be a string or null");
         var notes = raw.TryGetPropertyValue("notes", out var notesNode)
-            ? Core.Json.AsString(notesNode) ?? throw Fail(where, $"{fieldId}: notes must be a string")
+            ? Insolvia.Domain.Json.AsString(notesNode) ?? throw Fail(where, $"{fieldId}: notes must be a string")
             : string.Empty;
         var label = StrField(raw, "label", where);
 
@@ -438,7 +438,7 @@ public static partial class FormTemplates
 
         foreach (var nameNode in names)
         {
-            var name = Core.Json.AsString(nameNode);
+            var name = Insolvia.Domain.Json.AsString(nameNode);
             if (name is null || !widgets.ContainsKey(name))
             {
                 throw Fail(where, $"{fieldId}: claims unknown PDF field {Exact.Repr(nameNode)}");
@@ -449,7 +449,7 @@ public static partial class FormTemplates
 
         if (pdf["pattern"] is { } patternNode)
         {
-            var pattern = Core.Json.AsString(patternNode) ?? throw Fail(where, $"{fieldId}: pdf.pattern must be a string");
+            var pattern = Insolvia.Domain.Json.AsString(patternNode) ?? throw Fail(where, $"{fieldId}: pdf.pattern must be a string");
             var regex = new Regex($"\\A(?:{pattern})\\z", RegexOptions.CultureInvariant);
             var hits = widgets.Keys.Where(name => regex.IsMatch(name)).ToList();
             if (hits.Count == 0)
@@ -494,21 +494,21 @@ public static partial class FormTemplates
         var manifest = LoadJson(root, $"{directory}/manifest.json", where);
         var source = ReleaseParsing.ManifestSource(manifest, seriesId, effective, sequence, where, Fail);
         var sourceSha256 = StrField(source, "sha256", where);
-        var manifestNotes = Core.Json.AsString(manifest["notes"]);
+        var manifestNotes = Insolvia.Domain.Json.AsString(manifest["notes"]);
         if (manifestNotes is null || manifestNotes.Trim().Length == 0)
         {
             throw Fail(where, "manifest notes missing — say what this release is");
         }
 
         var dump = LoadJson(root, $"{directory}/acroform.json", where);
-        if (dump["source"] is not JsonObject dumpSource || Core.Json.AsString(dumpSource["pdf_sha256"]) != sourceSha256)
+        if (dump["source"] is not JsonObject dumpSource || Insolvia.Domain.Json.AsString(dumpSource["pdf_sha256"]) != sourceSha256)
         {
             throw Fail(where, "acroform.json source.pdf_sha256 disagrees with the manifest");
         }
 
         var widgets = Widgets(dump, where);
         var dumpOrder = widgets.Keys.Select((key, index) => (key, index)).ToDictionary(item => item.key, item => item.index, StringComparer.Ordinal);
-        if (!Core.Json.TryGetWholeNumber(dump["pages"], out var pageCount) || pageCount < 1)
+        if (!Insolvia.Domain.Json.TryGetWholeNumber(dump["pages"], out var pageCount) || pageCount < 1)
         {
             throw Fail(where, "acroform.json pages missing");
         }
@@ -520,20 +520,20 @@ public static partial class FormTemplates
             throw Fail(where, $"spec form {Exact.Repr(form)} disagrees with the series id");
         }
 
-        if (Core.Json.AsString(spec["form"]) != Core.Json.AsString(dump["form"]))
+        if (Insolvia.Domain.Json.AsString(spec["form"]) != Insolvia.Domain.Json.AsString(dump["form"]))
         {
             throw Fail(where, "spec form disagrees with acroform form");
         }
 
         var revision = StrField(spec, "revision", where);
-        if (revision != Core.Json.AsString(dump["revision"]))
+        if (revision != Insolvia.Domain.Json.AsString(dump["revision"]))
         {
             throw Fail(where, "spec revision disagrees with acroform revision");
         }
 
         foreach (var (doc, docName) in new[] { (spec, "spec"), (dump, "acroform") })
         {
-            if (Core.Json.AsString(doc["effective_date"]) != Exact.Iso(effective))
+            if (Insolvia.Domain.Json.AsString(doc["effective_date"]) != Exact.Iso(effective))
             {
                 throw Fail(where, $"{docName} effective_date disagrees with the path");
             }

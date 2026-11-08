@@ -1,10 +1,10 @@
 using Amazon.CognitoIdentityProvider;
 using Amazon.CognitoIdentityProvider.Model;
-using Insolvia.Aws.Cognito;
-using Insolvia.Aws.Tests.Support;
-using Insolvia.Core;
+using Insolvia.Domain;
+using Insolvia.Platform.Cognito;
+using Insolvia.Platform.Tests.Support;
 
-namespace Insolvia.Aws.Tests.Cognito;
+namespace Insolvia.Platform.Tests.Cognito;
 
 // The adapter behind POST /v1/firm/users (API) and POST /v1/firms (admin):
 // exactly the AdminCreateUser calls insolvia_core's CognitoUserDirectory

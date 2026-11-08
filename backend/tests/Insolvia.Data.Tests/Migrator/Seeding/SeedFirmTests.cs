@@ -1,6 +1,6 @@
 using System.Text.Json.Nodes;
-using Insolvia.Core;
-using Insolvia.Core.Firms;
+using Insolvia.Domain;
+using Insolvia.Domain.Firms;
 using Insolvia.Migrator.Seeding;
 using static Insolvia.Migrator.Tests.Seeding.SeedWorld;
 

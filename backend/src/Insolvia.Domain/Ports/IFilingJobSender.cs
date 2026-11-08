@@ -1,6 +1,6 @@
-using Insolvia.Core.Filings;
+using Insolvia.Domain.Filings;
 
-namespace Insolvia.Core.Ports;
+namespace Insolvia.Domain.Ports;
 
 /// <summary>
 /// Hands an approved filing to the filing worker (ADR 0024: its own queue).

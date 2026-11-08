@@ -7,16 +7,6 @@ using Insolvia.Api.Http;
 using Insolvia.Api.Logging;
 using Insolvia.Api.Mail;
 using Insolvia.Api.Routes;
-using Insolvia.Aws.Documents;
-using Insolvia.Aws.Filing;
-using Insolvia.Aws.Jobs;
-using Insolvia.Aws.Jwks;
-using Insolvia.Aws.Mailer;
-using Insolvia.Aws.Sealing;
-using Insolvia.Core.Courts;
-using Insolvia.Core.Local;
-using Insolvia.Core.Memory;
-using Insolvia.Core.Ports;
 using Insolvia.Data;
 using Insolvia.Data.AccessLogging;
 using Insolvia.Data.Calendar;
@@ -28,6 +18,16 @@ using Insolvia.Data.Pagination;
 using Insolvia.Data.Portal;
 using Insolvia.Data.Vault;
 using Insolvia.Data.Waitlist;
+using Insolvia.Domain.Courts;
+using Insolvia.Domain.Local;
+using Insolvia.Domain.Memory;
+using Insolvia.Domain.Ports;
+using Insolvia.Platform.Documents;
+using Insolvia.Platform.Filing;
+using Insolvia.Platform.Jobs;
+using Insolvia.Platform.Jwks;
+using Insolvia.Platform.Mailer;
+using Insolvia.Platform.Sealing;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging.Console;
 
@@ -75,7 +75,7 @@ public static class ApiComposition
         builder.Services.AddSingleton(services => services.GetRequiredService<ApiConfig>().Environment);
         builder.Services.AddSingleton(TimeProvider.System);
 
-        // The court registry ships inside Insolvia.Core (ADR 0014) and is the
+        // The court registry ships inside Insolvia.Domain (ADR 0014) and is the
         // same everywhere: a firm's default court is validated against it.
         builder.Services.AddSingleton<ICourtRegistry>(CourtRegistry.Shipped);
 
@@ -158,7 +158,7 @@ public static class ApiComposition
             // Cognito AdminCreateUser for POST /v1/firm/users and the portal
             // invitation's POST …/portal/invitation and …/resend, over the pool
             // LambdaBootRequirements already demanded.
-            builder.Services.AddSingleton<IUserDirectory>(_ => new Insolvia.Aws.Cognito.CognitoUserDirectory(new Amazon.CognitoIdentityProvider.AmazonCognitoIdentityProviderClient(), config.AuthUserPoolId!));
+            builder.Services.AddSingleton<IUserDirectory>(_ => new Insolvia.Platform.Cognito.CognitoUserDirectory(new Amazon.CognitoIdentityProvider.AmazonCognitoIdentityProviderClient(), config.AuthUserPoolId!));
 
             // KMS (18.12): the vault key's policy refuses this role Decrypt,
             // and the aliases resolve at composition (SealingKeys).

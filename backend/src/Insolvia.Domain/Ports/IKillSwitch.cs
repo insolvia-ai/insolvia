@@ -1,4 +1,4 @@
-namespace Insolvia.Core.Ports;
+namespace Insolvia.Domain.Ports;
 
 /// <summary>
 /// ADR 0024's environment kill switch: one flag the maintainer flips to

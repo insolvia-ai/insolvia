@@ -1,4 +1,4 @@
-namespace Insolvia.Engines.Regulatory;
+namespace Insolvia.Domain.Engines.Regulatory;
 
 /// <summary>What every registry release carries for resolution (effective-dating.md).</summary>
 public interface IRelease

@@ -1,12 +1,12 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json.Nodes;
-using Insolvia.Core.Auth;
-using Insolvia.Core.Memory;
+using Insolvia.Domain.Auth;
+using Insolvia.Domain.Memory;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 
-namespace Insolvia.Core.Tests;
+namespace Insolvia.Domain.Tests;
 
 /// <summary>Real RS256 tokens, signed with a keypair made for the run — the Python suites' `jwt.encode`.</summary>
 internal static class Tokens
@@ -555,7 +555,7 @@ public sealed class SingleClientAuthTests
 }
 
 // Translated from test_jwks_provider.py's memory-adapter half. The HTTP
-// adapter's caching tests belong with that adapter (Insolvia.Aws).
+// adapter's caching tests belong with that adapter (Insolvia.Platform).
 public sealed class StaticJwksProviderTests
 {
     [Fact]

@@ -1,11 +1,11 @@
 using System.Security.Cryptography;
 using System.Text.Json.Nodes;
-using Insolvia.Core.AccessLog;
-using Insolvia.Core.Debtors;
-using Insolvia.Core.Memory;
-using Insolvia.Core.TaxIds;
+using Insolvia.Domain.AccessLog;
+using Insolvia.Domain.Debtors;
+using Insolvia.Domain.Memory;
+using Insolvia.Domain.TaxIds;
 
-namespace Insolvia.Core.Tests;
+namespace Insolvia.Domain.Tests;
 
 /// <summary>
 /// The debtor's tax identifier, translated from test_tax_ids.py. The cipher
@@ -242,7 +242,7 @@ public sealed class TaxIdTests
 
     // The KMS cipher tests (FakeKms seal/open, the unwrap refusing another
     // context, the key alias) and the context_aad canonical-order assertion
-    // are the envelope adapter's — 18.12 (Insolvia.Aws) ports them.
+    // are the envelope adapter's — 18.12 (Insolvia.Platform) ports them.
 
     [Fact]
     public void The_tax_id_kinds_keep_their_wire_strings() => Assert.Equal(["ssn", "itin"], Wire.Names<TaxIdKind>());

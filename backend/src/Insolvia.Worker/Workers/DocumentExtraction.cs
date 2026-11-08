@@ -1,15 +1,15 @@
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
-using Insolvia.Core;
-using Insolvia.Core.AccessLog;
-using Insolvia.Core.Candidates;
-using Insolvia.Core.CaseEntities;
-using Insolvia.Core.Claims;
-using Insolvia.Core.Creditors;
-using Insolvia.Core.Documents;
-using Insolvia.Core.Income;
-using Insolvia.Core.Jobs;
-using Insolvia.Core.Ports;
+using Insolvia.Domain;
+using Insolvia.Domain.AccessLog;
+using Insolvia.Domain.Candidates;
+using Insolvia.Domain.CaseEntities;
+using Insolvia.Domain.Claims;
+using Insolvia.Domain.Creditors;
+using Insolvia.Domain.Documents;
+using Insolvia.Domain.Income;
+using Insolvia.Domain.Jobs;
+using Insolvia.Domain.Ports;
 
 namespace Insolvia.Worker.Workers;
 

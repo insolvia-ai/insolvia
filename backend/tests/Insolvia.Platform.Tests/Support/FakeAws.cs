@@ -1,7 +1,7 @@
 using System.Reflection;
 using Amazon.Runtime;
 
-namespace Insolvia.Aws.Tests.Support;
+namespace Insolvia.Platform.Tests.Support;
 
 /// <summary>
 /// An AWS SDK client interface answered by a handler, with no network: every

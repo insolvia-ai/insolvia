@@ -1,14 +1,14 @@
 using System.Text.Json.Nodes;
 using Insolvia.Api.Tests.Support;
-using Insolvia.Core;
-using Insolvia.Core.AccessLog;
-using Insolvia.Core.Cases;
-using Insolvia.Core.Documents;
-using Insolvia.Core.Firms;
-using Insolvia.Core.Jobs;
-using Insolvia.Core.Memory;
-using Insolvia.Core.Packets;
-using Insolvia.Core.Ports;
+using Insolvia.Domain;
+using Insolvia.Domain.AccessLog;
+using Insolvia.Domain.Cases;
+using Insolvia.Domain.Documents;
+using Insolvia.Domain.Firms;
+using Insolvia.Domain.Jobs;
+using Insolvia.Domain.Memory;
+using Insolvia.Domain.Packets;
+using Insolvia.Domain.Ports;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using static Insolvia.Api.Tests.Support.CaseWorld;
 

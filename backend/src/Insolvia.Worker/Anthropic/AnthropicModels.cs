@@ -3,8 +3,8 @@ using System.Text.Json.Nodes;
 using Anthropic;
 using Anthropic.Exceptions;
 using Anthropic.Models.Messages;
-using Insolvia.Core.Jobs;
-using Insolvia.Core.Ports;
+using Insolvia.Domain.Jobs;
+using Insolvia.Domain.Ports;
 using Insolvia.Worker.Workers;
 
 namespace Insolvia.Worker.Anthropic;

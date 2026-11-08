@@ -1,4 +1,4 @@
-namespace Insolvia.Engines;
+namespace Insolvia.Domain.Engines;
 
 // The exception kinds the engines raise and their callers tell apart, carried
 // over as types from the Python built-ins the ported modules raised: a

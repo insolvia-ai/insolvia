@@ -1,13 +1,13 @@
-using Insolvia.Engines.Regulatory;
+using Insolvia.Domain.Engines.Regulatory;
 
-namespace Insolvia.Engines.Tests;
+namespace Insolvia.Domain.Engines.Tests;
 
 // The regulatory files this assembly embeds (ADR 0014: they ship in the
 // artifact). Since 18.23 deleted the Python registry they were copied from,
 // backend/src/Insolvia.Domain/Engines/Regulatory IS the registry: a release is a
 // reviewed PR to that directory (src/Insolvia.UstTool writes the UST
 // series there). The template PDFs and the filing/ series ship with
-// Insolvia.Forms; the court registry with Insolvia.Core.
+// Insolvia.Domain.Forms; the court registry with Insolvia.Domain.
 public sealed class RegulatoryFilesTests
 {
     [Fact]

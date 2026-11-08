@@ -1,11 +1,11 @@
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
-using Insolvia.Core.CaseEntities;
-using Insolvia.Core.Fields;
-using Insolvia.Core.Provenance;
-using Insolvia.Core.TaxIds;
+using Insolvia.Domain.CaseEntities;
+using Insolvia.Domain.Fields;
+using Insolvia.Domain.Provenance;
+using Insolvia.Domain.TaxIds;
 
-namespace Insolvia.Core.Debtors;
+namespace Insolvia.Domain.Debtors;
 
 // The debtor record — B101 Part 1, and the root the rest of a case hangs off
 // (from debtors.py). A joint filing is TWO debtor records under one case, not

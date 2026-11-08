@@ -2,11 +2,11 @@ using System.Net;
 using System.Text;
 using Amazon.SQS;
 using Amazon.SQS.Model;
-using Insolvia.Aws.Filing;
-using Insolvia.Aws.Signing;
-using Insolvia.Core.Filings;
+using Insolvia.Domain.Filings;
+using Insolvia.Platform.Filing;
+using Insolvia.Platform.Signing;
 
-namespace Insolvia.Aws.Tests;
+namespace Insolvia.Platform.Tests;
 
 // test_aws_adapters.py (services/filing) and filing_queue.py's contract: the
 // kill switch is on for "true" alone, fails closed, and is read every time;

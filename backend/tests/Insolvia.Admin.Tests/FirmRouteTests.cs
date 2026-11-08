@@ -1,7 +1,7 @@
 using System.Text.Json.Nodes;
 using Insolvia.Admin.Tests.Support;
-using Insolvia.Core.AdminAudit;
-using Insolvia.Core.Firms;
+using Insolvia.Domain.AdminAudit;
+using Insolvia.Domain.Firms;
 using Microsoft.AspNetCore.Mvc.Testing;
 using static Insolvia.Admin.Tests.Support.AdminHost;
 

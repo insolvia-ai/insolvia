@@ -4,16 +4,16 @@ using Insolvia.Api.Calendar;
 using Insolvia.Api.Cases;
 using Insolvia.Api.Hosting;
 using Insolvia.Api.Http;
-using Insolvia.Core;
-using Insolvia.Core.AccessLog;
-using Insolvia.Core.Cases;
-using Insolvia.Core.Courts;
-using Insolvia.Core.Debtors;
-using Insolvia.Core.FirmClients;
-using Insolvia.Core.Firms;
-using Insolvia.Core.Petitions;
-using Insolvia.Core.Ports;
-using Insolvia.Engines.Exemptions;
+using Insolvia.Domain;
+using Insolvia.Domain.AccessLog;
+using Insolvia.Domain.Cases;
+using Insolvia.Domain.Courts;
+using Insolvia.Domain.Debtors;
+using Insolvia.Domain.Engines.Exemptions;
+using Insolvia.Domain.FirmClients;
+using Insolvia.Domain.Firms;
+using Insolvia.Domain.Petitions;
+using Insolvia.Domain.Ports;
 
 namespace Insolvia.Api.Routes;
 
@@ -34,7 +34,7 @@ namespace Insolvia.Api.Routes;
 /// a 409 (ADR 0027 row 3, #509). Its <c>filed_at</c> stays EDITABLE:
 /// a mistyped petition date must be correctable, and the filed event
 /// keeps the date it was recorded with (a correction is not a court event).</para>
-/// <para><b>The engines' two hooks</b> (Insolvia.Engines): the 106C opt-out
+/// <para><b>The engines' two hooks</b> (Insolvia.Domain.Engines): the 106C opt-out
 /// refusal before the write, and the deadline regeneration after it
 /// (<see cref="CaseDeadlines"/>). A conversion does NOT regenerate: Rule
 /// 1019's reset deadlines count from the conversion date, an anchor the

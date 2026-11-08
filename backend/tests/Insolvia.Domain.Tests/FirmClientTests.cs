@@ -1,9 +1,9 @@
 using System.Text.Json.Nodes;
-using Insolvia.Core.Fields;
-using Insolvia.Core.FirmClients;
-using Insolvia.Core.Firms;
+using Insolvia.Domain.Fields;
+using Insolvia.Domain.FirmClients;
+using Insolvia.Domain.Firms;
 
-namespace Insolvia.Core.Tests;
+namespace Insolvia.Domain.Tests;
 
 // Translated from test_firm_clients.py (and the parse half of
 // test_client_funnel.py): a firm's client (ADR 0022) — parsing, the

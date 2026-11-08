@@ -1,10 +1,9 @@
-using Insolvia.Core;
-using Insolvia.Core.Claims;
-using Insolvia.Core.Fields;
-using Insolvia.Engines.Liens;
-using static Insolvia.Engines.Projections.ProjectionHelpers;
+using Insolvia.Domain.Claims;
+using Insolvia.Domain.Engines.Liens;
+using Insolvia.Domain.Fields;
+using static Insolvia.Domain.Engines.Projections.ProjectionHelpers;
 
-namespace Insolvia.Engines.Projections.Forms;
+namespace Insolvia.Domain.Engines.Projections.Forms;
 
 /// <summary>
 /// B106D @ 2015-12-01 (revision 12/15) — Schedule D's mapping (from

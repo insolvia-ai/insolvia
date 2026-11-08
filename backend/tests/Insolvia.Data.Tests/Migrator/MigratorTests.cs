@@ -1,15 +1,15 @@
-using Insolvia.Core;
-using Insolvia.Core.AdminAudit;
-using Insolvia.Core.FilingAuthorizations;
-using Insolvia.Core.FilingCredentials;
-using Insolvia.Core.Firms;
-using Insolvia.Core.TaxIds;
 using Insolvia.Data;
 using Insolvia.Data.AdminAuditing;
 using Insolvia.Data.Connections;
 using Insolvia.Data.Firms;
 using Insolvia.Data.Tests;
 using Insolvia.Data.Vault;
+using Insolvia.Domain;
+using Insolvia.Domain.AdminAudit;
+using Insolvia.Domain.FilingAuthorizations;
+using Insolvia.Domain.FilingCredentials;
+using Insolvia.Domain.Firms;
+using Insolvia.Domain.TaxIds;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 

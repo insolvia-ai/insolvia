@@ -1,6 +1,6 @@
-using Insolvia.Engines.Projections;
+using Insolvia.Domain.Engines.Projections;
 
-namespace Insolvia.Forms.Tests.Support;
+namespace Insolvia.Domain.Forms.Tests.Support;
 
 /// <summary>
 /// The goldens' full-coverage synthetic values (test_form_fill.py's

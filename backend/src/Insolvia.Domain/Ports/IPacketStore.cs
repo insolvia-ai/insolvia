@@ -1,7 +1,7 @@
-using Insolvia.Core.Cases;
-using Insolvia.Core.Packets;
+using Insolvia.Domain.Cases;
+using Insolvia.Domain.Packets;
 
-namespace Insolvia.Core.Ports;
+namespace Insolvia.Domain.Ports;
 
 /// <summary>
 /// Persists assembled-packet records (Python's <c>PacketStore</c>; issue #96)

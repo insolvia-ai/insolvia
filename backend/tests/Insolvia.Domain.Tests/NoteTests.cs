@@ -1,8 +1,8 @@
-using Insolvia.Core.CaseEntities;
-using Insolvia.Core.Notes;
-using Insolvia.Core.Provenance;
+using Insolvia.Domain.CaseEntities;
+using Insolvia.Domain.Notes;
+using Insolvia.Domain.Provenance;
 
-namespace Insolvia.Core.Tests;
+namespace Insolvia.Domain.Tests;
 
 /// <summary>Case notes, translated from test_notes.py.</summary>
 public sealed class NoteTests

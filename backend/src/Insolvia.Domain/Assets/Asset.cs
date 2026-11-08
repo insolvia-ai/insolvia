@@ -1,9 +1,9 @@
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
-using Insolvia.Core.CaseEntities;
-using Insolvia.Core.Fields;
+using Insolvia.Domain.CaseEntities;
+using Insolvia.Domain.Fields;
 
-namespace Insolvia.Core.Assets;
+namespace Insolvia.Domain.Assets;
 
 /// <summary>
 /// One Schedule A/B asset (from <c>assets.py</c>). The vehicle members

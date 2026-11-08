@@ -1,9 +1,9 @@
 using System.Globalization;
 using System.Security.Cryptography;
-using Insolvia.Core.Documents;
-using Insolvia.Core.Ports;
+using Insolvia.Domain.Documents;
+using Insolvia.Domain.Ports;
 
-namespace Insolvia.Core.Local;
+namespace Insolvia.Domain.Local;
 
 /// <summary>
 /// A document store over a local directory — LOCAL ONLY. Two things write

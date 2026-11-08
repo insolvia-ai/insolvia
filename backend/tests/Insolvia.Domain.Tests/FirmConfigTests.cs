@@ -1,10 +1,10 @@
-using Insolvia.Core.DocumentRequests;
-using Insolvia.Core.Documents;
-using Insolvia.Core.Fields;
-using Insolvia.Core.LibraryCreditors;
-using Insolvia.Core.Questionnaires;
+using Insolvia.Domain.DocumentRequests;
+using Insolvia.Domain.Documents;
+using Insolvia.Domain.Fields;
+using Insolvia.Domain.LibraryCreditors;
+using Insolvia.Domain.Questionnaires;
 
-namespace Insolvia.Core.Tests;
+namespace Insolvia.Domain.Tests;
 
 // Translated from test_library_creditors.py: the firm's reusable creditor
 // library (issue 13.9) — parsing and the whole-record replace.

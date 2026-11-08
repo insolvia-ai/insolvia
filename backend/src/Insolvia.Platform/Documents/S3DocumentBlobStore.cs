@@ -1,10 +1,10 @@
 using System.Net;
 using Amazon.S3;
 using Amazon.S3.Model;
-using Insolvia.Core.Documents;
-using Insolvia.Core.Ports;
+using Insolvia.Domain.Documents;
+using Insolvia.Domain.Ports;
 
-namespace Insolvia.Aws.Documents;
+namespace Insolvia.Platform.Documents;
 
 /// <summary>
 /// <see cref="IDocumentBlobStore"/> over the case-document bucket (Python's

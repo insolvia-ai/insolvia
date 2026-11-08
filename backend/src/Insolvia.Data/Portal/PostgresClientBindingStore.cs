@@ -1,8 +1,8 @@
-using Insolvia.Core;
-using Insolvia.Core.Clients;
-using Insolvia.Core.Ports;
 using Insolvia.Data.Concurrency;
 using Insolvia.Data.Storage;
+using Insolvia.Domain;
+using Insolvia.Domain.Clients;
+using Insolvia.Domain.Ports;
 using Microsoft.EntityFrameworkCore;
 
 namespace Insolvia.Data.Portal;
@@ -10,7 +10,7 @@ namespace Insolvia.Data.Portal;
 /// <summary>
 /// The Postgres <see cref="IClientBindingStore"/> (Python's
 /// <c>DynamoDbClientBindingStore</c>), held to
-/// <see cref="Core.Memory.MemoryClientBindingStore"/> by the conformance
+/// <see cref="Insolvia.Domain.Memory.MemoryClientBindingStore"/> by the conformance
 /// suite. The cross-table <c>TransactWriteItems</c> is one transaction over
 /// three tables; each of its conditions is the <c>WHERE</c> of an upsert or an
 /// update, and zero rows affected is the <see cref="ConflictException"/> the

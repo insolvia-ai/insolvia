@@ -1,6 +1,6 @@
-using Insolvia.Core.Fields;
+using Insolvia.Domain.Fields;
 
-namespace Insolvia.Core.Tests;
+namespace Insolvia.Domain.Tests;
 
 // fields.py had no suite of its own (each case entity's tests exercised it).
 // These pin the places the C# port changed REPRESENTATION — money and rates

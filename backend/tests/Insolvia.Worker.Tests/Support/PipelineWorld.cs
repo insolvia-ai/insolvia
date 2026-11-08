@@ -1,10 +1,10 @@
-using Insolvia.Aws.Sealing;
-using Insolvia.Core;
-using Insolvia.Core.Cases;
-using Insolvia.Core.Memory;
-using Insolvia.Core.TaxIds;
-using Insolvia.Forms;
-using Insolvia.Forms.Tests.Support;
+using Insolvia.Domain;
+using Insolvia.Domain.Cases;
+using Insolvia.Domain.Forms;
+using Insolvia.Domain.Forms.Tests.Support;
+using Insolvia.Domain.Memory;
+using Insolvia.Domain.TaxIds;
+using Insolvia.Platform.Sealing;
 using Insolvia.Worker.Workers;
 
 namespace Insolvia.Worker.Tests.Support;

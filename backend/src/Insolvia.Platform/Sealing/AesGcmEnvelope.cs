@@ -1,9 +1,9 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
-using Insolvia.Core.TaxIds;
+using Insolvia.Domain.TaxIds;
 
-namespace Insolvia.Aws.Sealing;
+namespace Insolvia.Platform.Sealing;
 
 /// <summary>
 /// The symmetric half of envelope encryption, shared by every cipher in this

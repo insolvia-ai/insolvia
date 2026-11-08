@@ -8,28 +8,36 @@ the Python was deleted in 18.23. Comments that name a Python module
 (`core/x.py`, `services/api/...`) record where a port came from; the module
 itself is gone, and `git log` before 18.23 has it.
 
-## Layering — pinned by `tests/Insolvia.Core.Tests/Architecture`
+## Layering — pinned by `tests/Insolvia.Domain.Tests/Architecture`
 
-| Project | May reference |
-|---|---|
-| `Insolvia.Core` — pure: the domain and ports (`Insolvia.Core.*`), the calculation engines and form projections (`Engines/`, `Insolvia.Engines.*`), the PDF engine (`Forms/`, `Insolvia.Forms.*`) | nothing in the solution |
-| `Insolvia.Infrastructure` — the adapters: EF Core and the Postgres stores (`Data/`, `Insolvia.Data.*`), the AWS SDK adapters (`Aws/`, `Insolvia.Aws.*`) | `Core` |
-| hosts: `Api`, `Worker`, `Admin`, `Mcp`, `Filing`, `Migrator` | `Core`, `Infrastructure`; **never another host** |
-| tools: `UstTool` — run by a developer or CI, never deployed (no Dockerfile stage) | `Core`; never `Infrastructure` or a host |
+Three layers ([ADR 0030](../docs/adr/0030-three-backend-layers.md)):
 
-- **A project exists only as a separate deployable or a boundary the
-  compiler must enforce** ([ADR 0030](../docs/adr/0030-fewer-backend-projects.md)).
-  A new concern is a folder and a namespace in an existing project; say in
-  the PR which reason a new project meets.
-- **Namespaces follow folders, not assemblies.** `src/Insolvia.Core/Engines/`
-  is `Insolvia.Engines.*`; `src/Insolvia.Infrastructure/Data/` is
-  `Insolvia.Data.*`. Embedded resources keep their `Insolvia.Engines.…` /
-  `Insolvia.Forms.…` logical names.
-- **No AWS and no EF in Core.** A port (interface) lives in Core; its adapter
-  lives in `Infrastructure`; a host wires them. The architecture test also
-  refuses `AWSSDK.*`, `Amazon.*`, EF Core and Npgsql packages in Core.
+| Layer | Project | May reference |
+|---|---|---|
+| business logic | `Insolvia.Domain` — pure: entities, rules and ports; the calculation engines and form projections (`Engines/`); the PDF engine (`Forms/`) | nothing in the solution |
+| data access | `Insolvia.Data` — EF Core, the migrations, the Postgres stores | `Domain` |
+| platform services | `Insolvia.Platform` — document storage, sealing, the job queues, the user directory, mail, sign-in keys | `Domain` |
+| API (and the workers) | hosts: `Api`, `Worker`, `Admin`, `Mcp`, `Filing`, `Migrator` | `Domain`, `Data`, `Platform`; **never another host** |
+| — | tools: `UstTool` — run by a developer or CI, never deployed (no Dockerfile stage) | `Domain`; never `Data`, `Platform` or a host |
+
+- **Name a project for its role, never for a vendor or a product word.** No
+  `Aws`, no `Integrations` (that word means third-party systems such as
+  CM/ECF), no `Core`/`Common`. A provider's name belongs on the class that
+  implements a port (`S3DocumentBlobStore`, `KmsCiphers`), where a second
+  provider's class would sit beside it.
+- **Namespaces match the project and folder**: `src/Insolvia.Domain/Engines/`
+  is `Insolvia.Domain.Engines.*`, and a test project's namespaces are the
+  source namespace plus `.Tests` (`Insolvia.Domain.Engines.Tests`), so the
+  code under test is in scope without a `using`.
+- **No cloud SDK and no EF in Domain.** A port (interface) lives in Domain;
+  its implementation lives in `Data` or `Platform`; a host wires them. The
+  architecture test also refuses `AWSSDK.*`, `Amazon.*`, EF Core and Npgsql
+  packages in Domain.
+- A new concern is a folder and a namespace in the layer it belongs to, not a
+  new project. A new project must be a new deployable or a boundary the
+  compiler has to enforce; say in the PR which.
 - Code the filing worker shares with the API (approval, digest) goes in
-  `Core`, never in `Api`.
+  `Domain`, never in `Api`.
 - A new project needs a test project (`TestProjectOf` in the layering test
   maps each project to one), a line in `Insolvia.slnx`, and the rule above
   must name it. The test fails until all three are done.
@@ -37,7 +45,7 @@ itself is gone, and `git log` before 18.23 has it.
 ## Rules that are easy to get wrong
 
 - **Money is `decimal`**, never `double`; Postgres `numeric`. The engines'
-  parity outputs (`tests/Insolvia.Core.Tests/Engines/Parity/*.expected.json`,
+  parity outputs (`tests/Insolvia.Domain.Tests/Engines/Parity/*.expected.json`,
   captured from the Python oracle) pin Decimal-exact results; a deliberate
   change edits them in the same PR.
 - Timestamps are `DateTimeOffset` / `timestamptz`; court dates are `DateOnly`
@@ -54,10 +62,10 @@ itself is gone, and `git log` before 18.23 has it.
 - One deployable unit, one Dockerfile target. A host gets its stage when it
   gets a handler, and `backend-pr.yml` builds it in the same PR.
 
-## The data tier — `Insolvia.Infrastructure/Data` and `Insolvia.Migrator`
+## The data access layer — `Insolvia.Data` and `Insolvia.Migrator`
 
 - **One context, `InsolviaDbContext`, one schema, `insolvia`.** An entity
-  joins the model through an `IEntityTypeConfiguration<T>` in `Insolvia.Infrastructure`
+  joins the model through an `IEntityTypeConfiguration<T>` in `Insolvia.Data`
   (picked up by assembly scan); nobody edits the context to add a table. Its
   conventions are the rules above made mechanical: snake_case names,
   `DateTimeOffset` → `timestamptz` (written as UTC), `decimal` → `numeric`,
@@ -66,7 +74,7 @@ itself is gone, and `git log` before 18.23 has it.
 - **Adding a migration:** change the model, then
   ```bash
   cd backend && dotnet tool restore
-  dotnet ef migrations add <PascalCaseName> --project src/Insolvia.Infrastructure --startup-project src/Insolvia.Migrator --output-dir Data/Migrations --namespace Insolvia.Data.Migrations
+  dotnet ef migrations add <PascalCaseName> --project src/Insolvia.Data --startup-project src/Insolvia.Migrator --output-dir Migrations
   ```
   and commit the migration, its `.Designer.cs` and the updated snapshot
   together. `ModelTests.The_real_model_has_no_change_that_a_migration_does_not_capture`
@@ -104,7 +112,7 @@ itself is gone, and `git log` before 18.23 has it.
   - `InsertOnceAsync` handles its own: a generated key's conflict on a replay
     counts as done (no read — the waitlist and admin audit roles cannot read
     their tables); a key callers compete for passes `alsoMatching:`.
-  - `RetryTests` (Infrastructure.Tests) injects both faults through `FaultInjector`;
+  - `RetryTests` (Data.Tests) injects both faults through `FaultInjector`;
     a new write with a `landed` check gets a lost-ack test there.
 - **Listings page by keyset** (`Pagination/`): a `Keyset<TRow, TKey>` with a
   total order and a name that includes everything that changes the rows

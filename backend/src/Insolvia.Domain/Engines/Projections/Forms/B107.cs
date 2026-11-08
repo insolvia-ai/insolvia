@@ -1,12 +1,11 @@
-using Insolvia.Core;
-using Insolvia.Core.Debtors;
-using Insolvia.Core.Fields;
-using Insolvia.Core.Petitions;
-using Insolvia.Core.Sofa;
-using Insolvia.Engines.Regulatory;
-using static Insolvia.Engines.Projections.ProjectionHelpers;
+using Insolvia.Domain.Debtors;
+using Insolvia.Domain.Engines.Regulatory;
+using Insolvia.Domain.Fields;
+using Insolvia.Domain.Petitions;
+using Insolvia.Domain.Sofa;
+using static Insolvia.Domain.Engines.Projections.ProjectionHelpers;
 
-namespace Insolvia.Engines.Projections.Forms;
+namespace Insolvia.Domain.Engines.Projections.Forms;
 
 /// <summary>
 /// B107 @ 2025-04-01 (revision 04/25) — the Statement of Financial Affairs

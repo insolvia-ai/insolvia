@@ -1,15 +1,15 @@
 using Amazon.CognitoIdentityProvider;
 using Amazon.KeyManagementService;
 using Amazon.S3;
-using Insolvia.Aws.Documents;
-using Insolvia.Aws.Sealing;
-using Insolvia.Core.Local;
-using Insolvia.Core.Ports;
 using Insolvia.Data;
 using Insolvia.Data.Cases;
 using Insolvia.Data.Firms;
 using Insolvia.Data.Pagination;
 using Insolvia.Data.Portal;
+using Insolvia.Domain.Local;
+using Insolvia.Domain.Ports;
+using Insolvia.Platform.Documents;
+using Insolvia.Platform.Sealing;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 

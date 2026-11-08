@@ -2,7 +2,7 @@ using System.Net;
 using System.Text;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
-using Insolvia.Core;
+using Insolvia.Domain;
 using Insolvia.Filing.Drivers;
 using Insolvia.Filing.Fence;
 using Insolvia.Filing.Http;
@@ -232,7 +232,7 @@ public sealed partial class HandBackTests
     [Fact]
     public void Every_hand_back_lands_on_the_filing_set_checklist()
     {
-        Assert.All(HandBackReasons.HandBack.Keys, reason => Assert.Equal("packet", HandBackReasons.HandBackNote(reason, Core.Filings.FilingState.Claimed).Link));
+        Assert.All(HandBackReasons.HandBack.Keys, reason => Assert.Equal("packet", HandBackReasons.HandBackNote(reason, Insolvia.Domain.Filings.FilingState.Claimed).Link));
         Assert.All(HandBackReasons.HandBack.Where(p => p.Key != "document_mismatch").Select(p => p.Value), reason => Assert.Contains("Nothing reached the court", reason.Action, StringComparison.Ordinal));
     }
 
@@ -297,7 +297,7 @@ public sealed class ConfigTests
 
         Assert.IsType<Insolvia.Data.Cases.PostgresPacketStore>(deps.Packets);
         Assert.IsType<Insolvia.Data.Cases.PostgresFilingApprovalStore>(deps.Approvals);
-        Assert.IsType<Insolvia.Aws.Sealing.LocalFilingCredentialOpener>(deps.Opener);
+        Assert.IsType<Insolvia.Platform.Sealing.LocalFilingCredentialOpener>(deps.Opener);
         Assert.IsType<StaticKillSwitch>(deps.KillSwitch);
         Assert.NotNull(deps.FakeDriver);
     }
@@ -319,8 +319,8 @@ public sealed class ConfigTests
 
         var deps = FilingComposition.Deps(scope.ServiceProvider, config);
 
-        Assert.Equal("alias/insolvia-staging-filing-credentials", Assert.IsType<Insolvia.Aws.Sealing.KmsFilingCredentialOpener>(deps.Opener).KeyId);
-        Assert.IsType<Insolvia.Aws.Filing.SsmKillSwitch>(deps.KillSwitch);
+        Assert.Equal("alias/insolvia-staging-filing-credentials", Assert.IsType<Insolvia.Platform.Sealing.KmsFilingCredentialOpener>(deps.Opener).KeyId);
+        Assert.IsType<Insolvia.Platform.Filing.SsmKillSwitch>(deps.KillSwitch);
         Assert.Null(deps.FakeDriver);
     }
 }

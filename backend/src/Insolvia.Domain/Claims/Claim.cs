@@ -1,9 +1,9 @@
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
-using Insolvia.Core.CaseEntities;
-using Insolvia.Core.Fields;
+using Insolvia.Domain.CaseEntities;
+using Insolvia.Domain.Fields;
 
-namespace Insolvia.Core.Claims;
+namespace Insolvia.Domain.Claims;
 
 /// <summary>
 /// One debt — a 106D/E/F row (from <c>claims.py</c>). It names its creditor

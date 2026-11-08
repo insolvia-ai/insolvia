@@ -1,6 +1,6 @@
-using Insolvia.Core.Candidates;
+using Insolvia.Domain.Candidates;
 
-namespace Insolvia.Core.Ports;
+namespace Insolvia.Domain.Ports;
 
 /// <summary>
 /// Persists candidates — proposals awaiting review (Python's

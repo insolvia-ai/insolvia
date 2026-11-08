@@ -1,12 +1,12 @@
 using System.Text.Json.Nodes;
 using Insolvia.Api.Cases;
 using Insolvia.Api.Http;
-using Insolvia.Core;
-using Insolvia.Core.Access;
-using Insolvia.Core.Candidates;
-using Insolvia.Core.Clients;
-using Insolvia.Core.Questionnaires;
-using Insolvia.Core.Questions;
+using Insolvia.Domain;
+using Insolvia.Domain.Access;
+using Insolvia.Domain.Candidates;
+using Insolvia.Domain.Clients;
+using Insolvia.Domain.Questionnaires;
+using Insolvia.Domain.Questions;
 
 namespace Insolvia.Api.Portal;
 

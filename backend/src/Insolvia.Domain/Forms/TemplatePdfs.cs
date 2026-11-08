@@ -1,9 +1,9 @@
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
-using Insolvia.Engines;
-using Insolvia.Engines.Projections;
+using Insolvia.Domain.Engines;
+using Insolvia.Domain.Engines.Projections;
 
-namespace Insolvia.Forms;
+namespace Insolvia.Domain.Forms;
 
 /// <summary>
 /// The template-PDF half of the form registry (from <c>core/form_templates.py</c>):
@@ -14,7 +14,7 @@ namespace Insolvia.Forms;
 /// </summary>
 public static class TemplatePdfs
 {
-    private const string ResourcePrefix = "Insolvia.Forms.Templates/";
+    private const string ResourcePrefix = "Insolvia.Domain.Forms.Templates/";
     private static readonly ConcurrentDictionary<string, byte[]> Loaded = new(StringComparer.Ordinal);
 
     /// <summary>The release's official template bytes (a copy), hash-checked against its manifest.</summary>

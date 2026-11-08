@@ -1,4 +1,4 @@
-namespace Insolvia.Core.Firms;
+namespace Insolvia.Domain.Firms;
 
 /// <summary>
 /// Per-feature permissions and the admin invariant (from <c>firms.py</c>).

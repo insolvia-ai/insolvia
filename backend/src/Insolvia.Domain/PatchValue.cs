@@ -1,4 +1,4 @@
-namespace Insolvia.Core;
+namespace Insolvia.Domain;
 
 /// <summary>
 /// A PATCH member that may be ABSENT (leave unchanged), present with null

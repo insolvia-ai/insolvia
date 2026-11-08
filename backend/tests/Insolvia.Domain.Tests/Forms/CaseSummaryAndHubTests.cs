@@ -1,13 +1,12 @@
 using System.Text;
-using Insolvia.Core;
-using Insolvia.Core.Claims;
-using Insolvia.Engines;
-using Insolvia.Engines.Projections;
-using Insolvia.Engines.Projections.Forms;
-using Insolvia.Forms.Tests.Support;
+using Insolvia.Domain.Claims;
+using Insolvia.Domain.Engines;
+using Insolvia.Domain.Engines.Projections;
+using Insolvia.Domain.Engines.Projections.Forms;
+using Insolvia.Domain.Forms.Tests.Support;
 using PdfSharp.Pdf.IO;
 
-namespace Insolvia.Forms.Tests;
+namespace Insolvia.Domain.Forms.Tests;
 
 // test_case_summary's figures (the route's wire shape is the API's, 18.x),
 // test_forms_hub.py and test_amendment_cover_sheet.py, translated.
@@ -91,8 +90,8 @@ public sealed class CaseSummaryAndHubTests
 
         Assert.Equal(new FormMetric("count", data.Assets.Count.ToString(System.Globalization.CultureInfo.InvariantCulture)), rows["form/b106ab"].Metric);
         Assert.Equal(new FormMetric("count", data.Claims.Count(c => c.Body.ClaimClass == ClaimClass.Secured).ToString(System.Globalization.CultureInfo.InvariantCulture)), rows["form/b106d"].Metric);
-        Assert.Equal(new FormMetric("total", Engines.Exact.F(totals.MonthlyIncome)), rows["form/b106i"].Metric);
-        Assert.Equal(new FormMetric("total", Engines.Exact.F(totals.MonthlyExpenses)), rows["form/b106j"].Metric);
+        Assert.Equal(new FormMetric("total", Insolvia.Domain.Engines.Exact.F(totals.MonthlyIncome)), rows["form/b106i"].Metric);
+        Assert.Equal(new FormMetric("total", Insolvia.Domain.Engines.Exact.F(totals.MonthlyExpenses)), rows["form/b106j"].Metric);
         Assert.Null(rows["form/b101"].Metric);
         Assert.Null(rows["form/b107"].Metric);
     }
@@ -154,7 +153,7 @@ public sealed class CaseSummaryAndHubTests
         var id = FormsHub.NewPreviewId();
 
         Assert.Equal($"form-previews/11111111-1111-4111-8111-111111111111/{id}.pdf", FormsHub.FormPreviewObjectKey("11111111-1111-4111-8111-111111111111", id));
-        Assert.Throws<Core.ValidationException>(() => FormsHub.FormPreviewObjectKey("../etc", id));
+        Assert.Throws<Insolvia.Domain.ValidationException>(() => FormsHub.FormPreviewObjectKey("../etc", id));
     }
 
     // ── the amendment cover sheet ──

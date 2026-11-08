@@ -1,12 +1,12 @@
-using Insolvia.Core.Claims;
-using Insolvia.Core.ContractLeases;
-using Insolvia.Core.Debtors;
-using Insolvia.Core.Plans;
-using Insolvia.Engines.Liens;
-using Insolvia.Engines.Plans;
-using static Insolvia.Engines.Projections.ProjectionHelpers;
+using Insolvia.Domain.Claims;
+using Insolvia.Domain.ContractLeases;
+using Insolvia.Domain.Debtors;
+using Insolvia.Domain.Engines.Liens;
+using Insolvia.Domain.Engines.Plans;
+using Insolvia.Domain.Plans;
+using static Insolvia.Domain.Engines.Projections.ProjectionHelpers;
 
-namespace Insolvia.Engines.Projections.Forms;
+namespace Insolvia.Domain.Engines.Projections.Forms;
 
 /// <summary>
 /// B113 @ 2017-12-01 — the Chapter 13 plan (from <c>form_projections/b113.py</c>),

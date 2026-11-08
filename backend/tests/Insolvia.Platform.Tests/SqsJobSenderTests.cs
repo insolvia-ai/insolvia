@@ -1,10 +1,10 @@
 using System.Reflection;
 using Amazon.SQS;
 using Amazon.SQS.Model;
-using Insolvia.Aws.Jobs;
-using Insolvia.Core.Jobs;
+using Insolvia.Domain.Jobs;
+using Insolvia.Platform.Jobs;
 
-namespace Insolvia.Aws.Tests;
+namespace Insolvia.Platform.Tests;
 
 /// <summary>
 /// The enqueue adapter (Python's SqsJobQueue): it sends exactly

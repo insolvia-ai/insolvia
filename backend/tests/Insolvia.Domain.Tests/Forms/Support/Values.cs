@@ -1,7 +1,7 @@
 using System.Text.Json.Nodes;
-using Insolvia.Engines.Projections;
+using Insolvia.Domain.Engines.Projections;
 
-namespace Insolvia.Forms.Tests.Support;
+namespace Insolvia.Domain.Forms.Tests.Support;
 
 /// <summary>FieldValues from (and the fills of) the canonical JSON both languages write — <see cref="FieldEntry.ToJson"/>'s inverse.</summary>
 internal static class Values

@@ -1,7 +1,7 @@
-using Insolvia.Core.Events;
-using Insolvia.Core.Ports;
+using Insolvia.Domain.Events;
+using Insolvia.Domain.Ports;
 
-namespace Insolvia.Core.Memory;
+namespace Insolvia.Domain.Memory;
 
 /// <summary>
 /// The in-memory <see cref="ICalendarEventStore"/>. Keyed by (firm, id) as the

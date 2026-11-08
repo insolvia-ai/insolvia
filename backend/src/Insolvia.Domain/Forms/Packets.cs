@@ -1,10 +1,9 @@
 using System.Globalization;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
-using Insolvia.Core;
-using Insolvia.Core.Packets;
+using Insolvia.Domain.Packets;
 
-namespace Insolvia.Forms;
+namespace Insolvia.Domain.Forms;
 
 /// <summary>
 /// One file inside the packet zip as <see cref="PdfMeasure"/> measured it at

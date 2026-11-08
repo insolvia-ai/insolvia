@@ -3,7 +3,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
-namespace Insolvia.Core;
+namespace Insolvia.Domain;
 
 /// <summary>
 /// Python's <c>json.dumps</c>, for the two places its exact bytes cross a seam

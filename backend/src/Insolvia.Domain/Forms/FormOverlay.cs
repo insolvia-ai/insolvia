@@ -1,13 +1,12 @@
 using System.Globalization;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
-using Insolvia.Core;
-using Insolvia.Core.Debtors;
-using Insolvia.Engines.Projections;
-using Insolvia.Forms.Pdf;
+using Insolvia.Domain.Debtors;
+using Insolvia.Domain.Engines.Projections;
+using Insolvia.Domain.Forms.Pdf;
 using PdfSharp.Pdf.IO;
 
-namespace Insolvia.Forms;
+namespace Insolvia.Domain.Forms;
 
 /// <summary>Which pages of a form an output keeps: every page, only the signature pages, or every page but them.</summary>
 public enum SignaturePagesMode

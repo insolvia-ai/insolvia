@@ -1,7 +1,7 @@
 using PdfSharp.Pdf;
 using PdfSharp.Pdf.Advanced;
 
-namespace Insolvia.Forms.Pdf;
+namespace Insolvia.Domain.Forms.Pdf;
 
 /// <summary>
 /// Reading PDFsharp's object model the way pypdf's dictionary accessors read

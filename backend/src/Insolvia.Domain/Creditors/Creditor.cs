@@ -1,8 +1,8 @@
 using System.Text.Json.Nodes;
-using Insolvia.Core.CaseEntities;
-using Insolvia.Core.Fields;
+using Insolvia.Domain.CaseEntities;
+using Insolvia.Domain.Fields;
 
-namespace Insolvia.Core.Creditors;
+namespace Insolvia.Domain.Creditors;
 
 /// <summary>
 /// One deduplicated name-and-address for the creditor matrix (from

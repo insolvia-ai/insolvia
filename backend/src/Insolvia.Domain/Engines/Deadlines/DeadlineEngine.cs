@@ -1,6 +1,6 @@
-using Insolvia.Core.Cases;
+using Insolvia.Domain.Cases;
 
-namespace Insolvia.Engines.Deadlines;
+namespace Insolvia.Domain.Engines.Deadlines;
 
 /// <summary>One rule applied to one case: what the calendar event will say.</summary>
 public sealed record GeneratedDeadline(DeadlineRule Rule, DateOnly Start, DateOnly End)

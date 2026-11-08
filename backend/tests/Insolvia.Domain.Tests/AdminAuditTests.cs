@@ -1,7 +1,7 @@
-using Insolvia.Core.AdminAudit;
-using Insolvia.Core.Memory;
+using Insolvia.Domain.AdminAudit;
+using Insolvia.Domain.Memory;
 
-namespace Insolvia.Core.Tests;
+namespace Insolvia.Domain.Tests;
 
 // services/admin's core/audit.py had no unit tests of its own (its routes'
 // tests asserted the rows); these pin the domain half the port carries.

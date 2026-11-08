@@ -1,7 +1,7 @@
 using System.Text.Json.Nodes;
-using Insolvia.Core.Provenance;
+using Insolvia.Domain.Provenance;
 
-namespace Insolvia.Core.CaseEntities;
+namespace Insolvia.Domain.CaseEntities;
 
 // The machinery every case-scoped collection shares (issue #249; from
 // case_entities.py). Every collection is the same KIND of thing — a

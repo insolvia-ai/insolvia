@@ -4,13 +4,12 @@ using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using Insolvia.Core;
-using Insolvia.Core.CaseEntities;
-using Insolvia.Core.Cases;
-using Insolvia.Core.Courts;
-using Insolvia.Core.Debtors;
+using Insolvia.Domain.CaseEntities;
+using Insolvia.Domain.Cases;
+using Insolvia.Domain.Courts;
+using Insolvia.Domain.Debtors;
 
-namespace Insolvia.Forms;
+namespace Insolvia.Domain.Forms;
 
 /// <summary>The fee handling as it stands: handed back at the court's payment step, with the court's rule as recorded.</summary>
 public sealed record FeeHandling(string Handling, string? Deadline, string Note, bool Verified);

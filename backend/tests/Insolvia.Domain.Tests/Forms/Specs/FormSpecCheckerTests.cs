@@ -1,6 +1,6 @@
 using System.Text.Json.Nodes;
 
-namespace Insolvia.Forms.Tests.Specs;
+namespace Insolvia.Domain.Forms.Tests.Specs;
 
 // One red case per check forms/scripts/check.py made: each starts from a
 // small spec that passes and breaks exactly one thing, so a check that stops

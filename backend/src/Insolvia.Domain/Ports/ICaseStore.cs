@@ -1,9 +1,9 @@
-using Insolvia.Core.Access;
-using Insolvia.Core.Cases;
-using Insolvia.Core.Clients;
-using Insolvia.Core.Debtors;
+using Insolvia.Domain.Access;
+using Insolvia.Domain.Cases;
+using Insolvia.Domain.Clients;
+using Insolvia.Domain.Debtors;
 
-namespace Insolvia.Core.Ports;
+namespace Insolvia.Domain.Ports;
 
 /// <summary>
 /// Persists case records (issue 8.3; Python's <c>CaseStore</c>). Every read

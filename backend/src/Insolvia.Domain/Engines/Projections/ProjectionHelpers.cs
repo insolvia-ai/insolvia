@@ -1,10 +1,9 @@
 using System.Globalization;
-using Insolvia.Core;
-using Insolvia.Core.Claims;
-using Insolvia.Core.Debtors;
-using Insolvia.Core.Fields;
+using Insolvia.Domain.Claims;
+using Insolvia.Domain.Debtors;
+using Insolvia.Domain.Fields;
 
-namespace Insolvia.Engines.Projections;
+namespace Insolvia.Domain.Engines.Projections;
 
 /// <summary>
 /// What every per-form projection shares (from <c>form_projections/shared.py</c>):

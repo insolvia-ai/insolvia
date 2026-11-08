@@ -1,9 +1,9 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
-using Insolvia.Core;
-using Insolvia.Core.Firms;
-using Insolvia.Core.Questionnaires;
+using Insolvia.Domain;
+using Insolvia.Domain.Firms;
+using Insolvia.Domain.Questionnaires;
 
 namespace Insolvia.Data.Storage;
 

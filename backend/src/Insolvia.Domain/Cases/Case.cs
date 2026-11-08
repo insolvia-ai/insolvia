@@ -1,7 +1,7 @@
 using System.Text.Json.Serialization;
-using Insolvia.Core.Debtors;
+using Insolvia.Domain.Debtors;
 
-namespace Insolvia.Core.Cases;
+namespace Insolvia.Domain.Cases;
 
 /// <summary>
 /// A case record (from <c>cases.py</c>). A CASE BELONGS TO A FIRM, not to

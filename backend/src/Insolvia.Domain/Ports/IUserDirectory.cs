@@ -1,4 +1,4 @@
-namespace Insolvia.Core.Ports;
+namespace Insolvia.Domain.Ports;
 
 /// <summary>
 /// Creates — and re-invites — the Cognito account behind a firm user. THE

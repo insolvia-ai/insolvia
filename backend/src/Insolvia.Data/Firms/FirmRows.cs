@@ -1,7 +1,7 @@
 using System.Text.Json;
-using Insolvia.Core.FirmClients;
-using Insolvia.Core.Firms;
 using Insolvia.Data.Storage;
+using Insolvia.Domain.FirmClients;
+using Insolvia.Domain.Firms;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 

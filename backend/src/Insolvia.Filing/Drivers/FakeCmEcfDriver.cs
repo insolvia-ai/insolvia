@@ -20,7 +20,7 @@ namespace Insolvia.Filing.Drivers;
 /// the fence is the second wall. <paramref name="caseUpload"/> picks the
 /// fake court's configuration (ADR 0024's two): <c>true</c> (the default —
 /// what a laptop and the end-to-end tests file against) opens the case with a
-/// Case Upload file (Debtor.txt, Insolvia.Forms' <c>CaseUploads</c>) that the
+/// Case Upload file (Debtor.txt, Insolvia.Domain.Forms' <c>CaseUploads</c>) that the
 /// fake checks the way a court does; <c>false</c> is the screen-entry-only
 /// court, which receives no Debtor.txt and for which no tax id is opened.
 /// </remarks>

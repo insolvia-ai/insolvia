@@ -1,11 +1,10 @@
-using Insolvia.Core;
-using Insolvia.Core.Claims;
-using Insolvia.Core.Debtors;
-using Insolvia.Core.Expenses;
-using Insolvia.Core.Petitions;
-using static Insolvia.Engines.Projections.ProjectionHelpers;
+using Insolvia.Domain.Claims;
+using Insolvia.Domain.Debtors;
+using Insolvia.Domain.Expenses;
+using Insolvia.Domain.Petitions;
+using static Insolvia.Domain.Engines.Projections.ProjectionHelpers;
 
-namespace Insolvia.Engines.Projections.Forms;
+namespace Insolvia.Domain.Engines.Projections.Forms;
 
 /// <summary>
 /// B106J @ 2015-12-01 — Schedule J's mapping (from <c>form_projections/b106j.py</c>).

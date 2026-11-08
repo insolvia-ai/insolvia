@@ -1,7 +1,7 @@
 using System.Text.Json.Nodes;
-using Insolvia.Core.Candidates;
+using Insolvia.Domain.Candidates;
 
-namespace Insolvia.Core.Tests;
+namespace Insolvia.Domain.Tests;
 
 /// <summary>Candidates — proposals awaiting review — translated from test_candidates.py.</summary>
 public sealed class CandidateTests

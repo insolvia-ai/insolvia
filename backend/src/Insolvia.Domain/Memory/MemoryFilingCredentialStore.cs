@@ -1,7 +1,7 @@
-using Insolvia.Core.FilingCredentials;
-using Insolvia.Core.Ports;
+using Insolvia.Domain.FilingCredentials;
+using Insolvia.Domain.Ports;
 
-namespace Insolvia.Core.Memory;
+namespace Insolvia.Domain.Memory;
 
 /// <summary>The in-memory <see cref="IFilingCredentialStore"/>, keyed by (firm, attorney, credential).</summary>
 public sealed class MemoryFilingCredentialStore : IFilingCredentialStore

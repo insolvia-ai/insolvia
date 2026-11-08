@@ -1,9 +1,9 @@
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using Insolvia.Core.Documents;
+using Insolvia.Domain.Documents;
 
-namespace Insolvia.Core.Jobs;
+namespace Insolvia.Domain.Jobs;
 
 // Async pipeline jobs (ADR 0018; from services/api core/jobs.py): the record,
 // its transitions, and the queue contract both sides of SQS meet at. The

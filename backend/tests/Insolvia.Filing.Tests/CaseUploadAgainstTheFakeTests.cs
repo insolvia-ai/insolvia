@@ -1,7 +1,7 @@
 using System.Text;
-using Insolvia.Core.AccessLog;
-using Insolvia.Core.Debtors;
-using Insolvia.Core.Ports;
+using Insolvia.Domain.AccessLog;
+using Insolvia.Domain.Debtors;
+using Insolvia.Domain.Ports;
 using Insolvia.Filing.Drivers;
 using Insolvia.Filing.Fence;
 using Insolvia.Filing.Http;

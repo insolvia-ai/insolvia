@@ -1,14 +1,14 @@
-using Insolvia.Core.Assets;
-using Insolvia.Core.Claims;
-using Insolvia.Core.Creditors;
-using Insolvia.Core.Plans;
-using Insolvia.Engines.Exemptions;
-using Insolvia.Engines.Plans;
-using Insolvia.Engines.Projections;
-using Insolvia.Engines.Tests.Support;
-using static Insolvia.Engines.Plans.Chapter13Plan;
+using Insolvia.Domain.Assets;
+using Insolvia.Domain.Claims;
+using Insolvia.Domain.Creditors;
+using Insolvia.Domain.Engines.Exemptions;
+using Insolvia.Domain.Engines.Plans;
+using Insolvia.Domain.Engines.Projections;
+using Insolvia.Domain.Engines.Tests.Support;
+using Insolvia.Domain.Plans;
+using static Insolvia.Domain.Engines.Plans.Chapter13Plan;
 
-namespace Insolvia.Engines.Tests;
+namespace Insolvia.Domain.Engines.Tests;
 
 // Translated from services/api/tests/unit/test_chapter13_plan.py: the plan
 // calculator over a hand-built case file and hand-typed upstream figures.

@@ -3,11 +3,11 @@ using Insolvia.Api.Auth;
 using Insolvia.Api.Firms;
 using Insolvia.Api.Hosting;
 using Insolvia.Api.Http;
-using Insolvia.Core;
-using Insolvia.Core.AccessLog;
-using Insolvia.Core.FirmClients;
-using Insolvia.Core.Firms;
-using Insolvia.Core.Ports;
+using Insolvia.Domain;
+using Insolvia.Domain.AccessLog;
+using Insolvia.Domain.FirmClients;
+using Insolvia.Domain.Firms;
+using Insolvia.Domain.Ports;
 
 namespace Insolvia.Api.Routes;
 

@@ -1,7 +1,7 @@
-using Insolvia.Core.CaseTasks;
-using Insolvia.Core.Ports;
+using Insolvia.Domain.CaseTasks;
+using Insolvia.Domain.Ports;
 
-namespace Insolvia.Core.Memory;
+namespace Insolvia.Domain.Memory;
 
 /// <summary>
 /// The in-memory <see cref="ICaseTaskStore"/>. Keyed by (case, id) as the table is, so

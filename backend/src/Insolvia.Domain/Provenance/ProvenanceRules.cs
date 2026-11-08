@@ -2,7 +2,7 @@ using System.Globalization;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 
-namespace Insolvia.Core.Provenance;
+namespace Insolvia.Domain.Provenance;
 
 /// <summary>
 /// Where every stored value came from, and the two rules that make it

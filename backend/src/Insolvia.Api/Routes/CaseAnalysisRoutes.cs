@@ -3,24 +3,24 @@ using Insolvia.Api.Auth;
 using Insolvia.Api.Cases;
 using Insolvia.Api.Hosting;
 using Insolvia.Api.Http;
-using Insolvia.Core;
-using Insolvia.Core.AccessLog;
-using Insolvia.Core.Assets;
-using Insolvia.Core.Cases;
-using Insolvia.Core.Claims;
-using Insolvia.Core.Creditors;
-using Insolvia.Core.Expenses;
-using Insolvia.Core.Fields;
-using Insolvia.Core.Firms;
-using Insolvia.Core.Plans;
-using Insolvia.Core.Ports;
-using Insolvia.Engines.CreditorMatrix;
-using Insolvia.Engines.Exemptions;
-using Insolvia.Engines.Liens;
-using Insolvia.Engines.MeansTest;
-using Insolvia.Engines.Plans;
-using Insolvia.Engines.Projections;
-using Insolvia.Engines.Standards;
+using Insolvia.Domain;
+using Insolvia.Domain.AccessLog;
+using Insolvia.Domain.Assets;
+using Insolvia.Domain.Cases;
+using Insolvia.Domain.Claims;
+using Insolvia.Domain.Creditors;
+using Insolvia.Domain.Engines.CreditorMatrix;
+using Insolvia.Domain.Engines.Exemptions;
+using Insolvia.Domain.Engines.Liens;
+using Insolvia.Domain.Engines.MeansTest;
+using Insolvia.Domain.Engines.Plans;
+using Insolvia.Domain.Engines.Projections;
+using Insolvia.Domain.Engines.Standards;
+using Insolvia.Domain.Expenses;
+using Insolvia.Domain.Fields;
+using Insolvia.Domain.Firms;
+using Insolvia.Domain.Plans;
+using Insolvia.Domain.Ports;
 
 namespace Insolvia.Api.Routes;
 
@@ -114,7 +114,7 @@ public sealed class CaseAnalysisRoutes : IEndpointModule
     /// <summary>
     /// The IRS National and Local Standards for the case's jurisdiction and
     /// household, as of its creation date (the filing-date stand-in). An
-    /// <see cref="Engines.EngineLookupException"/> — no release covers the date
+    /// <see cref="Insolvia.Domain.Engines.EngineLookupException"/> — no release covers the date
     /// at all — is deliberately not caught: the generic 500 is the honest answer.
     /// </summary>
     private static async Task<IResult> StandardsAsync(HttpContext context, string caseId, CancellationToken cancellationToken)

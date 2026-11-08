@@ -1,7 +1,7 @@
-using Insolvia.Core.Documents;
-using Insolvia.Core.Local;
+using Insolvia.Domain.Documents;
+using Insolvia.Domain.Local;
 
-namespace Insolvia.Core.Tests;
+namespace Insolvia.Domain.Tests;
 
 /// <summary>
 /// The local directory store: the layout contract/scripts/aux-server.ts

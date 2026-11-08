@@ -1,8 +1,8 @@
 using System.Globalization;
 using System.Text.Json.Nodes;
-using Insolvia.Core.MeansTest;
+using Insolvia.Domain.MeansTest;
 
-namespace Insolvia.Core.Tests;
+namespace Insolvia.Domain.Tests;
 
 /// <summary>B122A-2's entered figures, translated from test_means_test_inputs.py.</summary>
 public sealed class MeansTestInputTests

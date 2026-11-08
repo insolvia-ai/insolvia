@@ -1,7 +1,7 @@
-using Insolvia.Core.Cases;
-using Insolvia.Core.Filings;
+using Insolvia.Domain.Cases;
+using Insolvia.Domain.Filings;
 
-namespace Insolvia.Core.Ports;
+namespace Insolvia.Domain.Ports;
 
 /// <summary>
 /// The filing records (ADR 0024 PR 7/8; Python's <c>FilingStore</c>). Written

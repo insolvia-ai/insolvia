@@ -1,4 +1,4 @@
-using Insolvia.Core;
+using Insolvia.Domain;
 
 namespace Insolvia.Mcp.Configuration;
 

@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace Insolvia.Core.AdminAudit;
+namespace Insolvia.Domain.AdminAudit;
 
 // The provisioning record — who did what to which firm (ADR 0011; from
 // services/admin's core/audit.py, #178/#212). The execution role is the only

@@ -1,10 +1,9 @@
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
-using Insolvia.Core;
-using Insolvia.Core.Courts;
-using Insolvia.Core.Creditors;
+using Insolvia.Domain.Courts;
+using Insolvia.Domain.Creditors;
 
-namespace Insolvia.Engines.CreditorMatrix;
+namespace Insolvia.Domain.Engines.CreditorMatrix;
 
 /// <summary>
 /// One district family's matrix shape, as numbers rather than branches.

@@ -1,6 +1,6 @@
-using Insolvia.Core.Debtors;
+using Insolvia.Domain.Debtors;
 
-namespace Insolvia.Core.Ports;
+namespace Insolvia.Domain.Ports;
 
 /// <summary>
 /// Persists the debtor records of a case (issue 8.5; Python's

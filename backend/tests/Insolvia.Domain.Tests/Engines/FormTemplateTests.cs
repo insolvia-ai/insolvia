@@ -1,12 +1,12 @@
-using Insolvia.Engines.Projections;
+using Insolvia.Domain.Engines.Projections;
 
-namespace Insolvia.Engines.Tests;
+namespace Insolvia.Domain.Engines.Tests;
 
 // Translated from the committed-registry half of services/api/tests/unit/
 // test_form_templates.py — the half the projections read (spec, AcroForm
 // dump, resolution). The template PDFs, their sha256 check and the loader's
 // malformed-release suite (which builds template.pdf files) move with the
-// fill engine to Insolvia.Forms (18.16).
+// fill engine to Insolvia.Domain.Forms (18.16).
 public sealed class FormTemplateTests
 {
     private static IEnumerable<FormRelease> AllReleases => FormTemplates.Registry.Values.SelectMany(series => series);

@@ -1,9 +1,9 @@
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
-using Insolvia.Core.CaseEntities;
-using Insolvia.Core.Fields;
+using Insolvia.Domain.CaseEntities;
+using Insolvia.Domain.Fields;
 
-namespace Insolvia.Core.Exemptions;
+namespace Insolvia.Domain.Exemptions;
 
 /// <summary>
 /// The claimed exemption — 106C, one row per exemption asserted on an asset

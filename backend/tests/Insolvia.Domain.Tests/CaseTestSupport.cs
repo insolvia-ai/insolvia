@@ -1,11 +1,11 @@
 using System.Text.Json.Nodes;
-using Insolvia.Core.Access;
-using Insolvia.Core.Cases;
-using Insolvia.Core.Firms;
-using Insolvia.Core.Ports;
-using Insolvia.Core.TaxIds;
+using Insolvia.Domain.Access;
+using Insolvia.Domain.Cases;
+using Insolvia.Domain.Firms;
+using Insolvia.Domain.Ports;
+using Insolvia.Domain.TaxIds;
 
-namespace Insolvia.Core.Tests;
+namespace Insolvia.Domain.Tests;
 
 /// <summary>Builders the case-half suites share. Every identifier is obviously fake.</summary>
 internal static class CaseFixtures

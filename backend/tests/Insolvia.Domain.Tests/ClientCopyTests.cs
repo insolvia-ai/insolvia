@@ -1,18 +1,18 @@
 using System.Text.Json.Nodes;
-using Insolvia.Core.Access;
-using Insolvia.Core.CaseEntities;
-using Insolvia.Core.Cases;
-using Insolvia.Core.Clients;
-using Insolvia.Core.Debtors;
-using Insolvia.Core.Fields;
-using Insolvia.Core.FirmClients;
-using Insolvia.Core.Firms;
-using Insolvia.Core.Memory;
-using Insolvia.Core.Provenance;
-using Insolvia.Core.TaxIds;
-using static Insolvia.Core.Tests.CaseFixtures;
+using Insolvia.Domain.Access;
+using Insolvia.Domain.CaseEntities;
+using Insolvia.Domain.Cases;
+using Insolvia.Domain.Clients;
+using Insolvia.Domain.Debtors;
+using Insolvia.Domain.Fields;
+using Insolvia.Domain.FirmClients;
+using Insolvia.Domain.Firms;
+using Insolvia.Domain.Memory;
+using Insolvia.Domain.Provenance;
+using Insolvia.Domain.TaxIds;
+using static Insolvia.Domain.Tests.CaseFixtures;
 
-namespace Insolvia.Core.Tests;
+namespace Insolvia.Domain.Tests;
 
 /// <summary>
 /// A client's identity copied onto a case and back (ADR 0022), translated from

@@ -1,19 +1,19 @@
 using System.Text;
 using System.Text.Json.Nodes;
-using Insolvia.Core.CaseEntities;
-using Insolvia.Core.Cases;
-using Insolvia.Core.Claims;
-using Insolvia.Core.Courts;
-using Insolvia.Core.Debtors;
-using Insolvia.Core.Expenses;
-using Insolvia.Core.Petitions;
-using Insolvia.Engines;
-using Insolvia.Engines.CreditorMatrix;
-using Insolvia.Engines.Projections;
-using Insolvia.Engines.Projections.Forms;
-using Insolvia.Engines.Regulatory;
+using Insolvia.Domain.CaseEntities;
+using Insolvia.Domain.Cases;
+using Insolvia.Domain.Claims;
+using Insolvia.Domain.Courts;
+using Insolvia.Domain.Debtors;
+using Insolvia.Domain.Engines;
+using Insolvia.Domain.Engines.CreditorMatrix;
+using Insolvia.Domain.Engines.Projections;
+using Insolvia.Domain.Engines.Projections.Forms;
+using Insolvia.Domain.Engines.Regulatory;
+using Insolvia.Domain.Expenses;
+using Insolvia.Domain.Petitions;
 
-namespace Insolvia.Forms;
+namespace Insolvia.Domain.Forms;
 
 /// <summary>
 /// One reason the case cannot yield a compliant packet: the source
@@ -587,7 +587,7 @@ public static class PacketAssembly
             }
             catch (EngineLookupException error)
             {
-                problems.Add(new(seriesId, null, string.Empty, Engines.Exact.Str(error)));
+                problems.Add(new(seriesId, null, string.Empty, Insolvia.Domain.Engines.Exact.Str(error)));
             }
         }
 
@@ -598,7 +598,7 @@ public static class PacketAssembly
         }
         catch (EngineLookupException error)
         {
-            problems.Add(new(DollarAmounts.SeriesId, null, string.Empty, Engines.Exact.Str(error)));
+            problems.Add(new(DollarAmounts.SeriesId, null, string.Empty, Insolvia.Domain.Engines.Exact.Str(error)));
         }
 
         var projected = new OrderedDictionary<string, FieldValues>(StringComparer.Ordinal);

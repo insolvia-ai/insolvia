@@ -1,12 +1,11 @@
-using Insolvia.Core;
-using Insolvia.Core.Claims;
-using Insolvia.Core.Debtors;
-using Insolvia.Core.MeansTest;
-using Insolvia.Engines.MeansTest;
-using Insolvia.Engines.Regulatory;
-using static Insolvia.Engines.Projections.ProjectionHelpers;
+using Insolvia.Domain.Claims;
+using Insolvia.Domain.Debtors;
+using Insolvia.Domain.Engines.MeansTest;
+using Insolvia.Domain.Engines.Regulatory;
+using Insolvia.Domain.MeansTest;
+using static Insolvia.Domain.Engines.Projections.ProjectionHelpers;
 
-namespace Insolvia.Engines.Projections.Forms;
+namespace Insolvia.Domain.Engines.Projections.Forms;
 
 /// <summary>
 /// B122A-1 @ 2019-12-01 — the Chapter 7 statement of current monthly income

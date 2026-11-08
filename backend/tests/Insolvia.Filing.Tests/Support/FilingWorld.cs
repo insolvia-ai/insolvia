@@ -3,22 +3,22 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json.Nodes;
 using Insolvia.Api.Tests.Support;
-using Insolvia.Aws.Sealing;
-using Insolvia.Core;
-using Insolvia.Core.AccessLog;
-using Insolvia.Core.Cases;
-using Insolvia.Core.Courts;
-using Insolvia.Core.Filings;
-using Insolvia.Core.Firms;
-using Insolvia.Core.Memory;
-using Insolvia.Core.Ports;
-using Insolvia.Core.TaxIds;
+using Insolvia.Domain;
+using Insolvia.Domain.AccessLog;
+using Insolvia.Domain.Cases;
+using Insolvia.Domain.Courts;
+using Insolvia.Domain.Filings;
+using Insolvia.Domain.Firms;
+using Insolvia.Domain.Forms;
+using Insolvia.Domain.Forms.Tests.Support;
+using Insolvia.Domain.Memory;
+using Insolvia.Domain.Ports;
+using Insolvia.Domain.TaxIds;
 using Insolvia.Filing.Drivers;
 using Insolvia.Filing.Fence;
 using Insolvia.Filing.Http;
 using Insolvia.Filing.Tests.FakeCourt;
-using Insolvia.Forms;
-using Insolvia.Forms.Tests.Support;
+using Insolvia.Platform.Sealing;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -148,7 +148,7 @@ internal sealed class FilingWorld : IAsyncDisposable
     private async Task SeedAsync()
     {
         var seeded = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
-        await Firms.CreateFirmAsync(new Core.Firms.Firm(Firm, "Example & Partners", FirmStatus.Active, seeded, seeded));
+        await Firms.CreateFirmAsync(new Insolvia.Domain.Firms.Firm(Firm, "Example & Partners", FirmStatus.Active, seeded, seeded));
         var permissions = Permissions.DefaultFor(FirmRole.Attorney).ToDictionary(pair => pair.Key, pair => pair.Value);
         permissions[Feature.ElectronicFiling] = PermissionLevel.AddEdit;
         await Firms.AddUserAsync(new FirmUser(Firm, Attorney, "a771@example.test", "Avery", "Example", FirmRole.Attorney, false, true, permissions.ToValueDictionary(), FirmUserStatus.Active, seeded, seeded));
@@ -186,7 +186,7 @@ internal sealed class FilingWorld : IAsyncDisposable
         CredentialId = await EnrolAsync(FakeCmEcf.Login, CourtFake.Password, CourtFake.TotpSeed);
     }
 
-    private Packet Packets_New(byte[] zip, AssembledPacket assembled) => Forms.Packets.NewPacket(
+    private Packet Packets_New(byte[] zip, AssembledPacket assembled) => Insolvia.Domain.Forms.Packets.NewPacket(
         CaseId,
         7,
         Guid.NewGuid().ToString(),
@@ -209,10 +209,10 @@ internal sealed class FilingWorld : IAsyncDisposable
     /// <summary>The bytes in the bucket and the row in the API's own packet store, the case pinned with it — what the job worker writes.</summary>
     private async Task StorePacketAsync(Packet packet, byte[] zip)
     {
-        await Service<IDocumentBlobStore>().PutBytesAsync(packet.StorageRef, zip, Forms.Packets.PacketContentType);
+        await Service<IDocumentBlobStore>().PutBytesAsync(packet.StorageRef, zip, Insolvia.Domain.Forms.Packets.PacketContentType);
         var stored = (await Service<ICaseStore>().ReadForWorkerAsync(CaseId))!;
         var pinned = stored with { FormRevisions = packet.FormRevisions, ConstantsSetId = packet.ConstantsSetId };
-        Assert.True(await Service<IPacketStore>().CreateAsync(Forms.Packets.ToItem(packet), pinned, stored.UpdatedAt));
+        Assert.True(await Service<IPacketStore>().CreateAsync(Insolvia.Domain.Forms.Packets.ToItem(packet), pinned, stored.UpdatedAt));
     }
 
     /// <summary>The reference case, in flmb, under <paramref name="caseId"/>, owned by the firm.</summary>
@@ -326,7 +326,7 @@ internal sealed class FilingWorld : IAsyncDisposable
 
     public Task<FilingResult> RunAsync(string body) => FilingWorker.RunAsync(body, Deps(), TestContext.Current.CancellationToken);
 
-    public async Task<Core.Filings.Filing> FilingAsync(FilingApproval approval) =>
+    public async Task<Insolvia.Domain.Filings.Filing> FilingAsync(FilingApproval approval) =>
         (await Service<IFilingStore>().GetAsync(CaseId, approval.FilingId))!;
 
     public Task<Case?> CaseAsync() => Service<ICaseStore>().ReadForWorkerAsync(CaseId);

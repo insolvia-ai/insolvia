@@ -3,7 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 
-namespace Insolvia.Engines.Regulatory;
+namespace Insolvia.Domain.Engines.Regulatory;
 
 /// <summary>
 /// A registry root as a file tree — the shape <c>importlib.resources</c> gave
@@ -14,7 +14,7 @@ namespace Insolvia.Engines.Regulatory;
 /// </summary>
 public sealed class RegistryTree
 {
-    private const string ResourcePrefix = "Insolvia.Engines.Regulatory/";
+    private const string ResourcePrefix = "Insolvia.Domain.Engines.Regulatory/";
 
     private static readonly Lazy<RegistryTree> ShippedTree = new(() => new RegistryTree(EmbeddedFiles()));
 
@@ -132,7 +132,7 @@ internal static partial class ReleaseParsing
 
     internal static string StrField(JsonObject data, string key, string where, Func<string, string, MalformedReleaseException>? fail = null)
     {
-        var value = Core.Json.AsString(data[key]);
+        var value = Insolvia.Domain.Json.AsString(data[key]);
         if (value is null || value.Trim().Length == 0)
         {
             throw (fail ?? Fail)(where, $"{key} missing or empty");
@@ -148,7 +148,7 @@ internal static partial class ReleaseParsing
             return null;
         }
 
-        var text = Core.Json.AsString(value)
+        var text = Insolvia.Domain.Json.AsString(value)
             ?? throw Fail(where, $"{fieldName} {Exact.Repr(value)} is not a date string");
         return Exact.ParseIso(text)
             ?? throw Fail(where, $"{fieldName} {Exact.Repr(text)}: Invalid isoformat string: {Exact.Repr(text)}");
@@ -262,17 +262,17 @@ internal static partial class ReleaseParsing
     internal static JsonObject ManifestSource(JsonObject manifest, string seriesId, DateOnly effective, int sequence, string where, Func<string, string, MalformedReleaseException>? fail = null)
     {
         fail ??= Fail;
-        if (Core.Json.AsString(manifest["series_id"]) != seriesId)
+        if (Insolvia.Domain.Json.AsString(manifest["series_id"]) != seriesId)
         {
             throw fail(where, $"manifest series_id {Exact.Repr(manifest["series_id"])}");
         }
 
-        if (Core.Json.AsString(manifest["effective_date"]) != Exact.Iso(effective))
+        if (Insolvia.Domain.Json.AsString(manifest["effective_date"]) != Exact.Iso(effective))
         {
             throw fail(where, "manifest effective_date disagrees with the path");
         }
 
-        if (!Core.Json.TryGetWholeNumber(manifest["sequence"], out var declared) || declared != sequence)
+        if (!Insolvia.Domain.Json.TryGetWholeNumber(manifest["sequence"], out var declared) || declared != sequence)
         {
             throw fail(where, "manifest sequence disagrees with the path");
         }
@@ -283,7 +283,7 @@ internal static partial class ReleaseParsing
     /// <summary>A two-decimal money string or the loader's refusal (<c>_money</c>).</summary>
     internal static string Money(JsonNode? value, string where, string fieldName)
     {
-        var text = Core.Json.AsString(value);
+        var text = Insolvia.Domain.Json.AsString(value);
         if (text is null || !MoneyPattern().IsMatch(text))
         {
             throw Fail(where, $"{fieldName} {Exact.Repr(value)} is not a two-decimal money string");
@@ -299,7 +299,7 @@ internal static partial class ReleaseParsing
     /// <summary><c>Verification(raw)</c>, refusing an unknown tier with Python's enum message.</summary>
     internal static Verification ParseVerification(JsonNode? value, string where)
     {
-        if (Core.Wire.TryParse<Verification>(Core.Json.AsString(value), out var verification))
+        if (Insolvia.Domain.Wire.TryParse<Verification>(Insolvia.Domain.Json.AsString(value), out var verification))
         {
             return verification;
         }
@@ -315,7 +315,7 @@ internal static partial class ReleaseParsing
             return string.Empty;
         }
 
-        return Core.Json.AsString(value) ?? throw Fail(where, message);
+        return Insolvia.Domain.Json.AsString(value) ?? throw Fail(where, message);
     }
 
     /// <summary>The sha256, absent allowed, a string when present.</summary>
@@ -327,13 +327,13 @@ internal static partial class ReleaseParsing
             return null;
         }
 
-        return Core.Json.AsString(value) ?? throw Fail(where, "source.sha256 must be a string or null");
+        return Insolvia.Domain.Json.AsString(value) ?? throw Fail(where, "source.sha256 must be a string or null");
     }
 
     /// <summary>The manifest's notes, required (<c>manifest notes missing</c>).</summary>
     internal static string ManifestNotes(JsonObject manifest, string where)
     {
-        var notes = Core.Json.AsString(manifest["notes"]);
+        var notes = Insolvia.Domain.Json.AsString(manifest["notes"]);
         if (notes is null || notes.Trim().Length == 0)
         {
             throw Fail(where, "manifest notes missing — say what this release is");

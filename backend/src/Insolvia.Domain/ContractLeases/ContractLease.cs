@@ -1,9 +1,9 @@
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
-using Insolvia.Core.CaseEntities;
-using Insolvia.Core.Fields;
+using Insolvia.Domain.CaseEntities;
+using Insolvia.Domain.Fields;
 
-namespace Insolvia.Core.ContractLeases;
+namespace Insolvia.Domain.ContractLeases;
 
 /// <summary>
 /// The executory contract / unexpired lease record — 106G, one row each (from

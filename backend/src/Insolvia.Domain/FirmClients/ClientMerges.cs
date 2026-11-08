@@ -1,6 +1,6 @@
-using Insolvia.Core.Ports;
+using Insolvia.Domain.Ports;
 
-namespace Insolvia.Core.FirmClients;
+namespace Insolvia.Domain.FirmClients;
 
 /// <summary>
 /// What a finished merge leaves: the survivor as it now stands and the merged

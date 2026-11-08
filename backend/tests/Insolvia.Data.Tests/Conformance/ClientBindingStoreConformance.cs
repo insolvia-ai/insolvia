@@ -1,8 +1,8 @@
-using Insolvia.Core;
-using Insolvia.Core.Clients;
-using Insolvia.Core.Memory;
-using Insolvia.Core.Ports;
 using Insolvia.Data.Portal;
+using Insolvia.Domain;
+using Insolvia.Domain.Clients;
+using Insolvia.Domain.Memory;
+using Insolvia.Domain.Ports;
 using Microsoft.EntityFrameworkCore;
 
 namespace Insolvia.Data.Tests.Conformance;

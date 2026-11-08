@@ -1,7 +1,7 @@
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 
-namespace Insolvia.Core.Cases;
+namespace Insolvia.Domain.Cases;
 
 // THE LIFECYCLE HISTORY (ADR 0027; #506 row 2). A case's history is ONE
 // ordered series of events, replacing the STATUS# rows: status moves, the

@@ -1,17 +1,16 @@
 using System.Text.Json.Nodes;
-using Insolvia.Core;
-using Insolvia.Core.Assets;
-using Insolvia.Core.Cases;
-using Insolvia.Core.Claims;
-using Insolvia.Core.Debtors;
-using Insolvia.Core.Exemptions;
-using Insolvia.Core.Fields;
-using Insolvia.Core.Petitions;
-using Insolvia.Core.Sofa;
-using Insolvia.Engines.Exemptions;
-using Insolvia.Engines.Tests.Support;
+using Insolvia.Domain.Assets;
+using Insolvia.Domain.Cases;
+using Insolvia.Domain.Claims;
+using Insolvia.Domain.Debtors;
+using Insolvia.Domain.Engines.Exemptions;
+using Insolvia.Domain.Engines.Tests.Support;
+using Insolvia.Domain.Exemptions;
+using Insolvia.Domain.Fields;
+using Insolvia.Domain.Petitions;
+using Insolvia.Domain.Sofa;
 
-namespace Insolvia.Engines.Tests;
+namespace Insolvia.Domain.Engines.Tests;
 
 // Translated from services/api/tests/unit/test_exemption_analysis.py: the
 // Schedule C workbench's arithmetic over hand-built inputs, every figure a

@@ -1,8 +1,8 @@
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
-using static Insolvia.Engines.Regulatory.ReleaseParsing;
+using static Insolvia.Domain.Engines.Regulatory.ReleaseParsing;
 
-namespace Insolvia.Engines.Regulatory;
+namespace Insolvia.Domain.Engines.Regulatory;
 
 // The exemption dataset: loader and resolution for the `exemptions/*` series
 // (from core/exemptions.py). Which states launch supports is ADR 0017's
@@ -221,7 +221,7 @@ public static class ExemptionRegistry
     public static IReadOnlyList<ExemptionScheme> SchemesForState(string state, DateOnly asOf)
     {
         ArgumentNullException.ThrowIfNull(state);
-        var seriesId = $"exemptions/{Core.TextRules.Lower(state)}";
+        var seriesId = $"exemptions/{Insolvia.Domain.TextRules.Lower(state)}";
         if (!LaunchStates.Contains(state.ToUpperInvariant()) || !Registry.ContainsKey(seriesId))
         {
             throw new EngineKeyException($"state {Exact.Repr(state)} is not in the launch set ('FL', 'TX', 'GA') (ADR 0017)");
@@ -243,7 +243,7 @@ public static class ExemptionRegistry
 
         var entryId = StrField(raw, "entry_id", where);
         where = $"{where} entry {entryId}";
-        if (!Core.Wire.TryParse<ExemptionCategory>(Core.Json.AsString(raw["category"]), out var category))
+        if (!Insolvia.Domain.Wire.TryParse<ExemptionCategory>(Insolvia.Domain.Json.AsString(raw["category"]), out var category))
         {
             throw Fail(where, $"{Exact.Repr(raw["category"])} is not a valid Category");
         }
@@ -253,12 +253,12 @@ public static class ExemptionRegistry
             ? flag.GetValue<bool>()
             : throw Fail(where, "unlimited must be a boolean");
         var carryFrom = raw["wildcard_carryover_from"];
-        if (carryFrom is not null && Core.Json.AsString(carryFrom) is null)
+        if (carryFrom is not null && Insolvia.Domain.Json.AsString(carryFrom) is null)
         {
             throw Fail(where, "wildcard_carryover_from must be a string or null");
         }
 
-        var notes = Notes(raw, where);
+        var notes = ReleaseParsing.Notes(raw, where);
         return new ExemptionEntry(
             EntryId: entryId,
             Category: category,
@@ -270,7 +270,7 @@ public static class ExemptionRegistry
             Sources: Sources(raw["sources"], where),
             PerItemAmount: MoneyOrNone(raw["per_item_amount"], where, "per_item_amount"),
             JointAmount: MoneyOrNone(raw["joint_amount"], where, "joint_amount"),
-            WildcardCarryoverFrom: Core.Json.AsString(carryFrom),
+            WildcardCarryoverFrom: Insolvia.Domain.Json.AsString(carryFrom),
             WildcardCarryoverCap: MoneyOrNone(raw["wildcard_carryover_cap"], where, "wildcard_carryover_cap"),
             FigureSince: DateOrNone(raw["figure_since"], where, "figure_since"),
             Notes: notes);
@@ -293,7 +293,7 @@ public static class ExemptionRegistry
         }
 
         var verification = ParseVerification(raw["verification"], where);
-        var notes = Notes(raw, where);
+        var notes = ReleaseParsing.Notes(raw, where);
         return new StatutoryLimit(
             LimitId: limitId,
             Citation: StrField(raw, "citation", where),
@@ -328,10 +328,10 @@ public static class ExemptionRegistry
         }
 
         var optedOutNode = payload["opted_out_of_federal"];
-        bool? optedOut = optedOutNode is null ? null : Core.Json.AsBool(optedOutNode) ?? throw Fail(where, "opted_out_of_federal must be a boolean or null");
+        bool? optedOut = optedOutNode is null ? null : Insolvia.Domain.Json.AsBool(optedOutNode) ?? throw Fail(where, "opted_out_of_federal must be a boolean or null");
         var citationNode = payload["opt_out_citation"];
-        var optOutCitation = citationNode is null ? null : Core.Json.AsString(citationNode) ?? throw Fail(where, "opt_out_citation must be a string or null");
-        var schemeNotes = Notes(payload, where, "payload notes must be a string");
+        var optOutCitation = citationNode is null ? null : Insolvia.Domain.Json.AsString(citationNode) ?? throw Fail(where, "opt_out_citation must be a string or null");
+        var schemeNotes = ReleaseParsing.Notes(payload, where, "payload notes must be a string");
 
         var scheme = new ExemptionScheme(
             SchemeId: StrField(payload, "scheme_id", where),

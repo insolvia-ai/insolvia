@@ -1,11 +1,11 @@
 using System.Security.Cryptography;
 using System.Text.Json.Nodes;
-using Insolvia.Core.AccessLog;
-using Insolvia.Core.Auth;
-using Insolvia.Core.FilingAuthorizations;
-using Insolvia.Core.Memory;
+using Insolvia.Domain.AccessLog;
+using Insolvia.Domain.Auth;
+using Insolvia.Domain.FilingAuthorizations;
+using Insolvia.Domain.Memory;
 
-namespace Insolvia.Core.Tests;
+namespace Insolvia.Domain.Tests;
 
 /// <summary>An attorney's signed filing authorization, translated from test_filing_authorization.py.</summary>
 public sealed class FilingAuthorizationTests
@@ -33,7 +33,7 @@ public sealed class FilingAuthorizationTests
     [Fact]
     public void The_current_text_ships_in_the_assembly_and_the_digest_is_of_its_bytes()
     {
-        using var stream = typeof(FilingAuthorizationRules).Assembly.GetManifestResourceStream($"Insolvia.Core.Agreements/filing-authorization/{FilingAuthorizationRules.TextVersion}.txt")!;
+        using var stream = typeof(FilingAuthorizationRules).Assembly.GetManifestResourceStream($"Insolvia.Domain.Agreements/filing-authorization/{FilingAuthorizationRules.TextVersion}.txt")!;
         using var buffer = new MemoryStream();
         stream.CopyTo(buffer);
         var shipped = buffer.ToArray();

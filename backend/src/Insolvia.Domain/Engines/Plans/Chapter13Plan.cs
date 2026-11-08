@@ -1,14 +1,13 @@
 using System.Text.Json.Nodes;
-using Insolvia.Core;
-using Insolvia.Core.Claims;
-using Insolvia.Core.Plans;
-using Insolvia.Engines.Exemptions;
-using Insolvia.Engines.Liens;
-using Insolvia.Engines.MeansTest;
-using Insolvia.Engines.Projections;
-using Insolvia.Engines.Projections.Forms;
+using Insolvia.Domain.Claims;
+using Insolvia.Domain.Engines.Exemptions;
+using Insolvia.Domain.Engines.Liens;
+using Insolvia.Domain.Engines.MeansTest;
+using Insolvia.Domain.Engines.Projections;
+using Insolvia.Domain.Engines.Projections.Forms;
+using Insolvia.Domain.Plans;
 
-namespace Insolvia.Engines.Plans;
+namespace Insolvia.Domain.Engines.Plans;
 
 // The Chapter 13 plan calculator (from core/chapter13_plan.py, issue 16.2 /
 // #366): the payment waterfall, feasibility, and the § 1325(a)(4) liquidation

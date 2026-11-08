@@ -1,10 +1,10 @@
 using System.Text.Json.Nodes;
 using Insolvia.Api.Http;
-using Insolvia.Core;
-using Insolvia.Core.FilingAuthorizations;
-using Insolvia.Core.FilingCredentials;
-using Insolvia.Core.Filings;
-using Insolvia.Forms;
+using Insolvia.Domain;
+using Insolvia.Domain.FilingAuthorizations;
+using Insolvia.Domain.FilingCredentials;
+using Insolvia.Domain.Filings;
+using Insolvia.Domain.Forms;
 
 namespace Insolvia.Api.Filing;
 
@@ -62,7 +62,7 @@ public static class FilingViews
     };
 
     /// <summary>A filing record as a reader sees it: ids, states, the court's facts and the resolution — never the page's storage key.</summary>
-    public static JsonObject Filing(Core.Filings.Filing filing)
+    public static JsonObject Filing(Insolvia.Domain.Filings.Filing filing)
     {
         ArgumentNullException.ThrowIfNull(filing);
         var body = new JsonObject

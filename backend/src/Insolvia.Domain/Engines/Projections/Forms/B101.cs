@@ -1,10 +1,9 @@
 using System.Text.RegularExpressions;
-using Insolvia.Core;
-using Insolvia.Core.Debtors;
-using Insolvia.Core.Petitions;
-using static Insolvia.Engines.Projections.ProjectionHelpers;
+using Insolvia.Domain.Debtors;
+using Insolvia.Domain.Petitions;
+using static Insolvia.Domain.Engines.Projections.ProjectionHelpers;
 
-namespace Insolvia.Engines.Projections.Forms;
+namespace Insolvia.Domain.Engines.Projections.Forms;
 
 /// <summary>
 /// B101 @ 2024-06-22 (revision 06/24) — the voluntary petition's mapping
@@ -99,7 +98,7 @@ public static partial class B101
 
             // Line 5 — where the debtor lives; mailing only when it differs.
             AddressFills(values, body.ResidenceAddress, $"line_5_{col}_street", $"line_5_{col}_street2", $"line_5_{col}_city", $"line_5_{col}_state", $"line_5_{col}_zip", $"line_5_{col}_county");
-            if (body.MailingAddress != new Core.Fields.Address() && body.MailingAddress != body.ResidenceAddress)
+            if (body.MailingAddress != new Insolvia.Domain.Fields.Address() && body.MailingAddress != body.ResidenceAddress)
             {
                 AddressFills(values, body.MailingAddress, $"line_5_{col}_mailing_street", $"line_5_{col}_mailing_pobox", $"line_5_{col}_mailing_city", $"line_5_{col}_mailing_state", $"line_5_{col}_mailing_zip");
             }
@@ -197,7 +196,7 @@ public static partial class B101
 
             // Line 14 — hazardous property.
             var hazard = petition.HazardousProperty;
-            var hasHazard = !string.IsNullOrEmpty(hazard.Description) || !string.IsNullOrEmpty(hazard.WhyImmediate) || hazard.Address != new Core.Fields.Address();
+            var hasHazard = !string.IsNullOrEmpty(hazard.Description) || !string.IsNullOrEmpty(hazard.WhyImmediate) || hazard.Address != new Insolvia.Domain.Fields.Address();
             values["line_14_hazardous_property"] = YesNo(release, "line_14_hazardous_property", hasHazard);
             if (!string.IsNullOrEmpty(hazard.Description))
             {

@@ -1,8 +1,8 @@
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
-using Insolvia.Core.Fields;
+using Insolvia.Domain.Fields;
 
-namespace Insolvia.Core.CaseTasks;
+namespace Insolvia.Domain.CaseTasks;
 
 /// <summary>
 /// One task of a case — metadata only, no provenance (issue #356 / 14.4; from

@@ -1,6 +1,6 @@
-using Insolvia.Core.Fields;
+using Insolvia.Domain.Fields;
 
-namespace Insolvia.Core.Firms;
+namespace Insolvia.Domain.Firms;
 
 /// <summary>
 /// What the firm prints at the top of a letter and on the signer block's firm

@@ -1,10 +1,10 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Insolvia.Api.Tests.Support;
-using Insolvia.Core.Income;
-using Insolvia.Core.MeansTest;
-using Insolvia.Core.Petitions;
-using Insolvia.Engines.Projections;
+using Insolvia.Domain.Engines.Projections;
+using Insolvia.Domain.Income;
+using Insolvia.Domain.MeansTest;
+using Insolvia.Domain.Petitions;
 using static Insolvia.Api.Tests.Support.CaseWorld;
 
 namespace Insolvia.Api.Tests.Routes;

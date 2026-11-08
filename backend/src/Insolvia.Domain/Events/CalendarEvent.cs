@@ -1,6 +1,6 @@
 using System.Globalization;
 
-namespace Insolvia.Core.Events;
+namespace Insolvia.Domain.Events;
 
 // Calendar events and the feed token (issue 14.6 / #358; Python's
 // services/api core/events.py and core/calendar_feed.py). The RECORDS live

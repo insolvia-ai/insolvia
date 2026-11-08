@@ -1,9 +1,9 @@
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
-using Insolvia.Core.CaseEntities;
-using Insolvia.Core.Fields;
+using Insolvia.Domain.CaseEntities;
+using Insolvia.Domain.Fields;
 
-namespace Insolvia.Core.Petitions;
+namespace Insolvia.Domain.Petitions;
 
 // From petitions.py: B101's entities (issue #93) — the petition's answers,
 // its repeating rows, and the Part 7 signer block.

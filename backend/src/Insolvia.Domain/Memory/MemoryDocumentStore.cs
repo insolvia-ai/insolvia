@@ -1,7 +1,7 @@
-using Insolvia.Core.Documents;
-using Insolvia.Core.Ports;
+using Insolvia.Domain.Documents;
+using Insolvia.Domain.Ports;
 
-namespace Insolvia.Core.Memory;
+namespace Insolvia.Domain.Memory;
 
 /// <summary>
 /// The in-memory <see cref="IDocumentStore"/>. Keyed by (case, id) as the table is, so

@@ -1,6 +1,6 @@
-using Insolvia.Core.Cases;
-using Insolvia.Core.Debtors;
-using Insolvia.Core.Documents;
+using Insolvia.Domain.Cases;
+using Insolvia.Domain.Debtors;
+using Insolvia.Domain.Documents;
 using Npgsql;
 
 namespace Insolvia.Data.Tests.Conformance;

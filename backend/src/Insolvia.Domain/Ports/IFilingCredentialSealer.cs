@@ -1,6 +1,6 @@
-using Insolvia.Core.TaxIds;
+using Insolvia.Domain.TaxIds;
 
-namespace Insolvia.Core.Ports;
+namespace Insolvia.Domain.Ports;
 
 /// <summary>
 /// SEALS an attorney's CM/ECF credential under the vault key — the API's half,

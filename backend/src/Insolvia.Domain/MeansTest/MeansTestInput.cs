@@ -1,9 +1,9 @@
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
-using Insolvia.Core.CaseEntities;
-using Insolvia.Core.Fields;
+using Insolvia.Domain.CaseEntities;
+using Insolvia.Domain.Fields;
 
-namespace Insolvia.Core.MeansTest;
+namespace Insolvia.Domain.MeansTest;
 
 // From means_test_inputs.py: B122A-2's (and B122C's) ENTERED figures, one
 // record per case — the gate owns the cardinality. Everything derived is the
