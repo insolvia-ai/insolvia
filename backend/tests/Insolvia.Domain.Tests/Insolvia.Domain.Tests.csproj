@@ -11,7 +11,7 @@
        Files copy to the output paths they had when each part was its own
        test project, so the suites' lookups did not change. -->
   <ItemGroup>
-    <ProjectReference Include="../../src/Insolvia.Core/Insolvia.Core.csproj" />
+    <ProjectReference Include="../../src/Insolvia.Domain/Insolvia.Domain.csproj" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Engines/Parity/*.json" Link="Parity/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />

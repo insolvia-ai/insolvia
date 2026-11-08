@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The data access layer (ADR 0030): EF Core, the migrations and the
+       Postgres stores behind Domain's ports. AWSSDK.RDS mints the IAM database
+       tokens deployed hosts connect with. Referenced by hosts only. -->
+  <ItemGroup>
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <PackageReference Include="EFCore.NamingConventions" />
+    <PackageReference Include="AWSSDK.RDS" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Insolvia.Domain/Insolvia.Domain.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Insolvia.Data.Tests" />
+  </ItemGroup>
+</Project>

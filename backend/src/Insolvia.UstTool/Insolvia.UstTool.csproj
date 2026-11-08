@@ -11,7 +11,7 @@
     <OutputType>Exe</OutputType>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="../Insolvia.Core/Insolvia.Core.csproj" />
+    <ProjectReference Include="../Insolvia.Domain/Insolvia.Domain.csproj" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Insolvia.UstTool.Tests" />

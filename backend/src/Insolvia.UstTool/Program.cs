@@ -174,7 +174,7 @@ static string RegistryRoot()
     {
         for (var dir = new DirectoryInfo(start); dir is not null; dir = dir.Parent)
         {
-            var candidate = Path.Combine(dir.FullName, "backend", "src", "Insolvia.Core", "Engines", "Regulatory");
+            var candidate = Path.Combine(dir.FullName, "backend", "src", "Insolvia.Domain", "Engines", "Regulatory");
             if (Directory.Exists(candidate))
             {
                 return candidate;
@@ -182,5 +182,5 @@ static string RegistryRoot()
         }
     }
 
-    throw new IngestException("no backend/src/Insolvia.Core/Engines/Regulatory above this directory; pass --out-root/--registry");
+    throw new IngestException("no backend/src/Insolvia.Domain/Engines/Regulatory above this directory; pass --out-root/--registry");
 }

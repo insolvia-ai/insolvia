@@ -11,7 +11,8 @@
     <PackageReference Include="Amazon.Lambda.AspNetCoreServer.Hosting" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="../Insolvia.Core/Insolvia.Core.csproj" />
-    <ProjectReference Include="../Insolvia.Infrastructure/Insolvia.Infrastructure.csproj" />
+    <ProjectReference Include="../Insolvia.Domain/Insolvia.Domain.csproj" />
+    <ProjectReference Include="../Insolvia.Data/Insolvia.Data.csproj" />
+    <ProjectReference Include="../Insolvia.Platform/Insolvia.Platform.csproj" />
   </ItemGroup>
 </Project>

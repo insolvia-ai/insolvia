@@ -43,8 +43,9 @@ WORKDIR /src
 # the restore layer. --locked-mode refuses a restore that would change any
 # packages.lock.json: the image gets exactly the reviewed dependency graph.
 COPY global.json Directory.Build.props Directory.Packages.props .editorconfig Insolvia.slnx ./
-COPY src/Insolvia.Core/*.csproj src/Insolvia.Core/packages.lock.json src/Insolvia.Core/
-COPY src/Insolvia.Infrastructure/*.csproj src/Insolvia.Infrastructure/packages.lock.json src/Insolvia.Infrastructure/
+COPY src/Insolvia.Domain/*.csproj src/Insolvia.Domain/packages.lock.json src/Insolvia.Domain/
+COPY src/Insolvia.Data/*.csproj src/Insolvia.Data/packages.lock.json src/Insolvia.Data/
+COPY src/Insolvia.Platform/*.csproj src/Insolvia.Platform/packages.lock.json src/Insolvia.Platform/
 COPY src/Insolvia.Api/*.csproj src/Insolvia.Api/packages.lock.json src/Insolvia.Api/
 COPY src/Insolvia.Migrator/*.csproj src/Insolvia.Migrator/packages.lock.json src/Insolvia.Migrator/
 COPY src/Insolvia.Mcp/*.csproj src/Insolvia.Mcp/packages.lock.json src/Insolvia.Mcp/

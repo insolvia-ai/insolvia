@@ -21,12 +21,13 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" Publish="false" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="../Insolvia.Core/Insolvia.Core.csproj" />
-    <!-- The stores, and the seeder's adapters: the KMS case-key cipher, the
-         S3 document store, and the SDK clients for the pool and the fixture bucket. -->
-    <ProjectReference Include="../Insolvia.Infrastructure/Insolvia.Infrastructure.csproj" />
+    <ProjectReference Include="../Insolvia.Domain/Insolvia.Domain.csproj" />
+    <ProjectReference Include="../Insolvia.Data/Insolvia.Data.csproj" />
+    <!-- The seeder's adapters: the case-key cipher, the document store, and
+         the SDK clients for the pool and the fixture bucket. -->
+    <ProjectReference Include="../Insolvia.Platform/Insolvia.Platform.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <InternalsVisibleTo Include="Insolvia.Infrastructure.Tests" />
+    <InternalsVisibleTo Include="Insolvia.Data.Tests" />
   </ItemGroup>
 </Project>

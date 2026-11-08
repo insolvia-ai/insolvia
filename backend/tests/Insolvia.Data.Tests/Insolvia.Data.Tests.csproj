@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The data access layer's tests, against a real Postgres 17 in Docker
+       (Testcontainers): one container per test run, one fresh database per
+       test. Migrator/ holds the migrator's tests, against the same container:
+       roles are cluster-wide, so they share the `postgres` collection and run
+       serially with the rest. It references the migrator (a host), and
+       through it Data. -->
+  <ItemGroup>
+    <PackageReference Include="Testcontainers.PostgreSql" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/Insolvia.Data/Insolvia.Data.csproj" />
+    <ProjectReference Include="../../src/Insolvia.Migrator/Insolvia.Migrator.csproj" />
+  </ItemGroup>
+</Project>

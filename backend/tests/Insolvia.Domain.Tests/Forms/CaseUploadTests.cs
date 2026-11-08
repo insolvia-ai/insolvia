@@ -357,7 +357,7 @@ public sealed class CaseUploadTests
         var offenders = Directory.GetFiles(src, "*.cs", SearchOption.AllDirectories)
             .Select(path => Path.GetRelativePath(src, path).Replace('\\', '/'))
             .Where(path => !path.Contains("/obj/", StringComparison.Ordinal) && !path.Contains("/bin/", StringComparison.Ordinal))
-            .Where(path => path is not ("Insolvia.Core/Forms/CaseUploads.cs" or "Insolvia.Core/Forms/CaseUploadSpec.cs") && !path.StartsWith("Insolvia.Filing/", StringComparison.Ordinal))
+            .Where(path => path is not ("Insolvia.Domain/Forms/CaseUploads.cs" or "Insolvia.Domain/Forms/CaseUploadSpec.cs") && !path.StartsWith("Insolvia.Filing/", StringComparison.Ordinal))
             .Where(path => File.ReadAllText(Path.Combine(src, path)).Contains("CaseUpload", StringComparison.Ordinal))
             .Where(path => File.ReadAllText(Path.Combine(src, path)) is var text && (text.Contains("CaseUploads.", StringComparison.Ordinal) || text.Contains("CaseUploadFile", StringComparison.Ordinal) || text.Contains("CaseUploadSpecs", StringComparison.Ordinal)))
             .ToList();
@@ -372,7 +372,7 @@ public sealed class CaseUploadTests
         for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir is not null; dir = dir.Parent)
         {
             var candidate = Path.Combine(dir.FullName, "backend", "src");
-            if (Directory.Exists(Path.Combine(candidate, "Insolvia.Core", "Forms")))
+            if (Directory.Exists(Path.Combine(candidate, "Insolvia.Domain", "Forms")))
             {
                 return candidate;
             }

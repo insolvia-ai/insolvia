@@ -192,7 +192,7 @@
           "xunit.v3.runner.common": "[3.2.2]"
         }
       },
-      "insolvia.core": {
+      "insolvia.domain": {
         "type": "Project",
         "dependencies": {
           "Microsoft.IdentityModel.JsonWebTokens": "[8.14.0, )",
@@ -203,7 +203,7 @@
       "insolvia.usttool": {
         "type": "Project",
         "dependencies": {
-          "Insolvia.Core": "[1.0.0, )"
+          "Insolvia.Domain": "[1.0.0, )"
         }
       },
       "Microsoft.IdentityModel.JsonWebTokens": {

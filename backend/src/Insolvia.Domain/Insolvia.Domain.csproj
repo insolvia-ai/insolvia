@@ -12,7 +12,7 @@
     <PackageReference Include="System.Security.Cryptography.Pkcs" />
   </ItemGroup>
   <ItemGroup>
-    <InternalsVisibleTo Include="Insolvia.Core.Tests" />
+    <InternalsVisibleTo Include="Insolvia.Domain.Tests" />
   </ItemGroup>
   <!-- Regulatory files ship in the artifact (ADR 0014). Logical names keep the
        paths under each folder, and keep the prefixes they had when Engines

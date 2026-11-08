@@ -18,10 +18,10 @@
   </ItemGroup>
   <ItemGroup>
     <!-- The reference case and its parser, shared with the Forms suite (read in place). -->
-    <Compile Include="../Insolvia.Core.Tests/Forms/Support/CaseFiles.cs" Link="Shared/CaseFiles.cs" />
-    <Compile Include="../Insolvia.Core.Tests/Forms/Support/CaseDatas.cs" Link="Shared/CaseDatas.cs" />
+    <Compile Include="../Insolvia.Domain.Tests/Forms/Support/CaseFiles.cs" Link="Shared/CaseFiles.cs" />
+    <Compile Include="../Insolvia.Domain.Tests/Forms/Support/CaseDatas.cs" Link="Shared/CaseDatas.cs" />
     <!-- Real RS256 tokens the API verifies, shared with the API suite. -->
     <Compile Include="../Insolvia.Api.Tests/Support/Tokens.cs" Link="Shared/Tokens.cs" />
-    <None Include="../Insolvia.Core.Tests/Engines/Parity/*.case.json" Link="CaseFiles/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../Insolvia.Domain.Tests/Engines/Parity/*.case.json" Link="CaseFiles/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

@@ -3,27 +3,28 @@ using System.Xml.Linq;
 namespace Insolvia.Architecture.Tests;
 
 // The successor of services/api's test_architecture.py (ADR 0028, § Repository
-// layout, amended by ADR 0030). A project exists because it is a separate
-// deployable or a boundary the compiler must enforce. The rule, in one place:
+// layout, amended by ADR 0030). Three layers, each project named for its role,
+// never for a vendor. The rule, in one place:
 //
-//   Core              references nothing in the solution; pure: no I/O, no
-//                     AWS, no EF. It holds the domain (Insolvia.Core.*), the
-//                     engines and projections (Engines/, Insolvia.Engines.*)
-//                     and the PDF engine (Forms/, Insolvia.Forms.*)
-//   Infrastructure    references Core only: the adapters behind Core's
-//                     ports — EF Core and the Postgres stores (Data/,
-//                     Insolvia.Data.*) and the AWS SDK adapters (Aws/,
-//                     Insolvia.Aws.*)
-//   hosts             may reference any library; never another host
-//   tools             reference the pure library only (Core); run by a
-//                     developer or CI, never deployed, so never
-//                     Infrastructure or a host — UstTool writes the
-//                     regulatory registry and validates it through the
-//                     engines (#585)
+//   Domain            the business logic layer: entities, rules, ports, the
+//                     calculation engines (Engines/) and the PDF engine
+//                     (Forms/). References nothing in the solution; pure: no
+//                     I/O, no cloud SDK, no EF
+//   Data              the data access layer: EF Core, the migrations and the
+//                     Postgres stores. References Domain only
+//   Platform          the platform services the app runs on — document
+//                     storage, sealing, queues, the user directory, mail.
+//                     References Domain only
+//   hosts             the API layer (and the workers): may reference any
+//                     library; never another host
+//   tools             reference the pure library only (Domain); run by a
+//                     developer or CI, never deployed, so never Data,
+//                     Platform or a host — UstTool writes the regulatory
+//                     registry and validates it through the engines (#585)
 //
-// Only hosts reference Infrastructure, which follows from the lines above: no
-// library is allowed them. The filing worker shares the API's approval and
-// digest code through Core, never through Api, which is what the hosts line
+// Only hosts reference Data or Platform, which follows from the lines above:
+// no library is allowed them. The filing worker shares the API's approval and
+// digest code through Domain, never through Api, which is what the hosts line
 // enforces.
 public sealed class LayeringTests
 {
@@ -31,36 +32,38 @@ public sealed class LayeringTests
 
     private static readonly Dictionary<string, string[]> ToolAllowed = new(StringComparer.Ordinal)
     {
-        ["UstTool"] = ["Core"],
+        ["UstTool"] = ["Domain"],
     };
 
     private static readonly Dictionary<string, string[]> LibraryAllowed = new(StringComparer.Ordinal)
     {
-        ["Core"] = [],
-        ["Infrastructure"] = ["Core"],
+        ["Domain"] = [],
+        ["Data"] = ["Domain"],
+        ["Platform"] = ["Domain"],
     };
 
-    // Where each source project's tests live (ADR 0030): a test project per
-    // project, except where projects were merged and their suites with them.
+    // Where each source project's tests live: its own test project, except
+    // the migrator's, which share the data access layer's Postgres container.
     private static readonly Dictionary<string, string> TestProjectOf = new(StringComparer.Ordinal)
     {
-        ["Core"] = "Core",
-        ["Infrastructure"] = "Infrastructure",
+        ["Domain"] = "Domain",
+        ["Data"] = "Data",
+        ["Platform"] = "Platform",
         ["Api"] = "Api",
         ["Worker"] = "Worker",
         ["Admin"] = "Admin",
         ["Mcp"] = "Mcp",
         ["Filing"] = "Filing",
-        ["Migrator"] = "Infrastructure",
+        ["Migrator"] = "Data",
         ["UstTool"] = "UstTool",
     };
 
-    // Packages that make a project impure. Core is the domain: no cloud SDK,
-    // no ORM, no database driver.
+    // Packages that make a project impure. Domain is the business logic: no
+    // cloud SDK, no ORM, no database driver.
     private static readonly string[] ImpurePackagePrefixes =
         ["AWSSDK.", "Amazon.", "Microsoft.EntityFrameworkCore", "Npgsql"];
 
-    private static readonly string[] PureProjects = ["Core"];
+    private static readonly string[] PureProjects = ["Domain"];
 
     private static readonly string[] ProjectDirectories = ["src", "tests"];
 
@@ -104,7 +107,7 @@ public sealed class LayeringTests
 
     [Theory]
     [MemberData(nameof(SourceProjects))]
-    public void Only_hosts_reference_Infrastructure(string project)
+    public void Only_hosts_reference_Data_or_Platform(string project)
     {
         if (Hosts.Contains(project))
         {
@@ -113,7 +116,8 @@ public sealed class LayeringTests
 
         var references = ProjectReferences(project);
 
-        Assert.DoesNotContain("Infrastructure", references);
+        Assert.DoesNotContain("Data", references);
+        Assert.DoesNotContain("Platform", references);
     }
 
     [Theory]

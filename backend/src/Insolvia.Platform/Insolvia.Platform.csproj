@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The platform services the app runs on (ADR 0030), behind Domain's ports:
+       document storage, sealing (envelope encryption under managed keys), the
+       job queues, the user directory, the mailer client and the sign-in keys
+       (JWKS). Named for the role, not the provider: today's implementations
+       are AWS's and say so in their class names (S3DocumentBlobStore,
+       KmsCiphers); another provider's would sit beside them, and a host's
+       wiring would choose. Referenced by hosts only. -->
+  <ItemGroup>
+    <PackageReference Include="AWSSDK.Core" />
+    <PackageReference Include="AWSSDK.KeyManagementService" />
+    <PackageReference Include="AWSSDK.CognitoIdentityProvider" />
+    <PackageReference Include="AWSSDK.S3" />
+    <PackageReference Include="AWSSDK.SQS" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Insolvia.Domain/Insolvia.Domain.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The byte-identity test against Python seals with a fixed nonce, which
+         is internal on purpose: a caller-chosen nonce is a GCM footgun. -->
+    <InternalsVisibleTo Include="Insolvia.Platform.Tests" />
+  </ItemGroup>
+</Project>

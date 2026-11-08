@@ -37,7 +37,7 @@
           "Microsoft.IdentityModel.Logging": "8.14.0"
         }
       },
-      "insolvia.core": {
+      "insolvia.domain": {
         "type": "Project",
         "dependencies": {
           "Microsoft.IdentityModel.JsonWebTokens": "[8.14.0, )",
