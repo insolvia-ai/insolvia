@@ -110,6 +110,7 @@ storybook-static/
 .claude/skills/design-system-*
 .claude/skills/expo-*
 .claude/skills/eas-*
+.claude/skills/ponytail*
 # mattpocock/skills has no common prefix, so each of its symlinks is listed by
 # name. Adding a skill from it means adding its line here too.
 .claude/skills/ask-matt
