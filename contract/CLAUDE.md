@@ -46,6 +46,11 @@ ADR 0029).
   called, or a tool the server's `tools/list` names was never called. A new
   client method or tool needs a call here in the same PR. A filtered run
   (`dev-test.sh <filter>`) or a deployed run reports but does not enforce.
+- **Every exchange is checked against the OpenAPI documents**
+  (`support/openapi.ts`, from `global.teardown.ts`): its route, its status,
+  its request body exactly and its response loosely. Unlike the coverage
+  gates this holds on any run. A failure means a row in `tool/openapi/` or a
+  client type disagrees with the server; fix it and run `npm run openapi`.
 - **Shapes come from `packages/insolvia_api_client/src/models.ts`.** `wire.ts`'s
   `expectShape` is deliberately not exact (extra fields pass) but a missing or
   retyped declared field fails, and an optional field must be ABSENT, never

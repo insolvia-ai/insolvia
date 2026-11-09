@@ -77,6 +77,9 @@ internal sealed class AdminHost : IDisposable
 
     public MemoryFirmStore Firms { get; } = new();
 
+    /// <summary>The composed host's services (its endpoint table, for one).</summary>
+    public IServiceProvider Services => _factory.Services;
+
     public MemoryUserDirectory Directory { get; } = new();
 
     public MemoryAdminAuditLog Audit { get; } = new();

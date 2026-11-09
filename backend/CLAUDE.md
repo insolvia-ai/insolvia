@@ -59,6 +59,12 @@ Three layers ([ADR 0030](../docs/adr/0030-three-backend-layers.md)):
   test can see it (`/health` keeps Flask's sorted keys and bare
   `application/json`): `contract/` and `packages/insolvia_api_client` pin it,
   and the app depends on it.
+- **A route change edits its OpenAPI row** in `tool/openapi/api-routes.ts`
+  or `admin-routes.ts`, then `npm run openapi`
+  ([`docs/reference/openapi/`](../docs/reference/openapi/README.md)).
+  `OpenApiDocumentTests` fails on a route, principal or permission the
+  document does not match. `Requires(...)` stamps a `PermissionRequirement`
+  on the endpoint for that test to read.
 - One deployable unit, one Dockerfile target. A host gets its stage when it
   gets a handler, and `backend-pr.yml` builds it in the same PR.
 

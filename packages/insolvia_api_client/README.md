@@ -36,28 +36,19 @@ still works. There is no `close()` — `fetch` owns no client to release.
 
 ## Why hand-written, not generated from an OpenAPI spec
 
-Issue #66 left the door open to generating this client from an OpenAPI
-spec "if practical". It is not, yet, and the decision is deliberate:
+The API now has an OpenAPI document
+([`docs/reference/openapi/api.json`](../../docs/reference/openapi/api.json)),
+but it is generated *from* this package — its types and its methods' doc
+comments — not the other way round. The .NET hosts write their JSON by hand
+and cannot describe their own bodies, and this package's types are the
+most exact statement of the wire there is: `src/index.test.ts` pins paths,
+methods, field names, status codes and error shapes, and `contract/` drives
+this same client against the running hosts. Generating the client from the
+document would make that loop circular.
 
-- The API ships **no OpenAPI spec today** — there is nothing to
-  generate from. Authoring a spec *plus* adopting a generator toolchain
-  (and its output style, its dependency set, its CI hooks) to cover **two
-  endpoints** is more machinery than the surface justifies, and generated
-  output is typically far noisier than the ~200 lines here.
-- The real risk codegen addresses — the client silently drifting from the
-  API — is covered another way: **this package's tests are the contract
-  pin.** `src/index.test.ts` asserts the exact paths, methods, field names,
-  status codes, and error-body shapes the API actually produces, with
-  pointers back to the API source they mirror (the Python modules they
-  name were deleted in 18.23; the .NET routes carry the same names), and
-  `contract/` drives this same client against the running .NET hosts. A
-  contract change must break those tests.
-
-The OpenAPI route stays open: when the API surface grows past a handful of
-endpoints (real case/e-filing resources), publish a spec from
-the API and revisit generating this package from it. Until then,
-every endpoint added to the API gets a hand-written method here and a
-contract test alongside it.
+So every endpoint added to the API still gets a hand-written method here, a
+contract test, and a row in `tool/openapi/api-routes.ts` (the document's
+route table; `npm run openapi` regenerates it).
 
 ## Conventions
 

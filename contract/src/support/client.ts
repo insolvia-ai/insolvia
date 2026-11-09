@@ -12,7 +12,7 @@
 import { expect } from '@jest/globals';
 import { InsolviaApiClient } from '@insolvia-ai/api-client';
 
-import { noteCall } from '../coverage.ts';
+import { noteCall, noteExchange } from '../coverage.ts';
 import { env } from './env.ts';
 import { expectShape, type Spec, withMessage } from './wire.ts';
 
@@ -56,6 +56,7 @@ export interface ContractClient {
  */
 export function contractClient(token?: string | (() => string)): ContractClient {
   const exchanges: Exchange[] = [];
+  let calling = '';
   const recordingFetch = async (input: string, init?: RequestInit): Promise<Response> => {
     const response = await globalThis.fetch(input, init);
     const text = await response.clone().text();
@@ -72,6 +73,17 @@ export function contractClient(token?: string | (() => string)): ContractClient 
       contentType,
       body,
     });
+    // Only the API's own exchanges: an upload to a presigned URL goes elsewhere.
+    if (input.startsWith(env.apiUrl))
+      noteExchange({
+        surface: 'api',
+        call: calling,
+        method: init?.method ?? 'GET',
+        path: url.pathname,
+        status: response.status,
+        request: typeof init?.body === 'string' ? (JSON.parse(init.body) as unknown) : undefined,
+        response: contentType.includes('json') && text !== '' ? body : undefined,
+      });
     return response;
   };
   const real = new InsolviaApiClient(env.apiUrl, {
@@ -84,6 +96,7 @@ export function contractClient(token?: string | (() => string)): ContractClient 
       if (typeof property === 'string' && methodSet.has(property) && typeof value === 'function') {
         return (...args: unknown[]) => {
           noteCall('api', property);
+          calling = property;
           // `target`, not the proxy: the class keeps its state in #private
           // fields, which only the real instance carries.
           return (value as (...a: unknown[]) => unknown).apply(target, args);
