@@ -1,9 +1,7 @@
 namespace Insolvia.Api;
 
 /// <summary>
-/// <c>GET /health</c>: the service's identity, unauthenticated. The body and
-/// status are the contract's, field for field (ported from services/api
-/// routes/health.py).
+/// <c>GET /health</c>: the service's identity, unauthenticated.
 /// </summary>
 public static class HealthEndpoint
 {
@@ -20,17 +18,17 @@ public static class HealthEndpoint
     {
         ArgumentNullException.ThrowIfNull(app);
 
-        // Flask's jsonify answers a bare `application/json` with the keys
-        // sorted; both are matched, so the two backends are byte-comparable
-        // apart from Flask's trailing newline.
-        app.MapGet("/health", (InsolviaEnvironment environment) => Results.Json(
-            new HealthBody(environment.Name, ServiceName, "ok", Version),
-            contentType: "application/json"));
+        app.MapGet("/health", Health);
 
         return app;
     }
 
-    /// <summary>The <c>/health</c> body, in Flask's sorted key order.</summary>
+    /// <summary>Liveness, and which build and environment answered.</summary>
+    /// <param name="environment">The configured environment.</param>
+    /// <returns>The body.</returns>
+    internal static HealthBody Health(InsolviaEnvironment environment) => new(environment.Name, ServiceName, "ok", Version);
+
+    /// <summary>The <c>/health</c> body.</summary>
     /// <param name="Environment">The configured environment.</param>
     /// <param name="Service">The service name.</param>
     /// <param name="Status">Always <c>ok</c>.</param>

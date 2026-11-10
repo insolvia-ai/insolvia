@@ -9,12 +9,12 @@ using static Insolvia.Api.Tests.Support.HttpAssert;
 namespace Insolvia.Api.Tests;
 
 /// <summary>
-/// app_factory.py's error handlers, body for body. The JSON shapes are the
-/// ones packages/insolvia_api_client/src/exceptions.ts reads:
+/// The error handler, body for body. The shapes are the ones
+/// packages/insolvia_api_client/src/exceptions.ts reads:
 /// <c>{"error": "ValidationError", "fields": {…}}</c> for a per-field 400,
 /// <c>{"error": "ReauthenticationRequired"}</c> on a 403 for a fresh sign-in,
-/// and <c>{"error", "message"}</c> for everything else. The HTML bodies are
-/// Werkzeug's, captured from Flask 3.1 / Werkzeug 3.1.
+/// and <c>{"error", "message"}</c> for everything else — the framework's own
+/// refusals (no such route, a method the route does not take) included.
 /// </summary>
 public sealed class ErrorMappingTests(WebApplicationFactory<Program> factory) : IClassFixture<WebApplicationFactory<Program>>
 {
@@ -80,33 +80,25 @@ public sealed class ErrorMappingTests(WebApplicationFactory<Program> factory) : 
     }
 
     [Fact]
-    public async Task An_unknown_route_is_werkzeugs_404()
+    public async Task An_unknown_route_is_a_json_404()
     {
         using var host = new AuthHost(factory);
         using var client = host.CreateClient();
 
         var answer = await client.Get("/nope");
 
-        Assert.Equal(404, answer.Status);
-        Assert.Equal(Werkzeug(404), answer.Body);
-        Assert.Equal("text/html; charset=utf-8", answer.Response.Content.Headers.ContentType?.ToString());
-        Assert.Equal(
-            "<!doctype html>\n<html lang=en>\n<title>404 Not Found</title>\n<h1>Not Found</h1>\n<p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.</p>\n",
-            answer.Body);
+        Json(answer, 404, """{"error":"NotFoundError","message":"No such route."}""");
     }
 
     [Fact]
-    public async Task A_method_the_route_does_not_take_is_werkzeugs_405_with_allow()
+    public async Task A_method_the_route_does_not_take_is_a_json_405_with_allow()
     {
         using var host = new AuthHost(factory);
         using var client = host.CreateClient();
 
         var answer = await client.SendAsync(HttpMethod.Post, "/health");
 
-        Assert.Equal(405, answer.Status);
-        Assert.Equal(
-            "<!doctype html>\n<html lang=en>\n<title>405 Method Not Allowed</title>\n<h1>Method Not Allowed</h1>\n<p>The method is not allowed for the requested URL.</p>\n",
-            answer.Body);
+        Json(answer, 405, """{"error":"MethodNotAllowedError","message":"This route does not take that method."}""");
         Assert.Equal(["HEAD", "OPTIONS", "GET"], answer.Response.Content.Headers.Allow);
     }
 

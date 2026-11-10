@@ -2,7 +2,6 @@ using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using Insolvia.Api.Auth;
 using Insolvia.Domain;
 
 namespace Insolvia.Api.Http;
@@ -31,7 +30,7 @@ public static class FlaskJson
     /// <param name="body">The body.</param>
     /// <param name="status">The status code.</param>
     /// <returns>The result.</returns>
-    public static IResult Result(JsonNode body, int status = StatusCodes.Status200OK) => new JsonBodyResult(status, Serialize(body));
+    public static IResult Result(JsonNode body, int status = StatusCodes.Status200OK) => new TextResult(status, Serialize(body));
 
     /// <summary>
     /// Flask's <c>return "", 204</c>: no body, and Flask's default
@@ -216,6 +215,16 @@ public static class FlaskJson
         }
 
         builder.Append('"');
+    }
+
+    private sealed record TextResult(int Status, string Body) : IResult
+    {
+        public Task ExecuteAsync(HttpContext httpContext)
+        {
+            httpContext.Response.StatusCode = Status;
+            httpContext.Response.ContentType = "application/json";
+            return httpContext.Response.WriteAsync(Body, httpContext.RequestAborted);
+        }
     }
 
     private sealed class EmptyResult : IResult

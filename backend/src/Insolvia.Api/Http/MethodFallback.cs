@@ -3,15 +3,15 @@ using Microsoft.AspNetCore.Routing.Template;
 namespace Insolvia.Api.Http;
 
 /// <summary>
-/// What Flask's router does for free and ASP.NET Core's does not, so the two
-/// backends answer the same outside the routes themselves:
+/// What the API answers outside its routes, which ASP.NET Core's router does
+/// not do by itself:
 /// <list type="bullet">
 /// <item><c>HEAD</c> on a <c>GET</c> route is that route, without the body.</item>
 /// <item><c>OPTIONS</c> on any existing path is a 200 with an empty body and an
 /// <c>Allow</c> header — and runs NO view, so a preflight never meets an auth
 /// filter (it gets its CORS headers from <see cref="Cors"/> like any response).</item>
-/// <item>A path no route has is Werkzeug's HTML 404; a method the path does not
-/// take is Werkzeug's HTML 405 with <c>Allow</c>.</item>
+/// <item>A path no route has is a JSON 404; a method the path does not take is
+/// a JSON 405 with <c>Allow</c> (<see cref="ErrorResponses.ForStatus"/>).</item>
 /// </list>
 /// </summary>
 public static class MethodFallback
@@ -51,7 +51,7 @@ public static class MethodFallback
 
             if (endpoint is null)
             {
-                return ErrorResponses.WriteHtmlAsync(context, StatusCodes.Status404NotFound);
+                return ErrorResponses.WriteAsync(context, StatusCodes.Status404NotFound, ErrorResponses.ForStatus(StatusCodes.Status404NotFound)!);
             }
 
             // Routing's own 405 endpoint: the path exists under other methods.
@@ -65,11 +65,10 @@ public static class MethodFallback
             if (HttpMethods.IsOptions(context.Request.Method))
             {
                 context.Response.StatusCode = StatusCodes.Status200OK;
-                context.Response.ContentType = "text/html; charset=utf-8";
                 return Task.CompletedTask;
             }
 
-            return ErrorResponses.WriteHtmlAsync(context, StatusCodes.Status405MethodNotAllowed);
+            return ErrorResponses.WriteAsync(context, StatusCodes.Status405MethodNotAllowed, ErrorResponses.ForStatus(StatusCodes.Status405MethodNotAllowed)!);
         });
     }
 

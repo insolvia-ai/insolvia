@@ -32,13 +32,13 @@ public sealed record PrincipalClass(string Name)
 /// <param name="Level">The level required.</param>
 public sealed record PermissionRequirement(Feature Feature, PermissionLevel Level);
 
-/// <summary>An <see cref="IResult"/> that writes a fixed JSON body with Flask's bare content type.</summary>
+/// <summary>An <see cref="IResult"/> that writes an error body.</summary>
 /// <param name="Status">The status code.</param>
-/// <param name="Body">The serialized body.</param>
-internal sealed record JsonBodyResult(int Status, string Body) : IResult
+/// <param name="Body">The body.</param>
+internal sealed record JsonBodyResult(int Status, Http.ErrorBody Body) : IResult
 {
     /// <summary>The 401 every authentication failure answers.</summary>
-    public static readonly JsonBodyResult Unauthorized = new(StatusCodes.Status401Unauthorized, Http.ErrorResponses.UnauthorizedJson);
+    public static readonly JsonBodyResult Unauthorized = new(StatusCodes.Status401Unauthorized, Http.ErrorResponses.Unauthorized);
 
-    public Task ExecuteAsync(HttpContext httpContext) => Http.ErrorResponses.WriteJsonAsync(httpContext, Status, Body);
+    public Task ExecuteAsync(HttpContext httpContext) => Http.ErrorResponses.WriteAsync(httpContext, Status, Body);
 }

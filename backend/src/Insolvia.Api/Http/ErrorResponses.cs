@@ -1,106 +1,77 @@
-using System.Text.Json.Nodes;
 using Insolvia.Domain;
 using Insolvia.Domain.Auth;
 
 namespace Insolvia.Api.Http;
 
 /// <summary>
-/// Every error body the API writes, in one place: the JSON bodies of
-/// services/api app_factory.py's handlers, and the HTML bodies Flask
-/// (Werkzeug) answers for an HTTP-level refusal — a route that does not
-/// exist, a method a route does not take. Both shapes are pinned by tests,
-/// because the API client reads the JSON ones and the contract suite compares
-/// the two backends.
+/// Every error body the API writes, in one place, each an <see cref="ErrorBody"/>:
+/// the domain's refusals (<see cref="ForApiException"/>), the framework's own
+/// (<see cref="ForStatus"/> — a route that does not exist, a method it does not
+/// take, an unreadable body), the one 401 and the one 500. The API client maps
+/// the <c>error</c> code to its exception classes.
 /// </summary>
 public static class ErrorResponses
 {
     /// <summary>The one body every 401 carries — the caller learns "unauthorized", never which check failed.</summary>
-    public const string UnauthorizedJson = """{"error":"Unauthorized","message":"authentication required"}""";
+    public static readonly ErrorBody Unauthorized = new("Unauthorized", "authentication required", null);
 
     /// <summary>The body of every unexpected failure: no type, no message, no trace.</summary>
-    public const string InternalErrorJson = """{"error":"InternalError","message":"request failed"}""";
+    public static readonly ErrorBody InternalError = new("InternalError", "request failed", null);
 
-    // Werkzeug's HTTPException.get_body, for the codes this host can produce
-    // without a handler: (name, description).
-    private static readonly Dictionary<int, (string Name, string Description)> HttpErrors = new()
+    // The refusals the framework makes before a handler runs.
+    private static readonly Dictionary<int, ErrorBody> HttpErrors = new()
     {
-        [400] = ("Bad Request", "The browser (or proxy) sent a request that this server could not understand."),
-        [404] = ("Not Found", "The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again."),
-        [405] = ("Method Not Allowed", "The method is not allowed for the requested URL."),
-        [413] = ("Request Entity Too Large", "The data value transmitted exceeds the capacity limit."),
-        [415] = ("Unsupported Media Type", "The server does not support the media type transmitted in the request."),
+        [400] = new("BadRequestError", "The request could not be read.", null),
+        [404] = new("NotFoundError", "No such route.", null),
+        [405] = new("MethodNotAllowedError", "This route does not take that method.", null),
+        [413] = new("PayloadTooLargeError", "The request body is too large.", null),
+        [415] = new("UnsupportedMediaTypeError", "The request body must be JSON.", null),
     };
 
     /// <summary>
-    /// The status and JSON body for an expected (Core) failure, or null when
-    /// <paramref name="error"/> is not one — app_factory.py's handlers, most
-    /// specific first, exactly as Flask dispatched them.
+    /// The status and body for an expected (domain) failure, or null when
+    /// <paramref name="error"/> is not one — most specific first.
     /// </summary>
     /// <param name="error">The exception a route raised.</param>
     /// <returns>The status and body, or null for an unexpected failure.</returns>
-    public static (int Status, string Body)? ForApiException(Exception error) => error switch
+    public static (int Status, ErrorBody Body)? ForApiException(Exception error) => error switch
     {
-        // The shape the marketing action surfaces per-field: {error, fields}.
-        FieldValidationException fields => (400, FlaskJson.Serialize(new JsonObject
-        {
-            ["error"] = "ValidationError",
-            ["fields"] = new JsonObject([.. fields.Fields.Select(pair => KeyValuePair.Create(pair.Key, (JsonNode?)pair.Value))]),
-        })),
-        ValidationException validation => (400, ErrorJson("ValidationError", validation)),
-        ConflictException conflict => (409, ErrorJson("ConflictError", conflict)),
+        FieldValidationException fields => (400, new ErrorBody("ValidationError", null, fields.Fields)),
+        ValidationException validation => (400, Of("ValidationError", validation)),
+        ConflictException conflict => (409, Of("ConflictError", conflict)),
 
         // A ForbiddenException with its own code: its remedy is a fresh
         // sign-in, not a permission (ADR 0024).
-        ReauthenticationRequiredException reauthenticate => (403, ErrorJson("ReauthenticationRequired", reauthenticate)),
-        ForbiddenException forbidden => (403, ErrorJson("ForbiddenError", forbidden)),
-        NotFoundException notFound => (404, ErrorJson("NotFoundError", notFound)),
+        ReauthenticationRequiredException reauthenticate => (403, Of("ReauthenticationRequired", reauthenticate)),
+        ForbiddenException forbidden => (403, Of("ForbiddenError", forbidden)),
+        NotFoundException notFound => (404, Of("NotFoundError", notFound)),
 
-        // The wire code is the error's class name as the contract spells it,
-        // ending in Error where these classes end in Exception.
-        ApiException other => (400, ErrorJson(ErrorCode(other), other)),
+        // The wire code is the error's class name, ending in Error where
+        // these classes end in Exception.
+        ApiException other => (400, Of(ErrorCode(other), other)),
         _ => null,
     };
 
-    /// <summary>Werkzeug's HTML body for <paramref name="status"/>, or null when this host never produces it.</summary>
+    /// <summary>The body for a refusal the framework makes, or null when this host never makes it.</summary>
     /// <param name="status">An HTTP status code.</param>
-    /// <returns>The HTML, ending in a newline as Werkzeug's does.</returns>
-    public static string? WerkzeugHtml(int status) => HttpErrors.TryGetValue(status, out var error)
-        ? "<!doctype html>\n<html lang=en>\n"
-            + $"<title>{status} {error.Name}</title>\n"
-            + $"<h1>{error.Name}</h1>\n"
-            + $"<p>{error.Description}</p>\n"
-        : null;
+    /// <returns>The body.</returns>
+    public static ErrorBody? ForStatus(int status) => HttpErrors.GetValueOrDefault(status);
 
-    /// <summary>Writes a JSON body with Flask's bare <c>application/json</c> content type.</summary>
+    /// <summary>Writes <paramref name="body"/> with <paramref name="status"/>.</summary>
     /// <param name="context">The request.</param>
     /// <param name="status">The status.</param>
-    /// <param name="body">The serialized body.</param>
+    /// <param name="body">The body.</param>
     /// <returns>A task that completes when the body is written.</returns>
-    public static Task WriteJsonAsync(HttpContext context, int status, string body)
+    public static Task WriteAsync(HttpContext context, int status, ErrorBody body)
     {
         ArgumentNullException.ThrowIfNull(context);
         context.Response.StatusCode = status;
-        context.Response.ContentType = "application/json";
-        return context.Response.WriteAsync(body, context.RequestAborted);
-    }
-
-    /// <summary>Writes Werkzeug's HTML body for <paramref name="status"/>.</summary>
-    /// <param name="context">The request.</param>
-    /// <param name="status">A status <see cref="WerkzeugHtml"/> knows.</param>
-    /// <returns>A task that completes when the body is written.</returns>
-    public static Task WriteHtmlAsync(HttpContext context, int status)
-    {
-        ArgumentNullException.ThrowIfNull(context);
-        var body = WerkzeugHtml(status) ?? throw new ArgumentOutOfRangeException(nameof(status), status, "no Werkzeug body for this status");
-        context.Response.StatusCode = status;
-        context.Response.ContentType = "text/html; charset=utf-8";
-        return context.Response.WriteAsync(body, context.RequestAborted);
+        return context.Response.WriteAsJsonAsync(body, WireJson.Options, context.RequestAborted);
     }
 
     /// <summary>
-    /// Python's <c>str(error)</c>: the message the exception was
-    /// built with, and the empty string for one built with none (where .NET
-    /// substitutes "Exception of type … was thrown.").
+    /// The exception's message, and the empty string for one built with none
+    /// (where .NET substitutes "Exception of type … was thrown.").
     /// </summary>
     /// <param name="error">The exception.</param>
     /// <returns>Its message as the wire carries it.</returns>
@@ -110,15 +81,11 @@ public static class ErrorResponses
         return error.Message == $"Exception of type '{error.GetType().FullName}' was thrown." ? string.Empty : error.Message;
     }
 
+    private static ErrorBody Of(string code, Exception error) => new(code, MessageOf(error), null);
+
     private static string ErrorCode(Exception error)
     {
         var name = error.GetType().Name;
         return name.EndsWith("Exception", StringComparison.Ordinal) ? name[..^"Exception".Length] + "Error" : name;
     }
-
-    // Flask's jsonify: sorted keys, and ensure_ascii — "doesn't" keeps its
-    // apostrophe and an em dash is \u2014, where Utf8JsonWriter's default
-    // encoder would write \u0027 and the raw character.
-    private static string ErrorJson(string code, Exception error) =>
-        FlaskJson.Serialize(new JsonObject { ["error"] = code, ["message"] = MessageOf(error) });
 }
