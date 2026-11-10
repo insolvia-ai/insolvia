@@ -37,12 +37,13 @@ public sealed class FirmRoutes : IEndpointModule
         routes.MapDelete("/v1/firm/users/{subject}", RemoveUserAsync).RequireAuth().Requires(Feature.FirmAdministration, PermissionLevel.AddEdit);
     }
 
-    /// <summary>The caller's firm, without provisioning provenance (#217).</summary>
+    /// <summary>Read your firm.</summary>
+    /// <remarks>Without provisioning provenance (#217): who at Insolvia created the firm is not its members' to read.</remarks>
     internal static async Task<FirmSummaryView> ReadFirmAsync(HttpContext context, CancellationToken cancellationToken) =>
         FirmSummaryView.Of((await context.CurrentAccessorAsync()).Firm);
 
-    /// <summary>Rename the firm, or change its defaults or letterhead.</summary>
-    /// <remarks>A status is refused: a firm suspending itself would lock out its own administrators.</remarks>
+    /// <summary>Update your firm.</summary>
+    /// <remarks>Rename it, or change its defaults or letterhead. A status is refused: a firm suspending itself would lock out its own administrators.</remarks>
     internal static async Task<FirmSummaryView> UpdateFirmAsync(HttpContext context, CancellationToken cancellationToken)
     {
         var store = context.FirmStore();
@@ -58,8 +59,8 @@ public sealed class FirmRoutes : IEndpointModule
         return FirmSummaryView.Of(written);
     }
 
-    /// <summary>Every member of the firm, by name, for anyone who works cases.</summary>
-    /// <remarks>Disabled colleagues are included, so a case's <c>createdBy</c> stays resolvable.</remarks>
+    /// <summary>List the firm's people.</summary>
+    /// <remarks>Names only, for anyone who works cases. Disabled colleagues are included, so a case's <c>createdBy</c> stays resolvable.</remarks>
     internal static async Task<FirmDirectory> DirectoryAsync(HttpContext context, CancellationToken cancellationToken)
     {
         var accessor = await context.CurrentAccessorAsync();
@@ -67,7 +68,8 @@ public sealed class FirmRoutes : IEndpointModule
         return new FirmDirectory([.. people.Select(UserSummaryView.Of)]);
     }
 
-    /// <summary>Every member of the firm, whole records, for its administrators.</summary>
+    /// <summary>List the firm's users.</summary>
+    /// <remarks>Whole records, stored permissions included, for the firm's administrators.</remarks>
     internal static async Task<FirmUserList> ListUsersAsync(HttpContext context, CancellationToken cancellationToken)
     {
         var accessor = await context.CurrentAccessorAsync();
@@ -79,8 +81,8 @@ public sealed class FirmRoutes : IEndpointModule
     // in between leaves a pool user in no firm — a state /v1/me already
     // reports and a retry resolves; the other order leaves an unreachable row.
 
-    /// <summary>Add someone to the firm, creating their sign-in account.</summary>
-    /// <remarks>Supplied permissions merge over the role's defaults.</remarks>
+    /// <summary>Add a user to the firm.</summary>
+    /// <remarks>Creates their sign-in account first. Supplied permissions merge over the role's defaults.</remarks>
     internal static async Task<Created<UserView>> AddUserAsync(HttpContext context, CancellationToken cancellationToken)
     {
         var store = context.FirmStore();
@@ -98,8 +100,9 @@ public sealed class FirmRoutes : IEndpointModule
         return TypedResults.Created((string?)null, UserView.Of(user));
     }
 
-    /// <summary>Change a firm member's name, role, axes, permissions, status or signature block.</summary>
+    /// <summary>Update a firm user.</summary>
     /// <remarks>
+    /// Changes their name, role, axes, permissions, status or signature block.
     /// Another firm's subject is the same 404 as none. <c>permissions</c>
     /// replaces the stored map. A change that would leave the firm with no
     /// active administrator is a 409.
@@ -122,7 +125,7 @@ public sealed class FirmRoutes : IEndpointModule
         return UserView.Of(written);
     }
 
-    /// <summary>Remove someone from the firm.</summary>
+    /// <summary>Remove a user from the firm.</summary>
     /// <remarks>
     /// Removes the membership, not the person: their sign-in account survives.
     /// Removing the last active administrator is a 409.

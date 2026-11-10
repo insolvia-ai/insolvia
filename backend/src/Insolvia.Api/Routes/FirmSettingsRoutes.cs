@@ -30,15 +30,15 @@ public sealed class FirmQuestionnaireRoutes : IEndpointModule
         routes.MapDelete("/v1/firm/questionnaire", ResetAsync).RequireAuth().Requires(Feature.FirmAdministration, PermissionLevel.AddEdit);
     }
 
-    /// <summary>The firm's questionnaire config: every section, switched off or not.</summary>
-    /// <remarks>A firm that never saved reads the defaults, <c>isDefault: true</c>.</remarks>
+    /// <summary>Read the questionnaire config.</summary>
+    /// <remarks>Every section, switched off or not. A firm that never saved reads the defaults, <c>isDefault: true</c>.</remarks>
     internal static async Task<QuestionnaireView> ReadAsync(HttpContext context, CancellationToken cancellationToken)
     {
         var accessor = await context.CurrentAccessorAsync();
         return QuestionnaireView.Of(await context.FirmStore().GetQuestionnaireAsync(accessor.FirmId, cancellationToken));
     }
 
-    /// <summary>Save the firm's questionnaire config.</summary>
+    /// <summary>Save the questionnaire config.</summary>
     /// <remarks>Answers what was saved, so the screen renders the server's normalisation rather than what it sent.</remarks>
     internal static async Task<QuestionnaireView> SaveAsync(HttpContext context, CancellationToken cancellationToken)
     {
@@ -50,8 +50,8 @@ public sealed class FirmQuestionnaireRoutes : IEndpointModule
         return QuestionnaireView.Of(config);
     }
 
-    /// <summary>Reset the firm's questionnaire config to the defaults.</summary>
-    /// <remarks>Idempotent: the same 200 and body whether or not anything was stored.</remarks>
+    /// <summary>Reset the questionnaire config.</summary>
+    /// <remarks>Back to the defaults by deleting the stored config. Idempotent: the same 200 and body whether or not anything was stored.</remarks>
     internal static async Task<QuestionnaireView> ResetAsync(HttpContext context, CancellationToken cancellationToken)
     {
         var accessor = await context.CurrentAccessorAsync();
@@ -85,14 +85,15 @@ public sealed class DocumentChecklistRoutes : IEndpointModule
         routes.MapDelete("/v1/firm/document-checklist", ResetAsync).RequireAuth().Requires(Feature.FirmAdministration, PermissionLevel.AddEdit);
     }
 
-    /// <summary>The firm's document checklist, with the shipped default beside it.</summary>
+    /// <summary>Read the document checklist.</summary>
+    /// <remarks>The list in force, with the shipped default beside it.</remarks>
     internal static async Task<ChecklistView> ReadAsync(HttpContext context, CancellationToken cancellationToken)
     {
         var accessor = await context.CurrentAccessorAsync();
         return ChecklistView.Of(await context.FirmStore().GetDocumentChecklistAsync(accessor.FirmId, cancellationToken));
     }
 
-    /// <summary>Save the firm's document checklist, whole.</summary>
+    /// <summary>Save the document checklist, whole.</summary>
     internal static async Task<ChecklistView> SaveAsync(HttpContext context, CancellationToken cancellationToken)
     {
         var accessor = await context.CurrentAccessorAsync();
@@ -103,8 +104,8 @@ public sealed class DocumentChecklistRoutes : IEndpointModule
         return ChecklistView.Of(checklist);
     }
 
-    /// <summary>Reset the firm's document checklist to the shipped default.</summary>
-    /// <remarks>Idempotent: the same 200 and body whether or not anything was stored.</remarks>
+    /// <summary>Reset the document checklist.</summary>
+    /// <remarks>Back to the shipped default by deleting the stored list. Idempotent: the same 200 and body whether or not anything was stored.</remarks>
     internal static async Task<ChecklistView> ResetAsync(HttpContext context, CancellationToken cancellationToken)
     {
         var accessor = await context.CurrentAccessorAsync();

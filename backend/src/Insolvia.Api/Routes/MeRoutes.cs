@@ -36,13 +36,13 @@ public sealed class MeRoutes : IEndpointModule
         routes.MapPatch("/v1/me", UpdateAsync).RequestBody<MeUpdateRequest>().RequireAuth();
     }
 
-    /// <summary>Who the signed-in caller is, and their firm membership when they have one.</summary>
-    /// <remarks><c>firm</c> is absent, not an error, for a caller in no firm.</remarks>
+    /// <summary>Read who you are.</summary>
+    /// <remarks>The token's own claims, and your firm membership when you have one; <c>firm</c> is absent, not an error, for a caller in no firm.</remarks>
     internal static async Task<MeView> ReadAsync(HttpContext context, CancellationToken cancellationToken) =>
         MeView.Of(context.CurrentPrincipal(), await context.ResolveAccessorAsync());
 
-    /// <summary>Change your own name or signature block.</summary>
-    /// <remarks>Needs no permission, only an active membership (403 without); answers the same body as the read.</remarks>
+    /// <summary>Update yourself.</summary>
+    /// <remarks>Changes your own name or signature block. Needs no permission, only an active membership (403 without); answers the same body as the read.</remarks>
     internal static async Task<MeView> UpdateAsync(HttpContext context, CancellationToken cancellationToken)
     {
         var store = context.FirmStore();

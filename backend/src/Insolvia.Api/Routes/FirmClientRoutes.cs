@@ -47,7 +47,7 @@ public sealed class FirmClientRoutes : IEndpointModule
         routes.MapPost("/v1/firm/clients/{clientId}/merge", MergeAsync).RequestBody<ClientMergeRequest>().RequireAuth().Requires(Feature.Clients, PermissionLevel.AddEdit);
     }
 
-    /// <summary>The firm's client directory.</summary>
+    /// <summary>List the firm's clients.</summary>
     /// <remarks>Not access-logged; reading one client is.</remarks>
     internal static async Task<ClientList> ListAsync(HttpContext context, CancellationToken cancellationToken)
     {
@@ -56,7 +56,8 @@ public sealed class FirmClientRoutes : IEndpointModule
         return new ClientList([.. clients.Select(ClientView.Of)]);
     }
 
-    /// <summary>Add a client to the directory.</summary>
+    /// <summary>Add a client.</summary>
+    /// <remarks>Logged as <c>client.create</c>. A tax id is refused here; it is entered on a case.</remarks>
     internal static async Task<Created<ClientView>> CreateAsync(HttpContext context, CancellationToken cancellationToken)
     {
         var (store, log) = Stores(context);
@@ -74,7 +75,8 @@ public sealed class FirmClientRoutes : IEndpointModule
 
     // The refused read IS logged: someone walking client ids is what the log should show.
 
-    /// <summary>One client.</summary>
+    /// <summary>Read a client.</summary>
+    /// <remarks>Logged as <c>client.read</c>, a refused read included.</remarks>
     internal static async Task<ClientView> GetAsync(HttpContext context, string clientId, CancellationToken cancellationToken)
     {
         var (store, log) = Stores(context);
@@ -83,7 +85,7 @@ public sealed class FirmClientRoutes : IEndpointModule
         return client is null ? throw new NotFoundException(NotFound) : ClientView.Of(client);
     }
 
-    /// <summary>Replace a client's record, whole.</summary>
+    /// <summary>Save a client, whole.</summary>
     /// <remarks>Keeps the status, the tax id, the stamps and the stage. A merged client is a 409: edit the survivor.</remarks>
     internal static async Task<ClientView> UpdateAsync(HttpContext context, string clientId, CancellationToken cancellationToken)
     {
@@ -97,7 +99,7 @@ public sealed class FirmClientRoutes : IEndpointModule
         return response;
     }
 
-    /// <summary>Archive a client, or restore one.</summary>
+    /// <summary>Archive or restore a client.</summary>
     /// <remarks>A status write, never a delete.</remarks>
     internal static async Task<ClientView> SetStatusAsync(HttpContext context, string clientId, CancellationToken cancellationToken)
     {
@@ -113,8 +115,8 @@ public sealed class FirmClientRoutes : IEndpointModule
     // Read from the record — never from its cases. The write is conditional
     // on the client still being a prospect.
 
-    /// <summary>Place a prospect at a stage of the funnel, or take them out of it with null.</summary>
-    /// <remarks>A retained client is a 409: the funnel is behind them (14.3 / #355).</remarks>
+    /// <summary>Set a prospect's stage.</summary>
+    /// <remarks>A stage places the prospect in the funnel; null takes them out. A retained client is a 409: the funnel is behind them (14.3 / #355).</remarks>
     internal static async Task<ClientView> SetProspectStageAsync(HttpContext context, string clientId, CancellationToken cancellationToken)
     {
         var (store, log) = Stores(context);
@@ -143,9 +145,9 @@ public sealed class FirmClientRoutes : IEndpointModule
 
     // Logged under BOTH ids.
 
-    /// <summary>Fold the named client into this one (ADR 0022 PR 7).</summary>
+    /// <summary>Merge a client into this one.</summary>
     /// <remarks>
-    /// Answers both clients and no count of the cases moved — a count would
+    /// Folds the named client into this one (ADR 0022 PR 7). Answers both clients and no count of the cases moved — a count would
     /// include cases the caller may not see.
     /// </remarks>
     internal static async Task<ClientMergeView> MergeAsync(HttpContext context, string clientId, CancellationToken cancellationToken)

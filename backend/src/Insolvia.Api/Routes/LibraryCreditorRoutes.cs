@@ -34,7 +34,8 @@ public sealed class LibraryCreditorRoutes : IEndpointModule
         routes.MapDelete("/v1/firm/creditors/{creditorId}", DeleteAsync).RequireAuth().Requires(Feature.CreditorLibrary, PermissionLevel.AddEdit);
     }
 
-    /// <summary>The firm's creditor library.</summary>
+    /// <summary>List the creditor library.</summary>
+    /// <remarks>Every creditor the firm keeps for copying into its cases.</remarks>
     internal static async Task<LibraryCreditorList> ListAsync(HttpContext context, CancellationToken cancellationToken)
     {
         var accessor = await context.CurrentAccessorAsync();
@@ -55,7 +56,7 @@ public sealed class LibraryCreditorRoutes : IEndpointModule
         return TypedResults.Created((string?)null, LibraryCreditorView.Of(creditor));
     }
 
-    /// <summary>One library creditor.</summary>
+    /// <summary>Read a library creditor.</summary>
     internal static async Task<LibraryCreditorView> GetAsync(HttpContext context, string creditorId, CancellationToken cancellationToken)
     {
         var accessor = await context.CurrentAccessorAsync();
@@ -64,7 +65,7 @@ public sealed class LibraryCreditorRoutes : IEndpointModule
         return LibraryCreditorView.Of(creditor);
     }
 
-    /// <summary>Replace a library creditor, whole.</summary>
+    /// <summary>Save a library creditor, whole.</summary>
     /// <remarks>PUT, not PATCH: a field the body omits is cleared. A case that copied it is never touched.</remarks>
     internal static async Task<LibraryCreditorView> UpdateAsync(HttpContext context, string creditorId, CancellationToken cancellationToken)
     {
