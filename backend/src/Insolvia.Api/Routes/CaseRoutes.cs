@@ -1,4 +1,3 @@
-using System.Text.Json.Nodes;
 using Insolvia.Api.Auth;
 using Insolvia.Api.Calendar;
 using Insolvia.Api.Cases;
@@ -14,6 +13,7 @@ using Insolvia.Domain.FirmClients;
 using Insolvia.Domain.Firms;
 using Insolvia.Domain.Petitions;
 using Insolvia.Domain.Ports;
+using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace Insolvia.Api.Routes;
 
@@ -54,10 +54,10 @@ public sealed class CaseRoutes : IEndpointModule
     public void Map(IEndpointRouteBuilder routes)
     {
         ArgumentNullException.ThrowIfNull(routes);
-        routes.MapPost("/v1/cases", CreateAsync).RequireAuth().Requires(Feature.Cases, PermissionLevel.AddEdit).Requires(Feature.Clients, PermissionLevel.ViewOnly);
+        routes.MapPost("/v1/cases", CreateAsync).RequestBody<CaseCreateRequest>().RequireAuth().Requires(Feature.Cases, PermissionLevel.AddEdit).Requires(Feature.Clients, PermissionLevel.ViewOnly);
         routes.MapGet("/v1/cases", ListAsync).RequireAuth().Requires(Feature.Cases, PermissionLevel.ViewOnly);
         routes.MapGet("/v1/cases/{caseId}", GetAsync).RequireAuth().Requires(Feature.Cases, PermissionLevel.ViewOnly);
-        routes.MapPatch("/v1/cases/{caseId}", UpdateAsync).RequireAuth().Requires(Feature.Cases, PermissionLevel.AddEdit);
+        routes.MapPatch("/v1/cases/{caseId}", UpdateAsync).RequestBody<CaseUpdateRequest>().RequireAuth().Requires(Feature.Cases, PermissionLevel.AddEdit);
         routes.MapGet("/v1/cases/{caseId}/assignees", ListAssigneesAsync).RequireAuth().Requires(Feature.Cases, PermissionLevel.ViewOnly);
         routes.MapPut("/v1/cases/{caseId}/assignees/{subject}", AssignAsync).RequireAuth().Requires(Feature.Cases, PermissionLevel.AddEdit);
         routes.MapDelete("/v1/cases/{caseId}/assignees/{subject}", UnassignAsync).RequireAuth().Requires(Feature.Cases, PermissionLevel.AddEdit);
@@ -95,9 +95,14 @@ public sealed class CaseRoutes : IEndpointModule
         }
     }
 
-    // The firm comes from the accessor, never the body. The creator is linked
-    // and the debtors copied from the clients in the case's own transaction.
-    private static async Task<IResult> CreateAsync(HttpContext context, CancellationToken cancellationToken)
+    /// <summary>Open a case for one client, or two filing jointly.</summary>
+    /// <remarks>
+    /// The firm is the caller's, never the body's. The caller is linked to the
+    /// case, and each client's identity is copied to its debtor (Debtor 1,
+    /// then Debtor 2) in the same write. An unknown, archived or merged client
+    /// is a 400 on <c>client_ids</c>.
+    /// </remarks>
+    internal static async Task<Created<CaseView>> CreateAsync(HttpContext context, CancellationToken cancellationToken)
     {
         var store = context.Cases();
         var draft = CaseRules.ParseCreation(await context.BodyAsync(MaxRequestBytes));
@@ -123,7 +128,7 @@ public sealed class CaseRoutes : IEndpointModule
 
         // GLBA: the case id and nothing about its contents; never the firm id.
         context.Log(Logger, "case created", ("case_id", created.Id));
-        return FlaskJson.Result(CaseViews.Case(created), StatusCodes.Status201Created);
+        return TypedResults.Created((string?)null, CaseView.Of(created));
     }
 
     // Each client resolved IN THE CALLER'S FIRM (another firm's and an unknown
@@ -153,29 +158,36 @@ public sealed class CaseRoutes : IEndpointModule
         return clients;
     }
 
-    // NOT access-logged: the log is keyed by case, and a list touches none in particular.
-    private static async Task<IResult> ListAsync(HttpContext context, CancellationToken cancellationToken)
+    /// <summary>The cases the caller may see, newest first, a page at a time.</summary>
+    /// <remarks>
+    /// Query: <c>limit</c> (1–100, default 50), <c>cursor</c> (the previous
+    /// page's <c>nextCursor</c>), <c>archived</c> (<c>true</c> lists the archived
+    /// cases instead of the working list). Not access-logged: the log is keyed
+    /// by case, and a list touches none in particular.
+    /// </remarks>
+    internal static async Task<CaseList> ListAsync(HttpContext context, CancellationToken cancellationToken)
     {
         var limit = CaseRules.ParseListLimit(Query(context, "limit"));
         var cursor = Query(context, "cursor") is { Length: > 0 } given ? given : null;
         var archived = ParseArchivedView(Query(context, "archived"));
         var page = await context.Cases().ListForAccessorAsync(await context.CurrentAccessorAsync(), limit, cursor, archived, cancellationToken);
 
-        var body = new JsonObject { ["cases"] = new JsonArray([.. page.Cases.Select(found => (JsonNode)CaseViews.Case(found))]) };
-
-        // Absent rather than null when there is no next page — the contract distinguishes them.
-        if (page.NextCursor is not null)
-        {
-            body["nextCursor"] = page.NextCursor;
-        }
-
-        return FlaskJson.Result(body);
+        return new CaseList([.. page.Cases.Select(CaseView.Of)], page.NextCursor);
     }
 
-    private static async Task<IResult> GetAsync(HttpContext context, string caseId, CancellationToken cancellationToken) =>
-        FlaskJson.Result(CaseViews.Case(await context.ReachableCaseAsync(caseId, AccessAction.CaseRead, cancellationToken)));
+    /// <summary>Read a case.</summary>
+    internal static async Task<CaseView> GetAsync(HttpContext context, string caseId, CancellationToken cancellationToken) =>
+        CaseView.Of(await context.ReachableCaseAsync(caseId, AccessAction.CaseRead, cancellationToken));
 
-    private static async Task<IResult> UpdateAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
+    /// <summary>Edit a case, or move its status.</summary>
+    /// <remarks>
+    /// A status move is recorded as a lifecycle event; a move off the lifecycle
+    /// is a 409, and reaching <c>filed</c> needs <c>filed_at</c> and
+    /// <c>case_number</c>. A filed case's chapter changes only by a conversion
+    /// (409). A change to the petition date, the § 341 date or the chapter
+    /// regenerates the case's deadlines.
+    /// </remarks>
+    internal static async Task<CaseView> UpdateAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
     {
         var store = context.Cases();
         var changes = CaseRules.ParseUpdate(await context.BodyAsync(MaxRequestBytes));
@@ -215,7 +227,7 @@ public sealed class CaseRoutes : IEndpointModule
         }
 
         context.Log(Logger, "case updated", ("case_id", updated.Id));
-        return FlaskJson.Result(CaseViews.Case(updated));
+        return CaseView.Of(updated);
     }
 
     // 106C line 1's opt-out rule at the write (#346): an opted-out state's
@@ -243,17 +255,21 @@ public sealed class CaseRoutes : IEndpointModule
         }
     }
 
-    // Subjects, not names — the directory turns one into a person.
-    private static async Task<IResult> ListAssigneesAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
+    /// <summary>The people linked to a case.</summary>
+    /// <remarks>Subjects, never names — the firm directory turns one into a person.</remarks>
+    internal static async Task<AssigneeList> ListAssigneesAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
     {
         await context.VisibleCaseAsync(caseId, cancellationToken);
         var assignees = await context.Cases().AssigneesAsync(caseId, cancellationToken);
-        return FlaskJson.Result(new JsonObject { ["assignees"] = new JsonArray([.. assignees.Select(assignment => (JsonNode)CaseViews.Assignee(assignment))]) });
+        return new AssigneeList([.. assignees.Select(AssigneeView.Of)]);
     }
 
-    // PUT: idempotent. The subject must be ACTIVE in the caller's firm — a
-    // 404 otherwise, so this is no probe for who works where.
-    private static async Task<IResult> AssignAsync(HttpContext context, string caseId, string subject, CancellationToken cancellationToken)
+    /// <summary>Link a colleague to a case.</summary>
+    /// <remarks>
+    /// Idempotent. The subject must be an active user of the caller's firm —
+    /// a 404 otherwise, so this is no probe for who works where.
+    /// </remarks>
+    internal static async Task<NoContent> AssignAsync(HttpContext context, string caseId, string subject, CancellationToken cancellationToken)
     {
         var accessor = await context.CurrentAccessorAsync();
         var target = await context.VisibleCaseAsync(caseId, cancellationToken);
@@ -266,11 +282,12 @@ public sealed class CaseRoutes : IEndpointModule
         await context.Cases().AssignAsync(CaseRules.Assign(target, subject, accessor.Subject, context.Clock()), cancellationToken);
         await context.RecordCaseAccessAsync(caseId, AccessAction.CaseUpdate, allowed: true, cancellationToken);
         context.Log(Logger, "case assignee added", ("case_id", caseId));
-        return FlaskJson.NoContent();
+        return TypedResults.NoContent();
     }
 
-    // Unlinking the last person is allowed: the firm's admins still reach the case.
-    private static async Task<IResult> UnassignAsync(HttpContext context, string caseId, string subject, CancellationToken cancellationToken)
+    /// <summary>Unlink a person from a case.</summary>
+    /// <remarks>Unlinking the last person is allowed: the firm's admins still reach the case.</remarks>
+    internal static async Task<NoContent> UnassignAsync(HttpContext context, string caseId, string subject, CancellationToken cancellationToken)
     {
         await context.VisibleCaseAsync(caseId, cancellationToken);
         if (!await context.Cases().UnassignAsync(caseId, subject, cancellationToken))
@@ -280,12 +297,12 @@ public sealed class CaseRoutes : IEndpointModule
 
         await context.RecordCaseAccessAsync(caseId, AccessAction.CaseUpdate, allowed: true, cancellationToken);
         context.Log(Logger, "case assignee removed", ("case_id", caseId));
-        return FlaskJson.NoContent();
+        return TypedResults.NoContent();
     }
 
-    // The client's cases THE CALLER MAY SEE, newest first, with the client's
-    // role on each; the rest leave no trace. The client read is logged.
-    private static async Task<IResult> ListClientCasesAsync(HttpContext context, string clientId, CancellationToken cancellationToken)
+    /// <summary>A firm client's cases, newest first, with the client's role on each.</summary>
+    /// <remarks>Only the cases the caller may see; the rest leave no trace. The client read is access-logged.</remarks>
+    internal static async Task<ClientCaseList> ListClientCasesAsync(HttpContext context, string clientId, CancellationToken cancellationToken)
     {
         var accessor = await context.CurrentAccessorAsync();
         var client = await context.FirmStore().GetClientAsync(accessor.FirmId, clientId, cancellationToken);
@@ -296,22 +313,15 @@ public sealed class CaseRoutes : IEndpointModule
         }
 
         var entries = await context.Cases().ListForClientAsync(client.Id, accessor, cancellationToken);
-        return FlaskJson.Result(new JsonObject
-        {
-            ["cases"] = new JsonArray([.. entries.Select(entry => (JsonNode)new JsonObject
-            {
-                ["filing_role"] = entry.FilingRole.ToWire(),
-                ["case"] = CaseViews.Case(entry.Case),
-            })]),
-        });
+        return new ClientCaseList([.. entries.Select(entry => new ClientCaseView(entry.FilingRole, CaseView.Of(entry.Case)))]);
     }
 
-    // Authenticated and IN A FIRM (current_accessor), no feature: every
-    // member picks a court when opening a case.
-    private static async Task<IResult> ListCourtsAsync(HttpContext context, CancellationToken cancellationToken)
+    /// <summary>The court registry in force: every bankruptcy court and its divisions.</summary>
+    /// <remarks>Any member of a firm may read it — every member picks a court when opening a case.</remarks>
+    internal static async Task<CourtsView> ListCourtsAsync(HttpContext context, CancellationToken cancellationToken)
     {
         await context.CurrentAccessorAsync();
-        return FlaskJson.Result(CaseViews.Courts(CourtRegistry.Shipped.Current));
+        return CourtsView.Of(CourtRegistry.Shipped.Current);
     }
 
     private static bool ParseArchivedView(string? raw) => raw switch

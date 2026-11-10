@@ -271,7 +271,7 @@ public sealed class CaseRouteTests : IAsyncLifetime, IDisposable
         var fetched = await _world.Get($"/v1/cases/{created.Str("id")}");
 
         Assert.Equal(200, fetched.Status);
-        Assert.Equal(Http.FlaskJson.Serialize(created), fetched.Body);
+        Assert.True(System.Text.Json.Nodes.JsonNode.DeepEquals(created, System.Text.Json.Nodes.JsonNode.Parse(fetched.Body)), fetched.Body);
     }
 
     [Fact]
