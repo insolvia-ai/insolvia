@@ -1,16 +1,17 @@
 using System.Text.Json.Nodes;
 using Insolvia.Api.Auth;
+using Insolvia.Api.Cases;
 using Insolvia.Api.Hosting;
 using Insolvia.Api.Http;
 using Insolvia.Domain;
 using Insolvia.Domain.AccessLog;
 using Insolvia.Domain.Documents;
-using Insolvia.Domain.Engines.Liens;
 using Insolvia.Domain.Engines.Projections;
 using Insolvia.Domain.Firms;
 using Insolvia.Domain.Forms;
 using Insolvia.Domain.Jobs;
 using Insolvia.Domain.Ports;
+using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace Insolvia.Api.Routes;
 
@@ -29,7 +30,7 @@ public sealed class JobRoutes : IEndpointModule
     public void Map(IEndpointRouteBuilder routes)
     {
         ArgumentNullException.ThrowIfNull(routes);
-        routes.MapPost("/v1/cases/{caseId}/jobs", AcceptAsync).RequireAuth().Requires(Feature.Cases, PermissionLevel.AddEdit);
+        routes.MapPost("/v1/cases/{caseId}/jobs", AcceptAsync).RequestBody<JobRequest>().RequireAuth().Requires(Feature.Cases, PermissionLevel.AddEdit);
         routes.MapGet("/v1/cases/{caseId}/jobs/{jobId}", GetAsync).RequireAuth().Requires(Feature.Cases, PermissionLevel.ViewOnly);
     }
 
@@ -57,20 +58,20 @@ public sealed class JobRoutes : IEndpointModule
         }
     }
 
-    /// <summary>
-    /// Always 202 with the job now in flight — a FRESH record, or the
+    /// <summary>Hand a job to the pipeline for the case.</summary>
+    /// <remarks>
+    /// Always 202 with the job now in flight — a fresh record, or the
     /// already-active one of the same (kind, document, options): a client that
     /// cannot tell whether its first request landed gets the same job back.
-    /// </summary>
-    private static async Task<IResult> AcceptAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
+    /// 503 <c>PipelineUnavailable</c> when this deployment has no pipeline.
+    /// </remarks>
+    internal static async Task<Results<Accepted<JobView>, JsonHttpResult<ErrorBody>>> AcceptAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
     {
         if (context.RequestServices.GetService<IJobSender>() is null)
         {
             // A real deployed state: the image can roll out ahead of the queue.
             // 503 says "not yet"; accepting and never running would be a lie.
-            return FlaskJson.Result(
-                new JsonObject { ["error"] = "PipelineUnavailable", ["message"] = "job pipeline is not available in this deployment" },
-                StatusCodes.Status503ServiceUnavailable);
+            return TypedResults.Json(new ErrorBody("PipelineUnavailable", "job pipeline is not available in this deployment", null), statusCode: StatusCodes.Status503ServiceUnavailable);
         }
 
         var jobs = context.Port<IJobStore>();
@@ -113,27 +114,25 @@ public sealed class JobRoutes : IEndpointModule
         if (existing is not null)
         {
             // The no-op repeat is not access-logged: the first accept was.
-            return FlaskJson.Result(JobRules.ToJson(existing), StatusCodes.Status202Accepted);
+            return TypedResults.Accepted((string?)null, JobView.Of(existing));
         }
 
         var job = JobRules.NewJob(kind, found.Id, accessor.Subject, documentId, options, context.Clock());
         await SendAsync(context, job, cancellationToken);
         await context.RecordCaseAccessAsync(found.Id, AccessAction.JobAccept, allowed: true, cancellationToken);
         context.Log(Logger, "job accepted", ("case_id", found.Id), ("job_id", job.Id), ("kind", kind));
-        return FlaskJson.Result(JobRules.ToJson(job), StatusCodes.Status202Accepted);
+        return TypedResults.Accepted((string?)null, JobView.Of(job));
     }
 
-    /// <summary>
-    /// One job's status, if the caller may see its case — a job of another
-    /// case answers the same 404. Not access-logged: a poll reads pipeline
-    /// state, not case data.
-    /// </summary>
-    private static async Task<IResult> GetAsync(HttpContext context, string caseId, string jobId, CancellationToken cancellationToken)
+    /// <summary>One job's status.</summary>
+    /// <remarks>A job of another case answers the same 404 as a missing one.</remarks>
+    internal static async Task<JobView> GetAsync(HttpContext context, string caseId, string jobId, CancellationToken cancellationToken)
     {
+        // Not access-logged: a poll reads pipeline state, not case data.
         var jobs = context.Port<IJobStore>();
         await context.VisibleCaseAsync(caseId, cancellationToken);
         var job = await jobs.GetAsync(caseId, jobId, cancellationToken) ?? throw new NotFoundException("job not found");
-        return FlaskJson.Result(JobRules.ToJson(job));
+        return JobView.Of(job);
     }
 }
 
@@ -153,28 +152,27 @@ public sealed class PacketRoutes : IEndpointModule
         routes.MapGet("/v1/cases/{caseId}/packets/{packetId}/url", UrlAsync).RequireAuth().Requires(Feature.Cases, PermissionLevel.ViewOnly);
     }
 
-    /// <summary>Every packet, newest first — re-assembly creates rather than replaces.</summary>
-    private static async Task<IResult> ListAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
+    /// <summary>A case's packets, newest first.</summary>
+    /// <remarks>Re-assembly creates a packet rather than replacing one.</remarks>
+    internal static async Task<PacketList> ListAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
     {
         var packets = context.Port<IPacketStore>();
         await context.ReachableCaseAsync(caseId, AccessAction.PacketRead, cancellationToken);
         var listed = await packets.ListForCaseAsync(caseId, cancellationToken);
-        return FlaskJson.Result(new JsonObject { ["packets"] = new JsonArray([.. listed.Select(item => (JsonNode)Packets.PacketJson(Packets.FromItem(item)))]) });
+        return new PacketList([.. listed.Select(item => PacketView.Of(Packets.FromItem(item)))]);
     }
 
-    /// <summary>A short-lived URL serving one packet's bytes; one access-log row per packet fetched.</summary>
-    private static async Task<IResult> UrlAsync(HttpContext context, string caseId, string packetId, CancellationToken cancellationToken)
+    /// <summary>A short-lived URL serving one packet's bytes.</summary>
+    internal static async Task<PacketUrlView> UrlAsync(HttpContext context, string caseId, string packetId, CancellationToken cancellationToken)
     {
         var packets = context.Port<IPacketStore>();
         var blobs = context.Port<IDocumentBlobStore>();
         await context.ReachableCaseAsync(caseId, AccessAction.PacketDownload, cancellationToken);
         var packet = await packets.GetAsync(caseId, packetId, cancellationToken) ?? throw new NotFoundException("packet not found");
-        return FlaskJson.Result(new JsonObject
-        {
-            ["url"] = await blobs.DownloadUrlAsync(packet.StorageRef, DownloadUrlTtlSeconds, cancellationToken),
-            ["method"] = "GET",
-            ["expiresAt"] = FlaskJson.Millis(DocumentRules.ExpiryTimestamp(DownloadUrlTtlSeconds, context.Clock())),
-        });
+        return new PacketUrlView(
+            await blobs.DownloadUrlAsync(packet.StorageRef, DownloadUrlTtlSeconds, cancellationToken),
+            "GET",
+            FlaskJson.Millis(DocumentRules.ExpiryTimestamp(DownloadUrlTtlSeconds, context.Clock())));
     }
 }
 
@@ -192,34 +190,12 @@ public sealed class CaseSummaryRoutes : IEndpointModule
         routes.MapGet("/v1/cases/{caseId}/summary", SummaryAsync).RequireAuth().Requires(Feature.Cases, PermissionLevel.ViewOnly);
     }
 
-    /// <summary>Money as STRINGS, never JSON numbers — a double would not carry 1234.05 unchanged.</summary>
-    internal static JsonObject TotalsJson(CaseTotals totals) => new()
-    {
-        ["realEstate"] = Insolvia.Domain.Engines.Exact.F(totals.RealEstate),
-        ["personalProperty"] = Insolvia.Domain.Engines.Exact.F(totals.PersonalProperty),
-        ["assets"] = Insolvia.Domain.Engines.Exact.F(totals.Assets),
-        ["totalExempt"] = Insolvia.Domain.Engines.Exact.F(totals.TotalExempt),
-        ["totalNonExempt"] = Insolvia.Domain.Engines.Exact.F(totals.TotalNonExempt),
-        ["secured"] = Insolvia.Domain.Engines.Exact.F(totals.Secured),
-        ["priorityUnsecured"] = Insolvia.Domain.Engines.Exact.F(totals.PriorityUnsecured),
-        ["nonpriorityUnsecured"] = Insolvia.Domain.Engines.Exact.F(totals.NonpriorityUnsecured),
-        ["liabilities"] = Insolvia.Domain.Engines.Exact.F(totals.Liabilities),
-        ["monthlyIncome"] = Insolvia.Domain.Engines.Exact.F(totals.MonthlyIncome),
-        ["monthlyExpenses"] = Insolvia.Domain.Engines.Exact.F(totals.MonthlyExpenses),
-        ["monthlyExcess"] = Insolvia.Domain.Engines.Exact.F(totals.MonthlyExcess),
-    };
-
-    private static async Task<IResult> SummaryAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
+    /// <summary>What the case is worth, what it owes, and whether it could be filed.</summary>
+    /// <remarks>Money is a decimal string, never a JSON number.</remarks>
+    internal static async Task<CaseSummaryView> SummaryAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
     {
         var found = await context.ReachableCaseAsync(caseId, AccessAction.CaseRead, cancellationToken);
         var data = await CaseDataReads.ReadAsync(found, context.Port<IDebtorStore>(), context.Port<ICaseEntityStore>(), cancellationToken);
-        var summary = CaseSummaries.Summarise(data);
-        return FlaskJson.Result(new JsonObject
-        {
-            ["readyToFile"] = summary.ReadyToFile,
-            ["problems"] = new JsonArray([.. summary.Problems.Select(problem => (JsonNode)PacketAssembly.ProblemJson(problem))]),
-            ["totals"] = TotalsJson(summary.Totals),
-            ["liens"] = LienEngine.Json(summary.Liens),
-        });
+        return CaseSummaryView.Of(CaseSummaries.Summarise(data));
     }
 }

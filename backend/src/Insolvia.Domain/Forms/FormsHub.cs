@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Text.Json.Nodes;
 using Insolvia.Domain.Cases;
 using Insolvia.Domain.Claims;
 using Insolvia.Domain.Engines;
@@ -136,13 +135,6 @@ public static class FormsHub
         }
 
         return summaries;
-    }
-
-    /// <summary>The metric's wire shape.</summary>
-    public static JsonObject FormMetricJson(FormMetric metric)
-    {
-        ArgumentNullException.ThrowIfNull(metric);
-        return new JsonObject { ["kind"] = metric.Kind, ["value"] = metric.Value };
     }
 
     /// <summary>

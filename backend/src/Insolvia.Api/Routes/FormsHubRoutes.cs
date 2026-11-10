@@ -1,5 +1,5 @@
-using System.Text.Json.Nodes;
 using Insolvia.Api.Auth;
+using Insolvia.Api.Cases;
 using Insolvia.Api.Hosting;
 using Insolvia.Api.Http;
 using Insolvia.Domain;
@@ -64,57 +64,33 @@ public sealed class FormsHubRoutes : IEndpointModule
         return counts;
     }
 
-    /// <summary>One hub row; <c>openTaskCount</c> present even at zero, <c>metric</c> only where the form defines one.</summary>
-    public static JsonObject FormSummaryJson(FormSummary summary, int openTaskCount)
-    {
-        ArgumentNullException.ThrowIfNull(summary);
-        var body = new JsonObject
-        {
-            ["series"] = summary.Series,
-            ["form"] = summary.Form,
-            ["title"] = summary.Title,
-            ["officialNumber"] = summary.OfficialNumber,
-            ["problems"] = new JsonArray([.. summary.Problems.Select(problem => (JsonNode)PacketAssembly.ProblemJson(problem))]),
-            ["openTaskCount"] = openTaskCount,
-        };
-        if (summary.Metric is { } metric)
-        {
-            body["metric"] = FormsHub.FormMetricJson(metric);
-        }
-
-        return body;
-    }
-
-    /// <summary>
-    /// Every form this case files, each with its metric and its own slice of
-    /// the completeness gate's problems — packet assembly's own functions,
-    /// grouped per form, never a second definition of either.
-    /// </summary>
-    private static async Task<IResult> ListAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
+    /// <summary>Every form the case files, each with its status.</summary>
+    /// <remarks>
+    /// Each form carries its metric and its own slice of the completeness
+    /// gate's problems — packet assembly's own functions, grouped per form.
+    /// </remarks>
+    internal static async Task<FormList> ListAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
     {
         var target = await context.ReachableCaseAsync(caseId, AccessAction.CaseRead, cancellationToken);
         var data = await CaseDataReads.ReadAsync(target, context.Port<IDebtorStore>(), context.Port<ICaseEntityStore>(), cancellationToken);
         var summaries = FormsHub.Summaries(data, context.Today());
         var counts = OpenTaskCounts(await context.Port<ICaseTaskStore>().ListForCaseAsync(caseId, cancellationToken));
-        return FlaskJson.Result(new JsonObject
-        {
-            ["forms"] = new JsonArray([.. summaries.Select(summary => (JsonNode)FormSummaryJson(summary, counts.GetValueOrDefault(summary.Form)))]),
-        });
+        return new FormList([.. summaries.Select(summary => FormSummaryView.Of(summary, counts.GetValueOrDefault(summary.Form)))]);
     }
 
-    /// <summary>
-    /// Render one form and mint a short-lived URL to the PDF — or answer the
-    /// reasons it cannot render yet. <paramref name="form"/> is the short key
-    /// (<c>b101</c>, <c>release.form</c>), not the slashed series id; a form
-    /// this case does not file is a 404, as <c>assemble</c> drops it.
-    /// </summary>
+    /// <summary>Render one form and answer a short-lived URL to the PDF, or the reasons it cannot render yet.</summary>
     /// <remarks>
-    /// The order is part of the contract: it decides the access-log rows a refused request
-    /// leaves: the <c>form_preview.render</c> row, the series 404, B121's
-    /// <c>taxid.read</c> rows, and only then the options' 400.
+    /// <c>form</c> is the short key (<c>b101</c>), not the slashed series id; a
+    /// form this case does not file is a 404. The output options ride in the
+    /// query string (<c>draftWatermark</c>, <c>printDate</c>,
+    /// <c>signElectronically</c>, <c>amendedOnly</c>, <c>signaturePages</c>,
+    /// <c>forms</c> as a comma list).
     /// </remarks>
-    private static async Task<IResult> PreviewAsync(HttpContext context, string caseId, string form, CancellationToken cancellationToken)
+    internal static async Task<FormPreviewView> PreviewAsync(HttpContext context, string caseId, string form, CancellationToken cancellationToken)
     {
+        // The order is part of the contract: it decides the access-log rows a
+        // refused request leaves: the form_preview.render row, the series 404,
+        // B121's taxid.read rows, and only then the options' 400.
         var target = await context.ReachableCaseAsync(caseId, AccessAction.FormPreviewRender, cancellationToken);
         var data = await CaseDataReads.ReadAsync(target, context.Port<IDebtorStore>(), context.Port<ICaseEntityStore>(), cancellationToken);
         var seriesId = $"form/{form}";
@@ -140,25 +116,19 @@ public sealed class FormsHubRoutes : IEndpointModule
             // GLBA: the case, the form and how many problems — never a
             // message, which can name case facts.
             context.Log(Logger, "form preview blocked", ("case_id", target.Id), ("series", seriesId), ("problems", problems.Count));
-            return FlaskJson.Result(new JsonObject
-            {
-                ["problems"] = new JsonArray([.. problems.Select(problem => (JsonNode)PacketAssembly.ProblemJson(problem))]),
-                ["options"] = FormOverlay.OutputOptionsJson(options),
-            });
+            return new FormPreviewView([.. problems.Select(PacketProblemView.Of)], OutputOptionsView.Of(options), null, null, null);
         }
 
         var blobs = context.Port<IDocumentBlobStore>();
         var storageRef = FormsHub.FormPreviewObjectKey(target.Id, FormsHub.NewPreviewId());
         await blobs.PutBytesAsync(storageRef, pdf, PreviewContentType, cancellationToken);
         context.Log(Logger, "form preview rendered", ("case_id", target.Id), ("series", seriesId));
-        return FlaskJson.Result(new JsonObject
-        {
-            ["url"] = await blobs.DownloadUrlAsync(storageRef, DownloadUrlTtlSeconds, cancellationToken),
-            ["method"] = "GET",
-            ["expiresAt"] = FlaskJson.Millis(DocumentRules.ExpiryTimestamp(DownloadUrlTtlSeconds, context.Clock())),
-            ["problems"] = new JsonArray(),
-            ["options"] = FormOverlay.OutputOptionsJson(options),
-        });
+        return new FormPreviewView(
+            [],
+            OutputOptionsView.Of(options),
+            await blobs.DownloadUrlAsync(storageRef, DownloadUrlTtlSeconds, cancellationToken),
+            "GET",
+            FlaskJson.Millis(DocumentRules.ExpiryTimestamp(DownloadUrlTtlSeconds, context.Clock())));
     }
 
     // Werkzeug's MultiDict `args[key]`: the FIRST value of a repeated key.
@@ -190,88 +160,13 @@ public sealed class FilingSetRoutes : IEndpointModule
         routes.MapGet("/v1/cases/{caseId}/filing-set", GetAsync).RequireAuth().Requires(Feature.Cases, PermissionLevel.ViewOnly);
     }
 
-    /// <summary>The wire shape: optional keys absent, never null.</summary>
-    public static JsonObject FilingSetJson(FilingSet filingSet)
-    {
-        ArgumentNullException.ThrowIfNull(filingSet);
-        var body = new JsonObject
-        {
-            ["registryRelease"] = filingSet.RegistryRelease,
-            ["filingMethod"] = filingSet.FilingMethod,
-            ["orderBasis"] = filingSet.OrderBasis,
-            ["namesBasis"] = filingSet.NamesBasis,
-            ["maxBytes"] = filingSet.MaxBytes,
-            ["maxBytesBasis"] = filingSet.MaxBytesBasis,
-            ["documents"] = new JsonArray([.. filingSet.Documents.Select(document => (JsonNode)DocumentJson(document))]),
-            ["checklist"] = new JsonArray([.. filingSet.Checklist.Select(item => (JsonNode)ItemJson(item))]),
-        };
-        if (filingSet.CourtCode is { } code && filingSet.CourtName is { } name)
-        {
-            var court = new JsonObject { ["code"] = code, ["name"] = name };
-            if (filingSet.DivisionName is { } division)
-            {
-                court["divisionName"] = division;
-            }
-
-            body["court"] = court;
-        }
-
-        if (filingSet.Packet is { } packet)
-        {
-            body["packet"] = new JsonObject { ["id"] = packet.Id, ["createdAt"] = packet.CreatedAt };
-        }
-
-        return body;
-    }
-
-    private static JsonObject DocumentJson(FilingDocument document)
-    {
-        var body = new JsonObject
-        {
-            ["key"] = document.Key,
-            ["title"] = document.Title,
-            ["fileName"] = document.FileName,
-            ["source"] = document.Source,
-            ["handling"] = document.Handling,
-            ["checks"] = new JsonArray([.. document.Checks.Select(check => (JsonNode)new JsonObject
-            {
-                ["check"] = check.Check,
-                ["outcome"] = check.Outcome,
-                ["message"] = check.Message,
-            })]),
-        };
-        if (document.Note.Length > 0)
-        {
-            body["note"] = document.Note;
-        }
-
-        return body;
-    }
-
-    private static JsonObject ItemJson(ChecklistItem item)
-    {
-        var body = new JsonObject
-        {
-            ["id"] = item.Id,
-            ["status"] = item.Status,
-            ["title"] = item.Title,
-            ["detail"] = item.Detail,
-        };
-        if (item.Link is { } link)
-        {
-            body["link"] = link;
-        }
-
-        return body;
-    }
-
-    private static async Task<IResult> GetAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
+    /// <summary>The filing set and hand-off checklist for the case's district.</summary>
+    internal static async Task<FilingSetView> GetAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
     {
         var target = await context.ReachableCaseAsync(caseId, AccessAction.CaseRead, cancellationToken);
         var data = await CaseDataReads.ReadAsync(target, context.Port<IDebtorStore>(), context.Port<ICaseEntityStore>(), cancellationToken);
         var packets = await context.Port<IPacketStore>().ListForCaseAsync(caseId, cancellationToken);
         var today = context.Today();
-        var filingSet = FilingSets.Build(data, [.. packets.Select(Packets.FromItem)], CourtRegistry.Shipped.Resolve(today), today);
-        return FlaskJson.Result(FilingSetJson(filingSet));
+        return FilingSetView.Of(FilingSets.Build(data, [.. packets.Select(Packets.FromItem)], CourtRegistry.Shipped.Resolve(today), today));
     }
 }

@@ -54,7 +54,7 @@ public sealed class LienRouteTests : IAsyncLifetime, IDisposable
         var answer = await Liens(caseId);
 
         Assert.Equal(200, answer.Status);
-        Assert.Equal("""{"assets":[],"claims":[]}""", answer.Body);
+        Assert.True(JsonNode.DeepEquals(JsonNode.Parse("""{"assets":[],"claims":[]}"""), answer.Json), answer.Body);
     }
 
     [Fact]

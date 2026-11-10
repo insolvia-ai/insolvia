@@ -10,7 +10,6 @@ using Insolvia.Domain.Debtors;
 using Insolvia.Domain.DocumentRequests;
 using Insolvia.Domain.Documents;
 using Insolvia.Domain.Events;
-using Insolvia.Domain.Notes;
 using Insolvia.Domain.Provenance;
 using Insolvia.Domain.TaxIds;
 
@@ -146,39 +145,6 @@ public static class CaseViews
             ["toStatus"] = recorded.ToStatus?.ToWire(),
         };
         AddIf(body, "filingId", recorded.FilingId);
-        return body;
-    }
-
-    /// <summary>
-    /// <c>entity_json</c>: identity, provenance and <c>amended</c> ALWAYS
-    /// ("not amended" is a fact), the body pruned of absent values.
-    /// </summary>
-    /// <param name="entity">The record.</param>
-    /// <returns>The body.</returns>
-    public static JsonObject Entity(ICaseEntity entity)
-    {
-        ArgumentNullException.ThrowIfNull(entity);
-        var body = BodyJson.Prune(entity.BodyNode());
-        body["id"] = entity.Id;
-        body["case_id"] = entity.CaseId;
-        body["created_at"] = CaseRules.Iso(entity.CreatedAt);
-        body["updated_at"] = CaseRules.Iso(entity.UpdatedAt);
-        body["provenance"] = ProvenanceRules.ToJson(entity.Provenance);
-        body["amended"] = entity.Amended;
-        return body;
-    }
-
-    /// <summary><c>note_json</c>: <see cref="Entity"/> without <c>provenance</c> or <c>amended</c> — a note carries neither.</summary>
-    /// <param name="note">The note.</param>
-    /// <returns>The body.</returns>
-    public static JsonObject Note(CaseEntity<NoteBody> note)
-    {
-        ArgumentNullException.ThrowIfNull(note);
-        var body = BodyJson.Prune(note.BodyNode());
-        body["id"] = note.Id;
-        body["case_id"] = note.CaseId;
-        body["created_at"] = CaseRules.Iso(note.CreatedAt);
-        body["updated_at"] = CaseRules.Iso(note.UpdatedAt);
         return body;
     }
 

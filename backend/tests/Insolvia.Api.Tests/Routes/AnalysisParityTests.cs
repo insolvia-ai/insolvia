@@ -1,5 +1,4 @@
 using System.Text.Json.Nodes;
-using Insolvia.Api.Http;
 using Insolvia.Api.Tests.Support;
 
 namespace Insolvia.Api.Tests.Routes;
@@ -8,8 +7,8 @@ namespace Insolvia.Api.Tests.Routes;
 /// The analysis routes end to end against the Python oracle: each of the
 /// four Engines parity case files is stored into the API's stores, read back
 /// through the whole HTTP pipeline (auth, the permission filters, the store
-/// reads, the engine, FlaskJson), and the response body must be exactly the
-/// bytes Flask's <c>jsonify</c> writes for the output the Python oracle
+/// reads, the engine, the typed view), and the response body must be the
+/// same JSON, member for member, as the output the Python oracle
 /// recorded (Parity/*.expected.json) — or, where the route wraps the engine's result, for that
 /// wrapping of it.
 /// </summary>
@@ -98,7 +97,7 @@ public sealed class AnalysisParityTests : IAsyncLifetime, IDisposable
 
         var answer = await _world.Get($"/v1/cases/{caseId}/standards");
 
-        AssertFlaskBody(wrapped, answer);
+        AssertBody(wrapped, answer);
     }
 
     // A scenario is the stored plan's body sent unsaved: the same calculation,
@@ -115,7 +114,7 @@ public sealed class AnalysisParityTests : IAsyncLifetime, IDisposable
         var answer = await _world.Post($"/v1/cases/{caseId}/plan-calculation", body.ToJsonString());
 
         var expected = new JsonObject { ["scenarios"] = new JsonArray(new JsonObject { ["label"] = "stored", ["calculation"] = Value(caseFile, "plan").DeepClone() }) };
-        AssertFlaskBody(expected, answer);
+        AssertBody(expected, answer);
     }
 
     private static JsonNode Value(string caseFile, string output)
@@ -125,11 +124,11 @@ public sealed class AnalysisParityTests : IAsyncLifetime, IDisposable
         return outcome["value"]!;
     }
 
-    private static void AssertFlaskBody(JsonNode expected, Answer answer)
+    private static void AssertBody(JsonNode expected, Answer answer)
     {
         Assert.Equal(200, answer.Status);
-        Assert.Equal("application/json", answer.ContentType);
-        Assert.Equal(FlaskJson.Serialize(expected), answer.Body);
+        Assert.Equal("application/json", answer.Response.Content.Headers.ContentType?.MediaType);
+        Assert.True(JsonNode.DeepEquals(expected, answer.Json), $"expected {expected.ToJsonString()}\nactual   {answer.Body}");
     }
 
     private async Task AssertRouteAsync(string caseFile, string route, JsonNode expected)
@@ -138,6 +137,6 @@ public sealed class AnalysisParityTests : IAsyncLifetime, IDisposable
 
         var answer = await _world.Get($"/v1/cases/{caseId}/{route}");
 
-        AssertFlaskBody(expected, answer);
+        AssertBody(expected, answer);
     }
 }
