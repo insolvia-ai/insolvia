@@ -28,7 +28,7 @@ namespace Insolvia.Api.Cases;
 /// </summary>
 /// <remarks>
 /// Here rather than in Core, beside the records, for the reason
-/// <see cref="Firms.FirmViews"/> gives: Core was closed to this change (#526).
+/// the firm views gave: Core was closed to this change (#526).
 /// </remarks>
 public static class CaseViews
 {

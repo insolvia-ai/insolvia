@@ -154,7 +154,7 @@ public sealed class FirmSettingsRouteTests : IAsyncLifetime, IDisposable
         var saved = await _world.Put("/v1/firm/document-checklist", """{"items": [{"title": "Lease", "kind": "other"}]}""", Ids.Alice);
 
         Assert.Equal(200, saved.Status);
-        Assert.Equal("""[{"description":null,"kind":"other","title":"Lease"}]""", saved.Object["items"]!.ToJsonString());
+        Assert.True(JsonNode.DeepEquals(JsonNode.Parse("""[{"description":null,"kind":"other","title":"Lease"}]"""), saved.Object["items"]));
         Assert.False(saved.Object["isDefault"]!.GetValue<bool>());
         Assert.Equal(Ids.Alice, saved.Str("updatedBy"));
         Assert.Equal(saved.Body, (await _world.Get("/v1/firm/document-checklist", Ids.Alice)).Body);

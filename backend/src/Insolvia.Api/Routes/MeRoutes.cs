@@ -33,13 +33,17 @@ public sealed class MeRoutes : IEndpointModule
     {
         ArgumentNullException.ThrowIfNull(routes);
         routes.MapGet("/v1/me", ReadAsync).RequireAuth();
-        routes.MapPatch("/v1/me", UpdateAsync).RequireAuth();
+        routes.MapPatch("/v1/me", UpdateAsync).RequestBody<MeUpdateRequest>().RequireAuth();
     }
 
-    private static async Task<IResult> ReadAsync(HttpContext context, CancellationToken cancellationToken) =>
-        FlaskJson.Result(FirmViews.Me(context.CurrentPrincipal(), await context.ResolveAccessorAsync()));
+    /// <summary>Read who you are.</summary>
+    /// <remarks>The token's own claims, and your firm membership when you have one; <c>firm</c> is absent, not an error, for a caller in no firm.</remarks>
+    internal static async Task<MeView> ReadAsync(HttpContext context, CancellationToken cancellationToken) =>
+        MeView.Of(context.CurrentPrincipal(), await context.ResolveAccessorAsync());
 
-    private static async Task<IResult> UpdateAsync(HttpContext context, CancellationToken cancellationToken)
+    /// <summary>Update yourself.</summary>
+    /// <remarks>Changes your own name or signature block. Needs no permission, only an active membership (403 without); answers the same body as the read.</remarks>
+    internal static async Task<MeView> UpdateAsync(HttpContext context, CancellationToken cancellationToken)
     {
         var store = context.FirmStore();
         var accessor = await context.CurrentAccessorAsync();
@@ -50,6 +54,6 @@ public sealed class MeRoutes : IEndpointModule
             ?? throw new NotFoundException("firm user not found"); // removed between resolving and writing
 
         context.Log(Logger, "self name updated");
-        return FlaskJson.Result(FirmViews.Me(context.CurrentPrincipal(), new Accessor(accessor.Firm, written)));
+        return MeView.Of(context.CurrentPrincipal(), new Accessor(accessor.Firm, written));
     }
 }
