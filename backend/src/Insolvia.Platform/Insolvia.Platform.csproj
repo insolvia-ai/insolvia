@@ -5,8 +5,13 @@
        (JWKS). Named for the role, not the provider: today's implementations
        are AWS's and say so in their class names (S3DocumentBlobStore,
        KmsCiphers); another provider's would sit beside them, and a host's
-       wiring would choose. Referenced by hosts only. -->
+       wiring would choose. Referenced by hosts only. Http/ is the wire's
+       conventions every HTTP host shares: the JSON (WireJson), the error body
+       and the generated OpenAPI document (WireOpenApi). -->
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Scalar.AspNetCore" />
     <PackageReference Include="AWSSDK.Core" />
     <PackageReference Include="AWSSDK.KeyManagementService" />
     <PackageReference Include="AWSSDK.CognitoIdentityProvider" />

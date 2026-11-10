@@ -34,9 +34,11 @@ namespace Insolvia.Admin.Hosting;
 /// are in memory. <c>FIRM_USER_POOL_ID</c> separately picks the Cognito
 /// directory (invites really mailed) over the in-memory one (subjects minted,
 /// nothing sent). Without <c>GOOGLE_CLIENT_ID</c> every staff route 401s.</para>
-/// <para>The HTTP plumbing (<see cref="FlaskJson"/>, <see cref="Cors"/>,
-/// <see cref="MethodFallback"/>, the request log and error mapping) is copied
-/// from Insolvia.Api, not referenced: a host never references another host.</para>
+/// <para>The wire's conventions — the JSON, the error body, the OpenAPI
+/// document — come from Insolvia.Platform's <c>Http/</c>, shared with the API.
+/// The rest of the HTTP plumbing (<see cref="Cors"/>, <see cref="MethodFallback"/>,
+/// the request log and error mapping) is copied from Insolvia.Api, not
+/// referenced: a host never references another host.</para>
 /// </remarks>
 public static class AdminComposition
 {
@@ -68,6 +70,10 @@ public static class AdminComposition
         builder.Services.AddSingleton(config);
         builder.Services.AddSingleton(services => services.GetRequiredService<AdminConfig>().Environment);
         builder.Services.AddSingleton(TimeProvider.System);
+
+        // A handler's typed result is written, and documented, by these settings.
+        builder.Services.ConfigureHttpJsonOptions(options => WireJson.Configure(options.SerializerOptions));
+        builder.Services.AddAdminDocument();
 
         var databaseConfigured = isLambda || !string.IsNullOrWhiteSpace(configuration[DatabaseSettings.ConnectionStringVariable]);
         if (databaseConfigured)
@@ -128,6 +134,8 @@ public static class AdminComposition
 
         app.MapFirmRoutes();
         app.MapHealth();
+        app.MapOpenApi();
+        app.MapReference("Insolvia admin service");
         return app;
     }
 }

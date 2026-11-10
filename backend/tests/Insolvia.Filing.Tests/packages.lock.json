@@ -427,6 +427,11 @@
           "Microsoft.IdentityModel.Logging": "8.14.0"
         }
       },
+      "Microsoft.OpenApi": {
+        "type": "Transitive",
+        "resolved": "2.12.2",
+        "contentHash": "ZkT7qiJe0Kj0+DTZOZo+xrDy1kNmdsWFQVPIQLNx9ZJ0T9cB2LG7r+Bi60so8/+yg1nkS7QCPadrzsTG4VPKrA=="
+      },
       "Microsoft.Testing.Extensions.Telemetry": {
         "type": "Transitive",
         "resolved": "1.9.1",
@@ -566,7 +571,8 @@
           "Amazon.Lambda.AspNetCoreServer.Hosting": "[2.2.1, )",
           "Insolvia.Data": "[1.0.0, )",
           "Insolvia.Domain": "[1.0.0, )",
-          "Insolvia.Platform": "[1.0.0, )"
+          "Insolvia.Platform": "[1.0.0, )",
+          "Microsoft.AspNetCore.OpenApi": "[10.0.13, )"
         }
       },
       "insolvia.data": {
@@ -604,7 +610,9 @@
           "AWSSDK.KeyManagementService": "[4.0.101, )",
           "AWSSDK.S3": "[4.0.104.3, )",
           "AWSSDK.SQS": "[4.0.100.17, )",
-          "Insolvia.Domain": "[1.0.0, )"
+          "Insolvia.Domain": "[1.0.0, )",
+          "Microsoft.AspNetCore.OpenApi": "[10.0.13, )",
+          "Scalar.AspNetCore": "[2.18.7, )"
         }
       },
       "Amazon.Lambda.AspNetCoreServer.Hosting": {
@@ -706,6 +714,15 @@
           "Microsoft.Extensions.DependencyInjection.Abstractions": "10.0.1"
         }
       },
+      "Microsoft.AspNetCore.OpenApi": {
+        "type": "CentralTransitive",
+        "requested": "[10.0.13, )",
+        "resolved": "10.0.13",
+        "contentHash": "XVuqUBGjVUVyb4DXR5BrSkrW0Br7sYKq39f723ILhQLlFHCyhAgWe1PkJBc42R/5mKBIgHiKVSY+PN5/4XtcQw==",
+        "dependencies": {
+          "Microsoft.OpenApi": "[2.12.2, 3.0.0)"
+        }
+      },
       "Microsoft.EntityFrameworkCore": {
         "type": "CentralTransitive",
         "requested": "[10.0.14, )",
@@ -759,6 +776,12 @@
           "Microsoft.Extensions.Logging.Abstractions": "8.0.3",
           "System.Security.Cryptography.Pkcs": "8.0.1"
         }
+      },
+      "Scalar.AspNetCore": {
+        "type": "CentralTransitive",
+        "requested": "[2.18.7, )",
+        "resolved": "2.18.7",
+        "contentHash": "JrNu0Sm4TVeJ//ptvAS3yRbT0oobfR8qp0ecf3HIS9zX4V7uSABr+VYEyWT7uyXjhN2ZTrZ/cpwKv7zHjlK8Gg=="
       },
       "System.Security.Cryptography.Pkcs": {
         "type": "CentralTransitive",

@@ -8,12 +8,13 @@ using Insolvia.Domain;
 using Insolvia.Domain.AdminAudit;
 using Insolvia.Domain.Firms;
 using Insolvia.Domain.Ports;
+using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace Insolvia.Admin.Routes;
 
 /// <summary>
-/// Cross-tenant firm administration (#212; services/admin api/routes/firms.py)
-/// — the provisioning surface #178 asked for instead of a shell script.
+/// Cross-tenant firm administration (#212) — the provisioning surface #178
+/// asked for instead of a shell script.
 /// </summary>
 /// <remarks>
 /// <para><b>Firm ids appear in these URLs</b>, which ADR 0009 forbade the
@@ -37,29 +38,26 @@ public static class FirmRoutes
     public static IEndpointRouteBuilder MapFirmRoutes(this IEndpointRouteBuilder app)
     {
         ArgumentNullException.ThrowIfNull(app);
-        app.MapPost("/v1/firms", ProvisionAsync).RequireStaff();
+        app.MapPost("/v1/firms", ProvisionAsync).RequireStaff().RequestBody<ProvisionRequest>();
         app.MapGet("/v1/firms", ListAsync).RequireStaff();
         app.MapGet("/v1/firms/{firmId}", GetAsync).RequireStaff();
-        app.MapPatch("/v1/firms/{firmId}", SetStatusAsync).RequireStaff();
+        app.MapPatch("/v1/firms/{firmId}", SetStatusAsync).RequireStaff().RequestBody<FirmStatusRequest>();
         app.MapGet("/v1/firms/{firmId}/users", ListUsersAsync).RequireStaff();
         app.MapPost("/v1/firms/{firmId}/users/{subject}/resend-invite", ResendInviteAsync).RequireStaff();
         return app;
     }
 
-    /// <summary>
-    /// Provision a firm and its first administrator — #178's whole subject.
-    /// Body: <c>{"name", "admin": {"email", "firstName", "lastName"}}</c>
-    /// (<c>admin.displayName</c> still accepted, the parser owns that arm).
-    /// </summary>
+    /// <summary>Provision a firm and invite its first administrator.</summary>
     /// <remarks>
-    /// The first administrator is an ADMIN BY CONSTRUCTION — <c>isAdmin</c> is
-    /// forced true whatever the body says, because a firm whose first user
-    /// cannot administer it is bricked at birth. ORDER: pool account first,
-    /// then rows, then audit — a duplicate address dies as a 409 before any
-    /// row exists; a row failure strands only a pool account. The audit row
-    /// comes after the firm exists because the table's foreign key needs it.
+    /// The first user is an administrator with every permission, whatever the
+    /// body says: a firm whose first user cannot administer it is bricked at
+    /// birth. A 409 means a firm or user with that identity already exists.
     /// </remarks>
-    private static async Task<IResult> ProvisionAsync(HttpContext context, CancellationToken cancellationToken)
+    // ORDER: pool account first, then rows, then audit — a duplicate address
+    // dies as a 409 before any row exists; a row failure strands only a pool
+    // account. The audit row comes after the firm exists because the table's
+    // foreign key needs it.
+    internal static async Task<Created<ProvisionedFirm>> ProvisionAsync(HttpContext context, CancellationToken cancellationToken)
     {
         var payload = await BodyAsync(context, cancellationToken).ConfigureAwait(false);
         var firmDraft = FirmParser.ParseFirmCreation(payload);
@@ -102,44 +100,42 @@ public static class FirmRoutes
             AdminEvents.Record(firm.Id, AdminAction.FirmProvision, staff.Subject, staff.Email, $"{firm.Name} · first administrator {adminUser.Email}", clock),
             cancellationToken).ConfigureAwait(false);
 
-        return FlaskJson.Result(
-            new JsonObject { ["firm"] = AdminFirmViews.Firm(firm), ["admin"] = AdminFirmViews.User(adminUser) },
-            StatusCodes.Status201Created);
+        return TypedResults.Created((string?)null, new ProvisionedFirm(FirmView.Of(firm), FirmUserView.Of(adminUser)));
     }
 
-    /// <summary>
-    /// Every firm, with a seat count — <c>len(list_users)</c> per firm, honest
-    /// about its price at tens-of-firms scale.
-    /// </summary>
-    private static async Task<IResult> ListAsync(HttpContext context, CancellationToken cancellationToken)
+    /// <summary>Every firm, with its user count.</summary>
+    // One user listing per firm: honest about its price at tens-of-firms scale.
+    internal static async Task<FirmList> ListAsync(HttpContext context, CancellationToken cancellationToken)
     {
         var store = context.FirmStore();
-        var firms = new JsonArray();
+        var firms = new List<FirmSummaryView>();
         foreach (var firm in await store.ListFirmsAsync(cancellationToken).ConfigureAwait(false))
         {
             var users = await store.ListUsersAsync(firm.Id, cancellationToken).ConfigureAwait(false);
-            firms.Add(AdminFirmViews.FirmWithCount(firm, users.Count));
+            firms.Add(FirmSummaryView.Of(firm, users.Count));
         }
 
-        return FlaskJson.Result(new JsonObject { ["firms"] = firms });
+        return new FirmList(firms);
     }
 
-    private static async Task<IResult> GetAsync(HttpContext context, string firmId, CancellationToken cancellationToken)
+    /// <summary>One firm, with its user count.</summary>
+    internal static async Task<FirmSummaryView> GetAsync(HttpContext context, string firmId, CancellationToken cancellationToken)
     {
         var store = context.FirmStore();
         var firm = await store.GetFirmAsync(firmId, cancellationToken).ConfigureAwait(false)
             ?? throw new NotFoundException("no such firm");
         var users = await store.ListUsersAsync(firm.Id, cancellationToken).ConfigureAwait(false);
-        return FlaskJson.Result(AdminFirmViews.FirmWithCount(firm, users.Count));
+        return FirmSummaryView.Of(firm, users.Count);
     }
 
-    /// <summary>
-    /// Suspend or reactivate. <c>status</c> is the ONLY writable field: the
-    /// firm's name belongs to its own admins (#217), and a single-purpose
-    /// route keeps its audit row unambiguous. Enforcement is immediate — the
-    /// tenant API re-reads the firm on every authenticated request.
-    /// </summary>
-    private static async Task<IResult> SetStatusAsync(HttpContext context, string firmId, CancellationToken cancellationToken)
+    /// <summary>Suspend or reactivate a firm.</summary>
+    /// <remarks>
+    /// A suspended firm stays in place, but none of its users can reach the API
+    /// until it is reactivated — immediately, since the API re-reads the firm on
+    /// every request. <c>status</c> is the only field this route writes: the
+    /// firm's name belongs to its own admins.
+    /// </remarks>
+    internal static async Task<FirmView> SetStatusAsync(HttpContext context, string firmId, CancellationToken cancellationToken)
     {
         var payload = await BodyAsync(context, cancellationToken).ConfigureAwait(false);
         if (payload["status"] is not JsonValue statusNode
@@ -167,11 +163,11 @@ public static class FirmRoutes
             AdminEvents.Record(firm.Id, status == FirmStatus.Suspended ? AdminAction.FirmSuspend : AdminAction.FirmReactivate, staff.Subject, staff.Email, clock: clock),
             cancellationToken).ConfigureAwait(false);
 
-        return FlaskJson.Result(AdminFirmViews.Firm(updated));
+        return FirmView.Of(updated);
     }
 
-    /// <summary>A firm's staff list, admin-shaped.</summary>
-    private static async Task<IResult> ListUsersAsync(HttpContext context, string firmId, CancellationToken cancellationToken)
+    /// <summary>A firm's users.</summary>
+    internal static async Task<FirmUserList> ListUsersAsync(HttpContext context, string firmId, CancellationToken cancellationToken)
     {
         var store = context.FirmStore();
         if (await store.GetFirmAsync(firmId, cancellationToken).ConfigureAwait(false) is null)
@@ -180,16 +176,15 @@ public static class FirmRoutes
         }
 
         var users = await store.ListUsersAsync(firmId, cancellationToken).ConfigureAwait(false);
-        return FlaskJson.Result(new JsonObject { ["users"] = new JsonArray([.. users.Select(user => (JsonNode)AdminFirmViews.User(user))]) });
+        return new FirmUserList([.. users.Select(FirmUserView.Of)]);
     }
 
-    /// <summary>
-    /// Re-send a stranded invitation with a fresh temporary password. The user
-    /// is resolved FIRM-SCOPED, so a subject from another firm answers the same
-    /// 404 an unknown one does. 409 for a user who has already signed in
-    /// (the directory's contract): forgot-password is their way back in.
-    /// </summary>
-    private static async Task<IResult> ResendInviteAsync(HttpContext context, string firmId, string subject, CancellationToken cancellationToken)
+    /// <summary>Send a user their sign-in invitation again, with a fresh temporary password.</summary>
+    /// <remarks>
+    /// A 409 for a user who has already signed in: forgot-password is their way
+    /// back in. A subject from another firm is the same 404 as an unknown one.
+    /// </remarks>
+    internal static async Task<NoContent> ResendInviteAsync(HttpContext context, string firmId, string subject, CancellationToken cancellationToken)
     {
         var store = context.FirmStore();
         if (await store.GetFirmAsync(firmId, cancellationToken).ConfigureAwait(false) is null)
@@ -207,12 +202,11 @@ public static class FirmRoutes
             AdminEvents.Record(firmId, AdminAction.InviteResend, staff.Subject, staff.Email, user.Email, context.Clock()),
             cancellationToken).ConfigureAwait(false);
 
-        return FlaskJson.NoContent();
+        return TypedResults.NoContent();
     }
 
-    // Flask's get_json(silent=True) and then "is it a mapping": a missing or
-    // non-JSON content type, a parse failure and a non-object are all the
-    // same field error, never a 415.
+    // A missing or non-JSON content type, a parse failure and a non-object
+    // are all the same field error, never a 415.
     private static async Task<JsonObject> BodyAsync(HttpContext context, CancellationToken cancellationToken)
     {
         var request = context.Request;
@@ -230,7 +224,7 @@ public static class FirmRoutes
         });
     }
 
-    // Werkzeug's Request.is_json: application/json, or application/*+json.
+    // application/json, or application/*+json.
     private static bool IsJson(string? contentType)
     {
         if (string.IsNullOrEmpty(contentType))

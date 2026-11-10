@@ -1,5 +1,4 @@
 using System.Text.Json.Nodes;
-using Microsoft.AspNetCore.Http.HttpResults;
 using Insolvia.Api.Auth;
 using Insolvia.Api.Cases;
 using Insolvia.Api.Hosting;
@@ -12,6 +11,7 @@ using Insolvia.Domain.FirmClients;
 using Insolvia.Domain.Firms;
 using Insolvia.Domain.Ports;
 using Insolvia.Domain.TaxIds;
+using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace Insolvia.Api.Routes;
 
@@ -42,9 +42,9 @@ public sealed class DebtorRoutes : IEndpointModule
     public void Map(IEndpointRouteBuilder routes)
     {
         ArgumentNullException.ThrowIfNull(routes);
-        routes.MapPut("/v1/cases/{caseId}/debtors/{filingRole}", PutAsync).Accepts<DebtorRequest>("application/json").RequireAuth().Requires(Feature.Intake, PermissionLevel.AddEdit);
+        routes.MapPut("/v1/cases/{caseId}/debtors/{filingRole}", PutAsync).RequestBody<DebtorRequest>().RequireAuth().Requires(Feature.Intake, PermissionLevel.AddEdit);
         routes.MapGet("/v1/cases/{caseId}/debtors", ListAsync).RequireAuth().Requires(Feature.Intake, PermissionLevel.ViewOnly);
-        routes.MapPut("/v1/cases/{caseId}/debtors/{filingRole}/client", LinkClientAsync).Accepts<DebtorLinkRequest>("application/json").RequireAuth().Requires(Feature.Intake, PermissionLevel.AddEdit).Requires(Feature.Clients, PermissionLevel.ViewOnly);
+        routes.MapPut("/v1/cases/{caseId}/debtors/{filingRole}/client", LinkClientAsync).RequestBody<DebtorLinkRequest>().RequireAuth().Requires(Feature.Intake, PermissionLevel.AddEdit).Requires(Feature.Clients, PermissionLevel.ViewOnly);
         routes.MapPost("/v1/cases/{caseId}/debtors/{filingRole}/copy-from-client", CopyFromClientAsync).RequireAuth().Requires(Feature.Intake, PermissionLevel.AddEdit).Requires(Feature.Clients, PermissionLevel.ViewOnly);
         routes.MapPost("/v1/cases/{caseId}/debtors/{filingRole}/copy-to-client", CopyToClientAsync).RequireAuth().Requires(Feature.Intake, PermissionLevel.ViewOnly).Requires(Feature.Clients, PermissionLevel.AddEdit);
     }

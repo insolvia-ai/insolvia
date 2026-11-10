@@ -1,5 +1,4 @@
 using System.Text.Json.Serialization;
-using Insolvia.Api.Http;
 using Insolvia.Domain.Cases;
 using Insolvia.Domain.Debtors;
 using Insolvia.Domain.Provenance;

@@ -7,6 +7,7 @@
   <ItemGroup>
     <!-- The probe routes and the auth host are written against the same
          ASP.NET Core surface Insolvia.Api uses. -->
+    <Using Include="Insolvia.Platform.Http" />
     <Using Include="Microsoft.AspNetCore.Builder" />
     <Using Include="Microsoft.AspNetCore.Http" />
     <Using Include="Microsoft.AspNetCore.Routing" />
@@ -15,7 +16,6 @@
   <ItemGroup>
     <!-- core/mail.py's own output, which MailTemplateTests holds the port to. -->
     <None Include="Fixtures/*.json" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="../../../docs/reference/openapi/api.json" Link="OpenApi/api.json" CopyToOutputDirectory="PreserveNewest" />
     <!-- The analysis routes' end-to-end parity: the Python oracle's own case
          files and outputs, owned by the Engines tests (Parity/*.json). -->
     <None Include="../Insolvia.Domain.Tests/Engines/Parity/*.json" LinkBase="Parity" CopyToOutputDirectory="PreserveNewest" />

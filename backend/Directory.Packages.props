@@ -13,6 +13,7 @@
     <PackageVersion Include="Amazon.Lambda.AspNetCoreServer.Hosting" Version="2.2.1" />
     <!-- The OpenAPI document, generated from the handlers' typed results. -->
     <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.13" />
+    <PackageVersion Include="Scalar.AspNetCore" Version="2.18.7" />
   </ItemGroup>
   <ItemGroup Label="MCP">
     <!-- The official C# MCP SDK (18.21; research 2026-10-27): the 2026-07-28

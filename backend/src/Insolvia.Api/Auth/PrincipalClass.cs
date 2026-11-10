@@ -35,7 +35,7 @@ public sealed record PermissionRequirement(Feature Feature, PermissionLevel Leve
 /// <summary>An <see cref="IResult"/> that writes an error body.</summary>
 /// <param name="Status">The status code.</param>
 /// <param name="Body">The body.</param>
-internal sealed record JsonBodyResult(int Status, Http.ErrorBody Body) : IResult
+internal sealed record JsonBodyResult(int Status, ErrorBody Body) : IResult
 {
     /// <summary>The 401 every authentication failure answers.</summary>
     public static readonly JsonBodyResult Unauthorized = new(StatusCodes.Status401Unauthorized, Http.ErrorResponses.Unauthorized);
