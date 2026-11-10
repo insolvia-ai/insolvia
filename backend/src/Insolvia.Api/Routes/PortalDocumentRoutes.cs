@@ -52,8 +52,8 @@ public sealed class PortalDocumentRoutes : IEndpointModule
     // bodies embed CaseViews.PortalRequest/PortalDocument, which convert to
     // records in Cases/ on another branch; type them once those land.
 
-    /// <summary>The documents the firm asked this client for, with the client's own uploads and the progress.</summary>
-    /// <remarks>Waived requests are included — "no longer needed" is something to be told.</remarks>
+    /// <summary>List my document requests.</summary>
+    /// <remarks>The documents the firm asked this client for, each with its status and the client's own uploads against it, and the overall progress. Waived requests are included — "no longer needed" is something to be told.</remarks>
     internal static async Task<IResult> RequestsAsync(HttpContext context, CancellationToken cancellationToken)
     {
         var client = context.CurrentClient();
@@ -74,8 +74,8 @@ public sealed class PortalDocumentRoutes : IEndpointModule
         });
     }
 
-    /// <summary>Authorise one upload against one of the firm's open document requests.</summary>
-    /// <remarks>Answers the document and a presigned PUT to upload its bytes to; then call <c>…/complete</c>.</remarks>
+    /// <summary>Start a document upload.</summary>
+    /// <remarks>Authorises one upload against one of the firm's open document requests, and answers the document and a presigned PUT for its bytes; then call <c>…/complete</c>.</remarks>
     internal static async Task<IResult> CreateAsync(HttpContext context, CancellationToken cancellationToken)
     {
         var client = context.CurrentClient();
@@ -97,8 +97,8 @@ public sealed class PortalDocumentRoutes : IEndpointModule
         return FlaskJson.Result(new JsonObject { ["document"] = CaseViews.PortalDocument(document), ["upload"] = upload }, StatusCodes.Status201Created);
     }
 
-    /// <summary>Say an upload's PUT finished: the document is stored and the request it answers received.</summary>
-    /// <remarks>Idempotent. A 409 when the bytes are not there.</remarks>
+    /// <summary>Complete a document upload.</summary>
+    /// <remarks>Say the upload's PUT finished: the document is stored and the request it answers is received. Idempotent; a 409 when the bytes are not there.</remarks>
     // HeadObject, clear the tag, write stored, then satisfy the request.
     internal static async Task<IResult> CompleteAsync(HttpContext context, string documentId, CancellationToken cancellationToken)
     {

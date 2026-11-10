@@ -67,8 +67,8 @@ public sealed class PortalRoutes : IEndpointModule
     internal static async Task<CasePublicStatus> PublicStatusAsync(HttpContext context, ClientAccessor client, CancellationToken cancellationToken) =>
         await context.Cases().PublicStatusAsync(client, cancellationToken) ?? throw new ForbiddenException(NoCase);
 
-    /// <summary>Whose portal this is: the client's name, the firm's, and the case's public status.</summary>
-    /// <remarks>"Is my session good?" — recorded as <c>portal.read</c>.</remarks>
+    /// <summary>Read my portal.</summary>
+    /// <remarks>Whose portal this is: the client's name as the firm gave it, the firm's name, and the case's chapter and stage — never a case id. Also answers "is my session good?".</remarks>
     internal static async Task<PortalMeView> MeAsync(HttpContext context, CancellationToken cancellationToken)
     {
         var client = context.CurrentClient();
@@ -76,7 +76,8 @@ public sealed class PortalRoutes : IEndpointModule
         return PortalMeView.Of(client, await PublicStatusAsync(context, client, cancellationToken));
     }
 
-    /// <summary>The questionnaire as the client's firm configured it — the enabled sections only.</summary>
+    /// <summary>Read my questionnaire.</summary>
+    /// <remarks>The questionnaire as the client's firm configured it: the enabled sections only, each with its instructions and questions in order.</remarks>
     // Read from the binding's FIRM, never from anything in the request.
     internal static async Task<PortalQuestionnaireView> QuestionnaireAsync(HttpContext context, CancellationToken cancellationToken)
     {
@@ -86,7 +87,8 @@ public sealed class PortalRoutes : IEndpointModule
         return PortalQuestionnaireView.Of(config);
     }
 
-    /// <summary>The client's own answers, every status, in sections the firm still shows.</summary>
+    /// <summary>List my answers.</summary>
+    /// <remarks>The client's own answers, every status, in sections the firm still shows.</remarks>
     // Nobody else's candidates, not even a count.
     internal static async Task<PortalAnswerList> ListAnswersAsync(HttpContext context, CancellationToken cancellationToken)
     {
@@ -112,8 +114,8 @@ public sealed class PortalRoutes : IEndpointModule
         return new PortalAnswerList(answers);
     }
 
-    /// <summary>Answer a question; the answer waits in the firm's review queue.</summary>
-    /// <remarks>Its origin is the verified token's — never anything the body says.</remarks>
+    /// <summary>Answer a question.</summary>
+    /// <remarks>The answer waits, pending, in the firm's review queue; nothing reaches the case until a person accepts it. Its origin is the verified token's — never anything the body says.</remarks>
     // Channel client, the portal app client, the subject.
     internal static async Task<Created<PortalAnswerView>> CreateAnswerAsync(HttpContext context, CancellationToken cancellationToken)
     {
@@ -135,7 +137,7 @@ public sealed class PortalRoutes : IEndpointModule
         return TypedResults.Created((string?)null, PortalAnswerView.Of(candidate, answer));
     }
 
-    /// <summary>Change a pending answer's value.</summary>
+    /// <summary>Change a pending answer.</summary>
     /// <remarks>
     /// Someone else's answer, or one in a section since switched off, is a 404;
     /// one already reviewed is a 409.

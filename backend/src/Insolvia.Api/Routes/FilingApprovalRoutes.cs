@@ -90,8 +90,8 @@ public sealed class FilingApprovalRoutes : IEndpointModule
             filing is null ? null : FilingView.Of(filing));
     }
 
-    /// <summary>What would be approved now, and the case's current approval and filing run.</summary>
-    /// <remarks>An approval whose filing set has changed since is shown VOIDED.</remarks>
+    /// <summary>Read the case's filing approval.</summary>
+    /// <remarks>What would be approved now (the basis and its digest), and the case's current approval and filing run. An approval whose filing set has changed since is shown voided.</remarks>
     internal static async Task<FilingApprovalState> ReadAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
     {
         var (@case, _, basis) = await BasisAsync(context, caseId, cancellationToken);
@@ -101,9 +101,10 @@ public sealed class FilingApprovalRoutes : IEndpointModule
         return FilingCredentialRoutes.NoStore(context, await ViewAsync(context, basis, approval, now, cancellationToken));
     }
 
-    /// <summary>Approve filing the case as shown, and queue the filing.</summary>
+    /// <summary>Approve filing the case.</summary>
     /// <remarks>
-    /// Post back the digest of the basis you were shown; a mismatch is refused.
+    /// Binds an approval to the basis shown and queues the filing: post back
+    /// the digest of the basis you were shown; a mismatch is refused.
     /// Needs a recent sign-in (403 <c>ReauthenticationRequired</c>). 409
     /// <c>FilingSetNotReady</c> lists what blocks it; 503 when filing is not
     /// configured or the queue refused the job (the approval is then voided).
@@ -171,7 +172,8 @@ public sealed class FilingApprovalRoutes : IEndpointModule
         return FilingCredentialRoutes.NoStore(context, TypedResults.Created((string?)null, await ViewAsync(context, basis, approval, now, cancellationToken)));
     }
 
-    /// <summary>Cancel the case's pending approval.</summary>
+    /// <summary>Cancel the filing approval.</summary>
+    /// <remarks>Voids the case's pending approval, so the filing it would start never runs. Answers the approval state afterwards.</remarks>
     internal static async Task<FilingApprovalState> CancelAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
     {
         var (@case, _, basis) = await BasisAsync(context, caseId, cancellationToken);
@@ -182,8 +184,8 @@ public sealed class FilingApprovalRoutes : IEndpointModule
         return FilingCredentialRoutes.NoStore(context, await ViewAsync(context, basis, voided, now, cancellationToken));
     }
 
-    /// <summary>Resolve a handed-back filing: what the court's docket shows.</summary>
-    /// <remarks>409 <c>ResolutionRefused</c>, with its reason, when the filing cannot be resolved that way.</remarks>
+    /// <summary>Resolve a handed-back filing.</summary>
+    /// <remarks>Records what the court's docket shows — filed or not filed — for a filing the worker handed back or could not confirm. 409 <c>ResolutionRefused</c>, with its reason, when the filing cannot be resolved that way.</remarks>
     internal static async Task<Results<Ok<FilingApprovalState>, JsonHttpResult<ResolutionRefusedBody>>> ResolveAsync(HttpContext context, string caseId, string filingId, CancellationToken cancellationToken)
     {
         var approvals = context.Port<IFilingApprovalStore>();

@@ -60,7 +60,8 @@ public sealed partial class FilingCredentialRoutes : IEndpointModule
         return result;
     }
 
-    /// <summary>The caller's own CM/ECF credentials.</summary>
+    /// <summary>List my CM/ECF credentials.</summary>
+    /// <remarks>The caller's own credentials, by status only — never a password or an authenticator key.</remarks>
     internal static async Task<FilingCredentialList> ListAsync(HttpContext context, CancellationToken cancellationToken)
     {
         var store = context.Port<IFilingCredentialStore>();
@@ -69,7 +70,7 @@ public sealed partial class FilingCredentialRoutes : IEndpointModule
         return NoStore(context, new FilingCredentialList([.. found.Select(FilingCredentialView.Of)]));
     }
 
-    /// <summary>Enrol a CM/ECF credential for the caller.</summary>
+    /// <summary>Enrol a CM/ECF credential.</summary>
     /// <remarks>
     /// The password and authenticator key are sealed on arrival and never
     /// returned. A 403 until the caller has signed the current authorization text.
@@ -88,8 +89,8 @@ public sealed partial class FilingCredentialRoutes : IEndpointModule
         return NoStore(context, TypedResults.Created((string?)null, FilingCredentialView.Of(credential)));
     }
 
-    /// <summary>Revoke — destroy — one of the caller's CM/ECF credentials.</summary>
-    /// <remarks>Another attorney's credential is a 404, the same as one that never existed.</remarks>
+    /// <summary>Revoke a CM/ECF credential.</summary>
+    /// <remarks>Destroys one of the caller's credentials. Another attorney's credential is a 404, the same as one that never existed.</remarks>
     internal static async Task<NoContent> RevokeAsync(HttpContext context, string credentialId, CancellationToken cancellationToken)
     {
         var store = context.Port<IFilingCredentialStore>();
@@ -104,7 +105,8 @@ public sealed partial class FilingCredentialRoutes : IEndpointModule
         return NoStore(context, TypedResults.NoContent());
     }
 
-    /// <summary>The caller's written authorization to file, and the text a new signature would be over.</summary>
+    /// <summary>Read my filing authorization.</summary>
+    /// <remarks>The caller's signature on record (in force or stale), and the text a new signature would be over.</remarks>
     internal static async Task<FilingAuthorizationView> ReadAuthorizationAsync(HttpContext context, CancellationToken cancellationToken)
     {
         var accessor = await context.CurrentAccessorAsync();
@@ -112,8 +114,8 @@ public sealed partial class FilingCredentialRoutes : IEndpointModule
         return NoStore(context, FilingAuthorizationView.Of(current, accessor.FirmId, accessor.Subject));
     }
 
-    /// <summary>Sign the current authorization text.</summary>
-    /// <remarks>Needs a recent sign-in (403 <c>ReauthenticationRequired</c> otherwise); the version and digest posted must be the current text's.</remarks>
+    /// <summary>Sign the filing authorization.</summary>
+    /// <remarks>Signs the current authorization text; the version and digest posted must be the current text's. Needs a recent sign-in (403 <c>ReauthenticationRequired</c> otherwise).</remarks>
     internal static async Task<Created<FilingAuthorizationView>> SignAsync(HttpContext context, CancellationToken cancellationToken)
     {
         var accessLog = context.AccessLog();
@@ -133,7 +135,8 @@ public sealed partial class FilingCredentialRoutes : IEndpointModule
         return NoStore(context, TypedResults.Created((string?)null, FilingAuthorizationView.Of(signed, accessor.FirmId, accessor.Subject)));
     }
 
-    /// <summary>Withdraw the caller's authorization, destroying every credential enrolled under it.</summary>
+    /// <summary>Withdraw my filing authorization.</summary>
+    /// <remarks>Destroys every credential enrolled under it, and answers how many.</remarks>
     internal static async Task<AuthorizationWithdrawn> WithdrawAsync(HttpContext context, CancellationToken cancellationToken)
     {
         var accessor = await context.CurrentAccessorAsync();

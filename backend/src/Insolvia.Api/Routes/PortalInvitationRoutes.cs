@@ -53,7 +53,8 @@ public sealed class PortalInvitationRoutes : IEndpointModule
         routes.MapDelete("/v1/cases/{caseId}/portal/clients/{subject}", RevokeAsync).RequireAuth().Requires(Feature.ClientPortal, PermissionLevel.AddEdit);
     }
 
-    /// <summary>Everyone ever invited to this case's portal, revoked included, oldest first.</summary>
+    /// <summary>List the case's portal clients.</summary>
+    /// <remarks>Everyone ever invited to this case's portal, revoked included, oldest first.</remarks>
     internal static async Task<ClientBindingList> ListAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
     {
         var accessor = await context.CurrentAccessorAsync();
@@ -63,7 +64,7 @@ public sealed class PortalInvitationRoutes : IEndpointModule
         return new ClientBindingList([.. clients.Select(ClientBindingView.Of)]);
     }
 
-    /// <summary>Invite a debtor to this case's client portal.</summary>
+    /// <summary>Invite a client to the portal.</summary>
     /// <remarks>
     /// Roles default to <c>debtor_1</c>; both roles is the firm's explicit
     /// choice of one login for both spouses. An address that already has an
@@ -106,8 +107,8 @@ public sealed class PortalInvitationRoutes : IEndpointModule
         return TypedResults.Created((string?)null, ClientBindingView.Of(binding));
     }
 
-    /// <summary>Re-send an invitation that has not been used yet.</summary>
-    /// <remarks>An invitation already used, or revoked, is a 409.</remarks>
+    /// <summary>Re-send a portal invitation.</summary>
+    /// <remarks>Only an invitation not used yet can be re-sent; one already used, or revoked, is a 409.</remarks>
     // The directory re-sends its password mail unless the account already
     // chose a password (the refiled-case shape — a ConflictException,
     // swallowed): then only the context mail goes.
@@ -136,7 +137,7 @@ public sealed class PortalInvitationRoutes : IEndpointModule
         return TypedResults.NoContent();
     }
 
-    /// <summary>Withdraw a client's portal access to this case.</summary>
+    /// <summary>Revoke a client's portal access.</summary>
     /// <remarks>
     /// The invitation is kept as revoked and its roles are released; the
     /// client's next request is refused.
