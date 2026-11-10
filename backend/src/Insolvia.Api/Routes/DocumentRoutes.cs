@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using Insolvia.Api.Auth;
 using Insolvia.Api.Cases;
@@ -10,6 +11,7 @@ using Insolvia.Domain.Documents;
 using Insolvia.Domain.Firms;
 using Insolvia.Domain.Jobs;
 using Insolvia.Domain.Ports;
+using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace Insolvia.Api.Routes;
 
@@ -30,7 +32,6 @@ public sealed class DocumentRoutes : IEndpointModule
     private const int MaxRequestBytes = 8 * 1024;
     private const int UploadUrlTtlSeconds = 15 * 60;
     private const int DownloadUrlTtlSeconds = 5 * 60;
-    private const string TaggingHeader = "x-amz-tagging";
     private const string Logger = "insolvia_api.api.routes.documents";
     private const string DocumentNotFound = "document not found";
 
@@ -38,7 +39,7 @@ public sealed class DocumentRoutes : IEndpointModule
     public void Map(IEndpointRouteBuilder routes)
     {
         ArgumentNullException.ThrowIfNull(routes);
-        routes.MapPost("/v1/cases/{caseId}/documents", CreateAsync).RequireAuth().Requires(Feature.Documents, PermissionLevel.AddEdit);
+        routes.MapPost("/v1/cases/{caseId}/documents", CreateAsync).RequestBody<DocumentUploadRequest>().RequireAuth().Requires(Feature.Documents, PermissionLevel.AddEdit);
         routes.MapPost("/v1/cases/{caseId}/documents/{documentId}/complete", CompleteAsync).RequireAuth().Requires(Feature.Documents, PermissionLevel.AddEdit);
         routes.MapGet("/v1/cases/{caseId}/documents", ListAsync).RequireAuth().Requires(Feature.Documents, PermissionLevel.ViewOnly);
         routes.MapGet("/v1/cases/{caseId}/documents/{documentId}/url", UrlAsync).RequireAuth().Requires(Feature.Documents, PermissionLevel.ViewOnly);
@@ -50,17 +51,15 @@ public sealed class DocumentRoutes : IEndpointModule
     /// headers it was signed for (S3 refuses anything else). Shared with the
     /// portal's upload route (18.19).
     /// </summary>
-    internal static async Task<JsonObject> UploadBlockAsync(HttpContext context, Document document, CancellationToken cancellationToken)
+    internal static async Task<PresignedRequest> UploadAsync(HttpContext context, Document document, CancellationToken cancellationToken)
     {
         var url = await context.Port<IDocumentBlobStore>().UploadUrlAsync(document.StorageRef, document.ContentType.ToWire(), document.ByteSize, UploadUrlTtlSeconds, cancellationToken);
-        return new JsonObject
-        {
-            ["url"] = url,
-            ["method"] = "PUT",
-            ["headers"] = new JsonObject { ["Content-Type"] = document.ContentType.ToWire(), [TaggingHeader] = DocumentRules.UploadTag },
-            ["expiresAt"] = FlaskJson.Millis(DocumentRules.ExpiryTimestamp(UploadUrlTtlSeconds, context.Clock())),
-        };
+        return new PresignedRequest(url, "PUT", new UploadHeaders(document.ContentType.ToWire(), DocumentRules.UploadTag), FlaskJson.Millis(DocumentRules.ExpiryTimestamp(UploadUrlTtlSeconds, context.Clock())));
     }
+
+    /// <summary><see cref="UploadAsync"/> as a JSON object, for the portal's upload route until it returns a typed result.</summary>
+    internal static async Task<JsonObject> UploadBlockAsync(HttpContext context, Document document, CancellationToken cancellationToken) =>
+        JsonSerializer.SerializeToNode(await UploadAsync(context, document, cancellationToken), WireJson.Options)!.AsObject();
 
     /// <summary>The request a new upload answers — a 400 on <c>requestId</c> when it is not this case's, or no longer wants documents.</summary>
     internal static async Task<DocumentRequest> OpenRequestOr400Async(HttpContext context, string caseId, string requestId, CancellationToken cancellationToken)
@@ -136,7 +135,14 @@ public sealed class DocumentRoutes : IEndpointModule
         context.Log(Logger, "extraction triggered by upload", ("case_id", document.CaseId), ("document_id", document.Id), ("job_id", job.Id));
     }
 
-    private static async Task<IResult> CreateAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
+    /// <summary>Start a document upload.</summary>
+    /// <remarks>
+    /// Records a pending document and mints a presigned PUT for its bytes.
+    /// The PUT is bound to the declared content type and size, and expires in
+    /// 15 minutes. Call <c>…/complete</c> once the bytes have landed. With a
+    /// <c>requestId</c>, the request must be this case's and still want documents.
+    /// </remarks>
+    internal static async Task<Created<DocumentUploadTicket>> CreateAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
     {
         var accessor = await context.CurrentAccessorAsync();
         var body = await context.BodyAsync(MaxRequestBytes);
@@ -150,12 +156,19 @@ public sealed class DocumentRoutes : IEndpointModule
 
         var document = DocumentRules.Create(draft, caseId, accessor.Subject, requestId: requestId, clock: context.Clock());
         await context.Port<IDocumentStore>().CreateAsync(document, cancellationToken);
-        var upload = await UploadBlockAsync(context, document, cancellationToken);
+        var upload = await UploadAsync(context, document, cancellationToken);
         context.Log(Logger, "document created", ("case_id", caseId), ("document_id", document.Id), ("kind", document.Kind.ToWire()));
-        return FlaskJson.Result(new JsonObject { ["document"] = CaseViews.Document(document), ["upload"] = upload }, StatusCodes.Status201Created);
+        return TypedResults.Created((string?)null, new DocumentUploadTicket(DocumentView.Of(document), upload));
     }
 
-    private static async Task<IResult> CompleteAsync(HttpContext context, string caseId, string documentId, CancellationToken cancellationToken)
+    /// <summary>Confirm a document upload.</summary>
+    /// <remarks>
+    /// Asks the bucket whether the bytes landed, and marks the document stored.
+    /// 409 when the object is not in the bucket. Records the size the bucket
+    /// counted, marks an answered document request received, and starts
+    /// extraction for an extractable kind (best effort).
+    /// </remarks>
+    internal static async Task<DocumentResult> CompleteAsync(HttpContext context, string caseId, string documentId, CancellationToken cancellationToken)
     {
         var blobs = context.Port<IDocumentBlobStore>();
         await context.ReachableCaseAsync(caseId, AccessAction.DocumentCreate, cancellationToken);
@@ -173,31 +186,31 @@ public sealed class DocumentRoutes : IEndpointModule
         await SatisfyRequestAsync(context, confirmed, cancellationToken);
         var accessor = await context.CurrentAccessorAsync();
         await TriggerExtractionAsync(context, confirmed, accessor.Subject, cancellationToken);
-        return FlaskJson.Result(new JsonObject { ["document"] = CaseViews.Document(confirmed) });
+        return new DocumentResult(DocumentView.Of(confirmed));
     }
 
-    private static async Task<IResult> ListAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
+    /// <summary>A case's documents.</summary>
+    internal static async Task<DocumentList> ListAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
     {
         await context.ReachableCaseAsync(caseId, AccessAction.DocumentRead, cancellationToken);
         var documents = await context.Port<IDocumentStore>().ListForCaseAsync(caseId, cancellationToken);
-        return FlaskJson.Result(new JsonObject { ["documents"] = new JsonArray([.. documents.Select(document => (JsonNode)CaseViews.Document(document))]) });
+        return new DocumentList([.. documents.Select(DocumentView.Of)]);
     }
 
-    private static async Task<IResult> UrlAsync(HttpContext context, string caseId, string documentId, CancellationToken cancellationToken)
+    /// <summary>A document's download URL.</summary>
+    /// <remarks>A presigned GET for the bytes. It expires in 5 minutes; ask again rather than storing it.</remarks>
+    internal static async Task<PresignedRequest> UrlAsync(HttpContext context, string caseId, string documentId, CancellationToken cancellationToken)
     {
         await context.ReachableCaseAsync(caseId, AccessAction.DocumentDownload, cancellationToken);
         var document = await DocumentOr404Async(context, caseId, documentId, cancellationToken);
-        return FlaskJson.Result(new JsonObject
-        {
-            ["url"] = await context.Port<IDocumentBlobStore>().DownloadUrlAsync(document.StorageRef, DownloadUrlTtlSeconds, cancellationToken),
-            ["method"] = "GET",
-            ["expiresAt"] = FlaskJson.Millis(DocumentRules.ExpiryTimestamp(DownloadUrlTtlSeconds, context.Clock())),
-        });
+        var url = await context.Port<IDocumentBlobStore>().DownloadUrlAsync(document.StorageRef, DownloadUrlTtlSeconds, cancellationToken);
+        return new PresignedRequest(url, "GET", null, FlaskJson.Millis(DocumentRules.ExpiryTimestamp(DownloadUrlTtlSeconds, context.Clock())));
     }
 
-    // The row first, so two racing deletes cannot both reach the bucket.
-    private static async Task<IResult> DeleteAsync(HttpContext context, string caseId, string documentId, CancellationToken cancellationToken)
+    /// <summary>Delete a document and its bytes.</summary>
+    internal static async Task<NoContent> DeleteAsync(HttpContext context, string caseId, string documentId, CancellationToken cancellationToken)
     {
+        // The row first, so two racing deletes cannot both reach the bucket.
         await context.ReachableCaseAsync(caseId, AccessAction.DocumentDelete, cancellationToken);
         var document = await DocumentOr404Async(context, caseId, documentId, cancellationToken);
         if (!await context.Port<IDocumentStore>().DeleteAsync(caseId, documentId, cancellationToken))
@@ -207,7 +220,7 @@ public sealed class DocumentRoutes : IEndpointModule
 
         await context.Port<IDocumentBlobStore>().DeleteAsync(document.StorageRef, cancellationToken);
         context.Log(Logger, "document deleted", ("case_id", caseId), ("document_id", documentId));
-        return FlaskJson.NoContent();
+        return TypedResults.NoContent();
     }
 
     private static async Task<Document> DocumentOr404Async(HttpContext context, string caseId, string documentId, CancellationToken cancellationToken) =>
@@ -243,19 +256,22 @@ public sealed class DocumentRequestRoutes : IEndpointModule
     {
         ArgumentNullException.ThrowIfNull(routes);
         routes.MapGet("/v1/cases/{caseId}/document-requests", ListAsync).RequireAuth().Requires(Feature.Documents, PermissionLevel.ViewOnly);
-        routes.MapPost("/v1/cases/{caseId}/document-requests", CreateAsync).RequireAuth().Requires(Feature.Documents, PermissionLevel.AddEdit);
+        routes.MapPost("/v1/cases/{caseId}/document-requests", CreateAsync).RequestBody<DocumentRequestCreation>().RequireAuth().Requires(Feature.Documents, PermissionLevel.AddEdit);
         routes.MapPost("/v1/cases/{caseId}/document-requests/from-checklist", ApplyChecklistAsync).RequireAuth().Requires(Feature.Documents, PermissionLevel.AddEdit);
-        routes.MapPatch("/v1/cases/{caseId}/document-requests/{requestId}", UpdateAsync).RequireAuth().Requires(Feature.Documents, PermissionLevel.AddEdit);
+        routes.MapPatch("/v1/cases/{caseId}/document-requests/{requestId}", UpdateAsync).RequestBody<DocumentRequestStatusChange>().RequireAuth().Requires(Feature.Documents, PermissionLevel.AddEdit);
         routes.MapDelete("/v1/cases/{caseId}/document-requests/{requestId}", DeleteAsync).RequireAuth().Requires(Feature.Documents, PermissionLevel.AddEdit);
     }
 
-    private static async Task<IResult> ListAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
+    /// <summary>A case's document requests.</summary>
+    /// <remarks>With the case's progress, counted from the same list.</remarks>
+    internal static async Task<DocumentRequestList> ListAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
     {
         await context.ReachableCaseAsync(caseId, AccessAction.CaseRead, cancellationToken);
-        return FlaskJson.Result(CaseViews.Requests(await context.Port<IDocumentRequestStore>().ListForCaseAsync(caseId, cancellationToken)));
+        return DocumentRequestList.Of(await context.Port<IDocumentRequestStore>().ListForCaseAsync(caseId, cancellationToken));
     }
 
-    private static async Task<IResult> CreateAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
+    /// <summary>Ask the client for one document.</summary>
+    internal static async Task<Created<DocumentRequestView>> CreateAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
     {
         var accessor = await context.CurrentAccessorAsync();
         var item = DocumentRequestRules.ParseCreation(await context.BodyAsync(MaxRequestBytes));
@@ -263,10 +279,12 @@ public sealed class DocumentRequestRoutes : IEndpointModule
         var made = DocumentRequestRules.Create(item, caseId, accessor.Subject, context.Clock());
         await context.Port<IDocumentRequestStore>().CreateAsync(made, cancellationToken);
         context.Log(Logger, "document request created", ("case_id", caseId), ("id", made.Id));
-        return FlaskJson.Result(CaseViews.Request(made), StatusCodes.Status201Created);
+        return TypedResults.Created((string?)null, DocumentRequestView.Of(made));
     }
 
-    private static async Task<IResult> ApplyChecklistAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
+    /// <summary>Apply the firm's checklist.</summary>
+    /// <remarks>Asks for every document on the firm's checklist that this case has not already been asked for.</remarks>
+    internal static async Task<ChecklistApplied> ApplyChecklistAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
     {
         var accessor = await context.CurrentAccessorAsync();
         var store = context.Port<IDocumentRequestStore>();
@@ -279,12 +297,13 @@ public sealed class DocumentRequestRoutes : IEndpointModule
         }
 
         context.Log(Logger, "document checklist applied", ("case_id", caseId), ("added", added.Count));
-        var body = CaseViews.Requests(await store.ListForCaseAsync(caseId, cancellationToken));
-        body["added"] = added.Count;
-        return FlaskJson.Result(body);
+        var list = DocumentRequestList.Of(await store.ListForCaseAsync(caseId, cancellationToken));
+        return new ChecklistApplied(list.Requests, list.Progress, added.Count);
     }
 
-    private static async Task<IResult> UpdateAsync(HttpContext context, string caseId, string requestId, CancellationToken cancellationToken)
+    /// <summary>Set a document request's status.</summary>
+    /// <remarks>Reopen it (<c>requested</c>) or waive it (<c>waived</c>); <c>received</c> follows an upload.</remarks>
+    internal static async Task<DocumentRequestView> UpdateAsync(HttpContext context, string caseId, string requestId, CancellationToken cancellationToken)
     {
         var store = context.Port<IDocumentRequestStore>();
         var status = DocumentRequestRules.ParseUpdate(await context.BodyAsync(MaxRequestBytes));
@@ -292,10 +311,11 @@ public sealed class DocumentRequestRoutes : IEndpointModule
         var stored = await store.GetAsync(caseId, requestId, cancellationToken) ?? throw new NotFoundException(RequestNotFound);
         var written = await store.UpdateAsync(DocumentRequestRules.SetStatus(stored, status, context.Clock()), cancellationToken) ?? throw new NotFoundException(RequestNotFound);
         context.Log(Logger, "document request updated", ("case_id", caseId), ("id", requestId), ("status", status.ToWire()));
-        return FlaskJson.Result(CaseViews.Request(written));
+        return DocumentRequestView.Of(written);
     }
 
-    private static async Task<IResult> DeleteAsync(HttpContext context, string caseId, string requestId, CancellationToken cancellationToken)
+    /// <summary>Withdraw a document request.</summary>
+    internal static async Task<NoContent> DeleteAsync(HttpContext context, string caseId, string requestId, CancellationToken cancellationToken)
     {
         await context.ReachableCaseAsync(caseId, AccessAction.CaseUpdate, cancellationToken);
         if (!await context.Port<IDocumentRequestStore>().DeleteAsync(caseId, requestId, cancellationToken))
@@ -304,6 +324,6 @@ public sealed class DocumentRequestRoutes : IEndpointModule
         }
 
         context.Log(Logger, "document request deleted", ("case_id", caseId), ("id", requestId));
-        return FlaskJson.NoContent();
+        return TypedResults.NoContent();
     }
 }

@@ -97,4 +97,25 @@ public sealed class CaseViewsTests
             Assert.True(JsonNode.DeepEquals(old, now), $"{FlaskJson.Serialize(old)}\n{FlaskJson.Serialize(now)}");
         }
     }
+
+    private static void Same(JsonNode old, object now) =>
+        Assert.True(JsonNode.DeepEquals(old, JsonSerializer.SerializeToNode(now, WireJson.Options)), $"{FlaskJson.Serialize(old)}\n{JsonSerializer.Serialize(now, WireJson.Options)}");
+
+    [Fact]
+    public void Parity_portal_document_and_request()
+    {
+        var bare = Upload with { RequestId = null, Status = DocumentStatus.Stored, Channel = DocumentChannel.Staff };
+        foreach (var document in new[] { Upload, bare })
+        {
+            Same(CaseViews.PortalDocument(document), PortalDocumentView.Of(document));
+        }
+
+        var open = new DocumentRequest("req-1", "case-1", "Bank statements", DocumentKind.BankStatement, null, DocumentRequestStatus.Requested, [], At, "staff", At);
+        var received = new DocumentRequest("req-2", "case-1", "Pay", DocumentKind.PayStub, "Last 60 days", DocumentRequestStatus.Received, ["doc-1"], At, "staff", At, At);
+        foreach (var request in new[] { open, received })
+        {
+            Same(CaseViews.PortalRequest(request, [Upload]), PortalRequestView.Of(request, [Upload]));
+            Same(CaseViews.PortalRequest(request, []), PortalRequestView.Of(request, []));
+        }
+    }
 }
