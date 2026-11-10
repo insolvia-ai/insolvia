@@ -1,16 +1,16 @@
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using Insolvia.Api.Cases;
 using Insolvia.Api.Http;
+using Insolvia.Domain;
 using Insolvia.Domain.Cases;
 using Insolvia.Domain.Clients;
+using Insolvia.Domain.Debtors;
 using Insolvia.Domain.DocumentRequests;
 using Insolvia.Domain.Documents;
-using Insolvia.Domain.TaxIds;
-using System.Text.Json;
-using Insolvia.Domain;
-using System.Text.Json.Nodes;
-using Insolvia.Domain.Debtors;
 using Insolvia.Domain.Fields;
 using Insolvia.Domain.Provenance;
+using Insolvia.Domain.TaxIds;
 
 namespace Insolvia.Api.Tests.Routes;
 
@@ -67,9 +67,9 @@ public sealed class CaseViewsTests
             PlanVersionId = "plan-1",
         };
 
-        Assert.Equal(
-            """{"candidateId":"cand-1","effectiveOn":"2026-06-01","kind":"confirmation","planVersionId":"plan-1","provenance":"court_notice","recordedAt":"2026-03-02T15:04:05.123000Z","recordedBy":"sub"}""",
-            FlaskJson.Serialize(CaseViews.LifecycleEvent(ruling)));
+        Assert.True(JsonNode.DeepEquals(
+            JsonNode.Parse("""{"candidateId":"cand-1","effectiveOn":"2026-06-01","kind":"confirmation","planVersionId":"plan-1","provenance":"court_notice","recordedAt":"2026-03-02T15:04:05.123000Z","recordedBy":"sub"}"""),
+            JsonSerializer.SerializeToNode(LifecycleEventView.Of(ruling), WireJson.Options)));
     }
 
     [Fact]

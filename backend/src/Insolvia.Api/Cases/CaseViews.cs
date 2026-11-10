@@ -5,7 +5,6 @@ using Insolvia.Domain.CaseEntities;
 using Insolvia.Domain.Cases;
 using Insolvia.Domain.CaseTasks;
 using Insolvia.Domain.Clients;
-using Insolvia.Domain.Courts;
 using Insolvia.Domain.Debtors;
 using Insolvia.Domain.DocumentRequests;
 using Insolvia.Domain.Documents;
@@ -34,121 +33,6 @@ namespace Insolvia.Api.Cases;
 /// </remarks>
 public static class CaseViews
 {
-    /// <summary>
-    /// <c>case_json</c>. No <c>firmId</c> (every reader is in that firm); the
-    /// registry reference, the pins, the election, the deadline anchors and
-    /// the docket facts are ABSENT until set; the deletion stamp never reaches
-    /// the wire.
-    /// </summary>
-    /// <param name="stored">The case.</param>
-    /// <returns>The body.</returns>
-    public static JsonObject Case(Case stored)
-    {
-        ArgumentNullException.ThrowIfNull(stored);
-        var body = new JsonObject
-        {
-            ["id"] = stored.Id,
-            ["createdBy"] = stored.CreatedBy,
-            ["chapter"] = stored.Chapter,
-            ["district"] = stored.District,
-            ["status"] = stored.Status.ToWire(),
-            ["createdAt"] = CaseRules.Iso(stored.CreatedAt),
-            ["updatedAt"] = CaseRules.Iso(stored.UpdatedAt),
-        };
-        AddIf(body, "court", stored.Court);
-        AddIf(body, "division", stored.Division);
-        if (stored.FormRevisions is not null)
-        {
-            var pins = new JsonObject();
-            foreach (var (series, revision) in stored.FormRevisions)
-            {
-                pins[series] = revision;
-            }
-
-            body["formRevisions"] = pins;
-        }
-
-        AddIf(body, "constantsSetId", stored.ConstantsSetId);
-        AddIf(body, "exemptionSet", stored.ExemptionSet?.ToWire());
-        AddIf(body, "filedAt", stored.FiledAt is { } filed ? FlaskJson.Date(filed) : null);
-        AddIf(body, "meeting341At", stored.Meeting341At is { } meeting ? FlaskJson.Date(meeting) : null);
-        AddIf(body, "caseNumber", stored.CaseNumber);
-        AddIf(body, "judge", stored.Judge);
-        AddIf(body, "trustee", stored.Trustee);
-        AddIf(body, "officeFileNumber", stored.OfficeFileNumber);
-        AddIf(body, "archivedAt", stored.ArchivedAt is { } archived ? CaseRules.Iso(archived) : null);
-        AddIf(body, "archivedBy", stored.ArchivedBy);
-        return body;
-    }
-
-    /// <summary><c>GET …/assignees</c>' entry: subjects, never names (the directory resolves them).</summary>
-    /// <param name="assignment">The link.</param>
-    /// <returns>The body.</returns>
-    public static JsonObject Assignee(CaseAssignment assignment)
-    {
-        ArgumentNullException.ThrowIfNull(assignment);
-        return new JsonObject
-        {
-            ["subject"] = assignment.Subject,
-            ["assignedAt"] = CaseRules.Iso(assignment.AssignedAt),
-            ["assignedBy"] = assignment.AssignedBy,
-        };
-    }
-
-    /// <summary>
-    /// ADR 0027's lifecycle event, for <c>GET …/lifecycle</c>. camelCase like
-    /// <see cref="Case"/>. <c>kind</c>, <c>recordedAt</c>, <c>recordedBy</c>,
-    /// <c>provenance</c> and <c>effectiveOn</c> are ALWAYS present —
-    /// <c>effectiveOn</c> null on a move between the pre-filing statuses, which
-    /// has no court date, because "no court date" is the answer, not a gap.
-    /// The per-kind members are absent unless the kind carries them.
-    /// </summary>
-    /// <param name="recorded">The event.</param>
-    /// <returns>The body.</returns>
-    public static JsonObject LifecycleEvent(LifecycleEvent recorded)
-    {
-        ArgumentNullException.ThrowIfNull(recorded);
-        var body = new JsonObject
-        {
-            ["kind"] = recorded.Kind.ToWire(),
-            ["effectiveOn"] = recorded.EffectiveOn is { } on ? FlaskJson.Date(on) : null,
-            ["recordedAt"] = CaseRules.Iso(recorded.RecordedAt),
-            ["recordedBy"] = recorded.RecordedBy,
-            ["provenance"] = recorded.Provenance.ToWire(),
-        };
-        AddIf(body, "candidateId", recorded.CandidateId);
-        AddIf(body, "fromStatus", recorded.FromStatus?.ToWire());
-        AddIf(body, "toStatus", recorded.ToStatus?.ToWire());
-        AddIf(body, "chapter", recorded.Chapter);
-        AddIf(body, "filingId", recorded.FilingId);
-        AddIf(body, "fromChapter", recorded.FromChapter);
-        AddIf(body, "toChapter", recorded.ToChapter);
-        AddIf(body, "planVersionId", recorded.PlanVersionId);
-        return body;
-    }
-
-    /// <summary>
-    /// <c>status_change_json</c> — <c>GET …/status-history</c>'s entry, kept
-    /// for the app's client (client.ts <c>getCaseStatusHistory</c>) and read
-    /// from the lifecycle history's STATUS events: a conversion or a ruling is
-    /// not a status move and is not in this view.
-    /// </summary>
-    /// <param name="recorded">A <see cref="LifecycleEventKind.Status"/> event.</param>
-    /// <returns>The body.</returns>
-    public static JsonObject StatusChange(LifecycleEvent recorded)
-    {
-        ArgumentNullException.ThrowIfNull(recorded);
-        var body = new JsonObject
-        {
-            ["changedAt"] = CaseRules.Iso(recorded.RecordedAt),
-            ["changedBy"] = recorded.RecordedBy,
-            ["fromStatus"] = recorded.FromStatus?.ToWire(),
-            ["toStatus"] = recorded.ToStatus?.ToWire(),
-        };
-        AddIf(body, "filingId", recorded.FilingId);
-        return body;
-    }
-
     /// <summary>
     /// <c>entity_json</c>: identity, provenance and <c>amended</c> ALWAYS
     /// ("not amended" is a fact), the body pruned of absent values.
@@ -389,69 +273,7 @@ public static class CaseViews
         return body;
     }
 
-    /// <summary>routes/courts.py <c>courts_json</c>: the registry release in force, every district and division.</summary>
-    /// <param name="release">The release.</param>
-    /// <returns>The body.</returns>
-    public static JsonObject Courts(CourtsRelease release)
-    {
-        ArgumentNullException.ThrowIfNull(release);
-        return new JsonObject
-        {
-            ["releaseId"] = release.ReleaseId,
-            ["effectiveDate"] = FlaskJson.Date(release.EffectiveDate),
-            ["districts"] = new JsonArray([.. release.Districts.Select(district => (JsonNode)District(district))]),
-        };
-    }
-
-    private static JsonObject District(CourtDistrict district) => new()
-    {
-        ["code"] = district.Code,
-        ["courtId"] = FlaskJson.Text(district.CourtId),
-        ["name"] = district.Name,
-        ["state"] = district.State,
-        ["circuit"] = district.Circuit,
-        ["website"] = district.Website,
-        ["divisions"] = new JsonArray([.. district.Divisions.Select(division => (JsonNode)Division(division))]),
-        ["caseUpload"] = new JsonObject
-        {
-            ["status"] = district.CaseUpload.Status.ToWire(),
-            ["verifiedAt"] = district.CaseUpload.VerifiedAt is { } verified ? FlaskJson.Date(verified) : null,
-        },
-    };
-
-    private static JsonObject Division(Division division)
-    {
-        var courthouse = division.Courthouse.Value;
-        return new JsonObject
-        {
-            ["code"] = division.Code,
-            ["name"] = division.Name,
-            ["officeCode"] = FlaskJson.Text(division.OfficeCode.Value),
-            ["officeCodeVerified"] = division.OfficeCode.Verified,
-            ["courthouse"] = courthouse is null
-                ? null
-                : new JsonObject
-                {
-                    ["name"] = courthouse.Name,
-                    ["line1"] = courthouse.Line1,
-                    ["line2"] = FlaskJson.Text(courthouse.Line2),
-                    ["city"] = courthouse.City,
-                    ["state"] = courthouse.State,
-                    ["postal_code"] = courthouse.PostalCode,
-                },
-            ["counties"] = new JsonArray([.. division.Counties.Select(county => (JsonNode)new JsonObject { ["name"] = county.Name, ["fips"] = county.Fips })]),
-        };
-    }
-
     private static void AddIf(JsonObject body, string key, string? value)
-    {
-        if (value is not null)
-        {
-            body[key] = value;
-        }
-    }
-
-    private static void AddIf(JsonObject body, string key, int? value)
     {
         if (value is not null)
         {

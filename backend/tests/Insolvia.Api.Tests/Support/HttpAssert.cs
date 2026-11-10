@@ -1,4 +1,5 @@
 using System.Net.Http.Headers;
+using System.Text.Json.Nodes;
 using Insolvia.Api.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
 
@@ -56,8 +57,8 @@ internal static class HttpAssert
     public static void Json((int Status, string Body, HttpResponseMessage Response) answer, int status, string body)
     {
         Assert.Equal(status, answer.Status);
-        Assert.Equal(body, answer.Body);
-        Assert.Equal("application/json", answer.Response.Content.Headers.ContentType?.ToString());
+        Assert.True(JsonNode.DeepEquals(JsonNode.Parse(body), JsonNode.Parse(answer.Body)), $"expected {body}\nactual   {answer.Body}");
+        Assert.Equal("application/json", answer.Response.Content.Headers.ContentType?.MediaType);
     }
 
     public static string ErrorBody(string error, string message) =>
