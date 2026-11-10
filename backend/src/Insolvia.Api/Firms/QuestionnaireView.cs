@@ -102,4 +102,4 @@ public sealed record ChecklistItemView(string Title, DocumentKind Kind, string? 
 /// this record is its shape for the OpenAPI document.
 /// </summary>
 /// <param name="Items">The whole list, in order.</param>
-public sealed record ChecklistRequest(IReadOnlyList<ChecklistItemView> Items);
+public sealed record ChecklistRequest(IReadOnlyList<ChecklistItem> Items);

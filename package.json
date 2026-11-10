@@ -64,15 +64,6 @@
     ],
     "tokens": "node tool/render-brand-theme.ts && node tool/render-brand-marks.ts",
     "tokens:check": "node tool/render-brand-theme.ts --check && node tool/render-brand-marks.ts --check",
-    "//openapi": [
-      "Renders docs/reference/openapi/{api,admin}.json from tool/openapi/'s",
-      "route tables and the clients' TypeScript types (tool/render-openapi.ts",
-      "says why it is not generated from the .NET hosts). `openapi:check`",
-      "fails when a committed document is stale; the Contract (.NET) check",
-      "runs it, and checks every exchange against the documents."
-    ],
-    "openapi": "node tool/render-openapi.ts",
-    "openapi:check": "node tool/render-openapi.ts --check",
     "//lint": [
       "Fans out per member rather than running ESLint once from the root, and",
       "there is deliberately NO `eslint.config.js` at the repo root \u2014 the rules",
@@ -114,7 +105,7 @@
       "what the CI workflows run per area, so `npm run ci` green locally is a",
       "fair predictor of a green PR."
     ],
-    "ci": "npm run tokens:check && npm run openapi:check && npm run format && npm run lint && npm run typecheck && npm run test"
+    "ci": "npm run tokens:check && npm run format && npm run lint && npm run typecheck && npm run test"
   },
   "//devDependencies": [
     "ESLint/Prettier versions match apps/insolvia_marketing deliberately \u2014 a",

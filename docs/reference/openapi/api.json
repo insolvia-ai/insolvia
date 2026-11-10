@@ -66,7 +66,6 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": ["firstName", "lastName", "displayName", "signatureBlock"],
                 "type": "object",
                 "properties": {
                   "firstName": {
@@ -82,7 +81,7 @@
                     "description": "Legacy: one string split on its last space, read only when neither half is sent."
                   },
                   "signatureBlock": {
-                    "type": "object",
+                    "type": ["null", "object"],
                     "properties": {
                       "bar_number": {
                         "type": ["null", "string"]
@@ -193,13 +192,6 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": [
-                  "name",
-                  "defaultCourt",
-                  "defaultDivision",
-                  "defaultChapter",
-                  "letterhead"
-                ],
                 "type": "object",
                 "properties": {
                   "name": {
@@ -220,7 +212,7 @@
                     "format": "int32"
                   },
                   "letterhead": {
-                    "type": "object",
+                    "type": ["null", "object"],
                     "properties": {
                       "name": {
                         "type": ["null", "string"]
@@ -354,16 +346,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": [
-                  "email",
-                  "firstName",
-                  "lastName",
-                  "displayName",
-                  "role",
-                  "isAdmin",
-                  "accessAllCases",
-                  "permissions"
-                ],
+                "required": ["email", "role"],
                 "type": "object",
                 "properties": {
                   "email": {
@@ -451,17 +434,6 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": [
-                  "firstName",
-                  "lastName",
-                  "displayName",
-                  "role",
-                  "isAdmin",
-                  "accessAllCases",
-                  "permissions",
-                  "status",
-                  "signatureBlock"
-                ],
                 "type": "object",
                 "properties": {
                   "firstName": {
@@ -499,7 +471,7 @@
                     "enum": ["active", "disabled", null]
                   },
                   "signatureBlock": {
-                    "type": "object",
+                    "type": ["null", "object"],
                     "properties": {
                       "bar_number": {
                         "type": ["null", "string"]
@@ -691,7 +663,7 @@
                     "description": "Date of birth, YYYY-MM-DD, never in the future."
                   },
                   "residence_address": {
-                    "type": "object",
+                    "type": ["null", "object"],
                     "properties": {
                       "line1": {
                         "type": ["null", "string"]
@@ -718,7 +690,7 @@
                     "description": "Structured parts AND a raw fallback (the IEPD\u0027s free-text form, for a\ncreditor block that will not parse). string? Address.County is B101 line 5\u0027s box."
                   },
                   "mailing_address": {
-                    "type": "object",
+                    "type": ["null", "object"],
                     "properties": {
                       "line1": {
                         "type": ["null", "string"]
@@ -904,7 +876,7 @@
                     "description": "Date of birth, YYYY-MM-DD, never in the future."
                   },
                   "residence_address": {
-                    "type": "object",
+                    "type": ["null", "object"],
                     "properties": {
                       "line1": {
                         "type": ["null", "string"]
@@ -931,7 +903,7 @@
                     "description": "Structured parts AND a raw fallback (the IEPD\u0027s free-text form, for a\ncreditor block that will not parse). string? Address.County is B101 line 5\u0027s box."
                   },
                   "mailing_address": {
-                    "type": "object",
+                    "type": ["null", "object"],
                     "properties": {
                       "line1": {
                         "type": ["null", "string"]
@@ -1086,7 +1058,6 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": ["prospect_stage"],
                 "type": "object",
                 "properties": {
                   "prospect_stage": {
@@ -1226,7 +1197,7 @@
                     "description": "The creditor\u0027s name; the one required field."
                   },
                   "address": {
-                    "type": "object",
+                    "type": ["null", "object"],
                     "properties": {
                       "line1": {
                         "type": ["null", "string"]
@@ -1398,7 +1369,7 @@
                     "description": "The creditor\u0027s name; the one required field."
                   },
                   "address": {
-                    "type": "object",
+                    "type": ["null", "object"],
                     "properties": {
                       "line1": {
                         "type": ["null", "string"]
@@ -1577,7 +1548,7 @@
                   "sections": {
                     "type": "array",
                     "items": {
-                      "required": ["id", "enabled", "instructions"],
+                      "required": ["id", "enabled"],
                       "type": "object",
                       "properties": {
                         "id": {
@@ -1693,12 +1664,10 @@
                   "items": {
                     "type": "array",
                     "items": {
-                      "required": ["title", "kind", "description"],
                       "type": "object",
                       "properties": {
                         "title": {
-                          "type": "string",
-                          "description": "What the document is called."
+                          "type": "string"
                         },
                         "kind": {
                           "enum": [
@@ -1713,11 +1682,10 @@
                           "description": "What a document is (Python\u0027s \u0060documents.KINDS\u0060). Here first because a\nfirm\u0027s document checklist files each entry under one; the rest of\n\u0060documents.py\u0060 is the case half\u0027s (18.7) and lands beside it."
                         },
                         "description": {
-                          "type": ["null", "string"],
-                          "description": "More about what to send; null when none."
+                          "type": ["null", "string"]
                         }
                       },
-                      "description": "One document a firm asks its clients for."
+                      "description": "One document a firm asks for. DocumentKind ChecklistItem.Kind is what an upload against\nit is filed under (the client never chooses one); string? ChecklistItem.Description\nis what the client reads under the title."
                     },
                     "description": "The whole list, in order."
                   }
@@ -2574,7 +2542,7 @@
                 "type": "object",
                 "properties": {
                   "tax_id": {
-                    "type": "object",
+                    "type": ["null", "object"],
                     "properties": {
                       "kind": {
                         "enum": ["ssn", "itin"],
@@ -2665,7 +2633,7 @@
                     "description": "Four discrete parts, never one string \u2014 the IEPD has no single-string fallback for names."
                   },
                   "other_names_used": {
-                    "type": ["null", "array"],
+                    "type": "array",
                     "items": {
                       "type": "object",
                       "properties": {
@@ -2690,7 +2658,7 @@
                     "description": "An immutable list with VALUE equality \u2014 the C# shape of a Python tuple on\na frozen dataclass. A record holding a plain array or \u0060List\u0060 compares\nit by reference, so two records describing the same client would be\nunequal; the stores\u0027 \u0022round-trips\u0022 and \u0022unchanged since\u0022 checks need\nequality by contents."
                   },
                   "employer_ids": {
-                    "type": ["null", "array"],
+                    "type": "array",
                     "items": {
                       "type": "string"
                     },
@@ -5290,6 +5258,7 @@
                     "description": "Whether this record amends a filed one \u2014 only once the case is filed. A PUT that omits it keeps the stored value."
                   }
                 },
+                "additionalProperties": {},
                 "description": "A record of a generic case collection as written: the collection\u0027s body\nfields at the top level (which ones depends on the collection in the URL;\nunknown keys are ignored), beside these. Parsed by the collection\u0027s own\nparser, which owns validation; this record is its shape for the OpenAPI document."
               }
             }
@@ -5519,6 +5488,7 @@
                     "description": "Whether this record amends a filed one \u2014 only once the case is filed. A PUT that omits it keeps the stored value."
                   }
                 },
+                "additionalProperties": {},
                 "description": "A record of a generic case collection as written: the collection\u0027s body\nfields at the top level (which ones depends on the collection in the URL;\nunknown keys are ignored), beside these. Parsed by the collection\u0027s own\nparser, which owns validation; this record is its shape for the OpenAPI document."
               }
             }
@@ -6155,7 +6125,7 @@
                     "description": "The document, for \u0060document_extraction\u0060 only (required there)."
                   },
                   "options": {
-                    "type": "object",
+                    "type": ["null", "object"],
                     "properties": {
                       "draftWatermark": {
                         "type": ["null", "boolean"],
@@ -6457,7 +6427,7 @@
                     "description": "\u0060accept\u0060 or \u0060reject\u0060."
                   },
                   "correctedPayload": {
-                    "type": "object"
+                    "type": ["null", "object"]
                   }
                 },
                 "description": "One review decision (\u0060POST \u2026/candidates/{candidateId}/review\u0060).\nParsed by \u0060ExtractionReview.ParseReview\u0060, which owns validation."
@@ -9037,6 +9007,7 @@
             "description": "Whether this record amends a filed one; always present \u2014 \u0022not amended\u0022 is an answer."
           }
         },
+        "additionalProperties": {},
         "description": "A record of one of the generic case collections (\u0060creditors\u0060,\n\u0060assets\u0060, \u0060claims\u0060, \u2026): the server\u0027s own fields, and beside them\nat the top level the collection\u0027s body fields, each unanswered one absent.\nWhich body fields there are depends on the collection in the URL."
       },
       "ErrorBody": {
@@ -10069,7 +10040,17 @@
         "description": "A firm\u0027s status. Only the admin service writes it (Firm FirmLifecycle.SetFirmStatus(Firm firm, FirmStatus status, TimeProvider? clock = null))."
       },
       "FirmSummaryView": {
-        "required": ["id", "name", "status", "createdAt", "updatedAt"],
+        "required": [
+          "id",
+          "name",
+          "status",
+          "createdAt",
+          "updatedAt",
+          "defaultCourt",
+          "defaultDivision",
+          "defaultChapter",
+          "letterhead"
+        ],
         "type": "object",
         "properties": {
           "id": {
@@ -10093,17 +10074,28 @@
             "description": "Last changed, ISO 8601 UTC to the millisecond."
           },
           "defaultCourt": {
-            "type": "string"
+            "type": ["null", "string"],
+            "description": "The default court\u0027s id; null when unset."
           },
           "defaultDivision": {
-            "type": "string"
+            "type": ["null", "string"],
+            "description": "The default division\u0027s id within that court; null when unset."
           },
           "defaultChapter": {
-            "type": "integer",
+            "type": ["null", "integer"],
+            "description": "The default chapter; null when unset.",
             "format": "int32"
           },
           "letterhead": {
-            "$ref": "#/components/schemas/Letterhead"
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "What the firm prints at the top of a letter, its unanswered fields absent; null when unset.",
+                "$ref": "#/components/schemas/Letterhead"
+              }
+            ]
           }
         },
         "description": "The firm as its own members see it (\u0060firm_summary_json\u0060): no\nprovisioning provenance \u2014 who at Insolvia created it is not the firm\u0027s to\nread \u2014 and the defaults as explicit nulls until set."
@@ -10978,7 +10970,11 @@
           "isAdmin",
           "accessAllCases",
           "permissions",
-          "signatureBlock"
+          "signatureBlock",
+          "defaultCourt",
+          "defaultDivision",
+          "defaultChapter",
+          "letterhead"
         ],
         "type": "object",
         "properties": {
@@ -11033,17 +11029,28 @@
             ]
           },
           "defaultCourt": {
-            "type": "string"
+            "type": ["null", "string"],
+            "description": "The default court\u0027s id; null when unset."
           },
           "defaultDivision": {
-            "type": "string"
+            "type": ["null", "string"],
+            "description": "The default division\u0027s id within that court; null when unset."
           },
           "defaultChapter": {
-            "type": "integer",
+            "type": ["null", "integer"],
+            "description": "The default chapter; null when unset.",
             "format": "int32"
           },
           "letterhead": {
-            "$ref": "#/components/schemas/Letterhead"
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "What the firm prints at the top of a letter, its unanswered fields absent; null when unset.",
+                "$ref": "#/components/schemas/Letterhead"
+              }
+            ]
           }
         },
         "description": "The caller\u0027s own membership: the firm, their name and axes, and the\nfirm\u0027s defaults. \u0060permissions\u0060 is the EFFECTIVE map \u2014 an administrator\nreads add_edit everywhere \u2014 where the firm\u0027s user list carries the stored one."

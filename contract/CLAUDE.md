@@ -49,8 +49,10 @@ ADR 0029).
 - **Every exchange is checked against the OpenAPI documents**
   (`support/openapi.ts`, from `global.teardown.ts`): its route, its status,
   its request body exactly and its response loosely. Unlike the coverage
-  gates this holds on any run. A failure means a row in `tool/openapi/` or a
-  client type disagrees with the server; fix it and run `npm run openapi`.
+  gates this holds on any run. The hosts generate the documents, so a
+  failure means a route's declared result disagrees with what it sends, or
+  a client sends what the route does not take; fix the route or the client,
+  then run `backend/scripts/dev-openapi.sh`.
 - **Shapes come from `packages/insolvia_api_client/src/models.ts`.** `wire.ts`'s
   `expectShape` is deliberately not exact (extra fields pass) but a missing or
   retyped declared field fails, and an optional field must be ABSENT, never

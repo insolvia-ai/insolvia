@@ -17,29 +17,27 @@ must hold. The MCP server speaks JSON-RPC, not REST, so it is not here:
 
 ## Generated — never edit the JSON
 
-```bash
-npm run openapi          # regenerate both
-npm run openapi:check    # fail if a committed document is stale
-```
+Each host generates its document from its endpoints: the handlers' typed
+results, their doc comments, and the auth and permission metadata on each
+route ([ADR 0031](../../adr/0031-typed-routes-and-a-generated-openapi-document.md);
+`backend/src/Insolvia.Http/WireOpenApi.cs`). A running host serves it at
+`/openapi/v1.json` and renders it at `/docs`. These files are committed
+copies:
 
-[`tool/render-openapi.ts`](../../../tool/render-openapi.ts) builds them from
-one route table per service ([`tool/openapi/`](../../../tool/openapi/)) and
-the clients' TypeScript types. Its header says why they are not generated
-from the .NET hosts.
+```bash
+backend/scripts/dev-openapi.sh    # rewrite both from the hosts
+```
 
 ## Why they can be trusted
 
-Three checks hold the documents to the running code:
-
-- **Routes, principals and permissions:** `OpenApiDocumentTests` in
-  `backend/tests/Insolvia.Api.Tests` and `Insolvia.Admin.Tests` compare each
-  document with the endpoints the host maps. A route added, removed or
-  re-permissioned without its table row fails `dotnet test`.
+- **Freshness and coverage:** `OpenApiDocumentTests` in
+  `backend/tests/Insolvia.Api.Tests` and `Insolvia.Admin.Tests` fail when
+  a committed copy differs from what the host serves, when a mapped route
+  is missing, or when an operation declares no typed success response.
 - **Bodies:** the contract suite (`contract/scripts/dev-test.sh`) checks every
   request it sends and every answer it gets against the documents. That
-  covers each operation a client method calls (130 of the API's 131).
-- **Freshness:** `npm run openapi:check` runs in the `Contract (.NET)` check.
+  covers each operation a client method calls.
 
-Response schemas list the fields the clients read, which is not always every
-field the server sends: the contract run's summary line counts the extra
-ones. Request schemas are exact.
+Response schemas are the server's own types, so they list every field it
+sends. Request schemas are docs-only records (`.RequestBody<T>()`); the
+route's parser still owns validation.

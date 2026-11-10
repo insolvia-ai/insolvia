@@ -56,16 +56,23 @@ Three layers ([ADR 0030](../docs/adr/0030-three-backend-layers.md)):
   `--locked-mode`, so commit the lock diff with the change.
 - Warnings are errors (`Directory.Build.props`). Do not add `NoWarn` to make a
   build pass without saying why on the same line.
-- The wire contract is the one the Python API defined, byte for byte where a
-  test can see it (`/health` keeps Flask's sorted keys and bare
-  `application/json`): `contract/` and `packages/insolvia_api_client` pin it,
-  and the app depends on it.
-- **A route change edits its OpenAPI row** in `tool/openapi/api-routes.ts`
-  or `admin-routes.ts`, then `npm run openapi`
-  ([`docs/reference/openapi/`](../docs/reference/openapi/README.md)).
-  `OpenApiDocumentTests` fails on a route, principal or permission the
-  document does not match. `Requires(...)` stamps a `PermissionRequirement`
-  on the endpoint for that test to read.
+- **A handler returns a typed record or result**, never a `JsonObject`
+  ([ADR 0031](../docs/adr/0031-typed-routes-and-a-generated-openapi-document.md)):
+  a record for a 200, `TypedResults.Created`/`Accepted`, `NoContent`, or
+  `Results<…>`. `WireJson` writes it (camelCase; `[SnakeCase]`; domain
+  records' unanswered members absent; `[Flatten]`). Field names and
+  absent-vs-null are the contract — `contract/` and
+  `packages/insolvia_api_client` pin them, and the app depends on them.
+  Errors are `ErrorBody`. Declare a body with `.RequestBody<T>()`, never
+  `.Accepts<T>()` (it constrains routing).
+- **The OpenAPI document is generated from the handlers** — their result
+  types and `internal static` doc comments (the summary generator skips
+  `private`). After a route change run `backend/scripts/dev-openapi.sh` and
+  commit `docs/reference/openapi/*.json`
+  ([`docs/reference/openapi/`](../docs/reference/openapi/README.md));
+  `OpenApiDocumentTests` fails on a stale copy, an unmapped route, or an
+  operation with no typed success response. `Requires(...)` stamps a
+  `PermissionRequirement` the document reads.
 - One deployable unit, one Dockerfile target. A host gets its stage when it
   gets a handler, and `backend-pr.yml` builds it in the same PR.
 

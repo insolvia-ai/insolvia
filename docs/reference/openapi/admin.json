@@ -365,7 +365,20 @@
         "description": "A firm\u0027s status. Only the admin service writes it (Firm FirmLifecycle.SetFirmStatus(Firm firm, FirmStatus status, TimeProvider? clock = null))."
       },
       "FirmSummaryView": {
-        "required": ["userCount"],
+        "required": [
+          "userCount",
+          "id",
+          "name",
+          "status",
+          "createdAt",
+          "updatedAt",
+          "createdBy",
+          "createdByEmail",
+          "defaultCourt",
+          "defaultDivision",
+          "defaultChapter",
+          "letterhead"
+        ],
         "type": "object",
         "properties": {
           "userCount": {
@@ -374,38 +387,56 @@
             "format": "int32"
           },
           "id": {
-            "type": "string"
+            "type": "string",
+            "description": "The firm\u0027s id."
           },
           "name": {
-            "type": "string"
+            "type": "string",
+            "description": "The firm\u0027s name."
           },
           "status": {
+            "description": "Active, or suspended (none of its users can reach the API).",
             "$ref": "#/components/schemas/FirmStatus"
           },
           "createdAt": {
-            "type": "string"
+            "type": "string",
+            "description": "When it was provisioned, ISO 8601 UTC to the millisecond."
           },
           "updatedAt": {
-            "type": "string"
+            "type": "string",
+            "description": "When it last changed, ISO 8601 UTC to the millisecond."
           },
           "createdBy": {
-            "type": "string"
+            "type": ["null", "string"],
+            "description": "The subject of the staff member who provisioned it; null when nobody recorded."
           },
           "createdByEmail": {
-            "type": "string"
+            "type": ["null", "string"],
+            "description": "Their email; null when nobody recorded."
           },
           "defaultCourt": {
-            "type": "string"
+            "type": ["null", "string"],
+            "description": "The court a new case starts in (its CM/ECF code); null when unset."
           },
           "defaultDivision": {
-            "type": "string"
+            "type": ["null", "string"],
+            "description": "That court\u0027s division; null when unset."
           },
           "defaultChapter": {
-            "type": "integer",
+            "type": ["null", "integer"],
+            "description": "The chapter a new case starts as; null when unset.",
             "format": "int32"
           },
           "letterhead": {
-            "$ref": "#/components/schemas/Letterhead"
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The firm\u0027s letterhead, its unanswered parts absent; null when it has none.",
+                "$ref": "#/components/schemas/Letterhead"
+              }
+            ]
           }
         },
         "description": "A firm with how many users it has \u2014 the list and the single read."

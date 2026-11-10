@@ -1,9 +1,11 @@
+using System.Reflection;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization.Metadata;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.OpenApi;
 using Scalar.AspNetCore;
 
@@ -181,27 +183,118 @@ public static partial class WireOpenApi
     [GeneratedRegex("(?<=[a-z])(?=[A-Z])")]
     private static partial Regex WordBreak();
 
-    // A member the serializer leaves out when it is unset (WireJson gives
-    // each one a ShouldSerialize) is not required...
-    private static Task OptionalMembers(OpenApiSchema schema, OpenApiSchemaTransformerContext context, CancellationToken cancellationToken)
+    private const string AbsentWhenUnset = "insolvia:absent";
+
+    // Per object schema: a [Flatten]ed member's own members, as its type
+    // documents them; a [JsonExtensionData] bag as additionalProperties; a
+    // member the serializer leaves out when unset (WireJson gives each one a
+    // ShouldSerialize) as not required — and a request body's nullable member
+    // as not required either: the parsers take absent and null alike.
+    private static async Task OptionalMembers(OpenApiSchema schema, OpenApiSchemaTransformerContext context, CancellationToken cancellationToken)
     {
-        if (context.JsonTypeInfo.Kind == JsonTypeInfoKind.Object && schema.Required is { } required)
+        var type = context.JsonTypeInfo;
+        if (type.Kind != JsonTypeInfoKind.Object)
         {
-            foreach (var property in context.JsonTypeInfo.Properties.Where(p => p.ShouldSerialize is not null))
+            return;
+        }
+
+        schema.Properties ??= new Dictionary<string, IOpenApiSchema>();
+        schema.Required ??= new HashSet<string>();
+        foreach (var flattened in type.Type.GetProperties().Where(p => p.IsDefined(typeof(FlattenAttribute), inherit: true)))
+        {
+            if (await context.GetOrCreateSchemaAsync(flattened.PropertyType, null, cancellationToken).ConfigureAwait(false) is not { Properties: { } members } inner)
             {
-                required.Remove(property.Name);
+                continue;
+            }
+
+            foreach (var (name, member) in members)
+            {
+                schema.Properties[name] = member;
+                if (inner.Required?.Contains(name) == true)
+                {
+                    schema.Required.Add(name);
+                }
+            }
+
+            if (inner.Metadata?.TryGetValue(AbsentWhenUnset, out var absent) == true)
+            {
+                Absent(schema).UnionWith((HashSet<string>)absent);
             }
         }
 
-        return Task.CompletedTask;
+        if (type.Properties.Any(p => p.IsExtensionData))
+        {
+            schema.AdditionalProperties = new OpenApiSchema();
+        }
+
+        foreach (var property in type.Properties.Where(p => p.ShouldSerialize is not null))
+        {
+            schema.Required.Remove(property.Name);
+            Absent(schema).Add(property.Name);
+        }
+
+        if (RequestBodies(context.ApplicationServices).Contains(type.Type))
+        {
+            var nullability = new NullabilityInfoContext();
+            foreach (var property in type.Properties.Where(p => p.AttributeProvider is PropertyInfo info && nullability.Create(info).ReadState == NullabilityState.Nullable))
+            {
+                schema.Required.Remove(property.Name);
+                // A body's schema arrives inline, where a nullable object is not marked so.
+                // (Its type, not a oneOf: the generator walks into it after this to transform it.)
+                if (schema.Properties.TryGetValue(property.Name, out var member) && member is OpenApiSchema { Type: JsonSchemaType.Object } inline)
+                {
+                    inline.Type = JsonSchemaType.Object | JsonSchemaType.Null;
+                }
+            }
+        }
     }
 
-    // ...and absent, never null: the wire has no optional member that is null.
+    private static HashSet<string> Absent(OpenApiSchema schema)
+    {
+        schema.Metadata ??= new Dictionary<string, object>();
+        if (!schema.Metadata.TryGetValue(AbsentWhenUnset, out var names))
+        {
+            schema.Metadata[AbsentWhenUnset] = names = new HashSet<string>(StringComparer.Ordinal);
+        }
+
+        return (HashSet<string>)names;
+    }
+
+    // Every type a route declares as its body (RequestBody<T>), and the host
+    // types inside one (a domain type's members follow the domain's rule).
+    private static HashSet<Type> RequestBodies(IServiceProvider services)
+    {
+        var found = new HashSet<Type>();
+        var pending = new Stack<Type>(services.GetRequiredService<EndpointDataSource>().Endpoints.SelectMany(e => e.Metadata.OfType<RequestBodyMetadata>()).Select(m => m.Type));
+        while (pending.TryPop(out var type))
+        {
+            if (type.Namespace?.StartsWith("Insolvia.Domain", StringComparison.Ordinal) != false || !type.Namespace.StartsWith("Insolvia.", StringComparison.Ordinal) || !found.Add(type))
+            {
+                continue;
+            }
+
+            foreach (var member in type.GetProperties().Select(p => p.PropertyType).SelectMany(t => t.IsGenericType ? t.GetGenericArguments() : [t]))
+            {
+                pending.Push(Nullable.GetUnderlyingType(member) ?? member);
+            }
+        }
+
+        return found;
+    }
+
+    // ...and a member left out when unset is absent, never null: the wire has
+    // no such member that is null. (A request's nullable member keeps its
+    // null — a PATCH clears with it.)
     private static void NeverNullWhenOptional(OpenApiSchema schema)
     {
-        foreach (var (name, member) in schema.Properties ?? new Dictionary<string, IOpenApiSchema>())
+        if (schema.Metadata?.TryGetValue(AbsentWhenUnset, out var names) != true)
         {
-            if (schema.Required?.Contains(name) == true || member is not OpenApiSchema concrete)
+            return;
+        }
+
+        foreach (var name in (HashSet<string>)names!)
+        {
+            if (schema.Properties?.TryGetValue(name, out var member) != true || member is not OpenApiSchema concrete)
             {
                 continue;
             }
