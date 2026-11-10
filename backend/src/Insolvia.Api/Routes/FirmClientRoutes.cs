@@ -1,4 +1,3 @@
-using System.Text.Json.Nodes;
 using Insolvia.Api.Auth;
 using Insolvia.Api.Firms;
 using Insolvia.Api.Hosting;
@@ -8,6 +7,7 @@ using Insolvia.Domain.AccessLog;
 using Insolvia.Domain.FirmClients;
 using Insolvia.Domain.Firms;
 using Insolvia.Domain.Ports;
+using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace Insolvia.Api.Routes;
 
@@ -39,22 +39,25 @@ public sealed class FirmClientRoutes : IEndpointModule
     {
         ArgumentNullException.ThrowIfNull(routes);
         routes.MapGet("/v1/firm/clients", ListAsync).RequireAuth().Requires(Feature.Clients, PermissionLevel.ViewOnly);
-        routes.MapPost("/v1/firm/clients", CreateAsync).RequireAuth().Requires(Feature.Clients, PermissionLevel.AddEdit);
+        routes.MapPost("/v1/firm/clients", CreateAsync).RequestBody<ClientRequest>().RequireAuth().Requires(Feature.Clients, PermissionLevel.AddEdit);
         routes.MapGet("/v1/firm/clients/{clientId}", GetAsync).RequireAuth().Requires(Feature.Clients, PermissionLevel.ViewOnly);
-        routes.MapPut("/v1/firm/clients/{clientId}", UpdateAsync).RequireAuth().Requires(Feature.Clients, PermissionLevel.AddEdit);
-        routes.MapPut("/v1/firm/clients/{clientId}/status", SetStatusAsync).RequireAuth().Requires(Feature.Clients, PermissionLevel.AddEdit);
-        routes.MapPut("/v1/firm/clients/{clientId}/prospect-stage", SetProspectStageAsync).RequireAuth().Requires(Feature.Clients, PermissionLevel.AddEdit);
-        routes.MapPost("/v1/firm/clients/{clientId}/merge", MergeAsync).RequireAuth().Requires(Feature.Clients, PermissionLevel.AddEdit);
+        routes.MapPut("/v1/firm/clients/{clientId}", UpdateAsync).RequestBody<ClientRequest>().RequireAuth().Requires(Feature.Clients, PermissionLevel.AddEdit);
+        routes.MapPut("/v1/firm/clients/{clientId}/status", SetStatusAsync).RequestBody<ClientStatusRequest>().RequireAuth().Requires(Feature.Clients, PermissionLevel.AddEdit);
+        routes.MapPut("/v1/firm/clients/{clientId}/prospect-stage", SetProspectStageAsync).RequestBody<ProspectStageRequest>().RequireAuth().Requires(Feature.Clients, PermissionLevel.AddEdit);
+        routes.MapPost("/v1/firm/clients/{clientId}/merge", MergeAsync).RequestBody<ClientMergeRequest>().RequireAuth().Requires(Feature.Clients, PermissionLevel.AddEdit);
     }
 
-    private static async Task<IResult> ListAsync(HttpContext context, CancellationToken cancellationToken)
+    /// <summary>The firm's client directory.</summary>
+    /// <remarks>Not access-logged; reading one client is.</remarks>
+    internal static async Task<ClientList> ListAsync(HttpContext context, CancellationToken cancellationToken)
     {
         var store = Stores(context).Firms;
         var clients = await store.ListClientsAsync((await context.CurrentAccessorAsync()).FirmId, cancellationToken);
-        return FlaskJson.Result(new JsonObject { ["clients"] = new JsonArray([.. clients.Select(client => (JsonNode)FirmViews.Client(client))]) });
+        return new ClientList([.. clients.Select(ClientView.Of)]);
     }
 
-    private static async Task<IResult> CreateAsync(HttpContext context, CancellationToken cancellationToken)
+    /// <summary>Add a client to the directory.</summary>
+    internal static async Task<Created<ClientView>> CreateAsync(HttpContext context, CancellationToken cancellationToken)
     {
         var (store, log) = Stores(context);
         var accessor = await context.CurrentAccessorAsync();
@@ -66,20 +69,23 @@ public sealed class FirmClientRoutes : IEndpointModule
 
         // GLBA: that a firm added SOMEONE is all a request log needs.
         context.Log(Logger, "client created");
-        return FlaskJson.Result(FirmViews.Client(client), StatusCodes.Status201Created);
+        return TypedResults.Created((string?)null, ClientView.Of(client));
     }
 
     // The refused read IS logged: someone walking client ids is what the log should show.
-    private static async Task<IResult> GetAsync(HttpContext context, string clientId, CancellationToken cancellationToken)
+
+    /// <summary>One client.</summary>
+    internal static async Task<ClientView> GetAsync(HttpContext context, string clientId, CancellationToken cancellationToken)
     {
         var (store, log) = Stores(context);
         var client = await store.GetClientAsync((await context.CurrentAccessorAsync()).FirmId, clientId, cancellationToken);
         await LogAsync(context, log, clientId, AccessAction.ClientRead, found: client is not null, cancellationToken);
-        return client is null ? throw new NotFoundException(NotFound) : FlaskJson.Result(FirmViews.Client(client));
+        return client is null ? throw new NotFoundException(NotFound) : ClientView.Of(client);
     }
 
-    // Whole-record replace; keeps status, tax-id pointer, stamps and stage.
-    private static async Task<IResult> UpdateAsync(HttpContext context, string clientId, CancellationToken cancellationToken)
+    /// <summary>Replace a client's record, whole.</summary>
+    /// <remarks>Keeps the status, the tax id, the stamps and the stage. A merged client is a 409: edit the survivor.</remarks>
+    internal static async Task<ClientView> UpdateAsync(HttpContext context, string clientId, CancellationToken cancellationToken)
     {
         var (store, log) = Stores(context);
         var clock = context.Clock();
@@ -91,8 +97,9 @@ public sealed class FirmClientRoutes : IEndpointModule
         return response;
     }
 
-    // Archive or restore — a status write, never a delete; logged as an update.
-    private static async Task<IResult> SetStatusAsync(HttpContext context, string clientId, CancellationToken cancellationToken)
+    /// <summary>Archive a client, or restore one.</summary>
+    /// <remarks>A status write, never a delete.</remarks>
+    internal static async Task<ClientView> SetStatusAsync(HttpContext context, string clientId, CancellationToken cancellationToken)
     {
         var (store, log) = Stores(context);
         var status = FirmClientRules.ParseClientStatus(await context.BodyAsync(MaxRequestBytes));
@@ -103,10 +110,12 @@ public sealed class FirmClientRoutes : IEndpointModule
         return response;
     }
 
-    // A stage for a PROSPECT, or null to leave the funnel (14.3 / #355). A
-    // retained client is a 409, read from the record — never from its cases.
-    // The write is conditional on the client still being a prospect.
-    private static async Task<IResult> SetProspectStageAsync(HttpContext context, string clientId, CancellationToken cancellationToken)
+    // Read from the record — never from its cases. The write is conditional
+    // on the client still being a prospect.
+
+    /// <summary>Place a prospect at a stage of the funnel, or take them out of it with null.</summary>
+    /// <remarks>A retained client is a 409: the funnel is behind them (14.3 / #355).</remarks>
+    internal static async Task<ClientView> SetProspectStageAsync(HttpContext context, string clientId, CancellationToken cancellationToken)
     {
         var (store, log) = Stores(context);
         var stage = FirmClientRules.ParseProspectStage(await context.BodyAsync(MaxRequestBytes));
@@ -129,13 +138,17 @@ public sealed class FirmClientRoutes : IEndpointModule
         }
 
         context.Log(Logger, "client prospect stage changed", ("stage", stage?.ToWire()));
-        return FlaskJson.Result(FirmViews.Client(written));
+        return ClientView.Of(written);
     }
 
-    // Fold the named client INTO this one (ADR 0022 PR 7). Answers both
-    // clients and no count of the cases moved — a count would include cases
-    // the caller may not see. Logged under BOTH ids.
-    private static async Task<IResult> MergeAsync(HttpContext context, string clientId, CancellationToken cancellationToken)
+    // Logged under BOTH ids.
+
+    /// <summary>Fold the named client into this one (ADR 0022 PR 7).</summary>
+    /// <remarks>
+    /// Answers both clients and no count of the cases moved — a count would
+    /// include cases the caller may not see.
+    /// </remarks>
+    internal static async Task<ClientMergeView> MergeAsync(HttpContext context, string clientId, CancellationToken cancellationToken)
     {
         var (store, log) = Stores(context);
         var accessor = await context.CurrentAccessorAsync();
@@ -162,11 +175,7 @@ public sealed class FirmClientRoutes : IEndpointModule
 
         // GLBA: that two records became one — no name, no id.
         context.Log(Logger, "clients merged");
-        return FlaskJson.Result(new JsonObject
-        {
-            ["client"] = FirmViews.Client(result.Survivor),
-            ["merged"] = FirmViews.Client(result.Merged),
-        });
+        return new ClientMergeView(ClientView.Of(result.Survivor), ClientView.Of(result.Merged));
     }
 
     private static (IFirmStore Firms, IAccessLog Log) Stores(HttpContext context)
@@ -192,11 +201,11 @@ public sealed class FirmClientRoutes : IEndpointModule
 
     // A row removed or moved between the read and this write answers the
     // same 404 as an id that never existed, rather than being resurrected.
-    private static async Task<IResult> WriteAsync(HttpContext context, IFirmStore store, IAccessLog log, FirmClient client, CancellationToken cancellationToken)
+    private static async Task<ClientView> WriteAsync(HttpContext context, IFirmStore store, IAccessLog log, FirmClient client, CancellationToken cancellationToken)
     {
         var written = await store.UpdateClientAsync(client, cancellationToken);
         await LogAsync(context, log, client.Id, AccessAction.ClientUpdate, found: written is not null, cancellationToken);
-        return written is null ? throw new NotFoundException(NotFound) : FlaskJson.Result(FirmViews.Client(written));
+        return written is null ? throw new NotFoundException(NotFound) : ClientView.Of(written);
     }
 
     private static async Task LogAsync(HttpContext context, IAccessLog log, string clientId, AccessAction action, bool found, CancellationToken cancellationToken)

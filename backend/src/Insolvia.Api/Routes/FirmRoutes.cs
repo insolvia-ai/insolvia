@@ -1,4 +1,3 @@
-using System.Text.Json.Nodes;
 using Insolvia.Api.Auth;
 using Insolvia.Api.Firms;
 using Insolvia.Api.Hosting;
@@ -6,6 +5,7 @@ using Insolvia.Api.Http;
 using Insolvia.Domain;
 using Insolvia.Domain.Firms;
 using Insolvia.Domain.Ports;
+using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace Insolvia.Api.Routes;
 
@@ -29,21 +29,21 @@ public sealed class FirmRoutes : IEndpointModule
     {
         ArgumentNullException.ThrowIfNull(routes);
         routes.MapGet("/v1/firm", ReadFirmAsync).RequireAuth().Requires(Feature.FirmAdministration, PermissionLevel.ViewOnly);
-        routes.MapPatch("/v1/firm", UpdateFirmAsync).RequireAuth().Requires(Feature.FirmAdministration, PermissionLevel.AddEdit);
+        routes.MapPatch("/v1/firm", UpdateFirmAsync).RequestBody<FirmUpdateRequest>().RequireAuth().Requires(Feature.FirmAdministration, PermissionLevel.AddEdit);
         routes.MapGet("/v1/firm/directory", DirectoryAsync).RequireAuth().Requires(Feature.Cases, PermissionLevel.ViewOnly);
         routes.MapGet("/v1/firm/users", ListUsersAsync).RequireAuth().Requires(Feature.FirmAdministration, PermissionLevel.ViewOnly);
-        routes.MapPost("/v1/firm/users", AddUserAsync).RequireAuth().Requires(Feature.FirmAdministration, PermissionLevel.AddEdit);
-        routes.MapPatch("/v1/firm/users/{subject}", UpdateUserAsync).RequireAuth().Requires(Feature.FirmAdministration, PermissionLevel.AddEdit);
+        routes.MapPost("/v1/firm/users", AddUserAsync).RequestBody<FirmUserCreateRequest>().RequireAuth().Requires(Feature.FirmAdministration, PermissionLevel.AddEdit);
+        routes.MapPatch("/v1/firm/users/{subject}", UpdateUserAsync).RequestBody<FirmUserUpdateRequest>().RequireAuth().Requires(Feature.FirmAdministration, PermissionLevel.AddEdit);
         routes.MapDelete("/v1/firm/users/{subject}", RemoveUserAsync).RequireAuth().Requires(Feature.FirmAdministration, PermissionLevel.AddEdit);
     }
 
-    // The firm's record without provisioning provenance (#217).
-    private static async Task<IResult> ReadFirmAsync(HttpContext context, CancellationToken cancellationToken) =>
-        FlaskJson.Result(FirmViews.FirmSummary((await context.CurrentAccessorAsync()).Firm));
+    /// <summary>The caller's firm, without provisioning provenance (#217).</summary>
+    internal static async Task<FirmSummaryView> ReadFirmAsync(HttpContext context, CancellationToken cancellationToken) =>
+        FirmSummaryView.Of((await context.CurrentAccessorAsync()).Firm);
 
-    // Rename, defaults and letterhead. A status is refused by the parser —
-    // a firm suspending ITSELF would lock out its own administrators.
-    private static async Task<IResult> UpdateFirmAsync(HttpContext context, CancellationToken cancellationToken)
+    /// <summary>Rename the firm, or change its defaults or letterhead.</summary>
+    /// <remarks>A status is refused: a firm suspending itself would lock out its own administrators.</remarks>
+    internal static async Task<FirmSummaryView> UpdateFirmAsync(HttpContext context, CancellationToken cancellationToken)
     {
         var store = context.FirmStore();
         var accessor = await context.CurrentAccessorAsync();
@@ -55,28 +55,33 @@ public sealed class FirmRoutes : IEndpointModule
             ?? throw new NotFoundException("firm not found"); // vanished between resolving and writing
 
         context.Log(Logger, "firm updated");
-        return FlaskJson.Result(FirmViews.FirmSummary(written));
+        return FirmSummaryView.Of(written);
     }
 
-    // Everyone, disabled colleagues INCLUDED: a case's createdBy must stay resolvable.
-    private static async Task<IResult> DirectoryAsync(HttpContext context, CancellationToken cancellationToken)
+    /// <summary>Every member of the firm, by name, for anyone who works cases.</summary>
+    /// <remarks>Disabled colleagues are included, so a case's <c>createdBy</c> stays resolvable.</remarks>
+    internal static async Task<FirmDirectory> DirectoryAsync(HttpContext context, CancellationToken cancellationToken)
     {
         var accessor = await context.CurrentAccessorAsync();
         var people = await context.FirmStore().ListUsersAsync(accessor.FirmId, cancellationToken);
-        return FlaskJson.Result(new JsonObject { ["people"] = new JsonArray([.. people.Select(person => (JsonNode)FirmViews.UserSummary(person))]) });
+        return new FirmDirectory([.. people.Select(UserSummaryView.Of)]);
     }
 
-    private static async Task<IResult> ListUsersAsync(HttpContext context, CancellationToken cancellationToken)
+    /// <summary>Every member of the firm, whole records, for its administrators.</summary>
+    internal static async Task<FirmUserList> ListUsersAsync(HttpContext context, CancellationToken cancellationToken)
     {
         var accessor = await context.CurrentAccessorAsync();
         var users = await context.FirmStore().ListUsersAsync(accessor.FirmId, cancellationToken);
-        return FlaskJson.Result(new JsonObject { ["users"] = new JsonArray([.. users.Select(user => (JsonNode)FirmViews.User(user))]) });
+        return new FirmUserList([.. users.Select(UserView.Of)]);
     }
 
     // Cognito FIRST: the subject it returns is half the row's key. A failure
     // in between leaves a pool user in no firm — a state /v1/me already
     // reports and a retry resolves; the other order leaves an unreachable row.
-    private static async Task<IResult> AddUserAsync(HttpContext context, CancellationToken cancellationToken)
+
+    /// <summary>Add someone to the firm, creating their sign-in account.</summary>
+    /// <remarks>Supplied permissions merge over the role's defaults.</remarks>
+    internal static async Task<Created<UserView>> AddUserAsync(HttpContext context, CancellationToken cancellationToken)
     {
         var store = context.FirmStore();
         var accessor = await context.CurrentAccessorAsync();
@@ -90,11 +95,16 @@ public sealed class FirmRoutes : IEndpointModule
         await store.AddUserAsync(user, cancellationToken);
 
         context.Log(Logger, "firm user added");
-        return FlaskJson.Result(FirmViews.User(user), StatusCodes.Status201Created);
+        return TypedResults.Created((string?)null, UserView.Of(user));
     }
 
-    // Firm-scoped by key: another firm's subject is the same 404 as none.
-    private static async Task<IResult> UpdateUserAsync(HttpContext context, string subject, CancellationToken cancellationToken)
+    /// <summary>Change a firm member's name, role, axes, permissions, status or signature block.</summary>
+    /// <remarks>
+    /// Another firm's subject is the same 404 as none. <c>permissions</c>
+    /// replaces the stored map. A change that would leave the firm with no
+    /// active administrator is a 409.
+    /// </remarks>
+    internal static async Task<UserView> UpdateUserAsync(HttpContext context, string subject, CancellationToken cancellationToken)
     {
         var store = context.FirmStore();
         var accessor = await context.CurrentAccessorAsync();
@@ -109,11 +119,15 @@ public sealed class FirmRoutes : IEndpointModule
             ?? throw new NotFoundException(UserNotFound);
 
         context.Log(Logger, "firm user updated");
-        return FlaskJson.Result(FirmViews.User(written));
+        return UserView.Of(written);
     }
 
-    // The MEMBERSHIP, not the person: the Cognito account survives.
-    private static async Task<IResult> RemoveUserAsync(HttpContext context, string subject, CancellationToken cancellationToken)
+    /// <summary>Remove someone from the firm.</summary>
+    /// <remarks>
+    /// Removes the membership, not the person: their sign-in account survives.
+    /// Removing the last active administrator is a 409.
+    /// </remarks>
+    internal static async Task<NoContent> RemoveUserAsync(HttpContext context, string subject, CancellationToken cancellationToken)
     {
         var store = context.FirmStore();
         var accessor = await context.CurrentAccessorAsync();
@@ -125,7 +139,7 @@ public sealed class FirmRoutes : IEndpointModule
         }
 
         context.Log(Logger, "firm user removed");
-        return FlaskJson.NoContent();
+        return TypedResults.NoContent();
     }
 
     // THE ONE IRRECOVERABLE MISTAKE (self-signup is off). 409, not 403: the

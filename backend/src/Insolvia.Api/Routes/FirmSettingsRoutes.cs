@@ -26,31 +26,33 @@ public sealed class FirmQuestionnaireRoutes : IEndpointModule
     {
         ArgumentNullException.ThrowIfNull(routes);
         routes.MapGet("/v1/firm/questionnaire", ReadAsync).RequireAuth().Requires(Feature.FirmAdministration, PermissionLevel.ViewOnly);
-        routes.MapPut("/v1/firm/questionnaire", SaveAsync).RequireAuth().Requires(Feature.FirmAdministration, PermissionLevel.AddEdit);
+        routes.MapPut("/v1/firm/questionnaire", SaveAsync).RequestBody<QuestionnaireRequest>().RequireAuth().Requires(Feature.FirmAdministration, PermissionLevel.AddEdit);
         routes.MapDelete("/v1/firm/questionnaire", ResetAsync).RequireAuth().Requires(Feature.FirmAdministration, PermissionLevel.AddEdit);
     }
 
-    // A firm that never saved reads the defaults, isDefault: true.
-    private static async Task<IResult> ReadAsync(HttpContext context, CancellationToken cancellationToken)
+    /// <summary>The firm's questionnaire config: every section, switched off or not.</summary>
+    /// <remarks>A firm that never saved reads the defaults, <c>isDefault: true</c>.</remarks>
+    internal static async Task<QuestionnaireView> ReadAsync(HttpContext context, CancellationToken cancellationToken)
     {
         var accessor = await context.CurrentAccessorAsync();
-        return FlaskJson.Result(FirmViews.Questionnaire(await context.FirmStore().GetQuestionnaireAsync(accessor.FirmId, cancellationToken)));
+        return QuestionnaireView.Of(await context.FirmStore().GetQuestionnaireAsync(accessor.FirmId, cancellationToken));
     }
 
-    // Answers the staff view of what was SAVED, so the screen renders the
-    // server's normalisation rather than what it sent.
-    private static async Task<IResult> SaveAsync(HttpContext context, CancellationToken cancellationToken)
+    /// <summary>Save the firm's questionnaire config.</summary>
+    /// <remarks>Answers what was saved, so the screen renders the server's normalisation rather than what it sent.</remarks>
+    internal static async Task<QuestionnaireView> SaveAsync(HttpContext context, CancellationToken cancellationToken)
     {
         var accessor = await context.CurrentAccessorAsync();
         var settings = Questionnaire.ParseUpdate(await context.BodyAsync(MaxRequestBytes));
         var config = Questionnaire.BuildConfig(settings, accessor.FirmId, accessor.Subject, context.Clock());
         await context.FirmStore().PutQuestionnaireAsync(config, cancellationToken);
         context.Log(Logger, "questionnaire config saved");
-        return FlaskJson.Result(FirmViews.Questionnaire(config));
+        return QuestionnaireView.Of(config);
     }
 
-    // Reset deletes the stored config. Idempotent: the same 200 and body either way.
-    private static async Task<IResult> ResetAsync(HttpContext context, CancellationToken cancellationToken)
+    /// <summary>Reset the firm's questionnaire config to the defaults.</summary>
+    /// <remarks>Idempotent: the same 200 and body whether or not anything was stored.</remarks>
+    internal static async Task<QuestionnaireView> ResetAsync(HttpContext context, CancellationToken cancellationToken)
     {
         var accessor = await context.CurrentAccessorAsync();
         if (await context.FirmStore().DeleteQuestionnaireAsync(accessor.FirmId, cancellationToken))
@@ -58,7 +60,7 @@ public sealed class FirmQuestionnaireRoutes : IEndpointModule
             context.Log(Logger, "questionnaire config reset to defaults");
         }
 
-        return FlaskJson.Result(FirmViews.Questionnaire(null));
+        return QuestionnaireView.Of(null);
     }
 }
 
@@ -79,29 +81,31 @@ public sealed class DocumentChecklistRoutes : IEndpointModule
     {
         ArgumentNullException.ThrowIfNull(routes);
         routes.MapGet("/v1/firm/document-checklist", ReadAsync).RequireAuth().Requires(Feature.FirmAdministration, PermissionLevel.ViewOnly);
-        routes.MapPut("/v1/firm/document-checklist", SaveAsync).RequireAuth().Requires(Feature.FirmAdministration, PermissionLevel.AddEdit);
+        routes.MapPut("/v1/firm/document-checklist", SaveAsync).RequestBody<ChecklistRequest>().RequireAuth().Requires(Feature.FirmAdministration, PermissionLevel.AddEdit);
         routes.MapDelete("/v1/firm/document-checklist", ResetAsync).RequireAuth().Requires(Feature.FirmAdministration, PermissionLevel.AddEdit);
     }
 
-    // The list in force and the shipped default beside it.
-    private static async Task<IResult> ReadAsync(HttpContext context, CancellationToken cancellationToken)
+    /// <summary>The firm's document checklist, with the shipped default beside it.</summary>
+    internal static async Task<ChecklistView> ReadAsync(HttpContext context, CancellationToken cancellationToken)
     {
         var accessor = await context.CurrentAccessorAsync();
-        return FlaskJson.Result(FirmViews.Checklist(await context.FirmStore().GetDocumentChecklistAsync(accessor.FirmId, cancellationToken)));
+        return ChecklistView.Of(await context.FirmStore().GetDocumentChecklistAsync(accessor.FirmId, cancellationToken));
     }
 
-    private static async Task<IResult> SaveAsync(HttpContext context, CancellationToken cancellationToken)
+    /// <summary>Save the firm's document checklist, whole.</summary>
+    internal static async Task<ChecklistView> SaveAsync(HttpContext context, CancellationToken cancellationToken)
     {
         var accessor = await context.CurrentAccessorAsync();
         var items = DocumentChecklists.ParseUpdate(await context.BodyAsync(MaxRequestBytes));
         var checklist = DocumentChecklists.Build(items, accessor.FirmId, accessor.Subject, context.Clock());
         await context.FirmStore().PutDocumentChecklistAsync(checklist, cancellationToken);
         context.Log(Logger, "document checklist saved", ("items", items.Count));
-        return FlaskJson.Result(FirmViews.Checklist(checklist));
+        return ChecklistView.Of(checklist);
     }
 
-    // Back to the shipped default by deleting the stored list. Idempotent.
-    private static async Task<IResult> ResetAsync(HttpContext context, CancellationToken cancellationToken)
+    /// <summary>Reset the firm's document checklist to the shipped default.</summary>
+    /// <remarks>Idempotent: the same 200 and body whether or not anything was stored.</remarks>
+    internal static async Task<ChecklistView> ResetAsync(HttpContext context, CancellationToken cancellationToken)
     {
         var accessor = await context.CurrentAccessorAsync();
         if (await context.FirmStore().DeleteDocumentChecklistAsync(accessor.FirmId, cancellationToken))
@@ -109,6 +113,6 @@ public sealed class DocumentChecklistRoutes : IEndpointModule
             context.Log(Logger, "document checklist reset to the default");
         }
 
-        return FlaskJson.Result(FirmViews.Checklist(null));
+        return ChecklistView.Of(null);
     }
 }
