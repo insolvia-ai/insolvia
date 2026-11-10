@@ -1,4 +1,3 @@
-using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Insolvia.Api.Auth;
 using Insolvia.Api.Filing;
@@ -9,6 +8,7 @@ using Insolvia.Domain.FilingAuthorizations;
 using Insolvia.Domain.FilingCredentials;
 using Insolvia.Domain.Firms;
 using Insolvia.Domain.Ports;
+using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace Insolvia.Api.Routes;
 
@@ -27,7 +27,7 @@ namespace Insolvia.Api.Routes;
 /// <para><b>The API seals and cannot open.</b> The composition holds an
 /// <see cref="IFilingCredentialSealer"/> and no opener; nothing returned
 /// carries the password, the seed or the envelope
-/// (<see cref="FilingViews.Credential"/> is the only serializer).</para>
+/// (<see cref="FilingCredentialView"/> is the only view of a credential).</para>
 /// <para><b>No credential without a signed authorization</b>: enrolment is a
 /// 403 until the caller signed the current text, and withdrawing the
 /// signature destroys every credential. Signing needs a fresh sign-in;
@@ -46,31 +46,35 @@ public sealed partial class FilingCredentialRoutes : IEndpointModule
     {
         ArgumentNullException.ThrowIfNull(routes);
         routes.MapGet("/v1/me/filing-credentials", ListAsync).RequireAuth().Requires(Feature.ElectronicFiling, PermissionLevel.ViewOnly);
-        routes.MapPost("/v1/me/filing-credentials", EnrolAsync).RequireAuth().Requires(Feature.ElectronicFiling, PermissionLevel.AddEdit);
+        routes.MapPost("/v1/me/filing-credentials", EnrolAsync).RequestBody<FilingEnrolmentRequest>().RequireAuth().Requires(Feature.ElectronicFiling, PermissionLevel.AddEdit);
         routes.MapDelete("/v1/me/filing-credentials/{credentialId}", RevokeAsync).RequireAuth().Requires(Feature.ElectronicFiling, PermissionLevel.AddEdit);
         routes.MapGet("/v1/me/filing-authorization", ReadAuthorizationAsync).RequireAuth().Requires(Feature.ElectronicFiling, PermissionLevel.ViewOnly);
-        routes.MapPost("/v1/me/filing-authorization", SignAsync).RequireAuth().Requires(Feature.ElectronicFiling, PermissionLevel.AddEdit);
+        routes.MapPost("/v1/me/filing-authorization", SignAsync).RequestBody<AuthorizationSignRequest>().RequireAuth().Requires(Feature.ElectronicFiling, PermissionLevel.AddEdit);
         routes.MapDelete("/v1/me/filing-authorization", WithdrawAsync).RequireAuth().Requires(Feature.ElectronicFiling, PermissionLevel.ViewOnly);
     }
 
-    internal static IResult NoStore(HttpContext context, IResult result)
+    /// <summary>Marks the response <c>Cache-Control: no-store</c> and passes <paramref name="result"/> through.</summary>
+    internal static T NoStore<T>(HttpContext context, T result)
     {
         context.Response.Headers.CacheControl = "no-store";
         return result;
     }
 
-    private static async Task<IResult> ListAsync(HttpContext context, CancellationToken cancellationToken)
+    /// <summary>The caller's own CM/ECF credentials.</summary>
+    internal static async Task<FilingCredentialList> ListAsync(HttpContext context, CancellationToken cancellationToken)
     {
         var store = context.Port<IFilingCredentialStore>();
         var accessor = await context.CurrentAccessorAsync();
         var found = await FilingCredentialRules.ListAsync(accessor.FirmId, accessor.Subject, store, cancellationToken);
-        return NoStore(context, FlaskJson.Result(new JsonObject
-        {
-            ["credentials"] = new JsonArray([.. found.Select(credential => (JsonNode)FilingViews.Credential(credential))]),
-        }));
+        return NoStore(context, new FilingCredentialList([.. found.Select(FilingCredentialView.Of)]));
     }
 
-    private static async Task<IResult> EnrolAsync(HttpContext context, CancellationToken cancellationToken)
+    /// <summary>Enrol a CM/ECF credential for the caller.</summary>
+    /// <remarks>
+    /// The password and authenticator key are sealed on arrival and never
+    /// returned. A 403 until the caller has signed the current authorization text.
+    /// </remarks>
+    internal static async Task<Created<FilingCredentialView>> EnrolAsync(HttpContext context, CancellationToken cancellationToken)
     {
         var store = context.Port<IFilingCredentialStore>();
         var sealer = context.Port<IFilingCredentialSealer>();
@@ -81,10 +85,12 @@ public sealed partial class FilingCredentialRoutes : IEndpointModule
 
         // Metadata only: that an enrolment happened, never the login or the subject.
         context.Log(Logger, "filing credential enrolled");
-        return NoStore(context, FlaskJson.Result(FilingViews.Credential(credential), StatusCodes.Status201Created));
+        return NoStore(context, TypedResults.Created((string?)null, FilingCredentialView.Of(credential)));
     }
 
-    private static async Task<IResult> RevokeAsync(HttpContext context, string credentialId, CancellationToken cancellationToken)
+    /// <summary>Revoke — destroy — one of the caller's CM/ECF credentials.</summary>
+    /// <remarks>Another attorney's credential is a 404, the same as one that never existed.</remarks>
+    internal static async Task<NoContent> RevokeAsync(HttpContext context, string credentialId, CancellationToken cancellationToken)
     {
         var store = context.Port<IFilingCredentialStore>();
         var accessor = await context.CurrentAccessorAsync();
@@ -95,17 +101,20 @@ public sealed partial class FilingCredentialRoutes : IEndpointModule
         }
 
         context.Log(Logger, "filing credential revoked");
-        return NoStore(context, FlaskJson.NoContent());
+        return NoStore(context, TypedResults.NoContent());
     }
 
-    private static async Task<IResult> ReadAuthorizationAsync(HttpContext context, CancellationToken cancellationToken)
+    /// <summary>The caller's written authorization to file, and the text a new signature would be over.</summary>
+    internal static async Task<FilingAuthorizationView> ReadAuthorizationAsync(HttpContext context, CancellationToken cancellationToken)
     {
         var accessor = await context.CurrentAccessorAsync();
         var current = await FilingAuthorizationRules.CurrentAsync(accessor.FirmId, accessor.Subject, context.Port<IFilingAuthorizationStore>(), cancellationToken);
-        return NoStore(context, FlaskJson.Result(FilingViews.Authorization(current, accessor.FirmId, accessor.Subject)));
+        return NoStore(context, FilingAuthorizationView.Of(current, accessor.FirmId, accessor.Subject));
     }
 
-    private static async Task<IResult> SignAsync(HttpContext context, CancellationToken cancellationToken)
+    /// <summary>Sign the current authorization text.</summary>
+    /// <remarks>Needs a recent sign-in (403 <c>ReauthenticationRequired</c> otherwise); the version and digest posted must be the current text's.</remarks>
+    internal static async Task<Created<FilingAuthorizationView>> SignAsync(HttpContext context, CancellationToken cancellationToken)
     {
         var accessLog = context.AccessLog();
         var accessor = await context.CurrentAccessorAsync();
@@ -121,16 +130,17 @@ public sealed partial class FilingCredentialRoutes : IEndpointModule
             context.Clock(),
             cancellationToken);
         context.Log(Logger, "filing authorization signed");
-        return NoStore(context, FlaskJson.Result(FilingViews.Authorization(signed, accessor.FirmId, accessor.Subject), StatusCodes.Status201Created));
+        return NoStore(context, TypedResults.Created((string?)null, FilingAuthorizationView.Of(signed, accessor.FirmId, accessor.Subject)));
     }
 
-    private static async Task<IResult> WithdrawAsync(HttpContext context, CancellationToken cancellationToken)
+    /// <summary>Withdraw the caller's authorization, destroying every credential enrolled under it.</summary>
+    internal static async Task<AuthorizationWithdrawn> WithdrawAsync(HttpContext context, CancellationToken cancellationToken)
     {
         var accessor = await context.CurrentAccessorAsync();
         var destroyed = await FilingCredentialRules.WithdrawAuthorizationAsync(
             accessor.FirmId, accessor.Subject, context.Port<IFilingAuthorizationStore>(), context.Port<IFilingCredentialStore>(), context.AccessLog(), context.Clock(), cancellationToken);
         context.Log(Logger, "filing authorization withdrawn");
-        return NoStore(context, FlaskJson.Result(new JsonObject { ["credentials_revoked"] = destroyed }));
+        return NoStore(context, new AuthorizationWithdrawn(destroyed));
     }
 
     [GeneratedRegex(@"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z")]

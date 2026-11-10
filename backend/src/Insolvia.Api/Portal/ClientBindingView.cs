@@ -1,0 +1,61 @@
+using System.Text.Json.Serialization;
+using Insolvia.Api.Http;
+using Insolvia.Domain.Clients;
+
+namespace Insolvia.Api.Portal;
+
+/// <summary>
+/// What a FIRM USER sees of a client invited to their case's portal — enough
+/// to manage the invitation. Never shown to the client.
+/// </summary>
+/// <param name="Subject">The client's user id.</param>
+/// <param name="Email">The address invited, lower-cased.</param>
+/// <param name="DisplayName">The name the firm gave at invitation.</param>
+/// <param name="Roles">The debtors this login answers for.</param>
+/// <param name="Status"><c>invited</c> until first use, then <c>active</c>; <c>revoked</c> once withdrawn.</param>
+/// <param name="InvitedBy">The firm user who invited them.</param>
+/// <param name="CreatedAt">When invited, ISO 8601 UTC with microseconds.</param>
+/// <param name="UpdatedAt">When last written, ISO 8601 UTC with microseconds.</param>
+public sealed record ClientBindingView(
+    string Subject,
+    string Email,
+    string DisplayName,
+    IReadOnlyList<ClientRole> Roles,
+    BindingStatus Status,
+    string InvitedBy,
+    string CreatedAt,
+    string UpdatedAt)
+{
+    /// <summary>The view of <paramref name="binding"/>.</summary>
+    /// <param name="binding">The binding.</param>
+    /// <returns>The view.</returns>
+    public static ClientBindingView Of(ClientBinding binding)
+    {
+        ArgumentNullException.ThrowIfNull(binding);
+        return new(
+            binding.Subject,
+            binding.Email,
+            binding.DisplayName,
+            [.. binding.Roles],
+            binding.Status,
+            binding.InvitedBy,
+            FlaskJson.Micros(binding.CreatedAt),
+            FlaskJson.Micros(binding.UpdatedAt));
+    }
+}
+
+/// <summary>Everyone ever invited to a case's portal, revoked included, oldest first.</summary>
+/// <param name="Clients">The invitations.</param>
+public sealed record ClientBindingList(IReadOnlyList<ClientBindingView> Clients);
+
+/// <summary>
+/// An invitation (<c>POST /v1/cases/{caseId}/portal/invitation</c>). Parsed
+/// by <c>ClientBindings.ParseInvitation</c>, which refuses any other key.
+/// </summary>
+/// <param name="Email">The client's address.</param>
+/// <param name="DisplayName">The name to greet them by.</param>
+/// <param name="Roles">The debtors the login answers for; absent for <c>debtor_1</c> alone.</param>
+public sealed record PortalInvitationRequest(
+    string Email,
+    string DisplayName,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<ClientRole>? Roles);
