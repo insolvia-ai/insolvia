@@ -1,13 +1,14 @@
 using Insolvia.Domain;
 using Insolvia.Domain.Auth;
+using Microsoft.AspNetCore.Http;
 
-namespace Insolvia.Admin.Http;
+namespace Insolvia.Http;
 
 /// <summary>
-/// Every error body the admin service writes, in one place, each an <see cref="ErrorBody"/>:
+/// Every error body an HTTP host writes, in one place, each an <see cref="ErrorBody"/>:
 /// the domain's refusals (<see cref="ForApiException"/>), the framework's own
 /// (<see cref="ForStatus"/> — a route that does not exist, a method it does not
-/// take, an unreadable body), the one 401 and the one 500. The admin portal maps
+/// take, an unreadable body), the one 401 and the one 500. The clients map
 /// the <c>error</c> code to its exception classes.
 /// </summary>
 public static class ErrorResponses

@@ -1,6 +1,6 @@
 using System.Globalization;
 
-namespace Insolvia.Platform.Http;
+namespace Insolvia.Http;
 
 /// <summary>
 /// The wire's timestamp and date strings. Their precision is part of the

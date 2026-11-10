@@ -6,7 +6,7 @@ using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
 
-namespace Insolvia.Platform.Http;
+namespace Insolvia.Http;
 
 /// <summary>
 /// How a handler's typed result becomes JSON: the one serializer setup every

@@ -17,7 +17,8 @@ Three layers ([ADR 0030](../docs/adr/0030-three-backend-layers.md)):
 | business logic | `Insolvia.Domain` — pure: entities, rules and ports; the calculation engines and form projections (`Engines/`); the PDF engine (`Forms/`) | nothing in the solution |
 | data access | `Insolvia.Data` — EF Core, the migrations, the Postgres stores | `Domain` |
 | platform services | `Insolvia.Platform` — document storage, sealing, the job queues, the user directory, mail, sign-in keys | `Domain` |
-| API (and the workers) | hosts: `Api`, `Worker`, `Admin`, `Mcp`, `Filing`, `Migrator` | `Domain`, `Data`, `Platform`; **never another host** |
+| the wire | `Insolvia.Http` — what the HTTP hosts share: the JSON (`WireJson`, `WireFormat`), the error body and the answers outside a route (`ErrorResponses`, `MethodFallback`), the OpenAPI document and its `/docs` page (`WireOpenApi`). The one library with ASP.NET; only `Api` and `Admin` reference it, so the workers and the migrator (a plain-runtime image) never carry it | `Domain` |
+| API (and the workers) | hosts: `Api`, `Worker`, `Admin`, `Mcp`, `Filing`, `Migrator` | `Domain`, `Data`, `Platform` (and `Http`, the HTTP hosts); **never another host** |
 | — | tools: `UstTool` — run by a developer or CI, never deployed (no Dockerfile stage) | `Domain`; never `Data`, `Platform` or a host |
 
 - **Name a project for its role, never for a vendor or a product word.** No

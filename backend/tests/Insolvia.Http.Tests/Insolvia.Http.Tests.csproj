@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Unit tests for Insolvia.Http: the wire's formats and the OpenAPI document's tidying. -->
+  <ItemGroup>
+    <ProjectReference Include="../../src/Insolvia.Http/Insolvia.Http.csproj" />
+  </ItemGroup>
+</Project>

@@ -140,7 +140,7 @@ public sealed class WaitlistTests : IDisposable
 
         var record = Assert.Single(_world.Host.Waitlist.Records);
         Assert.Equal(answer.Str("id"), record.Id);
-        Assert.Equal(answer.Str("submittedAt"), Insolvia.Platform.Http.WireFormat.Millis(record.SubmittedAt));
+        Assert.Equal(answer.Str("submittedAt"), Insolvia.Http.WireFormat.Millis(record.SubmittedAt));
         Assert.Equal("ada@lovelace-law.example", record.Submission.Email);
     }
 

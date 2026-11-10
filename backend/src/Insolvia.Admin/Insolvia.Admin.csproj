@@ -9,17 +9,18 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Amazon.Lambda.AspNetCoreServer.Hosting" />
-    <!-- Referenced here, not only through Platform: its source generator reads
+    <!-- Referenced here, not only through Http: its source generator reads
          this project's doc comments into the OpenAPI document's summaries. -->
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
   </ItemGroup>
   <ItemGroup>
-    <!-- The wire's conventions (WireJson, ErrorBody, WireOpenApi), shared with the API. -->
-    <Using Include="Insolvia.Platform.Http" />
+    <!-- The wire every HTTP host shares (WireJson, ErrorBody, WireOpenApi, …). -->
+    <Using Include="Insolvia.Http" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../Insolvia.Domain/Insolvia.Domain.csproj" />
     <ProjectReference Include="../Insolvia.Data/Insolvia.Data.csproj" />
     <ProjectReference Include="../Insolvia.Platform/Insolvia.Platform.csproj" />
+    <ProjectReference Include="../Insolvia.Http/Insolvia.Http.csproj" />
   </ItemGroup>
 </Project>

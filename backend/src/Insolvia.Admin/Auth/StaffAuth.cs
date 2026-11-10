@@ -98,9 +98,9 @@ public static class StaffAuth
 internal sealed record JsonBodyResult(int Status, ErrorBody Body) : IResult
 {
     /// <summary>The 401 every authentication failure answers.</summary>
-    public static readonly JsonBodyResult Unauthorized = new(StatusCodes.Status401Unauthorized, Http.ErrorResponses.Unauthorized);
+    public static readonly JsonBodyResult Unauthorized = new(StatusCodes.Status401Unauthorized, Insolvia.Http.ErrorResponses.Unauthorized);
 
-    public Task ExecuteAsync(HttpContext httpContext) => Http.ErrorResponses.WriteAsync(httpContext, Status, Body);
+    public Task ExecuteAsync(HttpContext httpContext) => Insolvia.Http.ErrorResponses.WriteAsync(httpContext, Status, Body);
 }
 
 /// <summary>Endpoint metadata: the route takes a staff Google token (<see cref="StaffAuth.RequireStaff{TBuilder}"/>).</summary>

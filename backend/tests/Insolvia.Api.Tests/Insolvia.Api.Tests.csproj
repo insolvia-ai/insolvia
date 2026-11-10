@@ -7,7 +7,7 @@
   <ItemGroup>
     <!-- The probe routes and the auth host are written against the same
          ASP.NET Core surface Insolvia.Api uses. -->
-    <Using Include="Insolvia.Platform.Http" />
+    <Using Include="Insolvia.Http" />
     <Using Include="Microsoft.AspNetCore.Builder" />
     <Using Include="Microsoft.AspNetCore.Http" />
     <Using Include="Microsoft.AspNetCore.Routing" />

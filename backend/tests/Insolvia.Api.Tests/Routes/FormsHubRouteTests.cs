@@ -143,7 +143,7 @@ public sealed partial class FormsHubRouteTests : IAsyncLifetime, IDisposable
         var caseId = await _world.OpenCaseIdAsync();
         var stored = (await _world.StoredAsync(caseId))!;
         var data = await CaseDataReads.ReadAsync(stored, _world.Service<IDebtorStore>(), _world.Service<ICaseEntityStore>(), HttpAssert.Ct);
-        var expected = new JsonArray([.. FormsHub.Summaries(data, DateOnly.FromDateTime(Now.UtcDateTime)).Select(summary => System.Text.Json.JsonSerializer.SerializeToNode(Cases.FormSummaryView.Of(summary, 0), Insolvia.Platform.Http.WireJson.Options))]);
+        var expected = new JsonArray([.. FormsHub.Summaries(data, DateOnly.FromDateTime(Now.UtcDateTime)).Select(summary => System.Text.Json.JsonSerializer.SerializeToNode(Cases.FormSummaryView.Of(summary, 0), Insolvia.Http.WireJson.Options))]);
 
         var answer = await Forms(caseId);
 
@@ -260,7 +260,7 @@ public sealed partial class FormsHubRouteTests : IAsyncLifetime, IDisposable
         Assert.Equal(["expiresAt", "method", "options", "problems", "url"], Answer.Keys(answer.Object));
         Assert.Empty(answer.Object["problems"]!.AsArray());
         Assert.Equal("GET", answer.Str("method"));
-        Assert.Equal(Insolvia.Platform.Http.WireFormat.Millis(Now.AddSeconds(5 * 60)), answer.Str("expiresAt"));
+        Assert.Equal(Insolvia.Http.WireFormat.Millis(Now.AddSeconds(5 * 60)), answer.Str("expiresAt"));
         var minted = Blobs.Minted[^1];
         Assert.Equal("GET", minted.Method);
         Assert.Equal(5 * 60, minted.ExpiresIn);

@@ -277,7 +277,7 @@ public sealed class EventRouteTests : IAsyncLifetime, IDisposable
     {
         var caseId = await _world.OpenCaseIdAsync();
         var today = Insolvia.Domain.Clock.Today();
-        await Add(caseId, $$"""{"title": "Hearing", "start": "{{Insolvia.Platform.Http.WireFormat.Date(today.AddDays(3))}}"}""");
+        await Add(caseId, $$"""{"title": "Hearing", "start": "{{Insolvia.Http.WireFormat.Date(today.AddDays(3))}}"}""");
 
         var feed = await _world.Get("/v1/me/calendar.ics");
 
@@ -295,7 +295,7 @@ public sealed class EventRouteTests : IAsyncLifetime, IDisposable
     public async Task A_feed_token_opens_the_feed_and_only_that_users_feed()
     {
         var caseId = await _world.OpenCaseIdAsync();
-        await Add(caseId, $$"""{"title": "Hearing", "start": "{{Insolvia.Platform.Http.WireFormat.Date(Insolvia.Domain.Clock.Today().AddDays(1))}}"}""");
+        await Add(caseId, $$"""{"title": "Hearing", "start": "{{Insolvia.Http.WireFormat.Date(Insolvia.Domain.Clock.Today().AddDays(1))}}"}""");
 
         var minted = await _world.Post("/v1/me/calendar-token", null);
         var token = minted.Str("token")!;

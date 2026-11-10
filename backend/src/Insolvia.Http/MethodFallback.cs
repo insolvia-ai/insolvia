@@ -1,15 +1,19 @@
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.Routing.Template;
+using Microsoft.Extensions.DependencyInjection;
 
-namespace Insolvia.Api.Http;
+namespace Insolvia.Http;
 
 /// <summary>
-/// What the API answers outside its routes, which ASP.NET Core's router does
+/// What a host answers outside its routes, which ASP.NET Core's router does
 /// not do by itself:
 /// <list type="bullet">
 /// <item><c>HEAD</c> on a <c>GET</c> route is that route, without the body.</item>
 /// <item><c>OPTIONS</c> on any existing path is a 200 with an empty body and an
 /// <c>Allow</c> header — and runs NO view, so a preflight never meets an auth
-/// filter (it gets its CORS headers from <see cref="Cors"/> like any response).</item>
+/// filter (it gets its CORS headers from the host's CORS middleware like any response).</item>
 /// <item>A path no route has is a JSON 404; a method the path does not take is
 /// a JSON 405 with <c>Allow</c> (<see cref="ErrorResponses.ForStatus"/>).</item>
 /// </list>

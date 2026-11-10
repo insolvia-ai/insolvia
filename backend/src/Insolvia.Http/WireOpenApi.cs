@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.OpenApi;
 using Scalar.AspNetCore;
 
-namespace Insolvia.Platform.Http;
+namespace Insolvia.Http;
 
 /// <summary>
 /// A host's OpenAPI document, generated from its endpoints: the schemas from

@@ -82,7 +82,7 @@ public sealed class FilingSetRouteTests : IAsyncLifetime, IDisposable
 
         var data = await CaseDataReads.ReadAsync((await _world.StoredAsync(caseId))!, _world.Service<IDebtorStore>(), _world.Service<ICaseEntityStore>(), HttpAssert.Ct);
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var expected = System.Text.Json.JsonSerializer.SerializeToNode(Cases.FilingSetView.Of(FilingSets.Build(data, [], CourtRegistry.Shipped.Resolve(today), today)), Insolvia.Platform.Http.WireJson.Options);
+        var expected = System.Text.Json.JsonSerializer.SerializeToNode(Cases.FilingSetView.Of(FilingSets.Build(data, [], CourtRegistry.Shipped.Resolve(today), today)), Insolvia.Http.WireJson.Options);
 
         Assert.True(System.Text.Json.Nodes.JsonNode.DeepEquals(expected, System.Text.Json.Nodes.JsonNode.Parse(answer.Body)), answer.Body);
         Assert.Contains(_world.Events, e => e.Action == AccessAction.CaseRead && e.CaseId == caseId && e.Outcome == AccessOutcome.Allowed);

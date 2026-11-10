@@ -576,6 +576,7 @@
           "Amazon.Lambda.AspNetCoreServer.Hosting": "[2.2.1, )",
           "Insolvia.Data": "[1.0.0, )",
           "Insolvia.Domain": "[1.0.0, )",
+          "Insolvia.Http": "[1.0.0, )",
           "Insolvia.Platform": "[1.0.0, )",
           "Microsoft.AspNetCore.OpenApi": "[10.0.13, )"
         }
@@ -597,6 +598,14 @@
           "System.Security.Cryptography.Pkcs": "[10.0.14, )"
         }
       },
+      "insolvia.http": {
+        "type": "Project",
+        "dependencies": {
+          "Insolvia.Domain": "[1.0.0, )",
+          "Microsoft.AspNetCore.OpenApi": "[10.0.13, )",
+          "Scalar.AspNetCore": "[2.18.7, )"
+        }
+      },
       "insolvia.platform": {
         "type": "Project",
         "dependencies": {
@@ -605,9 +614,7 @@
           "AWSSDK.KeyManagementService": "[4.0.101, )",
           "AWSSDK.S3": "[4.0.104.3, )",
           "AWSSDK.SQS": "[4.0.100.17, )",
-          "Insolvia.Domain": "[1.0.0, )",
-          "Microsoft.AspNetCore.OpenApi": "[10.0.13, )",
-          "Scalar.AspNetCore": "[2.18.7, )"
+          "Insolvia.Domain": "[1.0.0, )"
         }
       },
       "insolvia.worker": {

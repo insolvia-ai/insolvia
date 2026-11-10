@@ -241,7 +241,7 @@ public sealed class CaseLifecycleRouteTests : IAsyncLifetime, IDisposable
         await _world.Post("/v1/cases", $$"""{ {{Tampa}}, "client_ids": ["{{clientId}}"]}""");
 
         var retained = (await _world.Get($"/v1/firm/clients/{clientId}")).Object;
-        Assert.Equal(Insolvia.Platform.Http.WireFormat.Date(Clock.Today()), retained.Str("first_retained_at"));
+        Assert.Equal(Insolvia.Http.WireFormat.Date(Clock.Today()), retained.Str("first_retained_at"));
         Assert.False(retained.ContainsKey("prospect_stage"));
         Assert.Null((await _world.Firms.GetClientAsync(Ids.FirmA, clientId, HttpAssert.Ct))!.ProspectStage);
         Assert.Contains(_world.Events, e => (e.Action, e.ClientId) == (AccessAction.ClientUpdate, clientId));
@@ -275,7 +275,7 @@ public sealed class CaseLifecycleRouteTests : IAsyncLifetime, IDisposable
 
         Assert.Equal(201, (await _world.Post($"/v1/cases/{source}/copy", null)).Status);
 
-        Assert.Equal(Insolvia.Platform.Http.WireFormat.Date(Clock.Today()), (await _world.Get($"/v1/firm/clients/{clientId}")).Str("first_retained_at"));
+        Assert.Equal(Insolvia.Http.WireFormat.Date(Clock.Today()), (await _world.Get($"/v1/firm/clients/{clientId}")).Str("first_retained_at"));
     }
 
     // ── Archive ─────────────────────────────────────────────────────
