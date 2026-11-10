@@ -1,5 +1,4 @@
 using System.Text.Json.Serialization;
-using Insolvia.Api.Http;
 using Insolvia.Domain.Cases;
 
 namespace Insolvia.Api.Cases;
@@ -46,7 +45,7 @@ public sealed record LifecycleEventView(
         ArgumentNullException.ThrowIfNull(recorded);
         return new(
             recorded.Kind,
-            recorded.EffectiveOn is { } on ? FlaskJson.Date(on) : null,
+            recorded.EffectiveOn is { } on ? WireFormat.Date(on) : null,
             CaseRules.Iso(recorded.RecordedAt),
             recorded.RecordedBy,
             recorded.Provenance,

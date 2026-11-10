@@ -1,5 +1,4 @@
 using System.Text.Json.Serialization;
-using Insolvia.Api.Http;
 using Insolvia.Domain.Cases;
 using Insolvia.Domain.CaseTasks;
 
@@ -51,7 +50,7 @@ public sealed record TaskView(
             CaseRules.Iso(task.UpdatedAt),
             task.CreatedBy,
             task.Description,
-            task.DueDate is { } due ? FlaskJson.Date(due) : null,
+            task.DueDate is { } due ? WireFormat.Date(due) : null,
             task.AssigneeSubject,
             task.FormSeries,
             task.CompletedAt is { } completed ? CaseRules.Iso(completed) : null);

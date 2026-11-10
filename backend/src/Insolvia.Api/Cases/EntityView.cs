@@ -1,6 +1,5 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Insolvia.Api.Http;
 using Insolvia.Domain.CaseEntities;
 using Insolvia.Domain.Cases;
 using Insolvia.Domain.Notes;

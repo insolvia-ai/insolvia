@@ -115,3 +115,8 @@ public sealed record DocumentRequestCreation(
 /// </summary>
 /// <param name="Status">The status to set.</param>
 public sealed record DocumentRequestStatusChange(DocumentRequestStatus Status);
+
+/// <summary>The document requests a client's firm made of them, and the case's progress.</summary>
+/// <param name="Requests">The requests, oldest first, each with the client's own uploads against it.</param>
+/// <param name="Progress">Arrived against outstanding; the total excludes waived.</param>
+public sealed record PortalRequestList(IReadOnlyList<PortalRequestView> Requests, DocumentRequestProgress Progress);

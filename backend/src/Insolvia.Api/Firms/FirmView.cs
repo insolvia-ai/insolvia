@@ -1,4 +1,3 @@
-using Insolvia.Api.Http;
 using Insolvia.Domain.Firms;
 
 namespace Insolvia.Api.Firms;
@@ -28,7 +27,7 @@ public sealed record FirmSummaryView(
     public static FirmSummaryView Of(Firm firm)
     {
         ArgumentNullException.ThrowIfNull(firm);
-        return new(firm.Id, firm.Name, firm.Status, FlaskJson.Millis(firm.CreatedAt), FlaskJson.Millis(firm.UpdatedAt), FirmDefaults.Of(firm));
+        return new(firm.Id, firm.Name, firm.Status, WireFormat.Millis(firm.CreatedAt), WireFormat.Millis(firm.UpdatedAt), FirmDefaults.Of(firm));
     }
 }
 
@@ -137,8 +136,8 @@ public sealed record UserView(
             user.AccessAllCases,
             user.Permissions,
             user.Status,
-            FlaskJson.Millis(user.CreatedAt),
-            FlaskJson.Millis(user.UpdatedAt),
+            WireFormat.Millis(user.CreatedAt),
+            WireFormat.Millis(user.UpdatedAt),
             user.SignatureBlock);
     }
 }

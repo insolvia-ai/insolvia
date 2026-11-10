@@ -67,7 +67,7 @@ public sealed class LienRouteTests : IAsyncLifetime, IDisposable
 
         var body = (await Liens(caseId)).Object;
 
-        Assert.Equal($$"""[{"assetId":"{{house}}","claimIds":["{{first}}","{{second}}"],"securedTotal":"330000.00"}]""", Http.FlaskJson.Serialize(body["assets"]));
+        Assert.Equal($$"""[{"assetId":"{{house}}","claimIds":["{{first}}","{{second}}"],"securedTotal":"330000.00"}]""", Support.SortedJson.Serialize(body["assets"]));
         var rows = Rows(body);
         Assert.Equal("0.00", rows[first].Str("unsecuredAmount"));
         Assert.Equal("250000.00", rows[second].Str("seniorLiens"));

@@ -1,6 +1,4 @@
-using System.Text.Json.Nodes;
 using Insolvia.Api.Auth;
-using Insolvia.Api.Http;
 using Insolvia.Api.Tests.Support;
 
 namespace Insolvia.Api.Tests.Routes;
@@ -233,46 +231,16 @@ public sealed class RouteTableTests : IDisposable
             .SelectMany(e => (e.Metadata.GetMetadata<IHttpMethodMetadata>()?.HttpMethods ?? []).Select(m => ($"{m} {e.RoutePattern.RawText}", e.Metadata.GetMetadata<PrincipalClass>())))];
 }
 
-/// <summary>
-/// <see cref="FlaskJson"/>: the bytes Flask's jsonify writes — sorted keys at
-/// every depth, compact, ensure_ascii — and <c>fields.prune</c>.
-/// </summary>
-public sealed class FlaskJsonTests
+/// <summary><see cref="WireFormat"/>'s timestamps: ISO 8601 UTC with a Z.</summary>
+public sealed class WireFormatTests
 {
     [Fact]
-    public void Keys_are_sorted_at_every_depth_and_separators_are_compact()
-    {
-        var node = JsonNode.Parse("""{"b": 1, "a": {"z": true, "y": [ {"d": null, "c": "x"} ]}}""");
-
-        Assert.Equal("""{"a":{"y":[{"c":"x","d":null}],"z":true},"b":1}""", FlaskJson.Serialize(node));
-    }
-
-    [Theory]
-    [InlineData("Example & Partners", "\"Example & Partners\"")]
-    [InlineData("doesn't <b>", "\"doesn't <b>\"")]
-    [InlineData("café — ok", "\"caf\\u00e9 \\u2014 ok\"")]
-    [InlineData("\U0001F600", "\"\\ud83d\\ude00\"")]
-    [InlineData("q\"b\\s/\n\r\t\b\f\u0001\u007f", "\"q\\\"b\\\\s/\\n\\r\\t\\b\\f\\u0001\\u007f\"")]
-    public void Strings_are_escaped_as_python_ensure_ascii_does(string value, string expected)
-    {
-        Assert.Equal(expected, FlaskJson.Serialize(JsonValue.Create(value)));
-    }
-
-    [Fact]
-    public void Prune_drops_nulls_and_emptied_containers_but_keeps_answers()
-    {
-        var pruned = FlaskJson.Prune(JsonNode.Parse("""{"a": null, "b": {"c": null}, "d": [], "e": false, "f": 0, "g": "", "h": [null, {}], "i": {"j": {"k": null}}}"""));
-
-        Assert.Equal("""{"e":false,"f":0,"g":"","h":[null,{}]}""", FlaskJson.Serialize(pruned));
-    }
-
-    [Fact]
-    public void Timestamps_are_pythons_isoformat_with_a_z()
+    public void Timestamps_are_iso_8601_with_a_z()
     {
         var at = new DateTimeOffset(2026, 1, 2, 3, 4, 5, TimeSpan.Zero).AddTicks(1234567);
 
-        Assert.Equal("2026-01-02T03:04:05.123Z", FlaskJson.Millis(at));
-        Assert.Equal("2026-01-02T03:04:05.123456Z", FlaskJson.Micros(at));
-        Assert.Equal("2026-01-02T03:04:05.000000Z", FlaskJson.Micros(new DateTimeOffset(2026, 1, 2, 3, 4, 5, TimeSpan.Zero)));
+        Assert.Equal("2026-01-02T03:04:05.123Z", WireFormat.Millis(at));
+        Assert.Equal("2026-01-02T03:04:05.123456Z", WireFormat.Micros(at));
+        Assert.Equal("2026-01-02T03:04:05.000000Z", WireFormat.Micros(new DateTimeOffset(2026, 1, 2, 3, 4, 5, TimeSpan.Zero)));
     }
 }

@@ -4,7 +4,6 @@ using Insolvia.Api.Auth;
 using Insolvia.Api.Calendar;
 using Insolvia.Api.Cases;
 using Insolvia.Api.Hosting;
-using Insolvia.Api.Http;
 using Insolvia.Domain;
 using Insolvia.Domain.Access;
 using Insolvia.Domain.AccessLog;
@@ -294,7 +293,7 @@ public sealed class CalendarRoutes : IEndpointModule
 
         var caseId = CaseRoutes.Query(context, "case_id") is { Length: > 0 } given ? given : null;
         var events = await WindowEventsAsync(context, accessor, starting, ending, attendee, caseId, cancellationToken);
-        return new CalendarWindow(FlaskJson.Date(starting), FlaskJson.Date(ending), [.. events.Select(EventView.Of)]);
+        return new CalendarWindow(WireFormat.Date(starting), WireFormat.Date(ending), [.. events.Select(EventView.Of)]);
     }
 
     /// <summary>The caller's calendar feed.</summary>

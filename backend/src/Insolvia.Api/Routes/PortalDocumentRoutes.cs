@@ -1,8 +1,6 @@
-using System.Text.Json.Nodes;
 using Insolvia.Api.Auth;
 using Insolvia.Api.Cases;
 using Insolvia.Api.Hosting;
-using Insolvia.Api.Http;
 using Insolvia.Api.Portal;
 using Insolvia.Domain;
 using Insolvia.Domain.Access;
@@ -10,6 +8,7 @@ using Insolvia.Domain.AccessLog;
 using Insolvia.Domain.DocumentRequests;
 using Insolvia.Domain.Documents;
 using Insolvia.Domain.Ports;
+using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace Insolvia.Api.Routes;
 
@@ -24,7 +23,7 @@ namespace Insolvia.Api.Routes;
 /// <para><b>One upload seam, not two.</b> <c>POST /v1/portal/documents</c> is
 /// the staff route's create with the client as uploader, channel
 /// <c>client</c>, the REQUEST's kind, and the same presigned PUT
-/// (<see cref="DocumentRoutes.UploadBlockAsync"/>); <c>…/complete</c> is the
+/// (<see cref="DocumentRoutes.UploadAsync"/>); <c>…/complete</c> is the
 /// staff route's three steps, then the request is satisfied. A client's upload
 /// is never auto-extracted (ADR 0019's ZDR item): complete calls the staff
 /// route's trigger, whose channel check makes it a no-op here.</para>
@@ -48,35 +47,20 @@ public sealed class PortalDocumentRoutes : IEndpointModule
         routes.MapPost("/v1/portal/documents/{documentId}/complete", CompleteAsync).RequireClient();
     }
 
-    // shortcut: the three handlers below still answer FlaskJson.Result — their
-    // bodies embed CaseViews.PortalRequest/PortalDocument, which convert to
-    // records in Cases/ on another branch; type them once those land.
-
     /// <summary>List my document requests.</summary>
     /// <remarks>The documents the firm asked this client for, each with its status and the client's own uploads against it, and the overall progress. Waived requests are included — "no longer needed" is something to be told.</remarks>
-    internal static async Task<IResult> RequestsAsync(HttpContext context, CancellationToken cancellationToken)
+    internal static async Task<PortalRequestList> RequestsAsync(HttpContext context, CancellationToken cancellationToken)
     {
         var client = context.CurrentClient();
         var caseId = await BoundCaseAsync(context, client, AccessAction.PortalRead, cancellationToken);
         var requests = await context.Port<IDocumentRequestStore>().ListForCaseAsync(caseId, cancellationToken);
         var own = (await context.Port<IDocumentStore>().ListForCaseAsync(caseId, cancellationToken)).Where(document => IsOwn(document, client)).ToList();
-        var progress = DocumentRequestRules.Progress(requests);
-        return FlaskJson.Result(new JsonObject
-        {
-            ["requests"] = new JsonArray([.. requests.Select(item => (JsonNode)CaseViews.PortalRequest(item, own.Where(document => document.RequestId == item.Id)))]),
-            ["progress"] = new JsonObject
-            {
-                ["total"] = progress.Total,
-                ["received"] = progress.Received,
-                ["outstanding"] = progress.Outstanding,
-                ["waived"] = progress.Waived,
-            },
-        });
+        return new([.. requests.Select(item => PortalRequestView.Of(item, own.Where(document => document.RequestId == item.Id)))], DocumentRequestRules.Progress(requests));
     }
 
     /// <summary>Start a document upload.</summary>
     /// <remarks>Authorises one upload against one of the firm's open document requests, and answers the document and a presigned PUT for its bytes; then call <c>…/complete</c>.</remarks>
-    internal static async Task<IResult> CreateAsync(HttpContext context, CancellationToken cancellationToken)
+    internal static async Task<Created<PortalUploadTicket>> CreateAsync(HttpContext context, CancellationToken cancellationToken)
     {
         var client = context.CurrentClient();
 
@@ -92,15 +76,15 @@ public sealed class PortalDocumentRoutes : IEndpointModule
         var draft = DocumentRules.ParseUpload(body, answered.Kind);
         var document = DocumentRules.Create(draft, caseId, client.Subject, DocumentChannel.Client, answered.Id, context.Clock());
         await context.Port<IDocumentStore>().CreateAsync(document, cancellationToken);
-        var upload = await DocumentRoutes.UploadBlockAsync(context, document, cancellationToken);
+        var upload = await DocumentRoutes.UploadAsync(context, document, cancellationToken);
         context.Log(Logger, "client document created", ("document_id", document.Id), ("request_id", answered.Id));
-        return FlaskJson.Result(new JsonObject { ["document"] = CaseViews.PortalDocument(document), ["upload"] = upload }, StatusCodes.Status201Created);
+        return TypedResults.Created((string?)null, new PortalUploadTicket(PortalDocumentView.Of(document), upload));
     }
 
     /// <summary>Complete a document upload.</summary>
     /// <remarks>Say the upload's PUT finished: the document is stored and the request it answers is received. Idempotent; a 409 when the bytes are not there.</remarks>
     // HeadObject, clear the tag, write stored, then satisfy the request.
-    internal static async Task<IResult> CompleteAsync(HttpContext context, string documentId, CancellationToken cancellationToken)
+    internal static async Task<PortalUpload> CompleteAsync(HttpContext context, string documentId, CancellationToken cancellationToken)
     {
         var client = context.CurrentClient();
         var blobs = context.Port<IDocumentBlobStore>();
@@ -118,7 +102,7 @@ public sealed class PortalDocumentRoutes : IEndpointModule
         await DocumentRoutes.SatisfyRequestAsync(context, confirmed, cancellationToken);
         await DocumentRoutes.TriggerExtractionAsync(context, confirmed, client.Subject, cancellationToken);
         context.Log(Logger, "client document completed", ("document_id", documentId));
-        return FlaskJson.Result(new JsonObject { ["document"] = CaseViews.PortalDocument(confirmed) });
+        return new(PortalDocumentView.Of(confirmed));
     }
 
     // The binding's case, if it still exists, with the request on the access

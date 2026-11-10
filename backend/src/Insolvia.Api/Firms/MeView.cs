@@ -1,5 +1,4 @@
 using System.Text.Json.Serialization;
-using Insolvia.Api.Http;
 using Insolvia.Domain;
 using Insolvia.Domain.Access;
 using Insolvia.Domain.Auth;

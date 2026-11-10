@@ -1,5 +1,4 @@
 using System.Text.Json.Serialization;
-using Insolvia.Api.Http;
 using Insolvia.Domain.Clients;
 
 namespace Insolvia.Api.Portal;
@@ -39,8 +38,8 @@ public sealed record ClientBindingView(
             [.. binding.Roles],
             binding.Status,
             binding.InvitedBy,
-            FlaskJson.Micros(binding.CreatedAt),
-            FlaskJson.Micros(binding.UpdatedAt));
+            WireFormat.Micros(binding.CreatedAt),
+            WireFormat.Micros(binding.UpdatedAt));
     }
 }
 

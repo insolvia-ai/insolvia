@@ -2,7 +2,6 @@ using System.Text.RegularExpressions;
 using Insolvia.Api.Auth;
 using Insolvia.Api.Filing;
 using Insolvia.Api.Hosting;
-using Insolvia.Api.Http;
 using Insolvia.Domain;
 using Insolvia.Domain.FilingAuthorizations;
 using Insolvia.Domain.FilingCredentials;

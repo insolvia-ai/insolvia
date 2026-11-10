@@ -1,7 +1,6 @@
 using System.Text.Json.Serialization;
 using Insolvia.Api.Configuration;
 using Insolvia.Api.Hosting;
-using Insolvia.Api.Http;
 using Insolvia.Api.Mail;
 using Insolvia.Api.Waitlist;
 using Insolvia.Data.Waitlist;
@@ -41,7 +40,7 @@ public sealed class WaitlistRoutes : IEndpointModule
 
         // GLBA: only the server-generated id — never a submitted value.
         context.Log(Logger, "waitlist submission stored", ("waitlist_id", record.Id));
-        return TypedResults.Created((string?)null, new WaitlistReceipt(record.Id, FlaskJson.Millis(record.SubmittedAt)));
+        return TypedResults.Created((string?)null, new WaitlistReceipt(record.Id, WireFormat.Millis(record.SubmittedAt)));
     }
 }
 

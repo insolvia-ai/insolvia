@@ -1,4 +1,3 @@
-using Insolvia.Api.Http;
 using Insolvia.Domain.Courts;
 
 namespace Insolvia.Api.Cases;
@@ -15,7 +14,7 @@ public sealed record CourtsView(string ReleaseId, string EffectiveDate, IReadOnl
     public static CourtsView Of(CourtsRelease release)
     {
         ArgumentNullException.ThrowIfNull(release);
-        return new(release.ReleaseId, FlaskJson.Date(release.EffectiveDate), [.. release.Districts.Select(CourtDistrictView.Of)]);
+        return new(release.ReleaseId, WireFormat.Date(release.EffectiveDate), [.. release.Districts.Select(CourtDistrictView.Of)]);
     }
 }
 
@@ -52,7 +51,7 @@ public sealed record CourtDistrictView(
             district.Circuit,
             district.Website,
             [.. district.Divisions.Select(DivisionView.Of)],
-            new CaseUploadView(district.CaseUpload.Status, district.CaseUpload.VerifiedAt is { } verified ? FlaskJson.Date(verified) : null));
+            new CaseUploadView(district.CaseUpload.Status, district.CaseUpload.VerifiedAt is { } verified ? WireFormat.Date(verified) : null));
     }
 }
 

@@ -1,6 +1,5 @@
 using Insolvia.Api.Auth;
 using Insolvia.Api.Hosting;
-using Insolvia.Api.Http;
 using Insolvia.Api.Portal;
 using Insolvia.Domain;
 using Insolvia.Domain.Access;

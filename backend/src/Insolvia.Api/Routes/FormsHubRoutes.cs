@@ -1,7 +1,6 @@
 using Insolvia.Api.Auth;
 using Insolvia.Api.Cases;
 using Insolvia.Api.Hosting;
-using Insolvia.Api.Http;
 using Insolvia.Domain;
 using Insolvia.Domain.AccessLog;
 using Insolvia.Domain.Courts;
@@ -128,7 +127,7 @@ public sealed class FormsHubRoutes : IEndpointModule
             OutputOptionsView.Of(options),
             await blobs.DownloadUrlAsync(storageRef, DownloadUrlTtlSeconds, cancellationToken),
             "GET",
-            FlaskJson.Millis(DocumentRules.ExpiryTimestamp(DownloadUrlTtlSeconds, context.Clock())));
+            WireFormat.Millis(DocumentRules.ExpiryTimestamp(DownloadUrlTtlSeconds, context.Clock())));
     }
 
     // Werkzeug's MultiDict `args[key]`: the FIRST value of a repeated key.

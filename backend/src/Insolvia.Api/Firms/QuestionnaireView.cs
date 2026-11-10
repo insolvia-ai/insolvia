@@ -1,4 +1,3 @@
-using Insolvia.Api.Http;
 using Insolvia.Domain.DocumentRequests;
 using Insolvia.Domain.Documents;
 using Insolvia.Domain.Questionnaires;
@@ -20,7 +19,7 @@ public sealed record QuestionnaireView(bool IsDefault, string? UpdatedAt, string
     /// <returns>The view.</returns>
     public static QuestionnaireView Of(QuestionnaireConfig? config) => new(
         config is null,
-        config is null ? null : FlaskJson.Micros(config.UpdatedAt),
+        config is null ? null : WireFormat.Micros(config.UpdatedAt),
         config?.UpdatedBy,
         [.. Questionnaire.Resolve(config).Select(QuestionnaireSectionView.Of)]);
 }
@@ -75,7 +74,7 @@ public sealed record ChecklistView(bool IsDefault, string? UpdatedAt, string? Up
     /// <returns>The view.</returns>
     public static ChecklistView Of(DocumentChecklist? checklist) => new(
         checklist is null,
-        checklist is null ? null : FlaskJson.Micros(checklist.UpdatedAt),
+        checklist is null ? null : WireFormat.Micros(checklist.UpdatedAt),
         checklist?.UpdatedBy,
         [.. DocumentChecklists.Resolve(checklist).Select(ChecklistItemView.Of)],
         [.. DocumentChecklists.DefaultChecklist.Select(ChecklistItemView.Of)]);

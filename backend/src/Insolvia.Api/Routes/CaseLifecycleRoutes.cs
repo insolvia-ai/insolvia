@@ -3,7 +3,6 @@ using System.Text.Json.Nodes;
 using Insolvia.Api.Auth;
 using Insolvia.Api.Cases;
 using Insolvia.Api.Hosting;
-using Insolvia.Api.Http;
 using Insolvia.Domain;
 using Insolvia.Domain.AccessLog;
 using Insolvia.Domain.CaseEntities;
@@ -317,7 +316,7 @@ public sealed class CaseLifecycleRoutes : IEndpointModule
         DateOnly? effectiveOn = null;
         var raw = Json.AsString(payload["effectiveOn"]);
         var stripped = raw is null ? string.Empty : TextRules.Strip(raw);
-        if (DateOnly.TryParseExact(stripped, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed) && FlaskJson.Date(parsed) == stripped)
+        if (DateOnly.TryParseExact(stripped, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed) && WireFormat.Date(parsed) == stripped)
         {
             effectiveOn = parsed;
         }

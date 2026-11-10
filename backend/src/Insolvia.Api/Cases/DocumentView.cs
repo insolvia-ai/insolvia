@@ -1,5 +1,4 @@
 using System.Text.Json.Serialization;
-using Insolvia.Api.Http;
 using Insolvia.Domain.Documents;
 
 namespace Insolvia.Api.Cases;
@@ -36,7 +35,7 @@ public sealed record DocumentView(
     public static DocumentView Of(Document document)
     {
         ArgumentNullException.ThrowIfNull(document);
-        return new(document.Id, document.CaseId, document.Kind, document.FileName, document.ContentType, document.ByteSize, FlaskJson.Millis(document.UploadedAt), document.Status, document.Channel, document.RequestId);
+        return new(document.Id, document.CaseId, document.Kind, document.FileName, document.ContentType, document.ByteSize, WireFormat.Millis(document.UploadedAt), document.Status, document.Channel, document.RequestId);
     }
 }
 
@@ -63,7 +62,7 @@ public sealed record PortalDocumentView(
     public static PortalDocumentView Of(Document document)
     {
         ArgumentNullException.ThrowIfNull(document);
-        return new(document.Id, document.RequestId, document.FileName, document.ContentType, document.ByteSize, FlaskJson.Millis(document.UploadedAt), document.Status);
+        return new(document.Id, document.RequestId, document.FileName, document.ContentType, document.ByteSize, WireFormat.Millis(document.UploadedAt), document.Status);
     }
 }
 
@@ -116,3 +115,12 @@ public sealed record DocumentUploadRequest(
     DocumentContentType ContentType,
     long ByteSize,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? RequestId);
+
+/// <summary>A client's new upload: the document, and where to PUT its bytes.</summary>
+/// <param name="Document">The document, as the client sees it.</param>
+/// <param name="Upload">The presigned PUT.</param>
+public sealed record PortalUploadTicket(PortalDocumentView Document, PresignedRequest Upload);
+
+/// <summary>A client's upload, completed.</summary>
+/// <param name="Document">The document, as the client sees it.</param>
+public sealed record PortalUpload(PortalDocumentView Document);

@@ -1,9 +1,7 @@
-using System.Text.Json;
 using System.Text.Json.Nodes;
 using Insolvia.Api.Auth;
 using Insolvia.Api.Cases;
 using Insolvia.Api.Hosting;
-using Insolvia.Api.Http;
 using Insolvia.Domain;
 using Insolvia.Domain.AccessLog;
 using Insolvia.Domain.DocumentRequests;
@@ -54,12 +52,8 @@ public sealed class DocumentRoutes : IEndpointModule
     internal static async Task<PresignedRequest> UploadAsync(HttpContext context, Document document, CancellationToken cancellationToken)
     {
         var url = await context.Port<IDocumentBlobStore>().UploadUrlAsync(document.StorageRef, document.ContentType.ToWire(), document.ByteSize, UploadUrlTtlSeconds, cancellationToken);
-        return new PresignedRequest(url, "PUT", new UploadHeaders(document.ContentType.ToWire(), DocumentRules.UploadTag), FlaskJson.Millis(DocumentRules.ExpiryTimestamp(UploadUrlTtlSeconds, context.Clock())));
+        return new PresignedRequest(url, "PUT", new UploadHeaders(document.ContentType.ToWire(), DocumentRules.UploadTag), WireFormat.Millis(DocumentRules.ExpiryTimestamp(UploadUrlTtlSeconds, context.Clock())));
     }
-
-    /// <summary><see cref="UploadAsync"/> as a JSON object, for the portal's upload route until it returns a typed result.</summary>
-    internal static async Task<JsonObject> UploadBlockAsync(HttpContext context, Document document, CancellationToken cancellationToken) =>
-        JsonSerializer.SerializeToNode(await UploadAsync(context, document, cancellationToken), WireJson.Options)!.AsObject();
 
     /// <summary>The request a new upload answers — a 400 on <c>requestId</c> when it is not this case's, or no longer wants documents.</summary>
     internal static async Task<DocumentRequest> OpenRequestOr400Async(HttpContext context, string caseId, string requestId, CancellationToken cancellationToken)
@@ -204,7 +198,7 @@ public sealed class DocumentRoutes : IEndpointModule
         await context.ReachableCaseAsync(caseId, AccessAction.DocumentDownload, cancellationToken);
         var document = await DocumentOr404Async(context, caseId, documentId, cancellationToken);
         var url = await context.Port<IDocumentBlobStore>().DownloadUrlAsync(document.StorageRef, DownloadUrlTtlSeconds, cancellationToken);
-        return new PresignedRequest(url, "GET", null, FlaskJson.Millis(DocumentRules.ExpiryTimestamp(DownloadUrlTtlSeconds, context.Clock())));
+        return new PresignedRequest(url, "GET", null, WireFormat.Millis(DocumentRules.ExpiryTimestamp(DownloadUrlTtlSeconds, context.Clock())));
     }
 
     /// <summary>Delete a document and its bytes.</summary>

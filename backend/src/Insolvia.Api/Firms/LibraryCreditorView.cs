@@ -1,5 +1,4 @@
 using System.Text.Json.Serialization;
-using Insolvia.Api.Http;
 using Insolvia.Domain.Claims;
 using Insolvia.Domain.Fields;
 using Insolvia.Domain.LibraryCreditors;
@@ -41,8 +40,8 @@ public sealed record LibraryCreditorView(
             creditor.Address,
             [.. creditor.AdditionalNoticeParties.Select(NoticePartyView.Of)],
             creditor.Preferred,
-            FlaskJson.Micros(creditor.CreatedAt),
-            FlaskJson.Micros(creditor.UpdatedAt),
+            WireFormat.Micros(creditor.CreatedAt),
+            WireFormat.Micros(creditor.UpdatedAt),
             creditor.Notes);
     }
 }

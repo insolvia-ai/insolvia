@@ -1,6 +1,5 @@
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
-using Insolvia.Api.Http;
 using Insolvia.Domain.Candidates;
 using Insolvia.Domain.Clients;
 using Insolvia.Domain.Questions;
@@ -44,8 +43,8 @@ public sealed record PortalAnswerView(
             answer.FilingRole,
             QuestionRules.AnswerValue(answer.Question, candidate.Payload),
             candidate.Status,
-            FlaskJson.Micros(candidate.CreatedAt),
-            FlaskJson.Micros(candidate.UpdatedAt));
+            WireFormat.Micros(candidate.CreatedAt),
+            WireFormat.Micros(candidate.UpdatedAt));
     }
 }
 

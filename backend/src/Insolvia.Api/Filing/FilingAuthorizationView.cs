@@ -1,4 +1,3 @@
-using Insolvia.Api.Http;
 using Insolvia.Domain.FilingAuthorizations;
 
 namespace Insolvia.Api.Filing;
@@ -44,7 +43,7 @@ public sealed record FilingAuthorizationView(
         FilingAuthorizationRules.IsCurrent(authorization, firmId, attorneyId),
         authorization is null
             ? null
-            : new(authorization.AuthorizationId, authorization.TextVersion, authorization.TextDigest, FlaskJson.Micros(authorization.SignedAt)));
+            : new(authorization.AuthorizationId, authorization.TextVersion, authorization.TextDigest, WireFormat.Micros(authorization.SignedAt)));
 }
 
 /// <summary>A signature on record.</summary>

@@ -1,5 +1,4 @@
 using System.Text.Json.Serialization;
-using Insolvia.Api.Http;
 using Insolvia.Domain.Filings;
 
 namespace Insolvia.Api.Filing;
@@ -71,7 +70,7 @@ public sealed record FilingView(
                     FilingApprovalRecords.Iso(r.ResolvedAt),
                     FilingApprovalRecords.Iso(r.DocketCheckedAt),
                     r.CaseNumber,
-                    r.FiledAt is { } filedAt ? FlaskJson.Date(filedAt) : null,
+                    r.FiledAt is { } filedAt ? WireFormat.Date(filedAt) : null,
                     r.ConfirmationDocumentId)
                 : null);
     }

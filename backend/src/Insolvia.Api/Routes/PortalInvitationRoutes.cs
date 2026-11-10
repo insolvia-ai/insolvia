@@ -1,7 +1,6 @@
 using Insolvia.Api.Auth;
 using Insolvia.Api.Configuration;
 using Insolvia.Api.Hosting;
-using Insolvia.Api.Http;
 using Insolvia.Api.Logging;
 using Insolvia.Api.Mail;
 using Insolvia.Api.Portal;
@@ -204,7 +203,7 @@ public sealed class PortalInvitationRoutes : IEndpointModule
             // it carries the invitation's key.)
             await context.Port<IMailer>().SendAsync(
                 email,
-                $"client-invitation:{binding.CaseId}:{binding.Subject}:{FlaskJson.Micros(binding.UpdatedAt)}",
+                $"client-invitation:{binding.CaseId}:{binding.Subject}:{WireFormat.Micros(binding.UpdatedAt)}",
                 cancellationToken);
         }
 #pragma warning disable CA1031 // The mail is best effort; the invitation already stands.

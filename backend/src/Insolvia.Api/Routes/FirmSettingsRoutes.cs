@@ -1,7 +1,6 @@
 using Insolvia.Api.Auth;
 using Insolvia.Api.Firms;
 using Insolvia.Api.Hosting;
-using Insolvia.Api.Http;
 using Insolvia.Domain.DocumentRequests;
 using Insolvia.Domain.Firms;
 using Insolvia.Domain.Questionnaires;

@@ -241,7 +241,7 @@ public sealed class CaseLifecycleRouteTests : IAsyncLifetime, IDisposable
         await _world.Post("/v1/cases", $$"""{ {{Tampa}}, "client_ids": ["{{clientId}}"]}""");
 
         var retained = (await _world.Get($"/v1/firm/clients/{clientId}")).Object;
-        Assert.Equal(Http.FlaskJson.Date(Clock.Today()), retained.Str("first_retained_at"));
+        Assert.Equal(Insolvia.Platform.Http.WireFormat.Date(Clock.Today()), retained.Str("first_retained_at"));
         Assert.False(retained.ContainsKey("prospect_stage"));
         Assert.Null((await _world.Firms.GetClientAsync(Ids.FirmA, clientId, HttpAssert.Ct))!.ProspectStage);
         Assert.Contains(_world.Events, e => (e.Action, e.ClientId) == (AccessAction.ClientUpdate, clientId));
@@ -275,7 +275,7 @@ public sealed class CaseLifecycleRouteTests : IAsyncLifetime, IDisposable
 
         Assert.Equal(201, (await _world.Post($"/v1/cases/{source}/copy", null)).Status);
 
-        Assert.Equal(Http.FlaskJson.Date(Clock.Today()), (await _world.Get($"/v1/firm/clients/{clientId}")).Str("first_retained_at"));
+        Assert.Equal(Insolvia.Platform.Http.WireFormat.Date(Clock.Today()), (await _world.Get($"/v1/firm/clients/{clientId}")).Str("first_retained_at"));
     }
 
     // ── Archive ─────────────────────────────────────────────────────
@@ -404,7 +404,7 @@ public sealed class CaseLifecycleRouteTests : IAsyncLifetime, IDisposable
         Assert.All(debtor["provenance"]!.AsObject(), entry => Assert.Equal(source, entry.Value!["copied_from_case_id"]!.GetValue<string>()));
         var copied = Assert.Single((await _world.Get($"/v1/cases/{copy.Str("id")}/creditors")).Object["creditors"]!.AsArray())!.AsObject();
         Assert.Equal(creditor.Str("id"), copied.Str("id"));
-        Assert.Equal($$"""{"copied_from_case_id":"{{source}}","source":"staff_typed"}""", Http.FlaskJson.Serialize(copied["provenance"]!["name"]));
+        Assert.Equal($$"""{"copied_from_case_id":"{{source}}","source":"staff_typed"}""", Support.SortedJson.Serialize(copied["provenance"]!["name"]));
         var forClient = (await _world.Get($"/v1/firm/clients/{clientId}/cases")).Object["cases"]!.AsArray();
         Assert.Equal(new[] { source, copy.Str("id") }.Order(StringComparer.Ordinal), forClient.Select(e => e!["case"]!.AsObject().Str("id")).Order(StringComparer.Ordinal));
     }
@@ -458,7 +458,7 @@ public sealed class CaseLifecycleRouteTests : IAsyncLifetime, IDisposable
         var copyId = (await _world.Post($"/v1/cases/{source}/copy", null)).Str("id");
 
         var copied = Assert.Single((await _world.Get($"/v1/cases/{copyId}/debtors")).Object["debtors"]!.AsArray())!.AsObject();
-        Assert.Equal("""{"kind":"ssn","last_four":"4321"}""", Http.FlaskJson.Serialize(copied["tax_id"]));
+        Assert.Equal("""{"kind":"ssn","last_four":"4321"}""", Support.SortedJson.Serialize(copied["tax_id"]));
         var items = _world.Service<Insolvia.Domain.Ports.ITaxIdStore>() as MemoryTaxIdStore;
         Assert.Equal(new[] { source, copyId }.Order(StringComparer.Ordinal), items!.Items.Keys.Select(key => key.CaseId).Order(StringComparer.Ordinal));
     }

@@ -2,7 +2,6 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Insolvia.Api.Analysis;
 using Insolvia.Api.Cases;
-using Insolvia.Api.Http;
 using Insolvia.Api.Tests.Support;
 using Insolvia.Domain.Engines.CreditorMatrix;
 using Insolvia.Domain.Engines.Exemptions;

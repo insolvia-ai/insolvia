@@ -1,4 +1,3 @@
-using Insolvia.Api.Http;
 using Insolvia.Domain.FilingCredentials;
 
 namespace Insolvia.Api.Filing;
@@ -33,8 +32,8 @@ public sealed record FilingCredentialView(
             credential.Login,
             [.. credential.Courts],
             credential.Status,
-            FlaskJson.Micros(credential.CreatedAt),
-            FlaskJson.Micros(credential.UpdatedAt));
+            WireFormat.Micros(credential.CreatedAt),
+            WireFormat.Micros(credential.UpdatedAt));
     }
 }
 

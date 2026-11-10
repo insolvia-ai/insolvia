@@ -79,7 +79,7 @@ public sealed class DebtorRouteTests : IAsyncLifetime, IDisposable
 
         Assert.Equal((201, 200), (first.Status, second.Status));
         Assert.Equal(first.Str("id"), second.Str("id"));
-        Assert.Equal("""{"given":"Augusta"}""", Http.FlaskJson.Serialize(second.Object["name"]));
+        Assert.Equal("""{"given":"Augusta"}""", Support.SortedJson.Serialize(second.Object["name"]));
     }
 
     [Fact]
@@ -131,8 +131,8 @@ public sealed class DebtorRouteTests : IAsyncLifetime, IDisposable
         var listed = await _world.Get($"/v1/cases/{caseId}/debtors");
 
         Assert.Equal(200, saved.Status);
-        Assert.Equal("""{"kind":"ssn","last_four":"4321"}""", Http.FlaskJson.Serialize(saved.Object["tax_id"]));
-        Assert.Equal("""{"kind":"ssn","last_four":"4321"}""", Http.FlaskJson.Serialize(listed.Object["debtors"]![0]!["tax_id"]));
+        Assert.Equal("""{"kind":"ssn","last_four":"4321"}""", Support.SortedJson.Serialize(saved.Object["tax_id"]));
+        Assert.Equal("""{"kind":"ssn","last_four":"4321"}""", Support.SortedJson.Serialize(listed.Object["debtors"]![0]!["tax_id"]));
         foreach (var body in new[] { saved.Body, listed.Body })
         {
             Assert.DoesNotContain("987654321", body, StringComparison.Ordinal);
@@ -171,7 +171,7 @@ public sealed class DebtorRouteTests : IAsyncLifetime, IDisposable
 
         var kept = await Put(caseId, """ "name": {"given": "Ada"}, "tax_id": {"kind": "ssn", "last_four": "4321"}, "provenance": {"name.given": """ + Typed + """, "tax_id": """ + Typed + "}");
         Assert.Equal(200, kept.Status);
-        Assert.Equal("""{"kind":"ssn","last_four":"4321"}""", Http.FlaskJson.Serialize(kept.Object["tax_id"]));
+        Assert.Equal("""{"kind":"ssn","last_four":"4321"}""", Support.SortedJson.Serialize(kept.Object["tax_id"]));
 
         var wrong = await Put(caseId, """ "tax_id": {"kind": "ssn", "last_four": "9999"}, "provenance": {"tax_id": """ + Typed + "}");
         Assert.Equal(400, wrong.Status);
@@ -193,7 +193,7 @@ public sealed class DebtorRouteTests : IAsyncLifetime, IDisposable
         await Put(caseId, """ "name": {"given": "Ada"}, "provenance": {"name.given": """ + Typed + "}");
 
         Assert.Equal(["debtor_1", "debtor_2", "non_filing_spouse"], await RolesAsync(caseId));
-        Assert.Equal("""{"name.given":{"source":"staff_typed"}}""", Http.FlaskJson.Serialize((await DebtorsAsync(caseId))[0]["provenance"]));
+        Assert.Equal("""{"name.given":{"source":"staff_typed"}}""", Support.SortedJson.Serialize((await DebtorsAsync(caseId))[0]["provenance"]));
     }
 
     [Fact]
@@ -238,7 +238,7 @@ public sealed class DebtorRouteTests : IAsyncLifetime, IDisposable
 
         Assert.Equal(200, second.Status);
         Assert.Equal((first.Str("id"), first.Str("created_at")), (second.Str("id"), second.Str("created_at")));
-        Assert.Equal("""{"given":"Augusta"}""", Http.FlaskJson.Serialize(second.Object["name"]));
+        Assert.Equal("""{"given":"Augusta"}""", Support.SortedJson.Serialize(second.Object["name"]));
     }
 
     // ── Who may ─────────────────────────────────────────────────────
@@ -280,7 +280,7 @@ public sealed class DebtorRouteTests : IAsyncLifetime, IDisposable
 
         Assert.Equal(201, answer.Status);
         Assert.Equal(("debtor_2", sam, "sam@example.test"), (answer.Str("filing_role"), answer.Str("client_id"), answer.Str("email")));
-        Assert.Equal($$"""{"client_id":"{{sam}}","source":"client"}""", Http.FlaskJson.Serialize(answer.Object["provenance"]!["email"]));
+        Assert.Equal($$"""{"client_id":"{{sam}}","source":"client"}""", Support.SortedJson.Serialize(answer.Object["provenance"]!["email"]));
         Assert.Equal("[]", answer.Object["differs_from_client"]!.ToJsonString());
     }
 
@@ -295,7 +295,7 @@ public sealed class DebtorRouteTests : IAsyncLifetime, IDisposable
 
         Assert.Equal(200, answer.Status);
         Assert.Equal((original.Str("id"), other), (answer.Str("id"), answer.Str("client_id")));
-        Assert.Equal(Http.FlaskJson.Serialize(original["name"]), Http.FlaskJson.Serialize(answer.Object["name"]));
+        Assert.Equal(Support.SortedJson.Serialize(original["name"]), Support.SortedJson.Serialize(answer.Object["name"]));
         Assert.Equal("""["name.given","name.surname"]""", answer.Object["differs_from_client"]!.ToJsonString());
     }
 
@@ -328,7 +328,7 @@ public sealed class DebtorRouteTests : IAsyncLifetime, IDisposable
         var answer = await Link(caseId, role, sam);
 
         Assert.Equal(400, answer.Status);
-        Assert.Equal("""{"client_id":"That client is being merged into another client."}""", Http.FlaskJson.Serialize(answer.Object["fields"]));
+        Assert.Equal("""{"client_id":"That client is being merged into another client."}""", Support.SortedJson.Serialize(answer.Object["fields"]));
         Assert.Equal(["debtor_1"], await RolesAsync(caseId));
         Assert.Equal(before[0].Str("client_id"), (await DebtorsAsync(caseId))[0].Str("client_id"));
     }
@@ -396,8 +396,8 @@ public sealed class DebtorRouteTests : IAsyncLifetime, IDisposable
         var saved = await _world.Put($"/v1/cases/{caseId}/debtors/debtor_1", body.ToJsonString());
 
         Assert.True(saved.Status == 200, saved.Body);
-        Assert.Equal("""{"source":"staff_typed"}""", Http.FlaskJson.Serialize(saved.Object["provenance"]!["name.given"]));
-        Assert.Equal($$"""{"client_id":"{{loaded.Str("client_id")}}","source":"client"}""", Http.FlaskJson.Serialize(saved.Object["provenance"]!["name.surname"]));
+        Assert.Equal("""{"source":"staff_typed"}""", Support.SortedJson.Serialize(saved.Object["provenance"]!["name.given"]));
+        Assert.Equal($$"""{"client_id":"{{loaded.Str("client_id")}}","source":"client"}""", Support.SortedJson.Serialize(saved.Object["provenance"]!["name.surname"]));
     }
 
     [Fact]
@@ -429,10 +429,10 @@ public sealed class DebtorRouteTests : IAsyncLifetime, IDisposable
         var body = answer.Object;
         Assert.Equal(before.Str("id"), body.Str("id"));
         Assert.Equal("Jordan", body["name"]!["given"]!.GetValue<string>());
-        Assert.Equal($$"""{"client_id":"{{before.Str("client_id")}}","source":"client"}""", Http.FlaskJson.Serialize(body["provenance"]!["name.given"]));
+        Assert.Equal($$"""{"client_id":"{{before.Str("client_id")}}","source":"client"}""", Support.SortedJson.Serialize(body["provenance"]!["name.given"]));
         Assert.Equal("[]", body["differs_from_client"]!.ToJsonString());
-        Assert.Equal("""{"basis":"lived_longest_180_days"}""", Http.FlaskJson.Serialize(body["venue"]));
-        Assert.Equal("""{"source":"staff_typed"}""", Http.FlaskJson.Serialize(body["provenance"]!["venue.basis"]));
+        Assert.Equal("""{"basis":"lived_longest_180_days"}""", Support.SortedJson.Serialize(body["venue"]));
+        Assert.Equal("""{"source":"staff_typed"}""", Support.SortedJson.Serialize(body["provenance"]!["venue.basis"]));
     }
 
     [Fact]
@@ -474,10 +474,10 @@ public sealed class DebtorRouteTests : IAsyncLifetime, IDisposable
 
         Assert.Equal(200, answer.Status);
         Assert.Equal("[]", answer.Object["differs_from_client"]!.ToJsonString());
-        Assert.Equal(Http.FlaskJson.Serialize(before["name"]), Http.FlaskJson.Serialize(answer.Object["name"]));
-        Assert.Equal(Http.FlaskJson.Serialize(before["provenance"]), Http.FlaskJson.Serialize(answer.Object["provenance"]));
+        Assert.Equal(Support.SortedJson.Serialize(before["name"]), Support.SortedJson.Serialize(answer.Object["name"]));
+        Assert.Equal(Support.SortedJson.Serialize(before["provenance"]), Support.SortedJson.Serialize(answer.Object["provenance"]));
         Assert.Equal((AccessAction.ClientUpdate, AccessOutcome.Allowed), (_world.Events[^1].Action, _world.Events[^1].Outcome));
-        Assert.Equal("""{"given":"Jordy","surname":"Example"}""", Http.FlaskJson.Serialize((await _world.Get($"/v1/firm/clients/{before.Str("client_id")}")).Object["name"]));
+        Assert.Equal("""{"given":"Jordy","surname":"Example"}""", Support.SortedJson.Serialize((await _world.Get($"/v1/firm/clients/{before.Str("client_id")}")).Object["name"]));
     }
 
     [Fact]

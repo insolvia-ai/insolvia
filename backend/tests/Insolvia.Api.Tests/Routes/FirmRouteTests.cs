@@ -1,5 +1,4 @@
 using System.Text.Json.Nodes;
-using Insolvia.Api.Http;
 using Insolvia.Api.Tests.Support;
 using Insolvia.Domain.Firms;
 using Insolvia.Domain.Ports;
@@ -159,11 +158,11 @@ public sealed class FirmRouteTests : IAsyncLifetime, IDisposable
         const string block = """{"address":{"city":"Tampa","line1":"1 Main St","state":"FL"},"bar_number":"0123456","bar_state":"FL","email":"alice@example.test","firm_name":"Example & Partners","phone":"813-555-0100"}""";
         var me = await _world.Patch("/v1/me", "{\"signatureBlock\": " + block + "}", Ids.Alice);
         Assert.Equal(200, me.Status);
-        Assert.Equal(block, FlaskJson.Serialize(me.Object["firm"]!["signatureBlock"]));
+        Assert.Equal(block, SortedJson.Serialize(me.Object["firm"]!["signatureBlock"]));
 
         // Every colleague sees it in the directory — a bar number is printed on every filing.
         var people = (await _world.Get("/v1/firm/directory", Ids.Bob)).Object["people"]!.AsArray();
-        Assert.Equal(block, FlaskJson.Serialize(people.Single(p => p!["subject"]!.GetValue<string>() == Ids.Alice)!["signatureBlock"]));
+        Assert.Equal(block, SortedJson.Serialize(people.Single(p => p!["subject"]!.GetValue<string>() == Ids.Alice)!["signatureBlock"]));
         Assert.Null(people.Single(p => p!["subject"]!.GetValue<string>() == Ids.Bob)!["signatureBlock"]);
 
         // An administrator may set a colleague's too.

@@ -1,4 +1,3 @@
-using Insolvia.Api.Http;
 using Insolvia.Domain.Engines.Standards;
 
 namespace Insolvia.Api.Analysis;
@@ -33,7 +32,7 @@ public sealed record StandardsView(
     {
         ArgumentNullException.ThrowIfNull(result);
         return new(
-            FlaskJson.Date(result.AsOf),
+            WireFormat.Date(result.AsOf),
             result.State,
             result.County,
             result.HouseholdSize,

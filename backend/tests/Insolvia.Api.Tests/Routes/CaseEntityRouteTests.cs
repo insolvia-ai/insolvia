@@ -76,9 +76,9 @@ public sealed class CaseEntityRouteTests : IAsyncLifetime, IDisposable
         Assert.Equal(201, answer.Status);
         var record = answer.Object;
         Assert.Equal("Example Bank", record.Str("name"));
-        Assert.Equal("""{"city":"Exampleville","line1":"1 Example Way"}""", Http.FlaskJson.Serialize(record["address"]));
+        Assert.Equal("""{"city":"Exampleville","line1":"1 Example Way"}""", Support.SortedJson.Serialize(record["address"]));
         Assert.Equal(caseId, record.Str("case_id"));
-        Assert.Equal("""{"source":"staff_typed"}""", Http.FlaskJson.Serialize(record["provenance"]!["name"]));
+        Assert.Equal("""{"source":"staff_typed"}""", Support.SortedJson.Serialize(record["provenance"]!["name"]));
         Assert.Equal(record.Str("created_at"), record.Str("updated_at"));
         Assert.Equal(["address", "amended", "case_id", "created_at", "id", "name", "provenance", "updated_at"], Answer.Keys(record));
     }
@@ -186,7 +186,7 @@ public sealed class CaseEntityRouteTests : IAsyncLifetime, IDisposable
 
         Assert.Equal(201, answer.Status);
         Assert.Equal("gift", answer.Str("entry_type"));
-        Assert.Equal("""{"recipient":{"name":"Example Recipient"},"value":"700.00"}""", Http.FlaskJson.Serialize(answer.Object["payload"]));
+        Assert.Equal("""{"recipient":{"name":"Example Recipient"},"value":"700.00"}""", Support.SortedJson.Serialize(answer.Object["payload"]));
     }
 
     // ── The access log ──────────────────────────────────────────────

@@ -1,5 +1,4 @@
 using System.Text.Json.Serialization;
-using Insolvia.Api.Http;
 using Insolvia.Domain.Debtors;
 using Insolvia.Domain.Fields;
 using Insolvia.Domain.FirmClients;
@@ -63,12 +62,12 @@ public sealed record ClientView(
         return new(
             client.Id,
             client.Status,
-            FlaskJson.Micros(client.CreatedAt),
-            FlaskJson.Micros(client.UpdatedAt),
+            WireFormat.Micros(client.CreatedAt),
+            WireFormat.Micros(client.UpdatedAt),
             client.CreatedBy,
             client.Name,
             client.OtherNamesUsed.Count == 0 ? null : client.OtherNamesUsed,
-            client.DateOfBirth is { } born ? FlaskJson.Date(born) : null,
+            client.DateOfBirth is { } born ? WireFormat.Date(born) : null,
             client.ResidenceAddress == NoAddress ? null : client.ResidenceAddress,
             client.MailingAddress == NoAddress ? null : client.MailingAddress,
             client.Phone,
@@ -76,7 +75,7 @@ public sealed record ClientView(
             client.Email,
             client.LeadSource,
             client.ReferredBy,
-            client.FirstRetainedAt is { } retained ? FlaskJson.Date(retained) : null,
+            client.FirstRetainedAt is { } retained ? WireFormat.Date(retained) : null,
             client.TaxIdLastFour,
             client.MergedInto,
             client.Prospect ? client.ProspectStage : null);

@@ -2,7 +2,6 @@ using System.Text.Json.Nodes;
 using Insolvia.Api.Auth;
 using Insolvia.Api.Cases;
 using Insolvia.Api.Hosting;
-using Insolvia.Api.Http;
 using Insolvia.Domain;
 using Insolvia.Domain.AccessLog;
 using Insolvia.Domain.Documents;
@@ -172,7 +171,7 @@ public sealed class PacketRoutes : IEndpointModule
         return new PacketUrlView(
             await blobs.DownloadUrlAsync(packet.StorageRef, DownloadUrlTtlSeconds, cancellationToken),
             "GET",
-            FlaskJson.Millis(DocumentRules.ExpiryTimestamp(DownloadUrlTtlSeconds, context.Clock())));
+            WireFormat.Millis(DocumentRules.ExpiryTimestamp(DownloadUrlTtlSeconds, context.Clock())));
     }
 }
 

@@ -2,7 +2,6 @@ using System.Text.Json.Nodes;
 using Insolvia.Api.Auth;
 using Insolvia.Api.Cases;
 using Insolvia.Api.Hosting;
-using Insolvia.Api.Http;
 using Insolvia.Domain;
 using Insolvia.Domain.AccessLog;
 using Insolvia.Domain.Candidates;

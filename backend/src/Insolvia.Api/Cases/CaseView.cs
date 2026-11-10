@@ -1,5 +1,4 @@
 using System.Text.Json.Serialization;
-using Insolvia.Api.Http;
 using Insolvia.Domain.Cases;
 using Insolvia.Domain.Debtors;
 
@@ -71,8 +70,8 @@ public sealed record CaseView(
             stored.FormRevisions,
             stored.ConstantsSetId,
             stored.ExemptionSet,
-            stored.FiledAt is { } filed ? FlaskJson.Date(filed) : null,
-            stored.Meeting341At is { } meeting ? FlaskJson.Date(meeting) : null,
+            stored.FiledAt is { } filed ? WireFormat.Date(filed) : null,
+            stored.Meeting341At is { } meeting ? WireFormat.Date(meeting) : null,
             stored.CaseNumber,
             stored.Judge,
             stored.Trustee,

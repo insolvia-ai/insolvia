@@ -110,7 +110,7 @@ public sealed class FirmClientRouteTests : IAsyncLifetime, IDisposable
         Assert.Equal(201, created.Status);
         var body = created.Object;
         Assert.Equal("""{"given":"Jordan","surname":"Example"}""", body["name"]!.ToJsonString());
-        Assert.Equal("""{"county":"Sangamon","line1":"1 Example St"}""", Http.FlaskJson.Serialize(body["residence_address"]));
+        Assert.Equal("""{"county":"Sangamon","line1":"1 Example St"}""", Support.SortedJson.Serialize(body["residence_address"]));
         Assert.Equal("active", body["status"]!.GetValue<string>());
         Assert.Equal(Admin, body["created_by"]!.GetValue<string>());
         Assert.Equal("Referral", body["lead_source"]!.GetValue<string>());

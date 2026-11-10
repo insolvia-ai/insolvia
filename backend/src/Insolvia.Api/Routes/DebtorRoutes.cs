@@ -2,7 +2,6 @@ using System.Text.Json.Nodes;
 using Insolvia.Api.Auth;
 using Insolvia.Api.Cases;
 using Insolvia.Api.Hosting;
-using Insolvia.Api.Http;
 using Insolvia.Domain;
 using Insolvia.Domain.Access;
 using Insolvia.Domain.AccessLog;
@@ -27,7 +26,7 @@ namespace Insolvia.Api.Routes;
 /// a PUT to an empty client role is a 400 on <c>client_id</c>. The non-filing
 /// spouse may be typed.</para>
 /// <para><b>The tax id</b> is sealed on the way in (<see cref="TaxIdRules.StoreAsync"/>)
-/// and only its last four ever leave (<see cref="CaseViews.TaxId"/>).</para>
+/// and only its last four ever leave (<see cref="TaxIdView"/>).</para>
 /// <para><b><c>differs_from_client</c></b> is computed only for a caller who
 /// may see the client directory: a caller without <c>clients</c> is not told
 /// how a client record reads.</para>
