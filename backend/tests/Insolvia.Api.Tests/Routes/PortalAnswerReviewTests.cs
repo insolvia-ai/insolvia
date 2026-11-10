@@ -70,9 +70,9 @@ public sealed class PortalAnswerReviewTests : IAsyncLifetime, IDisposable
         var row = Assert.Single((await _world.Get($"/v1/cases/{_caseId}/extraction/candidates")).Object["candidates"]!.AsArray())!;
         Assert.Equal("client", row["origin"]!["channel"]!.GetValue<string>());
         Assert.Equal("""{"displayName":"Pat Example"}""", row["client"]!.ToJsonString());
-        Assert.Equal(
-            """{"filingRole":"debtor_1","id":"personal_information.legal_name","sectionId":"personal_information","sectionTitle":"Personal information","text":"What is your full legal name?"}""",
-            row["question"]!.ToJsonString());
+        Assert.True(JsonNode.DeepEquals(
+            JsonNode.Parse("""{"filingRole":"debtor_1","id":"personal_information.legal_name","sectionId":"personal_information","sectionTitle":"Personal information","text":"What is your full legal name?"}"""),
+            row["question"]));
     }
 
     [Fact]

@@ -5,8 +5,6 @@ using Insolvia.Domain.Cases;
 using Insolvia.Domain.Clients;
 using Insolvia.Domain.Debtors;
 using Insolvia.Domain.Provenance;
-using Insolvia.Domain.Questionnaires;
-using Insolvia.Domain.Questions;
 
 namespace Insolvia.Domain.Candidates;
 
@@ -329,97 +327,6 @@ public static partial class ExtractionReview
 
     /// <summary>One confirmation instant, minted once per review, so the row and every entry carry the same value.</summary>
     public static string ReviewMoment(TimeProvider? clock = null) => CaseRules.Iso(Clock.Now(clock));
-
-    /// <summary>
-    /// The review queue's wire shape (<c>candidate_json</c>): everything a
-    /// reviewer needs to verify a record; absent values omitted.
-    /// </summary>
-    public static JsonObject CandidateJson(Candidate candidate)
-    {
-        ArgumentNullException.ThrowIfNull(candidate);
-        var body = new JsonObject
-        {
-            ["id"] = candidate.Id,
-            ["entityType"] = candidate.EntityType,
-            ["status"] = candidate.Status.ToWire(),
-            ["payload"] = BodyJson.Prune((JsonObject)candidate.Payload.DeepClone()),
-            ["origin"] = new JsonObject
-            {
-                ["channel"] = candidate.Origin.Channel.ToWire(),
-                ["clientId"] = candidate.Origin.ClientId,
-                ["subject"] = candidate.Origin.Subject,
-            },
-            ["createdAt"] = CaseRules.Iso(candidate.CreatedAt),
-            ["updatedAt"] = CaseRules.Iso(candidate.UpdatedAt),
-        };
-        if (candidate.DocumentId is not null)
-        {
-            body["documentId"] = candidate.DocumentId;
-        }
-
-        if (candidate.Confidence is { } confidence)
-        {
-            body["confidence"] = confidence;
-        }
-
-        if (candidate.Locator is not null)
-        {
-            body["locator"] = candidate.Locator.DeepClone();
-        }
-
-        if (candidate.Note is not null)
-        {
-            body["note"] = candidate.Note;
-        }
-
-        if (candidate.ExternalRef is { } external)
-        {
-            var reference = new JsonObject { ["system"] = external.System, ["externalId"] = external.ExternalId };
-            if (external.ExternalUrl is not null)
-            {
-                reference["externalUrl"] = external.ExternalUrl;
-            }
-
-            body["externalRef"] = reference;
-        }
-
-        if (candidate.ConfirmedBy is not null)
-        {
-            body["confirmedBy"] = candidate.ConfirmedBy;
-        }
-
-        if (candidate.ConfirmedAt is not null)
-        {
-            body["confirmedAt"] = candidate.ConfirmedAt;
-        }
-
-        if (candidate.CorrectedPayload is not null)
-        {
-            body["correctedPayload"] = BodyJson.Prune((JsonObject)candidate.CorrectedPayload.DeepClone());
-        }
-
-        if (candidate.ResultingRecordId is not null)
-        {
-            body["resultingRecordId"] = candidate.ResultingRecordId;
-        }
-
-        return body;
-    }
-
-    /// <summary>The <c>question</c> block the staff queue shows beside a client's answer (<c>review_question_json</c>).</summary>
-    public static JsonObject ReviewQuestionJson(AnswerRef answer)
-    {
-        ArgumentNullException.ThrowIfNull(answer);
-        var title = Questionnaire.Catalogue.FirstOrDefault(section => section.Id == answer.Question.Section)?.Title ?? answer.Question.Section;
-        return new JsonObject
-        {
-            ["id"] = answer.Question.Id,
-            ["sectionId"] = answer.Question.Section,
-            ["sectionTitle"] = title,
-            ["text"] = answer.Question.Text,
-            ["filingRole"] = answer.FilingRole,
-        };
-    }
 
     // An unchanged field's pointers: the document, the page anchor (never a
     // client answer's question locator) and the model's confidence.

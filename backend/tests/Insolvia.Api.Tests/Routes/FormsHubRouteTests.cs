@@ -143,11 +143,11 @@ public sealed partial class FormsHubRouteTests : IAsyncLifetime, IDisposable
         var caseId = await _world.OpenCaseIdAsync();
         var stored = (await _world.StoredAsync(caseId))!;
         var data = await CaseDataReads.ReadAsync(stored, _world.Service<IDebtorStore>(), _world.Service<ICaseEntityStore>(), HttpAssert.Ct);
-        var expected = new JsonArray([.. FormsHub.Summaries(data, DateOnly.FromDateTime(Now.UtcDateTime)).Select(summary => (JsonNode)Insolvia.Api.Routes.FormsHubRoutes.FormSummaryJson(summary, 0))]);
+        var expected = new JsonArray([.. FormsHub.Summaries(data, DateOnly.FromDateTime(Now.UtcDateTime)).Select(summary => System.Text.Json.JsonSerializer.SerializeToNode(Cases.FormSummaryView.Of(summary, 0), Http.WireJson.Options))]);
 
         var answer = await Forms(caseId);
 
-        Assert.Equal(Http.FlaskJson.Serialize(new JsonObject { ["forms"] = expected }), answer.Body.TrimEnd('\n'));
+        Assert.True(JsonNode.DeepEquals(new JsonObject { ["forms"] = expected }, JsonNode.Parse(answer.Body)), answer.Body);
     }
 
     [Fact]
