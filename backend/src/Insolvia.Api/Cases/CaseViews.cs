@@ -3,13 +3,11 @@ using Insolvia.Api.Http;
 using Insolvia.Domain;
 using Insolvia.Domain.CaseEntities;
 using Insolvia.Domain.Cases;
-using Insolvia.Domain.CaseTasks;
 using Insolvia.Domain.Clients;
 using Insolvia.Domain.Courts;
 using Insolvia.Domain.Debtors;
 using Insolvia.Domain.DocumentRequests;
 using Insolvia.Domain.Documents;
-using Insolvia.Domain.Events;
 using Insolvia.Domain.Notes;
 using Insolvia.Domain.Provenance;
 using Insolvia.Domain.TaxIds;
@@ -224,30 +222,6 @@ public static class CaseViews
         return new JsonObject { ["kind"] = taxId.Kind.ToWire(), ["last_four"] = taxId.LastFour };
     }
 
-    /// <summary>
-    /// <c>document_json</c>: staff's view. No <c>uploadedBy</c>, <c>storageRef</c>
-    /// or <c>etag</c>; <c>requestId</c> present as null when unset (the wire shape has it so).
-    /// </summary>
-    /// <param name="document">The document.</param>
-    /// <returns>The body.</returns>
-    public static JsonObject Document(Document document)
-    {
-        ArgumentNullException.ThrowIfNull(document);
-        return new JsonObject
-        {
-            ["id"] = document.Id,
-            ["caseId"] = document.CaseId,
-            ["kind"] = document.Kind.ToWire(),
-            ["fileName"] = document.FileName,
-            ["contentType"] = document.ContentType.ToWire(),
-            ["byteSize"] = document.ByteSize,
-            ["uploadedAt"] = FlaskJson.Millis(document.UploadedAt),
-            ["status"] = document.Status.ToWire(),
-            ["channel"] = document.Channel.ToWire(),
-            ["requestId"] = FlaskJson.Text(document.RequestId),
-        };
-    }
-
     /// <summary><c>portal_document_json</c>: a CLIENT's view of their own upload — no case id, no channel.</summary>
     /// <param name="document">The document.</param>
     /// <returns>The body.</returns>
@@ -263,47 +237,6 @@ public static class CaseViews
             ["byteSize"] = document.ByteSize,
             ["uploadedAt"] = FlaskJson.Millis(document.UploadedAt),
             ["status"] = document.Status.ToWire(),
-        };
-    }
-
-    /// <summary><c>request_json</c>: staff's view; <c>description</c> and <c>receivedAt</c> null when unset, no <c>createdBy</c>.</summary>
-    /// <param name="request">The request.</param>
-    /// <returns>The body.</returns>
-    public static JsonObject Request(DocumentRequest request)
-    {
-        ArgumentNullException.ThrowIfNull(request);
-        return new JsonObject
-        {
-            ["id"] = request.Id,
-            ["caseId"] = request.CaseId,
-            ["title"] = request.Title,
-            ["kind"] = request.Kind.ToWire(),
-            ["description"] = FlaskJson.Text(request.Description),
-            ["status"] = request.Status.ToWire(),
-            ["documentIds"] = new JsonArray([.. request.DocumentIds.Select(id => (JsonNode)JsonValue.Create(id))]),
-            ["createdAt"] = CaseRules.Iso(request.CreatedAt),
-            ["updatedAt"] = CaseRules.Iso(request.UpdatedAt),
-            ["receivedAt"] = request.ReceivedAt is { } received ? CaseRules.Iso(received) : null,
-        };
-    }
-
-    /// <summary><c>requests_json</c>: the requests and the progress, from the same list so they agree.</summary>
-    /// <param name="requests">The case's requests.</param>
-    /// <returns>The body.</returns>
-    public static JsonObject Requests(IReadOnlyList<DocumentRequest> requests)
-    {
-        ArgumentNullException.ThrowIfNull(requests);
-        var progress = DocumentRequestRules.Progress(requests);
-        return new JsonObject
-        {
-            ["requests"] = new JsonArray([.. requests.Select(request => (JsonNode)Request(request))]),
-            ["progress"] = new JsonObject
-            {
-                ["total"] = progress.Total,
-                ["received"] = progress.Received,
-                ["outstanding"] = progress.Outstanding,
-                ["waived"] = progress.Waived,
-            },
         };
     }
 
@@ -326,32 +259,6 @@ public static class CaseViews
         };
     }
 
-    /// <summary><c>task_json</c>, with the derived <c>overdue</c> against one <paramref name="today"/> for the whole response.</summary>
-    /// <param name="task">The task.</param>
-    /// <param name="today">The day every task in the response is judged against.</param>
-    /// <returns>The body.</returns>
-    public static JsonObject Task(CaseTask task, DateOnly today)
-    {
-        ArgumentNullException.ThrowIfNull(task);
-        var body = new JsonObject
-        {
-            ["id"] = task.Id,
-            ["caseId"] = task.CaseId,
-            ["subject"] = task.Subject,
-            ["done"] = task.Done,
-            ["overdue"] = CaseTaskRules.IsOverdue(task, today),
-            ["createdAt"] = CaseRules.Iso(task.CreatedAt),
-            ["updatedAt"] = CaseRules.Iso(task.UpdatedAt),
-            ["createdBy"] = task.CreatedBy,
-        };
-        AddIf(body, "description", task.Description);
-        AddIf(body, "dueDate", task.DueDate is { } due ? FlaskJson.Date(due) : null);
-        AddIf(body, "assigneeSubject", task.AssigneeSubject);
-        AddIf(body, "formSeries", task.FormSeries);
-        AddIf(body, "completedAt", task.CompletedAt is { } completed ? CaseRules.Iso(completed) : null);
-        return body;
-    }
-
     /// <summary><c>public_status_json</c>: <c>/v1/portal/me</c>'s case block — no id.</summary>
     /// <param name="status">The bound case's chapter and stage.</param>
     /// <returns>The body.</returns>
@@ -359,34 +266,6 @@ public static class CaseViews
     {
         ArgumentNullException.ThrowIfNull(status);
         return new JsonObject { ["chapter"] = status.Chapter, ["stage"] = status.Stage.ToWire() };
-    }
-
-    /// <summary><c>event_json</c>: snake_case; <c>generated</c> derived and sent; absent values omitted.</summary>
-    /// <param name="calendarEvent">The event.</param>
-    /// <returns>The body.</returns>
-    public static JsonObject Event(CalendarEvent calendarEvent)
-    {
-        ArgumentNullException.ThrowIfNull(calendarEvent);
-        var body = new JsonObject
-        {
-            ["id"] = calendarEvent.Id,
-            ["title"] = calendarEvent.Title,
-            ["start"] = calendarEvent.Start,
-            ["end"] = calendarEvent.End,
-            ["all_day"] = calendarEvent.AllDay,
-            ["attendees"] = new JsonArray([.. calendarEvent.Attendees.Select(subject => (JsonNode)JsonValue.Create(subject))]),
-            ["generated"] = calendarEvent.Generated,
-            ["dismissed"] = calendarEvent.Dismissed,
-            ["created_by"] = calendarEvent.CreatedBy,
-            ["created_at"] = CaseRules.Iso(calendarEvent.CreatedAt),
-            ["updated_at"] = CaseRules.Iso(calendarEvent.UpdatedAt),
-        };
-        AddIf(body, "case_id", calendarEvent.CaseId);
-        AddIf(body, "description", calendarEvent.Description);
-        AddIf(body, "location", calendarEvent.Location);
-        AddIf(body, "rule_id", calendarEvent.RuleId);
-        AddIf(body, "rule_citation", calendarEvent.RuleCitation);
-        return body;
     }
 
     /// <summary>routes/courts.py <c>courts_json</c>: the registry release in force, every district and division.</summary>
