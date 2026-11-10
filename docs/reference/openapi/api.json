@@ -1910,6 +1910,32 @@
         "tags": ["Case"],
         "summary": "The cases the caller may see, newest first, a page at a time",
         "description": "Query: \u0060limit\u0060 (1\u2013100, default 50), \u0060cursor\u0060 (the previous\npage\u0027s \u0060nextCursor\u0060), \u0060archived\u0060 (\u0060true\u0060 lists the archived\ncases instead of the working list). Not access-logged: the log is keyed\nby case, and a list touches none in particular.",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "How many cases a page holds, 1 to 100; 50 when absent.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "The previous page\u0027s nextCursor, to read the page after it.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "archived",
+            "in": "query",
+            "description": "\u0060true\u0060 for the archived cases instead of the live ones; \u0060false\u0060 when absent.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "OK",
@@ -3972,6 +3998,16 @@
         "tags": ["Task"],
         "summary": "The caller\u0027s tasks",
         "description": "Across every case the caller may see \u2014 or, with \u0060?scope=firm\u0060,\neveryone\u0027s. Ordered by due date (undated last), then creation, then id.",
+        "parameters": [
+          {
+            "name": "scope",
+            "in": "query",
+            "description": "\u0060mine\u0060 (the default) for the caller\u0027s tasks, or \u0060firm\u0060 for everyone\u0027s.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "OK",
@@ -4647,6 +4683,42 @@
         "tags": ["Calendar"],
         "summary": "The firm\u0027s calendar",
         "description": "Every event in a window of at most 400 days, filtered to the cases the\ncaller may see.\n\u0060from\u0060 and \u0060to\u0060 (\u0060YYYY-MM-DD\u0060, inclusive) are required.\n\u0060attendee\u0060 narrows to one subject (\u0060me\u0060 for the caller);\n\u0060case_id\u0060 to one case.",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "description": "The window\u0027s first day, YYYY-MM-DD.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "The window\u0027s last day, YYYY-MM-DD; not before from, and at most the route\u0027s maximum span after it.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "attendee",
+            "in": "query",
+            "description": "Only this subject\u0027s events; \u0060me\u0060 for the caller\u0027s.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "case_id",
+            "in": "query",
+            "description": "Only this case\u0027s events.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "OK",
@@ -4675,6 +4747,16 @@
         "tags": ["Calendar"],
         "summary": "The caller\u0027s calendar feed",
         "description": "An ICS file covering two months back and a year ahead.\nAuthenticated by \u0060?token=\u0060 (a calendar client cannot send a bearer\ntoken) or, without one, by a staff session with \u0060events\u0060.",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "query",
+            "description": "A calendar feed token (POST /v1/me/calendar-token), for a calendar client that cannot send a bearer token. Without it, a staff session is required.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "OK",
@@ -6367,6 +6449,14 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "Only the candidates in this review status.",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -6977,6 +7067,54 @@
             "name": "form",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "draftWatermark",
+            "in": "query",
+            "description": "A \u0022DRAFT\u0022 watermark on every page; on unless empty, \u00600\u0060 or \u0060false\u0060.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "printDate",
+            "in": "query",
+            "description": "A date and time stamp in the top margin; on unless empty, \u00600\u0060 or \u0060false\u0060.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "signElectronically",
+            "in": "query",
+            "description": "\u0060/s/ Name\u0060 on every debtor signature line; on unless empty, \u00600\u0060 or \u0060false\u0060.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "amendedOnly",
+            "in": "query",
+            "description": "Only the forms and records marked amended; on unless empty, \u00600\u0060 or \u0060false\u0060.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "signaturePages",
+            "in": "query",
+            "description": "\u0060all\u0060, \u0060only\u0060 or \u0060omit\u0060.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "forms",
+            "in": "query",
+            "description": "Only these forms, by short key, comma-separated (\u0060b101,b106a\u0060).",
             "schema": {
               "type": "string"
             }

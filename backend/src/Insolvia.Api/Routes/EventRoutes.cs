@@ -253,11 +253,16 @@ public sealed class CalendarRoutes : IEndpointModule
     public void Map(IEndpointRouteBuilder routes)
     {
         ArgumentNullException.ThrowIfNull(routes);
-        routes.MapGet("/v1/calendar", WindowAsync).RequireAuth().Requires(Feature.Events, PermissionLevel.ViewOnly);
+        routes.MapGet("/v1/calendar", WindowAsync).RequireAuth().Requires(Feature.Events, PermissionLevel.ViewOnly)
+            .QueryParameter("from", "The window's first day, YYYY-MM-DD.", required: true)
+            .QueryParameter("to", "The window's last day, YYYY-MM-DD; not before from, and at most the route's maximum span after it.", required: true)
+            .QueryParameter("attendee", "Only this subject's events; `me` for the caller's.")
+            .QueryParameter("case_id", "Only this case's events.");
 
         // Not RequireAuth(): the token path has no bearer token. The handler
         // runs the same two checks itself when there is no token.
-        routes.MapGet("/v1/me/calendar.ics", FeedAsync).WithMetadata(PrincipalClass.Staff).Produces<string>(StatusCodes.Status200OK, "text/calendar");
+        routes.MapGet("/v1/me/calendar.ics", FeedAsync).WithMetadata(PrincipalClass.Staff).Produces<string>(StatusCodes.Status200OK, "text/calendar")
+            .QueryParameter("token", "A calendar feed token (POST /v1/me/calendar-token), for a calendar client that cannot send a bearer token. Without it, a staff session is required.");
         routes.MapPost("/v1/me/calendar-token", MintTokenAsync).RequireAuth().Requires(Feature.Events, PermissionLevel.ViewOnly);
         routes.MapDelete("/v1/me/calendar-token", RevokeTokenAsync).RequireAuth().Requires(Feature.Events, PermissionLevel.ViewOnly);
     }

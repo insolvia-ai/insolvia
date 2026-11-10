@@ -35,7 +35,8 @@ public sealed class TaskRoutes : IEndpointModule
         routes.MapGet("/v1/cases/{caseId}/tasks/{taskId}", GetAsync).RequireAuth().Requires(Feature.Tasks, PermissionLevel.ViewOnly);
         routes.MapPatch("/v1/cases/{caseId}/tasks/{taskId}", UpdateAsync).RequestBody<TaskChange>().RequireAuth().Requires(Feature.Tasks, PermissionLevel.AddEdit);
         routes.MapDelete("/v1/cases/{caseId}/tasks/{taskId}", DeleteAsync).RequireAuth().Requires(Feature.Tasks, PermissionLevel.AddEdit);
-        routes.MapGet("/v1/me/tasks", ListMineAsync).RequireAuth().Requires(Feature.Tasks, PermissionLevel.ViewOnly);
+        routes.MapGet("/v1/me/tasks", ListMineAsync).RequireAuth().Requires(Feature.Tasks, PermissionLevel.ViewOnly)
+            .QueryParameter("scope", "`mine` (the default) for the caller's tasks, or `firm` for everyone's.");
     }
 
     /// <summary>Create a task on a case.</summary>

@@ -54,7 +54,10 @@ public sealed class CaseRoutes : IEndpointModule
     {
         ArgumentNullException.ThrowIfNull(routes);
         routes.MapPost("/v1/cases", CreateAsync).RequestBody<CaseCreateRequest>().RequireAuth().Requires(Feature.Cases, PermissionLevel.AddEdit).Requires(Feature.Clients, PermissionLevel.ViewOnly);
-        routes.MapGet("/v1/cases", ListAsync).RequireAuth().Requires(Feature.Cases, PermissionLevel.ViewOnly);
+        routes.MapGet("/v1/cases", ListAsync).RequireAuth().Requires(Feature.Cases, PermissionLevel.ViewOnly)
+            .QueryParameter("limit", "How many cases a page holds, 1 to 100; 50 when absent.")
+            .QueryParameter("cursor", "The previous page's nextCursor, to read the page after it.")
+            .QueryParameter("archived", "`true` for the archived cases instead of the live ones; `false` when absent.");
         routes.MapGet("/v1/cases/{caseId}", GetAsync).RequireAuth().Requires(Feature.Cases, PermissionLevel.ViewOnly);
         routes.MapPatch("/v1/cases/{caseId}", UpdateAsync).RequestBody<CaseUpdateRequest>().RequireAuth().Requires(Feature.Cases, PermissionLevel.AddEdit);
         routes.MapGet("/v1/cases/{caseId}/assignees", ListAssigneesAsync).RequireAuth().Requires(Feature.Cases, PermissionLevel.ViewOnly);

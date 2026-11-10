@@ -31,7 +31,8 @@ public sealed class ExtractionReviewRoutes : IEndpointModule
     public void Map(IEndpointRouteBuilder routes)
     {
         ArgumentNullException.ThrowIfNull(routes);
-        routes.MapGet("/v1/cases/{caseId}/extraction/candidates", ListAsync).RequireAuth().Requires(Feature.ExtractionReview, PermissionLevel.ViewOnly);
+        routes.MapGet("/v1/cases/{caseId}/extraction/candidates", ListAsync).RequireAuth().Requires(Feature.ExtractionReview, PermissionLevel.ViewOnly)
+            .QueryParameter("status", "Only the candidates in this review status.");
         routes.MapPost("/v1/cases/{caseId}/extraction/candidates/{candidateId}/review", ReviewAsync).RequestBody<CandidateReviewRequest>().RequireAuth().Requires(Feature.ExtractionReview, PermissionLevel.AddEdit);
     }
 

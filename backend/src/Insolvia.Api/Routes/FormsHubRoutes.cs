@@ -39,7 +39,13 @@ public sealed class FormsHubRoutes : IEndpointModule
     {
         ArgumentNullException.ThrowIfNull(routes);
         routes.MapGet("/v1/cases/{caseId}/forms", ListAsync).RequireAuth().Requires(Feature.Cases, PermissionLevel.ViewOnly);
-        routes.MapGet("/v1/cases/{caseId}/forms/{form}/preview", PreviewAsync).RequireAuth().Requires(Feature.Cases, PermissionLevel.ViewOnly);
+        routes.MapGet("/v1/cases/{caseId}/forms/{form}/preview", PreviewAsync).RequireAuth().Requires(Feature.Cases, PermissionLevel.ViewOnly)
+            .QueryParameter("draftWatermark", "A \"DRAFT\" watermark on every page; on unless empty, `0` or `false`.")
+            .QueryParameter("printDate", "A date and time stamp in the top margin; on unless empty, `0` or `false`.")
+            .QueryParameter("signElectronically", "`/s/ Name` on every debtor signature line; on unless empty, `0` or `false`.")
+            .QueryParameter("amendedOnly", "Only the forms and records marked amended; on unless empty, `0` or `false`.")
+            .QueryParameter("signaturePages", "`all`, `only` or `omit`.")
+            .QueryParameter("forms", "Only these forms, by short key, comma-separated (`b101,b106a`).");
     }
 
     /// <summary>

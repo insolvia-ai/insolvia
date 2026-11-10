@@ -58,6 +58,19 @@ public static partial class WireOpenApi
                 operation.Extensions[PermissionsExtension] = new JsonNodeExtension(new JsonArray(permissions));
             }
 
+            foreach (var query in metadata.OfType<QueryParameterMetadata>())
+            {
+                operation.Parameters ??= [];
+                operation.Parameters.Add(new OpenApiParameter
+                {
+                    Name = query.Name,
+                    In = ParameterLocation.Query,
+                    Required = query.Required,
+                    Description = query.Description,
+                    Schema = new OpenApiSchema { Type = JsonSchemaType.String },
+                });
+            }
+
             if (metadata.OfType<RequestBodyMetadata>().LastOrDefault() is { } body)
             {
                 operation.RequestBody = new OpenApiRequestBody
@@ -112,6 +125,22 @@ public static partial class WireOpenApi
     {
         ArgumentNullException.ThrowIfNull(builder);
         return builder.WithMetadata(new RequestBodyMetadata(typeof(TRequest)));
+    }
+
+    /// <summary>
+    /// Documents a query-string parameter the route reads. Only documents, like
+    /// <see cref="RequestBody{TRequest}"/>: the route reads the query itself,
+    /// and its parser owns the 400s.
+    /// </summary>
+    /// <param name="builder">The route.</param>
+    /// <param name="name">The parameter's name.</param>
+    /// <param name="description">What it does, and its form.</param>
+    /// <param name="required">Whether the route refuses a request without it.</param>
+    /// <returns>The same route.</returns>
+    public static RouteHandlerBuilder QueryParameter(this RouteHandlerBuilder builder, string name, string description, bool required = false)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        return builder.WithMetadata(new QueryParameterMetadata(name, description, required));
     }
 
     /// <summary>
@@ -315,6 +344,12 @@ public static partial class WireOpenApi
 /// <summary>Endpoint metadata: the shape of the JSON body the route reads (<see cref="WireOpenApi.RequestBody{TRequest}"/>).</summary>
 /// <param name="Type">The body's type.</param>
 public sealed record RequestBodyMetadata(Type Type);
+
+/// <summary>Endpoint metadata: a query-string parameter the route reads (<see cref="WireOpenApi.QueryParameter"/>).</summary>
+/// <param name="Name">Its name.</param>
+/// <param name="Description">What it does, and its form.</param>
+/// <param name="Required">Whether the route refuses a request without it.</param>
+public sealed record QueryParameterMetadata(string Name, string Description, bool Required);
 
 /// <summary>What one host tells <see cref="WireOpenApi"/>.</summary>
 /// <param name="Title">The document's title.</param>
