@@ -5,6 +5,12 @@ using Insolvia.Domain.Clients;
 using Insolvia.Domain.DocumentRequests;
 using Insolvia.Domain.Documents;
 using Insolvia.Domain.TaxIds;
+using System.Text.Json;
+using Insolvia.Domain;
+using System.Text.Json.Nodes;
+using Insolvia.Domain.Debtors;
+using Insolvia.Domain.Fields;
+using Insolvia.Domain.Provenance;
 
 namespace Insolvia.Api.Tests.Routes;
 
@@ -64,5 +70,31 @@ public sealed class CaseViewsTests
         Assert.Equal(
             """{"candidateId":"cand-1","effectiveOn":"2026-06-01","kind":"confirmation","planVersionId":"plan-1","provenance":"court_notice","recordedAt":"2026-03-02T15:04:05.123000Z","recordedBy":"sub"}""",
             FlaskJson.Serialize(CaseViews.LifecycleEvent(ruling)));
+    }
+
+    [Fact]
+    public void Parity_debtor()
+    {
+        var empty = new Debtor("d-1", "case-1", FilingRole.Debtor1, At, At, DebtorBody.Empty);
+        var full = new Debtor("d-2", "case-1", FilingRole.Debtor2, At, At, DebtorBody.Empty with
+        {
+            Name = new PersonName("Ann", null, "Lee"),
+            OtherNamesUsed = [new OtherName("o-1", "A", null, null, null)],
+            ResidenceAddress = new Address(Line1: "1 Main", City: "Tampa"),
+            Phone = "",
+            Venue = new Venue(VenueBasis.LivedLongest180Days),
+            SignedAt = new DateOnly(2026, 1, 2),
+        })
+        {
+            TaxId = new TaxIdRef(TaxIdKind.Ssn, "4321", "ref"),
+            ClientId = "client-1",
+            Provenance = new Dictionary<string, ProvenanceEntry> { ["name.given"] = new(ProvenanceSource.StaffTyped) { ConfirmedBy = "sub", Confidence = 0.5 } }.ToValueDictionary(),
+        };
+        foreach (var (debtor, differs) in new[] { (empty, (IReadOnlyList<string>?)null), (full, ["name.given"]) })
+        {
+            var old = CaseViews.Debtor(debtor, differs);
+            var now = JsonSerializer.SerializeToNode(Insolvia.Api.Cases.DebtorView.Of(debtor, differs), WireJson.Options);
+            Assert.True(JsonNode.DeepEquals(old, now), $"{FlaskJson.Serialize(old)}\n{FlaskJson.Serialize(now)}");
+        }
     }
 }

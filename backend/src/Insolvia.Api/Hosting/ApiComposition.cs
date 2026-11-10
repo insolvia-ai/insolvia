@@ -75,6 +75,10 @@ public static class ApiComposition
         builder.Services.AddSingleton(services => services.GetRequiredService<ApiConfig>().Environment);
         builder.Services.AddSingleton(TimeProvider.System);
 
+        // A handler's typed result is written, and documented, by these settings.
+        builder.Services.ConfigureHttpJsonOptions(options => WireJson.Configure(options.SerializerOptions));
+        builder.Services.AddApiDocument();
+
         // The court registry ships inside Insolvia.Domain (ADR 0014) and is the
         // same everywhere: a firm's default court is validated against it.
         builder.Services.AddSingleton<ICourtRegistry>(CourtRegistry.Shipped);
@@ -383,6 +387,7 @@ public static class ApiComposition
         app.UseMethodFallback();
 
         app.MapHealth();
+        app.MapOpenApi();
         foreach (var module in app.Services.GetServices<IEndpointModule>())
         {
             module.Map(app);

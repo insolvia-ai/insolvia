@@ -11,6 +11,8 @@
   <ItemGroup Label="Hosting">
     <!-- ASP.NET Core on Lambda behind an HTTP API (payload format 2.0). -->
     <PackageVersion Include="Amazon.Lambda.AspNetCoreServer.Hosting" Version="2.2.1" />
+    <!-- The OpenAPI document, generated from the handlers' typed results. -->
+    <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.13" />
   </ItemGroup>
   <ItemGroup Label="MCP">
     <!-- The official C# MCP SDK (18.21; research 2026-10-27): the 2026-07-28

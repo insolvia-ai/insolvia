@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using Insolvia.Api.Auth;
 using Insolvia.Api.Cases;
@@ -122,7 +123,7 @@ public sealed class ExtractionReviewRoutes : IEndpointModule
         _ = await context.Port<ICandidateStore>().UpdateAsync(reviewed, CandidateStatus.Pending, cancellationToken) ?? throw new ConflictException(Reviewed);
         await debtors.PutAsync(debtor, cancellationToken);
         LogReviewed(context, candidate.CaseId, candidate.Id, reviewed.Status.ToWire());
-        return FlaskJson.Result(new JsonObject { ["candidate"] = ExtractionReview.CandidateJson(reviewed), ["record"] = CaseViews.Debtor(debtor) });
+        return FlaskJson.Result(new JsonObject { ["candidate"] = ExtractionReview.CandidateJson(reviewed), ["record"] = JsonSerializer.SerializeToNode(DebtorView.Of(debtor), WireJson.Options) });
     }
 
     // A client record answer's link, from the case — read on the STAFF side,
