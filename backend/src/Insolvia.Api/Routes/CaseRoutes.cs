@@ -175,7 +175,7 @@ public sealed class CaseRoutes : IEndpointModule
         return new CaseList([.. page.Cases.Select(CaseView.Of)], page.NextCursor);
     }
 
-    /// <summary>A case.</summary>
+    /// <summary>Read a case.</summary>
     internal static async Task<CaseView> GetAsync(HttpContext context, string caseId, CancellationToken cancellationToken) =>
         CaseView.Of(await context.ReachableCaseAsync(caseId, AccessAction.CaseRead, cancellationToken));
 
@@ -255,7 +255,8 @@ public sealed class CaseRoutes : IEndpointModule
         }
     }
 
-    /// <summary>The people linked to a case, as subjects — the firm directory turns one into a person.</summary>
+    /// <summary>The people linked to a case.</summary>
+    /// <remarks>Subjects, never names — the firm directory turns one into a person.</remarks>
     internal static async Task<AssigneeList> ListAssigneesAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
     {
         await context.VisibleCaseAsync(caseId, cancellationToken);
