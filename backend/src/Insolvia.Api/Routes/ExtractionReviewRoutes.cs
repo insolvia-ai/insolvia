@@ -2,7 +2,6 @@ using System.Text.Json.Nodes;
 using Insolvia.Api.Auth;
 using Insolvia.Api.Cases;
 using Insolvia.Api.Hosting;
-using Insolvia.Api.Http;
 using Insolvia.Domain;
 using Insolvia.Domain.AccessLog;
 using Insolvia.Domain.Candidates;
@@ -10,7 +9,6 @@ using Insolvia.Domain.Debtors;
 using Insolvia.Domain.Expenses;
 using Insolvia.Domain.Firms;
 using Insolvia.Domain.Ports;
-using Insolvia.Domain.Questions;
 
 namespace Insolvia.Api.Routes;
 
@@ -33,15 +31,14 @@ public sealed class ExtractionReviewRoutes : IEndpointModule
     public void Map(IEndpointRouteBuilder routes)
     {
         ArgumentNullException.ThrowIfNull(routes);
-        routes.MapGet("/v1/cases/{caseId}/extraction/candidates", ListAsync).RequireAuth().Requires(Feature.ExtractionReview, PermissionLevel.ViewOnly);
-        routes.MapPost("/v1/cases/{caseId}/extraction/candidates/{candidateId}/review", ReviewAsync).RequireAuth().Requires(Feature.ExtractionReview, PermissionLevel.AddEdit);
+        routes.MapGet("/v1/cases/{caseId}/extraction/candidates", ListAsync).RequireAuth().Requires(Feature.ExtractionReview, PermissionLevel.ViewOnly)
+            .QueryParameter("status", "Only the candidates in this review status.");
+        routes.MapPost("/v1/cases/{caseId}/extraction/candidates/{candidateId}/review", ReviewAsync).RequestBody<CandidateReviewRequest>().RequireAuth().Requires(Feature.ExtractionReview, PermissionLevel.AddEdit);
     }
 
-    /// <summary>
-    /// The queue, creation order, every stream. <c>?status=</c> narrows; the
-    /// unfiltered history keeps corrections and rejections on purpose.
-    /// </summary>
-    private static async Task<IResult> ListAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
+    /// <summary>A case's review queue, creation order, every stream.</summary>
+    /// <remarks><c>?status=</c> narrows; the unfiltered history keeps corrections and rejections on purpose.</remarks>
+    internal static async Task<CandidateList> ListAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
     {
         var status = ExtractionReview.ParseStatusFilter(context.Request.Query.TryGetValue("status", out var raw) ? raw.ToString() : null);
         await context.ReachableCaseAsync(caseId, AccessAction.ExtractionRead, cancellationToken);
@@ -51,15 +48,17 @@ public sealed class ExtractionReviewRoutes : IEndpointModule
         var names = listed.Any(candidate => candidate.Origin.Channel == OriginChannel.Client)
             ? await ClientNamesAsync(context, caseId, cancellationToken)
             : new Dictionary<string, string>(StringComparer.Ordinal);
-        return FlaskJson.Result(new JsonObject { ["candidates"] = new JsonArray([.. listed.Select(candidate => (JsonNode)QueueJson(candidate, names))]) });
+        return new CandidateList([.. listed.Select(candidate => CandidateView.InQueue(candidate, names))]);
     }
 
-    /// <summary>
-    /// Accept (optionally corrected) or reject ONE pending candidate. The
-    /// candidate is compare-and-swapped BEFORE the record is written; a second
-    /// reviewer gets a 409 and nothing is written.
-    /// </summary>
-    private static async Task<IResult> ReviewAsync(HttpContext context, string caseId, string candidateId, CancellationToken cancellationToken)
+    /// <summary>Accept (optionally corrected) or reject one pending candidate.</summary>
+    /// <remarks>
+    /// The candidate is compare-and-swapped BEFORE the record is written; a
+    /// second reviewer gets a 409 and nothing is written. A rejection answers
+    /// the candidate alone; an acceptance also the record it wrote — a case
+    /// record, or for a client's answer about a debtor, that debtor.
+    /// </remarks>
+    internal static async Task<CandidateReview> ReviewAsync(HttpContext context, string caseId, string candidateId, CancellationToken cancellationToken)
     {
         var candidates = context.Port<ICandidateStore>();
         var accessor = await context.CurrentAccessorAsync();
@@ -78,7 +77,7 @@ public sealed class ExtractionReviewRoutes : IEndpointModule
             var rejected = ExtractionReview.Reject(candidate, accessor.Subject, moment, context.Clock());
             _ = await candidates.UpdateAsync(rejected, CandidateStatus.Pending, cancellationToken) ?? throw new ConflictException(Reviewed);
             LogReviewed(context, caseId, candidate.Id, "rejected");
-            return FlaskJson.Result(new JsonObject { ["candidate"] = ExtractionReview.CandidateJson(rejected) });
+            return new CandidateReview(CandidateView.Of(rejected), null);
         }
 
         if (ExtractionReview.IsDebtorAnswer(candidate))
@@ -102,7 +101,7 @@ public sealed class ExtractionReviewRoutes : IEndpointModule
         _ = await candidates.UpdateAsync(reviewed, CandidateStatus.Pending, cancellationToken) ?? throw new ConflictException(Reviewed);
         await context.Port<ICaseEntityStore>().CreateAsync(entity, cancellationToken);
         LogReviewed(context, caseId, candidate.Id, reviewed.Status.ToWire());
-        return FlaskJson.Result(new JsonObject { ["candidate"] = ExtractionReview.CandidateJson(reviewed), ["record"] = CaseViews.Entity(entity) });
+        return new CandidateReview(CandidateView.Of(reviewed), EntityView.Of(entity));
     }
 
     /// <summary>
@@ -110,7 +109,7 @@ public sealed class ExtractionReviewRoutes : IEndpointModule
     /// keyed by filing role, existing since the case opened. A Debtor 2 not yet
     /// linked is a 409 naming the fix.
     /// </summary>
-    private static async Task<IResult> AcceptDebtorAnswerAsync(HttpContext context, Candidate candidate, JsonObject? corrected, string moment, string subject, CancellationToken cancellationToken)
+    private static async Task<CandidateReview> AcceptDebtorAnswerAsync(HttpContext context, Candidate candidate, JsonObject? corrected, string moment, string subject, CancellationToken cancellationToken)
     {
         var debtors = context.Port<IDebtorStore>();
         var role = ExtractionReview.AnswerFilingRole(candidate);
@@ -122,7 +121,7 @@ public sealed class ExtractionReviewRoutes : IEndpointModule
         _ = await context.Port<ICandidateStore>().UpdateAsync(reviewed, CandidateStatus.Pending, cancellationToken) ?? throw new ConflictException(Reviewed);
         await debtors.PutAsync(debtor, cancellationToken);
         LogReviewed(context, candidate.CaseId, candidate.Id, reviewed.Status.ToWire());
-        return FlaskJson.Result(new JsonObject { ["candidate"] = ExtractionReview.CandidateJson(reviewed), ["record"] = CaseViews.Debtor(debtor) });
+        return new CandidateReview(CandidateView.Of(reviewed), DebtorView.Of(debtor));
     }
 
     // A client record answer's link, from the case — read on the STAFF side,
@@ -166,21 +165,6 @@ public sealed class ExtractionReviewRoutes : IEndpointModule
         }
 
         return names;
-    }
-
-    private static JsonObject QueueJson(Candidate candidate, Dictionary<string, string> names)
-    {
-        var body = ExtractionReview.CandidateJson(candidate);
-        if (QuestionRules.RefOf(candidate) is { } answer)
-        {
-            body["question"] = ExtractionReview.ReviewQuestionJson(answer);
-            if (names.TryGetValue(candidate.Origin.Subject, out var name))
-            {
-                body["client"] = new JsonObject { ["displayName"] = name };
-            }
-        }
-
-        return body;
     }
 
     // GLBA: ids and the outcome word — never a payload.

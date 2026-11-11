@@ -1,3 +1,4 @@
+using System.Text.Json.Nodes;
 using Insolvia.Api.Tests.Support;
 using static Insolvia.Api.Tests.Support.CaseWorld;
 
@@ -57,8 +58,8 @@ public sealed class CreditorMatrixRouteTests : IAsyncLifetime, IDisposable
         var answer = await Matrix(caseId);
 
         Assert.Equal(200, answer.Status);
-        Assert.Equal("application/json", answer.ContentType);
-        Assert.Equal("""{"content":"Example Bank\r\nPO Box 15168\r\nWilmington, DE 19850\r\n","creditorCount":1,"duplicatesOmitted":0,"fileName":"creditor-matrix.txt","problems":[]}""", answer.Body);
+        Assert.Equal("application/json", answer.Response.Content.Headers.ContentType?.MediaType);
+        Assert.True(JsonNode.DeepEquals(JsonNode.Parse("""{"content":"Example Bank\r\nPO Box 15168\r\nWilmington, DE 19850\r\n","creditorCount":1,"duplicatesOmitted":0,"fileName":"creditor-matrix.txt","problems":[]}"""), answer.Json), answer.Body);
     }
 
     [Fact]
@@ -85,11 +86,9 @@ public sealed class CreditorMatrixRouteTests : IAsyncLifetime, IDisposable
         var answer = await Matrix(caseId);
 
         Assert.False(answer.Object.ContainsKey("content"));
-        // Flask's ensure_ascii: the em dash travels as \u2014.
-        Assert.Contains(
-            """problems":[{"field":"creditors","message":"The case has no creditors \u2014 a matrix must list every creditor before it can be filed."}]""",
-            answer.Body,
-            StringComparison.Ordinal);
+        Assert.True(JsonNode.DeepEquals(
+            JsonNode.Parse("""[{"field":"creditors","message":"The case has no creditors \u2014 a matrix must list every creditor before it can be filed."}]"""),
+            answer.Object["problems"]), answer.Body);
     }
 
     // "creditor-matrix" shares the /v1/cases/{id}/{segment} shape with the

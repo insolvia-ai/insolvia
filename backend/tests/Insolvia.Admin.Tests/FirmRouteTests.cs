@@ -111,8 +111,8 @@ public sealed class FirmRouteTests(WebApplicationFactory<Program> factory) : ICl
         var answer = await client.Get("/health");
 
         Assert.Equal(200, answer.Status);
-        Assert.Equal("""{"environment":"local","status":"ok"}""", answer.Body);
-        Assert.Equal("application/json", answer.Response.Content.Headers.ContentType?.ToString());
+        Assert.True(JsonNode.DeepEquals(JsonNode.Parse("""{"environment":"local","status":"ok"}"""), answer.Json), answer.Body);
+        Assert.Equal("application/json", answer.Response.Content.Headers.ContentType?.MediaType);
     }
 
     // ── Provision ───────────────────────────────────────────────────
@@ -153,20 +153,20 @@ public sealed class FirmRouteTests(WebApplicationFactory<Program> factory) : ICl
     }
 
     [Fact]
-    public async Task The_provision_body_is_flask_shaped()
+    public async Task The_provision_body_names_every_firm_field()
     {
         using var host = new AdminHost(factory);
         using var client = host.CreateClient();
 
         var answer = await Provision(client);
 
-        Assert.Equal("application/json", answer.Response.Content.Headers.ContentType?.ToString());
+        Assert.Equal("application/json", answer.Response.Content.Headers.ContentType?.MediaType);
         var firm = (JsonObject)answer.Json["firm"]!;
         Assert.Equal(
             ["createdAt", "createdBy", "createdByEmail", "defaultChapter", "defaultCourt", "defaultDivision", "id", "letterhead", "name", "status", "updatedAt"],
-            firm.Select(pair => pair.Key));
+            firm.Select(pair => pair.Key).Order(StringComparer.Ordinal));
         Assert.Null(firm["defaultCourt"]);
-        Assert.Contains("\"name\":\"Example & Partners\"", answer.Body, StringComparison.Ordinal);
+        Assert.Equal("Example & Partners", firm["name"]!.GetValue<string>());
         var admin = (JsonObject)answer.Json["admin"]!;
         Assert.Equal("Alice Attorney", admin["displayName"]!.GetValue<string>());
         Assert.Equal("attorney", admin["role"]!.GetValue<string>());

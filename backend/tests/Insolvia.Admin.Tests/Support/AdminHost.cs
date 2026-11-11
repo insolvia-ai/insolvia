@@ -166,8 +166,8 @@ internal static class Requests
     public static void Unauthorized(Answer answer)
     {
         Assert.Equal(401, answer.Status);
-        Assert.Equal("""{"error":"Unauthorized","message":"authentication required"}""", answer.Body);
-        Assert.Equal("application/json", answer.Response.Content.Headers.ContentType?.ToString());
+        Assert.True(JsonNode.DeepEquals(JsonNode.Parse("""{"error":"Unauthorized","message":"authentication required"}"""), answer.Json), answer.Body);
+        Assert.Equal("application/json", answer.Response.Content.Headers.ContentType?.MediaType);
     }
 }
 

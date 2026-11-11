@@ -151,8 +151,11 @@ internal sealed class AuthHost : IDisposable
 /// </summary>
 internal sealed class ProbeRoutes(Action<IEndpointRouteBuilder>? extra) : IEndpointModule
 {
-    public void Map(IEndpointRouteBuilder routes)
+    public void Map(IEndpointRouteBuilder host)
     {
+        // Test probes, not the API: kept out of its OpenAPI document.
+        var routes = host.MapGroup("").ExcludeFromDescription();
+
         // RequireAuth only — "who are you", nothing about a firm.
         routes.MapGet("/test/staff", (HttpContext context) => Results.Json(new { subject = context.CurrentPrincipal().Subject }))
             .RequireAuth();

@@ -1,4 +1,3 @@
-using System.Text.Json.Nodes;
 using Insolvia.Api.Auth;
 using Insolvia.Api.Filing;
 using Insolvia.Api.Hosting;
@@ -13,6 +12,7 @@ using Insolvia.Domain.Filings;
 using Insolvia.Domain.Firms;
 using Insolvia.Domain.Forms;
 using Insolvia.Domain.Ports;
+using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace Insolvia.Api.Routes;
 
@@ -50,11 +50,13 @@ public sealed class FilingApprovalRoutes : IEndpointModule
         ArgumentNullException.ThrowIfNull(routes);
         routes.MapGet("/v1/cases/{caseId}/filing-approval", ReadAsync).RequireAuth()
             .Requires(Feature.Cases, PermissionLevel.ViewOnly).Requires(Feature.ElectronicFiling, PermissionLevel.ViewOnly);
-        routes.MapPost("/v1/cases/{caseId}/filing-approval", ApproveAsync).RequireAuth()
+        routes.MapPost("/v1/cases/{caseId}/filing-approval", ApproveAsync).RequestBody<FilingApproveRequest>()
+            .Produces<FilingSetNotReadyBody>(StatusCodes.Status409Conflict).Produces<ErrorBody>(StatusCodes.Status503ServiceUnavailable).RequireAuth()
             .Requires(Feature.Cases, PermissionLevel.ViewOnly).Requires(Feature.ElectronicFiling, PermissionLevel.AddEdit);
         routes.MapDelete("/v1/cases/{caseId}/filing-approval", CancelAsync).RequireAuth()
             .Requires(Feature.Cases, PermissionLevel.ViewOnly).Requires(Feature.ElectronicFiling, PermissionLevel.ViewOnly);
-        routes.MapPost("/v1/cases/{caseId}/filings/{filingId}/resolution", ResolveAsync).RequireAuth()
+        routes.MapPost("/v1/cases/{caseId}/filings/{filingId}/resolution", ResolveAsync).RequestBody<FilingResolutionRequest>()
+            .Produces<ResolutionRefusedBody>(StatusCodes.Status409Conflict).RequireAuth()
             .Requires(Feature.Cases, PermissionLevel.AddEdit).Requires(Feature.ElectronicFiling, PermissionLevel.AddEdit);
     }
 
@@ -79,31 +81,35 @@ public sealed class FilingApprovalRoutes : IEndpointModule
             context.RequestServices.GetService<ICourtRegistry>() as CourtRegistry,
             cancellationToken);
 
-    private static async Task<JsonObject> ViewAsync(HttpContext context, ApprovalBasis basis, FilingApproval? approval, DateTimeOffset now, CancellationToken cancellationToken)
+    private static async Task<FilingApprovalState> ViewAsync(HttpContext context, ApprovalBasis basis, FilingApproval? approval, DateTimeOffset now, CancellationToken cancellationToken)
     {
-        var body = new JsonObject { ["basis"] = FilingViews.Basis(basis) };
-        if (approval is not null)
-        {
-            body["approval"] = FilingViews.Approval(approval, now);
-            if (await context.Port<IFilingStore>().GetAsync(approval.CaseId, approval.FilingId, cancellationToken) is { } filing)
-            {
-                body["filing"] = FilingViews.Filing(filing);
-            }
-        }
-
-        return body;
+        var filing = approval is null ? null : await context.Port<IFilingStore>().GetAsync(approval.CaseId, approval.FilingId, cancellationToken);
+        return new FilingApprovalState(
+            ApprovalBasisView.Of(basis),
+            approval is null ? null : FilingApprovalView.Of(approval, now),
+            filing is null ? null : FilingView.Of(filing));
     }
 
-    private static async Task<IResult> ReadAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
+    /// <summary>Read the case's filing approval.</summary>
+    /// <remarks>What would be approved now (the basis and its digest), and the case's current approval and filing run. An approval whose filing set has changed since is shown voided.</remarks>
+    internal static async Task<FilingApprovalState> ReadAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
     {
         var (@case, _, basis) = await BasisAsync(context, caseId, cancellationToken);
         var now = context.Clock().GetUtcNow();
         var accessor = await context.CurrentAccessorAsync();
         var approval = await FilingApprovals.CurrentAsync(@case.Id, basis, accessor.Subject, now, context.Port<IFilingApprovalStore>(), context.AccessLog(), cancellationToken);
-        return FilingCredentialRoutes.NoStore(context, FlaskJson.Result(await ViewAsync(context, basis, approval, now, cancellationToken)));
+        return FilingCredentialRoutes.NoStore(context, await ViewAsync(context, basis, approval, now, cancellationToken));
     }
 
-    private static async Task<IResult> ApproveAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
+    /// <summary>Approve filing the case.</summary>
+    /// <remarks>
+    /// Binds an approval to the basis shown and queues the filing: post back
+    /// the digest of the basis you were shown; a mismatch is refused.
+    /// Needs a recent sign-in (403 <c>ReauthenticationRequired</c>). 409
+    /// <c>FilingSetNotReady</c> lists what blocks it; 503 when filing is not
+    /// configured or the queue refused the job (the approval is then voided).
+    /// </remarks>
+    internal static async Task<Results<Created<FilingApprovalState>, JsonHttpResult<FilingSetNotReadyBody>, JsonHttpResult<ErrorBody>>> ApproveAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
     {
         var approvals = context.Port<IFilingApprovalStore>();
         var credentials = context.Port<IFilingCredentialStore>();
@@ -153,14 +159,7 @@ public sealed class FilingApprovalRoutes : IEndpointModule
         }
         catch (FilingSetNotReadyException notReady)
         {
-            return FlaskJson.Result(
-                new JsonObject
-                {
-                    ["error"] = "FilingSetNotReady",
-                    ["message"] = notReady.Message,
-                    ["blockers"] = new JsonArray([.. notReady.Blockers.Select(blocker => (JsonNode)blocker)]),
-                },
-                StatusCodes.Status409Conflict);
+            return TypedResults.Json(new FilingSetNotReadyBody("FilingSetNotReady", notReady.Message, [.. notReady.Blockers]), statusCode: StatusCodes.Status409Conflict);
         }
         catch (FilingQueueUnavailableException unavailable)
         {
@@ -170,20 +169,24 @@ public sealed class FilingApprovalRoutes : IEndpointModule
 
         // Metadata only: that an approval happened, never who or which case.
         context.Log(Logger, "filing approved and queued");
-        return FilingCredentialRoutes.NoStore(context, FlaskJson.Result(await ViewAsync(context, basis, approval, now, cancellationToken), StatusCodes.Status201Created));
+        return FilingCredentialRoutes.NoStore(context, TypedResults.Created((string?)null, await ViewAsync(context, basis, approval, now, cancellationToken)));
     }
 
-    private static async Task<IResult> CancelAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
+    /// <summary>Cancel the filing approval.</summary>
+    /// <remarks>Voids the case's pending approval, so the filing it would start never runs. Answers the approval state afterwards.</remarks>
+    internal static async Task<FilingApprovalState> CancelAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
     {
         var (@case, _, basis) = await BasisAsync(context, caseId, cancellationToken);
         var now = context.Clock().GetUtcNow();
         var accessor = await context.CurrentAccessorAsync();
         var voided = await FilingApprovals.CancelAsync(@case.Id, accessor.Subject, now, context.Port<IFilingApprovalStore>(), context.AccessLog(), cancellationToken);
         context.Log(Logger, "filing approval cancelled");
-        return FilingCredentialRoutes.NoStore(context, FlaskJson.Result(await ViewAsync(context, basis, voided, now, cancellationToken)));
+        return FilingCredentialRoutes.NoStore(context, await ViewAsync(context, basis, voided, now, cancellationToken));
     }
 
-    private static async Task<IResult> ResolveAsync(HttpContext context, string caseId, string filingId, CancellationToken cancellationToken)
+    /// <summary>Resolve a handed-back filing.</summary>
+    /// <remarks>Records what the court's docket shows — filed or not filed — for a filing the worker handed back or could not confirm. 409 <c>ResolutionRefused</c>, with its reason, when the filing cannot be resolved that way.</remarks>
+    internal static async Task<Results<Ok<FilingApprovalState>, JsonHttpResult<ResolutionRefusedBody>>> ResolveAsync(HttpContext context, string caseId, string filingId, CancellationToken cancellationToken)
     {
         var approvals = context.Port<IFilingApprovalStore>();
         var filings = context.Port<IFilingStore>();
@@ -201,9 +204,7 @@ public sealed class FilingApprovalRoutes : IEndpointModule
         }
         catch (ResolutionRefusedException refused)
         {
-            return FlaskJson.Result(
-                new JsonObject { ["error"] = "ResolutionRefused", ["message"] = refused.Message, ["reason"] = refused.Reason },
-                StatusCodes.Status409Conflict);
+            return TypedResults.Json(new ResolutionRefusedBody("ResolutionRefused", refused.Message, refused.Reason), statusCode: StatusCodes.Status409Conflict);
         }
 
         // Metadata only: that a resolution happened and which way, never who.
@@ -211,9 +212,9 @@ public sealed class FilingApprovalRoutes : IEndpointModule
         var fresh = await context.Cases().GetAsync(@case.Id, accessor, cancellationToken) ?? @case;
         var (_, basis) = await BasisOfAsync(context, fresh, packets, cancellationToken);
         var approval = await FilingApprovals.CurrentAsync(fresh.Id, basis, accessor.Subject, now, approvals, context.AccessLog(), cancellationToken);
-        return FilingCredentialRoutes.NoStore(context, FlaskJson.Result(await ViewAsync(context, basis, approval, now, cancellationToken)));
+        return FilingCredentialRoutes.NoStore(context, TypedResults.Ok(await ViewAsync(context, basis, approval, now, cancellationToken)));
     }
 
-    private static IResult Unavailable(string message) =>
-        FlaskJson.Result(new JsonObject { ["error"] = "FilingQueueUnavailable", ["message"] = message }, StatusCodes.Status503ServiceUnavailable);
+    private static JsonHttpResult<ErrorBody> Unavailable(string message) =>
+        TypedResults.Json(new ErrorBody("FilingQueueUnavailable", message, null), statusCode: StatusCodes.Status503ServiceUnavailable);
 }

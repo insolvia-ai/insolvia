@@ -1,3 +1,4 @@
+using System.Text.Json.Nodes;
 using Insolvia.Api.Tests.Support;
 using Insolvia.Domain.Firms;
 
@@ -157,9 +158,9 @@ public sealed class LibraryCreditorRouteTests : IAsyncLifetime, IDisposable
     {
         var created = await Add(extra: """, "additional_notice_parties": [{"id": "np1", "name": "Legal Dept", "account_last4": "1234"}]""");
 
-        Assert.Equal(
-            """[{"account_last4":"1234","address":{},"id":"np1","name":"Legal Dept"}]""",
-            created.Object["additional_notice_parties"]!.ToJsonString());
+        Assert.True(JsonNode.DeepEquals(
+            JsonNode.Parse("""[{"account_last4":"1234","address":{},"id":"np1","name":"Legal Dept"}]"""),
+            created.Object["additional_notice_parties"]));
     }
 
     [Fact]

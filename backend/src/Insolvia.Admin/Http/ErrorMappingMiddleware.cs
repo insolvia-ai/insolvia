@@ -3,11 +3,11 @@ using Insolvia.Admin.Logging;
 namespace Insolvia.Admin.Http;
 
 /// <summary>
-/// app_factory.py's error handlers: a Core exception becomes its status and
-/// JSON body (<see cref="ErrorResponses.ForApiException"/>); an HTTP-level
-/// refusal from the framework (an unreadable body) becomes Werkzeug's HTML,
-/// as Flask's HTTPException passed through; ANYTHING else is logged with its
-/// stack and answered with the one 500 body that names nothing.
+/// The error handler: a domain exception becomes its status and body
+/// (<see cref="ErrorResponses.ForApiException"/>); a refusal from the
+/// framework (an unreadable body) becomes its own (<see cref="ErrorResponses.ForStatus"/>);
+/// ANYTHING else is logged with its stack and answered with the one 500 body
+/// that names nothing.
 /// </summary>
 public sealed class ErrorMappingMiddleware(RequestDelegate next, ILoggerFactory loggers)
 {
@@ -28,18 +28,18 @@ public sealed class ErrorMappingMiddleware(RequestDelegate next, ILoggerFactory 
             context.Response.Clear();
             if (ErrorResponses.ForApiException(error) is { } mapped)
             {
-                await ErrorResponses.WriteJsonAsync(context, mapped.Status, mapped.Body).ConfigureAwait(false);
+                await ErrorResponses.WriteAsync(context, mapped.Status, mapped.Body).ConfigureAwait(false);
                 return;
             }
 
-            if (error is BadHttpRequestException badRequest && ErrorResponses.WerkzeugHtml(badRequest.StatusCode) is not null)
+            if (error is BadHttpRequestException badRequest && ErrorResponses.ForStatus(badRequest.StatusCode) is { } refusal)
             {
-                await ErrorResponses.WriteHtmlAsync(context, badRequest.StatusCode).ConfigureAwait(false);
+                await ErrorResponses.WriteAsync(context, badRequest.StatusCode, refusal).ConfigureAwait(false);
                 return;
             }
 
             _logger.Write(LogLevel.Error, "unexpected Insolvia admin failure", error);
-            await ErrorResponses.WriteJsonAsync(context, StatusCodes.Status500InternalServerError, ErrorResponses.InternalErrorJson).ConfigureAwait(false);
+            await ErrorResponses.WriteAsync(context, StatusCodes.Status500InternalServerError, ErrorResponses.InternalError).ConfigureAwait(false);
         }
     }
 }

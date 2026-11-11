@@ -271,7 +271,7 @@ public sealed class CaseRouteTests : IAsyncLifetime, IDisposable
         var fetched = await _world.Get($"/v1/cases/{created.Str("id")}");
 
         Assert.Equal(200, fetched.Status);
-        Assert.Equal(Http.FlaskJson.Serialize(created), fetched.Body);
+        Assert.True(System.Text.Json.Nodes.JsonNode.DeepEquals(created, System.Text.Json.Nodes.JsonNode.Parse(fetched.Body)), fetched.Body);
     }
 
     [Fact]
@@ -474,11 +474,11 @@ public sealed class CaseRouteTests : IAsyncLifetime, IDisposable
 
         Assert.Equal("debtor_1", debtor.Str("filing_role"));
         Assert.Equal(clientId, debtor.Str("client_id"));
-        Assert.Equal("""{"given":"Jordan","surname":"Example"}""", Http.FlaskJson.Serialize(debtor["name"]));
+        Assert.Equal("""{"given":"Jordan","surname":"Example"}""", Support.SortedJson.Serialize(debtor["name"]));
         Assert.Equal("555-0100", debtor.Str("phone"));
         Assert.False(debtor.ContainsKey("lead_source"));
         var copied = $$"""{"client_id":"{{clientId}}","source":"client"}""";
-        Assert.Equal($$"""{"name.given":{{copied}},"name.surname":{{copied}},"phone":{{copied}}}""", Http.FlaskJson.Serialize(debtor["provenance"]));
+        Assert.Equal($$"""{"name.given":{{copied}},"name.surname":{{copied}},"phone":{{copied}}}""", Support.SortedJson.Serialize(debtor["provenance"]));
         Assert.Equal("[]", debtor["differs_from_client"]!.ToJsonString());
     }
 
@@ -559,7 +559,7 @@ public sealed class CaseRouteTests : IAsyncLifetime, IDisposable
         var answer = await _world.Post("/v1/cases", $$"""{ {{Tampa}}, "client_ids": ["{{clientId}}"]}""");
 
         Assert.Equal(400, answer.Status);
-        Assert.Equal("""{"client_ids":"That client is being merged into another client."}""", Http.FlaskJson.Serialize(answer.Object["fields"]));
+        Assert.Equal("""{"client_ids":"That client is being merged into another client."}""", Support.SortedJson.Serialize(answer.Object["fields"]));
         Assert.Empty(await _world.FirmCasesAsync());
     }
 

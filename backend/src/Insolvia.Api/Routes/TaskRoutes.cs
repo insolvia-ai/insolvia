@@ -1,8 +1,6 @@
-using System.Text.Json.Nodes;
 using Insolvia.Api.Auth;
 using Insolvia.Api.Cases;
 using Insolvia.Api.Hosting;
-using Insolvia.Api.Http;
 using Insolvia.Domain;
 using Insolvia.Domain.Access;
 using Insolvia.Domain.AccessLog;
@@ -10,6 +8,7 @@ using Insolvia.Domain.Cases;
 using Insolvia.Domain.CaseTasks;
 using Insolvia.Domain.Firms;
 using Insolvia.Domain.Ports;
+using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace Insolvia.Api.Routes;
 
@@ -31,15 +30,18 @@ public sealed class TaskRoutes : IEndpointModule
     public void Map(IEndpointRouteBuilder routes)
     {
         ArgumentNullException.ThrowIfNull(routes);
-        routes.MapPost("/v1/cases/{caseId}/tasks", CreateAsync).RequireAuth().Requires(Feature.Tasks, PermissionLevel.AddEdit);
+        routes.MapPost("/v1/cases/{caseId}/tasks", CreateAsync).RequestBody<TaskCreation>().RequireAuth().Requires(Feature.Tasks, PermissionLevel.AddEdit);
         routes.MapGet("/v1/cases/{caseId}/tasks", ListAsync).RequireAuth().Requires(Feature.Tasks, PermissionLevel.ViewOnly);
         routes.MapGet("/v1/cases/{caseId}/tasks/{taskId}", GetAsync).RequireAuth().Requires(Feature.Tasks, PermissionLevel.ViewOnly);
-        routes.MapPatch("/v1/cases/{caseId}/tasks/{taskId}", UpdateAsync).RequireAuth().Requires(Feature.Tasks, PermissionLevel.AddEdit);
+        routes.MapPatch("/v1/cases/{caseId}/tasks/{taskId}", UpdateAsync).RequestBody<TaskChange>().RequireAuth().Requires(Feature.Tasks, PermissionLevel.AddEdit);
         routes.MapDelete("/v1/cases/{caseId}/tasks/{taskId}", DeleteAsync).RequireAuth().Requires(Feature.Tasks, PermissionLevel.AddEdit);
-        routes.MapGet("/v1/me/tasks", ListMineAsync).RequireAuth().Requires(Feature.Tasks, PermissionLevel.ViewOnly);
+        routes.MapGet("/v1/me/tasks", ListMineAsync).RequireAuth().Requires(Feature.Tasks, PermissionLevel.ViewOnly)
+            .QueryParameter("scope", "`mine` (the default) for the caller's tasks, or `firm` for everyone's.");
     }
 
-    private static async Task<IResult> CreateAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
+    /// <summary>Create a task on a case.</summary>
+    /// <remarks>An assignee must be an active user of the caller's firm.</remarks>
+    internal static async Task<Created<TaskView>> CreateAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
     {
         var accessor = await context.CurrentAccessorAsync();
         var draft = CaseTaskRules.ParseCreation(await context.BodyAsync(MaxRequestBytes));
@@ -48,25 +50,29 @@ public sealed class TaskRoutes : IEndpointModule
         var task = CaseTaskRules.Create(draft, caseId, accessor.Subject, context.Clock());
         await context.Port<ICaseTaskStore>().CreateAsync(task, cancellationToken);
         context.Log(Logger, "task created", ("case_id", caseId), ("id", task.Id));
-        return FlaskJson.Result(CaseViews.Task(task, context.Today()), StatusCodes.Status201Created);
+        return TypedResults.Created((string?)null, TaskView.Of(task, context.Today()));
     }
 
-    private static async Task<IResult> ListAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
+    /// <summary>A case's tasks.</summary>
+    internal static async Task<TaskList> ListAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
     {
         await context.ReachableCaseAsync(caseId, AccessAction.CaseRead, cancellationToken);
         var today = context.Today();
         var tasks = await context.Port<ICaseTaskStore>().ListForCaseAsync(caseId, cancellationToken);
-        return FlaskJson.Result(new JsonObject { ["tasks"] = new JsonArray([.. tasks.Select(task => (JsonNode)CaseViews.Task(task, today))]) });
+        return new TaskList([.. tasks.Select(task => TaskView.Of(task, today))]);
     }
 
-    private static async Task<IResult> GetAsync(HttpContext context, string caseId, string taskId, CancellationToken cancellationToken)
+    /// <summary>One task.</summary>
+    internal static async Task<TaskView> GetAsync(HttpContext context, string caseId, string taskId, CancellationToken cancellationToken)
     {
         await context.ReachableCaseAsync(caseId, AccessAction.CaseRead, cancellationToken);
         var task = await context.Port<ICaseTaskStore>().GetAsync(caseId, taskId, cancellationToken) ?? throw new NotFoundException(TaskNotFound);
-        return FlaskJson.Result(CaseViews.Task(task, context.Today()));
+        return TaskView.Of(task, context.Today());
     }
 
-    private static async Task<IResult> UpdateAsync(HttpContext context, string caseId, string taskId, CancellationToken cancellationToken)
+    /// <summary>Change a task.</summary>
+    /// <remarks>Only the members given change. A new assignee must be an active user of the caller's firm.</remarks>
+    internal static async Task<TaskView> UpdateAsync(HttpContext context, string caseId, string taskId, CancellationToken cancellationToken)
     {
         var accessor = await context.CurrentAccessorAsync();
         var store = context.Port<ICaseTaskStore>();
@@ -80,10 +86,11 @@ public sealed class TaskRoutes : IEndpointModule
 
         var written = await store.UpdateAsync(CaseTaskRules.ApplyChanges(stored, changes, context.Clock()), cancellationToken) ?? throw new NotFoundException(TaskNotFound);
         context.Log(Logger, "task updated", ("case_id", caseId), ("id", taskId));
-        return FlaskJson.Result(CaseViews.Task(written, context.Today()));
+        return TaskView.Of(written, context.Today());
     }
 
-    private static async Task<IResult> DeleteAsync(HttpContext context, string caseId, string taskId, CancellationToken cancellationToken)
+    /// <summary>Delete a task.</summary>
+    internal static async Task<NoContent> DeleteAsync(HttpContext context, string caseId, string taskId, CancellationToken cancellationToken)
     {
         await context.ReachableCaseAsync(caseId, AccessAction.CaseUpdate, cancellationToken);
         if (!await context.Port<ICaseTaskStore>().DeleteAsync(caseId, taskId, cancellationToken))
@@ -92,11 +99,15 @@ public sealed class TaskRoutes : IEndpointModule
         }
 
         context.Log(Logger, "task deleted", ("case_id", caseId), ("id", taskId));
-        return FlaskJson.NoContent();
+        return TypedResults.NoContent();
     }
 
-    // Due date first (undated last), then creation, then id.
-    private static async Task<IResult> ListMineAsync(HttpContext context, CancellationToken cancellationToken)
+    /// <summary>The caller's tasks.</summary>
+    /// <remarks>
+    /// Across every case the caller may see — or, with <c>?scope=firm</c>,
+    /// everyone's. Ordered by due date (undated last), then creation, then id.
+    /// </remarks>
+    internal static async Task<TaskList> ListMineAsync(HttpContext context, CancellationToken cancellationToken)
     {
         var accessor = await context.CurrentAccessorAsync();
         var scope = CaseRoutes.Query(context, "scope") is { Length: > 0 } given ? given : "mine";
@@ -116,7 +127,7 @@ public sealed class TaskRoutes : IEndpointModule
             .ThenBy(task => task.DueDate)
             .ThenBy(task => task.CreatedAt)
             .ThenBy(task => task.Id, StringComparer.Ordinal);
-        return FlaskJson.Result(new JsonObject { ["tasks"] = new JsonArray([.. ordered.Select(task => (JsonNode)CaseViews.Task(task, today))]) });
+        return new TaskList([.. ordered.Select(task => TaskView.Of(task, today))]);
     }
 
     /// <summary>Every case the accessor may see, the working list paged to its end.</summary>

@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace Insolvia.Api.Tests;
 
-// Ported from services/api/tests/unit/test_health.py, case for case.
+// What /health answers.
 public sealed class HealthTests(WebApplicationFactory<Program> factory)
     : IClassFixture<WebApplicationFactory<Program>>
 {
@@ -16,7 +16,7 @@ public sealed class HealthTests(WebApplicationFactory<Program> factory)
         using var response = await client.GetAsync(new Uri("/health", UriKind.Relative), TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Equal("application/json", response.Content.Headers.ContentType?.ToString());
+        Assert.Equal("application/json", response.Content.Headers.ContentType?.MediaType);
         var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
         Assert.Equal(
             """{"environment":"local","service":"insolvia-api","status":"ok","version":"0.1.0"}""",

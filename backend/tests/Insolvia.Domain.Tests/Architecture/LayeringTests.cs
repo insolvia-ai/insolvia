@@ -15,6 +15,10 @@ namespace Insolvia.Domain.Tests.Architecture;
 //   Platform          the platform services the app runs on — document
 //                     storage, sealing, queues, the user directory, mail.
 //                     References Domain only
+//   Http              the wire the HTTP hosts share — the JSON, the error
+//                     body, the OpenAPI document. References Domain only;
+//                     the one library with ASP.NET, so only Api and Admin
+//                     reference it and the workers stay without it
 //   hosts             the API layer (and the workers): may reference any
 //                     library; never another host
 //   tools             reference the pure library only (Domain); run by a
@@ -40,6 +44,7 @@ public sealed class LayeringTests
         ["Domain"] = [],
         ["Data"] = ["Domain"],
         ["Platform"] = ["Domain"],
+        ["Http"] = ["Domain"],
     };
 
     // Where each source project's tests live: its own test project, except
@@ -49,6 +54,7 @@ public sealed class LayeringTests
         ["Domain"] = "Domain",
         ["Data"] = "Data",
         ["Platform"] = "Platform",
+        ["Http"] = "Http",
         ["Api"] = "Api",
         ["Worker"] = "Worker",
         ["Admin"] = "Admin",

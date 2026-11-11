@@ -1,3 +1,4 @@
+using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Insolvia.Api.Auth;
 using Insolvia.Api.Tests.Support;
@@ -48,9 +49,8 @@ public sealed partial class PortalRouteTests : IAsyncLifetime, IDisposable
         var answer = await _world.PortalGet("/v1/portal/me", pat);
 
         Assert.Equal(200, answer.Status);
-        Assert.Equal(
-            $$"""{"case":{"chapter":7,"stage":"intake"},"displayName":"Pat Example","firm":{"name":"Example & Partners"},"roles":["debtor_1"],"subject":"{{pat}}"}""",
-            answer.Body);
+        var expected = $$"""{"case":{"chapter":7,"stage":"intake"},"displayName":"Pat Example","firm":{"name":"Example & Partners"},"roles":["debtor_1"],"subject":"{{pat}}"}""";
+        Assert.True(JsonNode.DeepEquals(JsonNode.Parse(expected), JsonNode.Parse(answer.Body)), answer.Body);
     }
 
     [Fact]

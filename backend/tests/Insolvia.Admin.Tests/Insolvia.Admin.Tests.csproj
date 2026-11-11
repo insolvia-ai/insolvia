@@ -13,6 +13,5 @@
     <ProjectReference Include="../../src/Insolvia.Admin/Insolvia.Admin.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="../../../docs/reference/openapi/admin.json" Link="OpenApi/admin.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

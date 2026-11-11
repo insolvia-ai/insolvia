@@ -140,7 +140,7 @@ public sealed class WaitlistTests : IDisposable
 
         var record = Assert.Single(_world.Host.Waitlist.Records);
         Assert.Equal(answer.Str("id"), record.Id);
-        Assert.Equal(answer.Str("submittedAt"), Http.FlaskJson.Millis(record.SubmittedAt));
+        Assert.Equal(answer.Str("submittedAt"), Insolvia.Http.WireFormat.Millis(record.SubmittedAt));
         Assert.Equal("ada@lovelace-law.example", record.Submission.Email);
     }
 
@@ -150,7 +150,7 @@ public sealed class WaitlistTests : IDisposable
         var answer = await _world.Post("/v1/waitlist", """{"name": "", "firm": "LLP", "email": "nope"}""");
 
         Assert.Equal(400, answer.Status);
-        Assert.Equal("""{"error":"ValidationError","fields":{"email":"That doesn't look like a valid email address.","name":"Please tell us your name."}}""", answer.Body);
+        Assert.True(JsonNode.DeepEquals(JsonNode.Parse("""{"error":"ValidationError","fields":{"email":"That doesn't look like a valid email address.","name":"Please tell us your name."}}"""), JsonNode.Parse(answer.Body)), answer.Body);
         Assert.Empty(_world.Host.Waitlist.Records);
     }
 

@@ -37,10 +37,10 @@ public sealed class CourtRouteTests : IAsyncLifetime, IDisposable
         var flmb = Districts((await _world.Get("/v1/courts", Greg)).Object).Single(d => d.Str("code") == "flmb");
 
         Assert.Equal(("Middle District of Florida", "FLMBK", "FL", 11), (flmb.Str("name"), flmb.Str("courtId"), flmb.Str("state"), flmb["circuit"]!.GetValue<int>()));
-        Assert.Equal("""{"status":"unverified","verifiedAt":null}""", Http.FlaskJson.Serialize(flmb["caseUpload"]));
+        Assert.Equal("""{"status":"unverified","verifiedAt":null}""", Support.SortedJson.Serialize(flmb["caseUpload"]));
         var tampa = flmb["divisions"]!.AsArray().Select(d => d!.AsObject()).Single(d => d.Str("code") == "tampa");
         Assert.Equal(("Tampa Division", "8", true, "Tampa"), (tampa.Str("name"), tampa.Str("officeCode"), tampa["officeCodeVerified"]!.GetValue<bool>(), tampa["courthouse"]!["city"]!.GetValue<string>()));
-        Assert.Contains("""{"fips":"12057","name":"Hillsborough"}""", tampa["counties"]!.AsArray().Select(Http.FlaskJson.Serialize));
+        Assert.Contains("""{"fips":"12057","name":"Hillsborough"}""", tampa["counties"]!.AsArray().Select(Support.SortedJson.Serialize));
         Assert.Equal(["code", "counties", "courthouse", "name", "officeCode", "officeCodeVerified"], Answer.Keys(tampa));
         Assert.Equal(["caseUpload", "circuit", "code", "courtId", "divisions", "name", "state", "website"], Answer.Keys(flmb));
     }

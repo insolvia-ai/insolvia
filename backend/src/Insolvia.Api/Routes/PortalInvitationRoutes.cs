@@ -1,8 +1,6 @@
-using System.Text.Json.Nodes;
 using Insolvia.Api.Auth;
 using Insolvia.Api.Configuration;
 using Insolvia.Api.Hosting;
-using Insolvia.Api.Http;
 using Insolvia.Api.Logging;
 using Insolvia.Api.Mail;
 using Insolvia.Api.Portal;
@@ -12,6 +10,7 @@ using Insolvia.Domain.AccessLog;
 using Insolvia.Domain.Clients;
 using Insolvia.Domain.Firms;
 using Insolvia.Domain.Ports;
+using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace Insolvia.Api.Routes;
 
@@ -48,25 +47,29 @@ public sealed class PortalInvitationRoutes : IEndpointModule
     {
         ArgumentNullException.ThrowIfNull(routes);
         routes.MapGet("/v1/cases/{caseId}/portal/clients", ListAsync).RequireAuth().Requires(Feature.ClientPortal, PermissionLevel.ViewOnly);
-        routes.MapPost("/v1/cases/{caseId}/portal/invitation", InviteAsync).RequireAuth().Requires(Feature.ClientPortal, PermissionLevel.AddEdit);
+        routes.MapPost("/v1/cases/{caseId}/portal/invitation", InviteAsync).RequestBody<PortalInvitationRequest>().RequireAuth().Requires(Feature.ClientPortal, PermissionLevel.AddEdit);
         routes.MapPost("/v1/cases/{caseId}/portal/clients/{subject}/resend", ResendAsync).RequireAuth().Requires(Feature.ClientPortal, PermissionLevel.AddEdit);
         routes.MapDelete("/v1/cases/{caseId}/portal/clients/{subject}", RevokeAsync).RequireAuth().Requires(Feature.ClientPortal, PermissionLevel.AddEdit);
     }
 
-    // Everyone ever invited to this case's portal, revoked included — oldest first.
-    private static async Task<IResult> ListAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
+    /// <summary>List the case's portal clients.</summary>
+    /// <remarks>Everyone ever invited to this case's portal, revoked included, oldest first.</remarks>
+    internal static async Task<ClientBindingList> ListAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
     {
         var accessor = await context.CurrentAccessorAsync();
         await VisibleCaseAsync(context, accessor, caseId, AccessAction.CaseRead, cancellationToken);
         await RecordAsync(context, accessor, caseId, AccessAction.CaseRead, null, cancellationToken);
         var clients = await context.Port<IClientBindingStore>().ListForCaseAsync(caseId, cancellationToken);
-        return FlaskJson.Result(new JsonObject { ["clients"] = new JsonArray([.. clients.Select(binding => (JsonNode)PortalViews.Binding(binding))]) });
+        return new ClientBindingList([.. clients.Select(ClientBindingView.Of)]);
     }
 
-    // {email, displayName, roles?} — roles defaults to [debtor_1]; both is the
-    // firm's explicit choice of one login for both spouses, and the access-log
-    // row records it.
-    private static async Task<IResult> InviteAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
+    /// <summary>Invite a client to the portal.</summary>
+    /// <remarks>
+    /// Roles default to <c>debtor_1</c>; both roles is the firm's explicit
+    /// choice of one login for both spouses. An address that already has an
+    /// account not among the firm's clients is a 409.
+    /// </remarks>
+    internal static async Task<Created<ClientBindingView>> InviteAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
     {
         var accessor = await context.CurrentAccessorAsync();
         await VisibleCaseAsync(context, accessor, caseId, AccessAction.ClientInvite, cancellationToken);
@@ -100,13 +103,15 @@ public sealed class PortalInvitationRoutes : IEndpointModule
 
         // No address, no subject, no name: that SOME client was invited is all a request log needs.
         context.Log(Logger, "portal client invited", ("narrowed", narrowed.Count));
-        return FlaskJson.Result(PortalViews.Binding(binding), StatusCodes.Status201Created);
+        return TypedResults.Created((string?)null, ClientBindingView.Of(binding));
     }
 
-    // Re-send an invitation not used yet. The directory re-sends its password
-    // mail unless the account already chose a password (the refiled-case
-    // shape — a ConflictException, swallowed): then only the context mail goes.
-    private static async Task<IResult> ResendAsync(HttpContext context, string caseId, string subject, CancellationToken cancellationToken)
+    /// <summary>Re-send a portal invitation.</summary>
+    /// <remarks>Only an invitation not used yet can be re-sent; one already used, or revoked, is a 409.</remarks>
+    // The directory re-sends its password mail unless the account already
+    // chose a password (the refiled-case shape — a ConflictException,
+    // swallowed): then only the context mail goes.
+    internal static async Task<NoContent> ResendAsync(HttpContext context, string caseId, string subject, CancellationToken cancellationToken)
     {
         var accessor = await context.CurrentAccessorAsync();
         await VisibleCaseAsync(context, accessor, caseId, AccessAction.ClientInvite, cancellationToken);
@@ -128,13 +133,16 @@ public sealed class PortalInvitationRoutes : IEndpointModule
         await RecordAsync(context, accessor, caseId, AccessAction.ClientInvite, binding.Roles, cancellationToken);
         await SendContextMailAsync(context, binding, accessor, cancellationToken);
         context.Log(Logger, "portal invitation re-sent");
-        return FlaskJson.NoContent();
+        return TypedResults.NoContent();
     }
 
-    // Withdraw access: the binding flips to revoked and its roles are
-    // released; the client's next request answers 403 with a denied row. The
-    // pool account survives — this service holds no AdminDeleteUser.
-    private static async Task<IResult> RevokeAsync(HttpContext context, string caseId, string subject, CancellationToken cancellationToken)
+    /// <summary>Revoke a client's portal access.</summary>
+    /// <remarks>
+    /// The invitation is kept as revoked and its roles are released; the
+    /// client's next request is refused.
+    /// </remarks>
+    // The pool account survives — this service holds no AdminDeleteUser.
+    internal static async Task<ClientBindingView> RevokeAsync(HttpContext context, string caseId, string subject, CancellationToken cancellationToken)
     {
         var accessor = await context.CurrentAccessorAsync();
         await VisibleCaseAsync(context, accessor, caseId, AccessAction.ClientRevoke, cancellationToken);
@@ -144,7 +152,7 @@ public sealed class PortalInvitationRoutes : IEndpointModule
 
         await RecordAsync(context, accessor, caseId, AccessAction.ClientRevoke, written.Roles, cancellationToken);
         context.Log(Logger, "portal client revoked");
-        return FlaskJson.Result(PortalViews.Binding(written));
+        return ClientBindingView.Of(written);
     }
 
     // 404 unless the caller may see the case — the refusal recorded, because
@@ -195,7 +203,7 @@ public sealed class PortalInvitationRoutes : IEndpointModule
             // it carries the invitation's key.)
             await context.Port<IMailer>().SendAsync(
                 email,
-                $"client-invitation:{binding.CaseId}:{binding.Subject}:{FlaskJson.Micros(binding.UpdatedAt)}",
+                $"client-invitation:{binding.CaseId}:{binding.Subject}:{WireFormat.Micros(binding.UpdatedAt)}",
                 cancellationToken);
         }
 #pragma warning disable CA1031 // The mail is best effort; the invitation already stands.

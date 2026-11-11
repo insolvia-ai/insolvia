@@ -1,7 +1,5 @@
-using System.Text.Json.Nodes;
 using Insolvia.Api.Auth;
 using Insolvia.Api.Hosting;
-using Insolvia.Api.Http;
 using Insolvia.Api.Portal;
 using Insolvia.Domain;
 using Insolvia.Domain.Access;
@@ -11,6 +9,7 @@ using Insolvia.Domain.Clients;
 using Insolvia.Domain.Ports;
 using Insolvia.Domain.Questionnaires;
 using Insolvia.Domain.Questions;
+using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace Insolvia.Api.Routes;
 
@@ -50,8 +49,8 @@ public sealed class PortalRoutes : IEndpointModule
         routes.MapGet("/v1/portal/me", MeAsync).RequireClient();
         routes.MapGet("/v1/portal/questionnaire", QuestionnaireAsync).RequireClient();
         routes.MapGet("/v1/portal/answers", ListAnswersAsync).RequireClient();
-        routes.MapPost("/v1/portal/answers", CreateAnswerAsync).RequireClient();
-        routes.MapPut("/v1/portal/answers/{answerId}", UpdateAnswerAsync).RequireClient();
+        routes.MapPost("/v1/portal/answers", CreateAnswerAsync).RequestBody<PortalAnswerRequest>().RequireClient();
+        routes.MapPut("/v1/portal/answers/{answerId}", UpdateAnswerAsync).RequestBody<PortalAnswerRevision>().RequireClient();
         routes.MapDelete("/v1/portal/answers/{answerId}", WithdrawAnswerAsync).RequireClient();
     }
 
@@ -67,33 +66,36 @@ public sealed class PortalRoutes : IEndpointModule
     internal static async Task<CasePublicStatus> PublicStatusAsync(HttpContext context, ClientAccessor client, CancellationToken cancellationToken) =>
         await context.Cases().PublicStatusAsync(client, cancellationToken) ?? throw new ForbiddenException(NoCase);
 
-    // "Is my session good, and whose portal is this?" — recorded as portal.read.
-    private static async Task<IResult> MeAsync(HttpContext context, CancellationToken cancellationToken)
+    /// <summary>Read my portal.</summary>
+    /// <remarks>Whose portal this is: the client's name as the firm gave it, the firm's name, and the case's chapter and stage — never a case id. Also answers "is my session good?".</remarks>
+    internal static async Task<PortalMeView> MeAsync(HttpContext context, CancellationToken cancellationToken)
     {
         var client = context.CurrentClient();
         await RecordAsync(context, client, AccessAction.PortalRead, cancellationToken);
-        return FlaskJson.Result(PortalViews.Me(client, await PublicStatusAsync(context, client, cancellationToken)));
+        return PortalMeView.Of(client, await PublicStatusAsync(context, client, cancellationToken));
     }
 
-    // The sections as this client's firm configured them — the enabled ones
-    // only. Read from the binding's FIRM, never from anything in the request.
-    private static async Task<IResult> QuestionnaireAsync(HttpContext context, CancellationToken cancellationToken)
+    /// <summary>Read my questionnaire.</summary>
+    /// <remarks>The questionnaire as the client's firm configured it: the enabled sections only, each with its instructions and questions in order.</remarks>
+    // Read from the binding's FIRM, never from anything in the request.
+    internal static async Task<PortalQuestionnaireView> QuestionnaireAsync(HttpContext context, CancellationToken cancellationToken)
     {
         var client = context.CurrentClient();
         var config = await context.FirmStore().GetQuestionnaireAsync(client.FirmId, cancellationToken);
         await RecordAsync(context, client, AccessAction.PortalRead, cancellationToken);
-        return FlaskJson.Result(PortalViews.Sections(config));
+        return PortalQuestionnaireView.Of(config);
     }
 
-    // This client's own answers, every status, only in sections the firm
-    // still shows: nobody else's candidates, not even a count.
-    private static async Task<IResult> ListAnswersAsync(HttpContext context, CancellationToken cancellationToken)
+    /// <summary>List my answers.</summary>
+    /// <remarks>The client's own answers, every status, in sections the firm still shows.</remarks>
+    // Nobody else's candidates, not even a count.
+    internal static async Task<PortalAnswerList> ListAnswersAsync(HttpContext context, CancellationToken cancellationToken)
     {
         var client = context.CurrentClient();
         var candidates = context.Port<ICandidateStore>();
         var sections = await SectionsAsync(context, client, cancellationToken);
         var enabled = sections.Where(resolved => resolved.Enabled).Select(resolved => resolved.Section.Id).ToHashSet(StringComparer.Ordinal);
-        var answers = new JsonArray();
+        var answers = new List<PortalAnswerView>();
         foreach (var candidate in await candidates.ListForCaseAsync(client.CaseId, cancellationToken))
         {
             if (!QuestionRules.IsOwnAnswer(candidate, client.Subject))
@@ -103,18 +105,18 @@ public sealed class PortalRoutes : IEndpointModule
 
             if (QuestionRules.RefOf(candidate) is { } answer && enabled.Contains(answer.Question.Section))
             {
-                answers.Add(PortalViews.Answer(candidate, answer));
+                answers.Add(PortalAnswerView.Of(candidate, answer));
             }
         }
 
         await RecordAsync(context, client, AccessAction.PortalRead, cancellationToken);
-        return FlaskJson.Result(new JsonObject { ["answers"] = answers });
+        return new PortalAnswerList(answers);
     }
 
-    // {questionId, filingRole?, value} → 201 with the pending answer. The
-    // origin is the verified token's — channel client, the portal app client,
-    // the subject — never anything the body says.
-    private static async Task<IResult> CreateAnswerAsync(HttpContext context, CancellationToken cancellationToken)
+    /// <summary>Answer a question.</summary>
+    /// <remarks>The answer waits, pending, in the firm's review queue; nothing reaches the case until a person accepts it. Its origin is the verified token's — never anything the body says.</remarks>
+    // Channel client, the portal app client, the subject.
+    internal static async Task<Created<PortalAnswerView>> CreateAnswerAsync(HttpContext context, CancellationToken cancellationToken)
     {
         var client = context.CurrentClient();
         var principal = context.CurrentClientPrincipal();
@@ -131,13 +133,17 @@ public sealed class PortalRoutes : IEndpointModule
         await RecordAsync(context, client, AccessAction.PortalAnswer, cancellationToken);
         LogAnswer(context, client, candidate.Id, "created");
         var answer = QuestionRules.RefOf(candidate) ?? throw new InvalidOperationException("an answer was written without its question");
-        return FlaskJson.Result(PortalViews.Answer(candidate, answer), StatusCodes.Status201Created);
+        return TypedResults.Created((string?)null, PortalAnswerView.Of(candidate, answer));
     }
 
-    // Change a PENDING answer's value: {value}. Someone else's, or one in a
-    // section since switched off, is a 404; the CAS on pending means an edit
-    // that races a reviewer loses rather than rewriting what they accepted.
-    private static async Task<IResult> UpdateAnswerAsync(HttpContext context, string answerId, CancellationToken cancellationToken)
+    /// <summary>Change a pending answer.</summary>
+    /// <remarks>
+    /// Someone else's answer, or one in a section since switched off, is a 404;
+    /// one already reviewed is a 409.
+    /// </remarks>
+    // The CAS on pending means an edit that races a reviewer loses rather
+    // than rewriting what they accepted.
+    internal static async Task<PortalAnswerView> UpdateAnswerAsync(HttpContext context, string answerId, CancellationToken cancellationToken)
     {
         var client = context.CurrentClient();
         var candidates = context.Port<ICandidateStore>();
@@ -154,12 +160,12 @@ public sealed class PortalRoutes : IEndpointModule
 
         await RecordAsync(context, client, AccessAction.PortalAnswer, cancellationToken);
         LogAnswer(context, client, revised.Id, "updated");
-        return FlaskJson.Result(PortalViews.Answer(revised, answer));
+        return PortalAnswerView.Of(revised, answer);
     }
 
-    // Withdraw a PENDING answer — the proposer's retraction, retained like
-    // every other terminal state. 409 once reviewed; 404 for anything not theirs.
-    private static async Task<IResult> WithdrawAnswerAsync(HttpContext context, string answerId, CancellationToken cancellationToken)
+    /// <summary>Withdraw a pending answer.</summary>
+    /// <remarks>The withdrawn answer is kept. 409 once reviewed; 404 for anything not the caller's.</remarks>
+    internal static async Task<PortalAnswerView> WithdrawAnswerAsync(HttpContext context, string answerId, CancellationToken cancellationToken)
     {
         var client = context.CurrentClient();
         var candidates = context.Port<ICandidateStore>();
@@ -175,7 +181,7 @@ public sealed class PortalRoutes : IEndpointModule
 
         await RecordAsync(context, client, AccessAction.PortalAnswer, cancellationToken);
         LogAnswer(context, client, withdrawn.Id, "withdrawn");
-        return FlaskJson.Result(PortalViews.Answer(withdrawn, answer));
+        return PortalAnswerView.Of(withdrawn, answer);
     }
 
     // The firm's questionnaire as it stands NOW — read on every answer

@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 namespace Insolvia.Admin.Tests;
 
 // The host around the routes: CORS (services/admin core/cors.py), the
-// Werkzeug-shaped 404/405/OPTIONS, configuration and the Lambda boot.
+// The JSON 404/405 and OPTIONS, configuration and the Lambda boot.
 public sealed class HostTests(WebApplicationFactory<Program> factory) : IClassFixture<WebApplicationFactory<Program>>
 {
     [Fact]
@@ -46,7 +46,7 @@ public sealed class HostTests(WebApplicationFactory<Program> factory) : IClassFi
     }
 
     [Fact]
-    public async Task An_unknown_path_and_a_wrong_method_answer_as_werkzeug()
+    public async Task An_unknown_path_and_a_wrong_method_answer_json_refusals()
     {
         using var host = new AdminHost(factory);
         using var client = host.CreateClient();
@@ -55,8 +55,9 @@ public sealed class HostTests(WebApplicationFactory<Program> factory) : IClassFi
         var wrongMethod = await client.SendAsync(HttpMethod.Delete, "/v1/firms");
 
         Assert.Equal(404, missing.Status);
-        Assert.Equal(ErrorResponses.WerkzeugHtml(404), missing.Body);
+        Assert.Equal("NotFoundError", missing.Json["error"]!.GetValue<string>());
         Assert.Equal(405, wrongMethod.Status);
+        Assert.Equal("MethodNotAllowedError", wrongMethod.Json["error"]!.GetValue<string>());
         Assert.Equal("HEAD, OPTIONS, GET, POST", string.Join(", ", wrongMethod.Response.Content.Headers.Allow));
     }
 

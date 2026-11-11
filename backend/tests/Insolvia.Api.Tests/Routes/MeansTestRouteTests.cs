@@ -75,7 +75,7 @@ public sealed class MeansTestRouteTests : IAsyncLifetime, IDisposable
         Assert.Empty(body["cmi"]!["columns"]!.AsArray());
         Assert.Equal(6, body["cmi"]!["window"]!["months"]!.AsArray().Count);
         Assert.Equal("case.created_at", body.Str("asOfSource"));
-        Assert.Equal("""{"source":null,"value":null}""", Http.FlaskJson.Serialize(body["household"]!["medianHouseholdSize"]));
+        Assert.Equal("""{"source":null,"value":null}""", Support.SortedJson.Serialize(body["household"]!["medianHouseholdSize"]));
     }
 
     [Fact]
@@ -221,7 +221,7 @@ public sealed class MeansTestRouteTests : IAsyncLifetime, IDisposable
 
         var body = (await MeansTest(caseId)).Object;
 
-        Assert.Equal("""{"source":"the case's debtor_2 record","value":"married_filing_jointly"}""", Http.FlaskJson.Serialize(body["maritalFilingStatus"]));
+        Assert.Equal("""{"source":"the case's debtor_2 record","value":"married_filing_jointly"}""", Support.SortedJson.Serialize(body["maritalFilingStatus"]));
         var household = body["household"]!.AsObject();
         Assert.Equal(3, household["peopleUnder65"]!.GetValue<int>());
         Assert.Equal(3, household["medianHouseholdSize"]!["value"]!.GetValue<int>());
@@ -229,7 +229,7 @@ public sealed class MeansTestRouteTests : IAsyncLifetime, IDisposable
         Assert.Equal(3, household["irsHousingFamilySize"]!["value"]!.GetValue<int>());
         Assert.Equal(1, household["childrenUnder18"]!.GetValue<int>());
         Assert.Null(body["exemptions"]!["applied"]);
-        Assert.Equal("""["non_consumer_debts","disabled_veteran","reservist_national_guard"]""", Http.FlaskJson.Serialize(body["exemptions"]!["available"]));
+        Assert.Equal("""["non_consumer_debts","disabled_veteran","reservist_national_guard"]""", Support.SortedJson.Serialize(body["exemptions"]!["available"]));
         Assert.NotEqual("0.00", body["debt"]!["priorityTotal"]!.GetValue<string>());
     }
 
@@ -260,7 +260,7 @@ public sealed class MeansTestRouteTests : IAsyncLifetime, IDisposable
 
         Assert.Equal("2026-10-15", body.Str("asOf"));
         Assert.Equal("petition.expected_filing_date", body.Str("asOfSource"));
-        Assert.Equal("""["2026-04","2026-05","2026-06","2026-07","2026-08","2026-09"]""", Http.FlaskJson.Serialize(body["cmi"]!["window"]!["months"]));
+        Assert.Equal("""["2026-04","2026-05","2026-06","2026-07","2026-08","2026-09"]""", Support.SortedJson.Serialize(body["cmi"]!["window"]!["months"]));
         // Ada's February and March checks fall out of the window; the figure
         // moves with the planned date, as the form's would.
         Assert.NotEqual("8700.00", body["cmi"]!["combinedMonthlyTotal"]!.GetValue<string>());
@@ -277,7 +277,7 @@ public sealed class MeansTestRouteTests : IAsyncLifetime, IDisposable
         Assert.Equal(200, answer.Status);
         var body = answer.Object;
         Assert.Equal("undetermined", body.Str("outcome"));
-        Assert.Equal("{}", Http.FlaskJson.Serialize(body["releaseIds"]));
+        Assert.Equal("{}", Support.SortedJson.Serialize(body["releaseIds"]));
         Assert.Contains(Problems(body), problem => problem.Contains("no release of", StringComparison.Ordinal));
         // The window is a calendar fact and still lands.
         Assert.Equal("2025-10", body["cmi"]!["window"]!["months"]![0]!.GetValue<string>());
@@ -317,8 +317,8 @@ public sealed class MeansTestRouteTests : IAsyncLifetime, IDisposable
 
         Assert.True(answer.Status == 201, answer.Body);
         var stored = answer.Object;
-        Assert.Equal(IncomeOverrides, Http.FlaskJson.Serialize(stored["income_overrides"]));
-        Assert.Equal(SecuredPayments, Http.FlaskJson.Serialize(stored["other_secured_payments"]));
+        Assert.Equal(IncomeOverrides, Support.SortedJson.Serialize(stored["income_overrides"]));
+        Assert.Equal(SecuredPayments, Support.SortedJson.Serialize(stored["other_secured_payments"]));
         var bare = JsonNode.Parse(payload)!.AsObject();
         bare.Remove("provenance");
         Assert.Equal(4, MeansTestInputRules.Kind.ParseBody(bare).MedianHouseholdSize);

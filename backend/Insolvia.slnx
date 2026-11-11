@@ -3,6 +3,7 @@
     <Project Path="src/Insolvia.Domain/Insolvia.Domain.csproj" />
     <Project Path="src/Insolvia.Data/Insolvia.Data.csproj" />
     <Project Path="src/Insolvia.Platform/Insolvia.Platform.csproj" />
+    <Project Path="src/Insolvia.Http/Insolvia.Http.csproj" />
     <Project Path="src/Insolvia.Api/Insolvia.Api.csproj" />
     <Project Path="src/Insolvia.Worker/Insolvia.Worker.csproj" />
     <Project Path="src/Insolvia.Admin/Insolvia.Admin.csproj" />
@@ -15,6 +16,7 @@
     <Project Path="tests/Insolvia.Domain.Tests/Insolvia.Domain.Tests.csproj" />
     <Project Path="tests/Insolvia.Data.Tests/Insolvia.Data.Tests.csproj" />
     <Project Path="tests/Insolvia.Platform.Tests/Insolvia.Platform.Tests.csproj" />
+    <Project Path="tests/Insolvia.Http.Tests/Insolvia.Http.Tests.csproj" />
     <Project Path="tests/Insolvia.Api.Tests/Insolvia.Api.Tests.csproj" />
     <Project Path="tests/Insolvia.Worker.Tests/Insolvia.Worker.Tests.csproj" />
     <Project Path="tests/Insolvia.Admin.Tests/Insolvia.Admin.Tests.csproj" />

@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The wire every HTTP host shares (ADR 0030's boundary for ASP.NET): the
+       JSON responses are written in (WireJson, WireFormat), the error body and
+       the answers outside a host's routes (ErrorResponses, MethodFallback),
+       and the generated OpenAPI document with its /docs page (WireOpenApi).
+       Referenced by the HTTP hosts only (Api, Admin), so the workers and the
+       migrator — whose image is the plain .NET runtime — never carry ASP.NET. -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Scalar.AspNetCore" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Insolvia.Domain/Insolvia.Domain.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Insolvia.Http.Tests" />
+  </ItemGroup>
+</Project>

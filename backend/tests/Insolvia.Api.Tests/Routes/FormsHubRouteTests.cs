@@ -143,11 +143,11 @@ public sealed partial class FormsHubRouteTests : IAsyncLifetime, IDisposable
         var caseId = await _world.OpenCaseIdAsync();
         var stored = (await _world.StoredAsync(caseId))!;
         var data = await CaseDataReads.ReadAsync(stored, _world.Service<IDebtorStore>(), _world.Service<ICaseEntityStore>(), HttpAssert.Ct);
-        var expected = new JsonArray([.. FormsHub.Summaries(data, DateOnly.FromDateTime(Now.UtcDateTime)).Select(summary => (JsonNode)Insolvia.Api.Routes.FormsHubRoutes.FormSummaryJson(summary, 0))]);
+        var expected = new JsonArray([.. FormsHub.Summaries(data, DateOnly.FromDateTime(Now.UtcDateTime)).Select(summary => System.Text.Json.JsonSerializer.SerializeToNode(Cases.FormSummaryView.Of(summary, 0), Insolvia.Http.WireJson.Options))]);
 
         var answer = await Forms(caseId);
 
-        Assert.Equal(Http.FlaskJson.Serialize(new JsonObject { ["forms"] = expected }), answer.Body.TrimEnd('\n'));
+        Assert.True(JsonNode.DeepEquals(new JsonObject { ["forms"] = expected }, JsonNode.Parse(answer.Body)), answer.Body);
     }
 
     [Fact]
@@ -260,7 +260,7 @@ public sealed partial class FormsHubRouteTests : IAsyncLifetime, IDisposable
         Assert.Equal(["expiresAt", "method", "options", "problems", "url"], Answer.Keys(answer.Object));
         Assert.Empty(answer.Object["problems"]!.AsArray());
         Assert.Equal("GET", answer.Str("method"));
-        Assert.Equal(Http.FlaskJson.Millis(Now.AddSeconds(5 * 60)), answer.Str("expiresAt"));
+        Assert.Equal(Insolvia.Http.WireFormat.Millis(Now.AddSeconds(5 * 60)), answer.Str("expiresAt"));
         var minted = Blobs.Minted[^1];
         Assert.Equal("GET", minted.Method);
         Assert.Equal(5 * 60, minted.ExpiresIn);
@@ -370,7 +370,7 @@ public sealed partial class FormsHubRouteTests : IAsyncLifetime, IDisposable
         var answer = await Preview(caseId, "b101");
         Assert.Equal(
             """{"amendedOnly":false,"draftWatermark":false,"printDate":false,"signElectronically":false,"signaturePages":"all"}""",
-            Http.FlaskJson.Serialize(answer.Object["options"]));
+            Support.SortedJson.Serialize(answer.Object["options"]));
     }
 
     [Fact]
@@ -384,7 +384,7 @@ public sealed partial class FormsHubRouteTests : IAsyncLifetime, IDisposable
         Assert.Equal(200, answer.Status);
         Assert.Equal(
             """{"amendedOnly":false,"draftWatermark":true,"printDate":true,"signElectronically":false,"signaturePages":"all"}""",
-            Http.FlaskJson.Serialize(answer.Object["options"]));
+            Support.SortedJson.Serialize(answer.Object["options"]));
         var page = PdfReader.Open(new MemoryStream(await TheOnlyPreviewAsync(caseId)), PdfDocumentOpenMode.Import).Pages[0];
         Assert.Contains("(DRAFT) Tj", PageContents(page), StringComparison.Ordinal);
     }

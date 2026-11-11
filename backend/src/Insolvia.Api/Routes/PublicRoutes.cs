@@ -1,11 +1,11 @@
-using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 using Insolvia.Api.Configuration;
 using Insolvia.Api.Hosting;
-using Insolvia.Api.Http;
 using Insolvia.Api.Mail;
 using Insolvia.Api.Waitlist;
 using Insolvia.Data.Waitlist;
 using Insolvia.Domain;
+using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace Insolvia.Api.Routes;
 
@@ -25,10 +25,12 @@ public sealed class WaitlistRoutes : IEndpointModule
     public void Map(IEndpointRouteBuilder routes)
     {
         ArgumentNullException.ThrowIfNull(routes);
-        routes.MapPost("/v1/waitlist", SubmitAsync);
+        routes.MapPost("/v1/waitlist", SubmitAsync).RequestBody<WaitlistRequest>();
     }
 
-    private static async Task<IResult> SubmitAsync(HttpContext context, CancellationToken cancellationToken)
+    /// <summary>Join the waitlist.</summary>
+    /// <remarks>Unauthenticated: the marketing site calls it server to server.</remarks>
+    internal static async Task<Created<WaitlistReceipt>> SubmitAsync(HttpContext context, CancellationToken cancellationToken)
     {
         var submission = WaitlistSubmissions.Parse(await context.BodyAsync(MaxRequestBytes));
         var record = WaitlistSubmissions.Create(submission, context.Clock());
@@ -38,9 +40,7 @@ public sealed class WaitlistRoutes : IEndpointModule
 
         // GLBA: only the server-generated id — never a submitted value.
         context.Log(Logger, "waitlist submission stored", ("waitlist_id", record.Id));
-        return FlaskJson.Result(
-            new JsonObject { ["id"] = record.Id, ["submittedAt"] = FlaskJson.Millis(record.SubmittedAt) },
-            StatusCodes.Status201Created);
+        return TypedResults.Created((string?)null, new WaitlistReceipt(record.Id, WireFormat.Millis(record.SubmittedAt)));
     }
 }
 
@@ -67,10 +67,15 @@ public sealed class UnsubscribeRoutes : IEndpointModule
     public void Map(IEndpointRouteBuilder routes)
     {
         ArgumentNullException.ThrowIfNull(routes);
-        routes.MapPost("/v1/unsubscribe", SubmitAsync);
+        routes.MapPost("/v1/unsubscribe", SubmitAsync).RequestBody<UnsubscribeRequest>();
     }
 
-    private static async Task<IResult> SubmitAsync(HttpContext context, CancellationToken cancellationToken)
+    /// <summary>Stop email to the address an unsubscribe link was made for.</summary>
+    /// <remarks>
+    /// Unauthenticated: the token is the authentication. An invalid token is a
+    /// 400; a valid one always answers the same 202, whatever the address's state.
+    /// </remarks>
+    internal static async Task<Accepted<UnsubscribeReceipt>> SubmitAsync(HttpContext context, CancellationToken cancellationToken)
     {
         var payload = await context.BodyAsync(MaxRequestBytes);
         var token = Json.AsString(payload["token"]) ?? throw new ValidationException("token is required");
@@ -83,6 +88,38 @@ public sealed class UnsubscribeRoutes : IEndpointModule
 
         // The address is PII and stays out of the log line.
         context.Log(Logger, "unsubscribe honoured");
-        return FlaskJson.Result(new JsonObject { ["status"] = "unsubscribed" }, StatusCodes.Status202Accepted);
+        return TypedResults.Accepted((string?)null, new UnsubscribeReceipt("unsubscribed"));
     }
 }
+
+/// <summary>
+/// A waitlist sign-up (<c>POST /v1/waitlist</c>). Parsed by
+/// <c>WaitlistSubmissions.Parse</c>, which owns validation: values are
+/// trimmed, a non-string counts as missing, and unknown keys are ignored.
+/// </summary>
+/// <param name="Name">The person's name (required, up to 200 characters).</param>
+/// <param name="Firm">Their firm's name (required, up to 200 characters).</param>
+/// <param name="Email">A work email (required, up to 320 characters).</param>
+/// <param name="CurrentSoftware">What they use today (up to 100 characters).</param>
+/// <param name="Message">Anything else (up to 2000 characters).</param>
+/// <param name="Host">The marketing host the form was sent from (up to 253 characters).</param>
+public sealed record WaitlistRequest(
+    string Name,
+    string Firm,
+    string Email,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? CurrentSoftware,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Message,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Host);
+
+/// <summary>A stored waitlist sign-up.</summary>
+/// <param name="Id">The sign-up's server-generated id.</param>
+/// <param name="SubmittedAt">When it was stored, ISO 8601 UTC with milliseconds.</param>
+public sealed record WaitlistReceipt(string Id, string SubmittedAt);
+
+/// <summary>An unsubscribe click (<c>POST /v1/unsubscribe</c>).</summary>
+/// <param name="Token">The signed token from the email's unsubscribe link.</param>
+public sealed record UnsubscribeRequest(string Token);
+
+/// <summary>The one answer to a valid unsubscribe token.</summary>
+/// <param name="Status">Always <c>unsubscribed</c>.</param>
+public sealed record UnsubscribeReceipt(string Status);

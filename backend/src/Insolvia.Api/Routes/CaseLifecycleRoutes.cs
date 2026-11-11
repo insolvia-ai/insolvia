@@ -3,7 +3,6 @@ using System.Text.Json.Nodes;
 using Insolvia.Api.Auth;
 using Insolvia.Api.Cases;
 using Insolvia.Api.Hosting;
-using Insolvia.Api.Http;
 using Insolvia.Domain;
 using Insolvia.Domain.AccessLog;
 using Insolvia.Domain.CaseEntities;
@@ -13,6 +12,7 @@ using Insolvia.Domain.FirmClients;
 using Insolvia.Domain.Firms;
 using Insolvia.Domain.Ports;
 using Insolvia.Domain.TaxIds;
+using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace Insolvia.Api.Routes;
 
@@ -52,34 +52,41 @@ public sealed class CaseLifecycleRoutes : IEndpointModule
         ArgumentNullException.ThrowIfNull(routes);
         routes.MapGet("/v1/cases/{caseId}/status-history", StatusHistoryAsync).RequireAuth().Requires(Feature.Cases, PermissionLevel.ViewOnly);
         routes.MapGet("/v1/cases/{caseId}/lifecycle", LifecycleAsync).RequireAuth().Requires(Feature.Cases, PermissionLevel.ViewOnly);
-        routes.MapPost("/v1/cases/{caseId}/conversions", ConvertAsync).RequireAuth().Requires(Feature.Cases, PermissionLevel.AddEdit);
-        routes.MapPut("/v1/cases/{caseId}/archived", ArchiveAsync).RequireAuth().Requires(Feature.Cases, PermissionLevel.AddEdit);
+        routes.MapPost("/v1/cases/{caseId}/conversions", ConvertAsync).RequestBody<ConversionRequest>().RequireAuth().Requires(Feature.Cases, PermissionLevel.AddEdit);
+        routes.MapPut("/v1/cases/{caseId}/archived", ArchiveAsync).RequestBody<CaseArchiveRequest>().RequireAuth().Requires(Feature.Cases, PermissionLevel.AddEdit);
         routes.MapDelete("/v1/cases/{caseId}", DeleteAsync).RequireAuth().Requires(Feature.Cases, PermissionLevel.AddEdit);
         routes.MapPost("/v1/cases/{caseId}/copy", CopyAsync).RequireAuth().Requires(Feature.Cases, PermissionLevel.AddEdit).Requires(Feature.Clients, PermissionLevel.ViewOnly);
     }
 
-    // Not access-logged, like the assignee list: a fact about the handling.
-    private static async Task<IResult> StatusHistoryAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
+    /// <summary>A case's status moves.</summary>
+    /// <remarks>
+    /// The lifecycle history's status events, in the older shape the app still
+    /// reads; <c>GET …/lifecycle</c> has every event. Not access-logged, like
+    /// the assignee list: a fact about the handling.
+    /// </remarks>
+    internal static async Task<StatusHistory> StatusHistoryAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
     {
         await context.VisibleCaseAsync(caseId, cancellationToken);
         var history = await context.Cases().LifecycleAsync(caseId, cancellationToken);
-        return FlaskJson.Result(new JsonObject
-        {
-            ["history"] = new JsonArray([.. history.Where(recorded => recorded.Kind == LifecycleEventKind.Status).Select(recorded => (JsonNode)CaseViews.StatusChange(recorded))]),
-        });
+        return new StatusHistory([.. history.Where(recorded => recorded.Kind == LifecycleEventKind.Status).Select(StatusChangeView.Of)]);
     }
 
-    private static async Task<IResult> LifecycleAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
+    /// <summary>A case's lifecycle history, oldest first.</summary>
+    internal static async Task<LifecycleList> LifecycleAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
     {
         await context.VisibleCaseAsync(caseId, cancellationToken);
         var history = await context.Cases().LifecycleAsync(caseId, cancellationToken);
-        return FlaskJson.Result(new JsonObject
-        {
-            ["events"] = new JsonArray([.. history.OrderBy(recorded => recorded.RecordedAt).Select(recorded => (JsonNode)CaseViews.LifecycleEvent(recorded))]),
-        });
+        return new LifecycleList([.. history.OrderBy(recorded => recorded.RecordedAt).Select(LifecycleEventView.Of)]);
     }
 
-    private static async Task<IResult> ConvertAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
+    /// <summary>Record the court's conversion of a filed case to another chapter.</summary>
+    /// <remarks>
+    /// Filed cases only (409). The new chapter must differ from the current one
+    /// (400 on <c>to_chapter</c>), and the date may not precede the petition or
+    /// the previous court event (400 on <c>effective_on</c>). The case's
+    /// deadlines are not regenerated.
+    /// </remarks>
+    internal static async Task<Created<ConversionView>> ConvertAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
     {
         var store = context.Cases();
         var (toChapter, effectiveOn) = ParseConversion(await context.BodyAsync(MaxRequestBytes));
@@ -101,13 +108,12 @@ public sealed class CaseLifecycleRoutes : IEndpointModule
         }
 
         context.Log(Logger, "case converted", ("case_id", caseId), ("to_chapter", toChapter));
-        return FlaskJson.Result(
-            new JsonObject { ["case"] = CaseViews.Case(updated), ["event"] = CaseViews.LifecycleEvent(write.Event) },
-            StatusCodes.Status201Created);
+        return TypedResults.Created((string?)null, new ConversionView(CaseView.Of(updated), LifecycleEventView.Of(write.Event)));
     }
 
-    // Archive or restore; idempotent, any status. Logged as the edit it is.
-    private static async Task<IResult> ArchiveAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
+    /// <summary>Archive or restore a case.</summary>
+    /// <remarks>Idempotent, in any status; archiving an archived case keeps its first stamp.</remarks>
+    internal static async Task<CaseView> ArchiveAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
     {
         var store = context.Cases();
         var archived = CaseRules.ParseArchive(await context.BodyAsync(MaxRequestBytes));
@@ -124,11 +130,12 @@ public sealed class CaseLifecycleRoutes : IEndpointModule
         }
 
         context.Log(Logger, "case archive changed", ("case_id", caseId));
-        return FlaskJson.Result(CaseViews.Case(updated));
+        return CaseView.Of(updated);
     }
 
-    // SOFT, a firm admin's act, and never a filed case (its petition is a court record).
-    private static async Task<IResult> DeleteAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
+    /// <summary>Delete a case.</summary>
+    /// <remarks>A soft delete, by a firm admin only (403), and never of a filed case (409): its petition is a court record.</remarks>
+    internal static async Task<NoContent> DeleteAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
     {
         var store = context.Cases();
         var accessor = await context.CurrentAccessorAsync();
@@ -157,7 +164,7 @@ public sealed class CaseLifecycleRoutes : IEndpointModule
         }
 
         context.Log(Logger, "case deleted", ("case_id", caseId));
-        return FlaskJson.NoContent();
+        return TypedResults.NoContent();
     }
 
     // A NEW case from this one's data, ALL OR NONE in one unit of work: the
@@ -165,8 +172,15 @@ public sealed class CaseLifecycleRoutes : IEndpointModule
     // ids' foreign keys need the case row), then the records and tax ids.
     // Python ordered the writes the other way, entities first, because
     // DynamoDB had no foreign keys and order was its transaction's
-    // substitute; Postgres refuses that order. The body is ignored.
-    private static async Task<IResult> CopyAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
+    // substitute; Postgres refuses that order.
+
+    /// <summary>Open a new case from a copy of this one's data.</summary>
+    /// <remarks>
+    /// All or nothing: the debtors, their sealed tax ids and every record are
+    /// copied. Debtor 1 must be linked to a client, and no linked client may be
+    /// archived or merged (409). Any request body is ignored.
+    /// </remarks>
+    internal static async Task<Created<CaseView>> CopyAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
     {
         var store = context.Cases();
         var debtorStore = context.Port<IDebtorStore>();
@@ -248,7 +262,7 @@ public sealed class CaseLifecycleRoutes : IEndpointModule
         }
 
         context.Log(Logger, "case copied", ("case_id", copy.Case.Id), ("source_case_id", source.Id));
-        return FlaskJson.Result(CaseViews.Case(copy.Case), StatusCodes.Status201Created);
+        return TypedResults.Created((string?)null, CaseView.Of(copy.Case));
     }
 
     // The copy obeys opening a case's rules: Debtor 1 names a client, and no
@@ -302,7 +316,7 @@ public sealed class CaseLifecycleRoutes : IEndpointModule
         DateOnly? effectiveOn = null;
         var raw = Json.AsString(payload["effectiveOn"]);
         var stripped = raw is null ? string.Empty : TextRules.Strip(raw);
-        if (DateOnly.TryParseExact(stripped, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed) && FlaskJson.Date(parsed) == stripped)
+        if (DateOnly.TryParseExact(stripped, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed) && WireFormat.Date(parsed) == stripped)
         {
             effectiveOn = parsed;
         }

@@ -1,8 +1,9 @@
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
+using Insolvia.Api.Analysis;
 using Insolvia.Api.Auth;
 using Insolvia.Api.Cases;
 using Insolvia.Api.Hosting;
-using Insolvia.Api.Http;
 using Insolvia.Domain;
 using Insolvia.Domain.AccessLog;
 using Insolvia.Domain.Assets;
@@ -59,35 +60,33 @@ public sealed class CaseAnalysisRoutes : IEndpointModule
         routes.MapGet("/v1/cases/{caseId}/liens", LiensAsync).RequireAuth().Requires(Feature.Intake, PermissionLevel.ViewOnly);
         routes.MapGet("/v1/cases/{caseId}/standards", StandardsAsync).RequireAuth().Requires(Feature.Cases, PermissionLevel.ViewOnly);
         routes.MapGet("/v1/cases/{caseId}/plan-calculation", PlanCalculationAsync).RequireAuth().Requires(Feature.Cases, PermissionLevel.ViewOnly);
-        routes.MapPost("/v1/cases/{caseId}/plan-calculation", PlanScenariosAsync).RequireAuth().Requires(Feature.Cases, PermissionLevel.ViewOnly);
+        routes.MapPost("/v1/cases/{caseId}/plan-calculation", PlanScenariosAsync).RequestBody<PlanScenariosRequest>().RequireAuth().Requires(Feature.Cases, PermissionLevel.ViewOnly);
     }
 
-    /// <summary>
-    /// The § 707(b) trace as of the expected filing date, over the whole case
-    /// file — the same read path the packet takes, so the endpoint and B122
-    /// read the same records.
-    /// </summary>
-    private static async Task<IResult> MeansTestAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
+    /// <summary>The § 707(b) means test as of the expected filing date.</summary>
+    /// <remarks>
+    /// Over the whole case file — the same read path the packet takes, so the
+    /// endpoint and B122 read the same records.
+    /// </remarks>
+    internal static async Task<MeansTestView> MeansTestAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
     {
         var target = await context.ReachableCaseAsync(caseId, AccessAction.CaseRead, cancellationToken);
         var stored = await CaseFileReader.ReadAsync(target, context.Port<IDebtorStore>(), context.Port<ICaseEntityStore>(), cancellationToken);
-        return FlaskJson.Result(MeansTestTraces.Json(MeansTestTraces.Trace(stored.CaseFile)));
+        return MeansTestView.Of(MeansTestTraces.Trace(stored.CaseFile));
     }
 
-    /// <summary>The Schedule C workbench: only the collections the arithmetic reads, resolved as of the petition's date or today.</summary>
-    private static async Task<IResult> ExemptionAnalysisAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
+    /// <summary>The Schedule C exemption workbench.</summary>
+    /// <remarks>Only the collections the arithmetic reads, resolved as of the petition's date or today.</remarks>
+    internal static async Task<ExemptionAnalysisView> ExemptionAnalysisAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
     {
         var target = await context.ReachableCaseAsync(caseId, AccessAction.CaseRead, cancellationToken);
         var inputs = await CaseFileReader.ReadExemptionCaseAsync(target, context.Port<IDebtorStore>(), context.Port<ICaseEntityStore>(), cancellationToken);
-        return FlaskJson.Result(ExemptionAnalyzer.Json(ExemptionAnalyzer.Analyse(inputs, context.Today())));
+        return ExemptionAnalysisView.Of(ExemptionAnalyzer.Analyse(inputs, context.Today()));
     }
 
-    /// <summary>
-    /// The court's mailing list in the court's own format, or every reason it
-    /// cannot be produced yet — 200 either way: the problem report is the
-    /// resource the intake screen renders, not an error.
-    /// </summary>
-    private static async Task<IResult> CreditorMatrixAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
+    /// <summary>The court's creditor mailing list, or every reason it cannot be produced yet.</summary>
+    /// <remarks>200 either way: the problem report is the resource the intake screen renders, not an error.</remarks>
+    internal static async Task<CreditorMatrixView> CreditorMatrixAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
     {
         var target = await context.ReachableCaseAsync(caseId, AccessAction.CaseRead, cancellationToken);
         var creditors = await context.Port<ICaseEntityStore>().ListTypedAsync(caseId, CreditorRules.Kind, cancellationToken);
@@ -95,11 +94,11 @@ public sealed class CaseAnalysisRoutes : IEndpointModule
         // GLBA: the case id and whether a file was produced — never a
         // creditor name, a count, or a problem message.
         context.Log(MatrixLogger, "creditor matrix generated", ("case_id", caseId), ("generated", matrix.Content is not null));
-        return FlaskJson.Result(CreditorMatrices.Json(matrix));
+        return CreditorMatrixView.Of(matrix);
     }
 
-    /// <summary>The derived collateral figures, from the two collections the arithmetic reads.</summary>
-    private static async Task<IResult> LiensAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
+    /// <summary>The derived collateral figures of the case's secured claims.</summary>
+    internal static async Task<LienView> LiensAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
     {
         var target = await context.ReachableCaseAsync(caseId, AccessAction.CaseRead, cancellationToken);
         var entities = context.Port<ICaseEntityStore>();
@@ -108,59 +107,50 @@ public sealed class CaseAnalysisRoutes : IEndpointModule
             Assets = [.. (await entities.ListTypedAsync(caseId, AssetRules.Kind, cancellationToken)).Select(entity => (entity.Id, entity.Body))],
             Claims = [.. (await entities.ListTypedAsync(caseId, ClaimRules.Kind, cancellationToken)).Select(entity => (entity.Id, entity.Body))],
         };
-        return FlaskJson.Result(LienEngine.Json(LienEngine.Derive(caseFile)));
+        return LienView.Of(LienEngine.Derive(caseFile));
     }
 
-    /// <summary>
-    /// The IRS National and Local Standards for the case's jurisdiction and
-    /// household, as of its creation date (the filing-date stand-in). An
-    /// <see cref="Insolvia.Domain.Engines.EngineLookupException"/> — no release covers the date
-    /// at all — is deliberately not caught: the generic 500 is the honest answer.
-    /// </summary>
-    private static async Task<IResult> StandardsAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
+    /// <summary>The IRS National and Local Standards for the case's jurisdiction and household.</summary>
+    /// <remarks>
+    /// As of the case's creation date (the filing-date stand-in). A date no
+    /// release covers at all is a 500.
+    /// </remarks>
+    internal static async Task<StandardsView> StandardsAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
     {
         var target = await context.ReachableCaseAsync(caseId, AccessAction.CaseRead, cancellationToken);
         var debtors = await context.Port<IDebtorStore>().ListForCaseAsync(target.Id, cancellationToken);
         var dependents = await context.Port<ICaseEntityStore>().ListTypedAsync(target.Id, ExpenseRules.Dependent, cancellationToken);
         var asOf = DateOnly.FromDateTime(target.CreatedAt.UtcDateTime);
-        return FlaskJson.Result(StandardsJson(IrsStandards.Resolve(asOf, debtors, [.. dependents.Select(entity => entity.Body)])));
+        // An EngineLookupException — no release covers the date — is
+        // deliberately not caught: the generic 500 is the honest answer.
+        return StandardsView.Of(IrsStandards.Resolve(asOf, debtors, [.. dependents.Select(entity => entity.Body)]));
     }
 
-    /// <summary>The stored plan's figures; a case with no plan still gets its liquidation floor.</summary>
-    private static async Task<IResult> PlanCalculationAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
+    /// <summary>The stored Chapter 13 plan's figures.</summary>
+    /// <remarks>A case with no plan still gets its liquidation floor; with several, the first created is used, and a warning says so.</remarks>
+    internal static async Task<PlanCalculationView> PlanCalculationAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
     {
         var target = await context.ReachableCaseAsync(caseId, AccessAction.CaseRead, cancellationToken);
         var (inputs, plans) = await PlanInputsAsync(context, target, cancellationToken);
-        var calculation = Chapter13Plan.Json(Chapter13Plan.Calculate(inputs, plans.Count > 0 ? plans[0] : null));
-        if (plans.Count > 1)
-        {
-            // The packet gate owns the cardinality; the calculator says which
-            // record it read rather than refusing.
-            calculation["warnings"]!.AsArray().Insert(0, $"This case has {plans.Count} plan records; the first created is used.");
-        }
-
-        return FlaskJson.Result(calculation);
+        var calculation = PlanCalculationView.Of(Chapter13Plan.Calculate(inputs, plans.Count > 0 ? plans[0] : null));
+        // The packet gate owns the cardinality; the calculator says which
+        // record it read rather than refusing.
+        return plans.Count > 1
+            ? calculation with { Warnings = [$"This case has {plans.Count} plan records; the first created is used.", .. calculation.Warnings] }
+            : calculation;
     }
 
-    /// <summary>
-    /// Unsaved alternatives, each calculated against the same case; nothing
-    /// is written. Reachability first, so a 400 is never an oracle for a case
-    /// id the caller cannot see; the body before the records, so a malformed
-    /// request costs no collection reads.
-    /// </summary>
-    private static async Task<IResult> PlanScenariosAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
+    /// <summary>Calculate unsaved plan alternatives against the case; nothing is written.</summary>
+    /// <remarks>At most five scenarios; each malformed one is named by its path (<c>scenarios[0].plan.term_months</c>).</remarks>
+    internal static async Task<PlanScenarioList> PlanScenariosAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
     {
+        // Reachability first, so a 400 is never an oracle for a case id the
+        // caller cannot see; the body before the records, so a malformed
+        // request costs no collection reads.
         var target = await context.ReachableCaseAsync(caseId, AccessAction.CaseRead, cancellationToken);
         var scenarios = Scenarios(await context.BodyAsync(MaxPlanRequestBytes));
         var (inputs, _) = await PlanInputsAsync(context, target, cancellationToken);
-        return FlaskJson.Result(new JsonObject
-        {
-            ["scenarios"] = new JsonArray([.. scenarios.Select(scenario => (JsonNode)new JsonObject
-            {
-                ["label"] = FlaskJson.Text(scenario.Label),
-                ["calculation"] = Chapter13Plan.Json(Chapter13Plan.Calculate(inputs, scenario.Plan)),
-            })]),
-        });
+        return new PlanScenarioList([.. scenarios.Select(scenario => new PlanScenario(scenario.Label, PlanCalculationView.Of(Chapter13Plan.Calculate(inputs, scenario.Plan))))]);
     }
 
     // plan.py's `_inputs`: the whole file read once, the stored plans beside it.
@@ -222,41 +212,24 @@ public sealed class CaseAnalysisRoutes : IEndpointModule
 
         return parsed;
     }
-
-    /// <summary>
-    /// standards.py's <c>_standards_json</c>: money and jurisdiction facts as
-    /// strings, null where a figure could not resolve — NOT pruned, because the
-    /// client needs to know which figure is missing to label its box.
-    /// </summary>
-    internal static JsonObject StandardsJson(StandardsResult result)
-    {
-        ArgumentNullException.ThrowIfNull(result);
-        return new JsonObject
-        {
-            ["asOf"] = FlaskJson.Date(result.AsOf),
-            ["state"] = FlaskJson.Text(result.State),
-            ["county"] = FlaskJson.Text(result.County),
-            ["householdSize"] = result.HouseholdSize is { } size ? JsonValue.Create(size) : null,
-            ["jurisdictionSource"] = FlaskJson.Text(result.JurisdictionSource),
-            ["nationalStandards"] = new JsonObject
-            {
-                ["releaseId"] = FlaskJson.Text(result.NationalReleaseId),
-                ["allowance"] = FlaskJson.Text(result.NationalAllowance),
-                ["oopHealthcareUnder65"] = FlaskJson.Text(result.OopHealthcareUnder65),
-                ["oopHealthcare65AndOlder"] = FlaskJson.Text(result.OopHealthcare65AndOlder),
-            },
-            ["localStandards"] = new JsonObject
-            {
-                ["releaseId"] = FlaskJson.Text(result.LocalReleaseId),
-                ["housingNonMortgage"] = FlaskJson.Text(result.HousingNonMortgage),
-                ["housingMortgageRent"] = FlaskJson.Text(result.HousingMortgageRent),
-                ["transportationPublicNational"] = FlaskJson.Text(result.TransportationPublicNational),
-                ["transportationOwnershipOneCar"] = FlaskJson.Text(result.TransportationOwnershipOneCar),
-                ["transportationOwnershipTwoCars"] = FlaskJson.Text(result.TransportationOwnershipTwoCars),
-                ["transportationOperatingOneCar"] = FlaskJson.Text(result.TransportationOperatingOneCar),
-                ["transportationOperatingTwoCars"] = FlaskJson.Text(result.TransportationOperatingTwoCars),
-            },
-            ["problems"] = new JsonArray([.. result.Problems.Select(problem => (JsonNode)problem)]),
-        };
-    }
 }
+
+/// <summary>The unsaved plan alternatives, each calculated against the same case, in request order.</summary>
+/// <param name="Scenarios">The calculations.</param>
+public sealed record PlanScenarioList(IReadOnlyList<PlanScenario> Scenarios);
+
+/// <summary>One unsaved plan alternative's figures.</summary>
+/// <param name="Label">The label sent with it; null when none was.</param>
+/// <param name="Calculation">The figures.</param>
+public sealed record PlanScenario(string? Label, PlanCalculationView Calculation);
+
+/// <summary>Unsaved plan alternatives to calculate (<c>POST …/plan-calculation</c>): one to five.</summary>
+/// <param name="Scenarios">The alternatives.</param>
+public sealed record PlanScenariosRequest(IReadOnlyList<PlanScenarioRequest> Scenarios);
+
+/// <summary>One unsaved plan alternative.</summary>
+/// <param name="Label">A label to tell it apart by.</param>
+/// <param name="Plan">The plan, as a plan record's body is written.</param>
+public sealed record PlanScenarioRequest(
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Label,
+    PlanBody Plan);

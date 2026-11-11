@@ -127,7 +127,7 @@ public sealed class DocumentRouteTests : IAsyncLifetime, IDisposable
         var upload = answer.Object["upload"]!.AsObject();
         Assert.Equal("PUT", upload.Str("method"));
         Assert.EndsWith("Z", upload.Str("expiresAt"), StringComparison.Ordinal);
-        Assert.Equal("""{"Content-Type":"application/pdf","x-amz-tagging":"upload=unconfirmed"}""", Http.FlaskJson.Serialize(upload["headers"]));
+        Assert.Equal("""{"Content-Type":"application/pdf","x-amz-tagging":"upload=unconfirmed"}""", Support.SortedJson.Serialize(upload["headers"]));
 
         var minted = Blobs.Minted[^1];
         Assert.Equal(("PUT", 4096L, "application/pdf", DocumentRules.UploadTag, 900), (minted.Method, minted.ByteSize!.Value, minted.ContentType, minted.Tag, minted.ExpiresIn));

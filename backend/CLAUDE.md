@@ -17,7 +17,8 @@ Three layers ([ADR 0030](../docs/adr/0030-three-backend-layers.md)):
 | business logic | `Insolvia.Domain` — pure: entities, rules and ports; the calculation engines and form projections (`Engines/`); the PDF engine (`Forms/`) | nothing in the solution |
 | data access | `Insolvia.Data` — EF Core, the migrations, the Postgres stores | `Domain` |
 | platform services | `Insolvia.Platform` — document storage, sealing, the job queues, the user directory, mail, sign-in keys | `Domain` |
-| API (and the workers) | hosts: `Api`, `Worker`, `Admin`, `Mcp`, `Filing`, `Migrator` | `Domain`, `Data`, `Platform`; **never another host** |
+| the wire | `Insolvia.Http` — what the HTTP hosts share: the JSON (`WireJson`, `WireFormat`), the error body and the answers outside a route (`ErrorResponses`, `MethodFallback`), the OpenAPI document and its `/docs` page (`WireOpenApi`). The one library with ASP.NET; only `Api` and `Admin` reference it, so the workers and the migrator (a plain-runtime image) never carry it | `Domain` |
+| API (and the workers) | hosts: `Api`, `Worker`, `Admin`, `Mcp`, `Filing`, `Migrator` | `Domain`, `Data`, `Platform` (and `Http`, the HTTP hosts); **never another host** |
 | — | tools: `UstTool` — run by a developer or CI, never deployed (no Dockerfile stage) | `Domain`; never `Data`, `Platform` or a host |
 
 - **Name a project for its role, never for a vendor or a product word.** No
@@ -55,16 +56,23 @@ Three layers ([ADR 0030](../docs/adr/0030-three-backend-layers.md)):
   `--locked-mode`, so commit the lock diff with the change.
 - Warnings are errors (`Directory.Build.props`). Do not add `NoWarn` to make a
   build pass without saying why on the same line.
-- The wire contract is the one the Python API defined, byte for byte where a
-  test can see it (`/health` keeps Flask's sorted keys and bare
-  `application/json`): `contract/` and `packages/insolvia_api_client` pin it,
-  and the app depends on it.
-- **A route change edits its OpenAPI row** in `tool/openapi/api-routes.ts`
-  or `admin-routes.ts`, then `npm run openapi`
-  ([`docs/reference/openapi/`](../docs/reference/openapi/README.md)).
-  `OpenApiDocumentTests` fails on a route, principal or permission the
-  document does not match. `Requires(...)` stamps a `PermissionRequirement`
-  on the endpoint for that test to read.
+- **A handler returns a typed record or result**, never a `JsonObject`
+  ([ADR 0031](../docs/adr/0031-typed-routes-and-a-generated-openapi-document.md)):
+  a record for a 200, `TypedResults.Created`/`Accepted`, `NoContent`, or
+  `Results<…>`. `WireJson` writes it (camelCase; `[SnakeCase]`; domain
+  records' unanswered members absent; `[Flatten]`). Field names and
+  absent-vs-null are the contract — `contract/` and
+  `packages/insolvia_api_client` pin them, and the app depends on them.
+  Errors are `ErrorBody`. Declare a body with `.RequestBody<T>()`, never
+  `.Accepts<T>()` (it constrains routing).
+- **The OpenAPI document is generated from the handlers** — their result
+  types and `internal static` doc comments (the summary generator skips
+  `private`). After a route change run `backend/scripts/dev-openapi.sh` and
+  commit `docs/reference/openapi/*.json`
+  ([`docs/reference/openapi/`](../docs/reference/openapi/README.md));
+  `OpenApiDocumentTests` fails on a stale copy, an unmapped route, or an
+  operation with no typed success response. `Requires(...)` stamps a
+  `PermissionRequirement` the document reads.
 - One deployable unit, one Dockerfile target. A host gets its stage when it
   gets a handler, and `backend-pr.yml` builds it in the same PR.
 

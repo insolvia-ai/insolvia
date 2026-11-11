@@ -7,6 +7,7 @@
   <ItemGroup>
     <!-- The probe routes and the auth host are written against the same
          ASP.NET Core surface Insolvia.Api uses. -->
+    <Using Include="Insolvia.Http" />
     <Using Include="Microsoft.AspNetCore.Builder" />
     <Using Include="Microsoft.AspNetCore.Http" />
     <Using Include="Microsoft.AspNetCore.Routing" />
@@ -15,7 +16,6 @@
   <ItemGroup>
     <!-- core/mail.py's own output, which MailTemplateTests holds the port to. -->
     <None Include="Fixtures/*.json" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="../../../docs/reference/openapi/api.json" Link="OpenApi/api.json" CopyToOutputDirectory="PreserveNewest" />
     <!-- The analysis routes' end-to-end parity: the Python oracle's own case
          files and outputs, owned by the Engines tests (Parity/*.json). -->
     <None Include="../Insolvia.Domain.Tests/Engines/Parity/*.json" LinkBase="Parity" CopyToOutputDirectory="PreserveNewest" />
@@ -30,8 +30,8 @@
     <ProjectReference Include="../../src/Insolvia.Worker/Insolvia.Worker.csproj" Aliases="worker" />
   </ItemGroup>
   <ItemGroup>
-    <!-- The reference case the end-to-end test assembles, read in place. -->
-    <None Include="../Insolvia.Domain.Tests/Engines/Parity/reference-ch7.case.json" Link="CaseFiles/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <!-- The parity case files, read in place: the end-to-end test assembles reference-ch7; EngineViewParityTests reads all four. -->
+    <None Include="../Insolvia.Domain.Tests/Engines/Parity/*.case.json" Link="CaseFiles/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <Compile Include="../Insolvia.Domain.Tests/Forms/Support/CaseFiles.cs" Link="Support/CaseFiles.cs" />
     <Compile Include="../Insolvia.Domain.Tests/Forms/Support/CaseDatas.cs" Link="Support/CaseDatas.cs" />
   </ItemGroup>

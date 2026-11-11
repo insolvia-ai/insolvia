@@ -1,17 +1,16 @@
 using System.Globalization;
 using System.Text;
-using System.Text.Json.Nodes;
 using Insolvia.Api.Auth;
 using Insolvia.Api.Calendar;
 using Insolvia.Api.Cases;
 using Insolvia.Api.Hosting;
-using Insolvia.Api.Http;
 using Insolvia.Domain;
 using Insolvia.Domain.Access;
 using Insolvia.Domain.AccessLog;
 using Insolvia.Domain.Events;
 using Insolvia.Domain.Firms;
 using Insolvia.Domain.Ports;
+using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace Insolvia.Api.Routes;
 
@@ -37,55 +36,64 @@ public sealed class EventRoutes : IEndpointModule
     {
         ArgumentNullException.ThrowIfNull(routes);
         routes.MapGet("/v1/cases/{caseId}/events", ListCaseAsync).RequireAuth().Requires(Feature.Events, PermissionLevel.ViewOnly);
-        routes.MapPost("/v1/cases/{caseId}/events", CreateCaseAsync).RequireAuth().Requires(Feature.Events, PermissionLevel.AddEdit);
+        routes.MapPost("/v1/cases/{caseId}/events", CreateCaseAsync).RequestBody<EventRequest>().RequireAuth().Requires(Feature.Events, PermissionLevel.AddEdit);
         routes.MapGet("/v1/cases/{caseId}/events/{eventId}", GetCaseAsync).RequireAuth().Requires(Feature.Events, PermissionLevel.ViewOnly);
-        routes.MapPut("/v1/cases/{caseId}/events/{eventId}", PutCaseAsync).RequireAuth().Requires(Feature.Events, PermissionLevel.AddEdit);
-        routes.MapPatch("/v1/cases/{caseId}/events/{eventId}", DismissCaseAsync).RequireAuth().Requires(Feature.Events, PermissionLevel.AddEdit);
+        routes.MapPut("/v1/cases/{caseId}/events/{eventId}", PutCaseAsync).RequestBody<EventRequest>().RequireAuth().Requires(Feature.Events, PermissionLevel.AddEdit);
+        routes.MapPatch("/v1/cases/{caseId}/events/{eventId}", DismissCaseAsync).RequestBody<EventDismissal>().RequireAuth().Requires(Feature.Events, PermissionLevel.AddEdit);
         routes.MapDelete("/v1/cases/{caseId}/events/{eventId}", DeleteCaseAsync).RequireAuth().Requires(Feature.Events, PermissionLevel.AddEdit);
         routes.MapGet("/v1/firm/events", ListFirmAsync).RequireAuth().Requires(Feature.Events, PermissionLevel.ViewOnly);
-        routes.MapPost("/v1/firm/events", CreateFirmAsync).RequireAuth().Requires(Feature.Events, PermissionLevel.AddEdit);
+        routes.MapPost("/v1/firm/events", CreateFirmAsync).RequestBody<EventRequest>().RequireAuth().Requires(Feature.Events, PermissionLevel.AddEdit);
         routes.MapGet("/v1/firm/events/{eventId}", GetFirmAsync).RequireAuth().Requires(Feature.Events, PermissionLevel.ViewOnly);
-        routes.MapPut("/v1/firm/events/{eventId}", PutFirmAsync).RequireAuth().Requires(Feature.Events, PermissionLevel.AddEdit);
-        routes.MapPatch("/v1/firm/events/{eventId}", DismissFirmAsync).RequireAuth().Requires(Feature.Events, PermissionLevel.AddEdit);
+        routes.MapPut("/v1/firm/events/{eventId}", PutFirmAsync).RequestBody<EventRequest>().RequireAuth().Requires(Feature.Events, PermissionLevel.AddEdit);
+        routes.MapPatch("/v1/firm/events/{eventId}", DismissFirmAsync).RequestBody<EventDismissal>().RequireAuth().Requires(Feature.Events, PermissionLevel.AddEdit);
         routes.MapDelete("/v1/firm/events/{eventId}", DeleteFirmAsync).RequireAuth().Requires(Feature.Events, PermissionLevel.AddEdit);
     }
 
     // ── Case scope ───────────────────────────────────────────────────
 
-    private static async Task<IResult> ListCaseAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
+    /// <summary>A case's events.</summary>
+    internal static async Task<EventList> ListCaseAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
     {
         var target = await context.ReachableCaseAsync(caseId, AccessAction.CaseRead, cancellationToken);
         return await ListAsync(context, new EventScope(target.FirmId, target.Id), cancellationToken);
     }
 
-    private static async Task<IResult> CreateCaseAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
+    /// <summary>Add an event to a case's calendar.</summary>
+    /// <remarks>Attendees must be members of the caller's firm.</remarks>
+    internal static async Task<Created<EventView>> CreateCaseAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
     {
         var draft = CalendarRules.Parse(await context.BodyAsync(MaxRequestBytes));
         var target = await context.ReachableCaseAsync(caseId, AccessAction.CaseUpdate, cancellationToken);
         return await CreateAsync(context, draft, new EventScope(target.FirmId, target.Id), "case event created", cancellationToken);
     }
 
-    private static async Task<IResult> GetCaseAsync(HttpContext context, string caseId, string eventId, CancellationToken cancellationToken)
+    /// <summary>One event of a case.</summary>
+    internal static async Task<EventView> GetCaseAsync(HttpContext context, string caseId, string eventId, CancellationToken cancellationToken)
     {
         var target = await context.ReachableCaseAsync(caseId, AccessAction.CaseRead, cancellationToken);
-        return FlaskJson.Result(CaseViews.Event(await EventOr404Async(context, new EventScope(target.FirmId, target.Id), eventId, cancellationToken)));
+        return EventView.Of(await EventOr404Async(context, new EventScope(target.FirmId, target.Id), eventId, cancellationToken));
     }
 
-    private static async Task<IResult> PutCaseAsync(HttpContext context, string caseId, string eventId, CancellationToken cancellationToken)
+    /// <summary>Replace a case event, whole.</summary>
+    /// <remarks>A generated deadline cannot be edited (400) — dismiss it instead.</remarks>
+    internal static async Task<EventView> PutCaseAsync(HttpContext context, string caseId, string eventId, CancellationToken cancellationToken)
     {
         var draft = CalendarRules.Parse(await context.BodyAsync(MaxRequestBytes));
         var target = await context.ReachableCaseAsync(caseId, AccessAction.CaseUpdate, cancellationToken);
         return await PutAsync(context, draft, new EventScope(target.FirmId, target.Id), eventId, "case event updated", cancellationToken);
     }
 
-    private static async Task<IResult> DismissCaseAsync(HttpContext context, string caseId, string eventId, CancellationToken cancellationToken)
+    /// <summary>Dismiss or restore a case event.</summary>
+    internal static async Task<EventView> DismissCaseAsync(HttpContext context, string caseId, string eventId, CancellationToken cancellationToken)
     {
         var dismissed = CalendarRules.ParseDismissal(await context.BodyAsync(MaxRequestBytes));
         var target = await context.ReachableCaseAsync(caseId, AccessAction.CaseUpdate, cancellationToken);
         return await DismissAsync(context, dismissed, new EventScope(target.FirmId, target.Id), eventId, "case event dismissal changed", cancellationToken);
     }
 
-    private static async Task<IResult> DeleteCaseAsync(HttpContext context, string caseId, string eventId, CancellationToken cancellationToken)
+    /// <summary>Delete a case event.</summary>
+    /// <remarks>A generated deadline cannot be deleted (400) — dismiss it instead.</remarks>
+    internal static async Task<NoContent> DeleteCaseAsync(HttpContext context, string caseId, string eventId, CancellationToken cancellationToken)
     {
         var target = await context.ReachableCaseAsync(caseId, AccessAction.CaseUpdate, cancellationToken);
         var scope = new EventScope(target.FirmId, target.Id);
@@ -100,34 +108,42 @@ public sealed class EventRoutes : IEndpointModule
 
     // ── Firm scope ───────────────────────────────────────────────────
 
-    private static async Task<IResult> ListFirmAsync(HttpContext context, CancellationToken cancellationToken) =>
+    /// <summary>The firm's own events.</summary>
+    /// <remarks>The events on no case.</remarks>
+    internal static async Task<EventList> ListFirmAsync(HttpContext context, CancellationToken cancellationToken) =>
         await ListAsync(context, new EventScope((await context.CurrentAccessorAsync()).FirmId), cancellationToken);
 
-    private static async Task<IResult> CreateFirmAsync(HttpContext context, CancellationToken cancellationToken)
+    /// <summary>Add an event to the firm's own calendar.</summary>
+    /// <remarks>Attendees must be members of the caller's firm.</remarks>
+    internal static async Task<Created<EventView>> CreateFirmAsync(HttpContext context, CancellationToken cancellationToken)
     {
         var accessor = await context.CurrentAccessorAsync();
         var draft = CalendarRules.Parse(await context.BodyAsync(MaxRequestBytes));
         return await CreateAsync(context, draft, new EventScope(accessor.FirmId), "firm event created", cancellationToken);
     }
 
-    private static async Task<IResult> GetFirmAsync(HttpContext context, string eventId, CancellationToken cancellationToken) =>
-        FlaskJson.Result(CaseViews.Event(await EventOr404Async(context, new EventScope((await context.CurrentAccessorAsync()).FirmId), eventId, cancellationToken)));
+    /// <summary>One of the firm's own events.</summary>
+    internal static async Task<EventView> GetFirmAsync(HttpContext context, string eventId, CancellationToken cancellationToken) =>
+        EventView.Of(await EventOr404Async(context, new EventScope((await context.CurrentAccessorAsync()).FirmId), eventId, cancellationToken));
 
-    private static async Task<IResult> PutFirmAsync(HttpContext context, string eventId, CancellationToken cancellationToken)
+    /// <summary>Replace one of the firm's own events, whole.</summary>
+    internal static async Task<EventView> PutFirmAsync(HttpContext context, string eventId, CancellationToken cancellationToken)
     {
         var accessor = await context.CurrentAccessorAsync();
         var draft = CalendarRules.Parse(await context.BodyAsync(MaxRequestBytes));
         return await PutAsync(context, draft, new EventScope(accessor.FirmId), eventId, "firm event updated", cancellationToken);
     }
 
-    private static async Task<IResult> DismissFirmAsync(HttpContext context, string eventId, CancellationToken cancellationToken)
+    /// <summary>Dismiss or restore one of the firm's own events.</summary>
+    internal static async Task<EventView> DismissFirmAsync(HttpContext context, string eventId, CancellationToken cancellationToken)
     {
         var accessor = await context.CurrentAccessorAsync();
         var dismissed = CalendarRules.ParseDismissal(await context.BodyAsync(MaxRequestBytes));
         return await DismissAsync(context, dismissed, new EventScope(accessor.FirmId), eventId, "firm event dismissal changed", cancellationToken);
     }
 
-    private static async Task<IResult> DeleteFirmAsync(HttpContext context, string eventId, CancellationToken cancellationToken)
+    /// <summary>Delete one of the firm's own events.</summary>
+    internal static async Task<NoContent> DeleteFirmAsync(HttpContext context, string eventId, CancellationToken cancellationToken)
     {
         var scope = new EventScope((await context.CurrentAccessorAsync()).FirmId);
         return await DeleteAsync(context, scope, await EventOr404Async(context, scope, eventId, cancellationToken), "firm event deleted", cancellationToken);
@@ -135,23 +151,23 @@ public sealed class EventRoutes : IEndpointModule
 
     // ── Shared ───────────────────────────────────────────────────────
 
-    private static async Task<IResult> ListAsync(HttpContext context, EventScope scope, CancellationToken cancellationToken)
+    private static async Task<EventList> ListAsync(HttpContext context, EventScope scope, CancellationToken cancellationToken)
     {
         var events = await context.Port<ICalendarEventStore>().ListForScopeAsync(scope, cancellationToken);
-        return FlaskJson.Result(new JsonObject { ["events"] = new JsonArray([.. events.Select(found => (JsonNode)CaseViews.Event(found))]) });
+        return new EventList([.. events.Select(EventView.Of)]);
     }
 
-    private static async Task<IResult> CreateAsync(HttpContext context, EventDraft draft, EventScope scope, string message, CancellationToken cancellationToken)
+    private static async Task<Created<EventView>> CreateAsync(HttpContext context, EventDraft draft, EventScope scope, string message, CancellationToken cancellationToken)
     {
         var accessor = await context.CurrentAccessorAsync();
         await CheckAttendeesAsync(context, accessor, draft, cancellationToken);
         var created = CalendarRules.Create(draft, scope, accessor.Subject, context.Clock());
         await context.Port<ICalendarEventStore>().CreateAsync(created, cancellationToken);
         Log(context, message, created);
-        return FlaskJson.Result(CaseViews.Event(created), StatusCodes.Status201Created);
+        return TypedResults.Created((string?)null, EventView.Of(created));
     }
 
-    private static async Task<IResult> PutAsync(HttpContext context, EventDraft draft, EventScope scope, string eventId, string message, CancellationToken cancellationToken)
+    private static async Task<EventView> PutAsync(HttpContext context, EventDraft draft, EventScope scope, string eventId, string message, CancellationToken cancellationToken)
     {
         await CheckAttendeesAsync(context, await context.CurrentAccessorAsync(), draft, cancellationToken);
         var updated = CalendarRules.Replace(await EventOr404Async(context, scope, eventId, cancellationToken), draft, context.Clock());
@@ -161,10 +177,10 @@ public sealed class EventRoutes : IEndpointModule
         }
 
         Log(context, message, updated);
-        return FlaskJson.Result(CaseViews.Event(updated));
+        return EventView.Of(updated);
     }
 
-    private static async Task<IResult> DismissAsync(HttpContext context, bool dismissed, EventScope scope, string eventId, string message, CancellationToken cancellationToken)
+    private static async Task<EventView> DismissAsync(HttpContext context, bool dismissed, EventScope scope, string eventId, string message, CancellationToken cancellationToken)
     {
         var updated = CalendarRules.SetDismissed(await EventOr404Async(context, scope, eventId, cancellationToken), dismissed, context.Clock());
         if (!await context.Port<ICalendarEventStore>().PutAsync(updated, cancellationToken))
@@ -173,10 +189,10 @@ public sealed class EventRoutes : IEndpointModule
         }
 
         Log(context, message, updated);
-        return FlaskJson.Result(CaseViews.Event(updated));
+        return EventView.Of(updated);
     }
 
-    private static async Task<IResult> DeleteAsync(HttpContext context, EventScope scope, CalendarEvent found, string message, CancellationToken cancellationToken)
+    private static async Task<NoContent> DeleteAsync(HttpContext context, EventScope scope, CalendarEvent found, string message, CancellationToken cancellationToken)
     {
         if (!await context.Port<ICalendarEventStore>().DeleteAsync(scope, found.Id, cancellationToken))
         {
@@ -184,7 +200,7 @@ public sealed class EventRoutes : IEndpointModule
         }
 
         Log(context, message, found);
-        return FlaskJson.NoContent();
+        return TypedResults.NoContent();
     }
 
     private static async Task<CalendarEvent> EventOr404Async(HttpContext context, EventScope scope, string eventId, CancellationToken cancellationToken) =>
@@ -237,16 +253,29 @@ public sealed class CalendarRoutes : IEndpointModule
     public void Map(IEndpointRouteBuilder routes)
     {
         ArgumentNullException.ThrowIfNull(routes);
-        routes.MapGet("/v1/calendar", WindowAsync).RequireAuth().Requires(Feature.Events, PermissionLevel.ViewOnly);
+        routes.MapGet("/v1/calendar", WindowAsync).RequireAuth().Requires(Feature.Events, PermissionLevel.ViewOnly)
+            .QueryParameter("from", "The window's first day, YYYY-MM-DD.", required: true)
+            .QueryParameter("to", "The window's last day, YYYY-MM-DD; not before from, and at most the route's maximum span after it.", required: true)
+            .QueryParameter("attendee", "Only this subject's events; `me` for the caller's.")
+            .QueryParameter("case_id", "Only this case's events.");
 
         // Not RequireAuth(): the token path has no bearer token. The handler
         // runs the same two checks itself when there is no token.
-        routes.MapGet("/v1/me/calendar.ics", FeedAsync).WithMetadata(PrincipalClass.Staff);
+        routes.MapGet("/v1/me/calendar.ics", FeedAsync).WithMetadata(PrincipalClass.Staff).Produces<string>(StatusCodes.Status200OK, "text/calendar")
+            .QueryParameter("token", "A calendar feed token (POST /v1/me/calendar-token), for a calendar client that cannot send a bearer token. Without it, a staff session is required.");
         routes.MapPost("/v1/me/calendar-token", MintTokenAsync).RequireAuth().Requires(Feature.Events, PermissionLevel.ViewOnly);
         routes.MapDelete("/v1/me/calendar-token", RevokeTokenAsync).RequireAuth().Requires(Feature.Events, PermissionLevel.ViewOnly);
     }
 
-    private static async Task<IResult> WindowAsync(HttpContext context, CancellationToken cancellationToken)
+    /// <summary>The firm's calendar.</summary>
+    /// <remarks>
+    /// Every event in a window of at most 400 days, filtered to the cases the
+    /// caller may see.
+    /// <c>from</c> and <c>to</c> (<c>YYYY-MM-DD</c>, inclusive) are required.
+    /// <c>attendee</c> narrows to one subject (<c>me</c> for the caller);
+    /// <c>case_id</c> to one case.
+    /// </remarks>
+    internal static async Task<CalendarWindow> WindowAsync(HttpContext context, CancellationToken cancellationToken)
     {
         var accessor = await context.CurrentAccessorAsync();
         var starting = ParseDate(CaseRoutes.Query(context, "from"), "from");
@@ -269,15 +298,16 @@ public sealed class CalendarRoutes : IEndpointModule
 
         var caseId = CaseRoutes.Query(context, "case_id") is { Length: > 0 } given ? given : null;
         var events = await WindowEventsAsync(context, accessor, starting, ending, attendee, caseId, cancellationToken);
-        return FlaskJson.Result(new JsonObject
-        {
-            ["from"] = FlaskJson.Date(starting),
-            ["to"] = FlaskJson.Date(ending),
-            ["events"] = new JsonArray([.. events.Select(found => (JsonNode)CaseViews.Event(found))]),
-        });
+        return new CalendarWindow(WireFormat.Date(starting), WireFormat.Date(ending), [.. events.Select(EventView.Of)]);
     }
 
-    private static async Task<IResult> FeedAsync(HttpContext context, CancellationToken cancellationToken)
+    /// <summary>The caller's calendar feed.</summary>
+    /// <remarks>
+    /// An ICS file covering two months back and a year ahead.
+    /// Authenticated by <c>?token=</c> (a calendar client cannot send a bearer
+    /// token) or, without one, by a staff session with <c>events</c>.
+    /// </remarks>
+    internal static async Task<IResult> FeedAsync(HttpContext context, CancellationToken cancellationToken)
     {
         var token = context.Request.Query["token"];
         Accessor? accessor;
@@ -305,8 +335,9 @@ public sealed class CalendarRoutes : IEndpointModule
         return new CalendarResult(CalendarFeed.RenderIcs(events, context.Clock().GetUtcNow()));
     }
 
-    // Rotation: a new secret replaces the person's old one.
-    private static async Task<IResult> MintTokenAsync(HttpContext context, CancellationToken cancellationToken)
+    /// <summary>Mint the caller's calendar-feed token.</summary>
+    /// <remarks>Rotation: a new token replaces the caller's old one, which stops working.</remarks>
+    internal static async Task<Created<CalendarFeedToken>> MintTokenAsync(HttpContext context, CancellationToken cancellationToken)
     {
         var accessor = await context.CurrentAccessorAsync();
         var secret = CalendarFeed.MintSecret();
@@ -315,10 +346,11 @@ public sealed class CalendarRoutes : IEndpointModule
             cancellationToken);
         context.Log(Logger, "calendar token minted");
         var token = CalendarFeed.FeedToken(accessor.Subject, secret);
-        return FlaskJson.Result(new JsonObject { ["token"] = token, ["feedPath"] = $"/v1/me/calendar.ics?token={token}" }, StatusCodes.Status201Created);
+        return TypedResults.Created((string?)null, new CalendarFeedToken(token, $"/v1/me/calendar.ics?token={token}"));
     }
 
-    private static async Task<IResult> RevokeTokenAsync(HttpContext context, CancellationToken cancellationToken)
+    /// <summary>Revoke the caller's calendar-feed token.</summary>
+    internal static async Task<NoContent> RevokeTokenAsync(HttpContext context, CancellationToken cancellationToken)
     {
         var accessor = await context.CurrentAccessorAsync();
         if (!await context.Port<ICalendarTokenStore>().DeleteAsync(accessor.FirmId, accessor.Subject, cancellationToken))
@@ -327,7 +359,7 @@ public sealed class CalendarRoutes : IEndpointModule
         }
 
         context.Log(Logger, "calendar token revoked");
-        return FlaskJson.NoContent();
+        return TypedResults.NoContent();
     }
 
     private static async Task<Accessor?> AccessorFromTokenAsync(HttpContext context, string token, CancellationToken cancellationToken)

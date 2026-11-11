@@ -12,13 +12,16 @@
 //   sends that the document does not name is allowed, as it is for the
 //   clients' models (support/wire.ts), and counted in the summary.
 //
-// The documents are generated (tool/render-openapi.ts), so a failure here
-// means a route table or a client type disagrees with the server: fix that
-// and run `npm run openapi`.
+// The hosts generate the documents from their typed routes (OpenApiDocumentTests
+// keeps the committed copies current), so a failure here means a route's
+// declared result disagrees with what it sends, or a client sends what the
+// route does not take: fix the route or the client, then run
+// backend/scripts/dev-openapi.sh.
 //
 // The validator covers the JSON Schema the generator emits — `$ref`, `type`,
 // `properties`, `required`, `additionalProperties`, `items`, `enum`, `const`,
-// `anyOf` — and nothing else.
+// `anyOf`, `oneOf` (checked as `anyOf`: the generator only uses it for
+// `null` or a `$ref`) — and nothing else. `type` may be a list (OpenAPI 3.1).
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -26,7 +29,7 @@ import type { WireExchange } from '../coverage.ts';
 
 type Schema = {
   readonly $ref?: string;
-  readonly type?: string;
+  readonly type?: string | readonly string[];
   readonly properties?: Readonly<Record<string, Schema>>;
   readonly required?: readonly string[];
   readonly additionalProperties?: boolean | Schema;
@@ -34,6 +37,7 @@ type Schema = {
   readonly enum?: readonly unknown[];
   readonly const?: unknown;
   readonly anyOf?: readonly Schema[];
+  readonly oneOf?: readonly Schema[];
 };
 
 interface Operation {
@@ -106,15 +110,16 @@ class Validator {
       this.check(value, target, at, strict, problems);
       return;
     }
-    if (schema.anyOf) {
-      const fits = schema.anyOf.some((option) => {
+    const alternatives = schema.anyOf ?? schema.oneOf;
+    if (alternatives) {
+      const fits = alternatives.some((option) => {
         const own: string[] = [];
         this.check(value, option, at, strict, own);
         return own.length === 0;
       });
       if (!fits)
         problems.push(
-          `${at}: matches none of its ${schema.anyOf.length} alternatives (${preview(value)})`,
+          `${at}: matches none of its ${alternatives.length} alternatives (${preview(value)})`,
         );
       return;
     }
@@ -128,8 +133,9 @@ class Validator {
       );
       return;
     }
-    if (schema.type && !hasType(value, schema.type)) {
-      problems.push(`${at}: expected ${schema.type}, got ${preview(value)}`);
+    const types = typeof schema.type === 'string' ? [schema.type] : schema.type;
+    if (types && !types.some((type) => hasType(value, type))) {
+      problems.push(`${at}: expected ${types.join(' or ')}, got ${preview(value)}`);
       return;
     }
     if (Array.isArray(value) && schema.items) {

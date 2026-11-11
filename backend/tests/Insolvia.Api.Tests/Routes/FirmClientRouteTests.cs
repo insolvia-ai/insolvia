@@ -110,7 +110,7 @@ public sealed class FirmClientRouteTests : IAsyncLifetime, IDisposable
         Assert.Equal(201, created.Status);
         var body = created.Object;
         Assert.Equal("""{"given":"Jordan","surname":"Example"}""", body["name"]!.ToJsonString());
-        Assert.Equal("""{"county":"Sangamon","line1":"1 Example St"}""", Http.FlaskJson.Serialize(body["residence_address"]));
+        Assert.Equal("""{"county":"Sangamon","line1":"1 Example St"}""", Support.SortedJson.Serialize(body["residence_address"]));
         Assert.Equal("active", body["status"]!.GetValue<string>());
         Assert.Equal(Admin, body["created_by"]!.GetValue<string>());
         Assert.Equal("Referral", body["lead_source"]!.GetValue<string>());
@@ -121,13 +121,12 @@ public sealed class FirmClientRouteTests : IAsyncLifetime, IDisposable
     }
 
     [Fact]
-    public async Task The_body_omits_what_is_absent_in_flasks_key_order()
+    public async Task The_body_omits_what_is_absent()
     {
         var created = await Add();
 
         Assert.Equal(["created_at", "created_by", "id", "name", "status", "updated_at"], Answer.Keys(created.Json));
         Assert.Matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{6}Z$", created.Str("created_at")!);
-        Assert.StartsWith("""{"created_at":""", created.Body, StringComparison.Ordinal);
     }
 
     [Fact]

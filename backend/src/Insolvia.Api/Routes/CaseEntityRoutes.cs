@@ -1,8 +1,6 @@
-using System.Text.Json.Nodes;
 using Insolvia.Api.Auth;
 using Insolvia.Api.Cases;
 using Insolvia.Api.Hosting;
-using Insolvia.Api.Http;
 using Insolvia.Domain;
 using Insolvia.Domain.AccessLog;
 using Insolvia.Domain.CaseEntities;
@@ -11,6 +9,7 @@ using Insolvia.Domain.Firms;
 using Insolvia.Domain.Notes;
 using Insolvia.Domain.Ports;
 using Insolvia.Domain.Provenance;
+using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace Insolvia.Api.Routes;
 
@@ -32,14 +31,16 @@ public sealed class CaseEntityRoutes : IEndpointModule
     public void Map(IEndpointRouteBuilder routes)
     {
         ArgumentNullException.ThrowIfNull(routes);
-        routes.MapPost("/v1/cases/{caseId}/{collection}", CreateAsync).RequireAuth().Requires(Feature.Intake, PermissionLevel.AddEdit);
+        routes.MapPost("/v1/cases/{caseId}/{collection}", CreateAsync).RequestBody<EntityRequest>().RequireAuth().Requires(Feature.Intake, PermissionLevel.AddEdit);
         routes.MapGet("/v1/cases/{caseId}/{collection}", ListAsync).RequireAuth().Requires(Feature.Intake, PermissionLevel.ViewOnly);
         routes.MapGet("/v1/cases/{caseId}/{collection}/{entityId}", GetAsync).RequireAuth().Requires(Feature.Intake, PermissionLevel.ViewOnly);
-        routes.MapPut("/v1/cases/{caseId}/{collection}/{entityId}", PutAsync).RequireAuth().Requires(Feature.Intake, PermissionLevel.AddEdit);
+        routes.MapPut("/v1/cases/{caseId}/{collection}/{entityId}", PutAsync).RequestBody<EntityRequest>().RequireAuth().Requires(Feature.Intake, PermissionLevel.AddEdit);
         routes.MapDelete("/v1/cases/{caseId}/{collection}/{entityId}", DeleteAsync).RequireAuth().Requires(Feature.Intake, PermissionLevel.AddEdit);
     }
 
-    private static async Task<IResult> CreateAsync(HttpContext context, string caseId, string collection, CancellationToken cancellationToken)
+    /// <summary>Create a record in a case collection.</summary>
+    /// <remarks>An unknown collection is a 404; <c>amended</c> before the case is filed is a 409.</remarks>
+    internal static async Task<Created<EntityView>> CreateAsync(HttpContext context, string caseId, string collection, CancellationToken cancellationToken)
     {
         var kind = KindOf(collection);
         var draft = kind.ParseDraft(await context.BodyAsync(MaxRequestBytes));
@@ -51,26 +52,30 @@ public sealed class CaseEntityRoutes : IEndpointModule
         var entity = kind.Restore(Guid.NewGuid().ToString(), caseId, now, now, draft);
         await context.Port<ICaseEntityStore>().CreateAsync(entity, cancellationToken);
         LogSaved(context, caseId, kind, entity.Id);
-        return FlaskJson.Result(CaseViews.Entity(entity), StatusCodes.Status201Created);
+        return TypedResults.Created((string?)null, EntityView.Of(entity));
     }
 
-    private static async Task<IResult> ListAsync(HttpContext context, string caseId, string collection, CancellationToken cancellationToken)
+    /// <summary>A case collection's records, oldest first.</summary>
+    /// <remarks>The one key is the collection's name, as in the URL (<c>{"creditors": [...]}</c>).</remarks>
+    internal static async Task<Dictionary<string, IReadOnlyList<EntityView>>> ListAsync(HttpContext context, string caseId, string collection, CancellationToken cancellationToken)
     {
         var kind = KindOf(collection);
         await context.ReachableCaseAsync(caseId, AccessAction.CaseRead, cancellationToken);
         var entities = await context.Port<ICaseEntityStore>().ListForCaseAsync(caseId, kind, cancellationToken);
-        return FlaskJson.Result(new JsonObject { [kind.Collection] = new JsonArray([.. entities.Select(entity => (JsonNode)CaseViews.Entity(entity))]) });
+        return new(StringComparer.Ordinal) { [kind.Collection] = [.. entities.Select(EntityView.Of)] };
     }
 
-    private static async Task<IResult> GetAsync(HttpContext context, string caseId, string collection, string entityId, CancellationToken cancellationToken)
+    /// <summary>One record of a case collection.</summary>
+    internal static async Task<EntityView> GetAsync(HttpContext context, string caseId, string collection, string entityId, CancellationToken cancellationToken)
     {
         var kind = KindOf(collection);
         await context.ReachableCaseAsync(caseId, AccessAction.CaseRead, cancellationToken);
-        return FlaskJson.Result(CaseViews.Entity(await EntityOr404Async(context, caseId, kind, entityId, cancellationToken)));
+        return EntityView.Of(await EntityOr404Async(context, caseId, kind, entityId, cancellationToken));
     }
 
-    // Whole-record replace; id and created_at kept; `amended` kept when omitted.
-    private static async Task<IResult> PutAsync(HttpContext context, string caseId, string collection, string entityId, CancellationToken cancellationToken)
+    /// <summary>Replace a record of a case collection, whole.</summary>
+    /// <remarks>The id and <c>created_at</c> are kept; so is <c>amended</c> when the request omits it.</remarks>
+    internal static async Task<EntityView> PutAsync(HttpContext context, string caseId, string collection, string entityId, CancellationToken cancellationToken)
     {
         var kind = KindOf(collection);
         var payload = await context.BodyAsync(MaxRequestBytes);
@@ -95,10 +100,11 @@ public sealed class CaseEntityRoutes : IEndpointModule
         }
 
         LogSaved(context, caseId, kind, entity.Id);
-        return FlaskJson.Result(CaseViews.Entity(entity));
+        return EntityView.Of(entity);
     }
 
-    private static async Task<IResult> DeleteAsync(HttpContext context, string caseId, string collection, string entityId, CancellationToken cancellationToken)
+    /// <summary>Delete a record of a case collection.</summary>
+    internal static async Task<NoContent> DeleteAsync(HttpContext context, string caseId, string collection, string entityId, CancellationToken cancellationToken)
     {
         var kind = KindOf(collection);
         await context.ReachableCaseAsync(caseId, AccessAction.CaseUpdate, cancellationToken);
@@ -108,7 +114,7 @@ public sealed class CaseEntityRoutes : IEndpointModule
         }
 
         context.Log(Logger, "case entity deleted", ("case_id", caseId), ("collection", kind.Collection), ("id", entityId));
-        return FlaskJson.NoContent();
+        return TypedResults.NoContent();
     }
 
     private static IEntityKind KindOf(string collection) =>
@@ -150,13 +156,14 @@ public sealed class NoteRoutes : IEndpointModule
     public void Map(IEndpointRouteBuilder routes)
     {
         ArgumentNullException.ThrowIfNull(routes);
-        routes.MapPost("/v1/cases/{caseId}/notes", CreateAsync).RequireAuth().Requires(Feature.Notes, PermissionLevel.AddEdit);
+        routes.MapPost("/v1/cases/{caseId}/notes", CreateAsync).RequestBody<NoteRequest>().RequireAuth().Requires(Feature.Notes, PermissionLevel.AddEdit);
         routes.MapGet("/v1/cases/{caseId}/notes", ListAsync).RequireAuth().Requires(Feature.Notes, PermissionLevel.ViewOnly);
-        routes.MapPut("/v1/cases/{caseId}/notes/{noteId}", PutAsync).RequireAuth().Requires(Feature.Notes, PermissionLevel.AddEdit);
+        routes.MapPut("/v1/cases/{caseId}/notes/{noteId}", PutAsync).RequestBody<NoteRequest>().RequireAuth().Requires(Feature.Notes, PermissionLevel.AddEdit);
         routes.MapDelete("/v1/cases/{caseId}/notes/{noteId}", DeleteAsync).RequireAuth().Requires(Feature.Notes, PermissionLevel.AddEdit);
     }
 
-    private static async Task<IResult> CreateAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
+    /// <summary>Write a note on a case, authored by the caller.</summary>
+    internal static async Task<Created<NoteView>> CreateAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
     {
         var accessor = await context.CurrentAccessorAsync();
         var body = NoteRules.Kind.ParseBody(await context.BodyAsync(MaxRequestBytes));
@@ -165,18 +172,20 @@ public sealed class NoteRoutes : IEndpointModule
         var note = CaseEntityRules.Create(NoteRules.Kind, new EntityDraft<NoteBody>(stamped, ValueCollections.EmptyDictionary<string, ProvenanceEntry>()), caseId, context.Clock());
         await context.Port<ICaseEntityStore>().CreateAsync(note, cancellationToken);
         LogSaved(context, caseId, note.Id);
-        return FlaskJson.Result(CaseViews.Note(note), StatusCodes.Status201Created);
+        return TypedResults.Created((string?)null, NoteView.Of(note));
     }
 
-    private static async Task<IResult> ListAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
+    /// <summary>A case's notes, newest first.</summary>
+    internal static async Task<NoteList> ListAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
     {
         await context.ReachableCaseAsync(caseId, AccessAction.CaseRead, cancellationToken);
         var notes = await context.Port<ICaseEntityStore>().ListTypedAsync(caseId, NoteRules.Kind, cancellationToken);
-        return FlaskJson.Result(new JsonObject { ["notes"] = new JsonArray([.. notes.Reverse().Select(note => (JsonNode)CaseViews.Note(note))]) });
+        return new NoteList([.. notes.Reverse().Select(NoteView.Of)]);
     }
 
-    // The original author stays the author when an admin edits.
-    private static async Task<IResult> PutAsync(HttpContext context, string caseId, string noteId, CancellationToken cancellationToken)
+    /// <summary>Edit a note: its author or a firm admin only.</summary>
+    /// <remarks>The original author stays the author when an admin edits.</remarks>
+    internal static async Task<NoteView> PutAsync(HttpContext context, string caseId, string noteId, CancellationToken cancellationToken)
     {
         var accessor = await context.CurrentAccessorAsync();
         var body = NoteRules.Kind.ParseBody(await context.BodyAsync(MaxRequestBytes));
@@ -191,10 +200,11 @@ public sealed class NoteRoutes : IEndpointModule
         }
 
         LogSaved(context, caseId, note.Id);
-        return FlaskJson.Result(CaseViews.Note(note));
+        return NoteView.Of(note);
     }
 
-    private static async Task<IResult> DeleteAsync(HttpContext context, string caseId, string noteId, CancellationToken cancellationToken)
+    /// <summary>Delete a note: its author or a firm admin only.</summary>
+    internal static async Task<NoContent> DeleteAsync(HttpContext context, string caseId, string noteId, CancellationToken cancellationToken)
     {
         var accessor = await context.CurrentAccessorAsync();
         await context.ReachableCaseAsync(caseId, AccessAction.CaseUpdate, cancellationToken);
@@ -206,7 +216,7 @@ public sealed class NoteRoutes : IEndpointModule
         }
 
         context.Log(Logger, "note deleted", ("case_id", caseId), ("collection", NoteRules.Kind.Collection), ("id", noteId));
-        return FlaskJson.NoContent();
+        return TypedResults.NoContent();
     }
 
     private static async Task<CaseEntity<NoteBody>> NoteOr404Async(HttpContext context, string caseId, string noteId, CancellationToken cancellationToken) =>

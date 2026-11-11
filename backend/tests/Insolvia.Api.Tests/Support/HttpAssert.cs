@@ -1,5 +1,5 @@
 using System.Net.Http.Headers;
-using Insolvia.Api.Http;
+using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace Insolvia.Api.Tests.Support;
@@ -48,22 +48,18 @@ internal static class HttpAssert
     /// <summary>test_auth.py's <c>assert_unauthorized</c>: the status AND the one body.</summary>
     public static void Unauthorized((int Status, string Body, HttpResponseMessage Response) answer)
     {
-        Assert.Equal(401, answer.Status);
-        Assert.Equal("""{"error":"Unauthorized","message":"authentication required"}""", answer.Body);
-        Assert.Equal("application/json", answer.Response.Content.Headers.ContentType?.ToString());
+        Json(answer, 401, """{"error":"Unauthorized","message":"authentication required"}""");
     }
 
     public static void Json((int Status, string Body, HttpResponseMessage Response) answer, int status, string body)
     {
         Assert.Equal(status, answer.Status);
-        Assert.Equal(body, answer.Body);
-        Assert.Equal("application/json", answer.Response.Content.Headers.ContentType?.ToString());
+        Assert.True(JsonNode.DeepEquals(JsonNode.Parse(body), JsonNode.Parse(answer.Body)), $"expected {body}\nactual   {answer.Body}");
+        Assert.Equal("application/json", answer.Response.Content.Headers.ContentType?.MediaType);
     }
 
     public static string ErrorBody(string error, string message) =>
         $$"""{"error":"{{error}}","message":"{{message}}"}""";
-
-    public static string Werkzeug(int status) => ErrorResponses.WerkzeugHtml(status)!;
 }
 
 /// <summary>A seeded <see cref="AuthHost"/> shared by one test class.</summary>

@@ -135,7 +135,7 @@ public sealed class PlanRouteTests : IAsyncLifetime, IDisposable
             ["months"] = meansTest["chapter13"]!["commitmentPeriodMonths"]!.DeepClone(),
             ["source"] = meansTest["chapter13"]!["commitmentSource"]!.DeepClone(),
         };
-        Assert.Equal(Http.FlaskJson.Serialize(expected), Http.FlaskJson.Serialize(body["commitmentPeriod"]));
+        Assert.Equal(Support.SortedJson.Serialize(expected), Support.SortedJson.Serialize(body["commitmentPeriod"]));
     }
 
     /// <summary>The issue's "done when", against the reference case.</summary>

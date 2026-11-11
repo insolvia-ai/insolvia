@@ -80,7 +80,7 @@ public sealed class CaseSummaryRouteTests : IAsyncLifetime, IDisposable
         Assert.Equal(
             """{"assets":"0","liabilities":"0","monthlyExcess":"0","monthlyExpenses":"0","monthlyIncome":"0","nonpriorityUnsecured":"0","personalProperty":"0","priorityUnsecured":"0","realEstate":"0","secured":"0","totalExempt":"0","totalNonExempt":"0"}""",
             Sorted(body["totals"]!));
-        Assert.Equal("""{"assets":[],"claims":[]}""", body["liens"]!.ToJsonString());
+        Assert.True(JsonNode.DeepEquals(JsonNode.Parse("""{"assets":[],"claims":[]}"""), body["liens"]), body["liens"]!.ToJsonString());
     }
 
     [Fact]
