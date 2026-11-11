@@ -258,6 +258,27 @@ public static partial class WireOpenApi
             schema.AdditionalProperties = new OpenApiSchema();
         }
 
+        // A member whose converter the generator cannot see through: a case
+        // body's money (a JSON number) and a ValueCollection (an array).
+        foreach (var property in type.Properties)
+        {
+            if (!schema.Properties.TryGetValue(property.Name, out var member) || member is not OpenApiSchema { Type: null, Items: null } shape)
+            {
+                continue;
+            }
+
+            var clr = Nullable.GetUnderlyingType(property.PropertyType) ?? property.PropertyType;
+            if (clr == typeof(decimal) && property.CustomConverter is not null)
+            {
+                shape.Type = JsonSchemaType.Number;
+            }
+            else if (clr.IsGenericType && clr.GetGenericTypeDefinition() == typeof(Insolvia.Domain.ValueCollection<>))
+            {
+                shape.Type = JsonSchemaType.Array;
+                shape.Items = await context.GetOrCreateSchemaAsync(clr.GetGenericArguments()[0], null, cancellationToken).ConfigureAwait(false);
+            }
+        }
+
         foreach (var property in type.Properties.Where(p => p.ShouldSerialize is not null))
         {
             schema.Required.Remove(property.Name);

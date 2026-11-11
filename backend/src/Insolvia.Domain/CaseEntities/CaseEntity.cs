@@ -5,11 +5,9 @@ namespace Insolvia.Domain.CaseEntities;
 
 // The machinery every case-scoped collection shares (issue #249; from
 // case_entities.py). Every collection is the same KIND of thing — a
-// many-cardinality record in its case, with server-stamped identity, a
-// validated body and a per-field provenance map — so the shape is written
-// once here and each entity module contributes only its body and parser.
-// The provenance invariants are INHERITED: ParseEntity runs
-// RequireProvenance over the parsed body, so no collection can forget it.
+// many-cardinality record in its case, with server-stamped identity, a typed
+// body and a per-field provenance map — so the shape is written once here and
+// each entity module contributes only its body record (ADR 0032).
 
 /// <summary>One collection's identity, without its body type — what a generic route or store holds.</summary>
 public interface IEntityKind
@@ -23,102 +21,39 @@ public interface IEntityKind
     /// <summary>The sort-key namespace in the case, e.g. <c>CREDITOR</c> — unique across the case's records.</summary>
     string SkPrefix { get; }
 
-    /// <summary>The body record's type, e.g. <c>CreditorBody</c> — what the API's document describes a record of this kind with.</summary>
+    /// <summary>The body record's type, e.g. <c>CreditorBody</c>.</summary>
     Type BodyType { get; }
 
-    /// <summary><see cref="CaseEntityRules.ParseEntity{TBody}"/> for this kind, untyped.</summary>
-    IEntityDraft ParseDraft(JsonObject payload, bool enforceProvenance = true);
-
-    /// <summary>
-    /// A stored record rebuilt from its identity and a draft this kind parsed
-    /// — a store's read, untyped (a store holds the kind, not the body type).
-    /// </summary>
-    ICaseEntity Restore(string id, string caseId, DateTimeOffset createdAt, DateTimeOffset updatedAt, IEntityDraft draft);
+    /// <summary>A record of this kind from its parts — a store's read, untyped (a store holds the kind, not the body type).</summary>
+    ICaseEntity Restore(string id, string caseId, DateTimeOffset createdAt, DateTimeOffset updatedAt, object body, ValueDictionary<string, ProvenanceEntry> provenance, bool amended);
 }
 
-/// <summary>
-/// One collection's identity: what it is called, where its items sort, and how
-/// a body is validated. <see cref="ParseBody"/> validates SHAPE AND TYPE ONLY,
-/// accepts absent values everywhere (progressive intake), and raises
-/// <see cref="FieldValidationException"/> with every malformed field named.
-/// It never sees <c>provenance</c> — that is parsed and enforced here.
-/// </summary>
+/// <summary>One collection's identity: what it is called, where its items sort, and its body record.</summary>
 /// <typeparam name="TBody">The body record.</typeparam>
-public sealed class EntityKind<TBody> : IEntityKind
+/// <param name="name">The entity's name.</param>
+/// <param name="collection">The URL segment.</param>
+/// <param name="skPrefix">The sort-key namespace.</param>
+public sealed class EntityKind<TBody>(string name, string collection, string skPrefix) : IEntityKind
     where TBody : class
 {
-    private readonly Func<JsonObject, TBody> _parseBody;
-
-    /// <summary>Creates the kind.</summary>
-    public EntityKind(string name, string collection, string skPrefix, Func<JsonObject, TBody> parseBody)
-    {
-        Name = name;
-        Collection = collection;
-        SkPrefix = skPrefix;
-        _parseBody = parseBody;
-    }
-
     /// <inheritdoc />
-    public string Name { get; }
+    public string Name { get; } = name;
 
     /// <inheritdoc />
     public Type BodyType => typeof(TBody);
 
     /// <inheritdoc />
-    public string Collection { get; }
+    public string Collection { get; } = collection;
 
     /// <inheritdoc />
-    public string SkPrefix { get; }
-
-    /// <summary>The body parser.</summary>
-    public TBody ParseBody(JsonObject payload) => _parseBody(payload);
+    public string SkPrefix { get; } = skPrefix;
 
     /// <inheritdoc />
-    public IEntityDraft ParseDraft(JsonObject payload, bool enforceProvenance = true) =>
-        CaseEntityRules.ParseEntity(this, payload, enforceProvenance);
-
-    /// <inheritdoc />
-    public ICaseEntity Restore(string id, string caseId, DateTimeOffset createdAt, DateTimeOffset updatedAt, IEntityDraft draft)
-    {
-        ArgumentNullException.ThrowIfNull(draft);
-        var typed = draft as EntityDraft<TBody> ?? throw new ArgumentException($"a {Name} draft was expected", nameof(draft));
-        return new CaseEntity<TBody>(this, id, caseId, createdAt, updatedAt, typed.Body, typed.Provenance, typed.Amended);
-    }
+    public ICaseEntity Restore(string id, string caseId, DateTimeOffset createdAt, DateTimeOffset updatedAt, object body, ValueDictionary<string, ProvenanceEntry> provenance, bool amended) =>
+        new CaseEntity<TBody>(this, id, caseId, createdAt, updatedAt, (TBody)body, provenance, amended);
 
     /// <inheritdoc />
     public override string ToString() => Name;
-}
-
-/// <summary>A validated body and its provenance, untyped.</summary>
-public interface IEntityDraft
-{
-    /// <summary>The body.</summary>
-    object Body { get; }
-
-    /// <summary>The per-field provenance.</summary>
-    ValueDictionary<string, ProvenanceEntry> Provenance { get; }
-
-    /// <summary>Whether the record amends a filed one (issue #370).</summary>
-    bool Amended { get; }
-
-    /// <summary>The body as plain nested JSON.</summary>
-    JsonObject BodyNode();
-}
-
-/// <summary>
-/// A validated body plus its provenance, before the server stamps identity.
-/// <see cref="Amended"/> (issue #370) rides beside the body, a GENERIC entity
-/// attribute rather than a per-body field; whether it may be set at all is a
-/// lifecycle rule the route enforces.
-/// </summary>
-/// <typeparam name="TBody">The body record.</typeparam>
-public sealed record EntityDraft<TBody>(TBody Body, ValueDictionary<string, ProvenanceEntry> Provenance, bool Amended = false) : IEntityDraft
-    where TBody : class
-{
-    object IEntityDraft.Body => Body;
-
-    /// <inheritdoc />
-    public JsonObject BodyNode() => BodyJson.ToNode(Body);
 }
 
 /// <summary>A stored collection record, untyped — what a generic route or store holds.</summary>
@@ -145,15 +80,15 @@ public interface ICaseEntity
     /// <summary>The per-field provenance.</summary>
     ValueDictionary<string, ProvenanceEntry> Provenance { get; }
 
-    /// <summary>Whether the record amends a filed one.</summary>
+    /// <summary>Whether the record amends a filed one (issue #370).</summary>
     bool Amended { get; }
 
-    /// <summary>The body as plain nested JSON — what provenance paths address.</summary>
+    /// <summary>The body as JSON — what provenance paths address.</summary>
     JsonObject BodyNode();
 
     /// <summary>
     /// This record moved into another case (Copy case): same id, same
-    /// <c>created_at</c>, the given <paramref name="updatedAt"/> and
+    /// <c>createdAt</c>, the given <paramref name="updatedAt"/> and
     /// <paramref name="provenance"/>, and never amended.
     /// </summary>
     ICaseEntity CopiedTo(string caseId, DateTimeOffset updatedAt, ValueDictionary<string, ProvenanceEntry> provenance);
@@ -188,68 +123,25 @@ public sealed record CaseEntity<TBody>(
 public static class CaseEntityRules
 {
     /// <summary>
-    /// Validate a whole entity body; unknown keys are ignored. WHOLE, not
-    /// partial: invariant 1 can only be checked against a complete record.
-    /// The body is parsed BEFORE provenance, so a malformed field is reported
-    /// first. <paramref name="enforceProvenance"/> is a WRITE rule, switched
-    /// off on reads, so a rule tightening never makes stored rows unreadable.
-    /// </summary>
-    public static EntityDraft<TBody> ParseEntity<TBody>(EntityKind<TBody> kind, JsonObject payload, bool enforceProvenance = true)
-        where TBody : class
-    {
-        ArgumentNullException.ThrowIfNull(kind);
-        ArgumentNullException.ThrowIfNull(payload);
-        var body = kind.ParseBody(payload);
-        var provenance = ProvenanceRules.Parse(payload["provenance"]);
-        var amended = ParseAmended(payload);
-        var draft = new EntityDraft<TBody>(body, provenance, amended);
-        if (enforceProvenance)
-        {
-            // Against the record as it will be STORED: the parsers collapse
-            // whitespace-only values to null, which then need no provenance.
-            ProvenanceRules.RequireProvenance(draft.BodyNode(), provenance);
-        }
-
-        return draft;
-    }
-
-    /// <summary>
-    /// A staff save may KEEP a <c>client_answered</c> entry and never mint one
+    /// The provenance a body must carry to be written: every populated field
+    /// has an entry (<see cref="ProvenanceRules.RequireProvenance"/>), and a
+    /// save may keep a server-minted entry but never mint one
     /// (<see cref="ProvenanceRules.RequireServerSourcesKept"/>). A null
     /// <paramref name="stored"/> is a create, which can keep nothing.
     /// </summary>
-    public static void RequireServerSourcesKept<TBody>(EntityDraft<TBody> draft, CaseEntity<TBody>? stored)
-        where TBody : class
+    public static void RequireProvenance(object body, IReadOnlyDictionary<string, ProvenanceEntry> provenance, ICaseEntity? stored)
     {
-        ArgumentNullException.ThrowIfNull(draft);
-        ProvenanceRules.RequireServerSourcesKept(draft.BodyNode(), draft.Provenance, stored?.BodyNode(), stored?.Provenance);
+        var node = BodyJson.ToNode(body);
+        ProvenanceRules.RequireProvenance(node, provenance);
+        ProvenanceRules.RequireServerSourcesKept(node, provenance, stored?.BodyNode(), stored?.Provenance);
     }
 
     /// <summary>A new record: a fresh uuid, created and updated now.</summary>
-    public static CaseEntity<TBody> Create<TBody>(EntityKind<TBody> kind, EntityDraft<TBody> draft, string caseId, TimeProvider? clock = null)
+    public static CaseEntity<TBody> Create<TBody>(EntityKind<TBody> kind, string caseId, TBody body, ValueDictionary<string, ProvenanceEntry> provenance, TimeProvider? clock = null)
         where TBody : class
     {
-        ArgumentNullException.ThrowIfNull(draft);
         var now = Clock.Now(clock);
-        return new CaseEntity<TBody>(kind, Guid.NewGuid().ToString(), caseId, now, now, draft.Body, draft.Provenance, draft.Amended);
-    }
-
-    /// <summary>
-    /// The draft's body over <paramref name="existing"/>, keeping its id (other
-    /// records' provenance paths may name it) and <c>created_at</c> (the sort).
-    /// </summary>
-    public static CaseEntity<TBody> Replace<TBody>(CaseEntity<TBody> existing, EntityDraft<TBody> draft, TimeProvider? clock = null)
-        where TBody : class
-    {
-        ArgumentNullException.ThrowIfNull(existing);
-        ArgumentNullException.ThrowIfNull(draft);
-        return existing with
-        {
-            UpdatedAt = Clock.Now(clock),
-            Body = draft.Body,
-            Provenance = draft.Provenance,
-            Amended = draft.Amended,
-        };
+        return new CaseEntity<TBody>(kind, Guid.NewGuid().ToString(), caseId, now, now, body, provenance);
     }
 
     /// <summary>
@@ -268,19 +160,4 @@ public static class CaseEntityRules
         var byTime = left.CreatedAt.CompareTo(right.CreatedAt);
         return byTime != 0 ? byTime : string.CompareOrdinal(left.Id, right.Id);
     });
-
-    /// <summary>
-    /// <c>amended</c>: shape and type only — true or false, defaulting false.
-    /// Present-but-null is refused: the default covers an absent key only (<c>payload.get("amended", False)</c>).
-    /// </summary>
-    private static bool ParseAmended(JsonObject payload)
-    {
-        if (!payload.TryGetPropertyValue("amended", out var value))
-        {
-            return false;
-        }
-
-        return Json.AsBool(value)
-            ?? throw new FieldValidationException(new Dictionary<string, string> { ["amended"] = "amended must be true or false." });
-    }
 }

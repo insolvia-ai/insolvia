@@ -265,16 +265,16 @@ public sealed class ExtractionReviewRouteTests : IAsyncLifetime, IDisposable
     {
         var caseId = await _world.OpenCaseIdAsync();
         var creditor = await PlantAsync(caseId);
-        var claim = await PlantAsync(caseId, "claims", $$"""{"creditor_id": "{{creditor.Id}}", "claim_class": "nonpriority_unsecured", "amount": "310.00"}""");
+        var claim = await PlantAsync(caseId, "claims", $$"""{"creditorId": "{{creditor.Id}}", "claimClass": "nonpriority_unsecured", "amount": 310.00}""");
 
         var early = await Review(caseId, claim.Id, """{"action": "accept"}""");
         Assert.Equal(400, early.Status);
-        Assert.Contains("accepted yet", early.Object["fields"]!["creditor_id"]!.GetValue<string>(), StringComparison.Ordinal);
+        Assert.Contains("accepted yet", early.Object["fields"]!["creditorId"]!.GetValue<string>(), StringComparison.Ordinal);
 
         var accepted = (await Review(caseId, creditor.Id, """{"action": "accept"}""")).Object;
         Assert.Equal(200, (await Review(caseId, claim.Id, """{"action": "accept"}""")).Status);
         var record = Assert.Single(await Entities.ListTypedAsync(caseId, ClaimRules.Kind, HttpAssert.Ct));
         Assert.Equal(accepted["record"]!["id"]!.GetValue<string>(), record.Body.CreditorId);
-        Assert.Equal(ProvenanceSource.AiExtracted, record.Provenance["creditor_id"].Source);
+        Assert.Equal(ProvenanceSource.AiExtracted, record.Provenance["creditorId"].Source);
     }
 }

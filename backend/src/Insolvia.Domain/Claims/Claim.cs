@@ -1,4 +1,4 @@
-using System.Text.Json.Nodes;
+using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 using Insolvia.Domain.CaseEntities;
 using Insolvia.Domain.Fields;
@@ -12,33 +12,56 @@ namespace Insolvia.Domain.Claims;
 /// for their class, which is a completeness fact, not a shape rule.
 /// </summary>
 public sealed record ClaimBody(
-    string? CreditorId,
-    ClaimClass? ClaimClass,
-    [property: JsonPropertyName("account_last4")] string? AccountLast4,
-    DateOnly? DateIncurred,
-    decimal? Amount,
-    bool? Contingent,
-    bool? Unliquidated,
-    bool? Disputed,
-    bool? SubjectToOffset,
-    DebtorAttribution? WhoIncurred,
-    bool? CommunityDebt,
-    ValueCollection<NoticeParty> NoticeParties,
-    string? AssetId,
-    int? LienPosition,
-    string? CollateralDescription,
-    decimal? CollateralValue,
-    ValueCollection<LienNature> LienNature,
-    string? LienNatureOther,
-    decimal? UnsecuredAmountOverride,
-    ClaimIntention? Intention,
-    string? IntentionExplanation,
-    decimal? PriorityAmount,
-    decimal? NonpriorityAmount,
-    PriorityType? PriorityType,
-    string? PriorityTypeOther,
-    NonpriorityType? NonpriorityType,
-    string? NonpriorityTypeOther);
+    [property: Text(64)] string? CreditorId = null,
+    ClaimClass? ClaimClass = null,
+    [property: Text(4), RegularExpression("^[0-9]*$", ErrorMessage = Claims.NoticeParties.Last4Message)] string? AccountLast4 = null,
+    DateOnly? DateIncurred = null,
+    [property: Money] decimal? Amount = null,
+    bool? Contingent = null,
+    bool? Unliquidated = null,
+    bool? Disputed = null,
+    bool? SubjectToOffset = null,
+    DebtorAttribution? WhoIncurred = null,
+    bool? CommunityDebt = null,
+    ValueCollection<NoticeParty>? NoticeParties = null,
+    [property: Text(64)] string? AssetId = null,
+    [property: Count(ClaimRules.MaxLienPosition)] int? LienPosition = null,
+    [property: Text(500)] string? CollateralDescription = null,
+    [property: Money] decimal? CollateralValue = null,
+    ValueCollection<LienNature>? LienNature = null,
+    [property: Text] string? LienNatureOther = null,
+    [property: Money] decimal? UnsecuredAmountOverride = null,
+    ClaimIntention? Intention = null,
+    [property: Text(500)] string? IntentionExplanation = null,
+    [property: Money] decimal? PriorityAmount = null,
+    [property: Money] decimal? NonpriorityAmount = null,
+    PriorityType? PriorityType = null,
+    [property: Text] string? PriorityTypeOther = null,
+    NonpriorityType? NonpriorityType = null,
+    [property: Text] string? NonpriorityTypeOther = null) : IValidatableObject
+{
+    /// <summary>Who else to notify about the debt — collection agencies, attorneys.</summary>
+    [Rows]
+    public ValueCollection<NoticeParty> NoticeParties { get; init; } = NoticeParties ?? [];
+
+    /// <summary>106D's "nature of lien" checkboxes.</summary>
+    public ValueCollection<LienNature> LienNature { get; init; } = LienNature ?? [];
+
+    /// <summary>
+    /// 1 is the senior lien. Zero is refused rather than read as "first": two
+    /// counting conventions on one asset would order the liens wrongly
+    /// without any field being malformed.
+    /// </summary>
+    /// <param name="validationContext">Unused.</param>
+    /// <returns>The failures.</returns>
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        if (LienPosition == 0)
+        {
+            yield return new ValidationResult("Must be 1 or more — 1 is the senior lien.", [nameof(LienPosition)]);
+        }
+    }
+}
 
 /// <summary>The claim collection.</summary>
 public static class ClaimRules
@@ -47,61 +70,7 @@ public static class ClaimRules
     public const int MaxLienPosition = 99;
 
     /// <summary>The collection's kind.</summary>
-    public static readonly EntityKind<ClaimBody> Kind = new("claim", "claims", "CLAIM", Parse);
-
-    /// <summary>Validates a claim body (Python's <c>parse_claim</c>).</summary>
-    public static ClaimBody Parse(JsonObject payload)
-    {
-        ArgumentNullException.ThrowIfNull(payload);
-        var errors = new Dictionary<string, string>(StringComparer.Ordinal);
-        var body = new ClaimBody(
-            CreditorId: FieldParsers.Text(payload["creditor_id"], "creditor_id", errors, limit: 64),
-            ClaimClass: FieldParsers.Choice<ClaimClass>(payload["claim_class"], "claim_class", errors),
-            AccountLast4: Claims.NoticeParties.Last4(payload["account_last4"], "account_last4", errors),
-            DateIncurred: FieldParsers.FormDate(payload["date_incurred"], "date_incurred", errors),
-            Amount: FieldParsers.Money(payload["amount"], "amount", errors),
-            Contingent: FieldParsers.Boolean(payload["contingent"], "contingent", errors),
-            Unliquidated: FieldParsers.Boolean(payload["unliquidated"], "unliquidated", errors),
-            Disputed: FieldParsers.Boolean(payload["disputed"], "disputed", errors),
-            SubjectToOffset: FieldParsers.Boolean(payload["subject_to_offset"], "subject_to_offset", errors),
-            WhoIncurred: FieldParsers.Choice<DebtorAttribution>(payload["who_incurred"], "who_incurred", errors),
-            CommunityDebt: FieldParsers.Boolean(payload["community_debt"], "community_debt", errors),
-            NoticeParties: Claims.NoticeParties.Parse(payload["notice_parties"], errors),
-            AssetId: FieldParsers.Text(payload["asset_id"], "asset_id", errors, limit: 64),
-            LienPosition: ParseLienPosition(payload["lien_position"], errors),
-            CollateralDescription: FieldParsers.Text(payload["collateral_description"], "collateral_description", errors, limit: 500),
-            CollateralValue: FieldParsers.Money(payload["collateral_value"], "collateral_value", errors),
-            LienNature: FieldParsers.ChoiceList<LienNature>(payload["lien_nature"], "lien_nature", errors),
-            LienNatureOther: FieldParsers.Text(payload["lien_nature_other"], "lien_nature_other", errors),
-            UnsecuredAmountOverride: FieldParsers.Money(payload["unsecured_amount_override"], "unsecured_amount_override", errors),
-            Intention: FieldParsers.Choice<ClaimIntention>(payload["intention"], "intention", errors),
-            IntentionExplanation: FieldParsers.Text(payload["intention_explanation"], "intention_explanation", errors, limit: 500),
-            PriorityAmount: FieldParsers.Money(payload["priority_amount"], "priority_amount", errors),
-            NonpriorityAmount: FieldParsers.Money(payload["nonpriority_amount"], "nonpriority_amount", errors),
-            PriorityType: FieldParsers.Choice<PriorityType>(payload["priority_type"], "priority_type", errors),
-            PriorityTypeOther: FieldParsers.Text(payload["priority_type_other"], "priority_type_other", errors),
-            NonpriorityType: FieldParsers.Choice<NonpriorityType>(payload["nonpriority_type"], "nonpriority_type", errors),
-            NonpriorityTypeOther: FieldParsers.Text(payload["nonpriority_type_other"], "nonpriority_type_other", errors));
-        IdRows.ThrowIfAny(errors);
-        return body;
-    }
-
-    /// <summary>
-    /// 1 is the senior lien. Zero is refused rather than read as "first": two
-    /// counting conventions on one asset would order the liens wrongly
-    /// without any field being malformed.
-    /// </summary>
-    private static int? ParseLienPosition(JsonNode? value, Dictionary<string, string> errors)
-    {
-        var position = FieldParsers.WholeNumber(value, "lien_position", errors, maximum: MaxLienPosition);
-        if (position == 0)
-        {
-            errors["lien_position"] = "Must be 1 or more — 1 is the senior lien.";
-            return null;
-        }
-
-        return position;
-    }
+    public static readonly EntityKind<ClaimBody> Kind = new("claim", "claims", "CLAIM");
 }
 
 /// <summary>Which schedule a claim belongs on (Python's <c>CLAIM_CLASSES</c>).</summary>

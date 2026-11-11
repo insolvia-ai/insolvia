@@ -3,51 +3,64 @@ using Insolvia.Domain.Fields;
 namespace Insolvia.Domain.Tests;
 
 // fields.py had no suite of its own (each case entity's tests exercised it).
-// These pin the places the C# port changed REPRESENTATION — money and rates
-// as decimal, form dates as DateOnly — against the canonical wire forms.
+// These pin the field attributes a collection body is checked with (ADR 0032)
+// and the form-date parser the debtor routes still use.
 public sealed class FieldsTests
 {
     private readonly Dictionary<string, string> _errors = new(StringComparer.Ordinal);
 
+    // One test per field attribute: what each refuses, with the message the wire carries.
     [Theory]
-    [InlineData("1200", "1200.00")]
-    [InlineData("1200.5", "1200.50")]
-    [InlineData(" 0.01 ", "0.01")]
-    [InlineData("1e2", "100.00")]
-    [InlineData("999999999999.99", "999999999999.99")]
-    public void Money_is_a_scale_two_decimal(string sent, string canonical)
-    {
-        var parsed = FieldParsers.Money(Body.Value($"\"{sent}\""), "amount", _errors);
-        Assert.Equal(canonical, parsed?.ToString(System.Globalization.CultureInfo.InvariantCulture));
-        Assert.Empty(_errors);
-    }
+    [InlineData("-1", "Must be a non-negative dollar amount.")]
+    [InlineData("1000000000000", "Amount is too large.")]
+    [InlineData("1.001", "Must have at most two decimal places.")]
+    [InlineData("1200.5", null)]
+    public void Money_is_a_non_negative_amount_in_cents(string sent, string? message) =>
+        Assert.Equal(message, Message(new MoneyAttribute(), decimal.Parse(sent, System.Globalization.CultureInfo.InvariantCulture)));
 
     [Theory]
-    [InlineData("1200", "Must be an amount carried as a string, like \"1200.00\".")]
-    [InlineData("\"twelve\"", "Must be a dollar amount, like \"1200.00\".")]
-    [InlineData("\"-1\"", "Must be a non-negative dollar amount.")]
-    [InlineData("\"1000000000000\"", "Amount is too large.")]
-    [InlineData("\"1.000\"", "Must have at most two decimal places.")]
-    public void Money_refuses_what_python_refused(string sent, string message)
-    {
-        Assert.Null(FieldParsers.Money(Body.Value(sent), "amount", _errors));
-        Assert.Equal(message, _errors["amount"]);
-    }
-
-    [Theory]
-    [InlineData("8.5", "8.50")]
-    [InlineData("8.500", "8.50")]
-    [InlineData("6.375", "6.375")]
-    [InlineData("10", "10.00")]
-    public void A_percentage_is_canonical(string sent, string canonical) =>
-        Assert.Equal(canonical, FieldParsers.Percentage(Body.Value($"\"{sent}\""), "rate", _errors)?.ToString(System.Globalization.CultureInfo.InvariantCulture));
+    [InlineData("10.5", "Must be between 0 and 10 per cent.")]
+    [InlineData("6.3755", "Must have at most 3 decimal places.")]
+    [InlineData("6.375", null)]
+    public void A_rate_respects_its_maximum_and_places(string sent, string? message) =>
+        Assert.Equal(message, Message(new RateAttribute(10), decimal.Parse(sent, System.Globalization.CultureInfo.InvariantCulture)));
 
     [Fact]
-    public void A_percentage_respects_its_statutory_maximum()
+    public void A_count_is_a_whole_number_in_range()
     {
-        Assert.Null(FieldParsers.Percentage(Body.Value("\"10.5\""), "rate", _errors, maximum: 10m));
-        Assert.Equal("Must be between 0 and 10 per cent.", _errors["rate"]);
+        Assert.Equal("Must be between 0 and 60.", Message(new CountAttribute(60), 61));
+        Assert.Equal("Must be between 0 and 60.", Message(new CountAttribute(60), -1));
+        Assert.Null(Message(new CountAttribute(60), 60));
     }
+
+    [Fact]
+    public void Text_is_one_line_under_its_cap()
+    {
+        Assert.Equal("Must be a single line.", Message(new TextAttribute(), "a\nb"));
+        Assert.Equal("Must be 3 characters or fewer.", Message(new TextAttribute(3), "abcd"));
+        Assert.Equal("Must be 3 characters or fewer.", Message(new TextAttribute(3), (string[])["ab", "abcd"]));
+        Assert.Null(Message(new TextAttribute(3), "abc"));
+    }
+
+    [Fact]
+    public void A_narrative_may_span_lines_under_its_cap()
+    {
+        Assert.Null(Message(new NarrativeAttribute(5), "a\nb"));
+        Assert.Equal("Must be 5 characters or fewer.", Message(new NarrativeAttribute(5), "abcdef"));
+    }
+
+    [Fact]
+    public void Rows_need_a_unique_addressable_id()
+    {
+        Assert.Equal(RowsAttribute.IdRequired, Message(new RowsAttribute(), new[] { new Row("ok"), new Row("not ok") }));
+        Assert.Equal("Duplicate id.", Message(new RowsAttribute(), new[] { new Row("a"), new Row("a") }));
+        Assert.Null(Message(new RowsAttribute(), new[] { new Row("a"), new Row("b") }));
+    }
+
+    private static string? Message(System.ComponentModel.DataAnnotations.ValidationAttribute attribute, object value) =>
+        attribute.GetValidationResult(value, new System.ComponentModel.DataAnnotations.ValidationContext(value))?.ErrorMessage;
+
+    private sealed record Row(string Id) : IRow;
 
     [Theory]
     [InlineData("2019-02-14", true)]
@@ -59,24 +72,6 @@ public sealed class FieldsTests
         var parsed = FieldParsers.FormDate(Body.Value($"\"{sent}\""), "date", _errors);
         Assert.Equal(valid, parsed is not null);
         Assert.Equal(!valid, _errors.ContainsKey("date"));
-    }
-
-    [Fact]
-    public void Text_collapses_blank_to_absent_and_refuses_a_second_line()
-    {
-        Assert.Null(FieldParsers.Text(Body.Value("\"   \""), "t", _errors));
-        Assert.Empty(_errors);
-        Assert.Null(FieldParsers.Text(Body.Value("\"a\\nb\""), "t", _errors));
-        Assert.Equal("Must be a single line.", _errors["t"]);
-    }
-
-    [Fact]
-    public void A_whole_number_is_not_a_boolean()
-    {
-        Assert.Null(FieldParsers.WholeNumber(Body.Value("true"), "n", _errors));
-        Assert.Equal(3, FieldParsers.WholeNumber(Body.Value("3"), "m", _errors));
-        Assert.Null(FieldParsers.WholeNumber(Body.Value("3.0"), "f", _errors));
-        Assert.Equal(["f", "n"], _errors.Keys.Order(StringComparer.Ordinal));
     }
 
     [Fact]

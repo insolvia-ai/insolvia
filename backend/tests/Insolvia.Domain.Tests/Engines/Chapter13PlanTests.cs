@@ -20,20 +20,20 @@ namespace Insolvia.Domain.Engines.Tests;
 public sealed class Chapter13PlanTests
 {
     private const string ReferencePlan = """
-        {"term_months": 60, "payment_source": "fixed", "monthly_payment": "600", "trustee_percentage": "10", "attorney_fees": "3000",
-         "secured_treatments": [
-           {"id": "t-auto", "claim_id": "claim-auto", "treatment": "cramdown", "cramdown_value": "9000", "interest_rate": "0"},
-           {"id": "t-home", "claim_id": "claim-mortgage", "treatment": "cure_and_maintain", "arrearage": "6000"}],
-         "unsecured_treatment": "pot"}
+        {"termMonths": 60, "paymentSource": "fixed", "monthlyPayment": 600, "trusteePercentage": 10, "attorneyFees": 3000,
+         "securedTreatments": [
+           {"id": "t-auto", "claimId": "claim-auto", "treatment": "cramdown", "cramdownValue": 9000, "interestRate": 0},
+           {"id": "t-home", "claimId": "claim-mortgage", "treatment": "cure_and_maintain", "arrearage": 6000}],
+         "unsecuredTreatment": "pot"}
         """;
 
     private static readonly CaseFile File = new(Build.Case(chapter: 13))
     {
         Assets =
         [
-            ("asset-house", Build.Body(AssetRules.Kind, """{"description": "12 Example Court", "value_entire": "250000"}""")),
-            ("asset-car", Build.Body(AssetRules.Kind, """{"description": "2019 sedan", "value_entire": "9000"}""")),
-            ("asset-savings", Build.Body(AssetRules.Kind, """{"description": "Savings", "value_entire": "10000"}""")),
+            ("asset-house", Build.Body(AssetRules.Kind, """{"description": "12 Example Court", "valueEntire": 250000}""")),
+            ("asset-car", Build.Body(AssetRules.Kind, """{"description": "2019 sedan", "valueEntire": 9000}""")),
+            ("asset-savings", Build.Body(AssetRules.Kind, """{"description": "Savings", "valueEntire": 10000}""")),
         ],
         Creditors =
         [
@@ -44,10 +44,10 @@ public sealed class Chapter13PlanTests
         ],
         Claims =
         [
-            ("claim-mortgage", Build.Body(ClaimRules.Kind, """{"creditor_id": "cr-mortgage", "claim_class": "secured", "amount": "200000.00", "asset_id": "asset-house", "lien_position": 1}""")),
-            ("claim-auto", Build.Body(ClaimRules.Kind, """{"creditor_id": "cr-auto", "claim_class": "secured", "amount": "12000.00", "asset_id": "asset-car", "lien_position": 1}""")),
-            ("claim-tax", Build.Body(ClaimRules.Kind, """{"creditor_id": "cr-tax", "claim_class": "priority_unsecured", "priority_amount": "3000.00", "nonpriority_amount": "1000.00"}""")),
-            ("claim-card", Build.Body(ClaimRules.Kind, """{"creditor_id": "cr-card", "claim_class": "nonpriority_unsecured", "amount": "20000.00"}""")),
+            ("claim-mortgage", Build.Body(ClaimRules.Kind, """{"creditorId": "cr-mortgage", "claimClass": "secured", "amount": 200000.00, "assetId": "asset-house", "lienPosition": 1}""")),
+            ("claim-auto", Build.Body(ClaimRules.Kind, """{"creditorId": "cr-auto", "claimClass": "secured", "amount": 12000.00, "assetId": "asset-car", "lienPosition": 1}""")),
+            ("claim-tax", Build.Body(ClaimRules.Kind, """{"creditorId": "cr-tax", "claimClass": "priority_unsecured", "priorityAmount": 3000.00, "nonpriorityAmount": 1000.00}""")),
+            ("claim-card", Build.Body(ClaimRules.Kind, """{"creditorId": "cr-card", "claimClass": "nonpriority_unsecured", "amount": 20000.00}""")),
         ],
     };
 
@@ -124,7 +124,7 @@ public sealed class Chapter13PlanTests
     [Fact]
     public void A_payment_too_small_for_the_waterfall_is_not_feasible()
     {
-        var calc = Run("""{"monthly_payment": "280"}""");
+        var calc = Run("""{"monthlyPayment": 280}""");
         Assert.False(calc.Feasibility.Feasible);
         Assert.True(calc.Feasibility.Shortfall > 0);
         Assert.Contains(calc.Feasibility.Reasons, reason => reason.Contains("unpaid after month 60", StringComparison.Ordinal));
@@ -133,7 +133,7 @@ public sealed class Chapter13PlanTests
     [Fact]
     public void A_promised_percentage_the_payment_cannot_meet_is_not_feasible()
     {
-        var calc = Run("""{"unsecured_treatment": "percentage", "unsecured_percentage": "60"}""");
+        var calc = Run("""{"unsecuredTreatment": "percentage", "unsecuredPercentage": 60}""");
         Assert.Equal(14400.00m, calc.UnsecuredTarget);
         Assert.False(calc.Feasibility.Feasible);
     }
@@ -141,7 +141,7 @@ public sealed class Chapter13PlanTests
     [Fact]
     public void A_promised_amount_the_payment_covers_is_feasible_with_a_surplus()
     {
-        var calc = Run("""{"unsecured_treatment": "amount", "unsecured_amount": "10000"}""");
+        var calc = Run("""{"unsecuredTreatment": "amount", "unsecuredAmount": 10000}""");
         Assert.True(calc.Feasibility.Feasible);
         Assert.Equal(1400.00m, calc.Feasibility.Surplus);
     }
@@ -149,7 +149,7 @@ public sealed class Chapter13PlanTests
     [Fact]
     public void A_payment_above_schedule_j_is_flagged()
     {
-        var calc = Run("""{"monthly_payment": "800"}""");
+        var calc = Run("""{"monthlyPayment": 800}""");
         Assert.True(calc.Feasibility.ExceedsScheduleJ);
         Assert.Contains(calc.Warnings, warning => warning.Contains("§ 1325(a)(6)", StringComparison.Ordinal));
     }
@@ -157,7 +157,7 @@ public sealed class Chapter13PlanTests
     [Fact]
     public void A_missing_trustee_percentage_leaves_feasibility_undetermined()
     {
-        var calc = Calculate(Inputs, Plan(remove: "trustee_percentage"));
+        var calc = Calculate(Inputs, Plan(remove: "trusteePercentage"));
         Assert.Null(calc.Feasibility.Feasible);
         Assert.Null(calc.BestInterests.Passes);
         Assert.Contains(calc.Problems, problem => problem.Contains("trustee's percentage", StringComparison.Ordinal));
@@ -168,7 +168,7 @@ public sealed class Chapter13PlanTests
     [Fact]
     public void The_term_defaults_to_the_commitment_period()
     {
-        var calc = Calculate(Inputs with { CommitmentMonths = 36 }, Plan(remove: "term_months"));
+        var calc = Calculate(Inputs with { CommitmentMonths = 36 }, Plan(remove: "termMonths"));
         Assert.Equal(36, calc.Funding.TermMonths);
         Assert.Contains("B122C-1 line 21", calc.Funding.TermSource ?? string.Empty, StringComparison.Ordinal);
     }
@@ -176,7 +176,7 @@ public sealed class Chapter13PlanTests
     [Fact]
     public void Without_a_term_or_a_means_test_there_is_no_waterfall()
     {
-        var calc = Calculate(Inputs with { CommitmentMonths = null }, Plan(remove: "term_months"));
+        var calc = Calculate(Inputs with { CommitmentMonths = null }, Plan(remove: "termMonths"));
         Assert.Empty(calc.Funding.Schedule);
         Assert.Null(calc.Feasibility.Feasible);
         Assert.Contains(calc.Problems, problem => problem.Contains("no term", StringComparison.Ordinal));
@@ -185,7 +185,7 @@ public sealed class Chapter13PlanTests
     [Fact]
     public void Steps_and_lump_sums_change_the_funding()
     {
-        var calc = Run("""{"step_payments": [{"id": "s1", "start_month": 31, "monthly_payment": "700"}], "lump_sums": [{"id": "l1", "month": 12, "amount": "1500"}]}""");
+        var calc = Run("""{"stepPayments": [{"id": "s1", "startMonth": 31, "monthlyPayment": 700}], "lumpSums": [{"id": "l1", "month": 12, "amount": 1500}]}""");
         var schedule = calc.Funding.Schedule.ToDictionary(item => item.Month, item => item.Payment);
         Assert.Equal((600.00m, 700.00m, 700.00m), (schedule[30], schedule[31], schedule[60]));
         Assert.Equal((600m * 30) + (700m * 30) + 1500, calc.Funding.Total);
@@ -194,7 +194,7 @@ public sealed class Chapter13PlanTests
     [Fact]
     public void The_schedule_j_source_uses_line_23c()
     {
-        var calc = Run("""{"payment_source": "schedule_j_excess", "monthly_payment": null}""");
+        var calc = Run("""{"paymentSource": "schedule_j_excess", "monthlyPayment": null}""");
         Assert.Equal(700.00m, calc.Funding.BasePayment);
         Assert.Equal("Schedule J line 23c", calc.Funding.BaseSource);
     }
@@ -202,7 +202,7 @@ public sealed class Chapter13PlanTests
     [Fact]
     public void The_disposable_income_source_needs_the_means_test()
     {
-        var calc = Run("""{"payment_source": "disposable_income", "monthly_payment": null}""");
+        var calc = Run("""{"paymentSource": "disposable_income", "monthlyPayment": null}""");
         Assert.Null(calc.Funding.BasePayment);
         Assert.Contains(calc.Problems, problem => problem.Contains("B122C-2", StringComparison.Ordinal));
     }
@@ -210,7 +210,7 @@ public sealed class Chapter13PlanTests
     [Fact]
     public void The_disposable_income_source_is_the_engines_figure()
     {
-        var calc = Run("""{"payment_source": "disposable_income", "monthly_payment": null}""", Inputs with { DisposableIncome = new Sourced(612.40m, "B122C-2 line 45") });
+        var calc = Run("""{"paymentSource": "disposable_income", "monthlyPayment": null}""", Inputs with { DisposableIncome = new Sourced(612.40m, "B122C-2 line 45") });
         Assert.Equal(612.40m, calc.Funding.BasePayment);
         Assert.Equal("B122C-2 line 45", calc.Funding.BaseSource);
     }
@@ -220,7 +220,7 @@ public sealed class Chapter13PlanTests
     [Fact]
     public void A_cramdown_at_a_rate_pays_the_value_plus_interest()
     {
-        var calc = Run("""{"monthly_payment": "900", "secured_treatments": [{"id": "t-auto", "claim_id": "claim-auto", "treatment": "cramdown", "cramdown_value": "9000", "interest_rate": "6"}]}""");
+        var calc = Run("""{"monthlyPayment": 900, "securedTreatments": [{"id": "t-auto", "claimId": "claim-auto", "treatment": "cramdown", "cramdownValue": 9000, "interestRate": 6}]}""");
         var auto = ByClass(calc, ClassSecured).Rows[0];
         Assert.Equal(174.00m, auto.MonthlyPayment);
         Assert.Equal(9000.00m, auto.Principal);
@@ -231,7 +231,7 @@ public sealed class Chapter13PlanTests
     [Fact]
     public void A_cramdown_without_a_value_uses_the_derived_secured_portion()
     {
-        var calc = Run("""{"secured_treatments": [{"id": "t-auto", "claim_id": "claim-auto", "treatment": "cramdown", "interest_rate": "0"}]}""");
+        var calc = Run("""{"securedTreatments": [{"id": "t-auto", "claimId": "claim-auto", "treatment": "cramdown", "interestRate": 0}]}""");
         Assert.Equal(9000.00m, ByClass(calc, ClassSecured).Rows[0].Allowed);
         Assert.Contains("bifurcated", calc.UnsecuredPool.First(c => c.ClaimId == "claim-auto").Source, StringComparison.Ordinal);
     }
@@ -239,7 +239,7 @@ public sealed class Chapter13PlanTests
     [Fact]
     public void A_surrendered_claims_deficiency_joins_the_unsecured_pool()
     {
-        var calc = Run("""{"secured_treatments": [{"id": "t-auto", "claim_id": "claim-auto", "treatment": "surrender"}]}""");
+        var calc = Run("""{"securedTreatments": [{"id": "t-auto", "claimId": "claim-auto", "treatment": "surrender"}]}""");
         Assert.DoesNotContain(calc.Classes.SelectMany(s => s.Rows), row => row.ClaimId == "claim-auto");
         Assert.Contains(calc.UnsecuredPool, c => c.ClaimId == "claim-auto" && c.Amount == 3000.00m);
     }
@@ -247,7 +247,7 @@ public sealed class Chapter13PlanTests
     [Fact]
     public void A_conduit_payment_is_paid_every_month_of_the_term()
     {
-        var calc = Run("""{"monthly_payment": "2200", "secured_treatments": [{"id": "t-home", "claim_id": "claim-mortgage", "treatment": "cure_and_maintain", "arrearage": "6000", "maintenance_payment": "1500"}]}""");
+        var calc = Run("""{"monthlyPayment": 2200, "securedTreatments": [{"id": "t-home", "claimId": "claim-mortgage", "treatment": "cure_and_maintain", "arrearage": 6000, "maintenancePayment": 1500}]}""");
         var conduit = ByClass(calc, ClassConduit).Rows[0];
         Assert.Equal(90000.00m, conduit.Principal);
         Assert.Equal((1, 60), (conduit.FirstMonth!.Value, conduit.LastMonth!.Value));
@@ -256,18 +256,18 @@ public sealed class Chapter13PlanTests
     [Fact]
     public void An_untreated_secured_claim_is_warned_about_not_paid()
     {
-        var calc = Run("""{"secured_treatments": []}""");
+        var calc = Run("""{"securedTreatments": []}""");
         Assert.Contains(calc.Warnings, w => w.Contains("Example Auto Finance", StringComparison.Ordinal) && w.Contains("§ 1325(a)(5)", StringComparison.Ordinal));
         Assert.DoesNotContain(ClassSecured, calc.Classes.Select(s => s.Key));
     }
 
     [Fact]
     public void A_treatment_naming_a_non_secured_claim_is_a_problem() =>
-        Assert.Contains(Run("""{"secured_treatments": [{"id": "t-x", "claim_id": "claim-card", "treatment": "surrender"}]}""").Problems, p => p.Contains("not a secured claim", StringComparison.Ordinal));
+        Assert.Contains(Run("""{"securedTreatments": [{"id": "t-x", "claimId": "claim-card", "treatment": "surrender"}]}""").Problems, p => p.Contains("not a secured claim", StringComparison.Ordinal));
 
     [Fact]
     public void A_reduced_priority_percentage_pays_less() =>
-        Assert.Equal(1500.00m, ByClass(Run("""{"priority_percentage": "50"}"""), ClassPriority).Principal);
+        Assert.Equal(1500.00m, ByClass(Run("""{"priorityPercentage": 50}"""), ClassPriority).Principal);
 
     // ── the liquidation test ──
 
@@ -283,7 +283,7 @@ public sealed class Chapter13PlanTests
 
     [Fact]
     public void Other_chapter_7_costs_lower_the_floor() =>
-        Assert.Equal(2450.00m, Run("""{"chapter_7_other_costs": "1000"}""").Liquidation.Available);
+        Assert.Equal(2450.00m, Run("""{"chapter7OtherCosts": 1000}""").Liquidation.Available);
 
     [Fact]
     public void A_plan_below_the_floor_fails_the_best_interests_test()
@@ -297,7 +297,7 @@ public sealed class Chapter13PlanTests
     public void A_present_value_rate_discounts_the_plans_unsecured_payments()
     {
         var nominal = Run();
-        var discounted = Run("""{"present_value_rate": "5"}""");
+        var discounted = Run("""{"presentValueRate": 5}""");
         Assert.True(discounted.BestInterests.PlanPercentage < nominal.BestInterests.PlanPercentage);
         Assert.Contains("present_value_rate", discounted.BestInterests.Rule, StringComparison.Ordinal);
     }
@@ -323,7 +323,7 @@ public sealed class Chapter13PlanTests
     {
         // $1,000 over 3 months at 0% is 333.333… — ROUND_UP gives 333.34, so
         // the last payment clears the balance.
-        var calc = Run("""{"term_months": 3, "monthly_payment": "5000", "trustee_percentage": "0", "attorney_fees": "0", "secured_treatments": [{"id": "t-auto", "claim_id": "claim-auto", "treatment": "cramdown", "cramdown_value": "1000", "interest_rate": "0"}]}""");
+        var calc = Run("""{"termMonths": 3, "monthlyPayment": 5000, "trusteePercentage": 0, "attorneyFees": 0, "securedTreatments": [{"id": "t-auto", "claimId": "claim-auto", "treatment": "cramdown", "cramdownValue": 1000, "interestRate": 0}]}""");
         var auto = ByClass(calc, ClassSecured).Rows[0];
         Assert.Equal(333.34m, auto.MonthlyPayment);
         Assert.Equal(1000.00m, auto.Principal);

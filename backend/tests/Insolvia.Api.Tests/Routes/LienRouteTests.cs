@@ -61,9 +61,9 @@ public sealed class LienRouteTests : IAsyncLifetime, IDisposable
     public async Task A_stored_claim_and_its_asset_reach_the_arithmetic()
     {
         var caseId = await OpenAsync();
-        var house = await _world.AddAsync(caseId, "assets", """{"category": "real_property", "value_entire": "300000.00"}""");
-        var first = await _world.AddAsync(caseId, "claims", $$"""{"claim_class": "secured", "amount": "250000.00", "asset_id": "{{house}}", "lien_position": 1}""");
-        var second = await _world.AddAsync(caseId, "claims", $$"""{"claim_class": "secured", "amount": "80000.00", "asset_id": "{{house}}", "lien_position": 2}""");
+        var house = await _world.AddAsync(caseId, "assets", """{"category": "real_property", "valueEntire": 300000.00}""");
+        var first = await _world.AddAsync(caseId, "claims", $$"""{"claimClass": "secured", "amount": 250000.00, "assetId": "{{house}}", "lienPosition": 1}""");
+        var second = await _world.AddAsync(caseId, "claims", $$"""{"claimClass": "secured", "amount": 80000.00, "assetId": "{{house}}", "lienPosition": 2}""");
 
         var body = (await Liens(caseId)).Object;
 
@@ -81,10 +81,10 @@ public sealed class LienRouteTests : IAsyncLifetime, IDisposable
     public async Task Moving_a_lien_senior_changes_the_deficiency()
     {
         var caseId = await OpenAsync();
-        var house = await _world.AddAsync(caseId, "assets", """{"category": "real_property", "value_entire": "300000.00"}""");
-        var big = await _world.AddAsync(caseId, "claims", $$"""{"claim_class": "secured", "amount": "250000.00", "asset_id": "{{house}}", "lien_position": 1}""");
-        await _world.AddAsync(caseId, "claims", $$"""{"claim_class": "secured", "amount": "80000.00", "asset_id": "{{house}}", "lien_position": 2}""");
-        var demoted = await _world.Put($"/v1/cases/{caseId}/claims/{big}", AnalysisWorld.Typed($$"""{"claim_class": "secured", "amount": "250000.00", "asset_id": "{{house}}", "lien_position": 3}"""));
+        var house = await _world.AddAsync(caseId, "assets", """{"category": "real_property", "valueEntire": 300000.00}""");
+        var big = await _world.AddAsync(caseId, "claims", $$"""{"claimClass": "secured", "amount": 250000.00, "assetId": "{{house}}", "lienPosition": 1}""");
+        await _world.AddAsync(caseId, "claims", $$"""{"claimClass": "secured", "amount": 80000.00, "assetId": "{{house}}", "lienPosition": 2}""");
+        var demoted = await _world.Put($"/v1/cases/{caseId}/claims/{big}", AnalysisWorld.Typed($$"""{"claimClass": "secured", "amount": 250000.00, "assetId": "{{house}}", "lienPosition": 3}"""));
         Assert.True(demoted.Status == 200, demoted.Body);
 
         var rows = Rows((await Liens(caseId)).Object);
@@ -97,7 +97,7 @@ public sealed class LienRouteTests : IAsyncLifetime, IDisposable
     public async Task Money_is_a_string_never_a_json_number()
     {
         var caseId = await OpenAsync();
-        await _world.AddAsync(caseId, "claims", """{"claim_class": "secured", "amount": "8412.66"}""");
+        await _world.AddAsync(caseId, "claims", """{"claimClass": "secured", "amount": 8412.66}""");
 
         var row = Assert.Single((await Liens(caseId)).Object["claims"]!.AsArray())!.AsObject();
 

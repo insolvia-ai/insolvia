@@ -452,7 +452,7 @@ public sealed class CaseEntityStoreTests
     {
         var entity = Creditor();
         await _store.CreateAsync(entity, Ct);
-        var renamed = CaseEntityRules.Replace(entity, CaseEntityRules.ParseEntity(Creditors.CreditorRules.Kind, Body.Of("""{"name": "Renamed", "provenance": {"name": {"source": "staff_typed"}}}""")));
+        var renamed = entity with { Body = new Creditors.CreditorBody("Renamed") };
         Assert.True(await _store.PutAsync(renamed, Ct));
         Assert.Equal("Renamed", (await _store.GetTypedAsync(CaseId, Creditors.CreditorRules.Kind, entity.Id, Ct))!.Body.Name);
     }
@@ -498,11 +498,7 @@ public sealed class CaseEntityStoreTests
 
     private static CaseEntity<Creditors.CreditorBody> Creditor(string caseId = CaseId, string name = "Example Bank", TimeProvider? clock = null)
     {
-        var draft = CaseEntityRules.ParseEntity(Creditors.CreditorRules.Kind, new JsonObject
-        {
-            ["name"] = name,
-            ["provenance"] = new JsonObject { ["name"] = new JsonObject { ["source"] = "staff_typed" } },
-        });
-        return CaseEntityRules.Create(Creditors.CreditorRules.Kind, draft, caseId, clock);
+        var provenance = new Dictionary<string, ProvenanceEntry> { ["name"] = new(ProvenanceSource.StaffTyped) }.ToValueDictionary();
+        return CaseEntityRules.Create(Creditors.CreditorRules.Kind, caseId, new Creditors.CreditorBody(name), provenance, clock);
     }
 }

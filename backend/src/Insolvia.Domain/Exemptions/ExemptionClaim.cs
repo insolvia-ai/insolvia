@@ -1,5 +1,3 @@
-using System.Text.Json.Nodes;
-using System.Text.Json.Serialization;
 using Insolvia.Domain.CaseEntities;
 using Insolvia.Domain.Fields;
 
@@ -14,30 +12,15 @@ namespace Insolvia.Domain.Exemptions;
 /// are the asset's, copied at projection time, never stored here.
 /// </summary>
 public sealed record ExemptionBody(
-    string? AssetId,
-    string? StatuteCitation,
-    decimal? Amount,
-    bool? ClaimsFullFmv,
-    [property: JsonPropertyName("acquired_within_1215_days")] bool? AcquiredWithin1215Days);
+    [property: Text(64)] string? AssetId = null,
+    [property: Text] string? StatuteCitation = null,
+    [property: Money] decimal? Amount = null,
+    bool? ClaimsFullFmv = null,
+    bool? AcquiredWithin1215Days = null);
 
 /// <summary>The exemption collection.</summary>
 public static class ExemptionRules
 {
     /// <summary>The collection's kind.</summary>
-    public static readonly EntityKind<ExemptionBody> Kind = new("exemption", "exemptions", "EXEMPTION", Parse);
-
-    /// <summary>Validates an exemption body (Python's <c>parse_exemption</c>).</summary>
-    public static ExemptionBody Parse(JsonObject payload)
-    {
-        ArgumentNullException.ThrowIfNull(payload);
-        var errors = new Dictionary<string, string>(StringComparer.Ordinal);
-        var body = new ExemptionBody(
-            AssetId: FieldParsers.Text(payload["asset_id"], "asset_id", errors, limit: 64),
-            StatuteCitation: FieldParsers.Text(payload["statute_citation"], "statute_citation", errors),
-            Amount: FieldParsers.Money(payload["amount"], "amount", errors),
-            ClaimsFullFmv: FieldParsers.Boolean(payload["claims_full_fmv"], "claims_full_fmv", errors),
-            AcquiredWithin1215Days: FieldParsers.Boolean(payload["acquired_within_1215_days"], "acquired_within_1215_days", errors));
-        IdRows.ThrowIfAny(errors);
-        return body;
-    }
+    public static readonly EntityKind<ExemptionBody> Kind = new("exemption", "exemptions", "EXEMPTION");
 }

@@ -71,7 +71,7 @@ public static class ClientCopies
         ArgumentNullException.ThrowIfNull(debtor);
         ArgumentNullException.ThrowIfNull(client);
         var body = DebtorRules.BodyNode(debtor.Body);
-        var copied = BodyJson.ToNode(ClientCopied(client));
+        var copied = BodyJson.ToSnakeNode(ClientCopied(client));
         foreach (var key in CopiedFields)
         {
             body[key] = copied[key]?.DeepClone();
@@ -108,7 +108,7 @@ public static class ClientCopies
     {
         ArgumentNullException.ThrowIfNull(client);
         ArgumentNullException.ThrowIfNull(debtor);
-        var whole = BodyJson.ToNode(new FirmClientDraft(
+        var whole = BodyJson.ToSnakeNode(new FirmClientDraft(
             client.Name,
             client.OtherNamesUsed,
             client.DateOfBirth,
@@ -120,7 +120,7 @@ public static class ClientCopies
             client.LeadSource,
             client.ReferredBy,
             client.FirstRetainedAt));
-        var ours = BodyJson.ToNode(DebtorCopied(debtor.Body));
+        var ours = BodyJson.ToSnakeNode(DebtorCopied(debtor.Body));
         foreach (var key in CopiedFields)
         {
             whole[key] = ours[key]?.DeepClone();
@@ -142,7 +142,7 @@ public static class ClientCopies
     private static CopiedIdentity DebtorCopied(DebtorBody body) =>
         new(body.Name, body.OtherNamesUsed, body.ResidenceAddress, body.MailingAddress, body.Phone, body.Mobile, body.Email);
 
-    private static JsonObject CopiedBody(CopiedIdentity identity) => BodyJson.Prune(BodyJson.ToNode(identity));
+    private static JsonObject CopiedBody(CopiedIdentity identity) => BodyJson.Prune(BodyJson.ToSnakeNode(identity));
 
     /// <summary>
     /// Field path to value for every populated leaf, list elements addressed by

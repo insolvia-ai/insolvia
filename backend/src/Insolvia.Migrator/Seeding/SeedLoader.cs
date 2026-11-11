@@ -8,6 +8,7 @@ using Insolvia.Domain.Documents;
 using Insolvia.Domain.FirmClients;
 using Insolvia.Domain.Firms;
 using Insolvia.Domain.Ports;
+using Insolvia.Domain.Provenance;
 using Insolvia.Domain.TaxIds;
 
 namespace Insolvia.Migrator.Seeding;
@@ -522,7 +523,11 @@ public sealed class SeedLoader
             var index = 0;
             foreach (var item in SeedJson.List(items))
             {
-                var draft = kind.ParseDraft(SeedJson.Body(Resolve(item)));
+                // An item is what a request carries: {body, provenance, amended?}, checked the same way.
+                var raw = SeedJson.Body(Resolve(item));
+                var body = BodyJson.Read(raw["body"], kind.BodyType);
+                var provenance = ProvenanceRules.Parse(raw["provenance"]);
+                CaseEntityRules.RequireProvenance(body, provenance, stored: null);
                 var entityId = SeedIds.Derive(caseId, name, index.ToString(System.Globalization.CultureInfo.InvariantCulture));
                 if (await _stores.Entities.GetAsync(caseId, kind, entityId, cancellationToken).ConfigureAwait(false) is null)
                 {
@@ -534,7 +539,7 @@ public sealed class SeedLoader
                     else
                     {
                         var now = Clock.Now(_clock);
-                        await _stores.Entities.CreateAsync(kind.Restore(entityId, caseId, now, now, draft), cancellationToken).ConfigureAwait(false);
+                        await _stores.Entities.CreateAsync(kind.Restore(entityId, caseId, now, now, body, provenance, raw["amended"]?.GetValue<bool>() ?? false), cancellationToken).ConfigureAwait(false);
                         await _out.WriteLineAsync($"    {name}[{index}]: created").ConfigureAwait(false);
                     }
                 }

@@ -18,16 +18,27 @@ namespace Insolvia.Http;
 /// <c>[JsonIgnore(Condition = WhenWritingNull)]</c>: the wire names both,
 /// and the clients read both.</para>
 /// <para>A <b>domain</b> record (anything in <c>Insolvia.Domain</c>: a case
-/// body, a provenance entry, an address) is written as the body serializer
-/// writes it (<c>BodyJson</c>): snake_case, and every unanswered member —
+/// body, a provenance entry, an address) writes every unanswered member —
 /// null, an empty list or map, an object with nothing in it — absent.
-/// Bodies are progressive; absent is how they say "not answered yet".</para>
+/// Bodies are progressive; absent is how they say "not answered yet".
+/// A case collection's body (<see cref="CamelNamespaces"/>) is camelCase
+/// with money a JSON number, as <c>BodyJson</c> writes it (ADR 0032); every
+/// other domain record is still the port's snake_case, money as text, until
+/// its routes are converted.</para>
 /// <para>A property marked <see cref="FlattenAttribute"/> writes its members
 /// beside its owner's, the way a stored body sits at the top of its record.</para>
 /// </remarks>
 public static class WireJson
 {
     private const string DomainNamespace = "Insolvia.Domain";
+
+    // The case collections' bodies, converted to typed requests (ADR 0032).
+    private static readonly HashSet<string> CamelNamespaces = new(StringComparer.Ordinal)
+    {
+        "Insolvia.Domain.Assets", "Insolvia.Domain.Claims", "Insolvia.Domain.Codebtors", "Insolvia.Domain.ContractLeases",
+        "Insolvia.Domain.Creditors", "Insolvia.Domain.Exemptions", "Insolvia.Domain.Expenses", "Insolvia.Domain.Income",
+        "Insolvia.Domain.MeansTest", "Insolvia.Domain.Notes", "Insolvia.Domain.Petitions", "Insolvia.Domain.Plans", "Insolvia.Domain.Sofa",
+    };
 
     /// <summary>The settings, for a serializer outside the HTTP pipeline (a test, a log).</summary>
     public static JsonSerializerOptions Options { get; } = Configure(new JsonSerializerOptions(JsonSerializerDefaults.Web), readOnly: true);
@@ -61,13 +72,19 @@ public static class WireJson
         }
 
         var domain = type.Type.Namespace?.StartsWith(DomainNamespace, StringComparison.Ordinal) == true;
-        var snake = domain || type.Type.GetCustomAttribute<SnakeCaseAttribute>() is not null;
+        var camel = domain && CamelNamespaces.Contains(type.Type.Namespace!);
+        var snake = (domain && !camel) || type.Type.GetCustomAttribute<SnakeCaseAttribute>() is not null;
         for (var index = 0; index < type.Properties.Count; index++)
         {
             var property = type.Properties[index];
             if (snake && property.AttributeProvider?.IsDefined(typeof(JsonPropertyNameAttribute), inherit: true) != true)
             {
                 property.Name = JsonNamingPolicy.SnakeCaseLower.ConvertName(MemberName(property));
+            }
+
+            if (camel && property.PropertyType == typeof(decimal?))
+            {
+                property.CustomConverter = DecimalAsNumberConverter.Instance;
             }
 
             if (domain)
@@ -134,7 +151,28 @@ public static class WireJson
             && type.Properties.All(p => p.Get is { } read && (p.ShouldSerialize is { } keep ? !keep(value, read(value)) : read(value) is null));
     }
 
-    // Money and rates travel as strings, never JSON numbers.
+    // A case body's money: a JSON number, read into decimal (the global converter writes text).
+    private sealed class DecimalAsNumberConverter : JsonConverter<decimal?>
+    {
+        public static readonly DecimalAsNumberConverter Instance = new();
+
+        public override decimal? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+            reader.TokenType == JsonTokenType.Null ? null : reader.GetDecimal();
+
+        public override void Write(Utf8JsonWriter writer, decimal? value, JsonSerializerOptions options)
+        {
+            if (value is { } amount)
+            {
+                writer.WriteNumberValue(amount);
+            }
+            else
+            {
+                writer.WriteNullValue();
+            }
+        }
+    }
+
+    // Money and rates travel as strings, never JSON numbers — outside a case collection's body.
     private sealed class DecimalAsTextConverter : JsonConverter<decimal>
     {
         public override decimal Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>

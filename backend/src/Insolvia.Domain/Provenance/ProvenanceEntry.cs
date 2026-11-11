@@ -47,7 +47,7 @@ public enum ProvenanceSource
 /// entries for exact equality. <see cref="Locator"/> is kept as the JSON
 /// object that was validated, unknown members included, as stored maps hold it.
 /// </remarks>
-public sealed record ProvenanceEntry(ProvenanceSource Source)
+public sealed record ProvenanceEntry([property: JsonRequired] ProvenanceSource Source)
 {
     /// <summary>The person who confirmed the value.</summary>
     public string? ConfirmedBy { get; init; }

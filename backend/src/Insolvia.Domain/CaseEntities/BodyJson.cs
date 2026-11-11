@@ -2,29 +2,73 @@ using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
+using Insolvia.Domain.Fields;
 
 namespace Insolvia.Domain.CaseEntities;
 
 /// <summary>
-/// A record body as plain nested JSON — Python's <c>dataclasses.asdict</c>
-/// over a body dataclass, which is what provenance paths address and what
-/// gets stored. Members are the snake_case field names the parsers read
-/// (a member whose name carries digits pins its spelling with
-/// <see cref="JsonPropertyNameAttribute"/>); enums are their wire strings;
-/// money and percentages are the decimal's own text (<c>"1200.00"</c>,
-/// <c>"8.50"</c>) exactly as stored rows hold its <c>str</c>; dates are
-/// <c>YYYY-MM-DD</c>. Absent members are written as null, as <c>asdict</c>
-/// wrote <c>None</c> — <see cref="Prune"/> drops them.
+/// A case collection's body as JSON — on the wire, in the stored row, and
+/// what provenance paths address (ADR 0032): camelCase members, unanswered
+/// ones left out, money and rates JSON numbers read into <c>decimal</c>,
+/// dates <c>yyyy-MM-dd</c>, enums their spelled names.
 /// </summary>
 public static class BodyJson
 {
-    /// <summary>The serializer settings every body shares.</summary>
+    /// <summary>The settings every collection body is written and read with.</summary>
     public static JsonSerializerOptions Options { get; } = CreateOptions();
 
-    /// <summary>The body as a JSON object.</summary>
-    public static JsonObject ToNode<TBody>(TBody body)
-        where TBody : notnull =>
-        JsonSerializer.SerializeToNode(body, body.GetType(), Options)!.AsObject();
+    /// <summary>
+    /// The port's snake_case with money as text — a debtor's and a firm
+    /// client's body, which still travel and are stored that way until their
+    /// own routes are converted (ADR 0032, build steps 3 and 4).
+    /// </summary>
+    public static JsonSerializerOptions SnakeOptions { get; } = CreateSnakeOptions();
+
+    /// <summary>The body as a JSON object, its unanswered members left out (<see cref="Prune"/>).</summary>
+    public static JsonObject ToNode(object body)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+        return Prune(JsonSerializer.SerializeToNode(body, body.GetType(), Options)!.AsObject());
+    }
+
+    /// <summary>A debtor's or firm client's body as a JSON object, in <see cref="SnakeOptions"/>.</summary>
+    public static JsonObject ToSnakeNode(object body)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+        return JsonSerializer.SerializeToNode(body, body.GetType(), SnakeOptions)!.AsObject();
+    }
+
+    /// <summary>
+    /// A body that arrived from outside a request — a seed, a model's
+    /// proposal, a portal answer — read as <paramref name="type"/> and checked
+    /// as a request's would be (<see cref="RecordValidator"/>).
+    /// </summary>
+    /// <exception cref="FieldValidationException">It is not that type, or a field failed.</exception>
+    public static object Read(JsonNode? node, Type type)
+    {
+        ArgumentNullException.ThrowIfNull(type);
+        object? body;
+        try
+        {
+            body = node.Deserialize(type, Options);
+        }
+        catch (JsonException error)
+        {
+            // A list's converter reports its item's path ("$[0].column") on the inner error.
+            var at = error.Path ?? "$";
+            for (var inner = error.InnerException as JsonException; inner?.Path is { } item; inner = inner.InnerException as JsonException)
+            {
+                at += item[1..];
+            }
+
+            var path = at.StartsWith("$.", StringComparison.Ordinal) ? at[2..] : string.Empty;
+            throw new FieldValidationException(new Dictionary<string, string> { [path.Length == 0 ? "body" : path] = "Not the expected type." });
+        }
+
+        body = body ?? throw new FieldValidationException(new Dictionary<string, string> { ["body"] = "Must be an object." });
+        RecordValidator.ThrowIfInvalid(body, Options);
+        return body;
+    }
 
     /// <summary>
     /// Drop absent members, recursively (Python's <c>fields.prune</c>):
@@ -73,6 +117,20 @@ public static class BodyJson
     {
         var options = new JsonSerializerOptions
         {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+            // A SOFA payload's entryType may come anywhere in its object.
+            AllowOutOfOrderMetadataProperties = true,
+        };
+        options.Converters.Add(new JsonStringEnumConverter(allowIntegerValues: false));
+        options.MakeReadOnly(populateMissingResolver: true);
+        return options;
+    }
+
+    private static JsonSerializerOptions CreateSnakeOptions()
+    {
+        var options = new JsonSerializerOptions
+        {
             PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
         };
         options.Converters.Add(new JsonStringEnumConverter());
@@ -81,7 +139,7 @@ public static class BodyJson
         return options;
     }
 
-    /// <summary>A decimal as its own text — money and rates travel as strings, never JSON numbers.</summary>
+    // The port's money: a decimal as its own text, never a JSON number.
     private sealed class DecimalAsTextConverter : JsonConverter<decimal>
     {
         public override decimal Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
@@ -89,27 +147,5 @@ public static class BodyJson
 
         public override void Write(Utf8JsonWriter writer, decimal value, JsonSerializerOptions options) =>
             writer.WriteStringValue(value.ToString(CultureInfo.InvariantCulture));
-    }
-}
-
-/// <summary>
-/// Serializes a value through its RUNTIME type — for a body member declared
-/// as an abstract base (a SOFA entry's payload), which System.Text.Json would
-/// otherwise write as the base's (empty) member set.
-/// </summary>
-/// <typeparam name="TBase">The declared base type.</typeparam>
-public sealed class RuntimeTypeConverter<TBase> : JsonConverter<TBase>
-    where TBase : class
-{
-    /// <inheritdoc />
-    public override TBase Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
-        throw new NotSupportedException("a body is parsed by its kind's parser, never deserialized");
-
-    /// <inheritdoc />
-    public override void Write(Utf8JsonWriter writer, TBase value, JsonSerializerOptions options)
-    {
-        ArgumentNullException.ThrowIfNull(writer);
-        ArgumentNullException.ThrowIfNull(value);
-        JsonSerializer.Serialize(writer, value, value.GetType(), options);
     }
 }

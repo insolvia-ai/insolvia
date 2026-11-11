@@ -9,10 +9,10 @@ public sealed class IncomeTests
     [Fact]
     public void A_full_pay_period_record_parses()
     {
-        var body = IncomeRules.ParsePayPeriodRecord(Body.Of("""
-            {"employment_id": "em-1", "period_start": "2026-03-01", "period_end": "2026-03-14", "pay_date": "2026-03-20",
-             "gross": "2600.00", "net": "2015.00",
-             "deductions": [{"id": "d1", "category": "tax", "amount": "455.00"}, {"id": "d2", "category": "other", "description": "Parking"}],
+        var body = Body.Read<PayPeriodRecordBody>(Body.Of("""
+            {"employmentId": "em-1", "periodStart": "2026-03-01", "periodEnd": "2026-03-14", "payDate": "2026-03-20",
+             "gross": 2600.00, "net": 2015.00,
+             "deductions": [{"id": "d1", "category": "tax", "amount": 455.00}, {"id": "d2", "category": "other", "description": "Parking"}],
              "frequency": "biweekly"}
             """));
         Assert.Equal(new DateOnly(2026, 3, 20), body.PayDate);
@@ -21,20 +21,20 @@ public sealed class IncomeTests
 
     [Theory]
     [InlineData("""{"frequency": "fortnightly"}""", "frequency")]
-    [InlineData("""{"pay_date": "03/20/2026"}""", "pay_date")]
-    [InlineData("""{"gross": "2600.001"}""", "gross")]
+    [InlineData("""{"payDate": "03/20/2026"}""", "payDate")]
+    [InlineData("""{"gross": 2600.001}""", "gross")]
     [InlineData("""{"deductions": [{"category": "tax"}]}""", "deductions[0].id")]
     [InlineData("""{"deductions": [{"id": "d1", "category": "yacht"}]}""", "deductions[0].category")]
     [InlineData("""{"deductions": [{"id": "d1", "category": "tax"}, {"id": "d1", "category": "insurance"}]}""", "deductions[1].id")]
     public void Malformed_pay_period_fields_are_named(string payload, string path) =>
-        Assert.Contains(path, Assert.Throws<FieldValidationException>(() => IncomeRules.ParsePayPeriodRecord(Body.Of(payload))).Fields.Keys);
+        Assert.Contains(path, Assert.Throws<FieldValidationException>(() => Body.Read<PayPeriodRecordBody>(Body.Of(payload))).Fields.Keys);
 
     [Fact]
     public void Every_income_category_parses_including_the_excluded_set()
     {
         foreach (var category in IncomeRules.IncludedCategories.Concat(IncomeRules.ExcludedCategories))
         {
-            var body = IncomeRules.ParseOtherIncomeRecord(new JsonObject { ["category"] = category.ToWire(), ["amount"] = "100.00", ["received_on"] = "2026-04-01" });
+            var body = Body.Read<OtherIncomeRecordBody>(new JsonObject { ["category"] = category.ToWire(), ["amount"] = 100.00m, ["receivedOn"] = "2026-04-01" });
             Assert.Equal(category, body.Category);
         }
     }
@@ -44,10 +44,10 @@ public sealed class IncomeTests
     {
         foreach (var category in new[] { "business", "rental" })
         {
-            Assert.Equal(600.00m, IncomeRules.ParseOtherIncomeRecord(new JsonObject { ["category"] = category, ["amount"] = "1800.00", ["expenses"] = "600.00" }).Expenses);
+            Assert.Equal(600.00m, Body.Read<OtherIncomeRecordBody>(new JsonObject { ["category"] = category, ["amount"] = 1800.00m, ["expenses"] = 600.00m }).Expenses);
         }
 
-        var error = Assert.Throws<FieldValidationException>(() => IncomeRules.ParseOtherIncomeRecord(Body.Of("""{"category": "unemployment", "amount": "275.00", "expenses": "10.00"}""")));
+        var error = Assert.Throws<FieldValidationException>(() => Body.Read<OtherIncomeRecordBody>(Body.Of("""{"category": "unemployment", "amount": 275.00, "expenses": 10.00}""")));
         Assert.Contains("expenses", error.Fields.Keys);
     }
 

@@ -19,6 +19,9 @@ internal static class Body
 
     /// <summary>Any JSON value from a literal.</summary>
     public static JsonNode? Value(string json) => JsonNode.Parse(json);
+
+    /// <summary>A collection body read and validated as a request's would be.</summary>
+    public static T Read<T>(JsonObject body) => (T)CaseEntities.BodyJson.Read(body, typeof(T));
 }
 
 /// <summary>

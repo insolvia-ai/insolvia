@@ -1,6 +1,8 @@
 using System.Collections;
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Insolvia.Domain;
 
@@ -12,6 +14,7 @@ namespace Insolvia.Domain;
 /// equality by contents.
 /// </summary>
 [CollectionBuilder(typeof(ValueCollections), nameof(ValueCollections.Create))]
+[JsonConverter(typeof(ValueCollectionJsonConverter))]
 public sealed class ValueCollection<T> : IReadOnlyList<T>, IEquatable<ValueCollection<T>>
 {
     private readonly ImmutableArray<T> _items;
@@ -175,4 +178,44 @@ public static class ValueCollections
     /// <summary>A value-equal map of <paramref name="pairs"/>.</summary>
     public static ValueDictionary<TKey, TValue> ToValueDictionary<TKey, TValue>(this IEnumerable<KeyValuePair<TKey, TValue>> pairs)
         where TKey : notnull => new(pairs);
+}
+
+/// <summary>
+/// A <see cref="ValueCollection{T}"/> is a JSON array. System.Text.Json does
+/// not know its collection builder, so it is read through a list.
+/// </summary>
+public sealed class ValueCollectionJsonConverter : JsonConverterFactory
+{
+    /// <inheritdoc />
+    public override bool CanConvert(Type typeToConvert)
+    {
+        ArgumentNullException.ThrowIfNull(typeToConvert);
+        return typeToConvert.IsGenericType && typeToConvert.GetGenericTypeDefinition() == typeof(ValueCollection<>);
+    }
+
+    /// <inheritdoc />
+    public override JsonConverter CreateConverter(Type typeToConvert, JsonSerializerOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(typeToConvert);
+        return (JsonConverter)Activator.CreateInstance(typeof(Of<>).MakeGenericType(typeToConvert.GetGenericArguments()[0]))!;
+    }
+
+    private sealed class Of<T> : JsonConverter<ValueCollection<T>>
+    {
+        public override ValueCollection<T> Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            try
+            {
+                return (JsonSerializer.Deserialize<List<T>>(ref reader, options) ?? []).ToValueCollection();
+            }
+            catch (JsonException error) when (error.Path is not null)
+            {
+                // Without a path, the serializer names the list's own place in the document.
+                throw new JsonException(error.Message, null, null, null, error);
+            }
+        }
+
+        public override void Write(Utf8JsonWriter writer, ValueCollection<T> value, JsonSerializerOptions options) =>
+            JsonSerializer.Serialize<IEnumerable<T>>(writer, value, options);
+    }
 }

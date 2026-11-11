@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Insolvia.Domain;
@@ -170,8 +171,8 @@ public static partial class DocumentExtraction
 
     private static readonly Dictionary<string, string> LinkField = new(StringComparer.Ordinal)
     {
-        [ClaimRules.Kind.Collection] = "creditor_id",
-        [IncomeRules.PayPeriodRecord.Collection] = "employment_id",
+        [ClaimRules.Kind.Collection] = "creditorId",
+        [IncomeRules.PayPeriodRecord.Collection] = "employmentId",
     };
 
     private static readonly HashSet<string> LinkLeaders = new(StringComparer.Ordinal) { CreditorRules.Kind.Collection, IncomeRules.Employment.Collection };
@@ -200,10 +201,10 @@ public static partial class DocumentExtraction
             {
                 var claimPayload = Validated(ClaimRules.Kind, new JsonObject
                 {
-                    ["claim_class"] = Text(claim["claim_class"]),
-                    ["account_last4"] = Last4(claim["account_last4"]),
-                    ["amount"] = MoneyString(claim["amount"]),
-                    ["date_incurred"] = Text(claim["date_incurred"]),
+                    ["claimClass"] = Text(claim["claim_class"]),
+                    ["accountLast4"] = Last4(claim["account_last4"]),
+                    ["amount"] = Money(claim["amount"]),
+                    ["dateIncurred"] = Text(claim["date_incurred"]),
                     ["disputed"] = Json.AsBool(claim["disputed"]),
                 });
                 if (claimPayload is null)
@@ -229,8 +230,8 @@ public static partial class DocumentExtraction
             ? null
             : Validated(IncomeRules.Employment, new JsonObject
             {
-                ["employer_name"] = employerName,
-                ["employer_address"] = Address(employer["address"]),
+                ["employerName"] = employerName,
+                ["employerAddress"] = Address(employer["address"]),
                 ["status"] = "employed",
             });
         var periods = Entries(raw["pay_periods"]);
@@ -253,18 +254,18 @@ public static partial class DocumentExtraction
                     // Worker-minted, satisfying the addressable-id contract.
                     ["id"] = $"d{++index}",
                     ["category"] = Text(deduction["category"]),
-                    ["amount"] = MoneyString(deduction["amount"]),
+                    ["amount"] = Money(deduction["amount"]),
                     ["description"] = Text(deduction["description"]),
                 });
             }
 
             var payload = Validated(IncomeRules.PayPeriodRecord, new JsonObject
             {
-                ["period_start"] = Text(period["period_start"]),
-                ["period_end"] = Text(period["period_end"]),
-                ["pay_date"] = Text(period["pay_date"]),
-                ["gross"] = MoneyString(period["gross"]),
-                ["net"] = MoneyString(period["net"]),
+                ["periodStart"] = Text(period["period_start"]),
+                ["periodEnd"] = Text(period["period_end"]),
+                ["payDate"] = Text(period["pay_date"]),
+                ["gross"] = Money(period["gross"]),
+                ["net"] = Money(period["net"]),
                 ["frequency"] = Text(period["frequency"]),
                 ["deductions"] = deductions,
             });
@@ -391,16 +392,19 @@ public static partial class DocumentExtraction
 
     private static string? Text(JsonNode? value) => Json.AsString(value) is { } text && TextRules.Strip(text).Length > 0 ? TextRules.Strip(text) : null;
 
-    private static string? MoneyString(JsonNode? value)
+    // Money is a JSON number in a body; the model may write "$1,234.50".
+    // The model's amount as a JSON number; text that is no amount stays text, so the body read refuses the record.
+    private static JsonNode? Money(JsonNode? value)
     {
-        var text = Text(value);
-        if (text is null)
+        if (value is JsonValue number && number.TryGetValue<decimal>(out var given))
         {
-            return null;
+            return given;
         }
 
-        var stripped = MoneyFurniture().Replace(text, string.Empty);
-        return stripped.Length > 0 ? stripped : null;
+        var text = Text(value);
+        return text is null ? null
+            : decimal.TryParse(MoneyFurniture().Replace(text, string.Empty), NumberStyles.Number, CultureInfo.InvariantCulture, out var amount) ? amount
+            : text;
     }
 
     private static string? Last4(JsonNode? value)
@@ -429,11 +433,12 @@ public static partial class DocumentExtraction
             return address;
         }
 
-        foreach (var key in new[] { "line1", "line2", "city", "state", "postal_code", "raw" })
+        // The model's schema keeps snake_case; the body's address says postalCode.
+        foreach (var (key, member) in new[] { ("line1", "line1"), ("line2", "line2"), ("city", "city"), ("state", "state"), ("postal_code", "postalCode"), ("raw", "raw") })
         {
             if (Text(raw[key]) is { } text)
             {
-                address[key] = text;
+                address[member] = text;
             }
         }
 
@@ -463,7 +468,7 @@ public static partial class DocumentExtraction
 
         try
         {
-            _ = kind.ParseDraft(pruned, enforceProvenance: false);
+            _ = BodyJson.Read(pruned, kind.BodyType);
         }
         catch (FieldValidationException)
         {

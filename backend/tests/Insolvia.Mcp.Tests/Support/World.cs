@@ -10,6 +10,7 @@ using Insolvia.Domain.FirmClients;
 using Insolvia.Domain.Firms;
 using Insolvia.Domain.Memory;
 using Insolvia.Domain.Ports;
+using Insolvia.Domain.Provenance;
 using Insolvia.Mcp.Tools;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
@@ -145,12 +146,11 @@ internal static class World
 
     public static async Task<ICaseEntity> CreditorAsync(ICaseEntityStore entities, string caseId, string name = "Example Bank")
     {
-        var draft = CaseEntityRules.ParseEntity(CreditorRules.Kind, new JsonObject
-        {
-            ["name"] = name,
-            ["provenance"] = new JsonObject { ["name"] = new JsonObject { ["source"] = "staff_typed" } },
-        });
-        var entity = CaseEntityRules.Create(CreditorRules.Kind, draft, caseId);
+        var entity = CaseEntityRules.Create(
+            CreditorRules.Kind,
+            caseId,
+            new CreditorBody(name),
+            new Dictionary<string, ProvenanceEntry> { ["name"] = new(ProvenanceSource.StaffTyped) }.ToValueDictionary());
         await entities.CreateAsync(entity, Ct);
         return entity;
     }

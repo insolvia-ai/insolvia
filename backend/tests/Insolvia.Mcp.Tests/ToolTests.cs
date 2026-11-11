@@ -164,7 +164,7 @@ public sealed class ToolTests
         var result = await Tools.ListCaseRecordsAsync(Admin, found.Id, "creditors", cancellationToken: Ct);
         var record = Assert.Single(result["records"]!.AsArray())!;
         Assert.Equal(entity.Id, (string?)record["id"]);
-        Assert.Equal("Example Bank", (string?)record["name"]);
+        Assert.Equal("Example Bank", (string?)record["body"]!["name"]);
         Assert.NotNull(record["provenance"]);
     }
 

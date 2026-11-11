@@ -1,4 +1,3 @@
-using System.Text.Json.Nodes;
 using Insolvia.Domain.CaseEntities;
 using Insolvia.Domain.Fields;
 
@@ -10,50 +9,46 @@ namespace Insolvia.Domain.Codebtors;
 /// and the forms engine renders the line. The id lists are attributed whole
 /// by provenance and unchecked against their collections (progressive intake).
 /// </summary>
-public sealed record CodebtorBody(string? Name, Address Address, ValueCollection<string> ClaimIds, ValueCollection<string> ContractLeaseIds);
+public sealed record CodebtorBody(
+    [property: Text] string? Name = null,
+    Address? Address = null,
+    ValueCollection<string>? ClaimIds = null,
+    ValueCollection<string>? ContractLeaseIds = null)
+{
+    /// <summary>The codebtor's address; an empty one when none was given.</summary>
+    public Address Address { get; init; } = Address ?? new();
+
+    /// <summary>The claims the codebtor shares.</summary>
+    [Text(64)]
+    public ValueCollection<string> ClaimIds { get; init; } = ClaimIds ?? [];
+
+    /// <summary>The contracts and leases the codebtor shares.</summary>
+    [Text(64)]
+    public ValueCollection<string> ContractLeaseIds { get; init; } = ContractLeaseIds ?? [];
+}
 
 /// <summary>
 /// 106H line 2's spouse or former spouse in a community-property state (and
 /// B107 Q3's same fact) — its own record because the 8-year lookback can name
 /// more than one person.
 /// </summary>
-public sealed record CommunityHouseholdMemberBody(string? Name, Address Address, string? CommunityState, bool? LivedWithDebtor);
+public sealed record CommunityHouseholdMemberBody(
+    [property: Text] string? Name = null,
+    Address? Address = null,
+    [property: Text(2)] string? CommunityState = null,
+    bool? LivedWithDebtor = null)
+{
+    /// <summary>The member's address; an empty one when none was given.</summary>
+    public Address Address { get; init; } = Address ?? new();
+}
 
 /// <summary>The two 106H collections.</summary>
 public static class CodebtorRules
 {
     /// <summary>The codebtor collection's kind.</summary>
-    public static readonly EntityKind<CodebtorBody> Kind = new("codebtor", "codebtors", "CODEBTOR", Parse);
+    public static readonly EntityKind<CodebtorBody> Kind = new("codebtor", "codebtors", "CODEBTOR");
 
     /// <summary>The community-household-member collection's kind.</summary>
     public static readonly EntityKind<CommunityHouseholdMemberBody> CommunityHouseholdMember =
-        new("community_household_member", "community_household_members", "COMMUNITY_HOUSEHOLD_MEMBER", ParseCommunityHouseholdMember);
-
-    /// <summary>Validates a codebtor body (Python's <c>parse_codebtor</c>).</summary>
-    public static CodebtorBody Parse(JsonObject payload)
-    {
-        ArgumentNullException.ThrowIfNull(payload);
-        var errors = new Dictionary<string, string>(StringComparer.Ordinal);
-        var body = new CodebtorBody(
-            Name: FieldParsers.Text(payload["name"], "name", errors),
-            Address: FieldParsers.ParseAddress(payload["address"], "address", errors),
-            ClaimIds: FieldParsers.StringList(payload["claim_ids"], "claim_ids", errors, limit: 64),
-            ContractLeaseIds: FieldParsers.StringList(payload["contract_lease_ids"], "contract_lease_ids", errors, limit: 64));
-        IdRows.ThrowIfAny(errors);
-        return body;
-    }
-
-    /// <summary>Validates a community-household-member body (Python's <c>parse_community_household_member</c>).</summary>
-    public static CommunityHouseholdMemberBody ParseCommunityHouseholdMember(JsonObject payload)
-    {
-        ArgumentNullException.ThrowIfNull(payload);
-        var errors = new Dictionary<string, string>(StringComparer.Ordinal);
-        var body = new CommunityHouseholdMemberBody(
-            Name: FieldParsers.Text(payload["name"], "name", errors),
-            Address: FieldParsers.ParseAddress(payload["address"], "address", errors),
-            CommunityState: FieldParsers.Text(payload["community_state"], "community_state", errors, limit: 2),
-            LivedWithDebtor: FieldParsers.Boolean(payload["lived_with_debtor"], "lived_with_debtor", errors));
-        IdRows.ThrowIfAny(errors);
-        return body;
-    }
+        new("community_household_member", "community_household_members", "COMMUNITY_HOUSEHOLD_MEMBER");
 }

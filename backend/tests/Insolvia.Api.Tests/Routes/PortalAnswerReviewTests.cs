@@ -61,7 +61,7 @@ public sealed class PortalAnswerReviewTests : IAsyncLifetime, IDisposable
     }
 
     private const string LegalName = """{"questionId": "personal_information.legal_name", "value": {"given": "Patricia", "surname": "Example"}}""";
-    private const string Vehicle = """{"questionId": "property.vehicle", "value": {"year": 2099, "make": "Examplecar", "value_entire": "1200"}}""";
+    private const string Vehicle = """{"questionId": "property.vehicle", "value": {"year": 2099, "make": "Examplecar", "valueEntire": 1200}}""";
 
     [Fact]
     public async Task Staff_see_the_answer_from_the_client_with_its_question()
@@ -132,8 +132,8 @@ public sealed class PortalAnswerReviewTests : IAsyncLifetime, IDisposable
         var answer = await Review(await AnswerAsync(Vehicle));
         Assert.True(answer.Status == 200, answer.Body);
         var record = answer.Object["record"]!;
-        Assert.Equal("vehicle", record["category"]!.GetValue<string>());
-        Assert.Equal("Examplecar", record["make"]!.GetValue<string>());
+        Assert.Equal("vehicle", record["body"]!["category"]!.GetValue<string>());
+        Assert.Equal("Examplecar", record["body"]!["make"]!.GetValue<string>());
         Assert.Equal("client_answered", record["provenance"]!["make"]!["source"]!.GetValue<string>());
         Assert.Equal("client_answered", record["provenance"]!["category"]!["source"]!.GetValue<string>());
     }
@@ -141,18 +141,18 @@ public sealed class PortalAnswerReviewTests : IAsyncLifetime, IDisposable
     [Fact]
     public async Task An_employment_answer_is_linked_to_the_debtor_who_gave_it()
     {
-        var answer = await Review(await AnswerAsync("""{"questionId": "income.employment", "value": {"employer_name": "Example Co"}}"""));
+        var answer = await Review(await AnswerAsync("""{"questionId": "income.employment", "value": {"employerName": "Example Co"}}"""));
         Assert.True(answer.Status == 200, answer.Body);
         var record = answer.Object["record"]!;
-        Assert.Equal((await Debtor1Async()).Str("id"), record["debtor_id"]!.GetValue<string>());
-        Assert.Equal("staff_typed", record["provenance"]!["debtor_id"]!["source"]!.GetValue<string>());
+        Assert.Equal((await Debtor1Async()).Str("id"), record["body"]!["debtorId"]!.GetValue<string>());
+        Assert.Equal("staff_typed", record["provenance"]!["debtorId"]!["source"]!.GetValue<string>());
     }
 
     [Fact]
     public async Task A_staff_save_cannot_mint_client_answered_provenance()
     {
         var answer = await _world.Post($"/v1/cases/{_caseId}/assets", $$"""
-            {"category": "vehicle", "make": "Examplecar", "provenance": {
+            {"body": {"category": "vehicle", "make": "Examplecar"}, "provenance": {
               "category": {"source": "staff_typed"},
               "make": {"source": "client_answered", "confirmed_by": "{{Alice}}", "confirmed_at": "2099-01-01T00:00:00.000000Z"} } }
             """);
@@ -164,16 +164,8 @@ public sealed class PortalAnswerReviewTests : IAsyncLifetime, IDisposable
     public async Task A_staff_save_keeps_an_accepted_answer_it_did_not_touch()
     {
         var record = (await Review(await AnswerAsync(Vehicle))).Object["record"]!.AsObject();
-        var body = new JsonObject();
-        foreach (var (key, value) in record)
-        {
-            if (key is not ("id" or "case_id" or "created_at" or "updated_at"))
-            {
-                body[key] = value?.DeepClone();
-            }
-        }
-
-        body["model"] = "Roadster";
+        var body = new JsonObject { ["body"] = record["body"]!.DeepClone(), ["provenance"] = record["provenance"]!.DeepClone() };
+        body["body"]!["model"] = "Roadster";
         body["provenance"]!["model"] = JsonNode.Parse("""{"source": "staff_typed"}""");
         var answer = await _world.Put($"/v1/cases/{_caseId}/assets/{record.Str("id")}", body.ToJsonString());
         Assert.True(answer.Status == 200, answer.Body);

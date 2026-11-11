@@ -7,6 +7,7 @@ using Insolvia.Api.Hosting;
 using Insolvia.Domain;
 using Insolvia.Domain.AccessLog;
 using Insolvia.Domain.Assets;
+using Insolvia.Domain.CaseEntities;
 using Insolvia.Domain.Cases;
 using Insolvia.Domain.Claims;
 using Insolvia.Domain.Creditors;
@@ -141,7 +142,7 @@ public sealed class CaseAnalysisRoutes : IEndpointModule
     }
 
     /// <summary>Calculate unsaved plan alternatives against the case; nothing is written.</summary>
-    /// <remarks>At most five scenarios; each malformed one is named by its path (<c>scenarios[0].plan.term_months</c>).</remarks>
+    /// <remarks>At most five scenarios; each malformed one is named by its path (<c>scenarios[0].plan.termMonths</c>).</remarks>
     internal static async Task<PlanScenarioList> PlanScenariosAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
     {
         // Reachability first, so a 400 is never an oracle for a case id the
@@ -194,7 +195,7 @@ public sealed class CaseAnalysisRoutes : IEndpointModule
 
             try
             {
-                parsed.Add((label, PlanRules.Kind.ParseBody((JsonObject)plan.DeepClone())));
+                parsed.Add((label, (PlanBody)BodyJson.Read(plan, typeof(PlanBody))));
             }
             catch (FieldValidationException error)
             {

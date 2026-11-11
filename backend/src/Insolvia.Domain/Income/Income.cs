@@ -1,4 +1,4 @@
-using System.Text.Json.Nodes;
+using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 using Insolvia.Domain.CaseEntities;
 using Insolvia.Domain.Fields;
@@ -11,32 +11,45 @@ namespace Insolvia.Domain.Income;
 
 /// <summary>106I Part 1: one job of one debtor.</summary>
 public sealed record EmploymentBody(
-    string? DebtorId,
-    EmploymentStatus? Status,
-    string? Occupation,
-    string? EmployerName,
-    Address EmployerAddress,
-    DateOnly? EmployedSince);
+    [property: Text(64)] string? DebtorId = null,
+    EmploymentStatus? Status = null,
+    [property: Text] string? Occupation = null,
+    [property: Text] string? EmployerName = null,
+    Address? EmployerAddress = null,
+    DateOnly? EmployedSince = null)
+{
+    /// <summary>The employer's address; an empty one when none was given.</summary>
+    public Address EmployerAddress { get; init; } = EmployerAddress ?? new();
+}
 
 /// <summary>
 /// One itemised deduction line on a stub; carries its own client-chosen id so
 /// provenance addresses it as <c>deductions[&lt;id&gt;].amount</c>.
 /// </summary>
-public sealed record PayPeriodDeduction(string Id, DeductionCategory? Category, decimal? Amount, string? Description);
+public sealed record PayPeriodDeduction(
+    string Id,
+    DeductionCategory? Category = null,
+    [property: Money] decimal? Amount = null,
+    [property: Text] string? Description = null) : IRow;
 
 /// <summary>
 /// One paycheck. The three dates are distinct facts; the means test's
 /// lookback keys on <see cref="PayDate"/>.
 /// </summary>
 public sealed record PayPeriodRecordBody(
-    string? EmploymentId,
-    DateOnly? PeriodStart,
-    DateOnly? PeriodEnd,
-    DateOnly? PayDate,
-    decimal? Gross,
-    decimal? Net,
-    PayFrequency? Frequency,
-    ValueCollection<PayPeriodDeduction> Deductions);
+    [property: Text(64)] string? EmploymentId = null,
+    DateOnly? PeriodStart = null,
+    DateOnly? PeriodEnd = null,
+    DateOnly? PayDate = null,
+    [property: Money] decimal? Gross = null,
+    [property: Money] decimal? Net = null,
+    PayFrequency? Frequency = null,
+    ValueCollection<PayPeriodDeduction>? Deductions = null)
+{
+    /// <summary>The stub's itemised deductions.</summary>
+    [Rows]
+    public ValueCollection<PayPeriodDeduction> Deductions { get; init; } = Deductions ?? [];
+}
 
 /// <summary>
 /// One dated non-wage receipt (issue #100). <see cref="Expenses"/> are the
@@ -45,42 +58,54 @@ public sealed record PayPeriodRecordBody(
 /// category is still a record — the derivation shows it excluded.
 /// </summary>
 public sealed record OtherIncomeRecordBody(
-    string? DebtorId,
-    OtherIncomeCategory? Category,
-    DateOnly? ReceivedOn,
-    decimal? Amount,
-    decimal? Expenses,
-    string? Payer,
-    string? Description);
+    [property: Text(64)] string? DebtorId = null,
+    OtherIncomeCategory? Category = null,
+    DateOnly? ReceivedOn = null,
+    [property: Money] decimal? Amount = null,
+    [property: Money] decimal? Expenses = null,
+    [property: Text] string? Payer = null,
+    [property: Text] string? Description = null) : IValidatableObject
+{
+    /// <summary>Operating expenses belong only to a business or rental receipt.</summary>
+    /// <param name="validationContext">Unused.</param>
+    /// <returns>The failures.</returns>
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        if (Expenses is not null && Category is not (null or OtherIncomeCategory.Business or OtherIncomeCategory.Rental))
+        {
+            yield return new ValidationResult("Only business and rental receipts carry operating expenses (B122A-1 lines 5-6).", [nameof(Expenses)]);
+        }
+    }
+}
 
 /// <summary>106I Part 2, one column — every money member a monthly estimate as of filing.</summary>
 public sealed record IncomeSummaryBody(
-    string? DebtorId,
-    decimal? Wages,
-    decimal? Overtime,
-    decimal? DeductionTax,
-    decimal? DeductionMandatoryRetirement,
-    decimal? DeductionVoluntaryRetirement,
-    decimal? DeductionRetirementLoanRepayment,
-    decimal? DeductionInsurance,
-    decimal? DeductionDomesticSupport,
-    decimal? DeductionUnionDues,
-    decimal? DeductionOther,
-    string? DeductionOtherSpecify,
-    decimal? BusinessNetIncome,
-    decimal? InterestAndDividends,
-    decimal? FamilySupport,
-    decimal? Unemployment,
-    decimal? SocialSecurity,
-    decimal? OtherGovernmentAssistance,
-    string? OtherGovernmentAssistanceSpecify,
-    decimal? PensionOrRetirement,
-    decimal? OtherMonthlyIncome,
-    string? OtherMonthlyIncomeSpecify,
-    decimal? HouseholdContributions,
-    string? HouseholdContributionsSpecify,
-    bool? ChangeExpected,
-    string? ChangeExplanation);
+    [property: Text(64)] string? DebtorId = null,
+    [property: Money] decimal? Wages = null,
+    [property: Money] decimal? Overtime = null,
+    [property: Money] decimal? DeductionTax = null,
+    [property: Money] decimal? DeductionMandatoryRetirement = null,
+    [property: Money] decimal? DeductionVoluntaryRetirement = null,
+    [property: Money] decimal? DeductionRetirementLoanRepayment = null,
+    [property: Money] decimal? DeductionInsurance = null,
+    [property: Money] decimal? DeductionDomesticSupport = null,
+    [property: Money] decimal? DeductionUnionDues = null,
+    [property: Money] decimal? DeductionOther = null,
+    [property: Text] string? DeductionOtherSpecify = null,
+    [property: Money] decimal? BusinessNetIncome = null,
+    [property: Money] decimal? InterestAndDividends = null,
+    [property: Money] decimal? FamilySupport = null,
+    [property: Money] decimal? Unemployment = null,
+    [property: Money] decimal? SocialSecurity = null,
+    [property: Money] decimal? OtherGovernmentAssistance = null,
+    [property: Text] string? OtherGovernmentAssistanceSpecify = null,
+    [property: Money] decimal? PensionOrRetirement = null,
+    [property: Money] decimal? OtherMonthlyIncome = null,
+    [property: Text] string? OtherMonthlyIncomeSpecify = null,
+    [property: Money] decimal? HouseholdContributions = null,
+    [property: Text] string? HouseholdContributionsSpecify = null,
+    bool? ChangeExpected = null,
+    [property: Narrative] string? ChangeExplanation = null);
 
 /// <summary>The four income collections.</summary>
 public static class IncomeRules
@@ -108,123 +133,16 @@ public static class IncomeRules
     ];
 
     /// <summary>The employment collection's kind.</summary>
-    public static readonly EntityKind<EmploymentBody> Employment = new("employment", "employments", "EMPLOYMENT", ParseEmployment);
+    public static readonly EntityKind<EmploymentBody> Employment = new("employment", "employments", "EMPLOYMENT");
 
     /// <summary>The pay-period collection's kind.</summary>
-    public static readonly EntityKind<PayPeriodRecordBody> PayPeriodRecord = new("pay_period_record", "pay_period_records", "PAY_PERIOD", ParsePayPeriodRecord);
+    public static readonly EntityKind<PayPeriodRecordBody> PayPeriodRecord = new("pay_period_record", "pay_period_records", "PAY_PERIOD");
 
     /// <summary>The other-income collection's kind.</summary>
-    public static readonly EntityKind<OtherIncomeRecordBody> OtherIncomeRecord = new("other_income_record", "other_income_records", "OTHER_INCOME", ParseOtherIncomeRecord);
+    public static readonly EntityKind<OtherIncomeRecordBody> OtherIncomeRecord = new("other_income_record", "other_income_records", "OTHER_INCOME");
 
     /// <summary>The income-summary collection's kind.</summary>
-    public static readonly EntityKind<IncomeSummaryBody> IncomeSummary = new("income_summary", "income_summaries", "INCOME_SUMMARY", ParseIncomeSummary);
-
-    /// <summary>Validates an employment body (Python's <c>parse_employment</c>).</summary>
-    public static EmploymentBody ParseEmployment(JsonObject payload)
-    {
-        ArgumentNullException.ThrowIfNull(payload);
-        var errors = new Dictionary<string, string>(StringComparer.Ordinal);
-        var body = new EmploymentBody(
-            DebtorId: FieldParsers.Text(payload["debtor_id"], "debtor_id", errors, limit: 64),
-            Status: FieldParsers.Choice<EmploymentStatus>(payload["status"], "status", errors),
-            Occupation: FieldParsers.Text(payload["occupation"], "occupation", errors),
-            EmployerName: FieldParsers.Text(payload["employer_name"], "employer_name", errors),
-            EmployerAddress: FieldParsers.ParseAddress(payload["employer_address"], "employer_address", errors),
-            EmployedSince: FieldParsers.FormDate(payload["employed_since"], "employed_since", errors));
-        IdRows.ThrowIfAny(errors);
-        return body;
-    }
-
-    /// <summary>Validates a pay-period body (Python's <c>parse_pay_period_record</c>).</summary>
-    public static PayPeriodRecordBody ParsePayPeriodRecord(JsonObject payload)
-    {
-        ArgumentNullException.ThrowIfNull(payload);
-        var errors = new Dictionary<string, string>(StringComparer.Ordinal);
-        var body = new PayPeriodRecordBody(
-            EmploymentId: FieldParsers.Text(payload["employment_id"], "employment_id", errors, limit: 64),
-            PeriodStart: FieldParsers.FormDate(payload["period_start"], "period_start", errors),
-            PeriodEnd: FieldParsers.FormDate(payload["period_end"], "period_end", errors),
-            PayDate: FieldParsers.FormDate(payload["pay_date"], "pay_date", errors),
-            Gross: FieldParsers.Money(payload["gross"], "gross", errors),
-            Net: FieldParsers.Money(payload["net"], "net", errors),
-            Frequency: FieldParsers.Choice<PayFrequency>(payload["frequency"], "frequency", errors),
-            Deductions: IdRows.Parse(
-                payload["deductions"],
-                "deductions",
-                errors,
-                (id, raw, path) => new PayPeriodDeduction(
-                    id,
-                    FieldParsers.Choice<DeductionCategory>(raw["category"], $"{path}.category", errors),
-                    FieldParsers.Money(raw["amount"], $"{path}.amount", errors),
-                    FieldParsers.Text(raw["description"], $"{path}.description", errors)),
-                skipNonObjects: false));
-        IdRows.ThrowIfAny(errors);
-        return body;
-    }
-
-    /// <summary>
-    /// Validates an other-income body (Python's <c>parse_other_income_record</c>).
-    /// Operating expenses belong only to a business or rental receipt.
-    /// </summary>
-    public static OtherIncomeRecordBody ParseOtherIncomeRecord(JsonObject payload)
-    {
-        ArgumentNullException.ThrowIfNull(payload);
-        var errors = new Dictionary<string, string>(StringComparer.Ordinal);
-        var category = FieldParsers.Choice<OtherIncomeCategory>(payload["category"], "category", errors);
-        var expenses = FieldParsers.Money(payload["expenses"], "expenses", errors);
-        if (expenses is not null && category is not (null or OtherIncomeCategory.Business or OtherIncomeCategory.Rental))
-        {
-            errors["expenses"] = "Only business and rental receipts carry operating expenses (B122A-1 lines 5-6).";
-        }
-
-        var body = new OtherIncomeRecordBody(
-            DebtorId: FieldParsers.Text(payload["debtor_id"], "debtor_id", errors, limit: 64),
-            Category: category,
-            ReceivedOn: FieldParsers.FormDate(payload["received_on"], "received_on", errors),
-            Amount: FieldParsers.Money(payload["amount"], "amount", errors),
-            Expenses: expenses,
-            Payer: FieldParsers.Text(payload["payer"], "payer", errors),
-            Description: FieldParsers.Text(payload["description"], "description", errors));
-        IdRows.ThrowIfAny(errors);
-        return body;
-    }
-
-    /// <summary>Validates an income-summary body (Python's <c>parse_income_summary</c>).</summary>
-    public static IncomeSummaryBody ParseIncomeSummary(JsonObject payload)
-    {
-        ArgumentNullException.ThrowIfNull(payload);
-        var errors = new Dictionary<string, string>(StringComparer.Ordinal);
-        decimal? Amount(string key) => FieldParsers.Money(payload[key], key, errors);
-        var body = new IncomeSummaryBody(
-            DebtorId: FieldParsers.Text(payload["debtor_id"], "debtor_id", errors, limit: 64),
-            Wages: Amount("wages"),
-            Overtime: Amount("overtime"),
-            DeductionTax: Amount("deduction_tax"),
-            DeductionMandatoryRetirement: Amount("deduction_mandatory_retirement"),
-            DeductionVoluntaryRetirement: Amount("deduction_voluntary_retirement"),
-            DeductionRetirementLoanRepayment: Amount("deduction_retirement_loan_repayment"),
-            DeductionInsurance: Amount("deduction_insurance"),
-            DeductionDomesticSupport: Amount("deduction_domestic_support"),
-            DeductionUnionDues: Amount("deduction_union_dues"),
-            DeductionOther: Amount("deduction_other"),
-            DeductionOtherSpecify: FieldParsers.Text(payload["deduction_other_specify"], "deduction_other_specify", errors),
-            BusinessNetIncome: Amount("business_net_income"),
-            InterestAndDividends: Amount("interest_and_dividends"),
-            FamilySupport: Amount("family_support"),
-            Unemployment: Amount("unemployment"),
-            SocialSecurity: Amount("social_security"),
-            OtherGovernmentAssistance: Amount("other_government_assistance"),
-            OtherGovernmentAssistanceSpecify: FieldParsers.Text(payload["other_government_assistance_specify"], "other_government_assistance_specify", errors),
-            PensionOrRetirement: Amount("pension_or_retirement"),
-            OtherMonthlyIncome: Amount("other_monthly_income"),
-            OtherMonthlyIncomeSpecify: FieldParsers.Text(payload["other_monthly_income_specify"], "other_monthly_income_specify", errors),
-            HouseholdContributions: Amount("household_contributions"),
-            HouseholdContributionsSpecify: FieldParsers.Text(payload["household_contributions_specify"], "household_contributions_specify", errors),
-            ChangeExpected: FieldParsers.Boolean(payload["change_expected"], "change_expected", errors),
-            ChangeExplanation: FieldParsers.Narrative(payload["change_explanation"], "change_explanation", errors));
-        IdRows.ThrowIfAny(errors);
-        return body;
-    }
+    public static readonly EntityKind<IncomeSummaryBody> IncomeSummary = new("income_summary", "income_summaries", "INCOME_SUMMARY");
 }
 
 /// <summary>106I line 1's employment status (Python's <c>EMPLOYMENT_STATUSES</c>).</summary>

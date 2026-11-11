@@ -57,17 +57,18 @@ public sealed class NoteRouteTests : IAsyncLifetime, IDisposable
     [Fact]
     public async Task Creating_a_note_stamps_the_caller_as_author_and_ignores_a_supplied_one()
     {
-        var answer = await Add(""" "text": "Client called.", "author_subject": "00000000-0000-4000-8000-00000000b0b0", "author_name": "Bob Impersonator" """, Dana);
+        var answer = await Add(""" "text": "Client called.", "authorSubject": "00000000-0000-4000-8000-00000000b0b0", "authorName": "Bob Impersonator" """, Dana);
 
         Assert.Equal(201, answer.Status);
-        Assert.Equal(("Client called.", Dana, "Person da4a", _caseId), (answer.Str("text"), answer.Str("author_subject"), answer.Str("author_name"), answer.Str("case_id")));
-        Assert.Equal(["author_name", "author_subject", "case_id", "created_at", "id", "text", "updated_at"], Answer.Keys(answer.Json));
+        var note = answer.Object["body"]!.AsObject();
+        Assert.Equal(("Client called.", Dana, "Person da4a", _caseId), (note.Str("text"), note.Str("authorSubject"), note.Str("authorName"), answer.Str("caseId")));
+        Assert.Equal(["body", "caseId", "createdAt", "id", "updatedAt"], Answer.Keys(answer.Json));
     }
 
     [Fact]
     public async Task A_note_can_anchor_to_a_form_series()
     {
-        Assert.Equal("form/b106g", (await Add(""" "text": "Check the lease term.", "form_series": "form/b106g" """)).Str("form_series"));
+        Assert.Equal("form/b106g", (await Add(""" "text": "Check the lease term.", "formSeries": "form/b106g" """)).Object["body"]!.AsObject().Str("formSeries"));
     }
 
     [Fact]
@@ -89,8 +90,9 @@ public sealed class NoteRouteTests : IAsyncLifetime, IDisposable
         var own = await _world.Put($"/v1/cases/{_caseId}/notes/{noteId}", """{"text": "corrected draft"}""", Dana);
         var admin = await _world.Put($"/v1/cases/{_caseId}/notes/{noteId}", """{"text": "corrected by an admin"}""");
 
-        Assert.Equal((200, "corrected draft"), (own.Status, own.Str("text")));
-        Assert.Equal((200, "corrected by an admin", Dana, "Person da4a"), (admin.Status, admin.Str("text"), admin.Str("author_subject"), admin.Str("author_name")));
+        Assert.Equal((200, "corrected draft"), (own.Status, own.Object["body"]!.AsObject().Str("text")));
+        var edited = admin.Object["body"]!.AsObject();
+        Assert.Equal((200, "corrected by an admin", Dana, "Person da4a"), (admin.Status, edited.Str("text"), edited.Str("authorSubject"), edited.Str("authorName")));
     }
 
     [Fact]

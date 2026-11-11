@@ -15,7 +15,7 @@ public sealed class QuestionTests
     private const string PortalApp = "portal-app-client-id";
 
     private const string LegalName = """{"questionId": "personal_information.legal_name", "value": {"given": "Testy", "surname": "Example"}}""";
-    private const string Vehicle = """{"questionId": "property.vehicle", "value": {"year": 2099, "make": "Examplecar", "value_entire": "1200"}}""";
+    private const string Vehicle = """{"questionId": "property.vehicle", "value": {"year": 2099, "make": "Examplecar", "valueEntire": 1200}}""";
 
     private static readonly CandidateOrigin Origin = new(OriginChannel.Client, PortalApp, ClientSub);
 
@@ -70,7 +70,7 @@ public sealed class QuestionTests
         // asserted the portal's JSON views (the API's); what they read is here.
         var vehicle = QuestionRules.Find("property.vehicle")!;
         Assert.True(vehicle.Repeats);
-        Assert.Equal(["year", "make", "model", "mileage", "value_entire"], vehicle.InputKeys);
+        Assert.Equal(["year", "make", "model", "mileage", "valueEntire"], vehicle.InputKeys);
         Assert.DoesNotContain(QuestionRules.For(Questionnaire.Property), entry => entry.Retired);
     }
 
@@ -87,7 +87,7 @@ public sealed class QuestionTests
 
     [Fact]
     public void A_record_answer_carries_its_fixed_category_and_canonical_values() =>
-        AssertJson("""{"year": 2099, "make": "Examplecar", "value_entire": "1200.00", "category": "vehicle"}""", Answer(Vehicle).Payload);
+        AssertJson("""{"year": 2099, "make": "Examplecar", "valueEntire": 1200, "category": "vehicle"}""", Answer(Vehicle).Payload);
 
     [Fact]
     public void A_key_the_question_does_not_ask_is_dropped_not_stored() =>
@@ -195,7 +195,7 @@ public sealed class QuestionTests
         // the portal JSON view; the value it carried is AnswerValue's.
         var candidate = Stored(Vehicle) with { Status = CandidateStatus.Accepted, ConfirmedBy = Ids.Alice, CorrectedPayload = Body.Of("""{"make": "Changed"}""") };
         var found = QuestionRules.RefOf(candidate)!;
-        AssertJson("""{"year": 2099, "make": "Examplecar", "value_entire": "1200.00"}""", QuestionRules.AnswerValue(found.Question, candidate.Payload));
+        AssertJson("""{"year": 2099, "make": "Examplecar", "valueEntire": 1200}""", QuestionRules.AnswerValue(found.Question, candidate.Payload));
         Assert.Equal("property.vehicle", found.Question.Id);
     }
 

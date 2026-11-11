@@ -1,333 +1,386 @@
-using System.Text.Json.Nodes;
+using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 using Insolvia.Domain.CaseEntities;
+using Insolvia.Domain.Claims;
 using Insolvia.Domain.Fields;
 
 namespace Insolvia.Domain.Sofa;
 
 // From sofa.py: the Statement of Financial Affairs (Form 107) — one generic
-// collection, one entry per answered row, typed by `entry_type`, whose
-// `payload` is the question's own shape. Error paths are keyed
-// `payload.<field>`.
+// collection, one entry per answered row, whose `payload` is the question's
+// own shape, named by its `entryType`. Error paths are keyed `payload.<field>`.
 
 /// <summary>A named party and their address — the shape most Form 107 rows open with.</summary>
-public sealed record Party(string? Name, Address Address);
+public sealed record Party([property: Text] string? Name = null, Address? Address = null)
+{
+    /// <summary>The party's address; an empty one when none was given.</summary>
+    public Address Address { get; init; } = Address ?? new();
+}
 
-/// <summary>One answer's question-specific shape. Serialized through its runtime type.</summary>
-[JsonConverter(typeof(RuntimeTypeConverter<SofaPayload>))]
-public abstract record SofaPayload;
+/// <summary>
+/// One answer's question-specific shape, named by its <c>entryType</c>. Not
+/// abstract on purpose: a payload without an <c>entryType</c> reads as this
+/// base record, which <see cref="SofaEntryBody"/> refuses by name, rather
+/// than failing the whole read.
+/// </summary>
+[JsonPolymorphic(TypeDiscriminatorPropertyName = "entryType")]
+[JsonDerivedType(typeof(MaritalStatus), "marital_status")]
+[JsonDerivedType(typeof(PriorAddress), "prior_address")]
+[JsonDerivedType(typeof(CommunityPropertyResidence), "community_property_residence")]
+[JsonDerivedType(typeof(IncomeByPeriod), "income_by_period")]
+[JsonDerivedType(typeof(ConsumerDebtDeclaration), "consumer_debt_declaration")]
+[JsonDerivedType(typeof(CreditorPayment), "creditor_payment")]
+[JsonDerivedType(typeof(InsiderPayment), "insider_payment")]
+[JsonDerivedType(typeof(InsiderBenefitPayment), "insider_benefit_payment")]
+[JsonDerivedType(typeof(Lawsuit), "lawsuit")]
+[JsonDerivedType(typeof(Repossession), "repossession")]
+[JsonDerivedType(typeof(Setoff), "setoff")]
+[JsonDerivedType(typeof(Receivership), "receivership")]
+[JsonDerivedType(typeof(Gift), "gift")]
+[JsonDerivedType(typeof(CharitableContribution), "charitable_contribution")]
+[JsonDerivedType(typeof(Loss), "loss")]
+[JsonDerivedType(typeof(ConsultantPayment), "consultant_payment")]
+[JsonDerivedType(typeof(CreditorAssistancePayment), "creditor_assistance_payment")]
+[JsonDerivedType(typeof(PropertyTransfer), "property_transfer")]
+[JsonDerivedType(typeof(SelfSettledTrust), "self_settled_trust")]
+[JsonDerivedType(typeof(ClosedAccount), "closed_account")]
+[JsonDerivedType(typeof(SafeDepositBox), "safe_deposit_box")]
+[JsonDerivedType(typeof(StorageUnit), "storage_unit")]
+[JsonDerivedType(typeof(HeldForAnother), "held_for_another")]
+[JsonDerivedType(typeof(EnvironmentalNotice), "environmental_notice")]
+[JsonDerivedType(typeof(EnvironmentalProceeding), "environmental_proceeding")]
+[JsonDerivedType(typeof(BusinessConnection), "business_connection")]
+[JsonDerivedType(typeof(FinancialStatementIssued), "financial_statement_issued")]
+public record SofaPayload;
 
 /// <summary>Line 2: where the debtor lived in the last three years.</summary>
-public sealed record PriorAddress(SofaDebtor? WhichDebtor, Address Address, DateOnly? FromDate, DateOnly? ToDate) : SofaPayload;
+public sealed record PriorAddress(SofaDebtor? WhichDebtor = null, Address? Address = null, DateOnly? FromDate = null, DateOnly? ToDate = null) : SofaPayload
+{
+    /// <summary>The address lived at.</summary>
+    public Address Address { get; init; } = Address ?? new();
+}
 
 /// <summary>Lines 4-5: income by period.</summary>
-public sealed record IncomeByPeriod(SofaDebtor? WhichDebtor, IncomeKind? Kind, string? Description, DateOnly? PeriodStart, DateOnly? PeriodEnd, decimal? GrossAmount) : SofaPayload;
+public sealed record IncomeByPeriod(
+    SofaDebtor? WhichDebtor = null,
+    IncomeKind? Kind = null,
+    [property: Text] string? Description = null,
+    DateOnly? PeriodStart = null,
+    DateOnly? PeriodEnd = null,
+    [property: Money] decimal? GrossAmount = null) : SofaPayload;
 
 /// <summary>Line 6: payments to creditors.</summary>
-public sealed record CreditorPayment(Party Creditor, ValueCollection<DateOnly> Dates, decimal? TotalPaid, decimal? AmountStillOwed, ValueCollection<PaymentPurpose> PaymentFor, string? PaymentForOther) : SofaPayload;
+public sealed record CreditorPayment(
+    Party? Creditor = null,
+    ValueCollection<DateOnly>? Dates = null,
+    [property: Money] decimal? TotalPaid = null,
+    [property: Money] decimal? AmountStillOwed = null,
+    ValueCollection<PaymentPurpose>? PaymentFor = null,
+    [property: Text] string? PaymentForOther = null) : SofaPayload
+{
+    /// <summary>Who was paid.</summary>
+    public Party Creditor { get; init; } = Creditor ?? new();
+
+    /// <summary>When.</summary>
+    public ValueCollection<DateOnly> Dates { get; init; } = Dates ?? [];
+
+    /// <summary>What the payment was for.</summary>
+    public ValueCollection<PaymentPurpose> PaymentFor { get; init; } = PaymentFor ?? [];
+}
 
 /// <summary>Line 7: payments to insiders.</summary>
-public sealed record InsiderPayment(Party Insider, string? Relationship, ValueCollection<DateOnly> Dates, decimal? TotalPaid, decimal? AmountStillOwed, string? Reason) : SofaPayload;
+public sealed record InsiderPayment(
+    Party? Insider = null,
+    [property: Text] string? Relationship = null,
+    ValueCollection<DateOnly>? Dates = null,
+    [property: Money] decimal? TotalPaid = null,
+    [property: Money] decimal? AmountStillOwed = null,
+    [property: Narrative] string? Reason = null) : SofaPayload
+{
+    /// <summary>Who was paid.</summary>
+    public Party Insider { get; init; } = Insider ?? new();
+
+    /// <summary>When.</summary>
+    public ValueCollection<DateOnly> Dates { get; init; } = Dates ?? [];
+}
 
 /// <summary>Line 8: payments that benefited an insider.</summary>
-public sealed record InsiderBenefitPayment(Party Recipient, string? InsiderName, ValueCollection<DateOnly> Dates, decimal? TotalPaid, string? Reason) : SofaPayload;
+public sealed record InsiderBenefitPayment(
+    Party? Recipient = null,
+    [property: Text] string? InsiderName = null,
+    ValueCollection<DateOnly>? Dates = null,
+    [property: Money] decimal? TotalPaid = null,
+    [property: Narrative] string? Reason = null) : SofaPayload
+{
+    /// <summary>Who was paid.</summary>
+    public Party Recipient { get; init; } = Recipient ?? new();
+
+    /// <summary>When.</summary>
+    public ValueCollection<DateOnly> Dates { get; init; } = Dates ?? [];
+}
 
 /// <summary>Line 9: a lawsuit the debtor was a party to.</summary>
-public sealed record Lawsuit(string? CaseTitle, string? CaseNumber, string? NatureOfCase, Party Court, LegalStatus? Status) : SofaPayload;
+public sealed record Lawsuit(
+    [property: Text] string? CaseTitle = null,
+    [property: Text(64)] string? CaseNumber = null,
+    [property: Text] string? NatureOfCase = null,
+    Party? Court = null,
+    LegalStatus? Status = null) : SofaPayload
+{
+    /// <summary>The court.</summary>
+    public Party Court { get; init; } = Court ?? new();
+}
 
 /// <summary>Line 10: property repossessed, foreclosed, garnished or attached.</summary>
-public sealed record Repossession(Party Creditor, RepossessionAction? Action, string? Description, DateOnly? Date, decimal? Value) : SofaPayload;
+public sealed record Repossession(
+    Party? Creditor = null,
+    RepossessionAction? Action = null,
+    [property: Narrative] string? Description = null,
+    DateOnly? Date = null,
+    [property: Money] decimal? Value = null) : SofaPayload
+{
+    /// <summary>The creditor who took it.</summary>
+    public Party Creditor { get; init; } = Creditor ?? new();
+}
 
 /// <summary>Line 11: a setoff.</summary>
-public sealed record Setoff(Party Creditor, string? Description, DateOnly? Date, decimal? Amount) : SofaPayload;
+public sealed record Setoff(
+    Party? Creditor = null,
+    [property: Narrative] string? Description = null,
+    DateOnly? Date = null,
+    [property: Money] decimal? Amount = null) : SofaPayload
+{
+    /// <summary>The creditor who set off.</summary>
+    public Party Creditor { get; init; } = Creditor ?? new();
+}
 
 /// <summary>Line 12: property held by a receiver or custodian.</summary>
-public sealed record Receivership(Party Custodian, string? Description, decimal? Value, string? CaseTitle, string? CaseNumber, Party Court, DateOnly? Date) : SofaPayload;
+public sealed record Receivership(
+    Party? Custodian = null,
+    [property: Narrative] string? Description = null,
+    [property: Money] decimal? Value = null,
+    [property: Text] string? CaseTitle = null,
+    [property: Text(64)] string? CaseNumber = null,
+    Party? Court = null,
+    DateOnly? Date = null) : SofaPayload
+{
+    /// <summary>The custodian.</summary>
+    public Party Custodian { get; init; } = Custodian ?? new();
+
+    /// <summary>The court.</summary>
+    public Party Court { get; init; } = Court ?? new();
+}
 
 /// <summary>Line 13: gifts over the threshold.</summary>
-public sealed record Gift(Party Recipient, string? Relationship, string? Description, ValueCollection<DateOnly> Dates, decimal? Value) : SofaPayload;
+public sealed record Gift(
+    Party? Recipient = null,
+    [property: Text] string? Relationship = null,
+    [property: Narrative] string? Description = null,
+    ValueCollection<DateOnly>? Dates = null,
+    [property: Money] decimal? Value = null) : SofaPayload
+{
+    /// <summary>Who received it.</summary>
+    public Party Recipient { get; init; } = Recipient ?? new();
+
+    /// <summary>When.</summary>
+    public ValueCollection<DateOnly> Dates { get; init; } = Dates ?? [];
+}
 
 /// <summary>Line 14: charitable contributions over the threshold.</summary>
-public sealed record CharitableContribution(Party Organization, string? Description, ValueCollection<DateOnly> Dates, decimal? Value) : SofaPayload;
+public sealed record CharitableContribution(
+    Party? Organization = null,
+    [property: Narrative] string? Description = null,
+    ValueCollection<DateOnly>? Dates = null,
+    [property: Money] decimal? Value = null) : SofaPayload
+{
+    /// <summary>The charity.</summary>
+    public Party Organization { get; init; } = Organization ?? new();
+
+    /// <summary>When.</summary>
+    public ValueCollection<DateOnly> Dates { get; init; } = Dates ?? [];
+}
 
 /// <summary>Line 15: a loss from fire, theft, disaster or gambling.</summary>
-public sealed record Loss(string? Description, string? InsuranceCoverage, DateOnly? Date, decimal? Value) : SofaPayload;
+public sealed record Loss(
+    [property: Narrative] string? Description = null,
+    [property: Narrative] string? InsuranceCoverage = null,
+    DateOnly? Date = null,
+    [property: Money] decimal? Value = null) : SofaPayload;
 
 /// <summary>Line 16: a payment for bankruptcy advice or preparation.</summary>
-public sealed record ConsultantPayment(Party Person, string? EmailOrWebsite, string? WhoMadePayment, string? Description, DateOnly? Date, decimal? Amount) : SofaPayload;
+public sealed record ConsultantPayment(
+    Party? Person = null,
+    [property: Text] string? EmailOrWebsite = null,
+    [property: Text] string? WhoMadePayment = null,
+    [property: Narrative] string? Description = null,
+    DateOnly? Date = null,
+    [property: Money] decimal? Amount = null) : SofaPayload
+{
+    /// <summary>Who was paid.</summary>
+    public Party Person { get; init; } = Person ?? new();
+}
 
 /// <summary>Line 17: a payment to someone who promised to help with creditors.</summary>
-public sealed record CreditorAssistancePayment(Party Person, string? Description, DateOnly? Date, decimal? Amount) : SofaPayload;
+public sealed record CreditorAssistancePayment(
+    Party? Person = null,
+    [property: Narrative] string? Description = null,
+    DateOnly? Date = null,
+    [property: Money] decimal? Amount = null) : SofaPayload
+{
+    /// <summary>Who was paid.</summary>
+    public Party Person { get; init; } = Person ?? new();
+}
 
 /// <summary>Line 18: a transfer of property outside the ordinary course.</summary>
-public sealed record PropertyTransfer(Party Transferee, string? Relationship, string? Description, string? ValueReceived, DateOnly? Date) : SofaPayload;
+public sealed record PropertyTransfer(
+    Party? Transferee = null,
+    [property: Text] string? Relationship = null,
+    [property: Narrative] string? Description = null,
+    [property: Narrative] string? ValueReceived = null,
+    DateOnly? Date = null) : SofaPayload
+{
+    /// <summary>Who received it.</summary>
+    public Party Transferee { get; init; } = Transferee ?? new();
+}
 
 /// <summary>Line 19: a self-settled trust.</summary>
-public sealed record SelfSettledTrust(string? TrustName, string? Description, DateOnly? Date) : SofaPayload;
+public sealed record SelfSettledTrust(
+    [property: Text] string? TrustName = null,
+    [property: Narrative] string? Description = null,
+    DateOnly? Date = null) : SofaPayload;
 
 /// <summary>Line 20: a closed financial account.</summary>
 public sealed record ClosedAccount(
-    Party Institution,
-    [property: JsonPropertyName("account_last4")] string? AccountLast4,
-    AccountType? AccountType,
-    DateOnly? DateClosed,
-    decimal? LastBalance) : SofaPayload;
+    Party? Institution = null,
+    [property: Text(4), RegularExpression("^[0-9]*$", ErrorMessage = NoticeParties.Last4Message)] string? AccountLast4 = null,
+    AccountType? AccountType = null,
+    DateOnly? DateClosed = null,
+    [property: Money] decimal? LastBalance = null) : SofaPayload
+{
+    /// <summary>The institution.</summary>
+    public Party Institution { get; init; } = Institution ?? new();
+}
 
 /// <summary>Line 21: a safe deposit box.</summary>
-public sealed record SafeDepositBox(Party Institution, ValueCollection<string> WhoHasAccess, string? Description, bool? StillHave) : SofaPayload;
+public sealed record SafeDepositBox(
+    Party? Institution = null,
+    ValueCollection<string>? WhoHasAccess = null,
+    [property: Narrative] string? Description = null,
+    bool? StillHave = null) : SofaPayload
+{
+    /// <summary>The institution.</summary>
+    public Party Institution { get; init; } = Institution ?? new();
+
+    /// <summary>Who else can open it.</summary>
+    [Text]
+    public ValueCollection<string> WhoHasAccess { get; init; } = WhoHasAccess ?? [];
+}
 
 /// <summary>Line 22: a storage unit.</summary>
-public sealed record StorageUnit(Party Facility, ValueCollection<string> WhoHasAccess, string? Description, bool? StillHave) : SofaPayload;
+public sealed record StorageUnit(
+    Party? Facility = null,
+    ValueCollection<string>? WhoHasAccess = null,
+    [property: Narrative] string? Description = null,
+    bool? StillHave = null) : SofaPayload
+{
+    /// <summary>The facility.</summary>
+    public Party Facility { get; init; } = Facility ?? new();
+
+    /// <summary>Who else can open it.</summary>
+    [Text]
+    public ValueCollection<string> WhoHasAccess { get; init; } = WhoHasAccess ?? [];
+}
 
 /// <summary>Line 23: property held for someone else.</summary>
-public sealed record HeldForAnother(Party Owner, string? Location, string? Description, decimal? Value) : SofaPayload;
+public sealed record HeldForAnother(
+    Party? Owner = null,
+    [property: Narrative] string? Location = null,
+    [property: Narrative] string? Description = null,
+    [property: Money] decimal? Value = null) : SofaPayload
+{
+    /// <summary>Whose it is.</summary>
+    public Party Owner { get; init; } = Owner ?? new();
+}
 
 /// <summary>Lines 24-25: an environmental notice received or release reported.</summary>
-public sealed record EnvironmentalNotice(EnvironmentalNoticeKind? Kind, Party Site, Party GovernmentalUnit, string? EnvironmentalLaw, DateOnly? Date) : SofaPayload;
+public sealed record EnvironmentalNotice(
+    EnvironmentalNoticeKind? Kind = null,
+    Party? Site = null,
+    Party? GovernmentalUnit = null,
+    [property: Text] string? EnvironmentalLaw = null,
+    DateOnly? Date = null) : SofaPayload
+{
+    /// <summary>The site.</summary>
+    public Party Site { get; init; } = Site ?? new();
+
+    /// <summary>The governmental unit.</summary>
+    public Party GovernmentalUnit { get; init; } = GovernmentalUnit ?? new();
+}
 
 /// <summary>Line 26: an environmental proceeding.</summary>
-public sealed record EnvironmentalProceeding(string? CaseTitle, string? CaseNumber, Party Court, string? NatureOfCase, LegalStatus? Status) : SofaPayload;
+public sealed record EnvironmentalProceeding(
+    [property: Text] string? CaseTitle = null,
+    [property: Text(64)] string? CaseNumber = null,
+    Party? Court = null,
+    [property: Text] string? NatureOfCase = null,
+    LegalStatus? Status = null) : SofaPayload
+{
+    /// <summary>The court.</summary>
+    public Party Court { get; init; } = Court ?? new();
+}
 
 /// <summary>Line 27: a business connection.</summary>
-public sealed record BusinessConnection(Party Business, string? NatureOfBusiness, string? Ein, DateOnly? FromDate, DateOnly? ToDate, ValueCollection<BusinessConnectionKind> Connection) : SofaPayload;
+public sealed record BusinessConnection(
+    Party? Business = null,
+    [property: Text] string? NatureOfBusiness = null,
+    [property: Text(20)] string? Ein = null,
+    DateOnly? FromDate = null,
+    DateOnly? ToDate = null,
+    ValueCollection<BusinessConnectionKind>? Connection = null) : SofaPayload
+{
+    /// <summary>The business.</summary>
+    public Party Business { get; init; } = Business ?? new();
+
+    /// <summary>How the debtor was connected.</summary>
+    public ValueCollection<BusinessConnectionKind> Connection { get; init; } = Connection ?? [];
+}
 
 /// <summary>Line 28: a financial statement issued.</summary>
-public sealed record FinancialStatementIssued(Party Recipient, DateOnly? DateIssued) : SofaPayload;
+public sealed record FinancialStatementIssued(Party? Recipient = null, DateOnly? DateIssued = null) : SofaPayload
+{
+    /// <summary>Who received it.</summary>
+    public Party Recipient { get; init; } = Recipient ?? new();
+}
 
 /// <summary>Line 1: marital status.</summary>
-public sealed record MaritalStatus(MaritalStatusKind? Status) : SofaPayload;
+public sealed record MaritalStatus(MaritalStatusKind? Status = null) : SofaPayload;
 
 /// <summary>Line 3: a community-property state lived in.</summary>
-public sealed record CommunityPropertyResidence(string? State) : SofaPayload;
+public sealed record CommunityPropertyResidence([property: Text(40)] string? State = null) : SofaPayload;
 
 /// <summary>The consumer-debt declaration.</summary>
-public sealed record ConsumerDebtDeclaration(bool? PrimarilyConsumerDebts) : SofaPayload;
+public sealed record ConsumerDebtDeclaration(bool? PrimarilyConsumerDebts = null) : SofaPayload;
 
-/// <summary>One Form 107 entry: which question, and its answer.</summary>
-public sealed record SofaEntryBody(SofaEntryType? EntryType, SofaPayload? Payload);
+/// <summary>One Form 107 entry: its answer, whose <c>entryType</c> names the question.</summary>
+public sealed record SofaEntryBody(SofaPayload? Payload = null) : IValidatableObject
+{
+    /// <summary>A payload names its question.</summary>
+    /// <param name="validationContext">Unused.</param>
+    /// <returns>The failures.</returns>
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        if (Payload is not null && Payload.GetType() == typeof(SofaPayload))
+        {
+            yield return new ValidationResult("Required — it names the question the payload answers.", ["payload.entryType"]);
+        }
+    }
+}
 
 /// <summary>The SOFA collection.</summary>
 public static class SofaRules
 {
     /// <summary>The collection's kind.</summary>
-    public static readonly EntityKind<SofaEntryBody> Kind = new("sofa_entry", "sofa_entries", "SOFA_ENTRY", Parse);
-
-    private static readonly Dictionary<SofaEntryType, Func<JsonObject, Dictionary<string, string>, SofaPayload>> Parsers = new()
-    {
-        [SofaEntryType.MaritalStatus] = (raw, e) => new MaritalStatus(FieldParsers.Choice<MaritalStatusKind>(raw["status"], "payload.status", e)),
-        [SofaEntryType.PriorAddress] = (raw, e) => new PriorAddress(
-            FieldParsers.Choice<SofaDebtor>(raw["which_debtor"], "payload.which_debtor", e),
-            FieldParsers.ParseAddress(raw["address"], "payload.address", e),
-            FieldParsers.FormDate(raw["from_date"], "payload.from_date", e),
-            FieldParsers.FormDate(raw["to_date"], "payload.to_date", e)),
-        [SofaEntryType.CommunityPropertyResidence] = (raw, e) => new CommunityPropertyResidence(FieldParsers.Text(raw["state"], "payload.state", e, limit: 40)),
-        [SofaEntryType.IncomeByPeriod] = (raw, e) => new IncomeByPeriod(
-            FieldParsers.Choice<SofaDebtor>(raw["which_debtor"], "payload.which_debtor", e),
-            FieldParsers.Choice<IncomeKind>(raw["kind"], "payload.kind", e),
-            FieldParsers.Text(raw["description"], "payload.description", e),
-            FieldParsers.FormDate(raw["period_start"], "payload.period_start", e),
-            FieldParsers.FormDate(raw["period_end"], "payload.period_end", e),
-            FieldParsers.Money(raw["gross_amount"], "payload.gross_amount", e)),
-        [SofaEntryType.ConsumerDebtDeclaration] = (raw, e) => new ConsumerDebtDeclaration(FieldParsers.Boolean(raw["primarily_consumer_debts"], "payload.primarily_consumer_debts", e)),
-        [SofaEntryType.CreditorPayment] = (raw, e) => new CreditorPayment(
-            ParseParty(raw["creditor"], "payload.creditor", e),
-            DateList(raw["dates"], "payload.dates", e),
-            FieldParsers.Money(raw["total_paid"], "payload.total_paid", e),
-            FieldParsers.Money(raw["amount_still_owed"], "payload.amount_still_owed", e),
-            FieldParsers.ChoiceList<PaymentPurpose>(raw["payment_for"], "payload.payment_for", e),
-            FieldParsers.Text(raw["payment_for_other"], "payload.payment_for_other", e)),
-        [SofaEntryType.InsiderPayment] = (raw, e) => new InsiderPayment(
-            ParseParty(raw["insider"], "payload.insider", e),
-            FieldParsers.Text(raw["relationship"], "payload.relationship", e),
-            DateList(raw["dates"], "payload.dates", e),
-            FieldParsers.Money(raw["total_paid"], "payload.total_paid", e),
-            FieldParsers.Money(raw["amount_still_owed"], "payload.amount_still_owed", e),
-            FieldParsers.Narrative(raw["reason"], "payload.reason", e)),
-        [SofaEntryType.InsiderBenefitPayment] = (raw, e) => new InsiderBenefitPayment(
-            ParseParty(raw["recipient"], "payload.recipient", e),
-            FieldParsers.Text(raw["insider_name"], "payload.insider_name", e),
-            DateList(raw["dates"], "payload.dates", e),
-            FieldParsers.Money(raw["total_paid"], "payload.total_paid", e),
-            FieldParsers.Narrative(raw["reason"], "payload.reason", e)),
-        [SofaEntryType.Lawsuit] = (raw, e) => new Lawsuit(
-            FieldParsers.Text(raw["case_title"], "payload.case_title", e),
-            FieldParsers.Text(raw["case_number"], "payload.case_number", e, limit: 64),
-            FieldParsers.Text(raw["nature_of_case"], "payload.nature_of_case", e),
-            ParseParty(raw["court"], "payload.court", e),
-            FieldParsers.Choice<LegalStatus>(raw["status"], "payload.status", e)),
-        [SofaEntryType.Repossession] = (raw, e) => new Repossession(
-            ParseParty(raw["creditor"], "payload.creditor", e),
-            FieldParsers.Choice<RepossessionAction>(raw["action"], "payload.action", e),
-            FieldParsers.Narrative(raw["description"], "payload.description", e),
-            FieldParsers.FormDate(raw["date"], "payload.date", e),
-            FieldParsers.Money(raw["value"], "payload.value", e)),
-        [SofaEntryType.Setoff] = (raw, e) => new Setoff(
-            ParseParty(raw["creditor"], "payload.creditor", e),
-            FieldParsers.Narrative(raw["description"], "payload.description", e),
-            FieldParsers.FormDate(raw["date"], "payload.date", e),
-            FieldParsers.Money(raw["amount"], "payload.amount", e)),
-        [SofaEntryType.Receivership] = (raw, e) => new Receivership(
-            ParseParty(raw["custodian"], "payload.custodian", e),
-            FieldParsers.Narrative(raw["description"], "payload.description", e),
-            FieldParsers.Money(raw["value"], "payload.value", e),
-            FieldParsers.Text(raw["case_title"], "payload.case_title", e),
-            FieldParsers.Text(raw["case_number"], "payload.case_number", e, limit: 64),
-            ParseParty(raw["court"], "payload.court", e),
-            FieldParsers.FormDate(raw["date"], "payload.date", e)),
-        [SofaEntryType.Gift] = (raw, e) => new Gift(
-            ParseParty(raw["recipient"], "payload.recipient", e),
-            FieldParsers.Text(raw["relationship"], "payload.relationship", e),
-            FieldParsers.Narrative(raw["description"], "payload.description", e),
-            DateList(raw["dates"], "payload.dates", e),
-            FieldParsers.Money(raw["value"], "payload.value", e)),
-        [SofaEntryType.CharitableContribution] = (raw, e) => new CharitableContribution(
-            ParseParty(raw["organization"], "payload.organization", e),
-            FieldParsers.Narrative(raw["description"], "payload.description", e),
-            DateList(raw["dates"], "payload.dates", e),
-            FieldParsers.Money(raw["value"], "payload.value", e)),
-        [SofaEntryType.Loss] = (raw, e) => new Loss(
-            FieldParsers.Narrative(raw["description"], "payload.description", e),
-            FieldParsers.Narrative(raw["insurance_coverage"], "payload.insurance_coverage", e),
-            FieldParsers.FormDate(raw["date"], "payload.date", e),
-            FieldParsers.Money(raw["value"], "payload.value", e)),
-        [SofaEntryType.ConsultantPayment] = (raw, e) => new ConsultantPayment(
-            ParseParty(raw["person"], "payload.person", e),
-            FieldParsers.Text(raw["email_or_website"], "payload.email_or_website", e),
-            FieldParsers.Text(raw["who_made_payment"], "payload.who_made_payment", e),
-            FieldParsers.Narrative(raw["description"], "payload.description", e),
-            FieldParsers.FormDate(raw["date"], "payload.date", e),
-            FieldParsers.Money(raw["amount"], "payload.amount", e)),
-        [SofaEntryType.CreditorAssistancePayment] = (raw, e) => new CreditorAssistancePayment(
-            ParseParty(raw["person"], "payload.person", e),
-            FieldParsers.Narrative(raw["description"], "payload.description", e),
-            FieldParsers.FormDate(raw["date"], "payload.date", e),
-            FieldParsers.Money(raw["amount"], "payload.amount", e)),
-        [SofaEntryType.PropertyTransfer] = (raw, e) => new PropertyTransfer(
-            ParseParty(raw["transferee"], "payload.transferee", e),
-            FieldParsers.Text(raw["relationship"], "payload.relationship", e),
-            FieldParsers.Narrative(raw["description"], "payload.description", e),
-            FieldParsers.Narrative(raw["value_received"], "payload.value_received", e),
-            FieldParsers.FormDate(raw["date"], "payload.date", e)),
-        [SofaEntryType.SelfSettledTrust] = (raw, e) => new SelfSettledTrust(
-            FieldParsers.Text(raw["trust_name"], "payload.trust_name", e),
-            FieldParsers.Narrative(raw["description"], "payload.description", e),
-            FieldParsers.FormDate(raw["date"], "payload.date", e)),
-        [SofaEntryType.ClosedAccount] = ParseClosedAccount,
-        [SofaEntryType.SafeDepositBox] = (raw, e) => new SafeDepositBox(
-            ParseParty(raw["institution"], "payload.institution", e),
-            FieldParsers.StringList(raw["who_has_access"], "payload.who_has_access", e),
-            FieldParsers.Narrative(raw["description"], "payload.description", e),
-            FieldParsers.Boolean(raw["still_have"], "payload.still_have", e)),
-        [SofaEntryType.StorageUnit] = (raw, e) => new StorageUnit(
-            ParseParty(raw["facility"], "payload.facility", e),
-            FieldParsers.StringList(raw["who_has_access"], "payload.who_has_access", e),
-            FieldParsers.Narrative(raw["description"], "payload.description", e),
-            FieldParsers.Boolean(raw["still_have"], "payload.still_have", e)),
-        [SofaEntryType.HeldForAnother] = (raw, e) => new HeldForAnother(
-            ParseParty(raw["owner"], "payload.owner", e),
-            FieldParsers.Narrative(raw["location"], "payload.location", e),
-            FieldParsers.Narrative(raw["description"], "payload.description", e),
-            FieldParsers.Money(raw["value"], "payload.value", e)),
-        [SofaEntryType.EnvironmentalNotice] = (raw, e) => new EnvironmentalNotice(
-            FieldParsers.Choice<EnvironmentalNoticeKind>(raw["kind"], "payload.kind", e),
-            ParseParty(raw["site"], "payload.site", e),
-            ParseParty(raw["governmental_unit"], "payload.governmental_unit", e),
-            FieldParsers.Text(raw["environmental_law"], "payload.environmental_law", e),
-            FieldParsers.FormDate(raw["date"], "payload.date", e)),
-        [SofaEntryType.EnvironmentalProceeding] = (raw, e) => new EnvironmentalProceeding(
-            FieldParsers.Text(raw["case_title"], "payload.case_title", e),
-            FieldParsers.Text(raw["case_number"], "payload.case_number", e, limit: 64),
-            ParseParty(raw["court"], "payload.court", e),
-            FieldParsers.Text(raw["nature_of_case"], "payload.nature_of_case", e),
-            FieldParsers.Choice<LegalStatus>(raw["status"], "payload.status", e)),
-        [SofaEntryType.BusinessConnection] = (raw, e) => new BusinessConnection(
-            ParseParty(raw["business"], "payload.business", e),
-            FieldParsers.Text(raw["nature_of_business"], "payload.nature_of_business", e),
-            FieldParsers.Text(raw["ein"], "payload.ein", e, limit: 20),
-            FieldParsers.FormDate(raw["from_date"], "payload.from_date", e),
-            FieldParsers.FormDate(raw["to_date"], "payload.to_date", e),
-            FieldParsers.ChoiceList<BusinessConnectionKind>(raw["connection"], "payload.connection", e)),
-        [SofaEntryType.FinancialStatementIssued] = (raw, e) => new FinancialStatementIssued(
-            ParseParty(raw["recipient"], "payload.recipient", e),
-            FieldParsers.FormDate(raw["date_issued"], "payload.date_issued", e)),
-    };
-
-    /// <summary>
-    /// Validates a SOFA entry (Python's <c>parse_sofa_entry</c>): the entry
-    /// type names the payload's parser, so a payload without one is refused.
-    /// </summary>
-    public static SofaEntryBody Parse(JsonObject payload)
-    {
-        ArgumentNullException.ThrowIfNull(payload);
-        var errors = new Dictionary<string, string>(StringComparer.Ordinal);
-        var entryType = FieldParsers.Choice<SofaEntryType>(payload["entry_type"], "entry_type", errors);
-        SofaPayload? parsed = null;
-        var rawPayload = payload["payload"];
-        if (rawPayload is not null)
-        {
-            if (entryType is null)
-            {
-                errors.TryAdd("entry_type", "Required when a payload is sent — it names the parser.");
-            }
-            else
-            {
-                parsed = Parsers[entryType.Value](FieldParsers.Mapping(rawPayload, "payload", errors), errors);
-            }
-        }
-
-        IdRows.ThrowIfAny(errors);
-        return new SofaEntryBody(entryType, parsed);
-    }
-
-    private static ClosedAccount ParseClosedAccount(JsonObject raw, Dictionary<string, string> e)
-    {
-        var accountLast4 = FieldParsers.Text(raw["account_last4"], "payload.account_last4", e, limit: 4);
-        if (accountLast4 is not null && !TextRules.IsDigits(accountLast4))
-        {
-            e["payload.account_last4"] = "Must be up to four digits.";
-            accountLast4 = null;
-        }
-
-        return new ClosedAccount(
-            ParseParty(raw["institution"], "payload.institution", e),
-            accountLast4,
-            FieldParsers.Choice<AccountType>(raw["account_type"], "payload.account_type", e),
-            FieldParsers.FormDate(raw["date_closed"], "payload.date_closed", e),
-            FieldParsers.Money(raw["last_balance"], "payload.last_balance", e));
-    }
-
-    private static Party ParseParty(JsonNode? value, string path, Dictionary<string, string> errors)
-    {
-        var raw = FieldParsers.Mapping(value, path, errors);
-        return new Party(
-            FieldParsers.Text(raw["name"], $"{path}.name", errors),
-            FieldParsers.ParseAddress(raw["address"], $"{path}.address", errors));
-    }
-
-    private static ValueCollection<DateOnly> DateList(JsonNode? value, string path, Dictionary<string, string> errors)
-    {
-        if (value is null)
-        {
-            return [];
-        }
-
-        if (value is not JsonArray list)
-        {
-            errors[path] = "Must be a list of dates.";
-            return [];
-        }
-
-        var dates = new List<DateOnly>();
-        for (var index = 0; index < list.Count; index++)
-        {
-            if (FieldParsers.FormDate(list[index], $"{path}[{index}]", errors) is { } parsed)
-            {
-                dates.Add(parsed);
-            }
-        }
-
-        return dates.ToValueCollection();
-    }
+    public static readonly EntityKind<SofaEntryBody> Kind = new("sofa_entry", "sofa_entries", "SOFA_ENTRY");
 }
 
 /// <summary>Which debtor a Form 107 row is about (Python's <c>SOFA_DEBTORS</c>).</summary>
@@ -496,116 +549,4 @@ public enum MaritalStatusKind
     /// <summary>The wire value <c>not_married</c>.</summary>
     [JsonStringEnumMemberName("not_married")]
     NotMarried,
-}
-
-/// <summary>Which Form 107 question an entry answers — the payload parser's key, in Python's <c>PAYLOAD_PARSERS</c> order.</summary>
-public enum SofaEntryType
-{
-    /// <summary>The wire value <c>marital_status</c>.</summary>
-    [JsonStringEnumMemberName("marital_status")]
-    MaritalStatus,
-
-    /// <summary>The wire value <c>prior_address</c>.</summary>
-    [JsonStringEnumMemberName("prior_address")]
-    PriorAddress,
-
-    /// <summary>The wire value <c>community_property_residence</c>.</summary>
-    [JsonStringEnumMemberName("community_property_residence")]
-    CommunityPropertyResidence,
-
-    /// <summary>The wire value <c>income_by_period</c>.</summary>
-    [JsonStringEnumMemberName("income_by_period")]
-    IncomeByPeriod,
-
-    /// <summary>The wire value <c>consumer_debt_declaration</c>.</summary>
-    [JsonStringEnumMemberName("consumer_debt_declaration")]
-    ConsumerDebtDeclaration,
-
-    /// <summary>The wire value <c>creditor_payment</c>.</summary>
-    [JsonStringEnumMemberName("creditor_payment")]
-    CreditorPayment,
-
-    /// <summary>The wire value <c>insider_payment</c>.</summary>
-    [JsonStringEnumMemberName("insider_payment")]
-    InsiderPayment,
-
-    /// <summary>The wire value <c>insider_benefit_payment</c>.</summary>
-    [JsonStringEnumMemberName("insider_benefit_payment")]
-    InsiderBenefitPayment,
-
-    /// <summary>The wire value <c>lawsuit</c>.</summary>
-    [JsonStringEnumMemberName("lawsuit")]
-    Lawsuit,
-
-    /// <summary>The wire value <c>repossession</c>.</summary>
-    [JsonStringEnumMemberName("repossession")]
-    Repossession,
-
-    /// <summary>The wire value <c>setoff</c>.</summary>
-    [JsonStringEnumMemberName("setoff")]
-    Setoff,
-
-    /// <summary>The wire value <c>receivership</c>.</summary>
-    [JsonStringEnumMemberName("receivership")]
-    Receivership,
-
-    /// <summary>The wire value <c>gift</c>.</summary>
-    [JsonStringEnumMemberName("gift")]
-    Gift,
-
-    /// <summary>The wire value <c>charitable_contribution</c>.</summary>
-    [JsonStringEnumMemberName("charitable_contribution")]
-    CharitableContribution,
-
-    /// <summary>The wire value <c>loss</c>.</summary>
-    [JsonStringEnumMemberName("loss")]
-    Loss,
-
-    /// <summary>The wire value <c>consultant_payment</c>.</summary>
-    [JsonStringEnumMemberName("consultant_payment")]
-    ConsultantPayment,
-
-    /// <summary>The wire value <c>creditor_assistance_payment</c>.</summary>
-    [JsonStringEnumMemberName("creditor_assistance_payment")]
-    CreditorAssistancePayment,
-
-    /// <summary>The wire value <c>property_transfer</c>.</summary>
-    [JsonStringEnumMemberName("property_transfer")]
-    PropertyTransfer,
-
-    /// <summary>The wire value <c>self_settled_trust</c>.</summary>
-    [JsonStringEnumMemberName("self_settled_trust")]
-    SelfSettledTrust,
-
-    /// <summary>The wire value <c>closed_account</c>.</summary>
-    [JsonStringEnumMemberName("closed_account")]
-    ClosedAccount,
-
-    /// <summary>The wire value <c>safe_deposit_box</c>.</summary>
-    [JsonStringEnumMemberName("safe_deposit_box")]
-    SafeDepositBox,
-
-    /// <summary>The wire value <c>storage_unit</c>.</summary>
-    [JsonStringEnumMemberName("storage_unit")]
-    StorageUnit,
-
-    /// <summary>The wire value <c>held_for_another</c>.</summary>
-    [JsonStringEnumMemberName("held_for_another")]
-    HeldForAnother,
-
-    /// <summary>The wire value <c>environmental_notice</c>.</summary>
-    [JsonStringEnumMemberName("environmental_notice")]
-    EnvironmentalNotice,
-
-    /// <summary>The wire value <c>environmental_proceeding</c>.</summary>
-    [JsonStringEnumMemberName("environmental_proceeding")]
-    EnvironmentalProceeding,
-
-    /// <summary>The wire value <c>business_connection</c>.</summary>
-    [JsonStringEnumMemberName("business_connection")]
-    BusinessConnection,
-
-    /// <summary>The wire value <c>financial_statement_issued</c>.</summary>
-    [JsonStringEnumMemberName("financial_statement_issued")]
-    FinancialStatementIssued,
 }

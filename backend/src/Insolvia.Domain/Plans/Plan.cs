@@ -1,4 +1,4 @@
-using System.Text.Json.Nodes;
+using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 using Insolvia.Domain.CaseEntities;
 using Insolvia.Domain.Fields;
@@ -9,10 +9,31 @@ namespace Insolvia.Domain.Plans;
 // case. Its figures are the calculator's, never stored.
 
 /// <summary>From <see cref="StartMonth"/> on (1-based, inclusive) the monthly payment is <see cref="MonthlyPayment"/>.</summary>
-public sealed record StepPayment(string Id, int? StartMonth, decimal? MonthlyPayment);
+public sealed record StepPayment(
+    string Id,
+    [property: Count(PlanRules.MaxTermMonths)] int? StartMonth = null,
+    [property: Money] decimal? MonthlyPayment = null) : IRow, IValidatableObject
+{
+    /// <summary>The month is one of the plan's.</summary>
+    /// <param name="validationContext">Unused.</param>
+    /// <returns>The failures.</returns>
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext) =>
+        PlanRules.CheckMonth(StartMonth, nameof(StartMonth));
+}
 
 /// <summary>A one-time payment into the plan in <see cref="Month"/>.</summary>
-public sealed record LumpSum(string Id, int? Month, decimal? Amount, string? Description);
+public sealed record LumpSum(
+    string Id,
+    [property: Count(PlanRules.MaxTermMonths)] int? Month = null,
+    [property: Money] decimal? Amount = null,
+    [property: Text] string? Description = null) : IRow, IValidatableObject
+{
+    /// <summary>The month is one of the plan's.</summary>
+    /// <param name="validationContext">Unused.</param>
+    /// <returns>The failures.</returns>
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext) =>
+        PlanRules.CheckMonth(Month, nameof(Month));
+}
 
 /// <summary>
 /// How the plan treats one secured claim: cure-and-maintain (arrearage cured,
@@ -22,35 +43,77 @@ public sealed record LumpSum(string Id, int? Month, decimal? Amount, string? Des
 /// </summary>
 public sealed record SecuredTreatment(
     string Id,
-    string? ClaimId,
-    SecuredTreatmentKind? Treatment,
-    decimal? Arrearage,
-    decimal? ArrearageInterestRate,
-    decimal? MaintenancePayment,
-    decimal? CramdownValue,
-    decimal? InterestRate,
-    decimal? MonthlyPayment);
+    [property: Text(64)] string? ClaimId = null,
+    SecuredTreatmentKind? Treatment = null,
+    [property: Money] decimal? Arrearage = null,
+    [property: Rate] decimal? ArrearageInterestRate = null,
+    [property: Money] decimal? MaintenancePayment = null,
+    [property: Money] decimal? CramdownValue = null,
+    [property: Rate] decimal? InterestRate = null,
+    [property: Money] decimal? MonthlyPayment = null) : IRow;
 
 /// <summary>The plan's proposal.</summary>
 public sealed record PlanBody(
-    int? TermMonths,
-    PaymentSource? PaymentSource,
-    decimal? MonthlyPayment,
-    ValueCollection<StepPayment> StepPayments,
-    ValueCollection<LumpSum> LumpSums,
-    decimal? TrusteePercentage,
-    decimal? AttorneyFees,
-    decimal? AttorneyFeeMonthly,
-    ValueCollection<SecuredTreatment> SecuredTreatments,
-    decimal? PriorityPercentage,
-    decimal? PriorityInterestRate,
-    UnsecuredTreatment? UnsecuredTreatment,
-    decimal? UnsecuredPercentage,
-    decimal? UnsecuredAmount,
-    decimal? UnsecuredInterestRate,
-    [property: JsonPropertyName("chapter_7_other_costs")] decimal? Chapter7OtherCosts,
-    [property: JsonPropertyName("chapter_7_other_costs_description")] string? Chapter7OtherCostsDescription,
-    decimal? PresentValueRate);
+    [property: Count(PlanRules.MaxTermMonths)] int? TermMonths = null,
+    PaymentSource? PaymentSource = null,
+    [property: Money] decimal? MonthlyPayment = null,
+    ValueCollection<StepPayment>? StepPayments = null,
+    ValueCollection<LumpSum>? LumpSums = null,
+    [property: Rate(PlanRules.MaxTrusteePercentage)] decimal? TrusteePercentage = null,
+    [property: Money] decimal? AttorneyFees = null,
+    [property: Money] decimal? AttorneyFeeMonthly = null,
+    ValueCollection<SecuredTreatment>? SecuredTreatments = null,
+    [property: Rate] decimal? PriorityPercentage = null,
+    [property: Rate] decimal? PriorityInterestRate = null,
+    UnsecuredTreatment? UnsecuredTreatment = null,
+    [property: Rate] decimal? UnsecuredPercentage = null,
+    [property: Money] decimal? UnsecuredAmount = null,
+    [property: Rate] decimal? UnsecuredInterestRate = null,
+    [property: Money] decimal? Chapter7OtherCosts = null,
+    [property: Text] string? Chapter7OtherCostsDescription = null,
+    [property: Rate] decimal? PresentValueRate = null) : IValidatableObject
+{
+    /// <summary>The step schedule.</summary>
+    [Rows]
+    public ValueCollection<StepPayment> StepPayments { get; init; } = StepPayments ?? [];
+
+    /// <summary>The one-time payments.</summary>
+    [Rows]
+    public ValueCollection<LumpSum> LumpSums { get; init; } = LumpSums ?? [];
+
+    /// <summary>The secured claims' treatments.</summary>
+    [Rows]
+    public ValueCollection<SecuredTreatment> SecuredTreatments { get; init; } = SecuredTreatments ?? [];
+
+    /// <summary>A plan runs at least a month; steps start in distinct months; a claim has one treatment.</summary>
+    /// <param name="validationContext">Unused.</param>
+    /// <returns>The failures.</returns>
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        if (TermMonths == 0)
+        {
+            yield return new ValidationResult($"A plan runs 1 to {PlanRules.MaxTermMonths} months — § 1322(d) caps it at five years.", [nameof(TermMonths)]);
+        }
+
+        var starts = new HashSet<int>();
+        for (var index = 0; index < StepPayments.Count; index++)
+        {
+            if (StepPayments[index].StartMonth is { } start && !starts.Add(start))
+            {
+                yield return new ValidationResult("Another step already starts in this month.", [$"stepPayments[{index}].startMonth"]);
+            }
+        }
+
+        var treated = new HashSet<string>(StringComparer.Ordinal);
+        for (var index = 0; index < SecuredTreatments.Count; index++)
+        {
+            if (SecuredTreatments[index].ClaimId is { } claimId && !treated.Add(claimId))
+            {
+                yield return new ValidationResult("This claim already has a treatment.", [$"securedTreatments[{index}].claimId"]);
+            }
+        }
+    }
+}
 
 /// <summary>The plan collection.</summary>
 public static class PlanRules
@@ -59,119 +122,21 @@ public static class PlanRules
     public const int MaxTermMonths = 60;
 
     /// <summary>The trustee's percentage fee is capped at ten per cent.</summary>
-    public static readonly decimal MaxTrusteePercentage = 10m;
+    public const int MaxTrusteePercentage = 10;
 
     /// <summary>The collection's kind.</summary>
-    public static readonly EntityKind<PlanBody> Kind = new("plan", "plans", "PLAN", Parse);
+    public static readonly EntityKind<PlanBody> Kind = new("plan", "plans", "PLAN");
 
-    /// <summary>Validates a plan body (Python's <c>parse_plan</c>).</summary>
-    public static PlanBody Parse(JsonObject payload)
+    /// <summary>A month of the plan is 1-based: 0 is refused.</summary>
+    /// <param name="month">The month.</param>
+    /// <param name="member">The member that holds it.</param>
+    /// <returns>The failures.</returns>
+    internal static IEnumerable<ValidationResult> CheckMonth(int? month, string member)
     {
-        ArgumentNullException.ThrowIfNull(payload);
-        var errors = new Dictionary<string, string>(StringComparer.Ordinal);
-        decimal? Amount(string key) => FieldParsers.Money(payload[key], key, errors);
-        decimal? Rate(string key) => FieldParsers.Percentage(payload[key], key, errors);
-
-        var term = FieldParsers.WholeNumber(payload["term_months"], "term_months", errors, maximum: 1000);
-        if (term is not null and (< 1 or > MaxTermMonths))
+        if (month == 0)
         {
-            errors["term_months"] = $"A plan runs 1 to {MaxTermMonths} months — § 1322(d) caps it at five years.";
-            term = null;
+            yield return new ValidationResult($"Must be a month of the plan, 1 to {MaxTermMonths}.", [member]);
         }
-
-        var body = new PlanBody(
-            TermMonths: term,
-            PaymentSource: FieldParsers.Choice<PaymentSource>(payload["payment_source"], "payment_source", errors),
-            MonthlyPayment: Amount("monthly_payment"),
-            StepPayments: IdRows.Parse(
-                payload["step_payments"],
-                "step_payments",
-                errors,
-                (id, raw, path) => new StepPayment(
-                    id,
-                    Month(raw["start_month"], $"{path}.start_month", errors),
-                    FieldParsers.Money(raw["monthly_payment"], $"{path}.monthly_payment", errors))),
-            LumpSums: IdRows.Parse(
-                payload["lump_sums"],
-                "lump_sums",
-                errors,
-                (id, raw, path) => new LumpSum(
-                    id,
-                    Month(raw["month"], $"{path}.month", errors),
-                    FieldParsers.Money(raw["amount"], $"{path}.amount", errors),
-                    FieldParsers.Text(raw["description"], $"{path}.description", errors))),
-            TrusteePercentage: FieldParsers.Percentage(payload["trustee_percentage"], "trustee_percentage", errors, maximum: MaxTrusteePercentage),
-            AttorneyFees: Amount("attorney_fees"),
-            AttorneyFeeMonthly: Amount("attorney_fee_monthly"),
-            SecuredTreatments: IdRows.Parse(
-                payload["secured_treatments"],
-                "secured_treatments",
-                errors,
-                (id, raw, path) => new SecuredTreatment(
-                    id,
-                    FieldParsers.Text(raw["claim_id"], $"{path}.claim_id", errors, limit: 64),
-                    FieldParsers.Choice<SecuredTreatmentKind>(raw["treatment"], $"{path}.treatment", errors),
-                    FieldParsers.Money(raw["arrearage"], $"{path}.arrearage", errors),
-                    FieldParsers.Percentage(raw["arrearage_interest_rate"], $"{path}.arrearage_interest_rate", errors),
-                    FieldParsers.Money(raw["maintenance_payment"], $"{path}.maintenance_payment", errors),
-                    FieldParsers.Money(raw["cramdown_value"], $"{path}.cramdown_value", errors),
-                    FieldParsers.Percentage(raw["interest_rate"], $"{path}.interest_rate", errors),
-                    FieldParsers.Money(raw["monthly_payment"], $"{path}.monthly_payment", errors))),
-            PriorityPercentage: Rate("priority_percentage"),
-            PriorityInterestRate: Rate("priority_interest_rate"),
-            UnsecuredTreatment: FieldParsers.Choice<UnsecuredTreatment>(payload["unsecured_treatment"], "unsecured_treatment", errors),
-            UnsecuredPercentage: Rate("unsecured_percentage"),
-            UnsecuredAmount: Amount("unsecured_amount"),
-            UnsecuredInterestRate: Rate("unsecured_interest_rate"),
-            Chapter7OtherCosts: Amount("chapter_7_other_costs"),
-            Chapter7OtherCostsDescription: FieldParsers.Text(payload["chapter_7_other_costs_description"], "chapter_7_other_costs_description", errors),
-            PresentValueRate: Rate("present_value_rate"));
-
-        // NOTE: the index is the row's position among the PARSED rows, not the
-        // payload's — as the contract has it; it differs only when an earlier row was refused,
-        // and then the request fails on that row anyway.
-        var starts = new HashSet<int>();
-        for (var index = 0; index < body.StepPayments.Count; index++)
-        {
-            if (body.StepPayments[index].StartMonth is not { } start)
-            {
-                continue;
-            }
-
-            if (!starts.Add(start))
-            {
-                errors[$"step_payments[{index}].start_month"] = "Another step already starts in this month.";
-            }
-        }
-
-        var treated = new HashSet<string>(StringComparer.Ordinal);
-        for (var index = 0; index < body.SecuredTreatments.Count; index++)
-        {
-            if (body.SecuredTreatments[index].ClaimId is not { } claimId)
-            {
-                continue;
-            }
-
-            if (!treated.Add(claimId))
-            {
-                errors[$"secured_treatments[{index}].claim_id"] = "This claim already has a treatment.";
-            }
-        }
-
-        IdRows.ThrowIfAny(errors);
-        return body;
-    }
-
-    private static int? Month(JsonNode? value, string path, Dictionary<string, string> errors)
-    {
-        var month = FieldParsers.WholeNumber(value, path, errors, maximum: MaxTermMonths);
-        if (month is < 1)
-        {
-            errors[path] = $"Must be a month of the plan, 1 to {MaxTermMonths}.";
-            return null;
-        }
-
-        return month;
     }
 }
 

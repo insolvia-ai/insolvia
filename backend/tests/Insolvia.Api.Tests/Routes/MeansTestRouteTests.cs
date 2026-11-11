@@ -201,7 +201,7 @@ public sealed class MeansTestRouteTests : IAsyncLifetime, IDisposable
         var caseId = await SeedReferenceAsync(chapter: 13);
         foreach (var entity in await _world.Entities.ListForCaseAsync(caseId, IncomeRules.PayPeriodRecord, HttpAssert.Ct))
         {
-            var answer = await _world.Put($"/v1/cases/{caseId}/pay_period_records/{entity.Id}", AnalysisWorld.Typed("""{"gross": "4500.00"}"""));
+            var answer = await _world.Put($"/v1/cases/{caseId}/pay_period_records/{entity.Id}", AnalysisWorld.Typed("""{"gross": 4500.00}"""));
             Assert.True(answer.Status == 200, answer.Body);
         }
 
@@ -238,7 +238,7 @@ public sealed class MeansTestRouteTests : IAsyncLifetime, IDisposable
     {
         var caseId = await SeedReferenceAsync();
         var existing = Assert.Single(await _world.Entities.ListForCaseAsync(caseId, MeansTestInputRules.Kind, HttpAssert.Ct));
-        var saved = await _world.Put($"/v1/cases/{caseId}/means_test_inputs/{existing.Id}", AnalysisWorld.Typed("""{"reservist_national_guard": true, "people_under_65": 3}"""));
+        var saved = await _world.Put($"/v1/cases/{caseId}/means_test_inputs/{existing.Id}", AnalysisWorld.Typed("""{"reservistNationalGuard": true, "peopleUnder65": 3}"""));
         Assert.True(saved.Status == 200, saved.Body);
 
         var body = (await MeansTest(caseId)).Object;
@@ -301,27 +301,20 @@ public sealed class MeansTestRouteTests : IAsyncLifetime, IDisposable
     public async Task The_sample_input_body_round_trips_through_the_collection_route()
     {
         var caseId = await _world.OpenCaseAsync();
-        const string IncomeOverrides = """[{"category":"wages","column":"A","id":"ov1","monthly_amount":"5000.00"}]""";
-        const string SecuredPayments = """[{"bucket":"vehicle_1","claim_id":"claim-1","cure_total":"1200.00","id":"sp1","monthly_payment":"400.00"}]""";
-        var typed = """{"source": "staff_typed"}""";
-        var payload = $$$"""
-            {"median_household_size": 4, "marital_filing_status": "married_not_filing_separated",
-             "income_overrides": {{{IncomeOverrides}}}, "other_secured_payments": {{{SecuredPayments}}},
-             "provenance": {"median_household_size": {{{typed}}}, "marital_filing_status": {{{typed}}},
-               "income_overrides[ov1].id": {{{typed}}}, "income_overrides[ov1].column": {{{typed}}}, "income_overrides[ov1].category": {{{typed}}}, "income_overrides[ov1].monthly_amount": {{{typed}}},
-               "other_secured_payments[sp1].id": {{{typed}}}, "other_secured_payments[sp1].claim_id": {{{typed}}}, "other_secured_payments[sp1].bucket": {{{typed}}},
-               "other_secured_payments[sp1].monthly_payment": {{{typed}}}, "other_secured_payments[sp1].cure_total": {{{typed}}}}}
+        const string IncomeOverrides = """[{"category":"wages","column":"A","id":"ov1","monthlyAmount":5000.00}]""";
+        const string SecuredPayments = """[{"bucket":"vehicle_1","claimId":"claim-1","cureTotal":1200.00,"id":"sp1","monthlyPayment":400.00}]""";
+        var body = $$"""
+            {"medianHouseholdSize": 4, "maritalFilingStatus": "married_not_filing_separated",
+             "incomeOverrides": {{IncomeOverrides}}, "otherSecuredPayments": {{SecuredPayments}}}
             """;
 
-        var answer = await _world.Post($"/v1/cases/{caseId}/means_test_inputs", payload);
+        var answer = await _world.Post($"/v1/cases/{caseId}/means_test_inputs", AnalysisWorld.Typed(body));
 
         Assert.True(answer.Status == 201, answer.Body);
-        var stored = answer.Object;
-        Assert.Equal(IncomeOverrides, Support.SortedJson.Serialize(stored["income_overrides"]));
-        Assert.Equal(SecuredPayments, Support.SortedJson.Serialize(stored["other_secured_payments"]));
-        var bare = JsonNode.Parse(payload)!.AsObject();
-        bare.Remove("provenance");
-        Assert.Equal(4, MeansTestInputRules.Kind.ParseBody(bare).MedianHouseholdSize);
+        var stored = answer.Object["body"]!;
+        Assert.Equal(IncomeOverrides, Support.SortedJson.Serialize(stored["incomeOverrides"]));
+        Assert.Equal(SecuredPayments, Support.SortedJson.Serialize(stored["otherSecuredPayments"]));
+        Assert.Equal(4, (int)stored["medianHouseholdSize"]!);
     }
 
     /// <summary>A projected money box back to the wire's plain two-place string.</summary>
@@ -337,7 +330,7 @@ public sealed class MeansTestRouteTests : IAsyncLifetime, IDisposable
     private async Task PutExpectedFilingDateAsync(string caseId, string expected)
     {
         var petition = Assert.Single(await _world.Entities.ListForCaseAsync(caseId, PetitionRules.Petition, HttpAssert.Ct));
-        var answer = await _world.Put($"/v1/cases/{caseId}/petitions/{petition.Id}", AnalysisWorld.Typed($$"""{"expected_filing_date": "{{expected}}"}"""));
+        var answer = await _world.Put($"/v1/cases/{caseId}/petitions/{petition.Id}", AnalysisWorld.Typed($$"""{"expectedFilingDate": "{{expected}}"}"""));
         Assert.True(answer.Status == 200, answer.Body);
     }
 

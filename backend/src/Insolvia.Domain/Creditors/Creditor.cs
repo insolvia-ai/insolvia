@@ -1,4 +1,3 @@
-using System.Text.Json.Nodes;
 using Insolvia.Domain.CaseEntities;
 using Insolvia.Domain.Fields;
 
@@ -11,23 +10,15 @@ namespace Insolvia.Domain.Creditors;
 /// — creditors are predominantly entities. Nothing here dedupes; matching is
 /// a suggestion to a human.
 /// </summary>
-public sealed record CreditorBody(string? Name, Address Address);
+public sealed record CreditorBody([property: Text] string? Name = null, Address? Address = null)
+{
+    /// <summary>The creditor's address; an empty one when none was given.</summary>
+    public Address Address { get; init; } = Address ?? new();
+}
 
 /// <summary>The creditor collection.</summary>
 public static class CreditorRules
 {
     /// <summary>The collection's kind.</summary>
-    public static readonly EntityKind<CreditorBody> Kind = new("creditor", "creditors", "CREDITOR", Parse);
-
-    /// <summary>Validates a creditor body (Python's <c>parse_creditor</c>).</summary>
-    public static CreditorBody Parse(JsonObject payload)
-    {
-        ArgumentNullException.ThrowIfNull(payload);
-        var errors = new Dictionary<string, string>(StringComparer.Ordinal);
-        var body = new CreditorBody(
-            Name: FieldParsers.Text(payload["name"], "name", errors),
-            Address: FieldParsers.ParseAddress(payload["address"], "address", errors));
-        IdRows.ThrowIfAny(errors);
-        return body;
-    }
+    public static readonly EntityKind<CreditorBody> Kind = new("creditor", "creditors", "CREDITOR");
 }

@@ -223,7 +223,7 @@ public sealed class ProjectionScheduleTests
         Assert.Equal(Text("1,100.00"), values["line_28_amount_federal"]);
         Assert.False(values.ContainsKey("line_28_amount_state"));
 
-        var mystery = ("asset-mystery", Build.Body(AssetRules.Kind, """{"category": "money_owed_to_you", "description": "A refund of some kind", "detail": "unspecified", "value_portion_owned": "10.00"}"""));
+        var mystery = ("asset-mystery", Build.Body(AssetRules.Kind, """{"category": "money_owed_to_you", "description": "A refund of some kind", "detail": "unspecified", "valuePortionOwned": 10.00}"""));
         var error = Refused("form/b106ab", Reference with { Assets = [.. Reference.Assets, mystery] });
         Assert.Contains("names none of them", error.Message, StringComparison.Ordinal);
         Assert.Contains("'unspecified'", error.Message, StringComparison.Ordinal);
@@ -232,7 +232,7 @@ public sealed class ProjectionScheduleTests
     [Fact]
     public void B106ab_overflow_past_the_printed_rows_is_an_error()
     {
-        var extra = Enumerable.Range(0, 3).Select(n => ($"asset-lot-{n}", Build.Body(AssetRules.Kind, $$"""{"category": "real_property", "description": "Vacant lot {{n}}", "value_portion_owned": "1000.00"}""")));
+        var extra = Enumerable.Range(0, 3).Select(n => ($"asset-lot-{n}", Build.Body(AssetRules.Kind, $$"""{"category": "real_property", "description": "Vacant lot {{n}}", "valuePortionOwned": 1000.00}""")));
         Assert.Contains("prints 3 rows", Refused("form/b106ab", Reference with { Assets = [.. Reference.Assets, .. extra] }).Message, StringComparison.Ordinal);
     }
 
@@ -320,8 +320,8 @@ public sealed class ProjectionScheduleTests
     [Fact]
     public void B106d_senior_liens_and_the_override_reach_column_b()
     {
-        var junior = Build.Body(ClaimRules.Kind, """{"creditor_id": "cred-auto", "claim_class": "secured", "amount": "100000.00", "asset_id": "asset-house", "lien_position": 2, "lien_nature": ["agreement"]}""");
-        var manual = Build.Body(ClaimRules.Kind, """{"creditor_id": "cred-auto", "claim_class": "secured", "amount": "5000.00", "collateral_value": "1.00", "unsecured_amount_override": "4321.00"}""");
+        var junior = Build.Body(ClaimRules.Kind, """{"creditorId": "cred-auto", "claimClass": "secured", "amount": 100000.00, "assetId": "asset-house", "lienPosition": 2, "lienNature": ["agreement"]}""");
+        var manual = Build.Body(ClaimRules.Kind, """{"creditorId": "cred-auto", "claimClass": "secured", "amount": 5000.00, "collateralValue": 1.00, "unsecuredAmountOverride": 4321.00}""");
         var values = Project("form/b106d", Reference with { Claims = [.. Reference.Claims, ("claim-second", junior), ("claim-manual", manual)] });
         Assert.Equal(Text("265,000.00"), Row(values, "form/b106d", "claim.collateral_value", 2));
         Assert.Equal(Text("30,000.00"), Row(values, "form/b106d", "claim.unsecured_portion", 2));
@@ -331,7 +331,7 @@ public sealed class ProjectionScheduleTests
     [Fact]
     public void B106d_broken_who_owes_rows_use_the_widget_escape_hatches()
     {
-        var filler = Enumerable.Range(0, 3).Select(n => ($"claim-extra-{n}", Build.Body(ClaimRules.Kind, $$"""{"creditor_id": "cred-auto", "claim_class": "secured", "amount": "100.00", "who_incurred": "{{(n == 1 ? "at_least_one_plus_another" : "debtor_2")}}"}""")));
+        var filler = Enumerable.Range(0, 3).Select(n => ($"claim-extra-{n}", Build.Body(ClaimRules.Kind, $$"""{"creditorId": "cred-auto", "claimClass": "secured", "amount": 100.00, "whoIncurred": "{{(n == 1 ? "at_least_one_plus_another" : "debtor_2")}}"}""")));
         var values = Project("form/b106d", Reference with { Claims = [.. Reference.Claims, .. filler] });
         Assert.Equal(WidgetStatesFill.ByIndexes(3), values["claim.who_owes_row_2_4"]);
         Assert.Equal(["Debtor 2 only_5"], Assert.IsType<RowFills>(values["claim.who_owes_row_2_5"]).Select(pair => pair.Key));

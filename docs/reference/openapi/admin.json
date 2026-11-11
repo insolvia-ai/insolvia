@@ -308,7 +308,7 @@
           "state": {
             "type": "string"
           },
-          "postal_code": {
+          "postalCode": {
             "type": "string"
           },
           "county": {
@@ -318,7 +318,7 @@
             "type": "string"
           }
         },
-        "description": "Structured parts AND a raw fallback (the IEPD\u0027s free-text form, for a\ncreditor block that will not parse). string? Address.County is B101 line 5\u0027s box."
+        "description": "Structured parts AND a raw fallback (the IEPD\u0027s free-text form, for a\ncreditor block that will not parse). string? Address.County is B101 line 5\u0027s box.\nstring? Address.PostalCode is \u0060postalCode\u0060 under every serializer, the\nsnake_case ones included: an address sits in a case collection\u0027s camelCase\nbody and in a debtor\u0027s, a firm\u0027s and a client\u0027s snake_case one alike (ADR 0032)."
       },
       "ErrorBody": {
         "required": ["error"],

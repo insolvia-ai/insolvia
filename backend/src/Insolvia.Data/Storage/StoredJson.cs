@@ -21,7 +21,7 @@ internal static class StoredJson
     {
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-        Converters = { new JsonStringEnumConverter(), new ValueCollectionConverterFactory() },
+        Converters = { new JsonStringEnumConverter() },
     };
 
     /// <summary><paramref name="value"/> as a document.</summary>
@@ -129,25 +129,5 @@ internal static class StoredJson
         }
 
         return int.MaxValue;
-    }
-
-    // ValueCollection<T> is a JSON array; System.Text.Json does not know its
-    // collection builder, so it is read through a list.
-    private sealed class ValueCollectionConverterFactory : JsonConverterFactory
-    {
-        public override bool CanConvert(Type typeToConvert) =>
-            typeToConvert.IsGenericType && typeToConvert.GetGenericTypeDefinition() == typeof(ValueCollection<>);
-
-        public override JsonConverter CreateConverter(Type typeToConvert, JsonSerializerOptions options) =>
-            (JsonConverter)Activator.CreateInstance(typeof(ValueCollectionConverter<>).MakeGenericType(typeToConvert.GetGenericArguments()[0]))!;
-    }
-
-    private sealed class ValueCollectionConverter<T> : JsonConverter<ValueCollection<T>>
-    {
-        public override ValueCollection<T> Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
-            (JsonSerializer.Deserialize<List<T>>(ref reader, options) ?? []).ToValueCollection();
-
-        public override void Write(Utf8JsonWriter writer, ValueCollection<T> value, JsonSerializerOptions options) =>
-            JsonSerializer.Serialize(writer, value.ToList(), options);
     }
 }
