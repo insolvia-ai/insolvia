@@ -213,15 +213,7 @@ export function checkExchanges(exchanges: readonly WireExchange[]): OpenApiRepor
       );
       const label = `${surface} ${exchange.method} ${template?.path ?? exchange.path}`;
       if (!template) {
-        // A host answers a route it does not have (an unknown collection, say)
-        // with the error envelope, like any refusal; only that is checked.
-        if (exchange.status >= 400 && exchange.status < 500) {
-          const problems: string[] = [];
-          const envelope = document.components.responses.Error!.content['application/json']!.schema;
-          if (exchange.response !== undefined)
-            validator.check(exchange.response, envelope, 'error', false, problems);
-          for (const problem of problems) failures.add(`${label}: ${problem}`);
-        } else failures.add(`${label}: no such operation in ${DOCUMENTS[surface]}`);
+        failures.add(`${label}: no such operation in ${DOCUMENTS[surface]}`);
         continue;
       }
       const operation = document.paths[template.path]![method]!;

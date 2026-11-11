@@ -89,18 +89,14 @@ describe('the generic case collections', () => {
     await expectApiError(admin.api.deleteCaseEntity(caseId, collection, id), 404, 'NotFoundError');
   });
 
-  it('refuses an invalid record by field, and an unknown collection or case', async () => {
+  // An unknown collection's 404 is CaseEntityRouteTests' (a refusal, ADR 0029 rule 1).
+  it('refuses an invalid record by field, and an unknown case', async () => {
     const admin = firmAdmin();
     const { caseId } = await scratchCase();
     await expectApiError(
       admin.api.addCaseEntity(caseId, 'creditors', { name: 42 } as never),
       400,
       'ValidationError',
-    );
-    await expectApiError(
-      admin.api.listCaseEntities(caseId, 'not_a_collection' as CaseCollection),
-      404,
-      'NotFoundError',
     );
     await expectApiError(
       admin.api.listCaseEntities('no-such-case', 'creditors'),

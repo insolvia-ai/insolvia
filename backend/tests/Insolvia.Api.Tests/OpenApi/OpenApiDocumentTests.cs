@@ -3,7 +3,6 @@ using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Insolvia.Api.Tests.Support;
-using Insolvia.Domain.CaseEntities;
 
 namespace Insolvia.Api.Tests.OpenApi;
 
@@ -90,11 +89,7 @@ public sealed class OpenApiDocumentTests : IDisposable
             // FirmWorld's own probes (AuthHost), and the document itself.
             .Where(endpoint => endpoint.RoutePattern.RawText is { } raw && !raw.StartsWith("/test/", StringComparison.Ordinal) && !raw.StartsWith("/openapi/", StringComparison.Ordinal) && !raw.StartsWith("/docs", StringComparison.Ordinal))
             .SelectMany(endpoint => (endpoint.Metadata.GetMetadata<IHttpMethodMetadata>()?.HttpMethods ?? [])
-                .Select(method => $"{method} {endpoint.RoutePattern.RawText}"))
-            // The document gives a /{collection} route one path per collection (ApiDocument).
-            .SelectMany(route => route.Contains("{collection}", StringComparison.Ordinal)
-                ? CaseCollections.Kinds.Select(kind => route.Replace("{collection}", kind.Collection, StringComparison.Ordinal))
-                : [route])];
+                .Select(method => $"{method} {endpoint.RoutePattern.RawText}"))];
 
     // From this source file to the repository's docs/, so the write lands in the checkout.
     private static string CommittedPath([CallerFilePath] string source = "") =>

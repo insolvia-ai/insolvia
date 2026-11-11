@@ -234,9 +234,23 @@ public static partial class WireOpenApi
 
         schema.Properties ??= new Dictionary<string, IOpenApiSchema>();
         schema.Required ??= new HashSet<string>();
+        var request = RequestBodies(context.ApplicationServices).Contains(type.Type);
+        var nullability = new NullabilityInfoContext();
         foreach (var flattened in type.Type.GetProperties().Where(p => p.IsDefined(typeof(FlattenAttribute), inherit: true)))
         {
-            Merge(schema, await context.GetOrCreateSchemaAsync(flattened.PropertyType, null, cancellationToken).ConfigureAwait(false));
+            var members = await context.GetOrCreateSchemaAsync(flattened.PropertyType, null, cancellationToken).ConfigureAwait(false);
+            if (request && nullability.Create(flattened).ReadState == NullabilityState.Nullable)
+            {
+                // A request's nullable flattened member: none of its fields is required.
+                foreach (var (name, member) in members.Properties ?? new Dictionary<string, IOpenApiSchema>())
+                {
+                    schema.Properties[name] = member;
+                }
+
+                continue;
+            }
+
+            Merge(schema, members);
         }
 
         if (type.Properties.Any(p => p.IsExtensionData))
@@ -250,9 +264,8 @@ public static partial class WireOpenApi
             Absent(schema).Add(property.Name);
         }
 
-        if (RequestBodies(context.ApplicationServices).Contains(type.Type))
+        if (request)
         {
-            var nullability = new NullabilityInfoContext();
             foreach (var property in type.Properties.Where(p => p.AttributeProvider is PropertyInfo info && nullability.Create(info).ReadState == NullabilityState.Nullable))
             {
                 schema.Required.Remove(property.Name);

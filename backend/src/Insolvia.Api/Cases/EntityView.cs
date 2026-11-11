@@ -1,4 +1,3 @@
-using System.Text.Json;
 using System.Text.Json.Serialization;
 using Insolvia.Domain.CaseEntities;
 using Insolvia.Domain.Cases;
@@ -8,59 +7,72 @@ using Insolvia.Domain.Provenance;
 namespace Insolvia.Api.Cases;
 
 /// <summary>
-/// A record of one of the generic case collections (<c>creditors</c>,
-/// <c>assets</c>, <c>claims</c>, …): the server's own fields, and beside them
-/// at the top level the collection's body fields, each unanswered one absent.
-/// Which body fields there are depends on the collection in the URL.
+/// A record of a case collection (<c>creditors</c>, <c>assets</c>, <c>claims</c>,
+/// …): the server's own fields, and beside them at the top level the
+/// collection's body fields, each unanswered one absent.
 /// </summary>
+/// <typeparam name="TBody">The collection's body record.</typeparam>
 /// <param name="Id">The record's id, stable across saves.</param>
 /// <param name="CaseId">The case.</param>
 /// <param name="CreatedAt">First saved, ISO 8601 UTC.</param>
 /// <param name="UpdatedAt">Last saved, ISO 8601 UTC.</param>
 /// <param name="Provenance">Where each populated field came from, by body path.</param>
 /// <param name="Amended">Whether this record amends a filed one; always present — "not amended" is an answer.</param>
+/// <param name="Body">The collection's fields.</param>
 [SnakeCase]
-public sealed record EntityView(
+public sealed record EntityView<TBody>(
     string Id,
     string CaseId,
     string CreatedAt,
     string UpdatedAt,
     IReadOnlyDictionary<string, ProvenanceEntry> Provenance,
-    bool Amended)
-{
-    /// <summary>The collection's body fields, written beside the server's.</summary>
-    [JsonExtensionData]
-    public IDictionary<string, JsonElement> Body { get; init; } = new Dictionary<string, JsonElement>();
+    bool Amended,
+    [property: Flatten] TBody Body)
+    where TBody : class;
 
+/// <summary>The views of stored collection records.</summary>
+public static class EntityViews
+{
     /// <summary>The view of <paramref name="entity"/>.</summary>
+    /// <typeparam name="TBody">The collection's body record.</typeparam>
     /// <param name="entity">The stored record.</param>
     /// <returns>The view.</returns>
-    public static EntityView Of(ICaseEntity entity)
+    public static EntityView<TBody> Of<TBody>(CaseEntity<TBody> entity)
+        where TBody : class
     {
         ArgumentNullException.ThrowIfNull(entity);
-        // The body's own record type, through the wire rules: its unanswered members absent.
-        var body = JsonSerializer.SerializeToElement(entity.Body, entity.Body.GetType(), WireJson.Options).EnumerateObject().ToDictionary(member => member.Name, member => member.Value, StringComparer.Ordinal);
-        return new(entity.Id, entity.CaseId, CaseRules.Iso(entity.CreatedAt), CaseRules.Iso(entity.UpdatedAt), entity.Provenance, entity.Amended) { Body = body };
+        return new(entity.Id, entity.CaseId, CaseRules.Iso(entity.CreatedAt), CaseRules.Iso(entity.UpdatedAt), entity.Provenance, entity.Amended, entity.Body);
     }
+
+    /// <summary>The view of a record whose collection is known only at run time, for its own body type.</summary>
+    /// <param name="entity">The stored record.</param>
+    /// <returns>An <see cref="EntityView{TBody}"/>.</returns>
+    public static object OfAny(ICaseEntity entity)
+    {
+        ArgumentNullException.ThrowIfNull(entity);
+        return OfMethod.MakeGenericMethod(entity.Kind.BodyType).Invoke(null, [entity])!;
+    }
+
+    private static readonly System.Reflection.MethodInfo OfMethod =
+        typeof(EntityViews).GetMethods().Single(method => method.Name == nameof(Of) && method.IsGenericMethodDefinition);
 }
 
 /// <summary>
-/// A record of a generic case collection as written: the collection's body
-/// fields at the top level (which ones depends on the collection in the URL;
-/// unknown keys are ignored), beside these. Parsed by the collection's own
-/// parser, which owns validation; this record is its shape for the OpenAPI document.
+/// A record of a case collection as written: the collection's body fields at
+/// the top level, all optional (unknown keys are ignored), beside these.
+/// Parsed by the collection's own parser, which owns validation; this record
+/// is its shape for the OpenAPI document.
 /// </summary>
+/// <typeparam name="TBody">The collection's body record.</typeparam>
+/// <param name="Body">The collection's fields; any may be absent (progressive intake).</param>
 /// <param name="Provenance">Where each populated field came from, by body path; every populated field needs an entry.</param>
 /// <param name="Amended">Whether this record amends a filed one — only once the case is filed. A PUT that omits it keeps the stored value.</param>
 [SnakeCase]
-public sealed record EntityRequest(
+public sealed record EntityRequest<TBody>(
+    [property: Flatten] TBody? Body,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyDictionary<string, ProvenanceEntry>? Provenance,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? Amended)
-{
-    /// <summary>The collection's body fields.</summary>
-    [JsonExtensionData]
-    public IDictionary<string, JsonElement>? Body { get; init; }
-}
+    where TBody : class;
 
 /// <summary>A case note: the server's fields beside the note, its author stamped by the server.</summary>
 /// <param name="Id">The note's id.</param>

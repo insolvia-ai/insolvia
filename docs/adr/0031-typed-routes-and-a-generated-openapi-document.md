@@ -70,10 +70,12 @@ ASP.NET must stay out of `Insolvia.Platform`.
 - Request bodies are declared with `.RequestBody<T>()`, a docs-only record.
   Routing never sees it. `.Accepts<T>()` would add a content-type constraint
   that turns a route's own 400 into a 415. The parsers still own validation.
-- Where a value's shape depends on something the CLR type cannot carry, the
+- Each case collection maps its own routes (`/v1/cases/{caseId}/creditors`,
+  …), typed by its body record: `EntityView<CreditorBody>` out,
+  `EntityRequest<CreditorBody>` in. A collection that does not exist is a
+  route that does not exist.
+- Where a value's shape depends on a sibling the CLR type cannot carry, the
   host's pass over the finished document (`ApiDocument`) says it:
-  - a `/{collection}` route is documented once per collection, with that
-    collection's record (`CreditorRecord`, `CreditorRecordRequest`, …);
   - a candidate is one variant per `entityType`, its `payload` that
     collection's request shape (`WireOpenApi.Discriminate`);
   - a job is one variant per `kind`, its `result` that kind's

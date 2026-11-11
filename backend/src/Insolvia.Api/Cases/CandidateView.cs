@@ -147,7 +147,7 @@ public sealed record CandidateList(IReadOnlyList<CandidateView> Candidates);
 /// <param name="Candidate">The candidate, as reviewed.</param>
 /// <param name="Record">
 /// Absent on a rejection. On an acceptance, the record written: an
-/// <c>EntityView</c> of the candidate's collection, or — for a client's answer
+/// <c>EntityView</c> of the candidate's collection's body, or — for a client's answer
 /// about a debtor — the <c>DebtorView</c> it merged into.
 /// </param>
 public sealed record CandidateReview(
