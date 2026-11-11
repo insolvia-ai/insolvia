@@ -14,12 +14,12 @@ using Microsoft.AspNetCore.Http.HttpResults;
 namespace Insolvia.Api.Routes;
 
 /// <summary>
-/// The generic case collections (routes/case_entities.py; issue #249): one
-/// set of five routes for every kind in <see cref="CaseCollections"/>, gated
-/// by <c>intake</c>. An unknown collection is a 404. <c>amended</c> may be set
-/// only once the case is filed (409), and a PUT that omits it keeps the stored
-/// value. The literal routes beside these (<c>debtors</c>, <c>notes</c>,
-/// <c>documents</c>, …) win by ASP.NET's route precedence, as Flask's did.
+/// The case collections (routes/case_entities.py; issue #249): five routes
+/// for each kind in <see cref="CaseCollections"/>, typed by its body record
+/// (<c>/v1/cases/{caseId}/creditors</c> answers <c>EntityView&lt;CreditorBody&gt;</c>),
+/// gated by <c>intake</c>. A collection that does not exist is a route that does
+/// not exist. <c>amended</c> may be set only once the case is filed (409), and
+/// a PUT that omits it keeps the stored value.
 /// </summary>
 public sealed class CaseEntityRoutes : IEndpointModule
 {
@@ -31,18 +31,42 @@ public sealed class CaseEntityRoutes : IEndpointModule
     public void Map(IEndpointRouteBuilder routes)
     {
         ArgumentNullException.ThrowIfNull(routes);
-        routes.MapPost("/v1/cases/{caseId}/{collection}", CreateAsync).RequestBody<EntityRequest>().RequireAuth().Requires(Feature.Intake, PermissionLevel.AddEdit);
-        routes.MapGet("/v1/cases/{caseId}/{collection}", ListAsync).RequireAuth().Requires(Feature.Intake, PermissionLevel.ViewOnly);
-        routes.MapGet("/v1/cases/{caseId}/{collection}/{entityId}", GetAsync).RequireAuth().Requires(Feature.Intake, PermissionLevel.ViewOnly);
-        routes.MapPut("/v1/cases/{caseId}/{collection}/{entityId}", PutAsync).RequestBody<EntityRequest>().RequireAuth().Requires(Feature.Intake, PermissionLevel.AddEdit);
-        routes.MapDelete("/v1/cases/{caseId}/{collection}/{entityId}", DeleteAsync).RequireAuth().Requires(Feature.Intake, PermissionLevel.AddEdit);
+        foreach (var kind in CaseCollections.Kinds)
+        {
+            // The registry holds kinds untyped; each collection's routes are mapped with its body type.
+            MapCollectionMethod.MakeGenericMethod(kind.BodyType).Invoke(null, [routes, kind]);
+        }
     }
 
-    /// <summary>Create a record in a case collection.</summary>
-    /// <remarks>An unknown collection is a 404; <c>amended</c> before the case is filed is a 409.</remarks>
-    internal static async Task<Created<EntityView>> CreateAsync(HttpContext context, string caseId, string collection, CancellationToken cancellationToken)
+    private static readonly System.Reflection.MethodInfo MapCollectionMethod =
+        typeof(CaseEntityRoutes).GetMethod(nameof(MapCollection), System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
+
+    private static void MapCollection<TBody>(IEndpointRouteBuilder routes, EntityKind<TBody> kind)
+        where TBody : class
     {
-        var kind = KindOf(collection);
+        var records = $"/v1/cases/{{caseId}}/{kind.Collection}";
+        var record = $"{records}/{{entityId}}";
+        var noun = kind.Name.Replace('_', ' ');
+        routes.MapPost(records, (HttpContext context, string caseId, CancellationToken cancellationToken) => CreateAsync(context, caseId, kind, cancellationToken))
+            .WithSummary($"Create a {noun}").WithDescription("`amended` before the case is filed is a 409.").WithTags(nameof(CaseEntityRoutes))
+            .RequestBody<EntityRequest<TBody>>().RequireAuth().Requires(Feature.Intake, PermissionLevel.AddEdit);
+        routes.MapGet(records, (HttpContext context, string caseId, CancellationToken cancellationToken) => ListAsync(context, caseId, kind, cancellationToken))
+            .WithSummary($"The case's {kind.Collection.Replace('_', ' ')}, oldest first").WithDescription($"The one key is `{kind.Collection}`.").WithTags(nameof(CaseEntityRoutes))
+            .RequireAuth().Requires(Feature.Intake, PermissionLevel.ViewOnly);
+        routes.MapGet(record, (HttpContext context, string caseId, string entityId, CancellationToken cancellationToken) => GetAsync(context, caseId, kind, entityId, cancellationToken))
+            .WithSummary($"One {noun}").WithTags(nameof(CaseEntityRoutes))
+            .RequireAuth().Requires(Feature.Intake, PermissionLevel.ViewOnly);
+        routes.MapPut(record, (HttpContext context, string caseId, string entityId, CancellationToken cancellationToken) => PutAsync(context, caseId, kind, entityId, cancellationToken))
+            .WithSummary($"Replace a {noun}, whole").WithDescription("The id and `created_at` are kept; so is `amended` when the request omits it.").WithTags(nameof(CaseEntityRoutes))
+            .RequestBody<EntityRequest<TBody>>().RequireAuth().Requires(Feature.Intake, PermissionLevel.AddEdit);
+        routes.MapDelete(record, (HttpContext context, string caseId, string entityId, CancellationToken cancellationToken) => DeleteAsync(context, caseId, kind, entityId, cancellationToken))
+            .WithSummary($"Delete a {noun}").WithTags(nameof(CaseEntityRoutes))
+            .RequireAuth().Requires(Feature.Intake, PermissionLevel.AddEdit);
+    }
+
+    private static async Task<Created<EntityView<TBody>>> CreateAsync<TBody>(HttpContext context, string caseId, EntityKind<TBody> kind, CancellationToken cancellationToken)
+        where TBody : class
+    {
         var draft = kind.ParseDraft(await context.BodyAsync(MaxRequestBytes));
         RequireServerSourcesKept(draft, null);
         var target = await context.ReachableCaseAsync(caseId, AccessAction.CaseUpdate, cancellationToken);
@@ -52,32 +76,27 @@ public sealed class CaseEntityRoutes : IEndpointModule
         var entity = kind.Restore(Guid.NewGuid().ToString(), caseId, now, now, draft);
         await context.Port<ICaseEntityStore>().CreateAsync(entity, cancellationToken);
         LogSaved(context, caseId, kind, entity.Id);
-        return TypedResults.Created((string?)null, EntityView.Of(entity));
+        return TypedResults.Created((string?)null, EntityViews.Of((CaseEntity<TBody>)entity));
     }
 
-    /// <summary>A case collection's records, oldest first.</summary>
-    /// <remarks>The one key is the collection's name, as in the URL (<c>{"creditors": [...]}</c>).</remarks>
-    internal static async Task<Dictionary<string, IReadOnlyList<EntityView>>> ListAsync(HttpContext context, string caseId, string collection, CancellationToken cancellationToken)
+    private static async Task<Dictionary<string, IReadOnlyList<EntityView<TBody>>>> ListAsync<TBody>(HttpContext context, string caseId, EntityKind<TBody> kind, CancellationToken cancellationToken)
+        where TBody : class
     {
-        var kind = KindOf(collection);
         await context.ReachableCaseAsync(caseId, AccessAction.CaseRead, cancellationToken);
         var entities = await context.Port<ICaseEntityStore>().ListForCaseAsync(caseId, kind, cancellationToken);
-        return new(StringComparer.Ordinal) { [kind.Collection] = [.. entities.Select(EntityView.Of)] };
+        return new(StringComparer.Ordinal) { [kind.Collection] = [.. entities.Cast<CaseEntity<TBody>>().Select(EntityViews.Of)] };
     }
 
-    /// <summary>One record of a case collection.</summary>
-    internal static async Task<EntityView> GetAsync(HttpContext context, string caseId, string collection, string entityId, CancellationToken cancellationToken)
+    private static async Task<EntityView<TBody>> GetAsync<TBody>(HttpContext context, string caseId, EntityKind<TBody> kind, string entityId, CancellationToken cancellationToken)
+        where TBody : class
     {
-        var kind = KindOf(collection);
         await context.ReachableCaseAsync(caseId, AccessAction.CaseRead, cancellationToken);
-        return EntityView.Of(await EntityOr404Async(context, caseId, kind, entityId, cancellationToken));
+        return EntityViews.Of((CaseEntity<TBody>)await EntityOr404Async(context, caseId, kind, entityId, cancellationToken));
     }
 
-    /// <summary>Replace a record of a case collection, whole.</summary>
-    /// <remarks>The id and <c>created_at</c> are kept; so is <c>amended</c> when the request omits it.</remarks>
-    internal static async Task<EntityView> PutAsync(HttpContext context, string caseId, string collection, string entityId, CancellationToken cancellationToken)
+    private static async Task<EntityView<TBody>> PutAsync<TBody>(HttpContext context, string caseId, EntityKind<TBody> kind, string entityId, CancellationToken cancellationToken)
+        where TBody : class
     {
-        var kind = KindOf(collection);
         var payload = await context.BodyAsync(MaxRequestBytes);
         var draft = kind.ParseDraft(payload);
         var target = await context.ReachableCaseAsync(caseId, AccessAction.CaseUpdate, cancellationToken);
@@ -100,13 +119,12 @@ public sealed class CaseEntityRoutes : IEndpointModule
         }
 
         LogSaved(context, caseId, kind, entity.Id);
-        return EntityView.Of(entity);
+        return EntityViews.Of((CaseEntity<TBody>)entity);
     }
 
-    /// <summary>Delete a record of a case collection.</summary>
-    internal static async Task<NoContent> DeleteAsync(HttpContext context, string caseId, string collection, string entityId, CancellationToken cancellationToken)
+    private static async Task<NoContent> DeleteAsync<TBody>(HttpContext context, string caseId, EntityKind<TBody> kind, string entityId, CancellationToken cancellationToken)
+        where TBody : class
     {
-        var kind = KindOf(collection);
         await context.ReachableCaseAsync(caseId, AccessAction.CaseUpdate, cancellationToken);
         if (!await context.Port<ICaseEntityStore>().DeleteAsync(caseId, kind, entityId, cancellationToken))
         {
@@ -116,9 +134,6 @@ public sealed class CaseEntityRoutes : IEndpointModule
         context.Log(Logger, "case entity deleted", ("case_id", caseId), ("collection", kind.Collection), ("id", entityId));
         return TypedResults.NoContent();
     }
-
-    private static IEntityKind KindOf(string collection) =>
-        CaseCollections.Find(collection) ?? throw new NotFoundException("no such collection");
 
     private static async Task<ICaseEntity> EntityOr404Async(HttpContext context, string caseId, IEntityKind kind, string entityId, CancellationToken cancellationToken) =>
         await context.Port<ICaseEntityStore>().GetAsync(caseId, kind, entityId, cancellationToken) ?? throw new NotFoundException(RecordNotFound);

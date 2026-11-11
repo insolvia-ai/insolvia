@@ -112,11 +112,20 @@ class Validator {
     }
     const alternatives = schema.anyOf ?? schema.oneOf;
     if (alternatives) {
+      // Only the alternative that fits says what is undocumented: a variant
+      // for another entityType would call the payload's fields unknown.
+      const before = new Set(this.undocumented);
       const fits = alternatives.some((option) => {
         const own: string[] = [];
+        this.undocumented.clear();
+        for (const field of before) this.undocumented.add(field);
         this.check(value, option, at, strict, own);
         return own.length === 0;
       });
+      if (!fits) {
+        this.undocumented.clear();
+        for (const field of before) this.undocumented.add(field);
+      }
       if (!fits)
         problems.push(
           `${at}: matches none of its ${alternatives.length} alternatives (${preview(value)})`,

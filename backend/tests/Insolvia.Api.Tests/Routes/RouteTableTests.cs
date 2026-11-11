@@ -1,5 +1,6 @@
 using Insolvia.Api.Auth;
 using Insolvia.Api.Tests.Support;
+using Insolvia.Domain.CaseEntities;
 
 namespace Insolvia.Api.Tests.Routes;
 
@@ -47,7 +48,7 @@ public sealed class RouteTableTests : IDisposable
     };
 
     /// <summary>The case-side slice 18.15 maps: part 1's records and part 2's computed analyses (no forms or approval; the pipeline and the portal have their own slices).</summary>
-    public static TheoryData<string, string> CaseSideRoutes => new()
+    public static TheoryData<string, string> CaseSideRoutes => WithCollections(new()
     {
         { "POST", "/v1/cases" },
         { "GET", "/v1/cases" },
@@ -112,12 +113,22 @@ public sealed class RouteTableTests : IDisposable
         { "GET", "/v1/cases/{caseId}/standards" },
         { "GET", "/v1/cases/{caseId}/plan-calculation" },
         { "POST", "/v1/cases/{caseId}/plan-calculation" },
-        { "POST", "/v1/cases/{caseId}/{collection}" },
-        { "GET", "/v1/cases/{caseId}/{collection}" },
-        { "GET", "/v1/cases/{caseId}/{collection}/{entityId}" },
-        { "PUT", "/v1/cases/{caseId}/{collection}/{entityId}" },
-        { "DELETE", "/v1/cases/{caseId}/{collection}/{entityId}" },
-    };
+    });
+
+    // Each case collection's five routes (CaseEntityRoutes).
+    private static TheoryData<string, string> WithCollections(TheoryData<string, string> rows)
+    {
+        foreach (var collection in CaseCollections.Kinds.Select(kind => kind.Collection))
+        {
+            rows.Add("POST", $"/v1/cases/{{caseId}}/{collection}");
+            rows.Add("GET", $"/v1/cases/{{caseId}}/{collection}");
+            rows.Add("GET", $"/v1/cases/{{caseId}}/{collection}/{{entityId}}");
+            rows.Add("PUT", $"/v1/cases/{{caseId}}/{collection}/{{entityId}}");
+            rows.Add("DELETE", $"/v1/cases/{{caseId}}/{collection}/{{entityId}}");
+        }
+
+        return rows;
+    }
 
     /// <summary>The portal's staff half (18.18): the firm's invitation routes, on the case.</summary>
     public static TheoryData<string, string> PortalStaffRoutes => new()
@@ -189,7 +200,7 @@ public sealed class RouteTableTests : IDisposable
     public async Task Every_firm_side_route_is_a_staff_route_and_401s_without_a_token(string method, string template)
     {
         var path = System.Text.RegularExpressions.Regex.Replace(
-            template.Replace("{subject}", Ids.Bob, StringComparison.Ordinal).Replace("{filingRole}", "debtor_1", StringComparison.Ordinal).Replace("{collection}", "creditors", StringComparison.Ordinal),
+            template.Replace("{subject}", Ids.Bob, StringComparison.Ordinal).Replace("{filingRole}", "debtor_1", StringComparison.Ordinal),
             "\\{[A-Za-z]+\\}",
             "c-1");
 

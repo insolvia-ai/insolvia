@@ -1,5 +1,10 @@
 using Insolvia.Api.Auth;
+using Insolvia.Api.Cases;
 using Insolvia.Domain;
+using Insolvia.Domain.Candidates;
+using Insolvia.Domain.CaseEntities;
+using Microsoft.AspNetCore.OpenApi;
+using Microsoft.OpenApi;
 
 namespace Insolvia.Api.Hosting;
 
@@ -24,7 +29,44 @@ public static class ApiDocument
                 [PrincipalClass.Client.Name] = WireOpenApi.Bearer("A portal client's Cognito access token."),
             },
             metadata => metadata.OfType<PrincipalClass>().LastOrDefault()?.Name,
-            metadata => metadata.OfType<PermissionRequirement>().Select(p => $"{p.Feature.ToWire()}:{p.Level.ToWire()}"))));
+            metadata => metadata.OfType<PermissionRequirement>().Select(p => $"{p.Feature.ToWire()}:{p.Level.ToWire()}"),
+            RefineAsync)));
+
+    // What the handlers' types cannot say: a candidate's payload is its
+    // entityType's request shape, and a job's result is its kind's.
+    private static async Task RefineAsync(OpenApiDocument document, OpenApiDocumentTransformerContext context, CancellationToken cancellationToken)
+    {
+        var schemas = document.Components!.Schemas!;
+        var payloads = new Dictionary<string, IOpenApiSchema>(StringComparer.Ordinal);
+        foreach (var kind in CaseCollections.Kinds)
+        {
+            var request = typeof(EntityRequest<>).MakeGenericType(kind.BodyType);
+            var name = $"EntityRequestOf{kind.BodyType.Name}";
+            schemas[name] = await context.GetOrCreateSchemaAsync(request, null, cancellationToken).ConfigureAwait(false);
+            payloads[kind.Collection] = new OpenApiSchemaReference(name, document);
+        }
+
+        schemas[nameof(DebtorRequest)] = await context.GetOrCreateSchemaAsync(typeof(DebtorRequest), null, cancellationToken).ConfigureAwait(false);
+        payloads[CandidateRules.Debtors] = new OpenApiSchemaReference(nameof(DebtorRequest), document);
+        WireOpenApi.Discriminate(document, nameof(CandidateView), "entityType", payloads.ToDictionary(
+            pair => pair.Key,
+            pair => (IReadOnlyDictionary<string, IOpenApiSchema>)new Dictionary<string, IOpenApiSchema> { ["payload"] = pair.Value, ["correctedPayload"] = pair.Value }));
+
+        var results = new Dictionary<string, IReadOnlyDictionary<string, IOpenApiSchema>>(StringComparer.Ordinal);
+        foreach (var (kind, types) in JobResults.ByKind)
+        {
+            var options = new List<IOpenApiSchema>();
+            foreach (var type in types)
+            {
+                schemas[type.Name] = await context.GetOrCreateSchemaAsync(type, null, cancellationToken).ConfigureAwait(false);
+                options.Add(new OpenApiSchemaReference(type.Name, document));
+            }
+
+            results[kind] = new Dictionary<string, IOpenApiSchema> { ["result"] = options.Count == 1 ? options[0] : new OpenApiSchema { AnyOf = options } };
+        }
+
+        WireOpenApi.Discriminate(document, nameof(JobView), "kind", results);
+    }
 
     private const string Description = """
         The API behind the Insolvia app and the client portal.

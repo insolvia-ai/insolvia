@@ -101,7 +101,7 @@ public sealed class ExtractionReviewRoutes : IEndpointModule
         _ = await candidates.UpdateAsync(reviewed, CandidateStatus.Pending, cancellationToken) ?? throw new ConflictException(Reviewed);
         await context.Port<ICaseEntityStore>().CreateAsync(entity, cancellationToken);
         LogReviewed(context, caseId, candidate.Id, reviewed.Status.ToWire());
-        return new CandidateReview(CandidateView.Of(reviewed), EntityView.Of(entity));
+        return new CandidateReview(CandidateView.Of(reviewed), EntityViews.OfAny(entity));
     }
 
     /// <summary>

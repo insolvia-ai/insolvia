@@ -48,12 +48,12 @@ public sealed class CaseEntityRouteTests : IAsyncLifetime, IDisposable
     }
 
     [Fact]
-    public async Task An_unknown_collection_is_a_plain_404_and_an_id_does_not_cross_collections()
+    public async Task An_unknown_collection_is_an_unknown_route_and_an_id_does_not_cross_collections()
     {
         var caseId = await _world.OpenCaseIdAsync();
         var entityId = (await Add(caseId)).Str("id");
 
-        Assert.Equal("""{"error":"NotFoundError","message":"no such collection"}""", (await _world.Get($"/v1/cases/{caseId}/pay_stubs")).Body);
+        Assert.Equal("""{"error":"NotFoundError","message":"No such route."}""", (await _world.Get($"/v1/cases/{caseId}/pay_stubs")).Body);
         Assert.Equal(404, (await _world.Get($"/v1/cases/{caseId}/claims/{entityId}")).Status);
     }
 

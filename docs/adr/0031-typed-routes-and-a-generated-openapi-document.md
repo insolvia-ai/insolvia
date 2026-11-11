@@ -70,11 +70,19 @@ ASP.NET must stay out of `Insolvia.Platform`.
 - Request bodies are declared with `.RequestBody<T>()`, a docs-only record.
   Routing never sees it. `.Accepts<T>()` would add a content-type constraint
   that turns a route's own 400 into a 415. The parsers still own validation.
-- Still free-form, each marked where it is declared:
-  - an answer's value;
-  - an extraction candidate's payload;
-  - a job's result;
-  - a case collection's body, documented as `additionalProperties`.
+- Each case collection maps its own routes (`/v1/cases/{caseId}/creditors`,
+  …), typed by its body record: `EntityView<CreditorBody>` out,
+  `EntityRequest<CreditorBody>` in. A collection that does not exist is a
+  route that does not exist.
+- Where a value's shape depends on a sibling the CLR type cannot carry, the
+  host's pass over the finished document (`ApiDocument`) says it:
+  - a candidate is one variant per `entityType`, its `payload` that
+    collection's request shape (`WireOpenApi.Discriminate`);
+  - a job is one variant per `kind`, its `result` that kind's
+    (`JobResults`: docs-only records, which nothing checks against a real
+    result yet, because the contract suite runs no job through the worker).
+- An answer's value stays free-form: its keys are the questions each firm
+  defines.
 - `packages/insolvia_api_client` stays hand-written. It is no longer what
   the document is generated from, so a generated client becomes possible
   later; that is not decided here.

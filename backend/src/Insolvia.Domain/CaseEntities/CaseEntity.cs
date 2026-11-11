@@ -23,6 +23,9 @@ public interface IEntityKind
     /// <summary>The sort-key namespace in the case, e.g. <c>CREDITOR</c> — unique across the case's records.</summary>
     string SkPrefix { get; }
 
+    /// <summary>The body record's type, e.g. <c>CreditorBody</c> — what the API's document describes a record of this kind with.</summary>
+    Type BodyType { get; }
+
     /// <summary><see cref="CaseEntityRules.ParseEntity{TBody}"/> for this kind, untyped.</summary>
     IEntityDraft ParseDraft(JsonObject payload, bool enforceProvenance = true);
 
@@ -57,6 +60,9 @@ public sealed class EntityKind<TBody> : IEntityKind
 
     /// <inheritdoc />
     public string Name { get; }
+
+    /// <inheritdoc />
+    public Type BodyType => typeof(TBody);
 
     /// <inheritdoc />
     public string Collection { get; }

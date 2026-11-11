@@ -128,7 +128,8 @@ public sealed class NoteRouteTests : IAsyncLifetime, IDisposable
         await Add();
 
         Assert.Single((await _world.Get($"/v1/cases/{_caseId}/notes")).Object["notes"]!.AsArray());
-        Assert.Equal(404, (await _world.Get($"/v1/cases/{_caseId}/notes/any")).Status);
+        // Notes have no GET of one note: only PUT and DELETE are mapped there.
+        Assert.Equal(405, (await _world.Get($"/v1/cases/{_caseId}/notes/any")).Status);
     }
 
     private Task<Answer> Add(string body = """ "text": "Called the client." """, string subject = Alice) =>
