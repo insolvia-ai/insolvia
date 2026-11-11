@@ -220,15 +220,19 @@ describe('the assets screen', () => {
     await user.press(await screen.findByRole('option', { name: /Vehicles — Vehicle/u }));
     await user.type(await screen.findByLabelText('Make (required)'), 'Honda');
     await user.type(screen.getByLabelText('Model (required)'), 'Civic LX');
+    await user.type(screen.getByLabelText('Year'), '2015');
+    await user.type(screen.getByLabelText('Mileage'), '84000');
     await user.press(screen.getByRole('button', { name: 'Save asset' }));
 
     await waitFor(() =>
       expect(lastBody(fetchMock, 'POST', '/assets')).toEqual({
-        body: { category: 'vehicle', make: 'Honda', model: 'Civic LX' },
+        body: { category: 'vehicle', make: 'Honda', model: 'Civic LX', year: 2015, mileage: 84000 },
         provenance: {
           category: { source: 'staff_typed' },
           make: { source: 'staff_typed' },
           model: { source: 'staff_typed' },
+          year: { source: 'staff_typed' },
+          mileage: { source: 'staff_typed' },
         },
       }),
     );

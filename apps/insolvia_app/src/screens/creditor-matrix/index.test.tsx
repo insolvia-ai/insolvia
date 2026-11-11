@@ -178,7 +178,7 @@ describe('the creditor matrix screen', () => {
             },
             {
               creditorId: CREDITOR_ID,
-              field: 'address.postal_code',
+              field: 'address.postalCode',
               message: 'A ZIP code is required.',
             },
             {

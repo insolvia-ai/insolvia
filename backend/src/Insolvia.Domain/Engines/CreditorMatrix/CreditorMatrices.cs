@@ -267,11 +267,11 @@ public static partial class CreditorMatrices
 
             if (address.PostalCode is null)
             {
-                Problem("address.postal_code", "A ZIP code is required.");
+                Problem("address.postalCode", "A ZIP code is required.");
             }
             else if (!ZipPattern().IsMatch(address.PostalCode))
             {
-                Problem("address.postal_code", "Must be a five-digit ZIP (\"33301\") or hyphenated nine-digit ZIP (\"33301-1234\").");
+                Problem("address.postalCode", "Must be a five-digit ZIP (\"33301\") or hyphenated nine-digit ZIP (\"33301-1234\").");
             }
         }
 

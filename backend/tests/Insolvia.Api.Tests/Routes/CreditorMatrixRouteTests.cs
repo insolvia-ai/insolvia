@@ -74,7 +74,7 @@ public sealed class CreditorMatrixRouteTests : IAsyncLifetime, IDisposable
         Assert.Equal(0, body["creditorCount"]!.GetValue<int>());
         var reported = body["problems"]!.AsArray().Select(p => (p!.AsObject().Str("creditorId"), p.AsObject().Str("field"))).ToHashSet();
         Assert.Equal(
-            new HashSet<(string?, string?)> { (creditorId, "address.city"), (creditorId, "address.state"), (creditorId, "address.postal_code") },
+            new HashSet<(string?, string?)> { (creditorId, "address.city"), (creditorId, "address.state"), (creditorId, "address.postalCode") },
             reported);
     }
 

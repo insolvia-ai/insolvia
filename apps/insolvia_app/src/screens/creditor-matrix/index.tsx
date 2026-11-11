@@ -55,7 +55,7 @@ function describeField(field: string): string {
     'address.line2': 'Address — apartment, suite or unit',
     'address.city': 'Address — city',
     'address.state': 'Address — state',
-    'address.postal_code': 'Address — ZIP code',
+    'address.postalCode': 'Address — ZIP code',
     creditors: 'Creditors',
   };
   return labels[field] ?? field.replace(/_/g, ' ');

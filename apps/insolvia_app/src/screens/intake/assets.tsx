@@ -537,7 +537,14 @@ function AssetForm({
       ) : isVehicle ? (
         <>
           <View style={styles.group}>
-            <TextField label="Year" path="year" body={body} errors={errors} onChange={onChange} />
+            <TextField
+              label="Year"
+              path="year"
+              body={body}
+              errors={errors}
+              onChange={onChange}
+              whole
+            />
             <TextField
               label="Make"
               path="make"
@@ -561,6 +568,7 @@ function AssetForm({
                 body={body}
                 errors={errors}
                 onChange={onChange}
+                whole
               />
             ) : null}
           </View>
@@ -726,6 +734,7 @@ function TextField({
   errors,
   onChange,
   required = false,
+  whole = false,
 }: {
   readonly label: string;
   readonly path: string;
@@ -733,6 +742,8 @@ function TextField({
   readonly errors: Readonly<Record<string, string>>;
   readonly onChange: (next: Body) => void;
   readonly required?: boolean;
+  /** A whole number on the wire; text that is not one is sent as typed, so the server's error lands on this box. */
+  readonly whole?: boolean;
 }) {
   const value = getAt(body, path);
   const message = errors[path];
@@ -740,8 +751,16 @@ function TextField({
     <Field.Root invalid={Boolean(message)}>
       <Field.Label>{required ? `${label} (required)` : label}</Field.Label>
       <Input
-        value={typeof value === 'string' ? value : ''}
-        onValueChange={(next) => onChange(setAt(body, path, next === '' ? undefined : next))}
+        value={typeof value === 'string' || typeof value === 'number' ? String(value) : ''}
+        onValueChange={(next) =>
+          onChange(
+            setAt(
+              body,
+              path,
+              next === '' ? undefined : whole && /^\d+$/u.test(next) ? Number(next) : next,
+            ),
+          )
+        }
         autoCorrect={false}
       />
       {message ? <Field.Error match>{message}</Field.Error> : null}
