@@ -77,6 +77,7 @@ public static class ApiComposition
 
         // A handler's typed result is written, and documented, by these settings.
         builder.Services.ConfigureHttpJsonOptions(options => WireJson.Configure(options.SerializerOptions));
+        builder.Services.AddRequestValidation();
         builder.Services.AddApiDocument();
 
         // The court registry ships inside Insolvia.Domain (ADR 0014) and is the
@@ -389,9 +390,10 @@ public static class ApiComposition
         app.MapHealth();
         app.MapOpenApi();
         app.MapReference("Insolvia API");
+        var routes = app.MapGroup(string.Empty).ValidatesRequests();
         foreach (var module in app.Services.GetServices<IEndpointModule>())
         {
-            module.Map(app);
+            module.Map(routes);
         }
 
         return app;

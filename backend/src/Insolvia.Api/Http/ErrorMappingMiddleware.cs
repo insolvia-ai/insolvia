@@ -32,9 +32,9 @@ public sealed class ErrorMappingMiddleware(RequestDelegate next, ILoggerFactory 
                 return;
             }
 
-            if (error is BadHttpRequestException badRequest && ErrorResponses.ForStatus(badRequest.StatusCode) is { } refusal)
+            if (error is BadHttpRequestException badRequest && ErrorResponses.ForBadRequest(badRequest) is { } refusal)
             {
-                await ErrorResponses.WriteAsync(context, badRequest.StatusCode, refusal).ConfigureAwait(false);
+                await ErrorResponses.WriteAsync(context, refusal.Status, refusal.Body).ConfigureAwait(false);
                 return;
             }
 

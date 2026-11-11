@@ -73,6 +73,7 @@ public static class AdminComposition
 
         // A handler's typed result is written, and documented, by these settings.
         builder.Services.ConfigureHttpJsonOptions(options => WireJson.Configure(options.SerializerOptions));
+        builder.Services.AddRequestValidation();
         builder.Services.AddAdminDocument();
 
         var databaseConfigured = isLambda || !string.IsNullOrWhiteSpace(configuration[DatabaseSettings.ConnectionStringVariable]);
@@ -132,7 +133,7 @@ public static class AdminComposition
         app.UseRouting();
         app.UseMethodFallback();
 
-        app.MapFirmRoutes();
+        app.MapGroup(string.Empty).ValidatesRequests().MapFirmRoutes();
         app.MapHealth();
         app.MapOpenApi();
         app.MapReference("Insolvia admin service");
