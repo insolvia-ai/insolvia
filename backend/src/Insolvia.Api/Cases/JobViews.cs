@@ -21,7 +21,7 @@ namespace Insolvia.Api.Cases;
 /// <param name="DocumentId">The document a document-scoped kind works on.</param>
 /// <param name="Options">The output options an options-scoped kind was accepted with, in full.</param>
 /// <param name="Failure">Why it failed, when it did.</param>
-/// <param name="Result">What it produced, when it succeeded; its shape is the kind's.</param>
+/// <param name="Result">What it produced, when it succeeded; its shape is the kind's (the document lists each: <see cref="JobResults"/>).</param>
 public sealed record JobView(
     string Id,
     string Kind,
@@ -56,6 +56,74 @@ public sealed record JobView(
             job.Result);
     }
 }
+
+/// <summary>
+/// What each job kind's result can be. The worker writes a result as JSON and
+/// the API passes it through, so <see cref="JobView.Result"/> stays a
+/// <c>JsonObject</c>; these records are its shapes for the OpenAPI document
+/// (<c>ApiDocument</c>). Nothing checks them against a real result yet — the
+/// contract suite runs no job through the worker — so the worker's builders
+/// (<c>JobDispatch</c>, <c>Workers/*</c>) and these change together, by hand.
+/// </summary>
+public static class JobResults
+{
+    /// <summary>Each kind's possible results.</summary>
+    public static readonly IReadOnlyDictionary<string, Type[]> ByKind = new Dictionary<string, Type[]>(StringComparer.Ordinal)
+    {
+        [JobRules.EchoKind] = [typeof(EchoResult)],
+        [JobRules.PacketAssemblyKind] = [typeof(PacketAssembledResult), typeof(JobBlockedResult)],
+        [JobRules.PetitionReviewKind] = [typeof(PetitionReviewedResult), typeof(JobBlockedResult)],
+        [JobRules.DocumentExtractionKind] = [typeof(DocumentExtractedResult)],
+    };
+}
+
+/// <summary>An echo job's result: the pipeline ran.</summary>
+/// <param name="Echo">The job's own id.</param>
+public sealed record EchoResult(string Echo);
+
+/// <summary>A packet assembly's result when the packet was built.</summary>
+/// <param name="Outcome"><c>assembled</c>.</param>
+/// <param name="Packet">The packet.</param>
+public sealed record PacketAssembledResult(string Outcome, PacketView Packet);
+
+/// <summary>An assembly's or a review's result when the completeness gate refused.</summary>
+/// <param name="Outcome"><c>blocked</c>.</param>
+/// <param name="Problems">What stands in the way.</param>
+public sealed record JobBlockedResult(string Outcome, IReadOnlyList<PacketProblemView> Problems);
+
+/// <summary>A petition review's result.</summary>
+/// <param name="Outcome"><c>reviewed</c>.</param>
+/// <param name="Report">The review.</param>
+public sealed record PetitionReviewedResult(string Outcome, PetitionReviewReport Report);
+
+/// <summary>A review of the case's latest packet.</summary>
+/// <param name="PacketId">The packet reviewed.</param>
+/// <param name="PacketSha256">Its SHA-256, hex.</param>
+/// <param name="Model">The model that reviewed it.</param>
+/// <param name="Findings">What it found.</param>
+public sealed record PetitionReviewReport(string PacketId, string PacketSha256, string Model, IReadOnlyList<ReviewFindingView> Findings);
+
+/// <summary>One finding of a petition review.</summary>
+/// <param name="Severity">How serious it is.</param>
+/// <param name="Category">What kind of problem.</param>
+/// <param name="Form">The form it is on.</param>
+/// <param name="Line">The line it is on.</param>
+/// <param name="Message">What the preparer is told.</param>
+public sealed record ReviewFindingView(string Severity, string Category, string Form, string Line, string Message);
+
+/// <summary>A document extraction's result.</summary>
+/// <param name="Outcome"><c>extracted</c>.</param>
+/// <param name="DocumentId">The document read.</param>
+/// <param name="DocumentKind">What kind of document it is.</param>
+/// <param name="Model">The model that read it.</param>
+/// <param name="Candidates">The candidates it proposed, now in the review queue.</param>
+/// <param name="Skipped">How many records it found but could not use.</param>
+public sealed record DocumentExtractedResult(string Outcome, string DocumentId, string DocumentKind, string Model, IReadOnlyList<ExtractedCandidate> Candidates, int Skipped);
+
+/// <summary>A candidate an extraction proposed.</summary>
+/// <param name="Id">The candidate's id.</param>
+/// <param name="EntityType">The kind of record it proposes.</param>
+public sealed record ExtractedCandidate(string Id, string EntityType);
 
 /// <summary>Why a job failed.</summary>
 /// <param name="Category">The failure's category, e.g. <c>enqueue_failed</c>.</param>

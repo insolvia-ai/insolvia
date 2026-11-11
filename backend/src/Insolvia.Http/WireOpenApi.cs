@@ -105,7 +105,12 @@ public static partial class WireOpenApi
                     },
                 },
             };
-            foreach (var schema in document.Components.Schemas.Values.OfType<OpenApiSchema>())
+            if (host.Refine is { } refine)
+            {
+                await refine(document, context, cancellationToken).ConfigureAwait(false);
+            }
+
+            foreach (var schema in document.Components.Schemas.Values.OfType<OpenApiSchema>().SelectMany(s => s.OneOf?.OfType<OpenApiSchema>().Prepend(s) ?? [s]))
             {
                 NeverNullWhenOptional(schema);
             }
@@ -231,24 +236,7 @@ public static partial class WireOpenApi
         schema.Required ??= new HashSet<string>();
         foreach (var flattened in type.Type.GetProperties().Where(p => p.IsDefined(typeof(FlattenAttribute), inherit: true)))
         {
-            if (await context.GetOrCreateSchemaAsync(flattened.PropertyType, null, cancellationToken).ConfigureAwait(false) is not { Properties: { } members } inner)
-            {
-                continue;
-            }
-
-            foreach (var (name, member) in members)
-            {
-                schema.Properties[name] = member;
-                if (inner.Required?.Contains(name) == true)
-                {
-                    schema.Required.Add(name);
-                }
-            }
-
-            if (inner.Metadata?.TryGetValue(AbsentWhenUnset, out var absent) == true)
-            {
-                Absent(schema).UnionWith((HashSet<string>)absent);
-            }
+            Merge(schema, await context.GetOrCreateSchemaAsync(flattened.PropertyType, null, cancellationToken).ConfigureAwait(false));
         }
 
         if (type.Properties.Any(p => p.IsExtensionData))
@@ -276,6 +264,96 @@ public static partial class WireOpenApi
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// Copies <paramref name="source"/>'s members into <paramref name="target"/>,
+    /// as a <see cref="FlattenAttribute"/> member's are: each property, whether
+    /// it is required, and whether it is absent when unset.
+    /// </summary>
+    /// <param name="target">The object schema that gains the members.</param>
+    /// <param name="source">The object schema whose members they are.</param>
+    public static void Merge(OpenApiSchema target, IOpenApiSchema source)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        ArgumentNullException.ThrowIfNull(source);
+        target.Properties ??= new Dictionary<string, IOpenApiSchema>();
+        target.Required ??= new HashSet<string>();
+        foreach (var (name, member) in source.Properties ?? new Dictionary<string, IOpenApiSchema>())
+        {
+            target.Properties[name] = member;
+            if (source.Required?.Contains(name) == true)
+            {
+                target.Required.Add(name);
+            }
+        }
+
+        if ((source as OpenApiSchema)?.Metadata?.TryGetValue(AbsentWhenUnset, out var absent) == true)
+        {
+            Absent(target).UnionWith((HashSet<string>)absent);
+        }
+    }
+
+    /// <summary>
+    /// Replaces the component <paramref name="component"/> with one variant per
+    /// value of its <paramref name="discriminator"/> member — a <c>oneOf</c>,
+    /// each a copy of the component whose discriminator is that value and
+    /// whose listed members have that value's schemas. For a member the wire
+    /// shapes by a sibling (a candidate's <c>payload</c> by its
+    /// <c>entityType</c>), which the serializer cannot say from a CLR type.
+    /// </summary>
+    /// <param name="document">The document.</param>
+    /// <param name="component">The component's name.</param>
+    /// <param name="discriminator">The member whose value picks the variant.</param>
+    /// <param name="variants">Each value, and the members it reshapes.</param>
+    public static void Discriminate(OpenApiDocument document, string component, string discriminator, IReadOnlyDictionary<string, IReadOnlyDictionary<string, IOpenApiSchema>> variants)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        ArgumentNullException.ThrowIfNull(variants);
+        var schemas = document.Components?.Schemas ?? throw new InvalidOperationException("The document has no schemas.");
+        if (!schemas.TryGetValue(component, out var found) || found is not OpenApiSchema { Properties: not null } original)
+        {
+            throw new InvalidOperationException($"The document has no object schema {component}.");
+        }
+
+        schemas[component] = new OpenApiSchema
+        {
+            Description = original.Description,
+            OneOf = [.. variants.Select(variant =>
+            {
+                var copy = Copy(original);
+                copy.Description = null;
+                var members = copy.Properties!;
+                members[discriminator] = new OpenApiSchema { Type = JsonSchemaType.String, Const = variant.Key };
+                foreach (var (name, shape) in variant.Value)
+                {
+                    members[name] = shape;
+                }
+
+                return (IOpenApiSchema)copy;
+            })],
+        };
+    }
+
+    /// <summary>A copy of <paramref name="schema"/> whose properties and required list can change without changing it.</summary>
+    /// <param name="schema">The schema.</param>
+    /// <returns>The copy.</returns>
+    public static OpenApiSchema Copy(IOpenApiSchema schema)
+    {
+        ArgumentNullException.ThrowIfNull(schema);
+        var copy = (OpenApiSchema)schema.CreateShallowCopy();
+        copy.Properties = new Dictionary<string, IOpenApiSchema>(schema.Properties ?? new Dictionary<string, IOpenApiSchema>());
+        copy.Required = new HashSet<string>(schema.Required ?? new HashSet<string>());
+        if (copy.Metadata is { } metadata)
+        {
+            copy.Metadata = new Dictionary<string, object>(metadata);
+            if (metadata.TryGetValue(AbsentWhenUnset, out var absent))
+            {
+                copy.Metadata[AbsentWhenUnset] = new HashSet<string>((HashSet<string>)absent, StringComparer.Ordinal);
+            }
+        }
+
+        return copy;
     }
 
     private static HashSet<string> Absent(OpenApiSchema schema)
@@ -357,9 +435,11 @@ public sealed record QueryParameterMetadata(string Name, string Description, boo
 /// <param name="Schemes">Its security schemes, by name.</param>
 /// <param name="SchemeOf">The scheme an endpoint's metadata requires; null for an open route.</param>
 /// <param name="PermissionsOf">The permissions an endpoint's metadata requires, as <c>feature:level</c>.</param>
+/// <param name="Refine">The host's own pass over the finished document, for shapes its types cannot state (<see cref="WireOpenApi.Discriminate"/>).</param>
 public sealed record WireOpenApiOptions(
     string Title,
     string Description,
     IReadOnlyDictionary<string, OpenApiSecurityScheme> Schemes,
     Func<IList<object>, string?> SchemeOf,
-    Func<IList<object>, IEnumerable<string>> PermissionsOf);
+    Func<IList<object>, IEnumerable<string>> PermissionsOf,
+    Func<OpenApiDocument, OpenApiDocumentTransformerContext, CancellationToken, Task>? Refine = null);
