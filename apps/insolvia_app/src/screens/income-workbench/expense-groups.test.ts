@@ -14,14 +14,14 @@ describe('EXPENSE_GROUPS', () => {
 });
 
 describe('groupExpenseTotals', () => {
-  function expense(category: string, amount: string): ExpenseBody {
+  function expense(category: string, amount: number): ExpenseBody {
     return { category: category as ExpenseBody['category'], amount };
   }
 
   test('sums same-group categories together', () => {
     const totals = groupExpenseTotals([
-      expense('electricity_heat_gas', '150.00'),
-      expense('water_sewer_garbage', '50.00'),
+      expense('electricity_heat_gas', 150),
+      expense('water_sewer_garbage', 50),
     ]);
 
     const utilities = totals.find((group) => group.name === 'Utilities');
@@ -37,7 +37,7 @@ describe('groupExpenseTotals', () => {
   });
 
   test('an expense with no category is not counted in any group', () => {
-    const totals = groupExpenseTotals([{ amount: '75.00' }]);
+    const totals = groupExpenseTotals([{ amount: 75 }]);
 
     expect(totals.reduce((sum, group) => sum + group.recordCount, 0)).toBe(0);
   });

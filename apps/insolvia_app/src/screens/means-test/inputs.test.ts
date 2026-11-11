@@ -1,7 +1,6 @@
 import type { CaseMeansTest, MeansTestInputBody } from '@insolvia-ai/api-client';
 
 import {
-  inputBodyOf,
   overrideFor,
   securedPaymentFor,
   verdictOf,
@@ -12,50 +11,35 @@ import {
 
 const mint = () => 'minted';
 
-describe('inputBodyOf', () => {
-  it('strips the record identity and keeps the answers', () => {
-    expect(
-      inputBodyOf({
-        id: 'x',
-        case_id: 'c',
-        created_at: 't',
-        updated_at: 't',
-        provenance: {},
-        taxes: '10.00',
-      }),
-    ).toEqual({ taxes: '10.00' });
-  });
-});
-
 describe('income overrides', () => {
   it('adds a row keyed by column and line, minting its id', () => {
-    const next = withOverride({}, 'A', 'wages', '5000.00', mint);
-    expect(next.income_overrides).toEqual([
-      { id: 'minted', column: 'A', category: 'wages', monthly_amount: '5000.00' },
+    const next = withOverride({}, 'A', 'wages', 5000, mint);
+    expect(next.incomeOverrides).toEqual([
+      { id: 'minted', column: 'A', category: 'wages', monthlyAmount: 5000 },
     ]);
-    expect(overrideFor(next, 'A', 'wages')?.monthly_amount).toBe('5000.00');
+    expect(overrideFor(next, 'A', 'wages')?.monthlyAmount).toBe(5000);
   });
 
   it('replaces an existing row in place, keeping its id', () => {
     const body: MeansTestInputBody = {
-      income_overrides: [
-        { id: 'keep', column: 'A', category: 'wages', monthly_amount: '1.00' },
-        { id: 'other', column: 'B', category: 'wages', monthly_amount: '2.00' },
+      incomeOverrides: [
+        { id: 'keep', column: 'A', category: 'wages', monthlyAmount: 1 },
+        { id: 'other', column: 'B', category: 'wages', monthlyAmount: 2 },
       ],
     };
-    const next = withOverride(body, 'A', 'wages', '3.00', mint);
-    expect(next.income_overrides).toEqual([
-      { id: 'other', column: 'B', category: 'wages', monthly_amount: '2.00' },
-      { id: 'keep', column: 'A', category: 'wages', monthly_amount: '3.00' },
+    const next = withOverride(body, 'A', 'wages', 3, mint);
+    expect(next.incomeOverrides).toEqual([
+      { id: 'other', column: 'B', category: 'wages', monthlyAmount: 2 },
+      { id: 'keep', column: 'A', category: 'wages', monthlyAmount: 3 },
     ]);
   });
 
-  it('a blank amount removes the row, and the list when it was the last', () => {
+  it('an absent amount removes the row, and the list when it was the last', () => {
     const body: MeansTestInputBody = {
-      taxes: '10.00',
-      income_overrides: [{ id: 'keep', column: 'A', category: 'wages', monthly_amount: '1.00' }],
+      taxes: 10,
+      incomeOverrides: [{ id: 'keep', column: 'A', category: 'wages', monthlyAmount: 1 }],
     };
-    expect(withOverride(body, 'A', 'wages', '  ', mint)).toEqual({ taxes: '10.00' });
+    expect(withOverride(body, 'A', 'wages', undefined, mint)).toEqual({ taxes: 10 });
     expect(withOverride(body, 'B', 'wages', undefined, mint)).toEqual(body);
   });
 });
@@ -64,27 +48,27 @@ describe('secured payments', () => {
   it('upserts by claim and finds the row by claim', () => {
     const first = withSecuredPayment(
       {},
-      { id: 'r1', claim_id: 'claim-1', bucket: 'home', monthly_payment: '1200.00' },
+      { id: 'r1', claimId: 'claim-1', bucket: 'home', monthlyPayment: 1200 },
     );
     const second = withSecuredPayment(first, {
       id: 'r1',
-      claim_id: 'claim-1',
+      claimId: 'claim-1',
       bucket: 'vehicle_1',
-      monthly_payment: '400.00',
+      monthlyPayment: 400,
     });
-    expect(second.other_secured_payments).toHaveLength(1);
+    expect(second.otherSecuredPayments).toHaveLength(1);
     expect(securedPaymentFor(second, 'claim-1')?.bucket).toBe('vehicle_1');
   });
 
   it('leaves rows entered by hand (no claim) alone', () => {
     const body: MeansTestInputBody = {
-      other_secured_payments: [{ id: 'typed', creditor_name: 'Marina', monthly_payment: '1.00' }],
+      otherSecuredPayments: [{ id: 'typed', creditorName: 'Marina', monthlyPayment: 1 }],
     };
-    const next = withSecuredPayment(body, { id: 'r1', claim_id: 'claim-1', bucket: 'other' });
-    expect(next.other_secured_payments?.map((row) => row.id)).toEqual(['typed', 'r1']);
+    const next = withSecuredPayment(body, { id: 'r1', claimId: 'claim-1', bucket: 'other' });
+    expect(next.otherSecuredPayments?.map((row) => row.id)).toEqual(['typed', 'r1']);
     expect(withoutSecuredPayment(next, 'claim-1')).toEqual(body);
     expect(
-      withoutSecuredPayment({ other_secured_payments: [{ id: 'r1', claim_id: 'c' }] }, 'c'),
+      withoutSecuredPayment({ otherSecuredPayments: [{ id: 'r1', claimId: 'c' }] }, 'c'),
     ).toEqual({});
   });
 });

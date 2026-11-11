@@ -15,6 +15,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { useMe } from '@/api/me';
+import { bodyErrors } from '@/api/body-errors';
 import { useApi } from '@/api/use-api';
 import { Heading } from '@/components/heading';
 import { labelize } from '@/screens/intake/collections';
@@ -115,12 +116,12 @@ export function SignerSection({ caseId }: { caseId: string }) {
         ...(person.firstName ? { given: person.firstName } : {}),
         ...(person.lastName ? { surname: person.lastName } : {}),
       },
-      ...defined('firm_name', block.firm_name ?? letterhead?.name),
+      ...defined('firmName', block.firm_name ?? letterhead?.name),
       ...(address === undefined ? {} : { address }),
       ...defined('phone', block.phone ?? letterhead?.phone),
       ...defined('email', block.email ?? letterhead?.email),
-      ...defined('bar_number', block.bar_number),
-      ...defined('bar_state', block.bar_state),
+      ...defined('barNumber', block.bar_number),
+      ...defined('barState', block.bar_state),
     }));
     setErrors({});
     setStatus(
@@ -142,17 +143,9 @@ export function SignerSection({ caseId }: { caseId: string }) {
           // this screen; the first one found is what this form edits and
           // saves over — the same "first block only" trade the B101
           // projection itself makes for sole proprietorships.
-          if (entity.role !== undefined && byRole[entity.role] === undefined) {
-            const {
-              id: _id,
-              case_id: _caseId,
-              created_at: _created,
-              updated_at: _updated,
-              provenance: _provenance,
-              amended: _amended,
-              ...rest
-            } = entity;
-            byRole[entity.role] = { id: entity.id, body: rest };
+          const entityRole = entity.body.role;
+          if (entityRole !== undefined && byRole[entityRole] === undefined) {
+            byRole[entityRole] = { id: entity.id, body: entity.body };
           }
         }
         setRecords(byRole);
@@ -180,12 +173,7 @@ export function SignerSection({ caseId }: { caseId: string }) {
     try {
       const toSave: FilingProfessionalBody = { ...body, role };
       const existingId = records[role]?.id ?? null;
-      // See the same cast in `screens/petition/index.tsx` — an interface
-      // body needs it, a `Record<string, unknown>` does not.
-      const request = {
-        ...toSave,
-        provenance: staffTypedProvenance(toSave as unknown as Record<string, unknown>),
-      };
+      const request = { body: toSave, provenance: staffTypedProvenance(toSave) };
       const result = await call((client) =>
         existingId === null
           ? client.addCaseEntity(caseId, 'filing_professionals', request)
@@ -195,21 +183,13 @@ export function SignerSection({ caseId }: { caseId: string }) {
         setStatus('');
         return;
       }
-      const {
-        id: _id,
-        case_id: _caseId,
-        created_at: _created,
-        updated_at: _updated,
-        provenance: _provenance,
-        amended: _amended,
-        ...rest
-      } = result.value;
-      setRecords((current) => ({ ...current, [role]: { id: result.value.id, body: rest } }));
+      const saved = result.value;
+      setRecords((current) => ({ ...current, [role]: { id: saved.id, body: saved.body } }));
       setErrors({});
       setStatus('Saved');
     } catch (cause) {
       if (cause instanceof ApiValidationException) {
-        setErrors(cause.fields);
+        setErrors(bodyErrors(cause.fields));
         setStatus('Some answers need attention.');
       } else {
         setStatus('Could not save. Your entries are still here — try again.');
@@ -313,14 +293,14 @@ export function SignerSection({ caseId }: { caseId: string }) {
           />
           <TextField
             label="Firm name"
-            path="firm_name"
-            value={body.firm_name}
+            path="firmName"
+            value={body.firmName}
             onChangeText={(v) =>
-              setBody((current) => ({ ...current, firm_name: v === '' ? undefined : v }))
+              setBody((current) => ({ ...current, firmName: v === '' ? undefined : v }))
             }
             errors={errors}
           />
-          {(['line1', 'line2', 'city', 'state', 'postal_code'] as const).map((part) => (
+          {(['line1', 'line2', 'city', 'state', 'postalCode'] as const).map((part) => (
             <TextField
               key={part}
               label={`Address — ${addressLabel(part)}`}
@@ -350,10 +330,10 @@ export function SignerSection({ caseId }: { caseId: string }) {
           />
           <TextField
             label="Bar number"
-            path="bar_number"
-            value={body.bar_number}
+            path="barNumber"
+            value={body.barNumber}
             onChangeText={(v) =>
-              setBody((current) => ({ ...current, bar_number: v === '' ? undefined : v }))
+              setBody((current) => ({ ...current, barNumber: v === '' ? undefined : v }))
             }
             errors={errors}
             disabled={role !== 'attorney'}
@@ -361,30 +341,28 @@ export function SignerSection({ caseId }: { caseId: string }) {
           />
           <TextField
             label="Bar state"
-            path="bar_state"
-            value={body.bar_state}
+            path="barState"
+            value={body.barState}
             onChangeText={(v) =>
-              setBody((current) => ({ ...current, bar_state: v === '' ? undefined : v }))
+              setBody((current) => ({ ...current, barState: v === '' ? undefined : v }))
             }
             errors={errors}
             disabled={role !== 'attorney'}
             disabledReason="Only applies to an attorney."
           />
-          <Field.Root invalid={Boolean(errors.signature_date)}>
+          <Field.Root invalid={Boolean(errors.signatureDate)}>
             <Field.Label>Date signed</Field.Label>
             <DateInput
-              value={body.signature_date ?? ''}
+              value={body.signatureDate ?? ''}
               onValueChange={(next, dateStatus) => {
                 if (dateStatus === 'incomplete') return;
                 setBody((current) => ({
                   ...current,
-                  signature_date: next === '' ? undefined : next,
+                  signatureDate: next === '' ? undefined : next,
                 }));
               }}
             />
-            {errors.signature_date ? (
-              <Field.Error match>{errors.signature_date}</Field.Error>
-            ) : null}
+            {errors.signatureDate ? <Field.Error match>{errors.signatureDate}</Field.Error> : null}
           </Field.Root>
 
           <Button size="lg" disabled={saving} onPress={() => void persist()}>
@@ -402,7 +380,7 @@ function defined<K extends string>(key: K, value: string | undefined): Partial<R
   return value === undefined ? {} : ({ [key]: value } as Record<K, string>);
 }
 
-function addressLabel(part: 'line1' | 'line2' | 'city' | 'state' | 'postal_code'): string {
+function addressLabel(part: 'line1' | 'line2' | 'city' | 'state' | 'postalCode'): string {
   switch (part) {
     case 'line1':
       return 'Street';
@@ -412,7 +390,7 @@ function addressLabel(part: 'line1' | 'line2' | 'city' | 'state' | 'postal_code'
       return 'City';
     case 'state':
       return 'State';
-    case 'postal_code':
+    case 'postalCode':
       return 'ZIP code';
   }
 }

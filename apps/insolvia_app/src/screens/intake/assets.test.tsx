@@ -200,14 +200,16 @@ describe('the assets screen', () => {
         respond: () =>
           jsonResponse(201, {
             id: '00000000-0000-4000-8000-00000000a5e2',
-            case_id: CASE_ID,
-            created_at: STAMP,
-            updated_at: STAMP,
+            caseId: CASE_ID,
+            createdAt: STAMP,
+            updatedAt: STAMP,
+            body: {
+              category: 'vehicle',
+              make: 'Honda',
+              model: 'Civic LX',
+            },
             amended: false,
             provenance: {},
-            category: 'vehicle',
-            make: 'Honda',
-            model: 'Civic LX',
           }),
       },
     ]);
@@ -222,9 +224,7 @@ describe('the assets screen', () => {
 
     await waitFor(() =>
       expect(lastBody(fetchMock, 'POST', '/assets')).toEqual({
-        category: 'vehicle',
-        make: 'Honda',
-        model: 'Civic LX',
+        body: { category: 'vehicle', make: 'Honda', model: 'Civic LX' },
         provenance: {
           category: { source: 'staff_typed' },
           make: { source: 'staff_typed' },

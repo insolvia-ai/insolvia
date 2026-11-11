@@ -9,7 +9,7 @@ export const ADDRESS: Spec = {
   'line2?': 'string',
   'city?': 'string',
   'state?': 'string',
-  'postal_code?': 'string',
+  'postalCode?': 'string',
   'county?': 'string',
 };
 
@@ -156,11 +156,13 @@ export const CALENDAR_EVENT: Spec = {
 
 export const NOTE: Spec = {
   id: 'string',
-  case_id: 'string',
-  'text?': 'string',
-  'form_series?': 'string',
-  author_subject: 'string',
-  author_name: 'string',
-  created_at: 'string',
-  updated_at: 'string',
+  caseId: 'string',
+  createdAt: 'string',
+  updatedAt: 'string',
+  body: {
+    'text?': 'string',
+    'formSeries?': 'string',
+    authorSubject: 'string',
+    authorName: 'string',
+  },
 };

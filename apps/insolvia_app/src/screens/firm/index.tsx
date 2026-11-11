@@ -362,7 +362,7 @@ const LETTERHEAD_ADDRESS = [
   ['line2', 'Apartment, suite or unit'],
   ['city', 'City'],
   ['state', 'State'],
-  ['postal_code', 'ZIP code'],
+  ['postalCode', 'ZIP code'],
 ] as const;
 
 type RegistryState =

@@ -272,7 +272,7 @@ describe('the creditor library', () => {
     const name = `Example Lender ${tag()}`;
     const added = await admin.api.addLibraryCreditor({
       name,
-      address: { line1: '1 Main St', city: 'Tampa', state: 'FL', postal_code: '33602' },
+      address: { line1: '1 Main St', city: 'Tampa', state: 'FL', postalCode: '33602' },
       preferred: true,
     });
     admin.wire(201, LIBRARY_CREDITOR);
@@ -280,7 +280,7 @@ describe('the creditor library', () => {
 
     const updated = await admin.api.updateLibraryCreditor(added.id, {
       name,
-      address: { line1: '2 Main St', city: 'Tampa', state: 'FL', postal_code: '33602' },
+      address: { line1: '2 Main St', city: 'Tampa', state: 'FL', postalCode: '33602' },
       notes: 'Contract note',
     });
     admin.wire(200, LIBRARY_CREDITOR);

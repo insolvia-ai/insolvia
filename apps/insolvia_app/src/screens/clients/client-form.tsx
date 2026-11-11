@@ -68,7 +68,7 @@ function addressState(address: Address | undefined): AddressState {
     line2: address?.line2 ?? '',
     city: address?.city ?? '',
     state: address?.state ?? '',
-    postalCode: address?.postal_code ?? '',
+    postalCode: address?.postalCode ?? '',
     county: address?.county ?? '',
   };
 }
@@ -103,7 +103,7 @@ function addressOrUndefined(address: AddressState): Address | undefined {
     line2: blankToUndefined(address.line2),
     city: blankToUndefined(address.city),
     state: blankToUndefined(address.state),
-    postal_code: blankToUndefined(address.postalCode),
+    postalCode: blankToUndefined(address.postalCode),
     county: blankToUndefined(address.county),
   };
   return Object.values(built).some((value) => value !== undefined) ? built : undefined;
@@ -143,7 +143,7 @@ export function requestFromForm(form: ClientFormState, stored?: FirmClient): Fir
  * edit mode, so the two cannot disagree about what a client is.
  *
  * Errors are the SERVER's, keyed by its field paths (`name`,
- * `date_of_birth`, `residence_address.postal_code`, …) and rendered on the
+ * `date_of_birth`, `residence_address.postalCode`, …) and rendered on the
  * box they name (ADR 0001): the rule lives in `insolvia_core.firm_clients`,
  * not in a second copy here. `name` — "a surname or a first name" — is
  * shown under the surname, the box a person reaches for first.
@@ -233,7 +233,7 @@ export function ClientForm({
             {text(`${root}.state`, label('State'), current.state, put('state'))}
           </View>
           <View style={styles.narrow}>
-            {text(`${root}.postal_code`, label('ZIP code'), current.postalCode, put('postalCode'))}
+            {text(`${root}.postalCode`, label('ZIP code'), current.postalCode, put('postalCode'))}
           </View>
         </View>
         {root === 'residence_address'

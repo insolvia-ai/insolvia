@@ -8,6 +8,7 @@ import { useMembership } from '@/api/me';
 import { useApi } from '@/api/use-api';
 import { CaseColumn } from '@/components/case-shell';
 import { Heading } from '@/components/heading';
+import { moneyOf } from '@/components/money-input';
 import { openDownload } from '@/screens/documents/browser';
 import { fontSizes, spacing, useTheme } from '@/theme';
 
@@ -66,7 +67,7 @@ function flattenPayload(payload: Readonly<Record<string, unknown>>): readonly Pa
       return;
     }
     if (typeof value === 'number') {
-      rows.push({ path, label: fieldLabel(path), value: String(value), editable: false });
+      rows.push({ path, label: fieldLabel(path), value: String(value), editable: true });
       return;
     }
     if (typeof value === 'boolean') {
@@ -123,7 +124,9 @@ function applyDrafts(
     if (draft.trim() === '') {
       delete cursor[leaf];
     } else {
-      cursor[leaf] = draft;
+      // A body's money and counts are JSON numbers; text that is not one is
+      // sent as typed, so the server's refusal names the field.
+      cursor[leaf] = typeof cursor[leaf] === 'number' ? (moneyOf(draft) ?? draft) : draft;
     }
   }
   return copy;

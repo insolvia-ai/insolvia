@@ -24,12 +24,14 @@ const PETITION_ID = '00000000-0000-4000-8000-0000000000p1';
 
 const SAVED_PETITION = {
   id: PETITION_ID,
-  case_id: CASE_ID,
-  created_at: '2026-09-01T10:00:00.000000Z',
-  updated_at: '2026-09-01T10:00:00.000000Z',
+  caseId: CASE_ID,
+  createdAt: '2026-09-01T10:00:00.000000Z',
+  updatedAt: '2026-09-01T10:00:00.000000Z',
+  body: {
+    feeHandling: 'waiver',
+  },
   amended: false,
-  provenance: { fee_handling: { source: 'staff_typed' } },
-  fee_handling: 'waiver',
+  provenance: { feeHandling: { source: 'staff_typed' } },
 };
 
 /** One stubbed API route: a method, a URL fragment, and its answer. */
@@ -185,13 +187,15 @@ describe('the petition screen', () => {
     // bracket starts at 1), so it is absent here.
     await waitFor(() =>
       expect(lastBody(fetchMock, 'POST', '/petitions')).toEqual({
-        fee_handling: 'waiver',
-        estimated_assets: '0_50000',
-        estimated_liabilities: '0_50000',
+        body: {
+          feeHandling: 'waiver',
+          estimatedAssets: '0_50000',
+          estimatedLiabilities: '0_50000',
+        },
         provenance: {
-          fee_handling: { source: 'staff_typed' },
-          estimated_assets: { source: 'staff_typed' },
-          estimated_liabilities: { source: 'staff_typed' },
+          feeHandling: { source: 'staff_typed' },
+          estimatedAssets: { source: 'staff_typed' },
+          estimatedLiabilities: { source: 'staff_typed' },
         },
       }),
     );
@@ -241,13 +245,15 @@ describe('the petition screen', () => {
           respond: () =>
             jsonResponse(201, {
               id: 'fp-1',
-              case_id: CASE_ID,
-              created_at: '2026-09-01T10:00:00.000000Z',
-              updated_at: '2026-09-01T10:00:00.000000Z',
+              caseId: CASE_ID,
+              createdAt: '2026-09-01T10:00:00.000000Z',
+              updatedAt: '2026-09-01T10:00:00.000000Z',
+              body: {
+                role: 'attorney',
+                barNumber: '0123456',
+              },
               amended: false,
               provenance: {},
-              role: 'attorney',
-              bar_number: '0123456',
             }),
         },
       ]),
@@ -267,12 +273,13 @@ describe('the petition screen', () => {
     await user.press(screen.getByRole('button', { name: 'Save signer' }));
 
     await waitFor(() => {
-      const body = lastBody(fetchMock, 'POST', '/filing_professionals');
-      expect(body.bar_number).toBe('0123456');
-      expect(body.bar_state).toBe('FL');
+      const sent = lastBody(fetchMock, 'POST', '/filing_professionals');
+      const body = sent.body as Record<string, unknown>;
+      expect(body.barNumber).toBe('0123456');
+      expect(body.barState).toBe('FL');
       expect(body.name).toEqual({ given: 'Alice', surname: 'Attorney' });
       expect(body.address).toEqual({ line1: '1 Main St', city: 'Tampa', state: 'FL' });
-      expect((body.provenance as Record<string, unknown>).bar_number).toEqual({
+      expect((sent.provenance as Record<string, unknown>).barNumber).toEqual({
         source: 'staff_typed',
       });
     });
@@ -288,9 +295,10 @@ describe('the petition screen', () => {
             jsonResponse(200, {
               creditors: Array.from({ length: 60 }, (_unused, index) => ({
                 id: `creditor-${index}`,
-                case_id: CASE_ID,
-                created_at: '2026-09-01T10:00:00.000000Z',
-                updated_at: '2026-09-01T10:00:00.000000Z',
+                caseId: CASE_ID,
+                createdAt: '2026-09-01T10:00:00.000000Z',
+                updatedAt: '2026-09-01T10:00:00.000000Z',
+                body: {},
                 amended: false,
                 provenance: {},
               })),

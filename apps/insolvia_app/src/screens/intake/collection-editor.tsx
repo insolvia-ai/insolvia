@@ -24,8 +24,10 @@ import {
 import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { bodyErrors } from '@/api/body-errors';
 import { useApi } from '@/api/use-api';
 import { Heading } from '@/components/heading';
+import { MoneyInput } from '@/components/money-input';
 import { fontSizes, spacing, useTheme } from '@/theme';
 
 import type { ChoiceOption, CollectionSpec, FieldSpec } from './collections';
@@ -142,19 +144,10 @@ const DEBTOR_LABELS: Readonly<Record<string, string>> = {
  * does — reusing these three rather than a second copy of them.
  */
 export function bodyOf(record: Record<string, unknown>): Body {
-  const {
-    id: _id,
-    case_id: _caseId,
-    created_at: _created,
-    updated_at: _updated,
-    provenance: _provenance,
-    // `amended` (issue #370) is a generic entity attribute, not case data —
-    // the same reason it is stripped here that `provenance` is: it rides
-    // beside the body, never inside it. Callers that need it read `Row.amended`.
-    amended: _amended,
-    ...body
-  } = record;
-  return body;
+  // The entity view nests case data under `body`; `provenance` and `amended`
+  // (issue #370) ride beside it. Callers that need `amended` read `Row.amended`.
+  const body = record.body;
+  return typeof body === 'object' && body !== null && !Array.isArray(body) ? (body as Body) : {};
 }
 
 /** Whether a loaded record's `amended` flag is `true` — the one field
@@ -219,7 +212,7 @@ function creditorNameOf(
   body: Body,
   references: Readonly<Partial<Record<string, readonly ReferenceOption[]>>>,
 ): string | undefined {
-  const creditorId = body.creditor_id;
+  const creditorId = body.creditorId;
   if (typeof creditorId !== 'string') return undefined;
   const label = references.creditors?.find((option) => option.value === creditorId)?.label;
   const name = label?.split(' — ').slice(1).join(' — ');
@@ -396,7 +389,7 @@ export function CollectionEditor({ caseId, spec, initialForm }: CollectionEditor
         // `FieldControl` clears it, which is what keeps this honest. Every
         // other save keeps the ordinary `staff_typed` rule.
         const request = {
-          ...form.body,
+          body: form.body,
           // `amended` (issue #370) rides only when the case is filed — the
           // one state where the control is even shown, and the one state
           // the server accepts `true` in. Omitted otherwise, matching this
@@ -458,7 +451,7 @@ export function CollectionEditor({ caseId, spec, initialForm }: CollectionEditor
         setMode({ kind: 'list' });
       } catch (cause) {
         if (cause instanceof ApiValidationException) {
-          setErrors(cause.fields);
+          setErrors(bodyErrors(cause.fields));
           setStatus('Some answers need attention.');
         } else {
           setStatus('Could not save. Your entries are still here — try again.');
@@ -640,14 +633,14 @@ export function CollectionEditor({ caseId, spec, initialForm }: CollectionEditor
           {spec.collection === 'claims' ? (
             <ClaimCollateralPanel caseId={caseId} claimId={mode.id} />
           ) : null}
-          {spec.collection === 'claims' && mode.body.claim_class === 'secured' ? (
+          {spec.collection === 'claims' && mode.body.claimClass === 'secured' ? (
             <ClaimSecuredPaymentPanel
               caseId={caseId}
               claimId={mode.id}
               creditorName={creditorNameOf(mode.body, references)}
               propertyDescription={
-                typeof mode.body.collateral_description === 'string'
-                  ? mode.body.collateral_description
+                typeof mode.body.collateralDescription === 'string'
+                  ? mode.body.collateralDescription
                   : undefined
               }
             />
@@ -847,7 +840,6 @@ function FieldControl({
 
   switch (field.kind) {
     case 'text':
-    case 'money':
       return (
         <Field.Root invalid={Boolean(message)}>
           <Field.Label>{field.label}</Field.Label>
@@ -856,9 +848,15 @@ function FieldControl({
             onValueChange={setText}
             autoCorrect={false}
           />
-          {field.kind === 'money' ? (
-            <Field.Description>Dollars, like 1200.00.</Field.Description>
-          ) : null}
+          {message ? <Field.Error match>{message}</Field.Error> : null}
+        </Field.Root>
+      );
+    case 'money':
+      return (
+        <Field.Root invalid={Boolean(message)}>
+          <Field.Label>{field.label}</Field.Label>
+          <MoneyInput value={typeof value === 'number' ? value : undefined} onValueChange={set} />
+          <Field.Description>Dollars, like 1200.00.</Field.Description>
           {message ? <Field.Error match>{message}</Field.Error> : null}
         </Field.Root>
       );
@@ -964,7 +962,7 @@ function FieldControl({
       const chosen = Array.isArray(value)
         ? value.filter((v): v is string => typeof v === 'string')
         : [];
-      // Server messages for a list are keyed per element (`lien_nature[0]`) or
+      // Server messages for a list are keyed per element (`lienNature[0]`) or
       // whole; either way they belong under this group.
       const groupMessage =
         message ?? Object.entries(errors).find(([path]) => path.startsWith(`${field.key}[`))?.[1];
@@ -1036,7 +1034,7 @@ function FieldControl({
           )
         : [];
       const setRows = (next: readonly Body[]) => set(next.length === 0 ? undefined : [...next]);
-      // Server messages are keyed by POSITION (`notice_parties[0].name`);
+      // Server messages are keyed by POSITION (`noticeParties[0].name`);
       // rescope each row's slice to row-relative paths so the row's own
       // controls can find them.
       const rowErrors = (index: number): Readonly<Record<string, string>> => {
@@ -1074,23 +1072,23 @@ function FieldControl({
                     setRows(rows.map((current, at) => (at === index ? next : current)))
                   }
                 />
-                <Field.Root invalid={Boolean(scoped.account_last4)}>
+                <Field.Root invalid={Boolean(scoped.accountLast4)}>
                   <Field.Label>{`${rowLabel} — account number, last four digits`}</Field.Label>
                   <Input
-                    value={typeof row.account_last4 === 'string' ? row.account_last4 : ''}
+                    value={typeof row.accountLast4 === 'string' ? row.accountLast4 : ''}
                     onValueChange={(next) =>
                       setRows(
                         rows.map((current, at) =>
                           at === index
-                            ? setAt(current, 'account_last4', next === '' ? undefined : next)
+                            ? setAt(current, 'accountLast4', next === '' ? undefined : next)
                             : current,
                         ),
                       )
                     }
                     autoCorrect={false}
                   />
-                  {scoped.account_last4 ? (
-                    <Field.Error match>{scoped.account_last4}</Field.Error>
+                  {scoped.accountLast4 ? (
+                    <Field.Error match>{scoped.accountLast4}</Field.Error>
                   ) : null}
                 </Field.Root>
                 {wholeRowMessage ? (
@@ -1259,7 +1257,7 @@ function AddressGroup({
     ['line2', 'Apartment, suite or unit'],
     ['city', 'City'],
     ['state', 'State'],
-    ['postal_code', 'ZIP code'],
+    ['postalCode', 'ZIP code'],
   ];
   return (
     <View style={styles.group}>

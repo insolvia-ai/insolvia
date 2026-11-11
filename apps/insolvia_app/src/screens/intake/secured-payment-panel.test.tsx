@@ -27,52 +27,58 @@ const STAMP = '2026-09-01T10:00:00.000000Z';
 
 const SECURED_CLAIM = {
   id: CLAIM_ID,
-  case_id: CASE_ID,
-  created_at: STAMP,
-  updated_at: STAMP,
+  caseId: CASE_ID,
+  createdAt: STAMP,
+  updatedAt: STAMP,
+  body: {
+    claimClass: 'secured',
+    amount: 12000,
+    creditorId: CREDITOR_ID,
+    collateralDescription: '2016 sedan',
+  },
   provenance: {
-    claim_class: { source: 'staff_typed' },
+    claimClass: { source: 'staff_typed' },
     amount: { source: 'staff_typed' },
-    creditor_id: { source: 'staff_typed' },
-    collateral_description: { source: 'staff_typed' },
+    creditorId: { source: 'staff_typed' },
+    collateralDescription: { source: 'staff_typed' },
   },
   amended: false,
-  claim_class: 'secured',
-  amount: '12000.00',
-  creditor_id: CREDITOR_ID,
-  collateral_description: '2016 sedan',
 };
 
 const CREDITOR = {
   id: CREDITOR_ID,
-  case_id: CASE_ID,
-  created_at: STAMP,
-  updated_at: STAMP,
+  caseId: CASE_ID,
+  createdAt: STAMP,
+  updatedAt: STAMP,
+  body: {
+    name: 'Example Auto Finance',
+  },
   provenance: { name: { source: 'staff_typed' } },
   amended: false,
-  name: 'Example Auto Finance',
 };
 
 /** A means-test record with a row already entered beside this claim. */
 const INPUT_WITH_ROW = {
   id: INPUT_ID,
-  case_id: CASE_ID,
-  created_at: STAMP,
-  updated_at: STAMP,
+  caseId: CASE_ID,
+  createdAt: STAMP,
+  updatedAt: STAMP,
+  body: {
+    taxes: 1620,
+    otherSecuredPayments: [
+      {
+        id: 'row-1',
+        claimId: CLAIM_ID,
+        bucket: 'vehicle_1',
+        monthlyPayment: 415,
+        cureTotal: 900,
+        creditorName: 'Example Auto Finance',
+        propertyDescription: '2016 sedan',
+      },
+    ],
+  },
   provenance: { taxes: { source: 'staff_typed' } },
   amended: false,
-  taxes: '1620.00',
-  other_secured_payments: [
-    {
-      id: 'row-1',
-      claim_id: CLAIM_ID,
-      bucket: 'vehicle_1',
-      monthly_payment: '415.00',
-      cure_total: '900.00',
-      creditor_name: 'Example Auto Finance',
-      property_description: '2016 sedan',
-    },
-  ],
 };
 
 interface Route {
@@ -85,7 +91,7 @@ interface Route {
  * The per-claim means-test panel (issue #349), through the real intake
  * route's claim form. What is asserted: the panel appears only under a
  * SECURED claim, it writes the case's one means_test_input record whole with
- * this claim's row keyed by `claim_id` and bucketed for the engine, it
+ * this claim's row keyed by `claimId` and bucketed for the engine, it
  * reloads an existing row, and it never touches the claim itself.
  */
 describe('the secured-payment panel', () => {
@@ -122,10 +128,12 @@ describe('the secured-payment panel', () => {
     fragment: string,
   ): Record<string, unknown> {
     const calls = requests(fetchMock, method, fragment);
-    return JSON.parse(String(calls[calls.length - 1]?.[1]?.body ?? '{}')) as Record<
-      string,
-      unknown
-    >;
+    // The request's body, with its provenance beside it, read flat.
+    const sent = JSON.parse(String(calls[calls.length - 1]?.[1]?.body ?? '{}')) as {
+      body?: Record<string, unknown>;
+      provenance?: unknown;
+    };
+    return { ...sent.body, provenance: sent.provenance };
   }
 
   const get = (fragment: string, body: unknown): Route => ({
@@ -191,24 +199,24 @@ describe('the secured-payment panel', () => {
 
     await waitFor(() => {
       const sent = lastBody(fetchMock, 'POST', '/means_test_inputs');
-      const rows = sent.other_secured_payments as Record<string, unknown>[];
+      const rows = sent.otherSecuredPayments as Record<string, unknown>[];
       expect(rows).toHaveLength(1);
       expect(rows[0]).toEqual(
         expect.objectContaining({
-          claim_id: CLAIM_ID,
+          claimId: CLAIM_ID,
           bucket: 'vehicle_1',
-          monthly_payment: '415.00',
-          cure_total: '900.00',
-          creditor_name: 'Example Auto Finance',
-          property_description: '2016 sedan',
+          monthlyPayment: 415,
+          cureTotal: 900,
+          creditorName: 'Example Auto Finance',
+          propertyDescription: '2016 sedan',
         }),
       );
       const provenance = sent.provenance as Record<string, { source: string }>;
       const rowId = String(rows[0]!.id);
-      expect(provenance[`other_secured_payments[${rowId}].bucket`]).toEqual({
+      expect(provenance[`otherSecuredPayments[${rowId}].bucket`]).toEqual({
         source: 'staff_typed',
       });
-      expect(provenance[`other_secured_payments[${rowId}].claim_id`]).toEqual({
+      expect(provenance[`otherSecuredPayments[${rowId}].claimId`]).toEqual({
         source: 'staff_typed',
       });
     });
@@ -229,7 +237,7 @@ describe('the secured-payment panel', () => {
     ]);
     const user = await openClaim();
 
-    expect(await screen.findByDisplayValue('415.00')).toBeTruthy();
+    expect(await screen.findByDisplayValue('415')).toBeTruthy();
     await user.clear(screen.getByLabelText('Average monthly payment over the next 60 months'));
     await user.type(
       screen.getByLabelText('Average monthly payment over the next 60 months'),
@@ -239,11 +247,11 @@ describe('the secured-payment panel', () => {
 
     await waitFor(() => {
       const sent = lastBody(fetchMock, 'PUT', `/means_test_inputs/${INPUT_ID}`);
-      const rows = sent.other_secured_payments as Record<string, unknown>[];
+      const rows = sent.otherSecuredPayments as Record<string, unknown>[];
       expect(rows).toHaveLength(1);
-      expect(rows[0]).toEqual(expect.objectContaining({ id: 'row-1', monthly_payment: '450.00' }));
+      expect(rows[0]).toEqual(expect.objectContaining({ id: 'row-1', monthlyPayment: 450 }));
       // The rest of the record rides along untouched.
-      expect(sent.taxes).toBe('1620.00');
+      expect(sent.taxes).toBe(1620);
     });
   });
 
@@ -251,7 +259,12 @@ describe('the secured-payment panel', () => {
     // Before `common`: the first matching route wins.
     signedIn([
       get(`/v1/cases/${CASE_ID}/claims`, {
-        claims: [{ ...SECURED_CLAIM, claim_class: 'nonpriority_unsecured' }],
+        claims: [
+          {
+            ...SECURED_CLAIM,
+            body: { ...SECURED_CLAIM.body, claimClass: 'nonpriority_unsecured' },
+          },
+        ],
       }),
       ...common,
       get(`/v1/cases/${CASE_ID}/means_test_inputs`, { means_test_inputs: [] }),

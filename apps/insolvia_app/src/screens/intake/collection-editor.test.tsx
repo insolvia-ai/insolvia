@@ -24,12 +24,14 @@ const CREDITOR_ID = '00000000-0000-4000-8000-0000000000e1';
 
 const SAVED_CREDITOR = {
   id: CREDITOR_ID,
-  case_id: CASE_ID,
-  created_at: '2026-09-01T10:00:00.000000Z',
-  updated_at: '2026-09-01T10:00:00.000000Z',
+  caseId: CASE_ID,
+  createdAt: '2026-09-01T10:00:00.000000Z',
+  updatedAt: '2026-09-01T10:00:00.000000Z',
+  body: {
+    name: 'Example Bank',
+  },
   provenance: { name: { source: 'staff_typed' } },
   amended: false,
-  name: 'Example Bank',
 };
 
 /** One stubbed API route: a method, a URL fragment, and its answer. */
@@ -193,7 +195,7 @@ describe('the intake collection sections', () => {
 
     await waitFor(() =>
       expect(lastBody(fetchMock, 'POST', '/creditors')).toEqual({
-        name: 'Example Bank',
+        body: { name: 'Example Bank' },
         provenance: { name: { source: 'staff_typed' } },
       }),
     );
@@ -258,7 +260,11 @@ describe('the intake collection sections', () => {
       {
         method: 'POST',
         fragment: `/v1/cases/${CASE_ID}/creditors`,
-        respond: () => jsonResponse(201, { ...SAVED_CREDITOR, address: { line1: '1 Main St' } }),
+        respond: () =>
+          jsonResponse(201, {
+            ...SAVED_CREDITOR,
+            body: { ...SAVED_CREDITOR.body, address: { line1: '1 Main St' } },
+          }),
       },
     ]);
 
@@ -276,8 +282,7 @@ describe('the intake collection sections', () => {
 
     await waitFor(() =>
       expect(lastBody(fetchMock, 'POST', '/creditors')).toEqual({
-        name: 'Acme Collections',
-        address: { line1: '1 Main St' },
+        body: { name: 'Acme Collections', address: { line1: '1 Main St' } },
         provenance: {
           name: { source: 'library', library_creditor_id: LIBRARY_CREDITOR_ID },
           'address.line1': { source: 'library', library_creditor_id: LIBRARY_CREDITOR_ID },
@@ -341,7 +346,11 @@ describe('the intake collection sections', () => {
       {
         method: 'PUT',
         fragment: `/v1/cases/${CASE_ID}/creditors/${CREDITOR_ID}`,
-        respond: () => jsonResponse(200, { ...SAVED_CREDITOR, name: 'Renamed Bank' }),
+        respond: () =>
+          jsonResponse(200, {
+            ...SAVED_CREDITOR,
+            body: { ...SAVED_CREDITOR.body, name: 'Renamed Bank' },
+          }),
       },
     ]);
 
@@ -354,7 +363,7 @@ describe('the intake collection sections', () => {
 
     await waitFor(() =>
       expect(lastBody(fetchMock, 'PUT', `/creditors/${CREDITOR_ID}`)).toEqual({
-        name: 'Renamed Bank',
+        body: { name: 'Renamed Bank' },
         provenance: { name: { source: 'staff_typed' } },
       }),
     );
@@ -419,12 +428,14 @@ describe('the intake collection sections', () => {
         respond: () =>
           jsonResponse(201, {
             id: '00000000-0000-4000-8000-0000000000f2',
-            case_id: CASE_ID,
-            created_at: '2026-09-01T10:00:00.000000Z',
-            updated_at: '2026-09-01T10:00:00.000000Z',
+            caseId: CASE_ID,
+            createdAt: '2026-09-01T10:00:00.000000Z',
+            updatedAt: '2026-09-01T10:00:00.000000Z',
+            body: {
+              noticeParties: [],
+            },
             provenance: {},
             amended: false,
-            notice_parties: [],
           }),
       },
     ]);
@@ -440,19 +451,20 @@ describe('the intake collection sections', () => {
     await user.press(screen.getByRole('button', { name: 'Save claim' }));
 
     await waitFor(() => {
-      const body = lastBody(fetchMock, 'POST', '/claims');
+      const sent = lastBody(fetchMock, 'POST', '/claims');
+      const body = sent.body as Record<string, unknown>;
       // The row's id is minted by the client (the API requires one so
       // provenance can address the row), so assert its shape and then use it.
-      const parties = body.notice_parties as readonly Record<string, unknown>[];
+      const parties = body.noticeParties as readonly Record<string, unknown>[];
       expect(parties).toHaveLength(1);
       const party = parties[0];
       if (party === undefined) throw new Error('expected one notice party');
       expect(typeof party.id).toBe('string');
       expect(party.name).toBe('Midland Credit');
-      expect(party.account_last4).toBe('4471');
-      expect(body.provenance).toEqual({
-        [`notice_parties[${String(party.id)}].name`]: { source: 'staff_typed' },
-        [`notice_parties[${String(party.id)}].account_last4`]: { source: 'staff_typed' },
+      expect(party.accountLast4).toBe('4471');
+      expect(sent.provenance).toEqual({
+        [`noticeParties[${String(party.id)}].name`]: { source: 'staff_typed' },
+        [`noticeParties[${String(party.id)}].accountLast4`]: { source: 'staff_typed' },
       });
     });
   });
@@ -487,7 +499,7 @@ describe('the intake collection sections', () => {
           jsonResponse(400, {
             error: 'validation failed',
             // Positional, exactly as core/claims.py keys them.
-            fields: { 'notice_parties[0].account_last4': 'Must be up to four digits.' },
+            fields: { 'noticeParties[0].accountLast4': 'Must be up to four digits.' },
           }),
       },
     ]);
@@ -533,12 +545,14 @@ describe('the intake collection sections', () => {
         respond: () =>
           jsonResponse(201, {
             id: '00000000-0000-4000-8000-0000000000f3',
-            case_id: CASE_ID,
-            created_at: '2026-09-01T10:00:00.000000Z',
-            updated_at: '2026-09-01T10:00:00.000000Z',
-            provenance: { account_last4: { source: 'staff_typed' } },
+            caseId: CASE_ID,
+            createdAt: '2026-09-01T10:00:00.000000Z',
+            updatedAt: '2026-09-01T10:00:00.000000Z',
+            body: {
+              accountLast4: '4471',
+            },
+            provenance: { accountLast4: { source: 'staff_typed' } },
             amended: false,
-            account_last4: '4471',
           }),
       },
     ]);
@@ -554,8 +568,8 @@ describe('the intake collection sections', () => {
 
     await waitFor(() =>
       expect(lastBody(fetchMock, 'POST', '/claims')).toEqual({
-        account_last4: '4471',
-        provenance: { account_last4: { source: 'staff_typed' } },
+        body: { accountLast4: '4471' },
+        provenance: { accountLast4: { source: 'staff_typed' } },
       }),
     );
   });
@@ -581,14 +595,16 @@ describe('the intake collection sections', () => {
         respond: () =>
           jsonResponse(201, {
             id: '00000000-0000-4000-8000-0000000000f4',
-            case_id: CASE_ID,
-            created_at: '2026-09-01T10:00:00.000000Z',
-            updated_at: '2026-09-01T10:00:00.000000Z',
+            caseId: CASE_ID,
+            createdAt: '2026-09-01T10:00:00.000000Z',
+            updatedAt: '2026-09-01T10:00:00.000000Z',
+            body: {
+              counterpartyName: 'StorSafe Tampa LLC',
+              intention: 'reject',
+              listOnStatementOfIntention: true,
+            },
             provenance: {},
             amended: false,
-            counterparty_name: 'StorSafe Tampa LLC',
-            intention: 'reject',
-            list_on_statement_of_intention: true,
           }),
       },
     ]);
@@ -608,13 +624,15 @@ describe('the intake collection sections', () => {
 
     await waitFor(() =>
       expect(lastBody(fetchMock, 'POST', '/contract_leases')).toEqual({
-        counterparty_name: 'StorSafe Tampa LLC',
-        intention: 'reject',
-        list_on_statement_of_intention: true,
+        body: {
+          counterpartyName: 'StorSafe Tampa LLC',
+          intention: 'reject',
+          listOnStatementOfIntention: true,
+        },
         provenance: {
-          counterparty_name: { source: 'staff_typed' },
+          counterpartyName: { source: 'staff_typed' },
           intention: { source: 'staff_typed' },
-          list_on_statement_of_intention: { source: 'staff_typed' },
+          listOnStatementOfIntention: { source: 'staff_typed' },
         },
       }),
     );
@@ -623,12 +641,14 @@ describe('the intake collection sections', () => {
   it('links a codebtor to a claim and a lease, and shows the link back on each', async () => {
     const LEASE = {
       id: '00000000-0000-4000-8000-0000000000f5',
-      case_id: CASE_ID,
-      created_at: '2026-09-01T10:00:00.000000Z',
-      updated_at: '2026-09-01T10:00:00.000000Z',
-      provenance: { counterparty_name: { source: 'staff_typed' } },
+      caseId: CASE_ID,
+      createdAt: '2026-09-01T10:00:00.000000Z',
+      updatedAt: '2026-09-01T10:00:00.000000Z',
+      body: {
+        counterpartyName: 'StorSafe Tampa LLC',
+      },
+      provenance: { counterpartyName: { source: 'staff_typed' } },
       amended: false,
-      counterparty_name: 'StorSafe Tampa LLC',
     };
     const fetchMock = signedIn([
       noDebtors,
@@ -653,16 +673,18 @@ describe('the intake collection sections', () => {
         respond: () =>
           jsonResponse(201, {
             id: '00000000-0000-4000-8000-0000000000f6',
-            case_id: CASE_ID,
-            created_at: '2026-09-01T10:00:00.000000Z',
-            updated_at: '2026-09-01T10:00:00.000000Z',
+            caseId: CASE_ID,
+            createdAt: '2026-09-01T10:00:00.000000Z',
+            updatedAt: '2026-09-01T10:00:00.000000Z',
+            body: {
+              name: 'Jane Doe',
+              contractLeaseIds: [LEASE.id],
+            },
             provenance: {
               name: { source: 'staff_typed' },
-              contract_lease_ids: { source: 'staff_typed' },
+              contractLeaseIds: { source: 'staff_typed' },
             },
             amended: false,
-            name: 'Jane Doe',
-            contract_lease_ids: [LEASE.id],
           }),
       },
     ]);
@@ -675,11 +697,10 @@ describe('the intake collection sections', () => {
 
     await waitFor(() =>
       expect(lastBody(fetchMock, 'POST', '/codebtors')).toEqual({
-        name: 'Jane Doe',
-        contract_lease_ids: [LEASE.id],
+        body: { name: 'Jane Doe', contractLeaseIds: [LEASE.id] },
         provenance: {
           name: { source: 'staff_typed' },
-          contract_lease_ids: { source: 'staff_typed' },
+          contractLeaseIds: { source: 'staff_typed' },
         },
       }),
     );
@@ -688,22 +709,26 @@ describe('the intake collection sections', () => {
   it('shows which codebtors are linked to a claim, read only', async () => {
     const CLAIM = {
       id: '00000000-0000-4000-8000-0000000000f7',
-      case_id: CASE_ID,
-      created_at: '2026-09-01T10:00:00.000000Z',
-      updated_at: '2026-09-01T10:00:00.000000Z',
+      caseId: CASE_ID,
+      createdAt: '2026-09-01T10:00:00.000000Z',
+      updatedAt: '2026-09-01T10:00:00.000000Z',
+      body: {
+        amount: 500,
+      },
       provenance: { amount: { source: 'staff_typed' } },
       amended: false,
-      amount: '500.00',
     };
     const CODEBTOR = {
       id: '00000000-0000-4000-8000-0000000000f8',
-      case_id: CASE_ID,
-      created_at: '2026-09-01T10:00:00.000000Z',
-      updated_at: '2026-09-01T10:00:00.000000Z',
-      provenance: { name: { source: 'staff_typed' }, claim_ids: { source: 'staff_typed' } },
+      caseId: CASE_ID,
+      createdAt: '2026-09-01T10:00:00.000000Z',
+      updatedAt: '2026-09-01T10:00:00.000000Z',
+      body: {
+        name: 'Jane Doe',
+        claimIds: [CLAIM.id],
+      },
+      provenance: { name: { source: 'staff_typed' }, claimIds: { source: 'staff_typed' } },
       amended: false,
-      name: 'Jane Doe',
-      claim_ids: [CLAIM.id],
     };
     signedIn([
       noDebtors,
@@ -748,16 +773,17 @@ describe('the intake collection sections', () => {
         respond: () =>
           jsonResponse(201, {
             id: '00000000-0000-4000-8000-0000000000f1',
-            case_id: CASE_ID,
-            created_at: '2026-09-01T10:00:00.000000Z',
-            updated_at: '2026-09-01T10:00:00.000000Z',
+            caseId: CASE_ID,
+            createdAt: '2026-09-01T10:00:00.000000Z',
+            updatedAt: '2026-09-01T10:00:00.000000Z',
+            body: {
+              payload: { entryType: 'gift', value: 700 },
+            },
             provenance: {
-              entry_type: { source: 'staff_typed' },
+              'payload.entryType': { source: 'staff_typed' },
               'payload.value': { source: 'staff_typed' },
             },
             amended: false,
-            entry_type: 'gift',
-            payload: { value: '700.00' },
           }),
       },
     ]);
@@ -771,10 +797,9 @@ describe('the intake collection sections', () => {
 
     await waitFor(() =>
       expect(lastBody(fetchMock, 'POST', '/sofa_entries')).toEqual({
-        entry_type: 'gift',
-        payload: { value: '700.00' },
+        body: { payload: { entryType: 'gift', value: 700 } },
         provenance: {
-          entry_type: { source: 'staff_typed' },
+          'payload.entryType': { source: 'staff_typed' },
           'payload.value': { source: 'staff_typed' },
         },
       }),
@@ -835,7 +860,7 @@ describe('the intake collection sections', () => {
 
     await waitFor(() =>
       expect(lastBody(fetchMock, 'POST', '/creditors')).toEqual({
-        name: 'Example Bank',
+        body: { name: 'Example Bank' },
         amended: true,
         provenance: { name: { source: 'staff_typed' } },
       }),

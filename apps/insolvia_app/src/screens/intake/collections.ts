@@ -124,8 +124,8 @@ export interface CollectionSpec {
   readonly summary: (body: Readonly<Record<string, unknown>>) => string;
   /**
    * A read-only backlink (issue #347): another collection's `reference-list`
-   * field that names records of THIS collection — a codebtor's `claim_ids`
-   * naming a claim, or `contract_lease_ids` naming a lease. Declared on the
+   * field that names records of THIS collection — a codebtor's `claimIds`
+   * naming a claim, or `contractLeaseIds` naming a lease. Declared on the
    * record being pointed AT, not the pointer, so the editor can show which
    * codebtors are linked to each claim or lease row, read only.
    */
@@ -174,6 +174,10 @@ const dates = (key: string, label: string): FieldSpec => ({ kind: 'dates', key, 
 const asText = (value: unknown): string | undefined =>
   typeof value === 'string' && value !== '' ? value : undefined;
 
+// Body money is a JSON number; summaries show it as typed text.
+const asMoney = (value: unknown): string | undefined =>
+  typeof value === 'number' ? value.toFixed(2) : asText(value);
+
 /**
  * The per-entry-type payload fields of a SOFA entry, keyed by the SAME names
  * `core/sofa.py`'s parsers read. Keys here are RELATIVE to the payload; the
@@ -182,29 +186,29 @@ const asText = (value: unknown): string | undefined =>
 const SOFA_PAYLOAD_FIELDS: Readonly<Record<SofaEntryType, readonly FieldSpec[]>> = {
   marital_status: [choice('status', 'Current marital status', ['married', 'not_married'])],
   prior_address: [
-    choice('which_debtor', 'Who lived there', ['debtor_1', 'debtor_2', 'both']),
+    choice('whichDebtor', 'Who lived there', ['debtor_1', 'debtor_2', 'both']),
     { kind: 'address', key: 'address', label: 'Address' },
-    date('from_date', 'From'),
-    date('to_date', 'To'),
+    date('fromDate', 'From'),
+    date('toDate', 'To'),
   ],
   community_property_residence: [text('state', 'Community property state')],
   income_by_period: [
-    choice('which_debtor', 'Whose income', ['debtor_1', 'debtor_2', 'both']),
+    choice('whichDebtor', 'Whose income', ['debtor_1', 'debtor_2', 'both']),
     choice('kind', 'Source', ['wages_and_commissions', 'operating_a_business', 'other']),
     text('description', 'Describe the source'),
-    date('period_start', 'Period start'),
-    date('period_end', 'Period end'),
-    money('gross_amount', 'Gross amount'),
+    date('periodStart', 'Period start'),
+    date('periodEnd', 'Period end'),
+    money('grossAmount', 'Gross amount'),
   ],
   consumer_debt_declaration: [
-    yesNo('primarily_consumer_debts', 'Are the debts primarily consumer debts?'),
+    yesNo('primarilyConsumerDebts', 'Are the debts primarily consumer debts?'),
   ],
   creditor_payment: [
     party('creditor', 'Creditor'),
     dates('dates', 'Dates of payment'),
-    money('total_paid', 'Total paid'),
-    money('amount_still_owed', 'Amount still owed'),
-    multichoice('payment_for', 'The payment was for', [
+    money('totalPaid', 'Total paid'),
+    money('amountStillOwed', 'Amount still owed'),
+    multichoice('paymentFor', 'The payment was for', [
       'mortgage',
       'car',
       'credit_card',
@@ -212,27 +216,27 @@ const SOFA_PAYLOAD_FIELDS: Readonly<Record<SofaEntryType, readonly FieldSpec[]>>
       'suppliers_or_vendors',
       'other',
     ]),
-    text('payment_for_other', 'Other — specify'),
+    text('paymentForOther', 'Other — specify'),
   ],
   insider_payment: [
     party('insider', 'Insider'),
     text('relationship', 'Relationship to the debtor'),
     dates('dates', 'Dates of payment'),
-    money('total_paid', 'Total paid'),
-    money('amount_still_owed', 'Amount still owed'),
+    money('totalPaid', 'Total paid'),
+    money('amountStillOwed', 'Amount still owed'),
     narrative('reason', 'Reason for the payment'),
   ],
   insider_benefit_payment: [
     party('recipient', 'Who was paid'),
-    text('insider_name', 'Insider who benefited'),
+    text('insiderName', 'Insider who benefited'),
     dates('dates', 'Dates'),
-    money('total_paid', 'Total paid'),
+    money('totalPaid', 'Total paid'),
     narrative('reason', 'Reason'),
   ],
   lawsuit: [
-    text('case_title', 'Case title'),
-    text('case_number', 'Case number'),
-    text('nature_of_case', 'Nature of the case'),
+    text('caseTitle', 'Case title'),
+    text('caseNumber', 'Case number'),
+    text('natureOfCase', 'Nature of the case'),
     party('court', 'Court or agency'),
     choice('status', 'Status', ['pending', 'on_appeal', 'concluded']),
   ],
@@ -253,8 +257,8 @@ const SOFA_PAYLOAD_FIELDS: Readonly<Record<SofaEntryType, readonly FieldSpec[]>>
     party('custodian', 'Assignee, receiver or custodian'),
     narrative('description', 'Describe the property'),
     money('value', 'Value'),
-    text('case_title', 'Case title'),
-    text('case_number', 'Case number'),
+    text('caseTitle', 'Case title'),
+    text('caseNumber', 'Case number'),
     party('court', 'Court'),
     date('date', 'Date'),
   ],
@@ -273,14 +277,14 @@ const SOFA_PAYLOAD_FIELDS: Readonly<Record<SofaEntryType, readonly FieldSpec[]>>
   ],
   loss: [
     narrative('description', 'Describe the property lost and how'),
-    narrative('insurance_coverage', 'Insurance coverage, and any claim pending'),
+    narrative('insuranceCoverage', 'Insurance coverage, and any claim pending'),
     date('date', 'Date of loss'),
     money('value', 'Value of the loss'),
   ],
   consultant_payment: [
     party('person', 'Who was paid'),
-    text('email_or_website', 'Email or website'),
-    text('who_made_payment', 'Who paid, if not the debtor'),
+    text('emailOrWebsite', 'Email or website'),
+    text('whoMadePayment', 'Who paid, if not the debtor'),
     narrative('description', 'Describe the services'),
     date('date', 'Date of payment'),
     money('amount', 'Amount'),
@@ -295,38 +299,38 @@ const SOFA_PAYLOAD_FIELDS: Readonly<Record<SofaEntryType, readonly FieldSpec[]>>
     party('transferee', 'Who received the transfer'),
     text('relationship', 'Relationship to the debtor'),
     narrative('description', 'Describe the property transferred'),
-    narrative('value_received', 'What was received in exchange'),
+    narrative('valueReceived', 'What was received in exchange'),
     date('date', 'Date of transfer'),
   ],
   self_settled_trust: [
-    text('trust_name', 'Name of the trust'),
+    text('trustName', 'Name of the trust'),
     narrative('description', 'Describe the property transferred'),
     date('date', 'Date of transfer'),
   ],
   closed_account: [
     party('institution', 'Financial institution'),
-    text('account_last4', 'Last four digits'),
-    choice('account_type', 'Type of account', [
+    text('accountLast4', 'Last four digits'),
+    choice('accountType', 'Type of account', [
       'checking',
       'savings',
       'money_market',
       'brokerage',
       'other',
     ]),
-    date('date_closed', 'Date closed or transferred'),
-    money('last_balance', 'Last balance'),
+    date('dateClosed', 'Date closed or transferred'),
+    money('lastBalance', 'Last balance'),
   ],
   safe_deposit_box: [
     party('institution', 'Institution'),
-    { kind: 'strings', key: 'who_has_access', label: 'Who has access', itemLabel: 'Person' },
+    { kind: 'strings', key: 'whoHasAccess', label: 'Who has access', itemLabel: 'Person' },
     narrative('description', 'Describe the contents'),
-    yesNo('still_have', 'Do you still have it?'),
+    yesNo('stillHave', 'Do you still have it?'),
   ],
   storage_unit: [
     party('facility', 'Storage facility'),
-    { kind: 'strings', key: 'who_has_access', label: 'Who has access', itemLabel: 'Person' },
+    { kind: 'strings', key: 'whoHasAccess', label: 'Who has access', itemLabel: 'Person' },
     narrative('description', 'Describe the contents'),
-    yesNo('still_have', 'Do you still have it?'),
+    yesNo('stillHave', 'Do you still have it?'),
   ],
   held_for_another: [
     party('owner', 'Owner of the property'),
@@ -337,23 +341,23 @@ const SOFA_PAYLOAD_FIELDS: Readonly<Record<SofaEntryType, readonly FieldSpec[]>>
   environmental_notice: [
     choice('kind', 'Which direction', ['liability_notice_received', 'release_reported']),
     party('site', 'Site'),
-    party('governmental_unit', 'Governmental unit'),
-    text('environmental_law', 'Environmental law'),
+    party('governmentalUnit', 'Governmental unit'),
+    text('environmentalLaw', 'Environmental law'),
     date('date', 'Date of notice'),
   ],
   environmental_proceeding: [
-    text('case_title', 'Case title'),
-    text('case_number', 'Case number'),
+    text('caseTitle', 'Case title'),
+    text('caseNumber', 'Case number'),
     party('court', 'Court or agency'),
-    text('nature_of_case', 'Nature of the case'),
+    text('natureOfCase', 'Nature of the case'),
     choice('status', 'Status', ['pending', 'on_appeal', 'concluded']),
   ],
   business_connection: [
     party('business', 'Business'),
-    text('nature_of_business', 'Nature of the business'),
+    text('natureOfBusiness', 'Nature of the business'),
     text('ein', 'Employer identification number'),
-    date('from_date', 'From'),
-    date('to_date', 'To'),
+    date('fromDate', 'From'),
+    date('toDate', 'To'),
     multichoice('connection', 'Connection to the business', [
       'sole_proprietor',
       'partner',
@@ -363,9 +367,12 @@ const SOFA_PAYLOAD_FIELDS: Readonly<Record<SofaEntryType, readonly FieldSpec[]>>
   ],
   financial_statement_issued: [
     party('recipient', 'Who received the statement'),
-    date('date_issued', 'Date issued'),
+    date('dateIssued', 'Date issued'),
   ],
 };
+
+const sofaEntryTypeOf = (body: Readonly<Record<string, unknown>>): unknown =>
+  (body.payload as Readonly<Record<string, unknown>> | undefined)?.entryType;
 
 const isSofaType = (value: unknown): value is SofaEntryType =>
   typeof value === 'string' && (SOFA_ENTRY_TYPES as readonly string[]).includes(value);
@@ -397,23 +404,23 @@ export const COLLECTION_SPECS: readonly CollectionSpec[] = [
       'One entry per debt. The class decides which schedule it prints on ' +
       '(106D secured, 106E/F priority and nonpriority unsecured).',
     fields: () => [
-      { kind: 'reference', key: 'creditor_id', label: 'Creditor', refers: 'creditors' },
-      choice('claim_class', 'Class of claim', CLAIM_CLASSES),
-      text('account_last4', 'Account number — last four digits'),
-      date('date_incurred', 'Date the debt was incurred'),
+      { kind: 'reference', key: 'creditorId', label: 'Creditor', refers: 'creditors' },
+      choice('claimClass', 'Class of claim', CLAIM_CLASSES),
+      text('accountLast4', 'Account number — last four digits'),
+      date('dateIncurred', 'Date the debt was incurred'),
       money('amount', 'Amount of the claim'),
       yesNo('contingent', 'Contingent'),
       yesNo('unliquidated', 'Unliquidated'),
       yesNo('disputed', 'Disputed'),
-      yesNo('subject_to_offset', 'Subject to offset'),
-      choice('who_incurred', 'Who incurred the debt', DEBTOR_ATTRIBUTION),
-      yesNo('community_debt', 'Community debt'),
+      yesNo('subjectToOffset', 'Subject to offset'),
+      choice('whoIncurred', 'Who incurred the debt', DEBTOR_ATTRIBUTION),
+      yesNo('communityDebt', 'Community debt'),
       {
         // 106D Part 2 / 106E/F Part 3 — collection agencies, attorneys, and
         // anyone else to be notified about this debt (issue #280). Keyed as
         // core/claims.py's parser reads it, ids minted by the editor.
         kind: 'party-list',
-        key: 'notice_parties',
+        key: 'noticeParties',
         label: 'Others to be notified about this debt',
         itemLabel: 'notice party',
       },
@@ -424,50 +431,50 @@ export const COLLECTION_SPECS: readonly CollectionSpec[] = [
       // collateral not on Schedule A/B or a value the preparer prefers.
       {
         kind: 'reference',
-        key: 'asset_id',
+        key: 'assetId',
         label: 'Collateral — property on Schedule A/B (secured)',
         refers: 'assets',
       },
       {
         kind: 'count',
-        key: 'lien_position',
+        key: 'lienPosition',
         label: 'Lien position — 1 is the senior lien (secured)',
       },
       narrative(
-        'collateral_description',
+        'collateralDescription',
         'Collateral — describe it here only if it is not the property above (secured)',
       ),
       money(
-        'collateral_value',
+        'collateralValue',
         'Value of the collateral — overrides the property’s value (secured)',
       ),
-      multichoice('lien_nature', 'Nature of the lien (secured)', LIEN_NATURES),
-      text('lien_nature_other', 'Other lien — specify'),
+      multichoice('lienNature', 'Nature of the lien (secured)', LIEN_NATURES),
+      text('lienNatureOther', 'Other lien — specify'),
       money(
-        'unsecured_amount_override',
+        'unsecuredAmountOverride',
         'Unsecured portion — enter only to override the calculated figure (secured)',
       ),
       choice('intention', 'Statement of intention for this collateral (secured)', INTENTIONS),
-      narrative('intention_explanation', 'Intention — explanation'),
-      money('priority_amount', 'Priority amount (priority unsecured)'),
-      money('nonpriority_amount', 'Nonpriority amount (priority unsecured)'),
-      choice('priority_type', 'Type of priority', PRIORITY_TYPES),
-      text('priority_type_other', 'Other priority — specify'),
-      choice('nonpriority_type', 'Type of nonpriority claim', NONPRIORITY_TYPES),
-      text('nonpriority_type_other', 'Other nonpriority — specify'),
+      narrative('intentionExplanation', 'Intention — explanation'),
+      money('priorityAmount', 'Priority amount (priority unsecured)'),
+      money('nonpriorityAmount', 'Nonpriority amount (priority unsecured)'),
+      choice('priorityType', 'Type of priority', PRIORITY_TYPES),
+      text('priorityTypeOther', 'Other priority — specify'),
+      choice('nonpriorityType', 'Type of nonpriority claim', NONPRIORITY_TYPES),
+      text('nonpriorityTypeOther', 'Other nonpriority — specify'),
     ],
     summary: (body) => {
-      const claimClass = asText(body.claim_class);
-      const amount = asText(body.amount);
+      const claimClass = asText(body.claimClass);
+      const amount = asMoney(body.amount);
       const parts = [
         claimClass !== undefined ? labelize(claimClass) : undefined,
         amount !== undefined ? `$${amount}` : undefined,
       ].filter((part): part is string => part !== undefined);
       return parts.length > 0 ? parts.join(' — ') : 'New claim';
     },
-    // A codebtor names claims it co-signed via `claim_ids` (Schedule H's
+    // A codebtor names claims it co-signed via `claimIds` (Schedule H's
     // "Schedule D/E/F, line __" column) — issue #347.
-    linkedFrom: { collection: 'codebtors', field: 'claim_ids' },
+    linkedFrom: { collection: 'codebtors', field: 'claimIds' },
   },
   {
     collection: 'assets',
@@ -477,15 +484,15 @@ export const COLLECTION_SPECS: readonly CollectionSpec[] = [
     fields: (body) => [
       choice('category', 'Category', ASSET_CATEGORIES),
       ...(body.category === 'real_property'
-        ? [multichoice('property_types', 'What is the property?', PROPERTY_TYPES)]
+        ? [multichoice('propertyTypes', 'What is the property?', PROPERTY_TYPES)]
         : []),
       narrative('description', 'Describe the property'),
       text('county', 'County'),
-      money('value_entire', 'Current value of the entire property'),
-      money('value_portion_owned', 'Current value of the portion you own'),
-      choice('ownership_interest', 'Who has an interest', DEBTOR_ATTRIBUTION),
-      text('ownership_interest_description', 'Nature of the ownership interest'),
-      yesNo('community_property', 'Is this community property?'),
+      money('valueEntire', 'Current value of the entire property'),
+      money('valuePortionOwned', 'Current value of the portion you own'),
+      choice('ownershipInterest', 'Who has an interest', DEBTOR_ATTRIBUTION),
+      text('ownershipInterestDescription', 'Nature of the ownership interest'),
+      yesNo('communityProperty', 'Is this community property?'),
       narrative('detail', 'Details — make, model, year, institution, account type…'),
     ],
     summary: (body) => {
@@ -501,14 +508,14 @@ export const COLLECTION_SPECS: readonly CollectionSpec[] = [
     recordName: 'employment',
     help: 'Schedule I, Part 1 — one entry per job, per debtor.',
     fields: () => [
-      { kind: 'debtor', key: 'debtor_id', label: 'Whose employment' },
+      { kind: 'debtor', key: 'debtorId', label: 'Whose employment' },
       choice('status', 'Employment status', EMPLOYMENT_STATUSES),
       text('occupation', 'Occupation'),
-      text('employer_name', 'Employer'),
-      { kind: 'address', key: 'employer_address', label: 'Employer address' },
-      date('employed_since', 'Employed since'),
+      text('employerName', 'Employer'),
+      { kind: 'address', key: 'employerAddress', label: 'Employer address' },
+      date('employedSince', 'Employed since'),
     ],
-    summary: (body) => asText(body.employer_name) ?? asText(body.occupation) ?? 'New employment',
+    summary: (body) => asText(body.employerName) ?? asText(body.occupation) ?? 'New employment',
   },
   {
     collection: 'pay_period_records',
@@ -517,19 +524,19 @@ export const COLLECTION_SPECS: readonly CollectionSpec[] = [
     help:
       'One entry per paycheck, dated — hand-entered here reads the same way ' +
       'to the means test as one pay-stub extraction would have written. ' +
-      '`pay_date` is what the six-month lookback keys on.',
+      '`payDate` is what the six-month lookback keys on.',
     fields: () => [
-      { kind: 'reference', key: 'employment_id', label: 'Employer', refers: 'employments' },
-      date('period_start', 'Pay period start'),
-      date('period_end', 'Pay period end'),
-      date('pay_date', 'Date paid'),
+      { kind: 'reference', key: 'employmentId', label: 'Employer', refers: 'employments' },
+      date('periodStart', 'Pay period start'),
+      date('periodEnd', 'Pay period end'),
+      date('payDate', 'Date paid'),
       money('gross', 'Gross pay this period'),
       money('net', 'Net pay this period'),
       choice('frequency', 'Pay frequency', PAY_FREQUENCIES),
     ],
     summary: (body) => {
-      const payDate = asText(body.pay_date);
-      const gross = asText(body.gross);
+      const payDate = asText(body.payDate);
+      const gross = asMoney(body.gross);
       const parts = [payDate, gross !== undefined ? `$${gross}` : undefined].filter(
         (part): part is string => part !== undefined,
       );
@@ -546,17 +553,17 @@ export const COLLECTION_SPECS: readonly CollectionSpec[] = [
       'compensation…) is still recorded, so the calculation can show it ' +
       'excluded rather than silently dropping it.',
     fields: () => [
-      { kind: 'debtor', key: 'debtor_id', label: 'Whose income' },
+      { kind: 'debtor', key: 'debtorId', label: 'Whose income' },
       choice('category', 'Category', [...OTHER_INCOME_CATEGORIES, ...EXCLUDED_INCOME_CATEGORIES]),
-      date('received_on', 'Date received'),
+      date('receivedOn', 'Date received'),
       money('amount', 'Amount received'),
       money('expenses', 'Operating expenses (business or rental only)'),
       text('payer', 'Payer'),
       narrative('description', 'Description'),
     ],
     summary: (body) => {
-      const receivedOn = asText(body.received_on);
-      const amount = asText(body.amount);
+      const receivedOn = asText(body.receivedOn);
+      const amount = asMoney(body.amount);
       const parts = [receivedOn, amount !== undefined ? `$${amount}` : undefined].filter(
         (part): part is string => part !== undefined,
       );
@@ -571,35 +578,35 @@ export const COLLECTION_SPECS: readonly CollectionSpec[] = [
       'Schedule I, Part 2 — one column per debtor, estimated as of the filing ' +
       'date. Totals are calculated when the form is rendered, never entered.',
     fields: () => [
-      { kind: 'debtor', key: 'debtor_id', label: 'Whose income' },
+      { kind: 'debtor', key: 'debtorId', label: 'Whose income' },
       money('wages', 'Monthly gross wages, salary and commissions'),
       money('overtime', 'Monthly overtime pay'),
-      money('deduction_tax', 'Tax, Medicare and Social Security deductions'),
-      money('deduction_mandatory_retirement', 'Mandatory retirement contributions'),
-      money('deduction_voluntary_retirement', 'Voluntary retirement contributions'),
-      money('deduction_retirement_loan_repayment', 'Retirement loan repayments'),
-      money('deduction_insurance', 'Insurance deductions'),
-      money('deduction_domestic_support', 'Domestic support obligations'),
-      money('deduction_union_dues', 'Union dues'),
-      money('deduction_other', 'Other deductions'),
-      text('deduction_other_specify', 'Other deductions — specify'),
-      money('business_net_income', 'Net income from business, profession, farm or rentals'),
-      money('interest_and_dividends', 'Interest and dividends'),
-      money('family_support', 'Family support payments received'),
+      money('deductionTax', 'Tax, Medicare and Social Security deductions'),
+      money('deductionMandatoryRetirement', 'Mandatory retirement contributions'),
+      money('deductionVoluntaryRetirement', 'Voluntary retirement contributions'),
+      money('deductionRetirementLoanRepayment', 'Retirement loan repayments'),
+      money('deductionInsurance', 'Insurance deductions'),
+      money('deductionDomesticSupport', 'Domestic support obligations'),
+      money('deductionUnionDues', 'Union dues'),
+      money('deductionOther', 'Other deductions'),
+      text('deductionOtherSpecify', 'Other deductions — specify'),
+      money('businessNetIncome', 'Net income from business, profession, farm or rentals'),
+      money('interestAndDividends', 'Interest and dividends'),
+      money('familySupport', 'Family support payments received'),
       money('unemployment', 'Unemployment compensation'),
-      money('social_security', 'Social Security'),
-      money('other_government_assistance', 'Other government assistance'),
-      text('other_government_assistance_specify', 'Other government assistance — specify'),
-      money('pension_or_retirement', 'Pension or retirement income'),
-      money('other_monthly_income', 'Other monthly income'),
-      text('other_monthly_income_specify', 'Other monthly income — specify'),
-      money('household_contributions', 'Regular contributions to household expenses (line 11)'),
-      text('household_contributions_specify', 'Contributions — specify from whom'),
-      yesNo('change_expected', 'Do you expect an increase or decrease within the year?'),
-      narrative('change_explanation', 'Explain the expected change'),
+      money('socialSecurity', 'Social Security'),
+      money('otherGovernmentAssistance', 'Other government assistance'),
+      text('otherGovernmentAssistanceSpecify', 'Other government assistance — specify'),
+      money('pensionOrRetirement', 'Pension or retirement income'),
+      money('otherMonthlyIncome', 'Other monthly income'),
+      text('otherMonthlyIncomeSpecify', 'Other monthly income — specify'),
+      money('householdContributions', 'Regular contributions to household expenses (line 11)'),
+      text('householdContributionsSpecify', 'Contributions — specify from whom'),
+      yesNo('changeExpected', 'Do you expect an increase or decrease within the year?'),
+      narrative('changeExplanation', 'Explain the expected change'),
     ],
     summary: (body) => {
-      const wages = asText(body.wages);
+      const wages = asMoney(body.wages);
       return wages !== undefined ? `Wages $${wages} monthly` : 'New income summary';
     },
   },
@@ -611,13 +618,13 @@ export const COLLECTION_SPECS: readonly CollectionSpec[] = [
       'Schedule J’s frame. Add a second household only when debtor 2 ' +
       'maintains a separate one (Schedule J-2).',
     fields: () => [
-      choice('which_household', 'Which household', WHICH_HOUSEHOLDS),
-      yesNo('separate_household', 'Does debtor 2 live in a separate household?'),
-      yesNo('change_expected', 'Do you expect expenses to change within the year?'),
-      narrative('change_explanation', 'Explain the expected change'),
+      choice('whichHousehold', 'Which household', WHICH_HOUSEHOLDS),
+      yesNo('separateHousehold', 'Does debtor 2 live in a separate household?'),
+      yesNo('changeExpected', 'Do you expect expenses to change within the year?'),
+      narrative('changeExplanation', 'Explain the expected change'),
     ],
     summary: (body) => {
-      const which = asText(body.which_household);
+      const which = asText(body.whichHousehold);
       return which !== undefined ? labelize(which) : 'New household';
     },
   },
@@ -629,14 +636,14 @@ export const COLLECTION_SPECS: readonly CollectionSpec[] = [
       'Schedule J — one entry per expense line. Totals are calculated when ' +
       'the form is rendered.',
     fields: () => [
-      { kind: 'reference', key: 'household_id', label: 'Household', refers: 'households' },
+      { kind: 'reference', key: 'householdId', label: 'Household', refers: 'households' },
       choice('category', 'Expense', EXPENSE_CATEGORIES),
-      text('specify_text', 'Specify'),
+      text('specifyText', 'Specify'),
       money('amount', 'Monthly amount'),
     ],
     summary: (body) => {
       const category = asText(body.category);
-      const amount = asText(body.amount);
+      const amount = asMoney(body.amount);
       const label = category !== undefined ? labelize(category) : 'New expense';
       return amount !== undefined ? `${label} — $${amount}` : label;
     },
@@ -649,10 +656,10 @@ export const COLLECTION_SPECS: readonly CollectionSpec[] = [
       'Relationship, age and residence only — the form does not ask for ' +
       'dependents’ names, so none are stored.',
     fields: () => [
-      { kind: 'reference', key: 'household_id', label: 'Household', refers: 'households' },
+      { kind: 'reference', key: 'householdId', label: 'Household', refers: 'households' },
       text('relationship', 'Relationship to the debtor'),
       { kind: 'count', key: 'age', label: 'Age' },
-      yesNo('lives_with_debtor', 'Lives with the debtor?'),
+      yesNo('livesWithDebtor', 'Lives with the debtor?'),
     ],
     summary: (body) => {
       const relationship = asText(body.relationship);
@@ -671,20 +678,20 @@ export const COLLECTION_SPECS: readonly CollectionSpec[] = [
     fields: () => [
       // A plain party field for now — the library picker arrives with the
       // creditor library (issue #350).
-      text('counterparty_name', 'Other party — name'),
-      { kind: 'address', key: 'counterparty_address', label: 'Other party — address' },
+      text('counterpartyName', 'Other party — name'),
+      { kind: 'address', key: 'counterpartyAddress', label: 'Other party — address' },
       narrative(
         'description',
         'What the contract or lease is for, the nature of the debtor’s ' +
           'interest, the remaining term, and any government contract number',
       ),
       choice('intention', 'Intention', CONTRACT_LEASE_INTENTIONS),
-      yesNo('list_on_statement_of_intention', 'List on the Statement of Intention (Form 108)?'),
+      yesNo('listOnStatementOfIntention', 'List on the Statement of Intention (Form 108)?'),
     ],
-    summary: (body) => asText(body.counterparty_name) ?? 'New contract or lease',
-    // A codebtor names leases it co-signed via `contract_lease_ids`
+    summary: (body) => asText(body.counterpartyName) ?? 'New contract or lease',
+    // A codebtor names leases it co-signed via `contractLeaseIds`
     // (Schedule H's "Schedule G, line __" column) — issue #347.
-    linkedFrom: { collection: 'codebtors', field: 'contract_lease_ids' },
+    linkedFrom: { collection: 'codebtors', field: 'contractLeaseIds' },
   },
   {
     collection: 'codebtors',
@@ -697,10 +704,10 @@ export const COLLECTION_SPECS: readonly CollectionSpec[] = [
     fields: () => [
       text('name', 'Codebtor name'),
       { kind: 'address', key: 'address', label: 'Address' },
-      { kind: 'reference-list', key: 'claim_ids', label: 'On which claims', refers: 'claims' },
+      { kind: 'reference-list', key: 'claimIds', label: 'On which claims', refers: 'claims' },
       {
         kind: 'reference-list',
-        key: 'contract_lease_ids',
+        key: 'contractLeaseIds',
         label: 'On which contracts or leases',
         refers: 'contract_leases',
       },
@@ -718,8 +725,8 @@ export const COLLECTION_SPECS: readonly CollectionSpec[] = [
     fields: () => [
       text('name', 'Name'),
       { kind: 'address', key: 'address', label: 'Address' },
-      text('community_state', 'Community property state (two-letter code)'),
-      yesNo('lived_with_debtor', 'Lived with the debtor?'),
+      text('communityState', 'Community property state (two-letter code)'),
+      yesNo('livedWithDebtor', 'Lived with the debtor?'),
     ],
     summary: (body) => asText(body.name) ?? 'New household member',
   },
@@ -731,15 +738,15 @@ export const COLLECTION_SPECS: readonly CollectionSpec[] = [
       'The Statement of Financial Affairs (Form 107) — one entry per answer, ' +
       'typed by the question it answers.',
     fields: (body) => {
-      const entryType = body.entry_type;
+      const entryType = sofaEntryTypeOf(body);
       const payloadFields = isSofaType(entryType) ? SOFA_PAYLOAD_FIELDS[entryType] : [];
       return [
-        choice('entry_type', 'What is this entry about?', SOFA_ENTRY_TYPES),
+        choice('payload.entryType', 'What is this entry about?', SOFA_ENTRY_TYPES),
         ...payloadFields.map((field) => ({ ...field, key: `payload.${field.key}` })),
       ];
     },
     summary: (body) => {
-      const entryType = asText(body.entry_type);
+      const entryType = asText(sofaEntryTypeOf(body));
       return entryType !== undefined ? labelize(entryType) : 'New entry';
     },
   },
@@ -755,11 +762,11 @@ export const COLLECTION_SPECS: readonly CollectionSpec[] = [
     help: 'B101 line 9 — any bankruptcy case filed within the last 8 years.',
     fields: () => [
       text('district', 'District'),
-      date('filed_on', 'Date filed'),
-      text('case_number', 'Case number'),
+      date('filedOn', 'Date filed'),
+      text('caseNumber', 'Case number'),
     ],
     summary: (body) => {
-      const parts = [asText(body.district), asText(body.case_number)].filter(
+      const parts = [asText(body.district), asText(body.caseNumber)].filter(
         (part): part is string => part !== undefined,
       );
       return parts.length > 0 ? parts.join(' — ') : 'New prior case';
@@ -771,13 +778,13 @@ export const COLLECTION_SPECS: readonly CollectionSpec[] = [
     recordName: 'related case',
     help: 'B101 line 10 — a pending case by a spouse, partner, or affiliate.',
     fields: () => [
-      text('debtor_name', 'Debtor'),
+      text('debtorName', 'Debtor'),
       text('relationship', 'Relationship'),
       text('district', 'District'),
-      date('filed_on', 'Date filed'),
-      text('case_number', 'Case number'),
+      date('filedOn', 'Date filed'),
+      text('caseNumber', 'Case number'),
     ],
-    summary: (body) => asText(body.debtor_name) ?? 'New related case',
+    summary: (body) => asText(body.debtorName) ?? 'New related case',
   },
   {
     collection: 'sole_proprietorships',
@@ -789,7 +796,7 @@ export const COLLECTION_SPECS: readonly CollectionSpec[] = [
     fields: () => [
       text('name', 'Business name'),
       { kind: 'address', key: 'address', label: 'Business address' },
-      choice('business_type', 'Type of business', BUSINESS_TYPES),
+      choice('businessType', 'Type of business', BUSINESS_TYPES),
     ],
     summary: (body) => asText(body.name) ?? 'New sole proprietorship',
   },

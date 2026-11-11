@@ -3,6 +3,8 @@ import { fromCents, sumMoney, toCents } from './money';
 describe('toCents', () => {
   test('parses a plain decimal string', () => {
     expect(toCents('1200.00')).toBe(120000);
+    expect(toCents(1200.1)).toBe(120010);
+    expect(toCents(0.29)).toBe(29);
   });
 
   test('parses a negative amount', () => {

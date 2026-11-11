@@ -39,7 +39,7 @@ function row(key: string, label: string, over: Record<string, unknown> = {}) {
     lastMonth: 11,
     monthsPaid: 11,
     unpaid: '0.00',
-    source: 'plan.attorney_fees (§ 503(b), § 507(a)(2))',
+    source: 'plan.attorneyFees (§ 503(b), § 507(a)(2))',
     ...over,
   };
 }
@@ -66,9 +66,9 @@ const FEASIBLE = {
   commitmentPeriod: { months: 60, source: 'line 20b is more than or equal to line 20c' },
   funding: {
     termMonths: 60,
-    termSource: 'plan.term_months',
+    termSource: 'plan.termMonths',
     basePayment: '600.00',
-    baseSource: 'plan.monthly_payment',
+    baseSource: 'plan.monthlyPayment',
     schedule: [],
     lumpSums: [],
     total: '36000.00',
@@ -81,7 +81,7 @@ const FEASIBLE = {
         claimId: 'claim-car',
         treatment: 'cramdown',
         source:
-          'plan.secured_treatments[t-car].cramdown_value (§ 506(a), § 1325(a)(5)(B)), 7.00% a year; amortised over 60 months',
+          'plan.securedTreatments[t-car].cramdownValue (§ 506(a), § 1325(a)(5)(B)), 7.00% a year; amortised over 60 months',
       }),
     ]),
   ],
@@ -161,40 +161,46 @@ const SHORT = {
 
 const STORED_PLAN = {
   id: PLAN_ID,
-  case_id: CASE_ID,
-  created_at: STAMP,
-  updated_at: STAMP,
+  caseId: CASE_ID,
+  createdAt: STAMP,
+  updatedAt: STAMP,
+  body: {
+    monthlyPayment: 600,
+    securedTreatments: [{ id: 't-car', claimId: 'claim-car', treatment: 'cramdown' }],
+  },
   amended: false,
   provenance: {
-    monthly_payment: { source: 'staff_typed' },
-    'secured_treatments[t-car].claim_id': { source: 'staff_typed' },
-    'secured_treatments[t-car].treatment': { source: 'staff_typed' },
+    monthlyPayment: { source: 'staff_typed' },
+    'securedTreatments[t-car].claimId': { source: 'staff_typed' },
+    'securedTreatments[t-car].treatment': { source: 'staff_typed' },
   },
-  monthly_payment: '600.00',
-  secured_treatments: [{ id: 't-car', claim_id: 'claim-car', treatment: 'cramdown' }],
 };
 
 const CLAIM = {
   id: 'claim-car',
-  case_id: CASE_ID,
-  created_at: STAMP,
-  updated_at: STAMP,
+  caseId: CASE_ID,
+  createdAt: STAMP,
+  updatedAt: STAMP,
+  body: {
+    creditorId: 'cr-auto',
+    claimClass: 'secured',
+    amount: 12000,
+    accountLast4: '8890',
+  },
   provenance: {},
   amended: false,
-  creditor_id: 'cr-auto',
-  claim_class: 'secured',
-  amount: '12000.00',
-  account_last4: '8890',
 };
 
 const CREDITOR = {
   id: 'cr-auto',
-  case_id: CASE_ID,
-  created_at: STAMP,
-  updated_at: STAMP,
+  caseId: CASE_ID,
+  createdAt: STAMP,
+  updatedAt: STAMP,
+  body: {
+    name: 'Example Auto Finance',
+  },
   provenance: {},
   amended: false,
-  name: 'Example Auto Finance',
 };
 
 interface Route {
@@ -312,7 +318,7 @@ describe('the plan screen', () => {
     expect(screen.getByText('47.50%')).toBeTruthy();
     expect(screen.getByText('Example Auto Finance — secured value')).toBeTruthy();
     // Every row says where its figure came from, verbatim from the server.
-    expect(screen.getByText(/plan\.secured_treatments\[t-car\]\.cramdown_value/u)).toBeTruthy();
+    expect(screen.getByText(/plan\.securedTreatments\[t-car\]\.cramdownValue/u)).toBeTruthy();
     expect(screen.getByText('Savings account')).toBeTruthy();
   });
 
@@ -336,7 +342,10 @@ describe('the plan screen', () => {
           respond: () =>
             jsonResponse(200, {
               ...STORED_PLAN,
-              secured_treatments: [{ ...STORED_PLAN.secured_treatments[0], interest_rate: '7.00' }],
+              body: {
+                ...STORED_PLAN.body,
+                securedTreatments: [{ ...STORED_PLAN.body.securedTreatments[0], interestRate: 7 }],
+              },
             }),
         },
       ]),
@@ -350,11 +359,11 @@ describe('the plan screen', () => {
 
     await waitFor(() => {
       const [sent] = bodiesSent(fetchMock, 'PUT', '/plans/');
-      expect(sent?.secured_treatments).toEqual([
-        { id: 't-car', claim_id: 'claim-car', treatment: 'cramdown', interest_rate: '7' },
+      expect((sent?.body as Record<string, unknown>).securedTreatments).toEqual([
+        { id: 't-car', claimId: 'claim-car', treatment: 'cramdown', interestRate: 7 },
       ]);
       const provenance = sent?.provenance as Record<string, { source: string }>;
-      expect(provenance['secured_treatments[t-car].interest_rate']).toEqual({
+      expect(provenance['securedTreatments[t-car].interestRate']).toEqual({
         source: 'staff_typed',
       });
     });
@@ -388,7 +397,7 @@ describe('the plan screen', () => {
       scenarios: [
         {
           label: 'Alternative',
-          plan: expect.objectContaining({ payment_source: 'fixed', monthly_payment: '300' }),
+          plan: expect.objectContaining({ paymentSource: 'fixed', monthlyPayment: 300 }),
         },
       ],
     });

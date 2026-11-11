@@ -201,7 +201,7 @@ describe('mcp: the eight tools', () => {
       limit: 100,
     });
     expectShape(records.structuredContent, {
-      records: [{ id: 'string', case_id: 'string', provenance: 'object' }],
+      records: [{ id: 'string', caseId: 'string', body: 'object', provenance: 'object' }],
       'nextCursor?': 'string',
     });
     const first = (records.structuredContent.records as { id: string }[])[0]!;
@@ -213,7 +213,9 @@ describe('mcp: the eight tools', () => {
       recordId: first.id,
     });
     expectShape(record.structuredContent, { record: { id: 'string' } });
-    expect((record.structuredContent.record as { name: string }).name).toBe(viaApi.name);
+    expect((record.structuredContent.record as { body: { name: string } }).body.name).toBe(
+      viaApi.body.name,
+    );
 
     // The case's clients, last four of the tax id only.
     const clients = await mcp.call('list_case_records', {
@@ -304,7 +306,9 @@ describe('mcp: the eight tools', () => {
       entityType: 'creditors',
       recordId: outcome!.resultingRecordId!,
     });
-    expect((created.structuredContent.record as { name: string }).name).toBe('Corrected Bank');
+    expect((created.structuredContent.record as { body: { name: string } }).body.name).toBe(
+      'Corrected Bank',
+    );
 
     const invalid = await mcp.refuse(
       'propose_case_records',

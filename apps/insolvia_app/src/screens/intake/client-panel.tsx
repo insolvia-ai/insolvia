@@ -51,7 +51,7 @@ const PART_LABELS: Readonly<Record<string, string>> = {
   line2: 'apartment, suite or unit',
   city: 'city',
   state: 'state',
-  postal_code: 'ZIP code',
+  postalCode: 'ZIP code',
   county: 'county',
 };
 

@@ -82,7 +82,7 @@ const ABOVE_MEDIAN = {
     people65OrOlder: 0,
     medianHouseholdSize: {
       value: 3,
-      source: 'entered (means_test_input.people_under_65 + people_65_or_older)',
+      source: 'entered (means_test_input.peopleUnder65 + people65OrOlder)',
     },
   },
   cmi: {
@@ -177,12 +177,14 @@ const CHAPTER_13 = {
 
 const SAVED_INPUT = {
   id: INPUT_ID,
-  case_id: CASE_ID,
-  created_at: STAMP,
-  updated_at: STAMP,
+  caseId: CASE_ID,
+  createdAt: STAMP,
+  updatedAt: STAMP,
+  body: {
+    taxes: 1620,
+  },
   amended: false,
   provenance: { taxes: { source: 'staff_typed' } },
-  taxes: '1620.00',
 };
 
 interface Route {
@@ -229,10 +231,12 @@ describe('the means-test screen', () => {
     const calls = fetchMock.mock.calls.filter(
       ([url, init]) => url.includes(fragment) && (init?.method ?? 'GET') === method,
     );
-    return JSON.parse(String(calls[calls.length - 1]?.[1]?.body ?? '{}')) as Record<
-      string,
-      unknown
-    >;
+    // The request's body, with its provenance beside it, read flat.
+    const sent = JSON.parse(String(calls[calls.length - 1]?.[1]?.body ?? '{}')) as {
+      body?: Record<string, unknown>;
+      provenance?: unknown;
+    };
+    return { ...sent.body, provenance: sent.provenance };
   }
 
   const get = (fragment: string, body: unknown): Route => ({
@@ -339,11 +343,12 @@ describe('the means-test screen', () => {
           respond: () =>
             jsonResponse(201, {
               ...SAVED_INPUT,
-              child_support_for_dependents: '300.00',
-              qualified_retirement_deductions: '210.00',
-              special_circumstances: [
-                { id: 'row', description: 'Dialysis travel', amount: '180.00' },
-              ],
+              body: {
+                ...SAVED_INPUT.body,
+                childSupportForDependents: 300,
+                qualifiedRetirementDeductions: 210,
+                specialCircumstances: [{ id: 'row', description: 'Dialysis travel', amount: 180 }],
+              },
             }),
         },
       ]),
@@ -363,15 +368,15 @@ describe('the means-test screen', () => {
 
     await waitFor(() => {
       const sent = lastBody(fetchMock, 'POST', '/means_test_inputs');
-      expect(sent.child_support_for_dependents).toBe('300.00');
-      expect(sent.qualified_retirement_deductions).toBe('210.00');
-      expect(sent.special_circumstances).toEqual([
-        expect.objectContaining({ description: 'Dialysis travel', amount: '180.00' }),
+      expect(sent.childSupportForDependents).toBe(300);
+      expect(sent.qualifiedRetirementDeductions).toBe(210);
+      expect(sent.specialCircumstances).toEqual([
+        expect.objectContaining({ description: 'Dialysis travel', amount: 180 }),
       ]);
       const provenance = sent.provenance as Record<string, { source: string }>;
-      expect(provenance.child_support_for_dependents).toEqual({ source: 'staff_typed' });
-      const rowId = (sent.special_circumstances as { id: string }[])[0]!.id;
-      expect(provenance[`special_circumstances[${rowId}].amount`]).toEqual({
+      expect(provenance.childSupportForDependents).toEqual({ source: 'staff_typed' });
+      const rowId = (sent.specialCircumstances as { id: string }[])[0]!.id;
+      expect(provenance[`specialCircumstances[${rowId}].amount`]).toEqual({
         source: 'staff_typed',
       });
     });
@@ -385,12 +390,14 @@ describe('the means-test screen', () => {
           petitions: [
             {
               id: 'p-1',
-              case_id: CASE_ID,
-              created_at: STAMP,
-              updated_at: STAMP,
+              caseId: CASE_ID,
+              createdAt: STAMP,
+              updatedAt: STAMP,
+              body: {
+                expectedFilingDate: '2026-10-15',
+              },
               amended: false,
-              provenance: { expected_filing_date: { source: 'staff_typed' } },
-              expected_filing_date: '2026-10-15',
+              provenance: { expectedFilingDate: { source: 'staff_typed' } },
             },
           ],
         }),
@@ -422,12 +429,15 @@ describe('the means-test screen', () => {
           respond: () =>
             jsonResponse(201, {
               ...SAVED_INPUT,
-              people_under_65: 3,
-              people_65_or_older: 0,
-              reservist_national_guard: true,
-              income_overrides: [
-                { id: 'row', column: 'A', category: 'wages', monthly_amount: '8000.00' },
-              ],
+              body: {
+                ...SAVED_INPUT.body,
+                peopleUnder65: 3,
+                people65OrOlder: 0,
+                reservistNationalGuard: true,
+                incomeOverrides: [
+                  { id: 'row', column: 'A', category: 'wages', monthlyAmount: 8000 },
+                ],
+              },
             }),
         },
       ]),
@@ -446,17 +456,17 @@ describe('the means-test screen', () => {
 
     await waitFor(() => {
       const sent = lastBody(fetchMock, 'POST', '/means_test_inputs');
-      expect(sent.people_under_65).toBe(3);
-      expect(sent.people_65_or_older).toBe(0);
-      expect(sent.reservist_national_guard).toBe(true);
-      expect(sent.income_overrides).toEqual([
-        expect.objectContaining({ column: 'A', category: 'wages', monthly_amount: '8000.00' }),
+      expect(sent.peopleUnder65).toBe(3);
+      expect(sent.people65OrOlder).toBe(0);
+      expect(sent.reservistNationalGuard).toBe(true);
+      expect(sent.incomeOverrides).toEqual([
+        expect.objectContaining({ column: 'A', category: 'wages', monthlyAmount: 8000 }),
       ]);
       const provenance = sent.provenance as Record<string, { source: string }>;
-      expect(provenance.people_under_65).toEqual({ source: 'staff_typed' });
-      expect(provenance.reservist_national_guard).toEqual({ source: 'staff_typed' });
-      const overrideId = (sent.income_overrides as { id: string }[])[0]!.id;
-      expect(provenance[`income_overrides[${overrideId}].monthly_amount`]).toEqual({
+      expect(provenance.peopleUnder65).toEqual({ source: 'staff_typed' });
+      expect(provenance.reservistNationalGuard).toEqual({ source: 'staff_typed' });
+      const overrideId = (sent.incomeOverrides as { id: string }[])[0]!.id;
+      expect(provenance[`incomeOverrides[${overrideId}].monthlyAmount`]).toEqual({
         source: 'staff_typed',
       });
     });
@@ -473,18 +483,18 @@ describe('the means-test screen', () => {
         {
           method: 'PUT',
           fragment: `/v1/cases/${CASE_ID}/means_test_inputs/${INPUT_ID}`,
-          respond: () => jsonResponse(200, { ...SAVED_INPUT, taxes: '1700.00' }),
+          respond: () => jsonResponse(200, { ...SAVED_INPUT, body: { taxes: 1700 } }),
         },
       ]),
     );
-    await screen.findByDisplayValue('1620.00');
+    await screen.findByDisplayValue('1620');
 
     await user.clear(screen.getByLabelText('Line 16 — taxes'));
     await user.type(screen.getByLabelText('Line 16 — taxes'), '1700.00');
     await user.press(screen.getAllByRole('button', { name: 'Save and recompute' })[0]!);
 
     await waitFor(() => {
-      expect(lastBody(fetchMock, 'PUT', `/means_test_inputs/${INPUT_ID}`).taxes).toBe('1700.00');
+      expect(lastBody(fetchMock, 'PUT', `/means_test_inputs/${INPUT_ID}`).taxes).toBe(1700);
     });
     expect(await screen.findByText('Saved')).toBeTruthy();
   });

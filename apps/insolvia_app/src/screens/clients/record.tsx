@@ -47,7 +47,7 @@ function addressLines(address: Address | undefined): string | undefined {
   if (address === undefined) return undefined;
   const cityLine = [
     [address.city, address.state].filter((part) => part !== undefined && part !== '').join(', '),
-    address.postal_code,
+    address.postalCode,
   ]
     .filter((part) => part !== undefined && part !== '')
     .join(' ');

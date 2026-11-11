@@ -56,7 +56,7 @@ function membership(overrides: Record<string, unknown> = {}) {
 const LIBRARY_CREDITOR = {
   id: CREDITOR_ID,
   name: 'Acme Collections',
-  address: { line1: '1 Main St', city: 'Springfield', state: 'IL', postal_code: '62701' },
+  address: { line1: '1 Main St', city: 'Springfield', state: 'IL', postalCode: '62701' },
   additional_notice_parties: [],
   preferred: false,
   created_at: '2026-01-01T00:00:00.000Z',

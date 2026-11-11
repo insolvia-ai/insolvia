@@ -14,25 +14,25 @@ import { fromCents, sumMoney, toCents } from './money';
  */
 
 const DEDUCTION_KEYS = [
-  'deduction_tax',
-  'deduction_mandatory_retirement',
-  'deduction_voluntary_retirement',
-  'deduction_retirement_loan_repayment',
-  'deduction_insurance',
-  'deduction_domestic_support',
-  'deduction_union_dues',
-  'deduction_other',
+  'deductionTax',
+  'deductionMandatoryRetirement',
+  'deductionVoluntaryRetirement',
+  'deductionRetirementLoanRepayment',
+  'deductionInsurance',
+  'deductionDomesticSupport',
+  'deductionUnionDues',
+  'deductionOther',
 ] as const satisfies readonly (keyof IncomeSummaryBody)[];
 
 const OTHER_INCOME_KEYS = [
-  'business_net_income',
-  'interest_and_dividends',
-  'family_support',
+  'businessNetIncome',
+  'interestAndDividends',
+  'familySupport',
   'unemployment',
-  'social_security',
-  'other_government_assistance',
-  'pension_or_retirement',
-  'other_monthly_income',
+  'socialSecurity',
+  'otherGovernmentAssistance',
+  'pensionOrRetirement',
+  'otherMonthlyIncome',
 ] as const satisfies readonly (keyof IncomeSummaryBody)[];
 
 export interface ScheduleILines {
@@ -84,11 +84,11 @@ export interface EmployerPaySummary {
 }
 
 export function summarizePayRecordsByEmployer(
-  records: readonly (PayPeriodRecordBody & { readonly id?: string })[],
+  records: readonly PayPeriodRecordBody[],
 ): readonly EmployerPaySummary[] {
   const byEmployer = new Map<string, PayPeriodRecordBody[]>();
   for (const record of records) {
-    const employmentId = record.employment_id;
+    const employmentId = record.employmentId;
     if (employmentId === undefined) continue;
     const bucket = byEmployer.get(employmentId) ?? [];
     bucket.push(record);

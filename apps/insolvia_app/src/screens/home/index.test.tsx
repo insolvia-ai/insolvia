@@ -172,12 +172,14 @@ describe('the dashboard', () => {
           respond.addNote?.(notesPostMatch[1], body) ??
             jsonResponse(201, {
               id: '00000000-0000-4000-8000-0000000000n1',
-              case_id: notesPostMatch[1],
-              text: (body as { text?: string }).text ?? '',
-              author_subject: ALICE,
-              author_name: 'Alice Attorney',
-              created_at: '2026-09-01T00:00:00.000000Z',
-              updated_at: '2026-09-01T00:00:00.000000Z',
+              caseId: notesPostMatch[1],
+              createdAt: '2026-09-01T00:00:00.000000Z',
+              updatedAt: '2026-09-01T00:00:00.000000Z',
+              body: {
+                text: (body as { text?: string }).text ?? '',
+                authorSubject: ALICE,
+                authorName: 'Alice Attorney',
+              },
             }),
         );
       }

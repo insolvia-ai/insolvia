@@ -321,7 +321,7 @@ describe('the extraction review screen', () => {
           candidates: [
             candidate({
               entityType: 'claims',
-              payload: { creditor_id: 'other-candidate', amount: '310.00' },
+              payload: { creditorId: 'other-candidate', amount: 310 },
             }),
           ],
         }),
@@ -329,7 +329,7 @@ describe('the extraction review screen', () => {
         jsonResponse(400, {
           error: 'ValidationError',
           fields: {
-            creditor_id:
+            creditorId:
               'This record references another extracted candidate (creditors) that has not been accepted yet — review that one first.',
           },
         }),

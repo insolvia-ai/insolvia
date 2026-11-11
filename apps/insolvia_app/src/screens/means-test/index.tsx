@@ -15,7 +15,6 @@ import type {
   MaritalFilingStatus,
   MeansTestInputBody,
   PetitionBody,
-  PresumptionExemption,
 } from '@insolvia-ai/api-client';
 import {
   Badge,
@@ -31,16 +30,18 @@ import { Link } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { bodyErrors } from '@/api/body-errors';
 import { useApi } from '@/api/use-api';
 import { CaseColumn, useCase } from '@/components/case-shell';
 import { Heading } from '@/components/heading';
+import { MoneyInput } from '@/components/money-input';
 import { CollectionEditor } from '@/screens/intake/collection-editor';
 import { COLLECTION_SPECS, labelize } from '@/screens/intake/collections';
 import { newRowId } from '@/screens/intake/row-id';
 import { formatFormDate } from '@/screens/petition/statutory-dates';
 import { fontSizes, spacing, useTheme } from '@/theme';
 
-import { inputBodyOf, overrideFor, verdictOf, withOverride } from './inputs';
+import { overrideFor, verdictOf, withOverride } from './inputs';
 
 /**
  * `/cases/<id>/means-test` — the means test (issues #349, #365): § 707(b)
@@ -144,21 +145,21 @@ for (const category of [...OTHER_INCOME_CATEGORIES, ...EXCLUDED_INCOME_CATEGORIE
 }
 
 const EXEMPTIONS: readonly {
-  readonly key: PresumptionExemption;
+  readonly key: 'nonConsumerDebts' | 'disabledVeteran' | 'reservistNationalGuard';
   readonly label: string;
 }[] = [
   {
-    key: 'non_consumer_debts',
+    key: 'nonConsumerDebts',
     label: 'The debts are not primarily consumer debts (§ 707(b)(1))',
   },
   {
-    key: 'disabled_veteran',
+    key: 'disabledVeteran',
     label:
       'Disabled veteran whose debts were incurred primarily during active duty or ' +
       'homeland-defense activity (§ 707(b)(2)(D)(i))',
   },
   {
-    key: 'reservist_national_guard',
+    key: 'reservistNationalGuard',
     label:
       'Reservist or National Guard member called to active duty after September 11, 2001 ' +
       '(§ 707(b)(2)(D)(ii))',
@@ -166,64 +167,64 @@ const EXEMPTIONS: readonly {
 ];
 
 type MoneyKey = {
-  [K in keyof MeansTestInputBody]-?: MeansTestInputBody[K] extends string | undefined ? K : never;
+  [K in keyof MeansTestInputBody]-?: MeansTestInputBody[K] extends number | undefined ? K : never;
 }[keyof MeansTestInputBody];
 
 /** The B122A-2 deductions the debtor supplies, in the form's line order. */
 const DEDUCTION_FIELDS: readonly { readonly key: MoneyKey; readonly label: string }[] = [
   {
-    key: 'home_secured_monthly_total',
+    key: 'homeSecuredMonthlyTotal',
     label:
       'Line 9b — average monthly payment on debts secured by the home (leave blank to use ' +
       'the per-claim rows)',
   },
   {
-    key: 'housing_adjustment_amount',
+    key: 'housingAdjustmentAmount',
     label: 'Line 10 — claimed adjustment to the housing standard',
   },
   {
-    key: 'vehicle_1_loan_monthly',
+    key: 'vehicle1LoanMonthly',
     label:
       'Line 13b — average monthly payment on Vehicle 1 (leave blank to use the per-claim rows)',
   },
   {
-    key: 'vehicle_2_loan_monthly',
+    key: 'vehicle2LoanMonthly',
     label:
       'Line 13e — average monthly payment on Vehicle 2 (leave blank to use the per-claim rows)',
   },
-  { key: 'additional_public_transportation', label: 'Line 15 — additional public transportation' },
+  { key: 'additionalPublicTransportation', label: 'Line 15 — additional public transportation' },
   { key: 'taxes', label: 'Line 16 — taxes' },
-  { key: 'involuntary_deductions', label: 'Line 17 — involuntary deductions' },
-  { key: 'term_life_insurance', label: 'Line 18 — term life insurance' },
-  { key: 'court_ordered_payments', label: 'Line 19 — court-ordered payments' },
+  { key: 'involuntaryDeductions', label: 'Line 17 — involuntary deductions' },
+  { key: 'termLifeInsurance', label: 'Line 18 — term life insurance' },
+  { key: 'courtOrderedPayments', label: 'Line 19 — court-ordered payments' },
   {
-    key: 'education_for_employment_or_disability',
+    key: 'educationForEmploymentOrDisability',
     label: 'Line 20 — education for employment or for a disabled child',
   },
   { key: 'childcare', label: 'Line 21 — childcare' },
-  { key: 'healthcare_above_allowance', label: 'Line 22 — additional health care expenses' },
-  { key: 'optional_telecom', label: 'Line 23 — optional telephones and telephone services' },
-  { key: 'health_insurance', label: 'Line 25 — health insurance' },
-  { key: 'disability_insurance', label: 'Line 25 — disability insurance' },
-  { key: 'health_savings_account', label: 'Line 25 — health savings account' },
-  { key: 'family_care_contributions', label: 'Line 26 — care of household or family members' },
-  { key: 'family_violence_protection', label: 'Line 27 — protection against family violence' },
-  { key: 'home_energy_excess', label: 'Line 28 — additional home energy costs' },
-  { key: 'education_under_18', label: 'Line 29 — education for dependent children under 18' },
-  { key: 'additional_food_clothing', label: 'Line 30 — additional food and clothing' },
-  { key: 'charitable_contributions', label: 'Line 31 — continuing charitable contributions' },
+  { key: 'healthcareAboveAllowance', label: 'Line 22 — additional health care expenses' },
+  { key: 'optionalTelecom', label: 'Line 23 — optional telephones and telephone services' },
+  { key: 'healthInsurance', label: 'Line 25 — health insurance' },
+  { key: 'disabilityInsurance', label: 'Line 25 — disability insurance' },
+  { key: 'healthSavingsAccount', label: 'Line 25 — health savings account' },
+  { key: 'familyCareContributions', label: 'Line 26 — care of household or family members' },
+  { key: 'familyViolenceProtection', label: 'Line 27 — protection against family violence' },
+  { key: 'homeEnergyExcess', label: 'Line 28 — additional home energy costs' },
+  { key: 'educationUnder18', label: 'Line 29 — education for dependent children under 18' },
+  { key: 'additionalFoodClothing', label: 'Line 30 — additional food and clothing' },
+  { key: 'charitableContributions', label: 'Line 31 — continuing charitable contributions' },
   {
-    key: 'priority_cure_total',
+    key: 'priorityCureTotal',
     label:
       'Line 34 — total past due on secured debts necessary for support (leave blank to use the per-claim rows)',
   },
-  { key: 'ch13_projected_plan_payment', label: 'Line 36 — projected Chapter 13 plan payment' },
+  { key: 'ch13ProjectedPlanPayment', label: 'Line 36 — projected Chapter 13 plan payment' },
 ];
 
 /** B122C-2's two § 1325(b)(2) subtractions the debtor supplies (issue #365). */
 const CHAPTER_13_FIELDS: readonly { readonly key: MoneyKey; readonly label: string }[] = [
-  { key: 'child_support_for_dependents', label: 'Line 40 — support income for dependent children' },
-  { key: 'qualified_retirement_deductions', label: 'Line 41 — qualified retirement deductions' },
+  { key: 'childSupportForDependents', label: 'Line 40 — support income for dependent children' },
+  { key: 'qualifiedRetirementDeductions', label: 'Line 41 — qualified retirement deductions' },
 ];
 
 export interface MeansTestProps {
@@ -274,7 +275,7 @@ export function MeansTest({ caseId }: MeansTestProps) {
         const first = inputs.value[0];
         if (first !== undefined) {
           setInputId(first.id);
-          setBody(inputBodyOf(first as unknown as Record<string, unknown>));
+          setBody(first.body);
         }
         setInputsLoaded(true);
       } catch {
@@ -284,7 +285,7 @@ export function MeansTest({ caseId }: MeansTestProps) {
         const petitions = await call((client) => client.listCaseEntities(caseId, 'petitions'));
         if (!petitions.ok || cancelled) return;
         const first = petitions.value[0];
-        if (first !== undefined) setPetition(first as PetitionBody);
+        if (first !== undefined) setPetition(first.body);
       } catch {
         // The date is shown for orientation; the petition screen owns it.
       }
@@ -301,10 +302,10 @@ export function MeansTest({ caseId }: MeansTestProps) {
       // The whole record, with staff_typed provenance derived from what is
       // filled in — the same rule every other editor applies. Nothing on
       // this record is ever extracted, so rebuilding the map is exact.
-      const request = {
-        ...body,
-        provenance: staffTypedProvenance(body as unknown as Record<string, unknown>),
-      } as unknown as CaseEntityRequest<'means_test_inputs'>;
+      const request: CaseEntityRequest<'means_test_inputs'> = {
+        body,
+        provenance: staffTypedProvenance(body),
+      };
       const result = await call((client) =>
         inputId === null
           ? client.addCaseEntity(caseId, 'means_test_inputs', request)
@@ -315,14 +316,14 @@ export function MeansTest({ caseId }: MeansTestProps) {
         return;
       }
       setInputId(result.value.id);
-      setBody(inputBodyOf(result.value as unknown as Record<string, unknown>));
+      setBody(result.value.body);
       setErrors({});
       setStatus('Saved — recomputing');
       await loadTrace();
       setStatus('Saved');
     } catch (cause) {
       if (cause instanceof ApiValidationException) {
-        setErrors(cause.fields);
+        setErrors(bodyErrors(cause.fields));
         setStatus('Some answers need attention.');
       } else {
         setStatus('Could not save. Your entries are still here — try again.');
@@ -335,16 +336,16 @@ export function MeansTest({ caseId }: MeansTestProps) {
   const muted = { color: theme.colors.muted, fontFamily: theme.typography.body };
   const ink = { color: theme.colors.ink, fontFamily: theme.typography.body };
 
-  const setMoney = (key: MoneyKey, next: string) =>
-    setBody((current) => ({ ...current, [key]: next === '' ? undefined : next }));
+  const setMoney = (key: MoneyKey, next: number | undefined) =>
+    setBody((current) => ({ ...current, [key]: next }));
   const setCount = (
     key:
-      | 'people_under_65'
-      | 'people_65_or_older'
-      | 'median_household_size'
-      | 'irs_family_size'
-      | 'irs_housing_family_size'
-      | 'vehicle_count',
+      | 'peopleUnder65'
+      | 'people65OrOlder'
+      | 'medianHouseholdSize'
+      | 'irsFamilySize'
+      | 'irsHousingFamilySize'
+      | 'vehicleCount',
     next: string,
   ) => {
     const digits = next.replaceAll(/[^0-9]/gu, '');
@@ -355,7 +356,7 @@ export function MeansTest({ caseId }: MeansTestProps) {
   const hasColumnB =
     debtors.some((debtor) => debtor.filing_role !== 'debtor_1') ||
     (ready?.cmi.columns.some((column) => column.column === 'B') ?? false) ||
-    (body.income_overrides?.some((row) => row.column === 'B') ?? false);
+    (body.incomeOverrides?.some((row) => row.column === 'B') ?? false);
   const columns: readonly IncomeColumn[] = hasColumnB ? ['A', 'B'] : ['A'];
 
   // The button appears twice (under the verdict, and after the last field)
@@ -394,9 +395,9 @@ export function MeansTest({ caseId }: MeansTestProps) {
 
       <Section title="Expected filing date">
         <Text style={[styles.row, ink]}>
-          {petition?.expected_filing_date === undefined
+          {petition?.expectedFilingDate === undefined
             ? 'No expected filing date is set — the case’s opening date stands in for it.'
-            : `Planned for ${formatFormDate(petition.expected_filing_date)}.`}
+            : `Planned for ${formatFormDate(petition.expectedFilingDate)}.`}
           {ready === null
             ? ''
             : ` The six-month window runs ${ready.cmi.window.start} to ${ready.cmi.window.end}.`}
@@ -410,15 +411,15 @@ export function MeansTest({ caseId }: MeansTestProps) {
       </Section>
 
       <Section title={`Marital and filing status (${statementForm} line 1)`}>
-        <Field.Root invalid={Boolean(errors.marital_filing_status)}>
+        <Field.Root invalid={Boolean(errors.maritalFilingStatus)}>
           <Field.Label>Marital and filing status</Field.Label>
           <Select
             options={MARITAL_OPTIONS}
-            value={body.marital_filing_status ?? null}
+            value={body.maritalFilingStatus ?? null}
             onValueChange={(next) =>
               setBody((current) => ({
                 ...current,
-                marital_filing_status: MARITAL_FILING_STATUSES.includes(next as MaritalFilingStatus)
+                maritalFilingStatus: MARITAL_FILING_STATUSES.includes(next as MaritalFilingStatus)
                   ? (next as MaritalFilingStatus)
                   : undefined,
               }))
@@ -430,8 +431,8 @@ export function MeansTest({ caseId }: MeansTestProps) {
               ? 'Leave unset to answer from the debtor records.'
               : `Currently: ${ready.maritalFilingStatus.value === null ? 'undetermined' : labelize(ready.maritalFilingStatus.value)} — ${ready.maritalFilingStatus.source}.`}
           </Field.Description>
-          {errors.marital_filing_status ? (
-            <Field.Error match>{errors.marital_filing_status}</Field.Error>
+          {errors.maritalFilingStatus ? (
+            <Field.Error match>{errors.maritalFilingStatus}</Field.Error>
           ) : null}
         </Field.Root>
       </Section>
@@ -439,42 +440,42 @@ export function MeansTest({ caseId }: MeansTestProps) {
       <Section title="Household">
         <CountField
           label="People under 65"
-          value={body.people_under_65}
-          error={errors.people_under_65}
-          onValueChange={(next) => setCount('people_under_65', next)}
+          value={body.peopleUnder65}
+          error={errors.peopleUnder65}
+          onValueChange={(next) => setCount('peopleUnder65', next)}
         />
         <CountField
           label="People 65 or older"
-          value={body.people_65_or_older}
-          error={errors.people_65_or_older}
-          onValueChange={(next) => setCount('people_65_or_older', next)}
+          value={body.people65OrOlder}
+          error={errors.people65OrOlder}
+          onValueChange={(next) => setCount('people65OrOlder', next)}
         />
         <CountField
           label={`Household size for the median table (${statementForm} line ${chapter13 ? '16b' : '13'}) — override`}
-          value={body.median_household_size}
-          error={errors.median_household_size}
+          value={body.medianHouseholdSize}
+          error={errors.medianHouseholdSize}
           description={figureNote(ready?.household.medianHouseholdSize)}
-          onValueChange={(next) => setCount('median_household_size', next)}
+          onValueChange={(next) => setCount('medianHouseholdSize', next)}
         />
         <CountField
           label={`IRS family size (${calculationForm} line 5) — override`}
-          value={body.irs_family_size}
-          error={errors.irs_family_size}
+          value={body.irsFamilySize}
+          error={errors.irsFamilySize}
           description={figureNote(ready?.household.irsFamilySize)}
-          onValueChange={(next) => setCount('irs_family_size', next)}
+          onValueChange={(next) => setCount('irsFamilySize', next)}
         />
         <CountField
           label={`IRS housing family size (${calculationForm} lines 8–9a) — override`}
-          value={body.irs_housing_family_size}
-          error={errors.irs_housing_family_size}
+          value={body.irsHousingFamilySize}
+          error={errors.irsHousingFamilySize}
           description={figureNote(ready?.household.irsHousingFamilySize)}
-          onValueChange={(next) => setCount('irs_housing_family_size', next)}
+          onValueChange={(next) => setCount('irsHousingFamilySize', next)}
         />
         <CountField
           label={`Vehicles claimed (${calculationForm} line 11) — at most 2`}
-          value={body.vehicle_count}
-          error={errors.vehicle_count}
-          onValueChange={(next) => setCount('vehicle_count', next)}
+          value={body.vehicleCount}
+          error={errors.vehicleCount}
+          onValueChange={(next) => setCount('vehicleCount', next)}
         />
       </Section>
 
@@ -546,16 +547,16 @@ export function MeansTest({ caseId }: MeansTestProps) {
             ? ' On Form 122C-1 the adjustment comes off before the median comparison (line 14).'
             : ''}
         </Text>
-        {(body.marital_adjustments ?? []).map((item) => (
+        {(body.maritalAdjustments ?? []).map((item, index) => (
           <View key={item.id} style={styles.adjustment}>
-            <Field.Root invalid={Boolean(errors[`marital_adjustments[${item.id}].description`])}>
+            <Field.Root invalid={Boolean(errors[`maritalAdjustments[${index}].description`])}>
               <Field.Label>Purpose</Field.Label>
               <Input
                 value={item.description ?? ''}
                 onValueChange={(next) =>
                   setBody((current) => ({
                     ...current,
-                    marital_adjustments: (current.marital_adjustments ?? []).map((row) =>
+                    maritalAdjustments: (current.maritalAdjustments ?? []).map((row) =>
                       row.id === item.id
                         ? { ...row, description: next === '' ? undefined : next }
                         : row,
@@ -564,15 +565,15 @@ export function MeansTest({ caseId }: MeansTestProps) {
                 }
               />
             </Field.Root>
-            <Field.Root invalid={Boolean(errors[`marital_adjustments[${item.id}].amount`])}>
+            <Field.Root invalid={Boolean(errors[`maritalAdjustments[${index}].amount`])}>
               <Field.Label>Monthly amount</Field.Label>
-              <Input
-                value={item.amount ?? ''}
+              <MoneyInput
+                value={item.amount}
                 onValueChange={(next) =>
                   setBody((current) => ({
                     ...current,
-                    marital_adjustments: (current.marital_adjustments ?? []).map((row) =>
-                      row.id === item.id ? { ...row, amount: next === '' ? undefined : next } : row,
+                    maritalAdjustments: (current.maritalAdjustments ?? []).map((row) =>
+                      row.id === item.id ? { ...row, amount: next } : row,
                     ),
                   }))
                 }
@@ -583,11 +584,11 @@ export function MeansTest({ caseId }: MeansTestProps) {
               intent="secondary"
               onPress={() =>
                 setBody((current) => {
-                  const rest = (current.marital_adjustments ?? []).filter(
+                  const rest = (current.maritalAdjustments ?? []).filter(
                     (row) => row.id !== item.id,
                   );
-                  const { marital_adjustments: _removed, ...without } = current;
-                  return rest.length === 0 ? without : { ...current, marital_adjustments: rest };
+                  const { maritalAdjustments: _removed, ...without } = current;
+                  return rest.length === 0 ? without : { ...current, maritalAdjustments: rest };
                 })
               }
             >
@@ -601,7 +602,7 @@ export function MeansTest({ caseId }: MeansTestProps) {
           onPress={() =>
             setBody((current) => ({
               ...current,
-              marital_adjustments: [...(current.marital_adjustments ?? []), { id: newRowId() }],
+              maritalAdjustments: [...(current.maritalAdjustments ?? []), { id: newRowId() }],
             }))
           }
         >
@@ -616,23 +617,23 @@ export function MeansTest({ caseId }: MeansTestProps) {
             shortens the commitment period, and the § 1325(b)(2) subtractions from current monthly
             income.
           </Text>
-          <Field.Root invalid={Boolean(errors.commitment_period_marital_adjustment)}>
+          <Field.Root invalid={Boolean(errors.commitmentPeriodMaritalAdjustment)}>
             <Field.Label>
               Line 19a — deduct the marital adjustment for the commitment period too?
             </Field.Label>
             <Select
               options={[...YES_NO_OPTIONS]}
               value={
-                body.commitment_period_marital_adjustment === true
+                body.commitmentPeriodMaritalAdjustment === true
                   ? 'yes'
-                  : body.commitment_period_marital_adjustment === false
+                  : body.commitmentPeriodMaritalAdjustment === false
                     ? 'no'
                     : null
               }
               onValueChange={(next) =>
                 setBody((current) => ({
                   ...current,
-                  commitment_period_marital_adjustment:
+                  commitmentPeriodMaritalAdjustment:
                     next === 'yes' ? true : next === 'no' ? false : undefined,
                 }))
               }
@@ -642,17 +643,16 @@ export function MeansTest({ caseId }: MeansTestProps) {
               A contention under § 1325(b)(4), not a fact: unanswered, line 19a is 0 as the form
               instructs.
             </Field.Description>
-            {errors.commitment_period_marital_adjustment ? (
-              <Field.Error match>{errors.commitment_period_marital_adjustment}</Field.Error>
+            {errors.commitmentPeriodMaritalAdjustment ? (
+              <Field.Error match>{errors.commitmentPeriodMaritalAdjustment}</Field.Error>
             ) : null}
           </Field.Root>
           {CHAPTER_13_FIELDS.map((field) => (
             <Field.Root key={field.key} invalid={Boolean(errors[field.key])}>
               <Field.Label>{field.label}</Field.Label>
-              <Input
-                value={body[field.key] ?? ''}
+              <MoneyInput
+                value={body[field.key]}
                 onValueChange={(next) => setMoney(field.key, next)}
-                autoCorrect={false}
               />
               {errors[field.key] ? <Field.Error match>{errors[field.key]}</Field.Error> : null}
             </Field.Root>
@@ -661,18 +661,16 @@ export function MeansTest({ caseId }: MeansTestProps) {
             Line 43 — special circumstances that justify additional expenses (§ 707(b)(2)(B)),
             deducted on Form 122C-2. The trustee gets the documentation; this page gets the amounts.
           </Text>
-          {(body.special_circumstances ?? []).map((item) => (
+          {(body.specialCircumstances ?? []).map((item, index) => (
             <View key={item.id} style={styles.adjustment}>
-              <Field.Root
-                invalid={Boolean(errors[`special_circumstances[${item.id}].description`])}
-              >
+              <Field.Root invalid={Boolean(errors[`specialCircumstances[${index}].description`])}>
                 <Field.Label>Special circumstance</Field.Label>
                 <Input
                   value={item.description ?? ''}
                   onValueChange={(next) =>
                     setBody((current) => ({
                       ...current,
-                      special_circumstances: (current.special_circumstances ?? []).map((row) =>
+                      specialCircumstances: (current.specialCircumstances ?? []).map((row) =>
                         row.id === item.id
                           ? { ...row, description: next === '' ? undefined : next }
                           : row,
@@ -681,17 +679,15 @@ export function MeansTest({ caseId }: MeansTestProps) {
                   }
                 />
               </Field.Root>
-              <Field.Root invalid={Boolean(errors[`special_circumstances[${item.id}].amount`])}>
+              <Field.Root invalid={Boolean(errors[`specialCircumstances[${index}].amount`])}>
                 <Field.Label>Monthly expense</Field.Label>
-                <Input
-                  value={item.amount ?? ''}
+                <MoneyInput
+                  value={item.amount}
                   onValueChange={(next) =>
                     setBody((current) => ({
                       ...current,
-                      special_circumstances: (current.special_circumstances ?? []).map((row) =>
-                        row.id === item.id
-                          ? { ...row, amount: next === '' ? undefined : next }
-                          : row,
+                      specialCircumstances: (current.specialCircumstances ?? []).map((row) =>
+                        row.id === item.id ? { ...row, amount: next } : row,
                       ),
                     }))
                   }
@@ -702,13 +698,11 @@ export function MeansTest({ caseId }: MeansTestProps) {
                 intent="secondary"
                 onPress={() =>
                   setBody((current) => {
-                    const rest = (current.special_circumstances ?? []).filter(
+                    const rest = (current.specialCircumstances ?? []).filter(
                       (row) => row.id !== item.id,
                     );
-                    const { special_circumstances: _removed, ...without } = current;
-                    return rest.length === 0
-                      ? without
-                      : { ...current, special_circumstances: rest };
+                    const { specialCircumstances: _removed, ...without } = current;
+                    return rest.length === 0 ? without : { ...current, specialCircumstances: rest };
                   })
                 }
               >
@@ -722,10 +716,7 @@ export function MeansTest({ caseId }: MeansTestProps) {
             onPress={() =>
               setBody((current) => ({
                 ...current,
-                special_circumstances: [
-                  ...(current.special_circumstances ?? []),
-                  { id: newRowId() },
-                ],
+                specialCircumstances: [...(current.specialCircumstances ?? []), { id: newRowId() }],
               }))
             }
           >
@@ -743,27 +734,26 @@ export function MeansTest({ caseId }: MeansTestProps) {
         {DEDUCTION_FIELDS.map((field) => (
           <Field.Root key={field.key} invalid={Boolean(errors[field.key])}>
             <Field.Label>{field.label}</Field.Label>
-            <Input
-              value={body[field.key] ?? ''}
+            <MoneyInput
+              value={body[field.key]}
               onValueChange={(next) => setMoney(field.key, next)}
-              autoCorrect={false}
             />
             {errors[field.key] ? <Field.Error match>{errors[field.key]}</Field.Error> : null}
           </Field.Root>
         ))}
-        <Field.Root invalid={Boolean(errors.housing_adjustment_explanation)}>
+        <Field.Root invalid={Boolean(errors.housingAdjustmentExplanation)}>
           <Field.Label>Line 10 — why the housing standard’s split is incorrect</Field.Label>
           <Textarea
-            value={body.housing_adjustment_explanation ?? ''}
+            value={body.housingAdjustmentExplanation ?? ''}
             onValueChange={(next) =>
               setBody((current) => ({
                 ...current,
-                housing_adjustment_explanation: next === '' ? undefined : next,
+                housingAdjustmentExplanation: next === '' ? undefined : next,
               }))
             }
           />
-          {errors.housing_adjustment_explanation ? (
-            <Field.Error match>{errors.housing_adjustment_explanation}</Field.Error>
+          {errors.housingAdjustmentExplanation ? (
+            <Field.Error match>{errors.housingAdjustmentExplanation}</Field.Error>
           ) : null}
         </Field.Root>
         {chapter13 ? (
@@ -772,22 +762,20 @@ export function MeansTest({ caseId }: MeansTestProps) {
             eligibility question — Form 122C-2 is the Chapter 13 form.
           </Text>
         ) : (
-          <Field.Root invalid={Boolean(errors.ch13_eligible)}>
+          <Field.Root invalid={Boolean(errors.ch13Eligible)}>
             <Field.Label>Line 36 — eligible to file under Chapter 13?</Field.Label>
             <Select
               options={[...YES_NO_OPTIONS]}
-              value={
-                body.ch13_eligible === true ? 'yes' : body.ch13_eligible === false ? 'no' : null
-              }
+              value={body.ch13Eligible === true ? 'yes' : body.ch13Eligible === false ? 'no' : null}
               onValueChange={(next) =>
                 setBody((current) => ({
                   ...current,
-                  ch13_eligible: next === 'yes' ? true : next === 'no' ? false : undefined,
+                  ch13Eligible: next === 'yes' ? true : next === 'no' ? false : undefined,
                 }))
               }
               placeholder="Not answered"
             />
-            {errors.ch13_eligible ? <Field.Error match>{errors.ch13_eligible}</Field.Error> : null}
+            {errors.ch13Eligible ? <Field.Error match>{errors.ch13Eligible}</Field.Error> : null}
           </Field.Root>
         )}
       </Section>
@@ -961,7 +949,7 @@ function IncomeGrid({
   readonly trace: CaseMeansTest | null;
   readonly body: MeansTestInputBody;
   readonly errors: Readonly<Record<string, string>>;
-  readonly onOverride: (category: IncomeLineCategory, next: string) => void;
+  readonly onOverride: (category: IncomeLineCategory, next: number | undefined) => void;
 }) {
   const theme = useTheme();
   const muted = { color: theme.colors.muted, fontFamily: theme.typography.body };
@@ -982,20 +970,17 @@ function IncomeGrid({
   ) =>
     lines.map((line) => {
       const override = overrideFor(body, column, line.category);
+      const index = override === undefined ? -1 : (body.incomeOverrides ?? []).indexOf(override);
       const errorKey = Object.keys(errors).find(
-        (path) =>
-          override !== undefined &&
-          path.startsWith(`income_overrides[`) &&
-          path.includes(override.id),
+        (path) => index >= 0 && path.startsWith(`incomeOverrides[${index}]`),
       );
       return (
         <View key={line.category} style={styles.gridRow}>
           <Field.Root invalid={errorKey !== undefined}>
             <Field.Label>{`${heading}: ${line.label}`}</Field.Label>
-            <Input
-              value={override?.monthly_amount ?? ''}
+            <MoneyInput
+              value={override?.monthlyAmount}
               onValueChange={(next) => onOverride(line.category, next)}
-              autoCorrect={false}
             />
             <Field.Description>{`From the records: ${derivedFor(line.category)}`}</Field.Description>
             {errorKey !== undefined ? <Field.Error match>{errors[errorKey]}</Field.Error> : null}

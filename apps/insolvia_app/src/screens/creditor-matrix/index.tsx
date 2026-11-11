@@ -107,7 +107,7 @@ export function CreditorMatrixScreen({ caseId }: { readonly caseId: string }) {
         if (!result.ok || cancelled) return;
         const loaded: Record<string, string> = {};
         for (const record of result.value) {
-          const name = (record as { name?: unknown }).name;
+          const name = record.body.name;
           if (typeof name === 'string' && name !== '') {
             loaded[record.id] = name;
           }

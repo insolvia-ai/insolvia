@@ -3,7 +3,6 @@ import type { PlanBody } from '@insolvia-ai/api-client';
 import {
   blankToAbsent,
   monthsText,
-  planBodyOf,
   treatmentFor,
   wholeNumberOf,
   withList,
@@ -13,37 +12,23 @@ import {
 const mint = () => 'row-1';
 
 describe('the plan record edits', () => {
-  it('strips the server-stamped identity from a stored record', () => {
-    expect(
-      planBodyOf({
-        id: 'p',
-        case_id: 'c',
-        created_at: 't',
-        updated_at: 't',
-        provenance: {},
-        amended: false,
-        monthly_payment: '500.00',
-      }),
-    ).toEqual({ monthly_payment: '500.00' });
-  });
-
   it('mints a treatment row the first time a claim is treated', () => {
     const body = withTreatment({}, 'claim-car', { treatment: 'cramdown' }, mint);
 
-    expect(body.secured_treatments).toEqual([
-      { id: 'row-1', claim_id: 'claim-car', treatment: 'cramdown' },
+    expect(body.securedTreatments).toEqual([
+      { id: 'row-1', claimId: 'claim-car', treatment: 'cramdown' },
     ]);
   });
 
   it('patches the existing row rather than adding a second', () => {
     const start = withTreatment({}, 'claim-car', { treatment: 'cramdown' }, mint);
 
-    const body = withTreatment(start, 'claim-car', { interest_rate: '7' }, () => 'row-2');
+    const body = withTreatment(start, 'claim-car', { interestRate: 7 }, () => 'row-2');
 
-    expect(body.secured_treatments).toEqual([
-      { id: 'row-1', claim_id: 'claim-car', treatment: 'cramdown', interest_rate: '7' },
+    expect(body.securedTreatments).toEqual([
+      { id: 'row-1', claimId: 'claim-car', treatment: 'cramdown', interestRate: 7 },
     ]);
-    expect(treatmentFor(body, 'claim-car')?.interest_rate).toBe('7');
+    expect(treatmentFor(body, 'claim-car')?.interestRate).toBe(7);
   });
 
   it('choosing no treatment removes the row, and the empty list with it', () => {
@@ -55,9 +40,9 @@ describe('the plan record edits', () => {
   });
 
   it('an emptied list is dropped, never sent as []', () => {
-    const body: PlanBody = { lump_sums: [{ id: 'l1' }], monthly_payment: '1' };
+    const body: PlanBody = { lumpSums: [{ id: 'l1' }], monthlyPayment: 1 };
 
-    expect(withList(body, 'lump_sums', [])).toEqual({ monthly_payment: '1' });
+    expect(withList(body, 'lumpSums', [])).toEqual({ monthlyPayment: 1 });
   });
 
   it.each([

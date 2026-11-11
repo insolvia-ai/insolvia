@@ -28,44 +28,52 @@ const STAMP = '2026-09-01T10:00:00.000000Z';
 
 const SAVED_ASSET = {
   id: ASSET_ID,
-  case_id: CASE_ID,
-  created_at: STAMP,
-  updated_at: STAMP,
+  caseId: CASE_ID,
+  createdAt: STAMP,
+  updatedAt: STAMP,
+  body: {
+    category: 'vehicle',
+    description: '2016 sedan',
+    valueEntire: 9000,
+  },
   provenance: { category: { source: 'staff_typed' }, description: { source: 'staff_typed' } },
   amended: false,
-  category: 'vehicle',
-  description: '2016 sedan',
-  value_entire: '9000.00',
 };
 
 /** A secured claim already linked to the sedan. */
 const LINKED_CLAIM = {
   id: CLAIM_ID,
-  case_id: CASE_ID,
-  created_at: STAMP,
-  updated_at: STAMP,
+  caseId: CASE_ID,
+  createdAt: STAMP,
+  updatedAt: STAMP,
+  body: {
+    claimClass: 'secured',
+    amount: 12000,
+    assetId: ASSET_ID,
+    lienPosition: 1,
+  },
   provenance: {
-    claim_class: { source: 'staff_typed' },
+    claimClass: { source: 'staff_typed' },
     amount: { source: 'staff_typed' },
-    asset_id: { source: 'staff_typed' },
-    lien_position: { source: 'staff_typed' },
+    assetId: { source: 'staff_typed' },
+    lienPosition: { source: 'staff_typed' },
   },
   amended: false,
-  claim_class: 'secured',
-  amount: '12000.00',
-  asset_id: ASSET_ID,
-  lien_position: 1,
 };
 
 /** The same claim before anyone linked it — a confirmed extraction, so its
  * provenance is NOT the plain staff_typed map. */
 const UNLINKED_CLAIM = {
   id: CLAIM_ID,
-  case_id: CASE_ID,
-  created_at: STAMP,
-  updated_at: STAMP,
+  caseId: CASE_ID,
+  createdAt: STAMP,
+  updatedAt: STAMP,
+  body: {
+    claimClass: 'secured',
+    amount: 12000,
+  },
   provenance: {
-    claim_class: { source: 'staff_typed' },
+    claimClass: { source: 'staff_typed' },
     amount: {
       source: 'ai_extracted',
       confirmed_by: 'subject-0001',
@@ -73,8 +81,6 @@ const UNLINKED_CLAIM = {
     },
   },
   amended: false,
-  claim_class: 'secured',
-  amount: '12000.00',
 };
 
 /** `liens_json` for the sedan under the linked claim. */
@@ -271,7 +277,7 @@ describe('the collateral panels', () => {
           jsonResponse(201, {
             ...LINKED_CLAIM,
             provenance: {},
-            account_last4: '4471',
+            accountLast4: '4471',
           }),
       },
     ]);
@@ -286,13 +292,11 @@ describe('the collateral panels', () => {
 
     await waitFor(() =>
       expect(lastBody(fetchMock, 'POST', '/claims')).toEqual({
-        claim_class: 'secured',
-        asset_id: ASSET_ID,
-        account_last4: '4471',
+        body: { claimClass: 'secured', assetId: ASSET_ID, accountLast4: '4471' },
         provenance: {
-          claim_class: { source: 'staff_typed' },
-          asset_id: { source: 'staff_typed' },
-          account_last4: { source: 'staff_typed' },
+          claimClass: { source: 'staff_typed' },
+          assetId: { source: 'staff_typed' },
+          accountLast4: { source: 'staff_typed' },
         },
       }),
     );
@@ -321,12 +325,10 @@ describe('the collateral panels', () => {
 
     await waitFor(() =>
       expect(lastBody(fetchMock, 'PUT', `/claims/${CLAIM_ID}`)).toEqual({
-        claim_class: 'secured',
-        amount: '12000.00',
-        asset_id: ASSET_ID,
+        body: { claimClass: 'secured', amount: 12000, assetId: ASSET_ID },
         provenance: {
           ...UNLINKED_CLAIM.provenance,
-          asset_id: { source: 'staff_typed' },
+          assetId: { source: 'staff_typed' },
         },
       }),
     );

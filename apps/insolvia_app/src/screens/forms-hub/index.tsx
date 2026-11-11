@@ -251,7 +251,7 @@ export function FormsHub({ caseId }: { readonly caseId: string }) {
             const badge = statusBadge(form.problems);
             const metric = describeMetric(form.metric);
             const segment = OPEN_SEGMENT[form.series];
-            const formNotes = notes.filter((note) => note.form_series === form.series);
+            const formNotes = notes.filter((note) => note.body.formSeries === form.series);
             const notesOpen = expandedNotes.has(form.series);
             return (
               <View role="listitem" key={form.series} style={styles.row}>

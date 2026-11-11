@@ -57,6 +57,7 @@ import type {
   CaseAssignee,
   CaseChapter,
   CaseCollection,
+  CaseCollections,
   CaseEntity,
   ClientRole,
   InvitePortalClientRequest,
@@ -179,8 +180,9 @@ import type {
   LocalStandardsFigures,
   NationalStandardsFigures,
   Note,
+  NoteBody,
   NoteRequest,
-  NoticeParty,
+  LibraryNoticeParty,
   OtherName,
   OutputOptions,
   OutputOptionsRequest,
@@ -1620,7 +1622,7 @@ export class InsolviaApiClient {
         body: JSON.stringify({
           scenarios: scenarios.map((scenario) => ({
             ...(scenario.label === undefined ? {} : { label: scenario.label }),
-            plan: caseEntityRequestToJson(scenario.plan),
+            plan: caseEntityRequestToJson({ body: scenario.plan }).body,
           })),
         }),
       },
@@ -4657,33 +4659,18 @@ function requireDebtorArray(response: DecodedResponse, key: string): readonly De
 // to a checked read here.
 // ---------------------------------------------------------------------------
 
-/** The six members `entity_json` stamps; everything else is the body. */
-const ENTITY_IDENTITY_KEYS: readonly string[] = [
-  'id',
-  'case_id',
-  'created_at',
-  'updated_at',
-  'provenance',
-  'amended',
-];
-
-/** Decodes a {@link CaseEntity} — `entity_json`'s exact shape. */
+/** Decodes a {@link CaseEntity} — `EntityView`'s exact shape. The body is
+ * checked to be an object and passed through; the server owns its fields. */
 function caseEntityFromJson<C extends CaseCollection>(response: DecodedResponse): CaseEntity<C> {
-  const body: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(response.json)) {
-    if (!ENTITY_IDENTITY_KEYS.includes(key)) {
-      body[key] = value;
-    }
-  }
   return {
-    ...body,
     id: requireString(response, 'id'),
-    case_id: requireString(response, 'case_id'),
-    created_at: requireString(response, 'created_at'),
-    updated_at: requireString(response, 'updated_at'),
+    caseId: requireString(response, 'caseId'),
+    createdAt: requireString(response, 'createdAt'),
+    updatedAt: requireString(response, 'updatedAt'),
+    body: childObject(response, 'body').json as CaseCollections[C],
     provenance: requireProvenanceMap(response, 'provenance'),
     amended: requireBoolean(response, 'amended'),
-  } as CaseEntity<C>;
+  };
 }
 
 /** The `{"<collection>": [...]}` envelope's array, checked per element. */
@@ -4708,19 +4695,22 @@ function requireCaseEntityArray<C extends CaseCollection>(
   });
 }
 
-/** Decodes a {@link Note} from a response body — `note_json`'s exact shape
- * (`insolvia_core.notes`). No `provenance` member: a note carries none. */
+/** Decodes a {@link Note} from a response body — `NoteView`'s exact shape.
+ * No `provenance` member: a note carries none. */
 function noteFromJson(response: DecodedResponse): Note {
-  return definedMembers<Note>({
+  const body = childObject(response, 'body');
+  return {
     id: requireString(response, 'id'),
-    case_id: requireString(response, 'case_id'),
-    created_at: requireString(response, 'created_at'),
-    updated_at: requireString(response, 'updated_at'),
-    author_subject: requireString(response, 'author_subject'),
-    author_name: requireString(response, 'author_name'),
-    text: optionalString(response, 'text'),
-    form_series: optionalString(response, 'form_series'),
-  });
+    caseId: requireString(response, 'caseId'),
+    createdAt: requireString(response, 'createdAt'),
+    updatedAt: requireString(response, 'updatedAt'),
+    body: definedMembers<NoteBody>({
+      text: optionalString(body, 'text'),
+      formSeries: optionalString(body, 'formSeries'),
+      authorSubject: optionalString(body, 'authorSubject'),
+      authorName: optionalString(body, 'authorName'),
+    }),
+  };
 }
 
 /** The `{"notes": [...]}` envelope's array, checked per element — the same
@@ -5675,12 +5665,12 @@ function libraryAddress(response: DecodedResponse, key: string): Address {
     line2: optionalString(nested, 'line2'),
     city: optionalString(nested, 'city'),
     state: optionalString(nested, 'state'),
-    postal_code: optionalString(nested, 'postal_code'),
+    postalCode: optionalString(nested, 'postalCode'),
     county: optionalString(nested, 'county'),
   });
 }
 
-function libraryNoticePartyFromJson(response: DecodedResponse): NoticeParty {
+function libraryNoticePartyFromJson(response: DecodedResponse): LibraryNoticeParty {
   return {
     id: requireString(response, 'id'),
     name: optionalString(response, 'name'),
@@ -5730,7 +5720,7 @@ function libraryCreditorFromJson(response: DecodedResponse): LibraryCreditor {
       : requireArrayOf(
           response,
           'additional_notice_parties',
-          'NoticeParty',
+          'LibraryNoticeParty',
           libraryNoticePartyFromJson,
         );
   return {

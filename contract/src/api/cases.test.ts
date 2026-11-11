@@ -85,7 +85,7 @@ describe('the client directory', () => {
     const created = await admin.api.createFirmClient({
       name: { given: 'Dana', surname },
       email: `dana-${tag()}@insolvia.test`,
-      residence_address: { line1: '1 Elm St', city: 'Tampa', state: 'FL', postal_code: '33602' },
+      residence_address: { line1: '1 Elm St', city: 'Tampa', state: 'FL', postalCode: '33602' },
       lead_source: 'referral',
     });
     admin.wire(201, FIRM_CLIENT);
@@ -320,7 +320,7 @@ describe('a case, opened from a client', () => {
     // A record on the source, so the copy has a collection to carry: copying
     // an empty case never exercised the order the copy is written in.
     await admin.api.addCaseEntity(caseId, 'creditors', {
-      name: 'Example Bank',
+      body: { name: 'Example Bank' },
       provenance: { name: { source: 'staff_typed' } },
     });
     const copy = await admin.api.copyCase(caseId);
@@ -328,7 +328,7 @@ describe('a case, opened from a client', () => {
     expect(copy.id).not.toBe(caseId);
     expect(copy.status).toBe('intake');
     const copied = await admin.api.listCaseEntities(copy.id, 'creditors');
-    expect(copied.map((c) => c.name)).toEqual(['Example Bank']);
+    expect(copied.map((c) => c.body.name)).toEqual(['Example Bank']);
     // The copy's Debtor 1 names its source on every value…
     const copyDebtor = (await admin.api.listDebtors(copy.id)).find(
       (d) => d.filing_role === 'debtor_1',
@@ -517,13 +517,13 @@ describe('notes', () => {
     const { caseId } = await scratchCase();
     const added = await admin.api.addNote(caseId, {
       text: 'Called the client.',
-      form_series: 'B101',
+      formSeries: 'B101',
     });
     admin.wire(201, NOTE);
     const edited = await admin.api.putNote(caseId, added.id, { text: 'Called twice.' });
     admin.wire(200, NOTE);
-    expect(edited.text).toBe('Called twice.');
-    expect(edited.author_subject).toBe(seeded.firmAdmin.subject);
+    expect(edited.body.text).toBe('Called twice.');
+    expect(edited.body.authorSubject).toBe(seeded.firmAdmin.subject);
     const listed = await admin.api.listNotes(caseId);
     admin.wire(200, { notes: [NOTE] });
     expect(listed.map((n) => n.id)).toContain(added.id);
