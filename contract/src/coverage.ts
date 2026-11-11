@@ -88,6 +88,29 @@ export function noteCall(surface: Surface, name: string): void {
   appendFileSync(join(coverageDir(), `${process.pid}.${surface}.log`), `${name}\n`);
 }
 
+/** One request and its answer, as the instrumented clients saw them on the wire. */
+export interface WireExchange {
+  readonly surface: 'api' | 'admin';
+  /** The client method being called when the request went out. */
+  readonly call: string;
+  readonly method: string;
+  /** The path without its query string. */
+  readonly path: string;
+  readonly status: number;
+  /** The JSON request body, or `undefined` when none was sent. */
+  readonly request: unknown;
+  /** The JSON response body, or `undefined` when it had none or was not JSON. */
+  readonly response: unknown;
+}
+
+/** Notes one exchange, for the OpenAPI check (support/openapi.ts). */
+export function noteExchange(exchange: WireExchange): void {
+  appendFileSync(
+    join(coverageDir(), `${process.pid}.exchanges.jsonl`),
+    `${JSON.stringify(exchange)}\n`,
+  );
+}
+
 /** Saves what the MCP server's `tools/list` answered, for the mcp gate. */
 export function noteToolListing(tools: readonly string[]): void {
   writeFileSync(join(coverageDir(), `${process.pid}.mcp-tools.json`), JSON.stringify(tools));
@@ -97,6 +120,7 @@ export function noteToolListing(tools: readonly string[]): void {
 export function readRun(dir: string): {
   called: Record<Surface, Set<string>>;
   listedTools: Set<string> | null;
+  exchanges: WireExchange[];
 } {
   const called: Record<Surface, Set<string>> = {
     api: new Set(),
@@ -104,8 +128,15 @@ export function readRun(dir: string): {
     mcp: new Set(),
   };
   let listedTools: Set<string> | null = null;
+  const exchanges: WireExchange[] = [];
   for (const file of readdirSync(dir)) {
     const text = readFileSync(join(dir, file), 'utf8');
+    if (file.endsWith('.exchanges.jsonl')) {
+      for (const line of text.split('\n')) {
+        if (line) exchanges.push(JSON.parse(line) as WireExchange);
+      }
+      continue;
+    }
     if (file.endsWith('.mcp-tools.json')) {
       listedTools ??= new Set();
       for (const tool of JSON.parse(text) as string[]) listedTools.add(tool);
@@ -117,5 +148,5 @@ export function readRun(dir: string): {
       if (line) called[surface].add(line);
     }
   }
-  return { called, listedTools };
+  return { called, listedTools, exchanges };
 }

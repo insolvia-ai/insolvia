@@ -13,8 +13,11 @@ lint, typecheck, test.
 - **Models mirror the wire format exactly** (camelCase: `currentSoftware`,
   `submittedAt`); optional request fields are **omitted when absent, never
   sent as `null` or `""`**.
-- Every endpoint added to the API gets a hand-written method here **and** a
-  contract test alongside it.
+- Every endpoint added to the API gets a hand-written method here, a
+  contract test alongside it, **and** a row in `tool/openapi/api-routes.ts`
+  (then `npm run openapi`). The OpenAPI document is generated from this
+  package's types and doc comments, so a method's first doc line stays
+  "`METHOD /path` — what it does".
 - **No dependencies, runtime or dev.** Platform `fetch`, no HTTP library;
   `jest`/`typescript`/`eslint`/`prettier` come from the workspace root.
 - **No build step** — `package.json` exports `./src/index.ts`, which Metro and

@@ -2,9 +2,10 @@
 // work. Throwing here fails the run. The gates are enforced on a FULL OFFLINE
 // run only (ADR 0029 rule 2): a filtered run cannot cover everything, and the
 // deployed target skips the offline-only specs that call some methods.
-import { rmSync } from 'node:fs';
+import { rmSync, writeFileSync } from 'node:fs';
 
 import { adminClientMethods, clientMethods, coverageDir, isFiltered, readRun } from './coverage.ts';
+import { checkExchanges } from './support/openapi.ts';
 import { TARGET } from './support/target.ts';
 
 interface Gate {
@@ -22,8 +23,23 @@ function gate(label: string, unit: string, all: readonly string[], called: Set<s
 
 export default function teardown(): void {
   const dir = coverageDir();
-  const { called, listedTools } = readRun(dir);
+  const { called, listedTools, exchanges } = readRun(dir);
   rmSync(dir, { recursive: true, force: true });
+  // Every exchange the run made, for a person reading what the wire said.
+  const out = process.env.CONTRACT_EXCHANGES_OUT;
+  if (out) writeFileSync(out, exchanges.map((e) => JSON.stringify(e)).join('\n'));
+
+  // Every exchange against the OpenAPI documents (support/openapi.ts). Unlike
+  // the coverage gates this holds on any run: an exchange that happened either
+  // matches its document or it does not.
+  const openapi = checkExchanges(exchanges);
+  console.log(openapi.summary);
+  if (openapi.failures.length > 0) {
+    throw new Error(
+      `the OpenAPI documents disagree with the running hosts:\n  ${openapi.failures.join('\n  ')}\n` +
+        'Fix the route table (tool/openapi/) or the client type it names, then run `npm run openapi`.',
+    );
+  }
 
   const gates: Gate[] = [
     gate('client', 'methods', clientMethods(), called.api),

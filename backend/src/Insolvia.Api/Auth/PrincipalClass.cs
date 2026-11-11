@@ -1,3 +1,5 @@
+using Insolvia.Domain.Firms;
+
 namespace Insolvia.Api.Auth;
 
 /// <summary>
@@ -19,6 +21,16 @@ public sealed record PrincipalClass(string Name)
     /// <summary>A debtor, through the client-portal app client.</summary>
     public static readonly PrincipalClass Client = new("client");
 }
+
+/// <summary>
+/// A permission an endpoint requires, stamped by
+/// <see cref="StaffAuth.Requires{TBuilder}"/> beside its filter, so a test can
+/// read every route's requirements without calling it — the OpenAPI document
+/// states them, and <c>OpenApiDocumentTests</c> holds it to these.
+/// </summary>
+/// <param name="Feature">The feature.</param>
+/// <param name="Level">The level required.</param>
+public sealed record PermissionRequirement(Feature Feature, PermissionLevel Level);
 
 /// <summary>An <see cref="IResult"/> that writes a fixed JSON body with Flask's bare content type.</summary>
 /// <param name="Status">The status code.</param>

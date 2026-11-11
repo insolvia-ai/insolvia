@@ -52,6 +52,11 @@ jobs:
             packages/insolvia_admin_client/**
             packages/insolvia_api_client/**
             seeds/**
+            # The OpenAPI documents the suite checks every exchange against,
+            # and what generates them.
+            docs/reference/openapi/**
+            tool/render-openapi.ts
+            tool/openapi/**
             package.json
             package-lock.json
             jest.base.js
@@ -80,6 +85,12 @@ jobs:
       - name: Restore
         if: steps.filter.outputs.run == 'true'
         run: dotnet restore backend/Insolvia.slnx --locked-mode
+
+      # Before the suite: it checks exchanges against these documents, so a
+      # stale one would fail there with a less direct message.
+      - name: OpenAPI documents are current
+        if: steps.filter.outputs.run == 'true'
+        run: npm run openapi:check
 
       # Starts the stack, runs the whole suite, enforces the coverage gate,
       # stops the stack. Logs of every process print on a failure.

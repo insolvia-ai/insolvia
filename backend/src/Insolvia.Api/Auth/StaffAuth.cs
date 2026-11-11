@@ -102,6 +102,7 @@ public static class StaffAuth
         where TBuilder : IEndpointConventionBuilder
     {
         ArgumentNullException.ThrowIfNull(builder);
+        builder.WithMetadata(new PermissionRequirement(feature, level));
         return builder.AddEndpointFilter(async (invocation, next) =>
         {
             await RequirePermissionAsync(invocation.HttpContext, feature, level).ConfigureAwait(false);

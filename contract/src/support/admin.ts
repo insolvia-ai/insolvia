@@ -13,7 +13,7 @@
 import { expect } from '@jest/globals';
 import { AdminApiError, AdminClient, AdminUnauthorizedError } from '@insolvia-ai/admin-client';
 
-import { adminClientMethods, noteCall } from '../coverage.ts';
+import { adminClientMethods, noteCall, noteExchange } from '../coverage.ts';
 import { env } from './env.ts';
 import { expectShape, type Spec, withMessage } from './wire.ts';
 
@@ -27,6 +27,7 @@ export interface AdminExchange {
 
 const exchanges: AdminExchange[] = [];
 let recording = false;
+let calling = '';
 
 function urlOf(input: Parameters<typeof fetch>[0]): string {
   if (typeof input === 'string') return input;
@@ -42,11 +43,21 @@ function record(): void {
     const url = urlOf(input);
     if (url.startsWith(env.adminUrl)) {
       const text = await response.clone().text();
+      const body = text === '' ? '' : (JSON.parse(text) as unknown);
       exchanges.push({
         method: init?.method ?? 'GET',
         path: new URL(url).pathname,
         status: response.status,
-        body: text === '' ? '' : (JSON.parse(text) as unknown),
+        body,
+      });
+      noteExchange({
+        surface: 'admin',
+        call: calling,
+        method: init?.method ?? 'GET',
+        path: new URL(url).pathname,
+        status: response.status,
+        request: typeof init?.body === 'string' ? (JSON.parse(init.body) as unknown) : undefined,
+        response: text === '' ? undefined : body,
       });
     }
     return response;
@@ -65,6 +76,7 @@ export function adminClient(token: () => string): AdminClient {
       if (typeof property === 'string' && methods.has(property) && typeof value === 'function') {
         return (...args: unknown[]) => {
           noteCall('admin', property);
+          calling = property;
           return (value as (...a: unknown[]) => unknown).apply(target, args);
         };
       }

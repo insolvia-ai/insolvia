@@ -49,6 +49,8 @@ jobs:
             seeds/**
             # SeedIdTests pins its accounts to the subjects the seed derives.
             contract/stack/stack.json
+            # OpenApiDocumentTests (Api.Tests, Admin.Tests) read the documents.
+            docs/reference/openapi/*.json
             .github/workflows/backend-pr.yml
             .github/actions/changed-paths/action.yml
 
