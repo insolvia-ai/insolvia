@@ -1,4 +1,3 @@
-using System.Text.Json.Nodes;
 using Insolvia.Domain.CaseEntities;
 using Insolvia.Domain.Fields;
 
@@ -10,33 +9,20 @@ namespace Insolvia.Domain.Notes;
 /// change what an old note says. <see cref="FormSeries"/> anchors the note to
 /// a form, unvalidated against the packet. A note uses the case-entity
 /// machinery but is NOT a generic collection: server-stamped authorship,
-/// per-record edit ownership, no provenance.
+/// per-record edit ownership, no provenance. A request's author members are
+/// never trusted: <see cref="NoteRules.StampAuthor"/> overwrites them.
 /// </summary>
-public sealed record NoteBody(string? Text, string? FormSeries, string? AuthorSubject, string? AuthorName);
+public sealed record NoteBody(
+    [property: Text(2000)] string? Text = null,
+    [property: Text] string? FormSeries = null,
+    [property: Text] string? AuthorSubject = null,
+    [property: Text] string? AuthorName = null);
 
 /// <summary>The note rules.</summary>
 public static class NoteRules
 {
     /// <summary>The note kind — deliberately absent from <see cref="CaseCollections"/>.</summary>
-    public static readonly EntityKind<NoteBody> Kind = new("note", "notes", "NOTE", Parse);
-
-    /// <summary>
-    /// Validates a note body. The author members ARE read — a stored note is
-    /// rebuilt through this — but a request's are never trusted:
-    /// <see cref="StampAuthor"/> overwrites them before anything is saved.
-    /// </summary>
-    public static NoteBody Parse(JsonObject payload)
-    {
-        ArgumentNullException.ThrowIfNull(payload);
-        var errors = new Dictionary<string, string>(StringComparer.Ordinal);
-        var body = new NoteBody(
-            Text: FieldParsers.Text(payload["text"], "text", errors, limit: 2000),
-            FormSeries: FieldParsers.Text(payload["form_series"], "form_series", errors),
-            AuthorSubject: FieldParsers.Text(payload["author_subject"], "author_subject", errors),
-            AuthorName: FieldParsers.Text(payload["author_name"], "author_name", errors));
-        IdRows.ThrowIfAny(errors);
-        return body;
-    }
+    public static readonly EntityKind<NoteBody> Kind = new("note", "notes", "NOTE");
 
     /// <summary>A copy of <paramref name="body"/> carrying who wrote it — the ONE place authorship is assigned.</summary>
     public static NoteBody StampAuthor(NoteBody body, string subject, string authorName)

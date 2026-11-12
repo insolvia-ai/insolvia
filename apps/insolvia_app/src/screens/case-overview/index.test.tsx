@@ -506,16 +506,18 @@ describe('the case overview’s readiness and totals', () => {
 
   const BOB = '00000000-0000-4000-8000-00000000b0b0';
 
-  function noteRecord(overrides: Record<string, unknown> = {}) {
+  function noteRecord({ id = 'note-1', ...body }: Record<string, unknown> = {}) {
     return {
-      id: 'note-1',
-      case_id: CASE_ID,
-      created_at: '2026-09-01T10:00:00.000000Z',
-      updated_at: '2026-09-01T10:00:00.000000Z',
-      author_subject: ALICE,
-      author_name: 'Alice Attorney',
-      text: 'A note.',
-      ...overrides,
+      id,
+      caseId: CASE_ID,
+      createdAt: '2026-09-01T10:00:00.000000Z',
+      updatedAt: '2026-09-01T10:00:00.000000Z',
+      body: {
+        authorSubject: ALICE,
+        authorName: 'Alice Attorney',
+        text: 'A note.',
+        ...body,
+      },
     };
   }
 
@@ -561,7 +563,7 @@ describe('the case overview’s readiness and totals', () => {
   it('shows which form an anchored note concerns', async () => {
     withHandlers({
       [`/v1/cases/${CASE_ID}/notes`]: () =>
-        jsonResponse(200, { notes: [noteRecord({ form_series: 'form/b106g' })] }),
+        jsonResponse(200, { notes: [noteRecord({ formSeries: 'form/b106g' })] }),
     });
     await screen.findByText('Filing readiness');
 
@@ -585,12 +587,12 @@ describe('the case overview’s readiness and totals', () => {
       [`/v1/cases/${CASE_ID}/notes`]: () =>
         jsonResponse(200, {
           notes: [
-            noteRecord({ id: 'mine', text: 'My note.', author_subject: ALICE }),
+            noteRecord({ id: 'mine', text: 'My note.', authorSubject: ALICE }),
             noteRecord({
               id: 'theirs',
               text: 'Colleague’s note.',
-              author_subject: BOB,
-              author_name: 'Bob Paralegal',
+              authorSubject: BOB,
+              authorName: 'Bob Paralegal',
             }),
           ],
         }),
@@ -611,8 +613,8 @@ describe('the case overview’s readiness and totals', () => {
             noteRecord({
               id: 'theirs',
               text: 'Colleague’s note.',
-              author_subject: BOB,
-              author_name: 'Bob Paralegal',
+              authorSubject: BOB,
+              authorName: 'Bob Paralegal',
             }),
           ],
         }),

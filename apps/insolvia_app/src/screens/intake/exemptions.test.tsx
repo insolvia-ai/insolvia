@@ -26,14 +26,16 @@ const STAMP = '2026-09-01T10:00:00.000000Z';
 
 const SAVED_HOUSE = {
   id: HOUSE_ID,
-  case_id: CASE_ID,
-  created_at: STAMP,
-  updated_at: STAMP,
+  caseId: CASE_ID,
+  createdAt: STAMP,
+  updatedAt: STAMP,
+  body: {
+    category: 'real_property',
+    description: '12 Byron Court',
+    valueEntire: 300000,
+  },
   amended: false,
   provenance: { category: { source: 'staff_typed' }, description: { source: 'staff_typed' } },
-  category: 'real_property',
-  description: '12 Byron Court',
-  value_entire: '300000.00',
 };
 
 /** The literal `analysis_json` for a Florida house behind a first mortgage,
@@ -257,16 +259,18 @@ describe('the exemptions panel', () => {
         respond: () =>
           jsonResponse(201, {
             id: '00000000-0000-4000-8000-0000000000e2',
-            case_id: CASE_ID,
-            created_at: STAMP,
-            updated_at: STAMP,
+            caseId: CASE_ID,
+            createdAt: STAMP,
+            updatedAt: STAMP,
+            body: {
+              assetId: HOUSE_ID,
+              statuteCitation: 'Fla. Const. art. X, § 4(a)(1); Fla. Stat. §§ 222.01-222.02',
+              amount: 49000,
+              claimsFullFmv: false,
+              acquiredWithin1215Days: false,
+            },
             amended: false,
             provenance: {},
-            asset_id: HOUSE_ID,
-            statute_citation: 'Fla. Const. art. X, § 4(a)(1); Fla. Stat. §§ 222.01-222.02',
-            amount: '49000.00',
-            claims_full_fmv: false,
-            acquired_within_1215_days: false,
           }),
       },
     ]);
@@ -290,17 +294,19 @@ describe('the exemptions panel', () => {
 
     await waitFor(() =>
       expect(lastBody(fetchMock, 'POST', '/exemptions')).toEqual({
-        asset_id: HOUSE_ID,
-        statute_citation: 'Fla. Const. art. X, § 4(a)(1); Fla. Stat. §§ 222.01-222.02',
-        claims_full_fmv: false,
-        amount: '49000.00',
-        acquired_within_1215_days: false,
+        body: {
+          assetId: HOUSE_ID,
+          statuteCitation: 'Fla. Const. art. X, § 4(a)(1); Fla. Stat. §§ 222.01-222.02',
+          claimsFullFmv: false,
+          amount: 49000,
+          acquiredWithin1215Days: false,
+        },
         provenance: {
-          asset_id: { source: 'staff_typed' },
-          statute_citation: { source: 'staff_typed' },
-          claims_full_fmv: { source: 'staff_typed' },
+          assetId: { source: 'staff_typed' },
+          statuteCitation: { source: 'staff_typed' },
+          claimsFullFmv: { source: 'staff_typed' },
           amount: { source: 'staff_typed' },
-          acquired_within_1215_days: { source: 'staff_typed' },
+          acquiredWithin1215Days: { source: 'staff_typed' },
         },
       }),
     );
@@ -317,14 +323,16 @@ describe('the exemptions panel', () => {
         respond: () =>
           jsonResponse(201, {
             id: '00000000-0000-4000-8000-0000000000e2',
-            case_id: CASE_ID,
-            created_at: STAMP,
-            updated_at: STAMP,
+            caseId: CASE_ID,
+            createdAt: STAMP,
+            updatedAt: STAMP,
+            body: {
+              assetId: HOUSE_ID,
+              statuteCitation: 'Fla. Const. art. X, § 4(a)(1); Fla. Stat. §§ 222.01-222.02',
+              claimsFullFmv: true,
+            },
             amended: false,
             provenance: {},
-            asset_id: HOUSE_ID,
-            statute_citation: 'Fla. Const. art. X, § 4(a)(1); Fla. Stat. §§ 222.01-222.02',
-            claims_full_fmv: true,
           }),
       },
     ]);
@@ -344,8 +352,10 @@ describe('the exemptions panel', () => {
     await user.press(screen.getByRole('button', { name: 'Claim exemption' }));
 
     await waitFor(() => {
-      const body = lastBody(fetchMock, 'POST', '/exemptions');
-      expect(body.claims_full_fmv).toBe(true);
+      const { body } = lastBody(fetchMock, 'POST', '/exemptions') as {
+        body: Record<string, unknown>;
+      };
+      expect(body.claimsFullFmv).toBe(true);
       expect('amount' in body).toBe(false);
     });
   });

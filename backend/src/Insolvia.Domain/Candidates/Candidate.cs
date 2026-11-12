@@ -223,7 +223,7 @@ public static class CandidateRules
         return byTime != 0 ? byTime : string.CompareOrdinal(left.Id, right.Id);
     });
 
-    /// <summary>The payload through the target's own parser, provenance not enforced.</summary>
+    /// <summary>The payload read as the target's body and checked as a request's would be; provenance is not asked for.</summary>
     internal static void ValidatePayloadShape(string entityType, JsonObject payload)
     {
         if (entityType == Debtors)
@@ -232,7 +232,7 @@ public static class CandidateRules
             return;
         }
 
-        _ = CaseCollections.ByCollection[entityType].ParseDraft(payload, enforceProvenance: false);
+        _ = BodyJson.Read(payload, CaseCollections.ByCollection[entityType].BodyType);
     }
 
     private static ExternalRef? ParseExternalRef(JsonNode? value, int index, Dictionary<string, string> errors)

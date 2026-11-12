@@ -33,15 +33,15 @@ public static partial class ExtractionReview
     /// <summary>The link fields a CLIENT answer cannot fill and acceptance fills from the case.</summary>
     public static readonly IReadOnlyDictionary<string, string> ClientLinks = new Dictionary<string, string>(StringComparer.Ordinal)
     {
-        ["employments"] = "debtor_id",
-        ["expenses"] = "household_id",
+        ["employments"] = "debtorId",
+        ["expenses"] = "householdId",
     };
 
     /// <summary>Which reference field may carry candidate-id indirection, per entity type.</summary>
     public static readonly IReadOnlyDictionary<string, string> LinkFields = new Dictionary<string, string>(StringComparer.Ordinal)
     {
-        ["claims"] = "creditor_id",
-        ["pay_period_records"] = "employment_id",
+        ["claims"] = "creditorId",
+        ["pay_period_records"] = "employmentId",
     };
 
     private static readonly string[] ReviewActions = ["accept", "reject"];
@@ -132,21 +132,22 @@ public static partial class ExtractionReview
 
     /// <summary>
     /// The record acceptance writes: <paramref name="payload"/> (final,
-    /// reference-resolved) plus minted provenance, through the same parse every
-    /// write path uses. Which source a field gets is decided against the
-    /// CANDIDATE'S original payload, both canonicalised by the same parser.
+    /// reference-resolved) read as the kind's body, checked as a request's
+    /// would be, plus minted provenance. Which source a field gets is decided
+    /// against the CANDIDATE'S original payload, both read the same way.
     /// </summary>
-    public static IEntityDraft BuildAcceptedDraft(Candidate candidate, JsonObject payload, string confirmedBy, string confirmedAt)
+    public static (object Body, ValueDictionary<string, ProvenanceEntry> Provenance) BuildAccepted(Candidate candidate, JsonObject payload, string confirmedBy, string confirmedAt)
     {
         ArgumentNullException.ThrowIfNull(candidate);
         ArgumentNullException.ThrowIfNull(payload);
         var kind = ReviewableKind(candidate);
         var machineSource = SourceFor(candidate.Origin.Channel);
-        var body = kind.ParseDraft(payload, enforceProvenance: false).BodyNode();
+        var accepted = BodyJson.Read(payload, kind.BodyType);
+        var body = BodyJson.ToNode(accepted);
         JsonObject original;
         try
         {
-            original = kind.ParseDraft(candidate.Payload, enforceProvenance: false).BodyNode();
+            original = BodyJson.ToNode(BodyJson.Read(candidate.Payload, kind.BodyType));
         }
         catch (FieldValidationException)
         {
@@ -177,9 +178,10 @@ public static partial class ExtractionReview
             provenance[path] = entry;
         }
 
-        var withProvenance = (JsonObject)payload.DeepClone();
-        withProvenance["provenance"] = provenance;
-        return kind.ParseDraft(withProvenance);
+        // Every field covered; the server-minted sources (client_answered) are this accept's own to mint.
+        var entries = ProvenanceRules.Parse(provenance);
+        ProvenanceRules.RequireProvenance(BodyJson.ToNode(accepted), entries);
+        return (accepted, entries);
     }
 
     /// <summary>A client's answer about a debtor's own fields — accepted by MERGING into that debtor.</summary>
@@ -292,7 +294,7 @@ public static partial class ExtractionReview
             return payload;
         }
 
-        var value = field == "debtor_id" ? debtorId : householdId;
+        var value = field == "debtorId" ? debtorId : householdId;
         if (value is null)
         {
             return payload;
@@ -362,7 +364,7 @@ public static partial class ExtractionReview
         _ => true,
     };
 
-    [GeneratedRegex("^([a-z][a-z0-9_]*)")]
+    [GeneratedRegex("^([a-z][A-Za-z0-9_]*)")]
     private static partial Regex SegmentRoot();
 
     private static FieldValidationException Field(string field, string message) =>

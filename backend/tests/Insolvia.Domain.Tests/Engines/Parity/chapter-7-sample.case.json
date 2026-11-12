@@ -23,7 +23,7 @@
     "address": {
      "city": "Tampa",
      "line1": "1 Example Plaza",
-     "postal_code": "33602",
+     "postalCode": "33602",
      "state": "FL"
     },
     "name": "Example Community Bank (fictitious)"
@@ -35,7 +35,7 @@
     "address": {
      "city": "Orlando",
      "line1": "PO Box 4100",
-     "postal_code": "32801",
+     "postalCode": "32801",
      "state": "FL"
     },
     "name": "Example Card Services (fictitious)"
@@ -53,7 +53,7 @@
      "city": "Tampa",
      "county": "Hillsborough",
      "line1": "123 Fixture Street",
-     "postal_code": "33602",
+     "postalCode": "33602",
      "state": "FL"
     }
    },
@@ -77,23 +77,23 @@
  "income_summaries": [],
  "means_test_inputs": [
   {
-   "people_65_or_older": 0,
-   "people_under_65": 1
+   "people65OrOlder": 0,
+   "peopleUnder65": 1
   }
  ],
  "other_income_records": [],
  "pay_period_records": [],
  "petition": {
-  "ch7_funds_available_for_creditors": false,
-  "debt_character": "consumer",
-  "estimated_assets": "0_50000",
-  "estimated_creditors": "1_49",
-  "estimated_liabilities": "0_50000",
-  "eviction_judgment_against_you": false,
-  "expected_filing_date": "2026-08-03",
-  "fee_handling": "full",
-  "rents_residence": true,
-  "small_business_status": "not_filing_under_chapter_11"
+  "ch7FundsAvailableForCreditors": false,
+  "debtCharacter": "consumer",
+  "estimatedAssets": "0_50000",
+  "estimatedCreditors": "1_49",
+  "estimatedLiabilities": "0_50000",
+  "evictionJudgmentAgainstYou": false,
+  "expectedFilingDate": "2026-08-03",
+  "feeHandling": "full",
+  "rentsResidence": true,
+  "smallBusinessStatus": "not_filing_under_chapter_11"
  },
  "plans": [],
  "prior_cases": [],

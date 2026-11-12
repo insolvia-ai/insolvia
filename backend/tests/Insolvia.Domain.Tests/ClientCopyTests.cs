@@ -27,7 +27,7 @@ public sealed class ClientCopyTests
         {"name": {"given": "Jordan", "surname": "Example", "suffix": "Jr."},
          "other_names_used": [{"id": "alias-1", "surname": "Sample"}],
          "date_of_birth": "1980-02-29",
-         "residence_address": {"line1": "1 Example St", "city": "Springfield", "state": "IL", "postal_code": "62701", "county": "Sangamon"},
+         "residence_address": {"line1": "1 Example St", "city": "Springfield", "state": "IL", "postalCode": "62701", "county": "Sangamon"},
          "phone": "555-0100", "email": "jordan@example.test", "lead_source": "Referral"}
         """;
 
@@ -99,7 +99,7 @@ public sealed class ClientCopyTests
         Assert.Equal(("555-0100", "jordan@example.test"), (debtor.Body.Phone, debtor.Body.Email));
         var entry = new ProvenanceEntry(ProvenanceSource.Client) { ClientId = client.Id };
         Assert.Equal(
-            ["email", "name.given", "name.suffix", "name.surname", "other_names_used[alias-1].surname", "phone", "residence_address.city", "residence_address.county", "residence_address.line1", "residence_address.postal_code", "residence_address.state"],
+            ["email", "name.given", "name.suffix", "name.surname", "other_names_used[alias-1].surname", "phone", "residence_address.city", "residence_address.county", "residence_address.line1", "residence_address.postalCode", "residence_address.state"],
             debtor.Provenance.Keys.Order(StringComparer.Ordinal));
         Assert.All(debtor.Provenance.Values, value => Assert.Equal(entry, value));
     }
@@ -239,7 +239,7 @@ public sealed class ClientCopyTests
     [InlineData("name.given", "\"Jordan\"")]
     [InlineData("other_names_used[alias-1].surname", "\"Sample\"")]
     [InlineData("other_names_used[no-such-row].surname", null)]
-    [InlineData("residence_address.postal_code", "\"62701\"")]
+    [InlineData("residence_address.postalCode", "\"62701\"")]
     [InlineData("phone", "\"555-0100\"")]
     [InlineData("not_a_field", null)]
     public void A_path_resolves_to_the_value_it_names(string path, string? expected) =>

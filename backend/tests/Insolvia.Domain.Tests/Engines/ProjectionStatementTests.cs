@@ -249,7 +249,7 @@ public sealed class ProjectionStatementTests
     [Fact]
     public void B107_q4_refuses_a_period_outside_the_three_printed_years()
     {
-        var stale = new SofaEntryBody(SofaEntryType.IncomeByPeriod, new IncomeByPeriod(SofaDebtor.Debtor1, IncomeKind.WagesAndCommissions, null, new DateOnly(2020, 1, 1), null, 100.00m));
+        var stale = new SofaEntryBody(new IncomeByPeriod(SofaDebtor.Debtor1, IncomeKind.WagesAndCommissions, null, new DateOnly(2020, 1, 1), null, 100.00m));
         Assert.Contains("fits none", Refused("form/b107", Reference with { SofaEntries = [.. Reference.SofaEntries, stale] }).Message, StringComparison.Ordinal);
     }
 
@@ -286,7 +286,7 @@ public sealed class ProjectionStatementTests
     [Fact]
     public void B107_q2_both_debtors_share_a_row_via_the_same_as_boxes()
     {
-        var shared = new SofaEntryBody(SofaEntryType.PriorAddress, new PriorAddress(SofaDebtor.Both, new Address("2 Shared Street", City: "Tampa", State: "FL", PostalCode: "33601"), new DateOnly(2022, 1, 1), new DateOnly(2022, 12, 31)));
+        var shared = new SofaEntryBody(new PriorAddress(SofaDebtor.Both, new Address("2 Shared Street", City: "Tampa", State: "FL", PostalCode: "33601"), new DateOnly(2022, 1, 1), new DateOnly(2022, 12, 31)));
         var values = Project("form/b107", Reference with { SofaEntries = [shared] });
         Assert.Equal(Text("2 Shared Street"), Row(values, "form/b107", "q2_debtor1_street", 0));
         Assert.Equal(new CheckFill(), Row(values, "form/b107", "q2_debtor2_same_as_debtor1", 0));
@@ -297,7 +297,7 @@ public sealed class ProjectionStatementTests
     public void B107_q26_merged_group_needs_the_widget_escape_hatch()
     {
         Assert.Equal(Option("no"), Project("form/b107", Reference)["q26_gate_and_status"]);
-        var proceeding = new SofaEntryBody(SofaEntryType.EnvironmentalProceeding, new EnvironmentalProceeding("State of Florida v. Lovelace", "26-ENV-001", new Party("Second District Court of Appeal", new Address()), "Stormwater runoff citation appeal", LegalStatus.OnAppeal));
+        var proceeding = new SofaEntryBody(new EnvironmentalProceeding("State of Florida v. Lovelace", "26-ENV-001", new Party("Second District Court of Appeal", new Address()), "Stormwater runoff citation appeal", LegalStatus.OnAppeal));
         var values = Project("form/b107", Reference with { SofaEntries = [.. Reference.SofaEntries, proceeding] });
         Assert.Equal(WidgetStatesFill.ByStates("yes", "on appeal"), values["q26_gate_and_status"]);
         Assert.Equal(Text("26-ENV-001"), values["q26_case_number"]);
@@ -306,7 +306,7 @@ public sealed class ProjectionStatementTests
     [Fact]
     public void B107_shared_widget_boxes_refuse_a_value_they_cannot_hold()
     {
-        var second = new SofaEntryBody(SofaEntryType.ClosedAccount, new ClosedAccount(new Party("Second Bank", new Address("9 Other Road", City: "Ocala", State: "FL", PostalCode: "34470")), "7788", AccountType.Savings, null, null));
+        var second = new SofaEntryBody(new ClosedAccount(new Party("Second Bank", new Address("9 Other Road", City: "Ocala", State: "FL", PostalCode: "34470")), "7788", AccountType.Savings, null, null));
         Assert.Contains("second widget of row one", Refused("form/b107", Reference with { SofaEntries = [.. Reference.SofaEntries, second] }).Message, StringComparison.Ordinal);
     }
 
@@ -354,5 +354,5 @@ public sealed class ProjectionStatementTests
     private static CreditorPayment Payment(string creditor, decimal? total) => new(new Party(creditor, new Address()), [], total, null, [], null);
 
     private static CaseFile WithPayment(CaseFile caseFile, CreditorPayment payment) =>
-        caseFile with { SofaEntries = [.. caseFile.SofaEntries.Where(entry => entry.Payload is not CreditorPayment), new SofaEntryBody(SofaEntryType.CreditorPayment, payment)] };
+        caseFile with { SofaEntries = [.. caseFile.SofaEntries.Where(entry => entry.Payload is not CreditorPayment), new SofaEntryBody(payment)] };
 }

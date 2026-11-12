@@ -73,25 +73,25 @@ public static class WireViews
     }
 
     /// <summary>
-    /// <c>entity_json</c>: identity, provenance, <c>amended</c> (always — "not
-    /// amended" is a fact), then the pruned body.
+    /// A collection record as the API's <c>EntityView</c> has it (ADR 0032):
+    /// identity, the pruned camelCase body under <c>body</c>, provenance, and
+    /// <c>amended</c> (always — "not amended" is a fact).
     /// </summary>
     /// <param name="entity">The record.</param>
     /// <returns>The body.</returns>
     public static JsonObject Entity(ICaseEntity entity)
     {
         ArgumentNullException.ThrowIfNull(entity);
-        var body = new JsonObject
+        return new JsonObject
         {
             ["id"] = entity.Id,
-            ["case_id"] = entity.CaseId,
-            ["created_at"] = Micros(entity.CreatedAt),
-            ["updated_at"] = Micros(entity.UpdatedAt),
+            ["caseId"] = entity.CaseId,
+            ["createdAt"] = Micros(entity.CreatedAt),
+            ["updatedAt"] = Micros(entity.UpdatedAt),
+            ["body"] = BodyJson.Prune(entity.BodyNode()),
             ["provenance"] = ProvenanceRules.ToJson(entity.Provenance),
             ["amended"] = entity.Amended,
         };
-        Spread(body, BodyJson.Prune(entity.BodyNode()));
-        return body;
     }
 
     /// <summary>
@@ -167,7 +167,7 @@ public static class WireViews
             ["created_by"] = client.CreatedBy,
             ["name"] = new JsonObject(),
         };
-        Spread(body, BodyJson.Prune(BodyJson.ToNode(new FirmClientDraft(
+        Spread(body, BodyJson.Prune(BodyJson.ToSnakeNode(new FirmClientDraft(
             client.Name,
             client.OtherNamesUsed,
             client.DateOfBirth,

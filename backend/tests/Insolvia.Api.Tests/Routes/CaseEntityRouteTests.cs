@@ -12,7 +12,8 @@ namespace Insolvia.Api.Tests.Routes;
 public sealed class CaseEntityRouteTests : IAsyncLifetime, IDisposable
 {
     private const string Typed = """{"source": "staff_typed"}""";
-    private const string Creditor = """{"name": "Example Bank", "address": {"line1": "1 Example Way", "city": "Exampleville"}, "provenance": {"name": {"source": "staff_typed"}, "address.line1": {"source": "staff_typed"}, "address.city": {"source": "staff_typed"}}}""";
+    private const string Creditor = """{"body": {"name": "Example Bank", "address": {"line1": "1 Example Way", "city": "Exampleville"}}, "provenance": {"name": {"source": "staff_typed"}, "address.line1": {"source": "staff_typed"}, "address.city": {"source": "staff_typed"}}}""";
+    private const string Renamed = """{"body": {"name": "Renamed Bank"}, "provenance": {"name": {"source": "staff_typed"}}""";
 
     private readonly CaseWorld _world = new();
 
@@ -75,17 +76,16 @@ public sealed class CaseEntityRouteTests : IAsyncLifetime, IDisposable
 
         Assert.Equal(201, answer.Status);
         var record = answer.Object;
-        Assert.Equal("Example Bank", record.Str("name"));
-        Assert.Equal("""{"city":"Exampleville","line1":"1 Example Way"}""", Support.SortedJson.Serialize(record["address"]));
-        Assert.Equal(caseId, record.Str("case_id"));
+        Assert.Equal("""{"address":{"city":"Exampleville","line1":"1 Example Way"},"name":"Example Bank"}""", Support.SortedJson.Serialize(record["body"]));
+        Assert.Equal(caseId, record.Str("caseId"));
         Assert.Equal("""{"source":"staff_typed"}""", Support.SortedJson.Serialize(record["provenance"]!["name"]));
-        Assert.Equal(record.Str("created_at"), record.Str("updated_at"));
-        Assert.Equal(["address", "amended", "case_id", "created_at", "id", "name", "provenance", "updated_at"], Answer.Keys(record));
+        Assert.Equal(record.Str("createdAt"), record.Str("updatedAt"));
+        Assert.Equal(["amended", "body", "caseId", "createdAt", "id", "provenance", "updatedAt"], Answer.Keys(record));
     }
 
     [Theory]
-    [InlineData("""{"name": "Example Bank", "provenance": {}}""")]
-    [InlineData("""{"name": "Example Bank", "provenance": {"name": {"source": "ai_extracted"}}}""")]
+    [InlineData("""{"body": {"name": "Example Bank"}, "provenance": {}}""")]
+    [InlineData("""{"body": {"name": "Example Bank"}, "provenance": {"name": {"source": "ai_extracted"}}}""")]
     public async Task A_value_without_confirmed_provenance_is_a_400(string body)
     {
         var answer = await Add(await _world.OpenCaseIdAsync(), body);
@@ -100,12 +100,12 @@ public sealed class CaseEntityRouteTests : IAsyncLifetime, IDisposable
         var caseId = await _world.OpenCaseIdAsync();
         var entityId = (await Add(caseId)).Str("id");
 
-        var answer = await _world.Put($"/v1/cases/{caseId}/creditors/{entityId}", """{"name": "Renamed Bank", "provenance": {"name": {"source": "staff_typed"}}}""");
+        var answer = await _world.Put($"/v1/cases/{caseId}/creditors/{entityId}", Renamed + "}");
 
         Assert.Equal(200, answer.Status);
-        Assert.Equal(("Renamed Bank", entityId), (answer.Str("name"), answer.Str("id")));
-        Assert.False(answer.Object.ContainsKey("address"));
-        Assert.Equal(404, (await _world.Put($"/v1/cases/{caseId}/creditors/never-minted", """{"name": "Example", "provenance": {"name": {"source": "staff_typed"}}}""")).Status);
+        Assert.Equal(("Renamed Bank", entityId), (answer.Object["body"]!.AsObject().Str("name"), answer.Str("id")));
+        Assert.False(answer.Object["body"]!.AsObject().ContainsKey("address"));
+        Assert.Equal(404, (await _world.Put($"/v1/cases/{caseId}/creditors/never-minted", Renamed + "}")).Status);
     }
 
     [Fact]
@@ -129,7 +129,7 @@ public sealed class CaseEntityRouteTests : IAsyncLifetime, IDisposable
         Assert.False(created.Object["amended"]!.GetValue<bool>());
 
         Assert.Equal(409, (await Add(caseId, Creditor[..^1] + """, "amended": true}""")).Status);
-        Assert.Equal(409, (await _world.Put($"/v1/cases/{caseId}/creditors/{created.Str("id")}", """{"name": "Renamed Bank", "provenance": {"name": {"source": "staff_typed"}}, "amended": true}""")).Status);
+        Assert.Equal(409, (await _world.Put($"/v1/cases/{caseId}/creditors/{created.Str("id")}", Renamed + """, "amended": true}""")).Status);
         Assert.False((await Add(caseId, Creditor[..^1] + """, "amended": false}""")).Object["amended"]!.GetValue<bool>());
     }
 
@@ -143,7 +143,7 @@ public sealed class CaseEntityRouteTests : IAsyncLifetime, IDisposable
 
         Assert.Equal(201, answer.Status);
         Assert.True(answer.Object["amended"]!.GetValue<bool>());
-        Assert.Contains("amended", (await Add(caseId, Creditor[..^1] + """, "amended": "yes"}""")).FieldErrors);
+        Assert.Equal(400, (await Add(caseId, Creditor[..^1] + """, "amended": "yes"}""")).Status);
     }
 
     [Theory]
@@ -155,7 +155,7 @@ public sealed class CaseEntityRouteTests : IAsyncLifetime, IDisposable
         await _world.FileAsync(caseId);
         var entityId = (await Add(caseId, Creditor[..^1] + """, "amended": true}""")).Str("id");
 
-        var answer = await _world.Put($"/v1/cases/{caseId}/creditors/{entityId}", """{"name": "Renamed Bank", "provenance": {"name": {"source": "staff_typed"}}""" + sent + "}");
+        var answer = await _world.Put($"/v1/cases/{caseId}/creditors/{entityId}", Renamed + sent + "}");
 
         Assert.Equal(200, answer.Status);
         Assert.Equal(expected, answer.Object["amended"]!.GetValue<bool>());
@@ -168,8 +168,8 @@ public sealed class CaseEntityRouteTests : IAsyncLifetime, IDisposable
     {
         var caseId = await _world.OpenCaseIdAsync();
         var first = (await Add(caseId)).Str("id");
-        var second = (await Add(caseId, """{"name": "Second Bank", "provenance": {"name": """ + Typed + "}}")).Str("id");
-        var expense = await _world.Post($"/v1/cases/{caseId}/expenses", """{"category": "rent_or_home_ownership", "amount": "1800.00", "provenance": {"category": {"source": "staff_typed"}, "amount": {"source": "staff_typed"}}}""");
+        var second = (await Add(caseId, """{"body": {"name": "Second Bank"}, "provenance": {"name": """ + Typed + "}}")).Str("id");
+        var expense = await _world.Post($"/v1/cases/{caseId}/expenses", """{"body": {"category": "rent_or_home_ownership", "amount": 1800.00}, "provenance": {"category": {"source": "staff_typed"}, "amount": {"source": "staff_typed"}}}""");
         Assert.Equal(201, expense.Status);
 
         var creditors = (await _world.Get($"/v1/cases/{caseId}/creditors")).Object["creditors"]!.AsArray();
@@ -182,11 +182,10 @@ public sealed class CaseEntityRouteTests : IAsyncLifetime, IDisposable
     {
         var caseId = await _world.OpenCaseIdAsync();
 
-        var answer = await _world.Post($"/v1/cases/{caseId}/sofa_entries", """{"entry_type": "gift", "payload": {"recipient": {"name": "Example Recipient"}, "value": "700.00"}, "provenance": {"entry_type": {"source": "staff_typed"}, "payload.recipient.name": {"source": "staff_typed"}, "payload.value": {"source": "staff_typed"}}}""");
+        var answer = await _world.Post($"/v1/cases/{caseId}/sofa_entries", """{"body": {"payload": {"entryType": "gift", "recipient": {"name": "Example Recipient"}, "value": 700.00}}, "provenance": {"payload.entryType": {"source": "staff_typed"}, "payload.recipient.name": {"source": "staff_typed"}, "payload.value": {"source": "staff_typed"}}}""");
 
         Assert.Equal(201, answer.Status);
-        Assert.Equal("gift", answer.Str("entry_type"));
-        Assert.Equal("""{"recipient":{"name":"Example Recipient"},"value":"700.00"}""", Support.SortedJson.Serialize(answer.Object["payload"]));
+        Assert.Equal("""{"entryType":"gift","recipient":{"name":"Example Recipient"},"value":700.00}""", Support.SortedJson.Serialize(answer.Object["body"]!["payload"]));
     }
 
     // ── The access log ──────────────────────────────────────────────
@@ -205,7 +204,7 @@ public sealed class CaseEntityRouteTests : IAsyncLifetime, IDisposable
         Assert.Contains((AccessAction.CaseRead, AccessOutcome.Denied), outcomes);
 
         var before = _world.Events.Count;
-        Assert.Equal(400, (await Add(caseId, """{"name": 7}""")).Status);
+        Assert.Equal(400, (await Add(caseId, """{"body": {"name": 7}}""")).Status);
         Assert.Equal(before, _world.Events.Count);
     }
 

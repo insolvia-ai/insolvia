@@ -487,7 +487,7 @@ describe('the filing packet screen', () => {
                 {
                   source: 'creditors',
                   itemId: 'cred-1',
-                  field: 'address.postal_code',
+                  field: 'address.postalCode',
                   message: 'A ZIP code is required.',
                 },
                 {

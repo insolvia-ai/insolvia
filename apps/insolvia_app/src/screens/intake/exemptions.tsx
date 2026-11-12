@@ -10,8 +10,10 @@ import { Alert, Button, Checkbox, Field, Input, Select } from '@insolvia-ai/desi
 import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { bodyErrors } from '@/api/body-errors';
 import { useApi } from '@/api/use-api';
 import { Heading } from '@/components/heading';
+import { moneyOf } from '@/components/money-input';
 import { formatFormDate } from '@/screens/petition/statutory-dates';
 import { fontSizes, spacing, useTheme } from '@/theme';
 
@@ -46,7 +48,7 @@ import { formatMoney } from './liens';
  * There is deliberately NO percentage field. B106C line 2 admits a dollar
  * amount OR "100% of fair market value, up to any applicable statutory
  * limit" — those are the two boxes the form prints and the two states the
- * record holds (`amount` / `claims_full_fmv`); a percentage would be a field
+ * record holds (`amount` / `claimsFullFmv`); a percentage would be a field
  * no form reads and a second definition of the claimed amount.
  */
 
@@ -163,19 +165,25 @@ export function AssetExemptionsPanel({
         // analysis matches the claim back to. `amount` is omitted, not sent
         // as '', under the full-FMV election; the record holds one or the
         // other (docs/reference/case-data-model.md).
+        const amount = moneyOf(draft.amount);
+        if (!draft.fullFmv && draft.amount.trim() !== '' && amount === undefined) {
+          setClaimErrors({ amount: 'Enter dollars, like 1200.00.' });
+          setStatus('Some answers need attention.');
+          return;
+        }
         const body: ExemptionBody = {
-          asset_id: assetId,
-          statute_citation: entry.citation,
-          claims_full_fmv: draft.fullFmv,
-          ...(draft.fullFmv || draft.amount.trim() === '' ? {} : { amount: draft.amount.trim() }),
+          assetId: assetId,
+          statuteCitation: entry.citation,
+          claimsFullFmv: draft.fullFmv,
+          ...(draft.fullFmv || amount === undefined ? {} : { amount }),
           ...(draft.acquiredWithin1215Days === undefined
             ? {}
-            : { acquired_within_1215_days: draft.acquiredWithin1215Days }),
+            : { acquiredWithin1215Days: draft.acquiredWithin1215Days }),
         };
         const result = await call((client) =>
           client.addCaseEntity(caseId, 'exemptions', {
-            ...body,
-            provenance: staffTypedProvenance(body as unknown as Record<string, unknown>),
+            body,
+            provenance: staffTypedProvenance(body),
           }),
         );
         if (!result.ok) {
@@ -187,7 +195,7 @@ export function AssetExemptionsPanel({
         await load();
       } catch (cause) {
         if (cause instanceof ApiValidationException) {
-          setClaimErrors(cause.fields);
+          setClaimErrors(bodyErrors(cause.fields));
           setStatus('Some answers need attention.');
         } else {
           setStatus('Could not save the claim. Try again.');
@@ -386,7 +394,7 @@ export function AssetExemptionsPanel({
       {/* ── A new claim ──────────────────────────────────────────── */}
       {analysis.entries.length === 0 ? null : (
         <View style={styles.form}>
-          <Field.Root invalid={Boolean(claimErrors.statute_citation)}>
+          <Field.Root invalid={Boolean(claimErrors.statuteCitation)}>
             <Field.Label>Claim an exemption under</Field.Label>
             <Select
               options={analysis.entries.map((entry) => ({
@@ -415,8 +423,8 @@ export function AssetExemptionsPanel({
                 }`}
               </Field.Description>
             )}
-            {claimErrors.statute_citation ? (
-              <Field.Error match>{claimErrors.statute_citation}</Field.Error>
+            {claimErrors.statuteCitation ? (
+              <Field.Error match>{claimErrors.statuteCitation}</Field.Error>
             ) : null}
           </Field.Root>
 
@@ -452,7 +460,7 @@ export function AssetExemptionsPanel({
           )}
 
           {isHomestead ? (
-            <Field.Root invalid={Boolean(claimErrors.acquired_within_1215_days)}>
+            <Field.Root invalid={Boolean(claimErrors.acquiredWithin1215Days)}>
               <Field.Label>
                 {`Was this homestead acquired within 1,215 days before filing (on or after ${formatFormDate(analysis.lookbacks.section522p)})?`}
               </Field.Label>
@@ -474,8 +482,8 @@ export function AssetExemptionsPanel({
                 }
                 placeholder="Not answered"
               />
-              {claimErrors.acquired_within_1215_days ? (
-                <Field.Error match>{claimErrors.acquired_within_1215_days}</Field.Error>
+              {claimErrors.acquiredWithin1215Days ? (
+                <Field.Error match>{claimErrors.acquiredWithin1215Days}</Field.Error>
               ) : null}
             </Field.Root>
           ) : null}

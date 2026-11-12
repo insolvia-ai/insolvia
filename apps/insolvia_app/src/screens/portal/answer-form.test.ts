@@ -10,7 +10,7 @@ const VEHICLE: PortalQuestion = {
   inputs: [
     { key: 'year', label: 'Year', type: 'whole_number', required: false },
     { key: 'make', label: 'Make', type: 'text', required: true },
-    { key: 'value_entire', label: 'What it is worth today', type: 'money', required: false },
+    { key: 'valueEntire', label: 'What it is worth today', type: 'money', required: false },
   ],
 };
 
@@ -29,16 +29,16 @@ describe('the answer form', () => {
     });
   });
 
-  it('sends a whole number as a number and money without its dollar sign', () => {
-    expect(valueFrom(VEHICLE, { year: '2099', make: 'X', value_entire: '$1,200' })).toEqual({
+  it('sends a whole number and money as numbers', () => {
+    expect(valueFrom(VEHICLE, { year: '2099', make: 'X', valueEntire: '$1,200' })).toEqual({
       year: 2099,
       make: 'X',
-      value_entire: '1200',
+      valueEntire: 1200,
     });
   });
 
   it('leaves a non-number as typed so the server can say what is wrong', () => {
-    expect(valueFrom(VEHICLE, { year: 'new', make: 'X', value_entire: '' })).toEqual({
+    expect(valueFrom(VEHICLE, { year: 'new', make: 'X', valueEntire: '' })).toEqual({
       year: 'new',
       make: 'X',
     });
@@ -54,12 +54,12 @@ describe('the answer form', () => {
     expect(draftFrom(VEHICLE, { year: 2099, make: 'X' })).toEqual({
       year: '2099',
       make: 'X',
-      value_entire: '',
+      valueEntire: '',
     });
   });
 
   it('summarises an answer for its row', () => {
-    expect(summary(VEHICLE, { year: 2099, make: 'Examplecar', value_entire: '1200.00' })).toBe(
+    expect(summary(VEHICLE, { year: 2099, make: 'Examplecar', valueEntire: 1200 })).toBe(
       '2099 · Examplecar · $1200.00',
     );
   });

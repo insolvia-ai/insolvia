@@ -113,7 +113,7 @@ public static class McpTools
             "propose_case_records",
             "Propose case records",
             "Write a batch of CANDIDATE records for human review — nothing becomes case data until a person accepts it in the app. "
-                + "1-25 proposals per call, each {entityType, payload, externalRef?, note?}; payload mirrors the target entity's wire shape. "
+                + "1-25 proposals per call, each {entityType, payload, externalRef?, note?}; payload is the target collection's body as its API record carries it under `body` (camelCase, money a JSON number), or for debtors the debtor's request shape. "
                 + "Proposable entity types: " + string.Join(", ", CandidateRules.ProposableEntityTypes) + ".",
             readOnly: false,
             [CaseId, new("proposals", ArgumentKind.ObjectList)],

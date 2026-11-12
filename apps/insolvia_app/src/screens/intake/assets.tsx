@@ -23,8 +23,10 @@ import {
 import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { bodyErrors } from '@/api/body-errors';
 import { useApi } from '@/api/use-api';
 import { Heading } from '@/components/heading';
+import { MoneyInput } from '@/components/money-input';
 import { fontSizes, spacing, useTheme } from '@/theme';
 
 import { bodyOf, getAt, setAt } from './collection-editor';
@@ -283,7 +285,7 @@ export function AssetsEditor({ caseId, initialForm, onOpenCollection }: AssetsEd
       setStatus('Saving…');
       try {
         const request = {
-          ...body,
+          body,
           provenance: staffTypedProvenance(body),
         } as unknown as CaseEntityRequest<'assets'>;
         const result = await call((client) =>
@@ -313,7 +315,7 @@ export function AssetsEditor({ caseId, initialForm, onOpenCollection }: AssetsEd
         void loadTotals();
       } catch (cause) {
         if (cause instanceof ApiValidationException) {
-          setErrors(cause.fields);
+          setErrors(bodyErrors(cause.fields));
           setStatus('Some answers need attention.');
         } else {
           setStatus('Could not save. Your entries are still here — try again.');
@@ -518,7 +520,7 @@ function AssetForm({
           <TextField label="County" path="county" body={body} errors={errors} onChange={onChange} />
           <MultichoiceField
             label="What is the property?"
-            path="property_types"
+            path="propertyTypes"
             options={PROPERTY_TYPES.map((value) => ({ value, label: labelize(value) }))}
             body={body}
             errors={errors}
@@ -526,7 +528,7 @@ function AssetForm({
           />
           <TextField
             label="Nature of the ownership interest"
-            path="ownership_interest_description"
+            path="ownershipInterestDescription"
             body={body}
             errors={errors}
             onChange={onChange}
@@ -535,7 +537,14 @@ function AssetForm({
       ) : isVehicle ? (
         <>
           <View style={styles.group}>
-            <TextField label="Year" path="year" body={body} errors={errors} onChange={onChange} />
+            <TextField
+              label="Year"
+              path="year"
+              body={body}
+              errors={errors}
+              onChange={onChange}
+              whole
+            />
             <TextField
               label="Make"
               path="make"
@@ -559,6 +568,7 @@ function AssetForm({
                 body={body}
                 errors={errors}
                 onChange={onChange}
+                whole
               />
             ) : null}
           </View>
@@ -582,7 +592,7 @@ function AssetForm({
           />
           <BooleanField
             label="Do your lists include personally identifiable information (as defined in 11 U.S.C. § 101(41A))?"
-            path="includes_personal_information"
+            path="includesPersonalInformation"
             body={body}
             errors={errors}
             onChange={onChange}
@@ -651,14 +661,14 @@ function AssetForm({
       <View style={styles.group}>
         <MoneyField
           label="Current value of the entire property"
-          path="value_entire"
+          path="valueEntire"
           body={body}
           errors={errors}
           onChange={onChange}
         />
         <MoneyField
           label="Current value of the portion you own"
-          path="value_portion_owned"
+          path="valuePortionOwned"
           body={body}
           errors={errors}
           onChange={onChange}
@@ -671,15 +681,15 @@ function AssetForm({
           <SelectField
             label="Who has an interest in the property?"
             options={DEBTOR_ATTRIBUTION.map((value) => ({ value, label: labelize(value) }))}
-            value={typeof body.ownership_interest === 'string' ? body.ownership_interest : null}
+            value={typeof body.ownershipInterest === 'string' ? body.ownershipInterest : null}
             onValueChange={(next) =>
-              onChange(setAt(body, 'ownership_interest', next === '' ? undefined : next))
+              onChange(setAt(body, 'ownershipInterest', next === '' ? undefined : next))
             }
-            message={errors.ownership_interest}
+            message={errors.ownershipInterest}
           />
           <BooleanField
             label="Is this community property?"
-            path="community_property"
+            path="communityProperty"
             body={body}
             errors={errors}
             onChange={onChange}
@@ -724,6 +734,7 @@ function TextField({
   errors,
   onChange,
   required = false,
+  whole = false,
 }: {
   readonly label: string;
   readonly path: string;
@@ -731,6 +742,8 @@ function TextField({
   readonly errors: Readonly<Record<string, string>>;
   readonly onChange: (next: Body) => void;
   readonly required?: boolean;
+  /** A whole number on the wire; text that is not one is sent as typed, so the server's error lands on this box. */
+  readonly whole?: boolean;
 }) {
   const value = getAt(body, path);
   const message = errors[path];
@@ -738,8 +751,16 @@ function TextField({
     <Field.Root invalid={Boolean(message)}>
       <Field.Label>{required ? `${label} (required)` : label}</Field.Label>
       <Input
-        value={typeof value === 'string' ? value : ''}
-        onValueChange={(next) => onChange(setAt(body, path, next === '' ? undefined : next))}
+        value={typeof value === 'string' || typeof value === 'number' ? String(value) : ''}
+        onValueChange={(next) =>
+          onChange(
+            setAt(
+              body,
+              path,
+              next === '' ? undefined : whole && /^\d+$/u.test(next) ? Number(next) : next,
+            ),
+          )
+        }
         autoCorrect={false}
       />
       {message ? <Field.Error match>{message}</Field.Error> : null}
@@ -796,10 +817,9 @@ function MoneyField({
   return (
     <Field.Root invalid={Boolean(message)}>
       <Field.Label>{label}</Field.Label>
-      <Input
-        value={typeof value === 'string' ? value : ''}
-        onValueChange={(next) => onChange(setAt(body, path, next === '' ? undefined : next))}
-        autoCorrect={false}
+      <MoneyInput
+        value={typeof value === 'number' ? value : undefined}
+        onValueChange={(next) => onChange(setAt(body, path, next))}
       />
       <Field.Description>
         {description ?? 'Dollars, like 1200.00. Leave blank if unknown.'}

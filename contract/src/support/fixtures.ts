@@ -27,8 +27,10 @@ export interface FixtureCase {
 const creditorKeys = (items: readonly Record<string, unknown>[]): string[] =>
   items
     .map((item) => {
-      const address = (item.address ?? {}) as Record<string, unknown>;
-      return `${String(item.name)}|${String(address.postal_code)}`;
+      // A seed item and an entity view both nest the creditor under `body`.
+      const body = (item.body ?? {}) as Record<string, unknown>;
+      const address = (body.address ?? {}) as Record<string, unknown>;
+      return `${String(body.name)}|${String(address.postalCode)}`;
     })
     .sort();
 

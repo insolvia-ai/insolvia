@@ -154,12 +154,14 @@ describe('the creditor matrix screen', () => {
           creditors: [
             {
               id: CREDITOR_ID,
-              case_id: CASE_ID,
-              created_at: '2026-09-01T10:00:00.000000Z',
-              updated_at: '2026-09-01T10:00:00.000000Z',
+              caseId: CASE_ID,
+              createdAt: '2026-09-01T10:00:00.000000Z',
+              updatedAt: '2026-09-01T10:00:00.000000Z',
+              body: {
+                name: 'Example Bank',
+              },
               amended: false,
               provenance: { name: { source: 'staff_typed' } },
-              name: 'Example Bank',
             },
           ],
         }),
@@ -176,7 +178,7 @@ describe('the creditor matrix screen', () => {
             },
             {
               creditorId: CREDITOR_ID,
-              field: 'address.postal_code',
+              field: 'address.postalCode',
               message: 'A ZIP code is required.',
             },
             {

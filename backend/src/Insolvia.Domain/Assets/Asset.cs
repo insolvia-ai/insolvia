@@ -1,4 +1,3 @@
-using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using Insolvia.Domain.CaseEntities;
 using Insolvia.Domain.Fields;
@@ -12,55 +11,37 @@ namespace Insolvia.Domain.Assets;
 /// for their categories, but that is a completeness fact, not a shape rule.
 /// </summary>
 public sealed record AssetBody(
-    AssetCategory? Category,
-    ValueCollection<PropertyType> PropertyTypes,
-    string? Description,
-    string? County,
-    decimal? ValueEntire,
-    decimal? ValuePortionOwned,
-    DebtorAttribution? OwnershipInterest,
-    string? OwnershipInterestDescription,
-    bool? CommunityProperty,
-    string? Detail,
-    int? Year,
-    string? Make,
-    string? Model,
-    int? Mileage,
-    bool? IncludesPersonalInformation);
+    AssetCategory? Category = null,
+    ValueCollection<PropertyType>? PropertyTypes = null,
+    [property: Narrative] string? Description = null,
+    [property: Text] string? County = null,
+    [property: Money] decimal? ValueEntire = null,
+    [property: Money] decimal? ValuePortionOwned = null,
+    DebtorAttribution? OwnershipInterest = null,
+    [property: Text(500)] string? OwnershipInterestDescription = null,
+    bool? CommunityProperty = null,
+    [property: Narrative] string? Detail = null,
+    [property: Count(AssetRules.MaxVehicleYear)] int? Year = null,
+    [property: Text(60)] string? Make = null,
+    [property: Text(60)] string? Model = null,
+    [property: Count(AssetRules.MaxMileage)] int? Mileage = null,
+    bool? IncludesPersonalInformation = null)
+{
+    /// <summary>106A/B line 1's "what is the property" checkboxes.</summary>
+    public ValueCollection<PropertyType> PropertyTypes { get; init; } = PropertyTypes ?? [];
+}
 
 /// <summary>The asset collection.</summary>
 public static class AssetRules
 {
+    /// <summary>The latest model year a vehicle may carry.</summary>
+    public const int MaxVehicleYear = 2100;
+
+    /// <summary>The highest odometer reading.</summary>
+    public const int MaxMileage = 999_999;
+
     /// <summary>The collection's kind.</summary>
-    public static readonly EntityKind<AssetBody> Kind = new("asset", "assets", "ASSET", Parse);
-
-    private const int MaxVehicleYear = 2100;
-    private const int MaxMileage = 999_999;
-
-    /// <summary>Validates an asset body (Python's <c>parse_asset</c>).</summary>
-    public static AssetBody Parse(JsonObject payload)
-    {
-        ArgumentNullException.ThrowIfNull(payload);
-        var errors = new Dictionary<string, string>(StringComparer.Ordinal);
-        var body = new AssetBody(
-            Category: FieldParsers.Choice<AssetCategory>(payload["category"], "category", errors),
-            PropertyTypes: FieldParsers.ChoiceList<PropertyType>(payload["property_types"], "property_types", errors),
-            Description: FieldParsers.Narrative(payload["description"], "description", errors),
-            County: FieldParsers.Text(payload["county"], "county", errors),
-            ValueEntire: FieldParsers.Money(payload["value_entire"], "value_entire", errors),
-            ValuePortionOwned: FieldParsers.Money(payload["value_portion_owned"], "value_portion_owned", errors),
-            OwnershipInterest: FieldParsers.Choice<DebtorAttribution>(payload["ownership_interest"], "ownership_interest", errors),
-            OwnershipInterestDescription: FieldParsers.Text(payload["ownership_interest_description"], "ownership_interest_description", errors, limit: 500),
-            CommunityProperty: FieldParsers.Boolean(payload["community_property"], "community_property", errors),
-            Detail: FieldParsers.Narrative(payload["detail"], "detail", errors),
-            Year: FieldParsers.WholeNumber(payload["year"], "year", errors, maximum: MaxVehicleYear),
-            Make: FieldParsers.Text(payload["make"], "make", errors, limit: 60),
-            Model: FieldParsers.Text(payload["model"], "model", errors, limit: 60),
-            Mileage: FieldParsers.WholeNumber(payload["mileage"], "mileage", errors, maximum: MaxMileage),
-            IncludesPersonalInformation: FieldParsers.Boolean(payload["includes_personal_information"], "includes_personal_information", errors));
-        IdRows.ThrowIfAny(errors);
-        return body;
-    }
+    public static readonly EntityKind<AssetBody> Kind = new("asset", "assets", "ASSET");
 }
 
 /// <summary>A Schedule A/B line's subject (Python's <c>ASSET_CATEGORIES</c>), named for what the line asks about.</summary>

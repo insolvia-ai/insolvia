@@ -8,6 +8,7 @@ import { Button } from '@insolvia-ai/design-system';
 import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { bodyErrors } from '@/api/body-errors';
 import { useApi } from '@/api/use-api';
 import { CaseColumn, useCase } from '@/components/case-shell';
 import { Heading } from '@/components/heading';
@@ -56,19 +57,6 @@ type LoadState =
   | { readonly kind: 'ready' }
   | { readonly kind: 'error'; readonly message: string };
 
-function bodyOf(record: Record<string, unknown>): PetitionBody {
-  const {
-    id: _id,
-    case_id: _caseId,
-    created_at: _created,
-    updated_at: _updated,
-    provenance: _provenance,
-    amended: _amended,
-    ...body
-  } = record;
-  return body as PetitionBody;
-}
-
 export function Petition() {
   const theme = useTheme();
   const { call } = useApi();
@@ -103,7 +91,7 @@ export function Petition() {
         const first = result.value[0];
         if (first !== undefined) {
           setPetitionId(first.id);
-          setBody(bodyOf(first as unknown as Record<string, unknown>));
+          setBody(first.body);
         }
         setLoad({ kind: 'ready' });
       } catch {
@@ -156,11 +144,11 @@ export function Petition() {
   useEffect(() => {
     if (load.kind !== 'ready') return;
     setManualCreditors(
-      body.estimated_creditors !== undefined && body.estimated_creditors !== derivedCreditors,
+      body.estimatedCreditors !== undefined && body.estimatedCreditors !== derivedCreditors,
     );
-    setManualAssets(body.estimated_assets !== undefined && body.estimated_assets !== derivedAssets);
+    setManualAssets(body.estimatedAssets !== undefined && body.estimatedAssets !== derivedAssets);
     setManualLiabilities(
-      body.estimated_liabilities !== undefined && body.estimated_liabilities !== derivedLiabilities,
+      body.estimatedLiabilities !== undefined && body.estimatedLiabilities !== derivedLiabilities,
     );
     // Deliberately NOT re-run when the derived values themselves change —
     // see the comment above. Only the load transition matters here.
@@ -172,25 +160,25 @@ export function Petition() {
   useEffect(() => {
     if (manualCreditors) return;
     setBody((current) =>
-      current.estimated_creditors === derivedCreditors
+      current.estimatedCreditors === derivedCreditors
         ? current
-        : { ...current, estimated_creditors: derivedCreditors },
+        : { ...current, estimatedCreditors: derivedCreditors },
     );
   }, [manualCreditors, derivedCreditors]);
   useEffect(() => {
     if (manualAssets) return;
     setBody((current) =>
-      current.estimated_assets === derivedAssets
+      current.estimatedAssets === derivedAssets
         ? current
-        : { ...current, estimated_assets: derivedAssets },
+        : { ...current, estimatedAssets: derivedAssets },
     );
   }, [manualAssets, derivedAssets]);
   useEffect(() => {
     if (manualLiabilities) return;
     setBody((current) =>
-      current.estimated_liabilities === derivedLiabilities
+      current.estimatedLiabilities === derivedLiabilities
         ? current
-        : { ...current, estimated_liabilities: derivedLiabilities },
+        : { ...current, estimatedLiabilities: derivedLiabilities },
     );
   }, [manualLiabilities, derivedLiabilities]);
 
@@ -198,14 +186,7 @@ export function Petition() {
     setSaving(true);
     setStatus('Saving…');
     try {
-      // `PetitionBody` is a strict interface, not `Record<string, unknown>`
-      // (TypeScript gives a type alias an implicit index signature but not an
-      // interface), so it needs the same cast `CollectionEditor` makes for
-      // every descriptor-driven body — the server re-validates either way.
-      const request = {
-        ...body,
-        provenance: staffTypedProvenance(body as unknown as Record<string, unknown>),
-      };
+      const request = { body, provenance: staffTypedProvenance(body) };
       const result = await call((client) =>
         petitionId === null
           ? client.addCaseEntity(caseId, 'petitions', request)
@@ -216,12 +197,12 @@ export function Petition() {
         return;
       }
       setPetitionId(result.value.id);
-      setBody(bodyOf(result.value as unknown as Record<string, unknown>));
+      setBody(result.value.body);
       setErrors({});
       setStatus('Saved');
     } catch (cause) {
       if (cause instanceof ApiValidationException) {
-        setErrors(cause.fields);
+        setErrors(bodyErrors(cause.fields));
         setStatus('Some answers need attention.');
       } else {
         setStatus('Could not save. Your entries are still here — try again.');
@@ -232,7 +213,7 @@ export function Petition() {
   };
 
   const muted = { color: theme.colors.muted, fontFamily: theme.typography.body };
-  const dates = statutoryDates(body.expected_filing_date);
+  const dates = statutoryDates(body.expectedFilingDate);
 
   return (
     <CaseColumn>

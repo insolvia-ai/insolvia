@@ -1,7 +1,7 @@
 /**
  * The two statutory dates the petition screen computes from the case's
  * expected filing date (issue #342). Neither is stored — they are arithmetic
- * over `PetitionBody.expected_filing_date`, recomputed whenever that date
+ * over `PetitionBody.expectedFilingDate`, recomputed whenever that date
  * changes, the same "derived values are computed, never stored" rule
  * docs/reference/case-data-model.md states for every schedule total.
  *

@@ -1,19 +1,17 @@
 /**
  * Exact decimal-string money arithmetic, integer cents underneath.
  *
- * Every money value on the wire is a two-decimal STRING (never a JSON
- * number — see `packages/insolvia_api_client/src/models.ts`'s repeated
- * warning). `Number(value)` on a decimal string reintroduces the float
- * imprecision the string was chosen to avoid, so every sum in this screen
- * goes through here instead: parse to integer cents by splitting the
- * string, add as integers, format back. No `Number()` anywhere in the path.
+ * A view's money is a two-decimal STRING; a collection body's is a JSON
+ * number (ADR 0032). Either is turned into integer cents here, added as
+ * integers and formatted back, so a sum never accumulates float error.
  */
 
-/** A money string ("1200.00", "-45.50") to integer cents. Absent, blank, or
- * unparseable is treated as zero — the same "blank box claims nothing"
- * reading the server's own `_entered()` helpers use. */
-export function toCents(value: string | undefined): number {
+/** A money string ("1200.00", "-45.50") or a body's number to integer cents.
+ * Absent, blank, or unparseable is treated as zero — the same "blank box
+ * claims nothing" reading the server's own `_entered()` helpers use. */
+export function toCents(value: string | number | undefined): number {
   if (value === undefined) return 0;
+  if (typeof value === 'number') return Number.isFinite(value) ? Math.round(value * 100) : 0;
   const trimmed = value.trim();
   if (trimmed === '') return 0;
   const negative = trimmed.startsWith('-');
@@ -37,7 +35,7 @@ export function fromCents(cents: number): string {
   return `${negative ? '-' : ''}${whole}.${remainder}`;
 }
 
-/** Sums a list of money strings exactly. */
-export function sumMoney(values: readonly (string | undefined)[]): string {
-  return fromCents(values.reduce((total, value) => total + toCents(value), 0));
+/** Sums a list of money values exactly. */
+export function sumMoney(values: readonly (string | number | undefined)[]): string {
+  return fromCents(values.reduce<number>((total, value) => total + toCents(value), 0));
 }

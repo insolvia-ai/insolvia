@@ -1,4 +1,3 @@
-using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using Insolvia.Domain.CaseEntities;
 using Insolvia.Domain.Fields;
@@ -12,32 +11,21 @@ namespace Insolvia.Domain.ContractLeases;
 /// the lease because the fact is the lease's (issue #347).
 /// </summary>
 public sealed record ContractLeaseBody(
-    string? CounterpartyName,
-    Address CounterpartyAddress,
-    string? Description,
-    ContractLeaseIntention? Intention,
-    bool? ListOnStatementOfIntention);
+    [property: Text] string? CounterpartyName = null,
+    Address? CounterpartyAddress = null,
+    [property: Narrative] string? Description = null,
+    ContractLeaseIntention? Intention = null,
+    bool? ListOnStatementOfIntention = null)
+{
+    /// <summary>The counterparty's address; an empty one when none was given.</summary>
+    public Address CounterpartyAddress { get; init; } = CounterpartyAddress ?? new();
+}
 
 /// <summary>The contract-and-lease collection.</summary>
 public static class ContractLeaseRules
 {
     /// <summary>The collection's kind.</summary>
-    public static readonly EntityKind<ContractLeaseBody> Kind = new("contract_lease", "contract_leases", "CONTRACT_LEASE", Parse);
-
-    /// <summary>Validates a contract-or-lease body (Python's <c>parse_contract_lease</c>).</summary>
-    public static ContractLeaseBody Parse(JsonObject payload)
-    {
-        ArgumentNullException.ThrowIfNull(payload);
-        var errors = new Dictionary<string, string>(StringComparer.Ordinal);
-        var body = new ContractLeaseBody(
-            CounterpartyName: FieldParsers.Text(payload["counterparty_name"], "counterparty_name", errors),
-            CounterpartyAddress: FieldParsers.ParseAddress(payload["counterparty_address"], "counterparty_address", errors),
-            Description: FieldParsers.Narrative(payload["description"], "description", errors),
-            Intention: FieldParsers.Choice<ContractLeaseIntention>(payload["intention"], "intention", errors),
-            ListOnStatementOfIntention: FieldParsers.Boolean(payload["list_on_statement_of_intention"], "list_on_statement_of_intention", errors));
-        IdRows.ThrowIfAny(errors);
-        return body;
-    }
+    public static readonly EntityKind<ContractLeaseBody> Kind = new("contract_lease", "contract_leases", "CONTRACT_LEASE");
 }
 
 /// <summary>Form 108's assume-or-reject for a lease (Python's <c>CONTRACT_LEASE_INTENTIONS</c>).</summary>

@@ -2854,7 +2854,7 @@ describe('putDebtor', () => {
       name: { given: 'Ada', middle: 'Augusta', surname: 'Lovelace', suffix: 'Jr.' },
       other_names_used: [{ id: 'n1', given: 'Ada', business_name: 'Analytical Engines' }],
       employer_ids: ['12-3456789'],
-      residence_address: { line1: '1 Main St', line2: 'Apt 2', postal_code: '19801' },
+      residence_address: { line1: '1 Main St', line2: 'Apt 2', postalCode: '19801' },
       mailing_address: { city: 'Wilmington' },
       phone: '302-555-0100',
       mobile: '302-555-0101',
@@ -2868,7 +2868,7 @@ describe('putDebtor', () => {
       name: { given: 'Ada', middle: 'Augusta', surname: 'Lovelace', suffix: 'Jr.' },
       other_names_used: [{ id: 'n1', given: 'Ada', business_name: 'Analytical Engines' }],
       employer_ids: ['12-3456789'],
-      residence_address: { line1: '1 Main St', line2: 'Apt 2', postal_code: '19801' },
+      residence_address: { line1: '1 Main St', line2: 'Apt 2', postalCode: '19801' },
       mailing_address: { city: 'Wilmington' },
       phone: '302-555-0100',
       mobile: '302-555-0101',
@@ -3693,7 +3693,7 @@ describe('staffTypedProvenance', () => {
     // These would otherwise produce a REQUIRED path that the server's
     // provenance parser then refuses as a key: no payload could satisfy both,
     // and the caller would be left with a 400 they could not fix.
-    for (const key of ['SSN', 'legalName', '1099_income', 'case-number', '']) {
+    for (const key of ['SSN', 'LegalName', '1099_income', 'case-number', '']) {
       expect(() => staffTypedProvenance({ [key]: 'value' })).toThrow(/not a field name/);
     }
   });
@@ -4237,7 +4237,7 @@ describe('the firm record', () => {
   // PATCH is the clear instruction, sent as such.
   const LETTERHEAD = {
     name: 'Example & Partners, P.A.',
-    address: { line1: '1 Main St', city: 'Tampa', state: 'FL', postal_code: '33602' },
+    address: { line1: '1 Main St', city: 'Tampa', state: 'FL', postalCode: '33602' },
     phone: '813-555-0100',
     email: 'office@example.test',
   };
@@ -4352,7 +4352,7 @@ describe('signature blocks (issue #360)', () => {
     bar_number: '0123456',
     bar_state: 'FL',
     firm_name: 'Example & Partners',
-    address: { line1: '1 Main St', city: 'Tampa', state: 'FL', postal_code: '33602' },
+    address: { line1: '1 Main St', city: 'Tampa', state: 'FL', postalCode: '33602' },
     phone: '813-555-0100',
     email: 'alice@example.test',
   };
@@ -4804,7 +4804,7 @@ describe('the library creditor endpoints', () => {
   const CREDITOR_JSON = {
     id: CREDITOR_ID,
     name: 'Acme Collections',
-    address: { line1: '1 Main St', city: 'Springfield', state: 'IL', postal_code: '62701' },
+    address: { line1: '1 Main St', city: 'Springfield', state: 'IL', postalCode: '62701' },
     additional_notice_parties: [
       { id: 'np1', name: 'Legal Dept', address: {}, account_last4: '1234' },
     ],
@@ -4816,7 +4816,7 @@ describe('the library creditor endpoints', () => {
   const CREDITOR: LibraryCreditor = {
     id: CREDITOR_ID,
     name: 'Acme Collections',
-    address: { line1: '1 Main St', city: 'Springfield', state: 'IL', postal_code: '62701' },
+    address: { line1: '1 Main St', city: 'Springfield', state: 'IL', postalCode: '62701' },
     additional_notice_parties: [
       { id: 'np1', name: 'Legal Dept', address: {}, account_last4: '1234' },
     ],
@@ -4849,7 +4849,7 @@ describe('the library creditor endpoints', () => {
 
     const created = await client.addLibraryCreditor({
       name: 'Acme Collections',
-      address: { line1: '1 Main St', city: 'Springfield', state: 'IL', postal_code: '62701' },
+      address: { line1: '1 Main St', city: 'Springfield', state: 'IL', postalCode: '62701' },
       additional_notice_parties: [{ id: 'np1', name: 'Legal Dept', account_last4: '1234' }],
       preferred: true,
       notes: 'Reach the legal department directly.',
@@ -4859,7 +4859,7 @@ describe('the library creditor endpoints', () => {
     expect(stub.lastRequest().method).toBe('POST');
     expect(JSON.parse(stub.lastRequest().body as string)).toEqual({
       name: 'Acme Collections',
-      address: { line1: '1 Main St', city: 'Springfield', state: 'IL', postal_code: '62701' },
+      address: { line1: '1 Main St', city: 'Springfield', state: 'IL', postalCode: '62701' },
       additional_notice_parties: [{ id: 'np1', name: 'Legal Dept', account_last4: '1234' }],
       preferred: true,
       notes: 'Reach the legal department directly.',
@@ -6215,31 +6215,28 @@ describe('tasks', () => {
 // The generic case-collection endpoints (issue #249) are pinned against
 // services/api/src/insolvia_api/api/routes/case_entities.py and
 // .../core/{case_entities,case_collections,creditors,claims,sofa,...}.py.
-// The bodies follow the debtor rules exactly: snake_case, absent means
-// absent, provenance always present on a response and required per populated
-// field on a request.
+// ADR 0032: the request nests the camelCase body beside its provenance, and
+// the response is an EntityView — identity, body, provenance, amended.
 const ENTITY_CASE_ID = 'b4e2f0a1-5c3d-4e2f-8b90-7d9f1e2a3b4c';
 const ENTITY_ID = '8dae7780-8536-41ef-a55c-f180d2a01bf8';
 
-/** A saved creditor as `entity_json` builds it. */
+/** A saved creditor as `EntityView` carries it. */
 const CREDITOR_RECORD = {
   id: ENTITY_ID,
-  case_id: ENTITY_CASE_ID,
-  created_at: '2026-09-01T10:00:00.123456Z',
-  updated_at: '2026-09-01T10:00:00.123456Z',
+  caseId: ENTITY_CASE_ID,
+  createdAt: '2026-09-01T10:00:00.123456Z',
+  updatedAt: '2026-09-01T10:00:00.123456Z',
+  body: { name: 'Example Bank', address: { line1: '1 Example Way' } },
   provenance: {
     name: { source: 'staff_typed' },
     'address.line1': { source: 'staff_typed' },
   },
   amended: false,
-  name: 'Example Bank',
-  address: { line1: '1 Example Way' },
 };
 
 describe('addCaseEntity', () => {
   const REQUEST = {
-    name: 'Example Bank',
-    address: { line1: '1 Example Way' },
+    body: { name: 'Example Bank', address: { line1: '1 Example Way' } },
     provenance: {
       name: { source: 'staff_typed' },
       'address.line1': { source: 'staff_typed' },
@@ -6261,8 +6258,7 @@ describe('addCaseEntity', () => {
     expect(seen.headers.get('authorization')).toBe(`Bearer ${ACCESS_TOKEN}`);
     expect(seen.headers.get('content-type')).toMatch(/^application\/json/);
     expect(JSON.parse(seen.body)).toEqual({
-      name: 'Example Bank',
-      address: { line1: '1 Example Way' },
+      body: { name: 'Example Bank', address: { line1: '1 Example Way' } },
       provenance: REQUEST.provenance,
     });
     expect(saved).toEqual(CREDITOR_RECORD);
@@ -6278,14 +6274,12 @@ describe('addCaseEntity', () => {
     });
 
     await client.addCaseEntity(ENTITY_CASE_ID, 'claims', {
-      creditor_id: undefined,
-      contingent: false,
-      notice_parties: [],
+      body: { creditorId: undefined, contingent: false, noticeParties: [] },
       provenance: { contingent: { source: 'staff_typed' } },
     });
 
     expect(JSON.parse(stub.lastRequest().body)).toEqual({
-      contingent: false,
+      body: { contingent: false },
       provenance: { contingent: { source: 'staff_typed' } },
     });
   });
@@ -6293,18 +6287,19 @@ describe('addCaseEntity', () => {
   test('a sofa entry sends its typed payload verbatim', async () => {
     const RECORD = {
       id: ENTITY_ID,
-      case_id: ENTITY_CASE_ID,
-      created_at: '2026-09-01T10:00:00.123456Z',
-      updated_at: '2026-09-01T10:00:00.123456Z',
+      caseId: ENTITY_CASE_ID,
+      createdAt: '2026-09-01T10:00:00.123456Z',
+      updatedAt: '2026-09-01T10:00:00.123456Z',
+      body: {
+        payload: { entryType: 'gift', recipient: { name: 'Example Recipient' }, value: 700 },
+      },
       provenance: {
-        entry_type: { source: 'staff_typed' },
+        'payload.entryType': { source: 'staff_typed' },
         'payload.recipient.name': { source: 'staff_typed' },
         'payload.value': { source: 'staff_typed' },
       },
       amended: false,
-      entry_type: 'gift',
-      payload: { recipient: { name: 'Example Recipient' }, value: '700.00' },
-    };
+    } as const;
     const stub = stubFetch(() => jsonResponse(RECORD, 201));
     const client = new InsolviaApiClient(BASE_URL, {
       fetch: stub.fetch,
@@ -6312,18 +6307,16 @@ describe('addCaseEntity', () => {
     });
 
     const saved = await client.addCaseEntity(ENTITY_CASE_ID, 'sofa_entries', {
-      entry_type: 'gift',
-      payload: { recipient: { name: 'Example Recipient' }, value: '700.00' },
-      provenance: {
-        entry_type: { source: 'staff_typed' },
-        'payload.recipient.name': { source: 'staff_typed' },
-        'payload.value': { source: 'staff_typed' },
+      body: {
+        payload: { entryType: 'gift', recipient: { name: 'Example Recipient' }, value: 700 },
       },
+      provenance: RECORD.provenance,
     });
 
-    expect(JSON.parse(stub.lastRequest().body).payload).toEqual({
+    expect(JSON.parse(stub.lastRequest().body).body.payload).toEqual({
+      entryType: 'gift',
       recipient: { name: 'Example Recipient' },
-      value: '700.00',
+      value: 700,
     });
     expect(saved).toEqual(RECORD);
   });
@@ -6400,7 +6393,7 @@ describe('addCaseEntity', () => {
     });
 
     const error = asApiValidationException(
-      await rejection(client.addCaseEntity(ENTITY_CASE_ID, 'creditors', { name: 'X' })),
+      await rejection(client.addCaseEntity(ENTITY_CASE_ID, 'creditors', { body: { name: 'X' } })),
     );
     expect(error.fields['provenance.name']).toBe('This field has a value but no provenance.');
   });
@@ -6411,13 +6404,14 @@ describe('addCaseEntity', () => {
     // (attributed whole, the employer_ids rule).
     const body = {
       name: 'Example Cosigner',
-      address: { city: 'Exampleville' },
-      claim_ids: ['cl-1', 'cl-2'],
+      address: { city: 'Exampleville', postalCode: '00000' },
+      claimIds: ['cl-1', 'cl-2'],
     };
     expect(staffTypedProvenance(body)).toEqual({
       name: { source: 'staff_typed' },
       'address.city': { source: 'staff_typed' },
-      claim_ids: { source: 'staff_typed' },
+      'address.postalCode': { source: 'staff_typed' },
+      claimIds: { source: 'staff_typed' },
     });
   });
 });
@@ -6479,7 +6473,7 @@ describe('getCaseEntity / putCaseEntity / deleteCaseEntity', () => {
   });
 
   test('PUTs the whole record and maps the 200', async () => {
-    const renamed = { ...CREDITOR_RECORD, name: 'Renamed Bank' };
+    const renamed = { ...CREDITOR_RECORD, body: { ...CREDITOR_RECORD.body, name: 'Renamed Bank' } };
     const stub = stubFetch(() => jsonResponse(renamed, 200));
     const client = new InsolviaApiClient(BASE_URL, {
       fetch: stub.fetch,
@@ -6487,8 +6481,7 @@ describe('getCaseEntity / putCaseEntity / deleteCaseEntity', () => {
     });
 
     const saved = await client.putCaseEntity(ENTITY_CASE_ID, 'creditors', ENTITY_ID, {
-      name: 'Renamed Bank',
-      address: { line1: '1 Example Way' },
+      body: { name: 'Renamed Bank', address: { line1: '1 Example Way' } },
       provenance: {
         name: { source: 'staff_typed' },
         'address.line1': { source: 'staff_typed' },
@@ -6511,7 +6504,9 @@ describe('getCaseEntity / putCaseEntity / deleteCaseEntity', () => {
     });
 
     const error = asApiException(
-      await rejection(client.putCaseEntity(ENTITY_CASE_ID, 'creditors', 'never-minted', {})),
+      await rejection(
+        client.putCaseEntity(ENTITY_CASE_ID, 'creditors', 'never-minted', { body: {} }),
+      ),
     );
     expect(error.statusCode).toBe(404);
   });
@@ -6544,18 +6539,20 @@ describe('getCaseEntity / putCaseEntity / deleteCaseEntity', () => {
   });
 });
 
-// Notes (issue 14.5 / #357). `note_json` never carries a `provenance` key —
+// Notes (issue 14.5 / #357). A `NoteView` never carries a `provenance` key —
 // unlike CREDITOR_RECORD above, so the contract below pins its absence, not
 // just its presence with a particular shape.
 const NOTE_RECORD = {
   id: '3fbb3f0a-8e2e-4a3f-9f9e-9b6f6b2d5a1e',
-  case_id: ENTITY_CASE_ID,
-  created_at: '2026-09-01T10:00:00.123456Z',
-  updated_at: '2026-09-01T10:00:00.123456Z',
-  author_subject: '00000000-0000-4000-8000-00000000a11c',
-  author_name: 'Alice Attorney',
-  text: 'Called the client about the car loan.',
-  form_series: 'form/b106g',
+  caseId: ENTITY_CASE_ID,
+  createdAt: '2026-09-01T10:00:00.123456Z',
+  updatedAt: '2026-09-01T10:00:00.123456Z',
+  body: {
+    text: 'Called the client about the car loan.',
+    formSeries: 'form/b106g',
+    authorSubject: '00000000-0000-4000-8000-00000000a11c',
+    authorName: 'Alice Attorney',
+  },
 };
 
 describe('addNote', () => {
@@ -6568,7 +6565,7 @@ describe('addNote', () => {
 
     const saved = await client.addNote(ENTITY_CASE_ID, {
       text: 'Called the client about the car loan.',
-      form_series: 'form/b106g',
+      formSeries: 'form/b106g',
     });
 
     const seen = stub.lastRequest();
@@ -6577,16 +6574,18 @@ describe('addNote', () => {
     expect(seen.headers.get('authorization')).toBe(`Bearer ${ACCESS_TOKEN}`);
     expect(JSON.parse(seen.body)).toEqual({
       text: 'Called the client about the car loan.',
-      form_series: 'form/b106g',
+      formSeries: 'form/b106g',
     });
     // There is no author field on the request at all — nothing to omit,
     // nothing to spoof. The server stamps it.
-    expect(Object.keys(JSON.parse(seen.body))).not.toContain('author_subject');
+    expect(Object.keys(JSON.parse(seen.body))).not.toContain('authorSubject');
     expect(saved).toEqual(NOTE_RECORD);
   });
 
-  test('a case-level note omits form_series from the request', async () => {
-    const stub = stubFetch(() => jsonResponse({ ...NOTE_RECORD, form_series: undefined }, 201));
+  test('a case-level note omits formSeries from the request', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse({ ...NOTE_RECORD, body: { ...NOTE_RECORD.body, formSeries: undefined } }, 201),
+    );
     const client = new InsolviaApiClient(BASE_URL, {
       fetch: stub.fetch,
       accessToken: () => ACCESS_TOKEN,
@@ -6616,7 +6615,7 @@ describe('listNotes', () => {
 
 describe('putNote / deleteNote', () => {
   test('PUTs the whole note and maps the 200', async () => {
-    const edited = { ...NOTE_RECORD, text: 'Corrected note.' };
+    const edited = { ...NOTE_RECORD, body: { ...NOTE_RECORD.body, text: 'Corrected note.' } };
     const stub = stubFetch(() => jsonResponse(edited, 200));
     const client = new InsolviaApiClient(BASE_URL, {
       fetch: stub.fetch,
@@ -6632,7 +6631,7 @@ describe('putNote / deleteNote', () => {
     expect(seen.url).toBe(`${BASE_URL}/v1/cases/${ENTITY_CASE_ID}/notes/${NOTE_RECORD.id}`);
     expect(saved).toEqual(edited);
     // Authorship is unaffected — the server keeps the stored author.
-    expect(saved.author_subject).toBe(NOTE_RECORD.author_subject);
+    expect(saved.body.authorSubject).toBe(NOTE_RECORD.body.authorSubject);
   });
 
   test('a PUT/DELETE refused by the ownership rule surfaces the 403', async () => {
@@ -6910,9 +6909,8 @@ describe('the case-collection enums', () => {
   });
 
   test('a secured claim sends its collateral reference, order, override and intention', async () => {
-    // The five members issue #345 added, as core/claims.py reads them:
-    // `lien_position` is the one JSON NUMBER on a claim (a whole number, like
-    // a dependent's age), every amount stays a string.
+    // The five members issue #345 added: a whole number for the lien
+    // position and JSON numbers for the amounts (ADR 0032).
     const stub = stubFetch(() => jsonResponse(CREDITOR_RECORD, 201));
     const client = new InsolviaApiClient(BASE_URL, {
       fetch: stub.fetch,
@@ -6920,30 +6918,32 @@ describe('the case-collection enums', () => {
     });
 
     await client.addCaseEntity(ENTITY_CASE_ID, 'claims', {
-      claim_class: 'secured',
-      amount: '12000.00',
-      asset_id: 'asset-0001',
-      lien_position: 2,
-      unsecured_amount_override: '3000.00',
-      intention: 'retain_reaffirm',
-      intention_explanation: 'Payments are current.',
+      body: {
+        claimClass: 'secured',
+        amount: 12000,
+        assetId: 'asset-0001',
+        lienPosition: 2,
+        unsecuredAmountOverride: 3000,
+        intention: 'retain_reaffirm',
+        intentionExplanation: 'Payments are current.',
+      },
       provenance: {
-        claim_class: { source: 'staff_typed' },
+        claimClass: { source: 'staff_typed' },
         amount: { source: 'staff_typed' },
-        asset_id: { source: 'staff_typed' },
-        lien_position: { source: 'staff_typed' },
-        unsecured_amount_override: { source: 'staff_typed' },
+        assetId: { source: 'staff_typed' },
+        lienPosition: { source: 'staff_typed' },
+        unsecuredAmountOverride: { source: 'staff_typed' },
         intention: { source: 'staff_typed' },
-        intention_explanation: { source: 'staff_typed' },
+        intentionExplanation: { source: 'staff_typed' },
       },
     });
 
-    const body = JSON.parse(stub.lastRequest().body);
-    expect(body.asset_id).toBe('asset-0001');
-    expect(body.lien_position).toBe(2);
-    expect(body.unsecured_amount_override).toBe('3000.00');
+    const { body } = JSON.parse(stub.lastRequest().body);
+    expect(body.assetId).toBe('asset-0001');
+    expect(body.lienPosition).toBe(2);
+    expect(body.unsecuredAmountOverride).toBe(3000);
     expect(body.intention).toBe('retain_reaffirm');
-    expect(body.intention_explanation).toBe('Payments are current.');
+    expect(body.intentionExplanation).toBe('Payments are current.');
   });
 
   test('CONTRACT_LEASE_INTENTIONS mirrors core/contract_leases.py', () => {
@@ -8201,10 +8201,10 @@ describe('the Chapter 13 plan (issue #366)', () => {
       {
         label: '$600 a month',
         plan: {
-          term_months: 2,
-          monthly_payment: '600',
-          unsecured_percentage: undefined,
-          secured_treatments: [{ id: 't-auto', claim_id: 'claim-auto', treatment: 'cramdown' }],
+          termMonths: 2,
+          monthlyPayment: 600,
+          unsecuredPercentage: undefined,
+          securedTreatments: [{ id: 't-auto', claimId: 'claim-auto', treatment: 'cramdown' }],
         },
       },
       { plan: {} },
@@ -8219,9 +8219,9 @@ describe('the Chapter 13 plan (issue #366)', () => {
         {
           label: '$600 a month',
           plan: {
-            term_months: 2,
-            monthly_payment: '600',
-            secured_treatments: [{ id: 't-auto', claim_id: 'claim-auto', treatment: 'cramdown' }],
+            termMonths: 2,
+            monthlyPayment: 600,
+            securedTreatments: [{ id: 't-auto', claimId: 'claim-auto', treatment: 'cramdown' }],
           },
         },
         { plan: {} },
@@ -8237,7 +8237,7 @@ describe('the Chapter 13 plan (issue #366)', () => {
         {
           error: 'ValidationError',
           fields: {
-            'scenarios[0].plan.term_months':
+            'scenarios[0].plan.termMonths':
               'A plan runs 1 to 60 months — § 1322(d) caps it at five years.',
           },
         },
@@ -8251,11 +8251,11 @@ describe('the Chapter 13 plan (issue #366)', () => {
 
     const error = asApiValidationException(
       await rejection(
-        client.calculatePlanScenarios(ENTITY_CASE_ID, [{ plan: { term_months: 84 } }]),
+        client.calculatePlanScenarios(ENTITY_CASE_ID, [{ plan: { termMonths: 84 } }]),
       ),
     );
 
-    expect(Object.keys(error.fields)).toEqual(['scenarios[0].plan.term_months']);
+    expect(Object.keys(error.fields)).toEqual(['scenarios[0].plan.termMonths']);
   });
 });
 

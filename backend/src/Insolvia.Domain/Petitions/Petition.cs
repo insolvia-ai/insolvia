@@ -1,4 +1,3 @@
-using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using Insolvia.Domain.CaseEntities;
 using Insolvia.Domain.Fields;
@@ -9,7 +8,10 @@ namespace Insolvia.Domain.Petitions;
 // its repeating rows, and the Part 7 signer block.
 
 /// <summary>B101 line 14: property needing immediate attention.</summary>
-public sealed record HazardousProperty(string? Description = null, string? WhyImmediate = null, Address? Address = null)
+public sealed record HazardousProperty(
+    [property: Narrative] string? Description = null,
+    [property: Narrative] string? WhyImmediate = null,
+    Address? Address = null)
 {
     /// <summary>Where the property is.</summary>
     public Address Address { get; init; } = Address ?? new Address();
@@ -17,27 +19,46 @@ public sealed record HazardousProperty(string? Description = null, string? WhyIm
 
 /// <summary>The petition's own answers — one per case.</summary>
 public sealed record PetitionBody(
-    FeeHandling? FeeHandling,
-    bool? RentsResidence,
-    bool? EvictionJudgmentAgainstYou,
-    SmallBusinessStatus? SmallBusinessStatus,
-    HazardousProperty HazardousProperty,
-    DebtCharacter? DebtCharacter,
-    string? DebtCharacterOther,
-    [property: JsonPropertyName("ch7_funds_available_for_creditors")] bool? Ch7FundsAvailableForCreditors,
-    EstimatedCreditors? EstimatedCreditors,
-    EstimatedDollars? EstimatedAssets,
-    EstimatedDollars? EstimatedLiabilities,
-    DateOnly? ExpectedFilingDate);
+    FeeHandling? FeeHandling = null,
+    bool? RentsResidence = null,
+    bool? EvictionJudgmentAgainstYou = null,
+    SmallBusinessStatus? SmallBusinessStatus = null,
+    HazardousProperty? HazardousProperty = null,
+    DebtCharacter? DebtCharacter = null,
+    [property: Text] string? DebtCharacterOther = null,
+    bool? Ch7FundsAvailableForCreditors = null,
+    EstimatedCreditors? EstimatedCreditors = null,
+    EstimatedDollars? EstimatedAssets = null,
+    EstimatedDollars? EstimatedLiabilities = null,
+    DateOnly? ExpectedFilingDate = null)
+{
+    /// <summary>B101 line 14; an empty one when none was given.</summary>
+    public HazardousProperty HazardousProperty { get; init; } = HazardousProperty ?? new();
+}
 
 /// <summary>B101 line 9: a bankruptcy filed within the last 8 years.</summary>
-public sealed record PriorCaseBody(string? District, DateOnly? FiledOn, string? CaseNumber);
+public sealed record PriorCaseBody(
+    [property: Text] string? District = null,
+    DateOnly? FiledOn = null,
+    [property: Text] string? CaseNumber = null);
 
 /// <summary>B101 line 10: a pending case by a spouse, partner, or affiliate.</summary>
-public sealed record RelatedCaseBody(string? DebtorName, string? Relationship, string? District, DateOnly? FiledOn, string? CaseNumber);
+public sealed record RelatedCaseBody(
+    [property: Text] string? DebtorName = null,
+    [property: Text] string? Relationship = null,
+    [property: Text] string? District = null,
+    DateOnly? FiledOn = null,
+    [property: Text] string? CaseNumber = null);
 
 /// <summary>B101 line 12: a business the debtor operates as a sole proprietor.</summary>
-public sealed record SoleProprietorshipBody(string? Name, Address Address, BusinessType? BusinessType);
+public sealed record SoleProprietorshipBody(
+    [property: Text] string? Name = null,
+    Address? Address = null,
+    BusinessType? BusinessType = null)
+{
+    /// <summary>The business's address; an empty one when none was given.</summary>
+    public Address Address { get; init; } = Address ?? new();
+}
 
 /// <summary>
 /// B101 Part 7's attorney or petition-preparer block, and B2030's § 329(a)
@@ -45,153 +66,49 @@ public sealed record SoleProprietorshipBody(string? Name, Address Address, Busin
 /// the difference of the two amounts and is never stored.
 /// </summary>
 public sealed record FilingProfessionalBody(
-    FilingProfessionalRole? Role,
-    PersonName Name,
-    string? FirmName,
-    Address Address,
-    string? Phone,
-    string? Email,
-    string? BarNumber,
-    string? BarState,
-    DateOnly? SignatureDate,
-    decimal? CompensationAgreed,
-    decimal? CompensationReceived,
-    CompensationSource? CompensationSourcePaid,
-    string? CompensationSourcePaidOther,
-    CompensationSource? CompensationSourceToBePaid,
-    string? CompensationSourceToBePaidOther,
-    bool? CompensationShared,
-    string? ServicesOther,
-    string? ServicesExcluded);
+    FilingProfessionalRole? Role = null,
+    PersonName? Name = null,
+    [property: Text] string? FirmName = null,
+    Address? Address = null,
+    [property: Text(32)] string? Phone = null,
+    [property: Text] string? Email = null,
+    [property: Text(32)] string? BarNumber = null,
+    [property: Text(2)] string? BarState = null,
+    DateOnly? SignatureDate = null,
+    [property: Money] decimal? CompensationAgreed = null,
+    [property: Money] decimal? CompensationReceived = null,
+    CompensationSource? CompensationSourcePaid = null,
+    [property: Text] string? CompensationSourcePaidOther = null,
+    CompensationSource? CompensationSourceToBePaid = null,
+    [property: Text] string? CompensationSourceToBePaidOther = null,
+    bool? CompensationShared = null,
+    [property: Narrative] string? ServicesOther = null,
+    [property: Narrative] string? ServicesExcluded = null)
+{
+    /// <summary>The signer's name; an empty one when none was given.</summary>
+    public PersonName Name { get; init; } = Name ?? new();
+
+    /// <summary>The signer's address; an empty one when none was given.</summary>
+    public Address Address { get; init; } = Address ?? new();
+}
 
 /// <summary>The five B101 collections.</summary>
 public static class PetitionRules
 {
     /// <summary>The petition collection's kind.</summary>
-    public static readonly EntityKind<PetitionBody> Petition = new("petition", "petitions", "PETITION", ParsePetition);
+    public static readonly EntityKind<PetitionBody> Petition = new("petition", "petitions", "PETITION");
 
     /// <summary>The prior-case collection's kind.</summary>
-    public static readonly EntityKind<PriorCaseBody> PriorCase = new("prior_case", "prior_cases", "PRIOR_CASE", ParsePriorCase);
+    public static readonly EntityKind<PriorCaseBody> PriorCase = new("prior_case", "prior_cases", "PRIOR_CASE");
 
     /// <summary>The related-case collection's kind.</summary>
-    public static readonly EntityKind<RelatedCaseBody> RelatedCase = new("related_case", "related_cases", "RELATED_CASE", ParseRelatedCase);
+    public static readonly EntityKind<RelatedCaseBody> RelatedCase = new("related_case", "related_cases", "RELATED_CASE");
 
     /// <summary>The sole-proprietorship collection's kind.</summary>
-    public static readonly EntityKind<SoleProprietorshipBody> SoleProprietorship = new("sole_proprietorship", "sole_proprietorships", "SOLE_PROPRIETORSHIP", ParseSoleProprietorship);
+    public static readonly EntityKind<SoleProprietorshipBody> SoleProprietorship = new("sole_proprietorship", "sole_proprietorships", "SOLE_PROPRIETORSHIP");
 
     /// <summary>The filing-professional collection's kind.</summary>
-    public static readonly EntityKind<FilingProfessionalBody> FilingProfessional = new("filing_professional", "filing_professionals", "FILING_PROFESSIONAL", ParseFilingProfessional);
-
-    /// <summary>Validates a petition body (Python's <c>parse_petition</c>).</summary>
-    public static PetitionBody ParsePetition(JsonObject payload)
-    {
-        ArgumentNullException.ThrowIfNull(payload);
-        var errors = new Dictionary<string, string>(StringComparer.Ordinal);
-        var body = new PetitionBody(
-            FeeHandling: FieldParsers.Choice<FeeHandling>(payload["fee_handling"], "fee_handling", errors),
-            RentsResidence: FieldParsers.Boolean(payload["rents_residence"], "rents_residence", errors),
-            EvictionJudgmentAgainstYou: FieldParsers.Boolean(payload["eviction_judgment_against_you"], "eviction_judgment_against_you", errors),
-            SmallBusinessStatus: FieldParsers.Choice<SmallBusinessStatus>(payload["small_business_status"], "small_business_status", errors),
-            HazardousProperty: ParseHazardousProperty(payload["hazardous_property"], "hazardous_property", errors),
-            DebtCharacter: FieldParsers.Choice<DebtCharacter>(payload["debt_character"], "debt_character", errors),
-            DebtCharacterOther: FieldParsers.Text(payload["debt_character_other"], "debt_character_other", errors),
-            Ch7FundsAvailableForCreditors: FieldParsers.Boolean(payload["ch7_funds_available_for_creditors"], "ch7_funds_available_for_creditors", errors),
-            EstimatedCreditors: FieldParsers.Choice<EstimatedCreditors>(payload["estimated_creditors"], "estimated_creditors", errors),
-            EstimatedAssets: FieldParsers.Choice<EstimatedDollars>(payload["estimated_assets"], "estimated_assets", errors),
-            EstimatedLiabilities: FieldParsers.Choice<EstimatedDollars>(payload["estimated_liabilities"], "estimated_liabilities", errors),
-            ExpectedFilingDate: FieldParsers.FormDate(payload["expected_filing_date"], "expected_filing_date", errors));
-        IdRows.ThrowIfAny(errors);
-        return body;
-    }
-
-    /// <summary>Validates a prior-case body (Python's <c>parse_prior_case</c>).</summary>
-    public static PriorCaseBody ParsePriorCase(JsonObject payload)
-    {
-        ArgumentNullException.ThrowIfNull(payload);
-        var errors = new Dictionary<string, string>(StringComparer.Ordinal);
-        var body = new PriorCaseBody(
-            District: FieldParsers.Text(payload["district"], "district", errors),
-            FiledOn: FieldParsers.FormDate(payload["filed_on"], "filed_on", errors),
-            CaseNumber: FieldParsers.Text(payload["case_number"], "case_number", errors));
-        IdRows.ThrowIfAny(errors);
-        return body;
-    }
-
-    /// <summary>Validates a related-case body (Python's <c>parse_related_case</c>).</summary>
-    public static RelatedCaseBody ParseRelatedCase(JsonObject payload)
-    {
-        ArgumentNullException.ThrowIfNull(payload);
-        var errors = new Dictionary<string, string>(StringComparer.Ordinal);
-        var body = new RelatedCaseBody(
-            DebtorName: FieldParsers.Text(payload["debtor_name"], "debtor_name", errors),
-            Relationship: FieldParsers.Text(payload["relationship"], "relationship", errors),
-            District: FieldParsers.Text(payload["district"], "district", errors),
-            FiledOn: FieldParsers.FormDate(payload["filed_on"], "filed_on", errors),
-            CaseNumber: FieldParsers.Text(payload["case_number"], "case_number", errors));
-        IdRows.ThrowIfAny(errors);
-        return body;
-    }
-
-    /// <summary>Validates a sole-proprietorship body (Python's <c>parse_sole_proprietorship</c>).</summary>
-    public static SoleProprietorshipBody ParseSoleProprietorship(JsonObject payload)
-    {
-        ArgumentNullException.ThrowIfNull(payload);
-        var errors = new Dictionary<string, string>(StringComparer.Ordinal);
-        var body = new SoleProprietorshipBody(
-            Name: FieldParsers.Text(payload["name"], "name", errors),
-            Address: FieldParsers.ParseAddress(payload["address"], "address", errors),
-            BusinessType: FieldParsers.Choice<BusinessType>(payload["business_type"], "business_type", errors));
-        IdRows.ThrowIfAny(errors);
-        return body;
-    }
-
-    /// <summary>Validates a filing-professional body (Python's <c>parse_filing_professional</c>).</summary>
-    public static FilingProfessionalBody ParseFilingProfessional(JsonObject payload)
-    {
-        ArgumentNullException.ThrowIfNull(payload);
-        var errors = new Dictionary<string, string>(StringComparer.Ordinal);
-        var body = new FilingProfessionalBody(
-            Role: FieldParsers.Choice<FilingProfessionalRole>(payload["role"], "role", errors),
-            Name: FieldParsers.ParseName(payload["name"], "name", errors),
-            FirmName: FieldParsers.Text(payload["firm_name"], "firm_name", errors),
-            Address: FieldParsers.ParseAddress(payload["address"], "address", errors),
-            Phone: FieldParsers.Text(payload["phone"], "phone", errors, limit: 32),
-            Email: FieldParsers.Text(payload["email"], "email", errors),
-            BarNumber: FieldParsers.Text(payload["bar_number"], "bar_number", errors, limit: 32),
-            BarState: FieldParsers.Text(payload["bar_state"], "bar_state", errors, limit: 2),
-            SignatureDate: FieldParsers.FormDate(payload["signature_date"], "signature_date", errors),
-            CompensationAgreed: FieldParsers.Money(payload["compensation_agreed"], "compensation_agreed", errors),
-            CompensationReceived: FieldParsers.Money(payload["compensation_received"], "compensation_received", errors),
-            CompensationSourcePaid: FieldParsers.Choice<CompensationSource>(payload["compensation_source_paid"], "compensation_source_paid", errors),
-            CompensationSourcePaidOther: FieldParsers.Text(payload["compensation_source_paid_other"], "compensation_source_paid_other", errors),
-            CompensationSourceToBePaid: FieldParsers.Choice<CompensationSource>(payload["compensation_source_to_be_paid"], "compensation_source_to_be_paid", errors),
-            CompensationSourceToBePaidOther: FieldParsers.Text(payload["compensation_source_to_be_paid_other"], "compensation_source_to_be_paid_other", errors),
-            CompensationShared: FieldParsers.Boolean(payload["compensation_shared"], "compensation_shared", errors),
-            ServicesOther: FieldParsers.Narrative(payload["services_other"], "services_other", errors),
-            ServicesExcluded: FieldParsers.Narrative(payload["services_excluded"], "services_excluded", errors));
-        IdRows.ThrowIfAny(errors);
-        return body;
-    }
-
-    private static HazardousProperty ParseHazardousProperty(JsonNode? value, string path, Dictionary<string, string> errors)
-    {
-        if (value is null)
-        {
-            return new HazardousProperty();
-        }
-
-        if (value is not JsonObject raw)
-        {
-            // The contract's own lower-case spelling, kept: a client may match it.
-            errors[path] = "must be an object";
-            return new HazardousProperty();
-        }
-
-        return new HazardousProperty(
-            Description: FieldParsers.Narrative(raw["description"], $"{path}.description", errors),
-            WhyImmediate: FieldParsers.Narrative(raw["why_immediate"], $"{path}.why_immediate", errors),
-            Address: FieldParsers.ParseAddress(raw["address"], $"{path}.address", errors));
-    }
+    public static readonly EntityKind<FilingProfessionalBody> FilingProfessional = new("filing_professional", "filing_professionals", "FILING_PROFESSIONAL");
 }
 
 /// <summary>B101 line 8: how the filing fee is paid (Python's <c>FEE_HANDLING</c>).</summary>

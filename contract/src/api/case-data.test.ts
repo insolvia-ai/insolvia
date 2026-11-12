@@ -16,13 +16,13 @@ import { expectApiError, type Spec, withMessage } from '../support/wire.ts';
 
 const ENTITY: Spec = {
   id: 'string',
-  case_id: 'string',
-  created_at: 'string',
-  updated_at: 'string',
+  caseId: 'string',
+  createdAt: 'string',
+  updatedAt: 'string',
+  body: 'object',
   provenance: 'object',
   amended: 'boolean',
 };
-const IDENTITY = new Set(['id', 'case_id', 'created_at', 'updated_at', 'amended']);
 const PROBLEM: Spec = { 'code?': 'string', message: 'string' };
 
 let chapter13: string;
@@ -66,9 +66,10 @@ describe('the generic case collections', () => {
     for (const collection of CASE_COLLECTIONS) {
       const items = await admin.api.listCaseEntities(chapter13, collection);
       for (const item of items) {
-        const body = remap(
-          Object.fromEntries(Object.entries(item).filter(([key]) => !IDENTITY.has(key))),
-        ) as CaseEntityRequest<typeof collection>;
+        const body = remap({
+          body: item.body,
+          provenance: item.provenance,
+        }) as CaseEntityRequest<typeof collection>;
         const added = await admin.api.addCaseEntity(caseId, collection, body);
         admin.wire(201, ENTITY);
         idMap.set(item.id, added.id);
@@ -94,7 +95,7 @@ describe('the generic case collections', () => {
     const admin = firmAdmin();
     const { caseId } = await scratchCase();
     await expectApiError(
-      admin.api.addCaseEntity(caseId, 'creditors', { name: 42 } as never),
+      admin.api.addCaseEntity(caseId, 'creditors', { body: { name: 42 } } as never),
       400,
       'ValidationError',
     );
@@ -104,11 +105,11 @@ describe('the generic case collections', () => {
       'NotFoundError',
     );
     const creditor: CaseEntity<'creditors'> = await admin.api.addCaseEntity(caseId, 'creditors', {
-      name: 'Example Bank',
+      body: { name: 'Example Bank' },
       provenance: { name: { source: 'staff_typed' } },
     });
     await expectApiError(
-      admin.api.putCaseEntity(caseId, 'creditors', creditor.id, { name: 7 } as never),
+      admin.api.putCaseEntity(caseId, 'creditors', creditor.id, { body: { name: 7 } } as never),
       400,
       'ValidationError',
     );
@@ -235,9 +236,7 @@ describe('what a case computes', () => {
     expect(plan.commitmentPeriod).toMatchObject({ months: 60 });
 
     const [stored] = await admin.api.listCaseEntities(chapter13, 'plans');
-    const body = Object.fromEntries(
-      Object.entries(stored ?? {}).filter(([key]) => !IDENTITY.has(key) && key !== 'provenance'),
-    );
+    const body = stored?.body ?? {};
     const scenarios = await admin.api.calculatePlanScenarios(chapter13, [
       { label: 'as filed', plan: body as never },
       { plan: body as never },

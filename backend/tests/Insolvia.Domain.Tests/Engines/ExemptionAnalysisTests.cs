@@ -18,15 +18,15 @@ namespace Insolvia.Domain.Engines.Tests;
 public sealed class ExemptionAnalysisTests
 {
     private static readonly DateOnly Today = new(2026, 9, 16);
-    private static readonly (string, AssetBody) House = ("asset-house", Build.Body(AssetRules.Kind, """{"category": "real_property", "description": "12 Byron Court", "value_entire": "300000.00", "value_portion_owned": "300000.00"}"""));
-    private static readonly (string, AssetBody) Car = ("asset-car", Build.Body(AssetRules.Kind, """{"category": "vehicle", "description": "2016 sedan", "value_entire": "9000.00"}"""));
-    private static readonly (string, ClaimBody) Mortgage = ("claim-mortgage", Build.Body(ClaimRules.Kind, """{"claim_class": "secured", "amount": "250000.00", "asset_id": "asset-house", "lien_position": 1}"""));
+    private static readonly (string, AssetBody) House = ("asset-house", Build.Body(AssetRules.Kind, """{"category": "real_property", "description": "12 Byron Court", "valueEntire": 300000.00, "valuePortionOwned": 300000.00}"""));
+    private static readonly (string, AssetBody) Car = ("asset-car", Build.Body(AssetRules.Kind, """{"category": "vehicle", "description": "2016 sedan", "valueEntire": 9000.00}"""));
+    private static readonly (string, ClaimBody) Mortgage = ("claim-mortgage", Build.Body(ClaimRules.Kind, """{"claimClass": "secured", "amount": 250000.00, "assetId": "asset-house", "lienPosition": 1}"""));
 
     // ── Dates ──
 
     [Fact]
     public void The_expected_filing_date_is_the_resolution_date_when_typed() =>
-        Assert.Equal((new DateOnly(2026, 12, 1), "expected_filing_date"), ExemptionAnalyzer.ResolutionDate(Build.Body(PetitionRules.Petition, """{"expected_filing_date": "2026-12-01"}"""), Today));
+        Assert.Equal((new DateOnly(2026, 12, 1), "expected_filing_date"), ExemptionAnalyzer.ResolutionDate(Build.Body(PetitionRules.Petition, """{"expectedFilingDate": "2026-12-01"}"""), Today));
 
     [Fact]
     public void A_floating_case_resolves_as_of_today()
@@ -115,7 +115,7 @@ public sealed class ExemptionAnalysisTests
     [Fact]
     public void A_filing_date_before_the_series_baseline_refuses()
     {
-        var result = Analysis("GA", petition: Build.Body(PetitionRules.Petition, """{"expected_filing_date": "2026-06-01"}"""));
+        var result = Analysis("GA", petition: Build.Body(PetitionRules.Petition, """{"expectedFilingDate": "2026-06-01"}"""));
         Assert.Equal(new DateOnly(2026, 6, 1), result.AsOf);
         Assert.Empty(result.Entries);
         Assert.Contains(result.Problems, problem => problem.Contains("no release of exemptions/ga", StringComparison.Ordinal));
@@ -230,8 +230,8 @@ public sealed class ExemptionAnalysisTests
     [Fact]
     public void Liens_never_push_net_equity_below_zero()
     {
-        var underwater = ("asset-car", Build.Body(AssetRules.Kind, """{"category": "vehicle", "value_entire": "9000.00"}"""));
-        var loan = ("claim-loan", Build.Body(ClaimRules.Kind, """{"claim_class": "secured", "amount": "12000.00", "asset_id": "asset-car"}"""));
+        var underwater = ("asset-car", Build.Body(AssetRules.Kind, """{"category": "vehicle", "valueEntire": 9000.00}"""));
+        var loan = ("claim-loan", Build.Body(ClaimRules.Kind, """{"claimClass": "secured", "amount": 12000.00, "assetId": "asset-car"}"""));
         Assert.Equal(0.00m, Asset(Analysis("FL", assets: [underwater], claims: [loan]), "asset-car").NetEquity);
     }
 
@@ -285,7 +285,7 @@ public sealed class ExemptionAnalysisTests
     {
         SofaEntryBody[] entries = which is null
             ? []
-            : [new SofaEntryBody(SofaEntryType.PriorAddress, new PriorAddress(Wire.TryParse<SofaDebtor>(which, out var debtor) ? debtor : null, new Address(State: "NY"), new DateOnly(2022, 1, 1), Exact.ParseIso(toDate)))];
+            : [new SofaEntryBody(new PriorAddress(Wire.TryParse<SofaDebtor>(which, out var debtor) ? debtor : null, new Address(State: "NY"), new DateOnly(2022, 1, 1), Exact.ParseIso(toDate)))];
         Assert.Equal(warned, Analysis("FL", sofa: entries).Warnings.Any(warning => warning.Contains("§ 522(b)(3)(A)", StringComparison.Ordinal)));
     }
 

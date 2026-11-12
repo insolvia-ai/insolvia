@@ -358,15 +358,13 @@ public sealed class SeedCaseTests : IDisposable
         collections["creditors"]![0]!["$handle"] = "bank";
         collections["claims"] = new JsonArray(new JsonObject
         {
-            ["creditor_id"] = new JsonObject { ["$ref"] = "creditors/bank" },
-            ["claim_class"] = "secured",
-            ["provenance"] = new JsonObject { ["creditor_id"] = Typed.DeepClone(), ["claim_class"] = Typed.DeepClone() },
+            ["body"] = new JsonObject { ["creditorId"] = new JsonObject { ["$ref"] = "creditors/bank" }, ["claimClass"] = "secured" },
+            ["provenance"] = new JsonObject { ["creditorId"] = Typed.DeepClone(), ["claimClass"] = Typed.DeepClone() },
         });
         collections["income_summaries"] = new JsonArray(new JsonObject
         {
-            ["debtor_id"] = new JsonObject { ["$ref"] = "debtors/debtor_1" },
-            ["wages"] = "100.00",
-            ["provenance"] = new JsonObject { ["debtor_id"] = Typed.DeepClone(), ["wages"] = Typed.DeepClone() },
+            ["body"] = new JsonObject { ["debtorId"] = new JsonObject { ["$ref"] = "debtors/debtor_1" }, ["wages"] = 100.00m },
+            ["provenance"] = new JsonObject { ["debtorId"] = Typed.DeepClone(), ["wages"] = Typed.DeepClone() },
         });
     });
 
@@ -401,7 +399,7 @@ public sealed class SeedCaseTests : IDisposable
     public async Task A_reference_to_nothing_is_refused_before_anything_is_written(string reference)
     {
         WithReferences();
-        _world.Edit(CasesJson, body => body["cases"]![0]!["collections"]!["claims"]![0]!["creditor_id"] = JsonNode.Parse(reference));
+        _world.Edit(CasesJson, body => body["cases"]![0]!["collections"]!["claims"]![0]!["body"]!["creditorId"] = JsonNode.Parse(reference));
 
         Assert.Equal(2, await _world.LoadAsync());
         Assert.Empty(_world.Cases.Cases);

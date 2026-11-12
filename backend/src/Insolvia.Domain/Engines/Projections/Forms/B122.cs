@@ -62,7 +62,7 @@ public static class B122A1
     }
 
     /// <summary>An empty means-test input body (Python's <c>MeansTestInputBody()</c>).</summary>
-    public static MeansTestInputBody EmptyInputs { get; } = MeansTestInputRules.Parse([]);
+    public static MeansTestInputBody EmptyInputs { get; } = new();
 
     /// <summary>The § 101(10A) derivation for this case file.</summary>
     public static CmiResult ComputeCmi(CaseFile caseFile)

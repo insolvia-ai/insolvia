@@ -13,10 +13,11 @@ import { Button, Field, Input, Select } from '@insolvia-ai/design-system';
 import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { bodyErrors } from '@/api/body-errors';
 import { useApi } from '@/api/use-api';
 import { Heading } from '@/components/heading';
+import { moneyOf } from '@/components/money-input';
 import {
-  inputBodyOf,
   securedPaymentFor,
   withSecuredPayment,
   withoutSecuredPayment,
@@ -33,8 +34,8 @@ import { newRowId } from './row-id';
  * offsets — the home (B122A-2 line 9b), the first or second claimed vehicle
  * (lines 13b/13e), or none of them (line 33d).
  *
- * WHERE IT IS WRITTEN. These are `other_secured_payments` rows on the case's
- * ONE `means_test_input` record, keyed by `claim_id`, so the engine reads
+ * WHERE IT IS WRITTEN. These are `otherSecuredPayments` rows on the case's
+ * ONE `means_test_input` record, keyed by `claimId`, so the engine reads
  * them by bucket exactly as the screen's own rows. The panel reads that
  * record, replaces this claim's row, and writes the whole record back with
  * `staff_typed` provenance — the same rule every editor applies, and exact
@@ -99,12 +100,11 @@ export function ClaimSecuredPaymentPanel({
         const result = await call((client) => client.listCaseEntities(caseId, 'means_test_inputs'));
         if (!result.ok || cancelled) return;
         const first = result.value[0];
-        const body =
-          first === undefined ? {} : inputBodyOf(first as unknown as Record<string, unknown>);
+        const body = first?.body ?? {};
         const row = securedPaymentFor(body, claimId);
         setBucket(row?.bucket ?? null);
-        setMonthly(row?.monthly_payment ?? '');
-        setCure(row?.cure_total ?? '');
+        setMonthly(row?.monthlyPayment === undefined ? '' : String(row.monthlyPayment));
+        setCure(row?.cureTotal === undefined ? '' : String(row.cureTotal));
         setState({ kind: 'ready', inputId: first?.id ?? null, body });
       } catch {
         if (!cancelled) setState({ kind: 'error' });
@@ -120,10 +120,10 @@ export function ClaimSecuredPaymentPanel({
       if (state.kind !== 'ready') return;
       setStatus('Saving…');
       try {
-        const request = {
-          ...next,
-          provenance: staffTypedProvenance(next as unknown as Record<string, unknown>),
-        } as unknown as CaseEntityRequest<'means_test_inputs'>;
+        const request: CaseEntityRequest<'means_test_inputs'> = {
+          body: next,
+          provenance: staffTypedProvenance(next),
+        };
         const result = await call((client) =>
           state.inputId === null
             ? client.addCaseEntity(caseId, 'means_test_inputs', request)
@@ -136,13 +136,13 @@ export function ClaimSecuredPaymentPanel({
         setState({
           kind: 'ready',
           inputId: result.value.id,
-          body: inputBodyOf(result.value as unknown as Record<string, unknown>),
+          body: result.value.body,
         });
         setErrors({});
         setStatus('Saved — the means test will use it on its next run');
       } catch (cause) {
         if (cause instanceof ApiValidationException) {
-          setErrors(cause.fields);
+          setErrors(bodyErrors(cause.fields));
           setStatus('Some answers need attention.');
         } else {
           setStatus('Could not save. Try again.');
@@ -190,20 +190,20 @@ export function ClaimSecuredPaymentPanel({
   const rowError = (member: string) =>
     existing === undefined
       ? undefined
-      : (errors[`other_secured_payments[${existing.id}].${member}`] ??
+      : (errors[`otherSecuredPayments[${existing.id}].${member}`] ??
         Object.entries(errors).find(
-          ([path]) => path.startsWith('other_secured_payments[') && path.endsWith(`.${member}`),
+          ([path]) => path.startsWith('otherSecuredPayments[') && path.endsWith(`.${member}`),
         )?.[1]);
 
   const save = () => {
     const row: OtherSecuredPayment = {
       id: existing?.id ?? newRowId(),
-      claim_id: claimId,
+      claimId: claimId,
       ...(bucket === null ? {} : { bucket }),
-      ...(monthly.trim() === '' ? {} : { monthly_payment: monthly.trim() }),
-      ...(cure.trim() === '' ? {} : { cure_total: cure.trim() }),
-      ...(creditorName === undefined ? {} : { creditor_name: creditorName }),
-      ...(propertyDescription === undefined ? {} : { property_description: propertyDescription }),
+      ...(moneyOf(monthly) === undefined ? {} : { monthlyPayment: moneyOf(monthly) }),
+      ...(moneyOf(cure) === undefined ? {} : { cureTotal: moneyOf(cure) }),
+      ...(creditorName === undefined ? {} : { creditorName: creditorName }),
+      ...(propertyDescription === undefined ? {} : { propertyDescription: propertyDescription }),
     };
     void persist(withSecuredPayment(state.body, row));
   };
@@ -234,21 +234,21 @@ export function ClaimSecuredPaymentPanel({
         />
         {rowError('bucket') ? <Field.Error match>{rowError('bucket')}</Field.Error> : null}
       </Field.Root>
-      <Field.Root invalid={rowError('monthly_payment') !== undefined}>
+      <Field.Root invalid={rowError('monthlyPayment') !== undefined}>
         <Field.Label>Average monthly payment over the next 60 months</Field.Label>
         <Input value={monthly} onValueChange={setMonthly} autoCorrect={false} />
         <Field.Description>Dollars, like 415.00.</Field.Description>
-        {rowError('monthly_payment') ? (
-          <Field.Error match>{rowError('monthly_payment')}</Field.Error>
+        {rowError('monthlyPayment') ? (
+          <Field.Error match>{rowError('monthlyPayment')}</Field.Error>
         ) : null}
       </Field.Root>
-      <Field.Root invalid={rowError('cure_total') !== undefined}>
+      <Field.Root invalid={rowError('cureTotal') !== undefined}>
         <Field.Label>Total past due (the cure amount; line 34 divides it by 60)</Field.Label>
         <Input value={cure} onValueChange={setCure} autoCorrect={false} />
         <Field.Description>
           Dollars, like 2100.00. Leave blank if nothing is past due.
         </Field.Description>
-        {rowError('cure_total') ? <Field.Error match>{rowError('cure_total')}</Field.Error> : null}
+        {rowError('cureTotal') ? <Field.Error match>{rowError('cureTotal')}</Field.Error> : null}
       </Field.Root>
       <View style={styles.actions}>
         <Button size="lg" intent="secondary" onPress={save}>

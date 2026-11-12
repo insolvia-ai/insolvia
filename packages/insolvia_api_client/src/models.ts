@@ -599,7 +599,7 @@ export interface LibraryCreditor {
   /** Other parties to notify about a debt to this creditor — copy target for
    * a claim's {@link ClaimBody.notice_parties} once the claim exists; not
    * copied onto the case creditor itself, which carries no such field. */
-  readonly additional_notice_parties: readonly NoticeParty[];
+  readonly additional_notice_parties: readonly LibraryNoticeParty[];
   /** Surfaced first by a picker; set by whoever curates the library. */
   readonly preferred: boolean;
   readonly notes?: string | undefined;
@@ -618,12 +618,24 @@ export interface LibraryCreditorDraft {
   /** Required — a library entry with no name is not a record the picker can show. */
   readonly name: string;
   readonly address?: Address | undefined;
-  readonly additional_notice_parties?: readonly NoticeParty[] | undefined;
+  readonly additional_notice_parties?: readonly LibraryNoticeParty[] | undefined;
   readonly preferred?: boolean | undefined;
   readonly notes?: string | undefined;
 }
 
-function noticePartyToJson(party: NoticeParty): Record<string, unknown> {
+/**
+ * A library entry's notice party: a claim's {@link NoticeParty} as the
+ * library still spells it — snake_case until the firm routes move (ADR 0032),
+ * its address camelCase like every {@link Address}.
+ */
+export interface LibraryNoticeParty {
+  readonly id: string;
+  readonly name?: string | undefined;
+  readonly address?: Address | undefined;
+  readonly account_last4?: string | undefined;
+}
+
+function noticePartyToJson(party: LibraryNoticeParty): Record<string, unknown> {
   return assignDefined(
     { id: party.id },
     {
@@ -775,7 +787,7 @@ function clientAddressToJson(address: Address | undefined): Record<string, unkno
     line2: address.line2,
     city: address.city,
     state: address.state,
-    postal_code: address.postal_code,
+    postalCode: address.postalCode,
     county: address.county,
   });
 }
@@ -960,7 +972,7 @@ export interface PortalAnswerAddress {
   readonly line2?: string;
   readonly city?: string;
   readonly state?: string;
-  readonly postal_code?: string;
+  readonly postalCode?: string;
   readonly county?: string;
 }
 
@@ -2903,15 +2915,11 @@ export interface UploadPortalDocumentOptions {
 // smoothing the two spellings together — a client that translated would be the
 // only place in the system where a debtor field has two names.
 //
-// Renaming them to camelCase here would also be unsafe, for a reason that has
-// nothing to do with taste. A debtor's `provenance` map is keyed by DOTTED
-// PATHS INTO THIS RECORD — `name.given`, `residence_address.line1`,
-// `other_names_used[n1].surname` — and the server's grammar for a path segment
-// is `[a-z][a-z0-9_]*`, which rejects a capital letter outright. A client whose
-// model said `residenceAddress` would build the key `residenceAddress.line1`,
-// the API would refuse it as "Not a field path", and the caller would be stuck:
-// the value requires provenance and the only key that describes it is refused.
-// One spelling, and it is the server's.
+// A debtor's `provenance` map is keyed by DOTTED PATHS INTO THIS RECORD —
+// `name.given`, `residence_address.postalCode`, `other_names_used[n1].surname`
+// — so a path follows whatever the body spells: snake_case here until the
+// debtor routes move to camelCase (ADR 0032), except the shared `Address`,
+// which is camelCase everywhere already. One spelling, and it is the server's.
 // ---------------------------------------------------------------------------
 
 // The four enums below are declared as `as const` arrays with the union
@@ -3156,8 +3164,8 @@ export interface Address {
   readonly city?: string | undefined;
   /** Max 40 characters. */
   readonly state?: string | undefined;
-  /** Max 12 characters. */
-  readonly postal_code?: string | undefined;
+  /** Max 12 characters. camelCase on every body, snake_case or not (ADR 0032). */
+  readonly postalCode?: string | undefined;
   /**
    * B101 line 5's County box (venue turns on it). Only the debtor's
    * residence address ever needs it; max 64 characters.
@@ -3412,7 +3420,7 @@ function addressToJson(address: Address | undefined): Record<string, unknown> | 
     line2: address.line2,
     city: address.city,
     state: address.state,
-    postal_code: address.postal_code,
+    postalCode: address.postalCode,
   });
 }
 
@@ -3498,15 +3506,17 @@ function provenanceToJson(
 }
 
 /**
- * What {@link staffTypedProvenance} will walk.
+ * What {@link staffTypedProvenance} will walk: a debtor, any case collection's
+ * body, or a loose object.
  *
- * The union has three members and needs all three: an `interface` is **not**
+ * The interfaces are named as well as the record: an `interface` is **not**
  * assignable to `Record<string, unknown>` in TypeScript (only a type alias
  * gets an implicit index signature), so naming the record type alone would
- * reject the two shapes callers actually hold, and naming the two alone would
+ * reject the shapes callers actually hold, and naming those alone would
  * reject the loose objects a caller assembles from a form.
  */
-export type DebtorBodyLike = PutDebtorRequest | Debtor | Readonly<Record<string, unknown>>;
+export type DebtorBodyLike =
+  PutDebtorRequest | Debtor | CaseCollections[CaseCollection] | Readonly<Record<string, unknown>>;
 
 /**
  * A `provenance` map that says "a person typed this" for every populated field
@@ -3541,7 +3551,7 @@ export type DebtorBodyLike = PutDebtorRequest | Debtor | Readonly<Record<string,
  * the server's own, case for case, so a divergence fails here first.
  *
  * @throws Error — before any request — when a key is not a legal field name
- * (`[a-z][a-z0-9_]*`), because no provenance path could ever describe it. The
+ * (`[a-z][A-Za-z0-9_]*`), because no provenance path could ever describe it. The
  * API answers 400 for the same body; failing here names the key.
  */
 export function staffTypedProvenance(body: DebtorBodyLike): Record<string, ProvenanceEntry> {
@@ -3565,7 +3575,7 @@ export function staffTypedProvenance(body: DebtorBodyLike): Record<string, Prove
  * ```ts
  * const body = { name: creditor.name, address: creditor.address };
  * await client.addCaseEntity(caseId, 'creditors', {
- *   ...body,
+ *   body,
  *   provenance: libraryProvenance(body, creditor.id),
  * });
  * ```
@@ -3634,7 +3644,7 @@ function taxIdIdentity(sent: Record<string, unknown>): string {
     : `${String(sent.kind)}:${String(sent.last_four)}`;
 }
 
-const PATH_SEGMENT_RE = /^([a-z][a-z0-9_]*)(?:\[([A-Za-z0-9_-]+)\])?$/;
+const PATH_SEGMENT_RE = /^([a-z][A-Za-z0-9_]*)(?:\[([A-Za-z0-9_-]+)\])?$/;
 
 /** The value a provenance path addresses in `record` — `value_at` in
  * `core/provenance.py`, and the inverse of {@link populatedPaths}. */
@@ -3698,8 +3708,8 @@ function caseDataOf(
   return caseData;
 }
 
-/** A field path segment. Note the lower-case start: `SSN` and `legalName` are not names. */
-const FIELD_NAME_RE = /^[a-z][a-z0-9_]*$/;
+/** A field path segment. Note the lower-case start: `SSN` and `LegalName` are not names. */
+const FIELD_NAME_RE = /^[a-z][A-Za-z0-9_]*$/;
 
 /** What a list element's `id` has to look like to be usable as an address. */
 const ADDRESSABLE_ID_RE = /^[A-Za-z0-9_-]+$/;
@@ -3742,7 +3752,7 @@ function populatedPaths(record: unknown, prefix = ''): string[] {
         continue;
       }
       if (!FIELD_NAME_RE.test(key)) {
-        // Loud, and here rather than at the API: a key like `legalName` or
+        // Loud, and here rather than at the API: a key like `LegalName` or
         // `1099_income` would otherwise mint a REQUIRED path that the server's
         // provenance parser then refuses as a key, and no payload could
         // satisfy both.
@@ -4026,10 +4036,10 @@ export const SOFA_ENTRY_TYPES = [
 export type SofaEntryType = (typeof SOFA_ENTRY_TYPES)[number];
 
 /**
- * A dollar amount on the wire: a fixed-scale decimal CARRIED AS A STRING,
- * `"1200.00"`. Never a number — a JSON number has been through the sender's
- * binary floating point, which is the corruption the string exists to
- * prevent. The API canonicalises to two decimal places and rejects negatives.
+ * A dollar amount in a computed VIEW (the summary, the means test, the plan
+ * calculation): a fixed-scale decimal carried as a string, `"1200.00"`.
+ * A case collection's BODY carries money as a JSON number instead (ADR 0032),
+ * read into a decimal server-side; the API rejects negatives.
  */
 export type Money = string;
 
@@ -4052,7 +4062,7 @@ export interface NoticeParty {
   readonly id: string;
   readonly name?: string | undefined;
   readonly address?: Address | undefined;
-  readonly account_last4?: string | undefined;
+  readonly accountLast4?: string | undefined;
 }
 
 /**
@@ -4069,62 +4079,62 @@ export interface ClaimBody {
    * The creditor record this claim names. Not checked server-side — a claim
    * typed before its creditor is saved must persist.
    */
-  readonly creditor_id?: string | undefined;
-  readonly claim_class?: ClaimClass | undefined;
+  readonly creditorId?: string | undefined;
+  readonly claimClass?: ClaimClass | undefined;
   /** Up to four digits. Never a full account number. */
-  readonly account_last4?: string | undefined;
-  readonly date_incurred?: FormDate | undefined;
-  readonly amount?: Money | undefined;
+  readonly accountLast4?: string | undefined;
+  readonly dateIncurred?: FormDate | undefined;
+  readonly amount?: number | undefined;
   readonly contingent?: boolean | undefined;
   readonly unliquidated?: boolean | undefined;
   readonly disputed?: boolean | undefined;
-  readonly subject_to_offset?: boolean | undefined;
-  readonly who_incurred?: DebtorAttribution | undefined;
-  readonly community_debt?: boolean | undefined;
-  readonly notice_parties?: readonly NoticeParty[] | undefined;
+  readonly subjectToOffset?: boolean | undefined;
+  readonly whoIncurred?: DebtorAttribution | undefined;
+  readonly communityDebt?: boolean | undefined;
+  readonly noticeParties?: readonly NoticeParty[] | undefined;
   /**
    * The Schedule A/B asset this lien encumbers (issue #345). Shape-checked
    * only, like `creditor_id`; a dangling id is the completeness gate's to
    * flag. The asset supplies the collateral's description and value unless
    * the two typed fields below override it.
    */
-  readonly asset_id?: string | undefined;
+  readonly assetId?: string | undefined;
   /** Order among the liens on one asset: 1 is the senior lien; 1–99. */
-  readonly lien_position?: number | undefined;
+  readonly lienPosition?: number | undefined;
   /** Free-text collateral — the override, or collateral not on Schedule A/B. */
-  readonly collateral_description?: string | undefined;
+  readonly collateralDescription?: string | undefined;
   /** Typed collateral value — wins over the linked asset's value when present. */
-  readonly collateral_value?: Money | undefined;
-  readonly lien_nature?: readonly LienNature[] | undefined;
-  readonly lien_nature_other?: string | undefined;
+  readonly collateralValue?: number | undefined;
+  readonly lienNature?: readonly LienNature[] | undefined;
+  readonly lienNatureOther?: string | undefined;
   /**
    * "Enter the unsecured portion manually." Present means the server reports
    * this figure with `unsecuredSource: 'manual'` instead of deriving it; its
    * provenance entry is the record of who entered it.
    */
-  readonly unsecured_amount_override?: Money | undefined;
+  readonly unsecuredAmountOverride?: number | undefined;
   /** B108's answer for this collateral; data only until #351 prints it. */
   readonly intention?: Intention | undefined;
-  readonly intention_explanation?: string | undefined;
-  readonly priority_amount?: Money | undefined;
-  readonly nonpriority_amount?: Money | undefined;
-  readonly priority_type?: PriorityType | undefined;
-  readonly priority_type_other?: string | undefined;
-  readonly nonpriority_type?: NonpriorityType | undefined;
-  readonly nonpriority_type_other?: string | undefined;
+  readonly intentionExplanation?: string | undefined;
+  readonly priorityAmount?: number | undefined;
+  readonly nonpriorityAmount?: number | undefined;
+  readonly priorityType?: PriorityType | undefined;
+  readonly priorityTypeOther?: string | undefined;
+  readonly nonpriorityType?: NonpriorityType | undefined;
+  readonly nonpriorityTypeOther?: string | undefined;
 }
 
 /** One row of 106A/B. Both value boxes are stored; subtotals never are. */
 export interface AssetBody {
   readonly category?: AssetCategory | undefined;
-  readonly property_types?: readonly PropertyType[] | undefined;
+  readonly propertyTypes?: readonly PropertyType[] | undefined;
   readonly description?: string | undefined;
   readonly county?: string | undefined;
-  readonly value_entire?: Money | undefined;
-  readonly value_portion_owned?: Money | undefined;
-  readonly ownership_interest?: DebtorAttribution | undefined;
-  readonly ownership_interest_description?: string | undefined;
-  readonly community_property?: boolean | undefined;
+  readonly valueEntire?: number | undefined;
+  readonly valuePortionOwned?: number | undefined;
+  readonly ownershipInterest?: DebtorAttribution | undefined;
+  readonly ownershipInterestDescription?: string | undefined;
+  readonly communityProperty?: boolean | undefined;
   /** Category-specific free text: institution and account type, percentage
    * ownership for an entity interest, and a vehicle's "Other information"
    * box once its own year/make/model/mileage boxes are filled. */
@@ -4140,17 +4150,17 @@ export interface AssetBody {
   readonly model?: string | undefined;
   readonly mileage?: number | undefined;
   /** `customer_lists_and_intangibles` only — line 43's § 101(41A) question. */
-  readonly includes_personal_information?: boolean | undefined;
+  readonly includesPersonalInformation?: boolean | undefined;
 }
 
 /** 106I Part 1: where a debtor works. */
 export interface EmploymentBody {
-  readonly debtor_id?: string | undefined;
+  readonly debtorId?: string | undefined;
   readonly status?: EmploymentStatus | undefined;
   readonly occupation?: string | undefined;
-  readonly employer_name?: string | undefined;
-  readonly employer_address?: Address | undefined;
-  readonly employed_since?: FormDate | undefined;
+  readonly employerName?: string | undefined;
+  readonly employerAddress?: Address | undefined;
+  readonly employedSince?: FormDate | undefined;
 }
 
 /** How often a stub says the debtor is paid — `PAY_FREQUENCIES` in core. */
@@ -4175,7 +4185,7 @@ export type DeductionCategory =
 export interface PayPeriodDeduction {
   readonly id: string;
   readonly category?: DeductionCategory | undefined;
-  readonly amount?: Money | undefined;
+  readonly amount?: number | undefined;
   /** The stub's own wording for the line. */
   readonly description?: string | undefined;
 }
@@ -4186,12 +4196,12 @@ export interface PayPeriodDeduction {
  * through the review flow. All three dates are distinct facts.
  */
 export interface PayPeriodRecordBody {
-  readonly employment_id?: string | undefined;
-  readonly period_start?: FormDate | undefined;
-  readonly period_end?: FormDate | undefined;
-  readonly pay_date?: FormDate | undefined;
-  readonly gross?: Money | undefined;
-  readonly net?: Money | undefined;
+  readonly employmentId?: string | undefined;
+  readonly periodStart?: FormDate | undefined;
+  readonly periodEnd?: FormDate | undefined;
+  readonly payDate?: FormDate | undefined;
+  readonly gross?: number | undefined;
+  readonly net?: number | undefined;
   readonly frequency?: PayFrequency | undefined;
   readonly deductions?: readonly PayPeriodDeduction[] | undefined;
 }
@@ -4202,33 +4212,33 @@ export interface PayPeriodRecordBody {
  * (gross, totals, take-home, combined) are never stored or sent.
  */
 export interface IncomeSummaryBody {
-  readonly debtor_id?: string | undefined;
-  readonly wages?: Money | undefined;
-  readonly overtime?: Money | undefined;
-  readonly deduction_tax?: Money | undefined;
-  readonly deduction_mandatory_retirement?: Money | undefined;
-  readonly deduction_voluntary_retirement?: Money | undefined;
-  readonly deduction_retirement_loan_repayment?: Money | undefined;
-  readonly deduction_insurance?: Money | undefined;
-  readonly deduction_domestic_support?: Money | undefined;
-  readonly deduction_union_dues?: Money | undefined;
-  readonly deduction_other?: Money | undefined;
-  readonly deduction_other_specify?: string | undefined;
-  readonly business_net_income?: Money | undefined;
-  readonly interest_and_dividends?: Money | undefined;
-  readonly family_support?: Money | undefined;
-  readonly unemployment?: Money | undefined;
-  readonly social_security?: Money | undefined;
-  readonly other_government_assistance?: Money | undefined;
-  readonly other_government_assistance_specify?: string | undefined;
-  readonly pension_or_retirement?: Money | undefined;
-  readonly other_monthly_income?: Money | undefined;
-  readonly other_monthly_income_specify?: string | undefined;
+  readonly debtorId?: string | undefined;
+  readonly wages?: number | undefined;
+  readonly overtime?: number | undefined;
+  readonly deductionTax?: number | undefined;
+  readonly deductionMandatoryRetirement?: number | undefined;
+  readonly deductionVoluntaryRetirement?: number | undefined;
+  readonly deductionRetirementLoanRepayment?: number | undefined;
+  readonly deductionInsurance?: number | undefined;
+  readonly deductionDomesticSupport?: number | undefined;
+  readonly deductionUnionDues?: number | undefined;
+  readonly deductionOther?: number | undefined;
+  readonly deductionOtherSpecify?: string | undefined;
+  readonly businessNetIncome?: number | undefined;
+  readonly interestAndDividends?: number | undefined;
+  readonly familySupport?: number | undefined;
+  readonly unemployment?: number | undefined;
+  readonly socialSecurity?: number | undefined;
+  readonly otherGovernmentAssistance?: number | undefined;
+  readonly otherGovernmentAssistanceSpecify?: string | undefined;
+  readonly pensionOrRetirement?: number | undefined;
+  readonly otherMonthlyIncome?: number | undefined;
+  readonly otherMonthlyIncomeSpecify?: string | undefined;
   /** Line 11 — case-level on the form; carried on the debtor-1 summary. */
-  readonly household_contributions?: Money | undefined;
-  readonly household_contributions_specify?: string | undefined;
-  readonly change_expected?: boolean | undefined;
-  readonly change_explanation?: string | undefined;
+  readonly householdContributions?: number | undefined;
+  readonly householdContributionsSpecify?: string | undefined;
+  readonly changeExpected?: boolean | undefined;
+  readonly changeExplanation?: string | undefined;
 }
 
 /**
@@ -4237,11 +4247,11 @@ export interface IncomeSummaryBody {
  * subtract them, never below zero); the server refuses it elsewhere.
  */
 export interface OtherIncomeRecordBody {
-  readonly debtor_id?: string | undefined;
+  readonly debtorId?: string | undefined;
   readonly category?: OtherIncomeCategory | undefined;
-  readonly received_on?: FormDate | undefined;
-  readonly amount?: Money | undefined;
-  readonly expenses?: Money | undefined;
+  readonly receivedOn?: FormDate | undefined;
+  readonly amount?: number | undefined;
+  readonly expenses?: number | undefined;
   readonly payer?: string | undefined;
   readonly description?: string | undefined;
 }
@@ -4250,7 +4260,7 @@ export interface OtherIncomeRecordBody {
 export interface MaritalAdjustmentItem {
   readonly id: string;
   readonly description?: string | undefined;
-  readonly amount?: Money | undefined;
+  readonly amount?: number | undefined;
 }
 
 /**
@@ -4261,7 +4271,7 @@ export interface MaritalAdjustmentItem {
 export interface SpecialCircumstanceItem {
   readonly id: string;
   readonly description?: string | undefined;
-  readonly amount?: Money | undefined;
+  readonly amount?: number | undefined;
 }
 
 /**
@@ -4284,12 +4294,12 @@ export type SecuredPaymentBucket = (typeof SECURED_PAYMENT_BUCKETS)[number];
  */
 export interface OtherSecuredPayment {
   readonly id: string;
-  readonly creditor_name?: string | undefined;
-  readonly property_description?: string | undefined;
-  readonly monthly_payment?: Money | undefined;
-  readonly claim_id?: string | undefined;
+  readonly creditorName?: string | undefined;
+  readonly propertyDescription?: string | undefined;
+  readonly monthlyPayment?: number | undefined;
+  readonly claimId?: string | undefined;
   readonly bucket?: SecuredPaymentBucket | undefined;
-  readonly cure_total?: Money | undefined;
+  readonly cureTotal?: number | undefined;
 }
 
 /**
@@ -4339,7 +4349,7 @@ export interface IncomeLineOverride {
   readonly id: string;
   readonly column?: IncomeColumn | undefined;
   readonly category?: IncomeLineCategory | undefined;
-  readonly monthly_amount?: Money | undefined;
+  readonly monthlyAmount?: number | undefined;
 }
 
 /**
@@ -4361,49 +4371,49 @@ export interface IncomeLineOverride {
  * (line 41) and the special-circumstance rows (line 43).
  */
 export interface MeansTestInputBody {
-  readonly people_under_65?: number | undefined;
-  readonly people_65_or_older?: number | undefined;
-  readonly median_household_size?: number | undefined;
-  readonly irs_family_size?: number | undefined;
-  readonly irs_housing_family_size?: number | undefined;
-  readonly marital_filing_status?: MaritalFilingStatus | undefined;
-  readonly non_consumer_debts?: boolean | undefined;
-  readonly disabled_veteran?: boolean | undefined;
-  readonly reservist_national_guard?: boolean | undefined;
-  readonly income_overrides?: readonly IncomeLineOverride[] | undefined;
-  readonly marital_adjustments?: readonly MaritalAdjustmentItem[] | undefined;
-  readonly home_secured_monthly_total?: Money | undefined;
-  readonly housing_adjustment_amount?: Money | undefined;
-  readonly housing_adjustment_explanation?: string | undefined;
-  readonly vehicle_count?: number | undefined;
-  readonly vehicle_1_loan_monthly?: Money | undefined;
-  readonly vehicle_2_loan_monthly?: Money | undefined;
-  readonly additional_public_transportation?: Money | undefined;
-  readonly taxes?: Money | undefined;
-  readonly involuntary_deductions?: Money | undefined;
-  readonly term_life_insurance?: Money | undefined;
-  readonly court_ordered_payments?: Money | undefined;
-  readonly education_for_employment_or_disability?: Money | undefined;
-  readonly childcare?: Money | undefined;
-  readonly healthcare_above_allowance?: Money | undefined;
-  readonly optional_telecom?: Money | undefined;
-  readonly health_insurance?: Money | undefined;
-  readonly disability_insurance?: Money | undefined;
-  readonly health_savings_account?: Money | undefined;
-  readonly family_care_contributions?: Money | undefined;
-  readonly family_violence_protection?: Money | undefined;
-  readonly home_energy_excess?: Money | undefined;
-  readonly education_under_18?: Money | undefined;
-  readonly additional_food_clothing?: Money | undefined;
-  readonly charitable_contributions?: Money | undefined;
-  readonly other_secured_payments?: readonly OtherSecuredPayment[] | undefined;
-  readonly priority_cure_total?: Money | undefined;
-  readonly ch13_eligible?: boolean | undefined;
-  readonly ch13_projected_plan_payment?: Money | undefined;
-  readonly commitment_period_marital_adjustment?: boolean | undefined;
-  readonly child_support_for_dependents?: Money | undefined;
-  readonly qualified_retirement_deductions?: Money | undefined;
-  readonly special_circumstances?: readonly SpecialCircumstanceItem[] | undefined;
+  readonly peopleUnder65?: number | undefined;
+  readonly people65OrOlder?: number | undefined;
+  readonly medianHouseholdSize?: number | undefined;
+  readonly irsFamilySize?: number | undefined;
+  readonly irsHousingFamilySize?: number | undefined;
+  readonly maritalFilingStatus?: MaritalFilingStatus | undefined;
+  readonly nonConsumerDebts?: boolean | undefined;
+  readonly disabledVeteran?: boolean | undefined;
+  readonly reservistNationalGuard?: boolean | undefined;
+  readonly incomeOverrides?: readonly IncomeLineOverride[] | undefined;
+  readonly maritalAdjustments?: readonly MaritalAdjustmentItem[] | undefined;
+  readonly homeSecuredMonthlyTotal?: number | undefined;
+  readonly housingAdjustmentAmount?: number | undefined;
+  readonly housingAdjustmentExplanation?: string | undefined;
+  readonly vehicleCount?: number | undefined;
+  readonly vehicle1LoanMonthly?: number | undefined;
+  readonly vehicle2LoanMonthly?: number | undefined;
+  readonly additionalPublicTransportation?: number | undefined;
+  readonly taxes?: number | undefined;
+  readonly involuntaryDeductions?: number | undefined;
+  readonly termLifeInsurance?: number | undefined;
+  readonly courtOrderedPayments?: number | undefined;
+  readonly educationForEmploymentOrDisability?: number | undefined;
+  readonly childcare?: number | undefined;
+  readonly healthcareAboveAllowance?: number | undefined;
+  readonly optionalTelecom?: number | undefined;
+  readonly healthInsurance?: number | undefined;
+  readonly disabilityInsurance?: number | undefined;
+  readonly healthSavingsAccount?: number | undefined;
+  readonly familyCareContributions?: number | undefined;
+  readonly familyViolenceProtection?: number | undefined;
+  readonly homeEnergyExcess?: number | undefined;
+  readonly educationUnder18?: number | undefined;
+  readonly additionalFoodClothing?: number | undefined;
+  readonly charitableContributions?: number | undefined;
+  readonly otherSecuredPayments?: readonly OtherSecuredPayment[] | undefined;
+  readonly priorityCureTotal?: number | undefined;
+  readonly ch13Eligible?: boolean | undefined;
+  readonly ch13ProjectedPlanPayment?: number | undefined;
+  readonly commitmentPeriodMaritalAdjustment?: boolean | undefined;
+  readonly childSupportForDependents?: number | undefined;
+  readonly qualifiedRetirementDeductions?: number | undefined;
+  readonly specialCircumstances?: readonly SpecialCircumstanceItem[] | undefined;
 }
 
 /**
@@ -4441,15 +4451,15 @@ export type UnsecuredTreatment = (typeof UNSECURED_TREATMENTS)[number];
 /** From `start_month` on (1-based), the monthly payment is `monthly_payment`. */
 export interface PlanStepPayment {
   readonly id: string;
-  readonly start_month?: number | undefined;
-  readonly monthly_payment?: Money | undefined;
+  readonly startMonth?: number | undefined;
+  readonly monthlyPayment?: number | undefined;
 }
 
 /** A one-time payment into the plan in `month`. */
 export interface PlanLumpSum {
   readonly id: string;
   readonly month?: number | undefined;
-  readonly amount?: Money | undefined;
+  readonly amount?: number | undefined;
   readonly description?: string | undefined;
 }
 
@@ -4463,14 +4473,14 @@ export interface PlanLumpSum {
  */
 export interface PlanSecuredTreatment {
   readonly id: string;
-  readonly claim_id?: string | undefined;
+  readonly claimId?: string | undefined;
   readonly treatment?: SecuredTreatmentKind | undefined;
-  readonly arrearage?: Money | undefined;
-  readonly arrearage_interest_rate?: Percentage | undefined;
-  readonly maintenance_payment?: Money | undefined;
-  readonly cramdown_value?: Money | undefined;
-  readonly interest_rate?: Percentage | undefined;
-  readonly monthly_payment?: Money | undefined;
+  readonly arrearage?: number | undefined;
+  readonly arrearageInterestRate?: number | undefined;
+  readonly maintenancePayment?: number | undefined;
+  readonly cramdownValue?: number | undefined;
+  readonly interestRate?: number | undefined;
+  readonly monthlyPayment?: number | undefined;
 }
 
 /**
@@ -4481,42 +4491,42 @@ export interface PlanSecuredTreatment {
  * trustee's percentage is at most 10 (28 U.S.C. § 586(e)).
  */
 export interface PlanBody {
-  readonly term_months?: number | undefined;
-  readonly payment_source?: PlanPaymentSource | undefined;
-  readonly monthly_payment?: Money | undefined;
-  readonly step_payments?: readonly PlanStepPayment[] | undefined;
-  readonly lump_sums?: readonly PlanLumpSum[] | undefined;
-  readonly trustee_percentage?: Percentage | undefined;
-  readonly attorney_fees?: Money | undefined;
-  readonly attorney_fee_monthly?: Money | undefined;
-  readonly secured_treatments?: readonly PlanSecuredTreatment[] | undefined;
-  readonly priority_percentage?: Percentage | undefined;
-  readonly priority_interest_rate?: Percentage | undefined;
-  readonly unsecured_treatment?: UnsecuredTreatment | undefined;
-  readonly unsecured_percentage?: Percentage | undefined;
-  readonly unsecured_amount?: Money | undefined;
-  readonly unsecured_interest_rate?: Percentage | undefined;
-  readonly chapter_7_other_costs?: Money | undefined;
-  readonly chapter_7_other_costs_description?: string | undefined;
-  readonly present_value_rate?: Percentage | undefined;
+  readonly termMonths?: number | undefined;
+  readonly paymentSource?: PlanPaymentSource | undefined;
+  readonly monthlyPayment?: number | undefined;
+  readonly stepPayments?: readonly PlanStepPayment[] | undefined;
+  readonly lumpSums?: readonly PlanLumpSum[] | undefined;
+  readonly trusteePercentage?: number | undefined;
+  readonly attorneyFees?: number | undefined;
+  readonly attorneyFeeMonthly?: number | undefined;
+  readonly securedTreatments?: readonly PlanSecuredTreatment[] | undefined;
+  readonly priorityPercentage?: number | undefined;
+  readonly priorityInterestRate?: number | undefined;
+  readonly unsecuredTreatment?: UnsecuredTreatment | undefined;
+  readonly unsecuredPercentage?: number | undefined;
+  readonly unsecuredAmount?: number | undefined;
+  readonly unsecuredInterestRate?: number | undefined;
+  readonly chapter7OtherCosts?: number | undefined;
+  readonly chapter7OtherCostsDescription?: string | undefined;
+  readonly presentValueRate?: number | undefined;
 }
 
 /** 106J Part 1's frame: which schedule, and the change narrative. */
 export interface HouseholdBody {
-  readonly which_household?: WhichHousehold | undefined;
-  readonly separate_household?: boolean | undefined;
+  readonly whichHousehold?: WhichHousehold | undefined;
+  readonly separateHousehold?: boolean | undefined;
   /** Line 3 — expenses include people other than the debtors + dependents. */
-  readonly expenses_include_others?: boolean | undefined;
-  readonly change_expected?: boolean | undefined;
-  readonly change_explanation?: string | undefined;
+  readonly expensesIncludeOthers?: boolean | undefined;
+  readonly changeExpected?: boolean | undefined;
+  readonly changeExplanation?: string | undefined;
 }
 
 /** One 106J expense line: a row, not a column. */
 export interface ExpenseBody {
-  readonly household_id?: string | undefined;
+  readonly householdId?: string | undefined;
   readonly category?: ExpenseCategory | undefined;
-  readonly specify_text?: string | undefined;
-  readonly amount?: Money | undefined;
+  readonly specifyText?: string | undefined;
+  readonly amount?: number | undefined;
 }
 
 /**
@@ -4525,10 +4535,10 @@ export interface ExpenseBody {
  * dropping it.
  */
 export interface DependentBody {
-  readonly household_id?: string | undefined;
+  readonly householdId?: string | undefined;
   readonly relationship?: string | undefined;
   readonly age?: number | undefined;
-  readonly lives_with_debtor?: boolean | undefined;
+  readonly livesWithDebtor?: boolean | undefined;
 }
 
 /** 106H Part 2: who else is liable, and on which claims. */
@@ -4536,9 +4546,9 @@ export interface CodebtorBody {
   readonly name?: string | undefined;
   readonly address?: Address | undefined;
   /** Claim record ids — the fact behind the form's "Schedule D, line __". */
-  readonly claim_ids?: readonly string[] | undefined;
+  readonly claimIds?: readonly string[] | undefined;
   /** Contract/lease record ids — the "Schedule G, line __" column. */
-  readonly contract_lease_ids?: readonly string[] | undefined;
+  readonly contractLeaseIds?: readonly string[] | undefined;
 }
 
 /**
@@ -4550,12 +4560,12 @@ export interface CodebtorBody {
  */
 export interface ExemptionBody {
   /** The asset record this exemption protects. Not checked server-side. */
-  readonly asset_id?: string | undefined;
-  readonly statute_citation?: string | undefined;
-  readonly amount?: Money | undefined;
-  readonly claims_full_fmv?: boolean | undefined;
+  readonly assetId?: string | undefined;
+  readonly statuteCitation?: string | undefined;
+  readonly amount?: number | undefined;
+  readonly claimsFullFmv?: boolean | undefined;
   /** 106C line 3's follow-up — a fact the debtor supplies. */
-  readonly acquired_within_1215_days?: boolean | undefined;
+  readonly acquiredWithin1215Days?: boolean | undefined;
 }
 
 /**
@@ -4569,8 +4579,8 @@ export type ContractLeaseIntention = (typeof CONTRACT_LEASE_INTENTIONS)[number];
 /** 106G, one row: an executory contract or unexpired lease. */
 export interface ContractLeaseBody {
   /** One free-text line — counterparties are predominantly entities. */
-  readonly counterparty_name?: string | undefined;
-  readonly counterparty_address?: Address | undefined;
+  readonly counterpartyName?: string | undefined;
+  readonly counterpartyAddress?: Address | undefined;
   /** What the contract or lease is for, term remaining, contract number. */
   readonly description?: string | undefined;
   /**
@@ -4579,7 +4589,7 @@ export interface ContractLeaseBody {
    */
   readonly intention?: ContractLeaseIntention | undefined;
   /** Whether this row belongs on the Statement of Intention at all. */
-  readonly list_on_statement_of_intention?: boolean | undefined;
+  readonly listOnStatementOfIntention?: boolean | undefined;
 }
 
 /** 106H line 2 / B107 Q3: the community-property spouse or former spouse. */
@@ -4587,23 +4597,23 @@ export interface CommunityHouseholdMemberBody {
   readonly name?: string | undefined;
   readonly address?: Address | undefined;
   /** The community property state lived in — a two-letter code. */
-  readonly community_state?: string | undefined;
-  readonly lived_with_debtor?: boolean | undefined;
+  readonly communityState?: string | undefined;
+  readonly livedWithDebtor?: boolean | undefined;
 }
 
 /**
- * A SOFA payload's members, typed loosely on the wire. The per-type shapes
- * are owned and validated by `core/sofa.py` server-side — the one dispatch
- * table — and re-declaring all twenty-seven here would be a second copy of
- * that contract with no second reader yet. The intake UI narrows what it
- * renders per {@link SofaEntryType}.
+ * A SOFA payload: its `entryType` names the question, and the rest are that
+ * question's camelCase members, typed loosely on the wire. The per-type shapes
+ * are owned and validated by `SofaEntry.cs` server-side — a polymorphic
+ * record discriminated on `entryType` — and re-declaring all twenty-seven here
+ * would be a second copy of that contract with no second reader yet. The
+ * intake UI narrows what it renders per {@link SofaEntryType}.
  */
-export type SofaPayload = Readonly<Record<string, unknown>>;
+export type SofaPayload = { readonly entryType: SofaEntryType } & Readonly<Record<string, unknown>>;
 
 /** One B107 answer: a typed row in the single SOFA table. */
 export interface SofaEntryBody {
-  readonly entry_type?: SofaEntryType | undefined;
-  /** Refused with a 400 when sent without {@link entry_type}. */
+  /** Refused with a 400 when sent without its `entryType`. */
   readonly payload?: SofaPayload | undefined;
 }
 
@@ -4675,7 +4685,7 @@ export type FilingProfessionalRole = (typeof FILING_PROFESSIONAL_ROLES)[number];
 /** B101 line 14: property needing immediate attention. */
 export interface HazardousProperty {
   readonly description?: string | undefined;
-  readonly why_immediate?: string | undefined;
+  readonly whyImmediate?: string | undefined;
   readonly address?: Address | undefined;
 }
 
@@ -4685,47 +4695,47 @@ export interface HazardousProperty {
  * collection; the pre-filing completeness gate flags a duplicate.
  */
 export interface PetitionBody {
-  readonly fee_handling?: FeeHandling | undefined;
-  readonly rents_residence?: boolean | undefined;
-  readonly eviction_judgment_against_you?: boolean | undefined;
-  readonly small_business_status?: SmallBusinessStatus | undefined;
-  readonly hazardous_property?: HazardousProperty | undefined;
-  readonly debt_character?: DebtCharacter | undefined;
-  readonly debt_character_other?: string | undefined;
-  readonly ch7_funds_available_for_creditors?: boolean | undefined;
-  readonly estimated_creditors?: EstimatedCreditorsBand | undefined;
-  readonly estimated_assets?: EstimatedDollarBand | undefined;
-  readonly estimated_liabilities?: EstimatedDollarBand | undefined;
+  readonly feeHandling?: FeeHandling | undefined;
+  readonly rentsResidence?: boolean | undefined;
+  readonly evictionJudgmentAgainstYou?: boolean | undefined;
+  readonly smallBusinessStatus?: SmallBusinessStatus | undefined;
+  readonly hazardousProperty?: HazardousProperty | undefined;
+  readonly debtCharacter?: DebtCharacter | undefined;
+  readonly debtCharacterOther?: string | undefined;
+  readonly ch7FundsAvailableForCreditors?: boolean | undefined;
+  readonly estimatedCreditors?: EstimatedCreditorsBand | undefined;
+  readonly estimatedAssets?: EstimatedDollarBand | undefined;
+  readonly estimatedLiabilities?: EstimatedDollarBand | undefined;
   /**
    * NOT a B101 line — the form has no such box. The petition screen's own
    * planning figure (issue #342): the base the §109(h) 180-day counseling
    * window and the 8-year prior-case lookback are computed from. Mirrors
    * `PetitionBody.expected_filing_date` in `core/petitions.py`.
    */
-  readonly expected_filing_date?: FormDate | undefined;
+  readonly expectedFilingDate?: FormDate | undefined;
 }
 
 /** B101 line 9: a bankruptcy filed within the last 8 years. */
 export interface PriorCaseBody {
   readonly district?: string | undefined;
-  readonly filed_on?: FormDate | undefined;
-  readonly case_number?: string | undefined;
+  readonly filedOn?: FormDate | undefined;
+  readonly caseNumber?: string | undefined;
 }
 
 /** B101 line 10: a pending case by a spouse, partner, or affiliate. */
 export interface RelatedCaseBody {
-  readonly debtor_name?: string | undefined;
+  readonly debtorName?: string | undefined;
   readonly relationship?: string | undefined;
   readonly district?: string | undefined;
-  readonly filed_on?: FormDate | undefined;
-  readonly case_number?: string | undefined;
+  readonly filedOn?: FormDate | undefined;
+  readonly caseNumber?: string | undefined;
 }
 
 /** B101 line 12: a business the debtor runs as a sole proprietor. */
 export interface SoleProprietorshipBody {
   readonly name?: string | undefined;
   readonly address?: Address | undefined;
-  readonly business_type?: BusinessType | undefined;
+  readonly businessType?: BusinessType | undefined;
 }
 
 /**
@@ -4736,28 +4746,28 @@ export interface SoleProprietorshipBody {
 export interface FilingProfessionalBody {
   readonly role?: FilingProfessionalRole | undefined;
   readonly name?: PersonName | undefined;
-  readonly firm_name?: string | undefined;
+  readonly firmName?: string | undefined;
   readonly address?: Address | undefined;
   readonly phone?: string | undefined;
   readonly email?: string | undefined;
-  readonly bar_number?: string | undefined;
-  readonly bar_state?: string | undefined;
-  readonly signature_date?: FormDate | undefined;
+  readonly barNumber?: string | undefined;
+  readonly barState?: string | undefined;
+  readonly signatureDate?: FormDate | undefined;
   /**
    * B2030, the attorney's compensation disclosure (issue #351): the fee
    * agreed and received (money strings), who paid / will pay, whether the
    * fee is shared outside the firm, and the services covered or excluded.
    * The balance due is derived by the forms engine, never stored.
    */
-  readonly compensation_agreed?: Money | undefined;
-  readonly compensation_received?: Money | undefined;
-  readonly compensation_source_paid?: CompensationSource | undefined;
-  readonly compensation_source_paid_other?: string | undefined;
-  readonly compensation_source_to_be_paid?: CompensationSource | undefined;
-  readonly compensation_source_to_be_paid_other?: string | undefined;
-  readonly compensation_shared?: boolean | undefined;
-  readonly services_other?: string | undefined;
-  readonly services_excluded?: string | undefined;
+  readonly compensationAgreed?: number | undefined;
+  readonly compensationReceived?: number | undefined;
+  readonly compensationSourcePaid?: CompensationSource | undefined;
+  readonly compensationSourcePaidOther?: string | undefined;
+  readonly compensationSourceToBePaid?: CompensationSource | undefined;
+  readonly compensationSourceToBePaidOther?: string | undefined;
+  readonly compensationShared?: boolean | undefined;
+  readonly servicesOther?: string | undefined;
+  readonly servicesExcluded?: string | undefined;
 }
 
 /** B2030 items 2 and 3: who paid, and who will pay, the attorney's fee. */
@@ -4834,10 +4844,12 @@ export const CASE_COLLECTIONS = [
  * server refuses `true` with a 409 unless the case is `filed`, and a PUT
  * that omits it keeps the stored flag rather than clearing it.
  */
-export type CaseEntityRequest<C extends CaseCollection> = CaseCollections[C] & {
+export interface CaseEntityRequest<C extends CaseCollection> {
+  readonly body: CaseCollections[C];
+  /** Keyed by camelCase body path (`address.postalCode`). */
   readonly provenance?: ProvenanceMap | undefined;
   readonly amended?: boolean | undefined;
-};
+}
 
 /**
  * A stored record as every entity endpoint returns it: server-stamped
@@ -4845,12 +4857,14 @@ export type CaseEntityRequest<C extends CaseCollection> = CaseCollections[C] & {
  * populated — absent members are absent, never null, exactly as on
  * {@link Debtor}.
  */
-export type CaseEntity<C extends CaseCollection> = CaseCollections[C] & {
+export interface CaseEntity<C extends CaseCollection> {
   /** The server-generated id, stable across saves. */
   readonly id: string;
-  readonly case_id: string;
-  readonly created_at: string;
-  readonly updated_at: string;
+  readonly caseId: string;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  /** Whatever of the body is populated; absent members are absent. */
+  readonly body: CaseCollections[C];
   /** Always present — `{}` on a record with nothing in it. */
   readonly provenance: ProvenanceMap;
   /**
@@ -4859,7 +4873,7 @@ export type CaseEntity<C extends CaseCollection> = CaseCollections[C] & {
    * on a case that has never been filed.
    */
   readonly amended: boolean;
-};
+}
 
 /**
  * A generic collection request body as JSON, with absent members omitted
@@ -4872,19 +4886,13 @@ export type CaseEntity<C extends CaseCollection> = CaseCollections[C] & {
 export function caseEntityRequestToJson(
   request: CaseEntityRequest<CaseCollection>,
 ): Record<string, unknown> {
-  const json: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(request)) {
-    if (key === 'provenance') {
-      continue;
-    }
-    const pruned = pruneJsonValue(value);
-    if (pruned !== undefined) {
-      json[key] = pruned;
-    }
-  }
+  const json: Record<string, unknown> = { body: pruneJsonValue(request.body) ?? {} };
   const provenance = provenanceToJson(request.provenance);
   if (provenance !== undefined) {
     json.provenance = provenance;
+  }
+  if (request.amended !== undefined) {
+    json.amended = request.amended;
   }
   return json;
 }
@@ -4898,17 +4906,15 @@ export function caseEntityRequestToJson(
 // is editable only by its author or a firm admin, neither of which the
 // generic collection routes can express.
 //
-// SNAKE_CASE, like {@link Debtor} and unlike everything else in this file —
-// see that section's comment for why: the wire is mirrored, not smoothed.
-// `note_json` (`insolvia_core.notes`) emits `case_id`, `created_at`,
-// `author_subject` — and, unlike every {@link CaseEntity}, no `provenance`
+// camelCase (ADR 0032). The response nests the note under `body`, beside the
+// server's identity, like every {@link CaseEntity} — but with no `provenance`
 // key at all: a note is not case data printed on a form, so it carries none.
 // ---------------------------------------------------------------------------
 
 /** The client-supplied half of a note: everything but its server identity
  * and its server-stamped author. Used for both create and edit — there is no
  * partial update, the same PUT-replaces-whole rule {@link PutDebtorRequest}
- * follows. */
+ * follows. Sent flat, not nested under `body`. */
 export interface NoteRequest {
   readonly text?: string | undefined;
   /**
@@ -4916,43 +4922,45 @@ export interface NoteRequest {
    * `"form/b106g"`) — the form this note is anchored to, or absent for a
    * case-level note.
    */
-  readonly form_series?: string | undefined;
+  readonly formSeries?: string | undefined;
 }
 
-/**
- * A note as every note endpoint returns it: server identity, the author
- * snapshot captured at write, and whatever of {@link NoteRequest} is
- * populated. Absent members are absent, never null — the same rule
- * {@link Debtor} follows.
- */
-export interface Note extends NoteRequest {
-  /** The server-generated note id, stable across edits. */
-  readonly id: string;
-  readonly case_id: string;
-  readonly created_at: string;
-  readonly updated_at: string;
+/** A note's body: what was written, and the author snapshot captured at write. */
+export interface NoteBody extends NoteRequest {
   /**
    * The Cognito subject of whoever wrote this note, captured when it was
    * created and unaffected by later edits — including an admin's, per
    * {@link putNote}. Never the editor's.
    */
-  readonly author_subject: string;
-  /** The author's display name, captured at the same moment as `author_subject`. */
-  readonly author_name: string;
+  readonly authorSubject?: string | undefined;
+  /** The author's display name, captured at the same moment as `authorSubject`. */
+  readonly authorName?: string | undefined;
+}
+
+/**
+ * A note as every note endpoint returns it: server identity and its
+ * {@link NoteBody}. Absent members are absent, never null.
+ */
+export interface Note {
+  /** The server-generated note id, stable across edits. */
+  readonly id: string;
+  readonly caseId: string;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  readonly body: NoteBody;
 }
 
 /**
  * The request body for `POST`/`PUT .../notes[...]`, with absent members
- * omitted from the JSON entirely — the note counterpart of
- * {@link putDebtorRequestToJson}. There is no `provenance` member to prune
- * separately: a note carries none.
+ * omitted from the JSON entirely. There is no `provenance` member: a note
+ * carries none.
  */
 export function noteRequestToJson(request: NoteRequest): Record<string, unknown> {
   return assignDefined(
     {},
     {
       text: request.text,
-      form_series: request.form_series,
+      formSeries: request.formSeries,
     },
   );
 }

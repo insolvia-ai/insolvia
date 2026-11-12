@@ -413,17 +413,19 @@ function meBody(notesLevel: string = 'add_edit') {
   };
 }
 
-function noteRecord(overrides: Record<string, unknown> = {}) {
+function noteRecord({ id = 'note-1', ...body }: Record<string, unknown> = {}) {
   return {
-    id: 'note-1',
-    case_id: CASE_ID,
-    created_at: '2026-09-01T10:00:00.000000Z',
-    updated_at: '2026-09-01T10:00:00.000000Z',
-    author_subject: ALICE,
-    author_name: 'Alice Attorney',
-    text: 'A note on this form.',
-    form_series: 'form/b106g',
-    ...overrides,
+    id,
+    caseId: CASE_ID,
+    createdAt: '2026-09-01T10:00:00.000000Z',
+    updatedAt: '2026-09-01T10:00:00.000000Z',
+    body: {
+      authorSubject: ALICE,
+      authorName: 'Alice Attorney',
+      text: 'A note on this form.',
+      formSeries: 'form/b106g',
+      ...body,
+    },
   };
 }
 
@@ -459,7 +461,7 @@ describe('notes on a form row (issue 14.5 / #357)', () => {
           const created = noteRecord({
             id: `note-${String(nextId)}`,
             text: body.text,
-            form_series: body.form_series,
+            formSeries: body.formSeries,
           });
           nextId += 1;
           notes.push(created);
@@ -544,7 +546,7 @@ describe('notes on a form row (issue 14.5 / #357)', () => {
     );
     expect(posted).toBeDefined();
     const body = JSON.parse(String((posted?.[1] as RequestInit).body)) as Record<string, unknown>;
-    expect(body).toEqual({ text: 'Check the lease term.', form_series: 'form/b106g' });
+    expect(body).toEqual({ text: 'Check the lease term.', formSeries: 'form/b106g' });
   });
 
   it('hides the composer without the notes feature', async () => {

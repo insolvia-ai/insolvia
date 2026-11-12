@@ -93,9 +93,9 @@ public sealed class ExtractionReviewRoutes : IEndpointModule
             .ToDictionary(sibling => sibling.Id, StringComparer.Ordinal);
         var payload = ExtractionReview.ResolveCandidateReferences(candidate.EntityType, decision.CorrectedPayload ?? candidate.Payload, siblings);
         payload = await WithClientLinksAsync(context, candidate, payload, cancellationToken);
-        var draft = ExtractionReview.BuildAcceptedDraft(candidate, payload, accessor.Subject, moment);
+        var (body, provenance) = ExtractionReview.BuildAccepted(candidate, payload, accessor.Subject, moment);
         var now = Clock.Now(context.Clock());
-        var entity = kind.Restore(Guid.NewGuid().ToString(), caseId, now, now, draft);
+        var entity = kind.Restore(Guid.NewGuid().ToString(), caseId, now, now, body, provenance, amended: false);
 
         var reviewed = ExtractionReview.Accept(candidate, decision.CorrectedPayload, entity.Id, accessor.Subject, moment, context.Clock());
         _ = await candidates.UpdateAsync(reviewed, CandidateStatus.Pending, cancellationToken) ?? throw new ConflictException(Reviewed);
@@ -135,7 +135,7 @@ public sealed class ExtractionReviewRoutes : IEndpointModule
 
         string? debtorId = null;
         string? householdId = null;
-        if (field == "debtor_id")
+        if (field == "debtorId")
         {
             debtorId = (await context.Port<IDebtorStore>().GetAsync(candidate.CaseId, ExtractionReview.AnswerFilingRole(candidate), cancellationToken))?.Id;
         }

@@ -110,44 +110,44 @@ export function PetitionFields({
   const setAddress = (part: keyof Address, value: string) =>
     onChange({
       ...body,
-      hazardous_property: {
-        ...body.hazardous_property,
-        address: { ...body.hazardous_property?.address, [part]: value },
+      hazardousProperty: {
+        ...body.hazardousProperty,
+        address: { ...body.hazardousProperty?.address, [part]: value },
       },
     });
 
-  const dates = statutoryDates(body.expected_filing_date);
+  const dates = statutoryDates(body.expectedFilingDate);
 
   return (
     <View style={styles.form}>
       <Section title="Filing fee">
         <YesNoLikeSelect
           label="How will the filing fee be handled?"
-          path="fee_handling"
-          value={body.fee_handling}
+          path="feeHandling"
+          value={body.feeHandling}
           options={FEE_HANDLING_OPTIONS}
           onValueChange={(next) =>
-            onChange({ ...body, fee_handling: next as PetitionBody['fee_handling'] })
+            onChange({ ...body, feeHandling: next as PetitionBody['feeHandling'] })
           }
           errors={errors}
         />
       </Section>
 
       <Section title="Filing timeline">
-        <Field.Root invalid={Boolean(errors.expected_filing_date)}>
+        <Field.Root invalid={Boolean(errors.expectedFilingDate)}>
           <Field.Label>Expected filing date</Field.Label>
           <DateInput
-            value={body.expected_filing_date ?? ''}
+            value={body.expectedFilingDate ?? ''}
             onValueChange={(next, status) => {
               if (status === 'incomplete') return;
-              onChange({ ...body, expected_filing_date: next === '' ? undefined : next });
+              onChange({ ...body, expectedFilingDate: next === '' ? undefined : next });
             }}
           />
           <Field.Description>
             A planning date, not a deadline — the two dates below move with it.
           </Field.Description>
-          {errors.expected_filing_date ? (
-            <Field.Error match>{errors.expected_filing_date}</Field.Error>
+          {errors.expectedFilingDate ? (
+            <Field.Error match>{errors.expectedFilingDate}</Field.Error>
           ) : null}
         </Field.Root>
         <Text style={[styles.derivedDate, muted]}>
@@ -160,32 +160,32 @@ export function PetitionFields({
       <Section title="Residence">
         <YesNoField
           label="Does the debtor rent their residence?"
-          path="rents_residence"
-          value={body.rents_residence}
-          onValueChange={(next) => onChange({ ...body, rents_residence: next })}
+          path="rentsResidence"
+          value={body.rentsResidence}
+          onValueChange={(next) => onChange({ ...body, rentsResidence: next })}
           errors={errors}
         />
         <YesNoField
           label="Has the landlord obtained an eviction judgment against the debtor?"
-          path="eviction_judgment_against_you"
-          value={body.eviction_judgment_against_you}
-          onValueChange={(next) => onChange({ ...body, eviction_judgment_against_you: next })}
+          path="evictionJudgmentAgainstYou"
+          value={body.evictionJudgmentAgainstYou}
+          onValueChange={(next) => onChange({ ...body, evictionJudgmentAgainstYou: next })}
           errors={errors}
-          disabled={body.rents_residence !== true}
+          disabled={body.rentsResidence !== true}
           disabledReason="Only applies when the debtor rents."
         />
       </Section>
 
       <Section title="Business filing">
-        <Field.Root invalid={Boolean(errors.small_business_status)}>
+        <Field.Root invalid={Boolean(errors.smallBusinessStatus)}>
           <Field.Label>Small business status</Field.Label>
           <Select
             options={[...smallBusinessOptions(chapter)]}
-            value={body.small_business_status ?? null}
+            value={body.smallBusinessStatus ?? null}
             onValueChange={(next) =>
               onChange({
                 ...body,
-                small_business_status: next as PetitionBody['small_business_status'],
+                smallBusinessStatus: next as PetitionBody['smallBusinessStatus'],
               })
             }
             placeholder="Choose one"
@@ -195,8 +195,8 @@ export function PetitionFields({
               ? 'Includes the Subchapter V election.'
               : 'The Subchapter V and small-business options only apply to a chapter 11 case.'}
           </Field.Description>
-          {errors.small_business_status ? (
-            <Field.Error match>{errors.small_business_status}</Field.Error>
+          {errors.smallBusinessStatus ? (
+            <Field.Error match>{errors.smallBusinessStatus}</Field.Error>
           ) : null}
         </Field.Root>
       </Section>
@@ -206,76 +206,76 @@ export function PetitionFields({
           Property that needs immediate attention because it poses a threat of imminent and
           identifiable hazard.
         </Text>
-        <Field.Root invalid={Boolean(errors['hazardous_property.description'])}>
+        <Field.Root invalid={Boolean(errors['hazardousProperty.description'])}>
           <Field.Label>Describe the property</Field.Label>
           <Textarea
-            value={body.hazardous_property?.description ?? ''}
+            value={body.hazardousProperty?.description ?? ''}
             onValueChange={(next) =>
               onChange({
                 ...body,
-                hazardous_property: { ...body.hazardous_property, description: next },
+                hazardousProperty: { ...body.hazardousProperty, description: next },
               })
             }
           />
-          {errors['hazardous_property.description'] ? (
-            <Field.Error match>{errors['hazardous_property.description']}</Field.Error>
+          {errors['hazardousProperty.description'] ? (
+            <Field.Error match>{errors['hazardousProperty.description']}</Field.Error>
           ) : null}
         </Field.Root>
-        <Field.Root invalid={Boolean(errors['hazardous_property.why_immediate'])}>
+        <Field.Root invalid={Boolean(errors['hazardousProperty.whyImmediate'])}>
           <Field.Label>Why does it need immediate attention?</Field.Label>
           <Textarea
-            value={body.hazardous_property?.why_immediate ?? ''}
+            value={body.hazardousProperty?.whyImmediate ?? ''}
             onValueChange={(next) =>
               onChange({
                 ...body,
-                hazardous_property: { ...body.hazardous_property, why_immediate: next },
+                hazardousProperty: { ...body.hazardousProperty, whyImmediate: next },
               })
             }
           />
-          {errors['hazardous_property.why_immediate'] ? (
-            <Field.Error match>{errors['hazardous_property.why_immediate']}</Field.Error>
+          {errors['hazardousProperty.whyImmediate'] ? (
+            <Field.Error match>{errors['hazardousProperty.whyImmediate']}</Field.Error>
           ) : null}
         </Field.Root>
         <AddressFields
-          address={body.hazardous_property?.address}
+          address={body.hazardousProperty?.address}
           onChange={setAddress}
           errors={errors}
         />
       </Section>
 
       <Section title="Nature of the debts">
-        <Field.Root invalid={Boolean(errors.debt_character)}>
+        <Field.Root invalid={Boolean(errors.debtCharacter)}>
           <Field.Label>Are the debts primarily consumer or business debts?</Field.Label>
           <Select
             options={[...DEBT_CHARACTER_OPTIONS]}
-            value={body.debt_character ?? null}
+            value={body.debtCharacter ?? null}
             onValueChange={(next) =>
-              onChange({ ...body, debt_character: next as PetitionBody['debt_character'] })
+              onChange({ ...body, debtCharacter: next as PetitionBody['debtCharacter'] })
             }
             placeholder="Choose one"
           />
-          {errors.debt_character ? <Field.Error match>{errors.debt_character}</Field.Error> : null}
+          {errors.debtCharacter ? <Field.Error match>{errors.debtCharacter}</Field.Error> : null}
         </Field.Root>
-        <Field.Root invalid={Boolean(errors.debt_character_other)}>
+        <Field.Root invalid={Boolean(errors.debtCharacterOther)}>
           <Field.Label>If other, describe</Field.Label>
           <Input
-            value={body.debt_character_other ?? ''}
+            value={body.debtCharacterOther ?? ''}
             onValueChange={(next) =>
-              onChange({ ...body, debt_character_other: next === '' ? undefined : next })
+              onChange({ ...body, debtCharacterOther: next === '' ? undefined : next })
             }
-            disabled={body.debt_character !== 'other'}
+            disabled={body.debtCharacter !== 'other'}
             autoCorrect={false}
           />
           <Field.Description>Only applies when "Other" is chosen above.</Field.Description>
-          {errors.debt_character_other ? (
-            <Field.Error match>{errors.debt_character_other}</Field.Error>
+          {errors.debtCharacterOther ? (
+            <Field.Error match>{errors.debtCharacterOther}</Field.Error>
           ) : null}
         </Field.Root>
         <YesNoField
           label="Chapter 7 only — after exempt property is excluded and administrative expenses paid, will funds be available for distribution to unsecured creditors?"
-          path="ch7_funds_available_for_creditors"
-          value={body.ch7_funds_available_for_creditors}
-          onValueChange={(next) => onChange({ ...body, ch7_funds_available_for_creditors: next })}
+          path="ch7FundsAvailableForCreditors"
+          value={body.ch7FundsAvailableForCreditors}
+          onValueChange={(next) => onChange({ ...body, ch7FundsAvailableForCreditors: next })}
           errors={errors}
           disabled={chapter !== 7}
           disabledReason="Only applies to a chapter 7 case."
@@ -290,36 +290,36 @@ export function PetitionFields({
         </Text>
         <EstimateField
           label="Estimated number of creditors"
-          path="estimated_creditors"
+          path="estimatedCreditors"
           options={creditorsBandOptions()}
-          value={body.estimated_creditors}
+          value={body.estimatedCreditors}
           state={estimatedCreditors}
           onValueChange={(next) =>
-            onChange({ ...body, estimated_creditors: next as PetitionBody['estimated_creditors'] })
+            onChange({ ...body, estimatedCreditors: next as PetitionBody['estimatedCreditors'] })
           }
           errors={errors}
         />
         <EstimateField
           label="Estimated assets"
-          path="estimated_assets"
+          path="estimatedAssets"
           options={dollarBandOptions()}
-          value={body.estimated_assets}
+          value={body.estimatedAssets}
           state={estimatedAssets}
           onValueChange={(next) =>
-            onChange({ ...body, estimated_assets: next as PetitionBody['estimated_assets'] })
+            onChange({ ...body, estimatedAssets: next as PetitionBody['estimatedAssets'] })
           }
           errors={errors}
         />
         <EstimateField
           label="Estimated liabilities"
-          path="estimated_liabilities"
+          path="estimatedLiabilities"
           options={dollarBandOptions()}
-          value={body.estimated_liabilities}
+          value={body.estimatedLiabilities}
           state={estimatedLiabilities}
           onValueChange={(next) =>
             onChange({
               ...body,
-              estimated_liabilities: next as PetitionBody['estimated_liabilities'],
+              estimatedLiabilities: next as PetitionBody['estimatedLiabilities'],
             })
           }
           errors={errors}
@@ -478,12 +478,12 @@ function AddressFields({
     ['line2', 'Apartment, suite or unit'],
     ['city', 'City'],
     ['state', 'State'],
-    ['postal_code', 'ZIP code'],
+    ['postalCode', 'ZIP code'],
   ];
   return (
     <>
       {parts.map(([part, label]) => {
-        const path = `hazardous_property.address.${part}`;
+        const path = `hazardousProperty.address.${part}`;
         const message = errors[path];
         return (
           <Field.Root key={part} invalid={Boolean(message)}>

@@ -19,9 +19,11 @@ import { Badge, Button, Field, Input, Select, Table } from '@insolvia-ai/design-
 import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { bodyErrors } from '@/api/body-errors';
 import { useApi } from '@/api/use-api';
 import { CaseColumn, useCase } from '@/components/case-shell';
 import { Heading } from '@/components/heading';
+import { MoneyInput, moneyOf } from '@/components/money-input';
 import { newRowId } from '@/screens/intake/row-id';
 import { fontSizes, spacing, useTheme } from '@/theme';
 
@@ -34,7 +36,6 @@ import {
   moneyText,
   monthsText,
   percentText,
-  planBodyOf,
   treatmentFor,
   wholeNumberOf,
   withList,
@@ -136,7 +137,7 @@ export function Plan({ caseId }: PlanProps) {
         const first = plans.value[0];
         if (first !== undefined) {
           setPlanId(first.id);
-          setBody(planBodyOf(first as unknown as Record<string, unknown>));
+          setBody(first.body);
         }
         setLoaded(true);
       } catch {
@@ -149,11 +150,11 @@ export function Plan({ caseId }: PlanProps) {
         ]);
         if (cancelled) return;
         if (claimList.ok) {
-          setClaims(claimList.value.filter((claim) => claim.claim_class === 'secured'));
+          setClaims(claimList.value.filter((claim) => claim.body.claimClass === 'secured'));
         }
         if (creditorList.ok) {
           setCreditorNames(
-            new Map(creditorList.value.map((creditor) => [creditor.id, creditor.name ?? ''])),
+            new Map(creditorList.value.map((creditor) => [creditor.id, creditor.body.name ?? ''])),
           );
         }
       } catch {
@@ -169,10 +170,10 @@ export function Plan({ caseId }: PlanProps) {
     setSaving(true);
     setStatus('Saving…');
     try {
-      const request = {
-        ...body,
-        provenance: staffTypedProvenance(body as unknown as Record<string, unknown>),
-      } as unknown as CaseEntityRequest<'plans'>;
+      const request: CaseEntityRequest<'plans'> = {
+        body,
+        provenance: staffTypedProvenance(body),
+      };
       const result = await call((client) =>
         planId === null
           ? client.addCaseEntity(caseId, 'plans', request)
@@ -183,14 +184,14 @@ export function Plan({ caseId }: PlanProps) {
         return;
       }
       setPlanId(result.value.id);
-      setBody(planBodyOf(result.value as unknown as Record<string, unknown>));
+      setBody(result.value.body);
       setErrors({});
       setStatus('Saved — recalculating');
       await loadCalculation();
       setStatus('Saved');
     } catch (cause) {
       if (cause instanceof ApiValidationException) {
-        setErrors(cause.fields);
+        setErrors(bodyErrors(cause.fields));
         setStatus('Some answers need attention.');
       } else {
         setStatus('Could not save. Your entries are still here — try again.');
@@ -244,23 +245,23 @@ export function Plan({ caseId }: PlanProps) {
       <Section title="Payments">
         <TextField
           label="Term in months (blank: the commitment period)"
-          value={body.term_months === undefined ? '' : String(body.term_months)}
-          error={errors.term_months}
+          value={body.termMonths === undefined ? '' : String(body.termMonths)}
+          error={errors.termMonths}
           description={
             ready?.commitmentPeriod.months == null
               ? 'The means test has not set a commitment period yet.'
               : `The means test sets ${ready.commitmentPeriod.months} months — ${ready.commitmentPeriod.source ?? ''}.`
           }
-          onValueChange={(next) => set('term_months', wholeNumberOf(next))}
+          onValueChange={(next) => set('termMonths', wholeNumberOf(next))}
         />
-        <Field.Root invalid={Boolean(errors.payment_source)}>
+        <Field.Root invalid={Boolean(errors.paymentSource)}>
           <Field.Label>Where the monthly payment comes from</Field.Label>
           <Select
             options={PAYMENT_SOURCE_OPTIONS}
-            value={body.payment_source ?? null}
+            value={body.paymentSource ?? null}
             onValueChange={(next) =>
               set(
-                'payment_source',
+                'paymentSource',
                 PLAN_PAYMENT_SOURCES.includes(next as PlanPaymentSource)
                   ? (next as PlanPaymentSource)
                   : undefined,
@@ -273,62 +274,62 @@ export function Plan({ caseId }: PlanProps) {
               {`Currently ${moneyText(ready.funding.basePayment)} a month — ${ready.funding.baseSource}.`}
             </Field.Description>
           )}
-          {errors.payment_source ? <Field.Error match>{errors.payment_source}</Field.Error> : null}
+          {errors.paymentSource ? <Field.Error match>{errors.paymentSource}</Field.Error> : null}
         </Field.Root>
-        {body.payment_source === undefined || body.payment_source === 'fixed' ? (
-          <TextField
+        {body.paymentSource === undefined || body.paymentSource === 'fixed' ? (
+          <MoneyField
             label="Monthly payment"
-            value={body.monthly_payment ?? ''}
-            error={errors.monthly_payment}
-            onValueChange={(next) => set('monthly_payment', blankToAbsent(next))}
+            value={body.monthlyPayment}
+            error={errors.monthlyPayment}
+            onValueChange={(next) => set('monthlyPayment', next)}
           />
         ) : null}
-        <TextField
+        <MoneyField
           label="Trustee’s percentage fee (at most 10%)"
-          value={body.trustee_percentage ?? ''}
-          error={errors.trustee_percentage}
-          onValueChange={(next) => set('trustee_percentage', blankToAbsent(next))}
+          value={body.trusteePercentage}
+          error={errors.trusteePercentage}
+          onValueChange={(next) => set('trusteePercentage', next)}
         />
-        <TextField
+        <MoneyField
           label="Attorney’s fees paid through the plan"
-          value={body.attorney_fees ?? ''}
-          error={errors.attorney_fees}
-          onValueChange={(next) => set('attorney_fees', blankToAbsent(next))}
+          value={body.attorneyFees}
+          error={errors.attorneyFees}
+          onValueChange={(next) => set('attorneyFees', next)}
         />
-        <TextField
+        <MoneyField
           label="Attorney’s fees, most paid in one month (blank: whatever is available)"
-          value={body.attorney_fee_monthly ?? ''}
-          error={errors.attorney_fee_monthly}
-          onValueChange={(next) => set('attorney_fee_monthly', blankToAbsent(next))}
+          value={body.attorneyFeeMonthly}
+          error={errors.attorneyFeeMonthly}
+          onValueChange={(next) => set('attorneyFeeMonthly', next)}
         />
 
         <Heading level={3} size="body">
           Step payments
         </Heading>
-        {(body.step_payments ?? []).map((step, index) => (
+        {(body.stepPayments ?? []).map((step, index) => (
           <View key={step.id} style={styles.rowGroup}>
             <TextField
               label={`Step ${index + 1}: starts in month`}
-              value={step.start_month === undefined ? '' : String(step.start_month)}
-              error={errors[`step_payments[${index}].start_month`]}
+              value={step.startMonth === undefined ? '' : String(step.startMonth)}
+              error={errors[`stepPayments[${index}].startMonth`]}
               onValueChange={(next) =>
                 set(
-                  'step_payments',
-                  (body.step_payments ?? []).map((row) =>
-                    row.id === step.id ? { ...row, start_month: wholeNumberOf(next) } : row,
+                  'stepPayments',
+                  (body.stepPayments ?? []).map((row) =>
+                    row.id === step.id ? { ...row, startMonth: wholeNumberOf(next) } : row,
                   ),
                 )
               }
             />
-            <TextField
+            <MoneyField
               label={`Step ${index + 1}: monthly payment from then on`}
-              value={step.monthly_payment ?? ''}
-              error={errors[`step_payments[${index}].monthly_payment`]}
+              value={step.monthlyPayment}
+              error={errors[`stepPayments[${index}].monthlyPayment`]}
               onValueChange={(next) =>
                 set(
-                  'step_payments',
-                  (body.step_payments ?? []).map((row) =>
-                    row.id === step.id ? { ...row, monthly_payment: blankToAbsent(next) } : row,
+                  'stepPayments',
+                  (body.stepPayments ?? []).map((row) =>
+                    row.id === step.id ? { ...row, monthlyPayment: next } : row,
                   ),
                 )
               }
@@ -340,8 +341,8 @@ export function Plan({ caseId }: PlanProps) {
                 setBody((current) =>
                   withList(
                     current,
-                    'step_payments',
-                    (current.step_payments ?? []).filter((row) => row.id !== step.id),
+                    'stepPayments',
+                    (current.stepPayments ?? []).filter((row) => row.id !== step.id),
                   ),
                 )
               }
@@ -356,7 +357,7 @@ export function Plan({ caseId }: PlanProps) {
           onPress={() =>
             setBody((current) => ({
               ...current,
-              step_payments: [...(current.step_payments ?? []), { id: newRowId() }],
+              stepPayments: [...(current.stepPayments ?? []), { id: newRowId() }],
             }))
           }
         >
@@ -366,30 +367,30 @@ export function Plan({ caseId }: PlanProps) {
         <Heading level={3} size="body">
           Lump sums
         </Heading>
-        {(body.lump_sums ?? []).map((lump, index) => (
+        {(body.lumpSums ?? []).map((lump, index) => (
           <View key={lump.id} style={styles.rowGroup}>
             <TextField
               label={`Lump sum ${index + 1}: month received`}
               value={lump.month === undefined ? '' : String(lump.month)}
-              error={errors[`lump_sums[${index}].month`]}
+              error={errors[`lumpSums[${index}].month`]}
               onValueChange={(next) =>
                 set(
-                  'lump_sums',
-                  (body.lump_sums ?? []).map((row) =>
+                  'lumpSums',
+                  (body.lumpSums ?? []).map((row) =>
                     row.id === lump.id ? { ...row, month: wholeNumberOf(next) } : row,
                   ),
                 )
               }
             />
-            <TextField
+            <MoneyField
               label={`Lump sum ${index + 1}: amount`}
-              value={lump.amount ?? ''}
-              error={errors[`lump_sums[${index}].amount`]}
+              value={lump.amount}
+              error={errors[`lumpSums[${index}].amount`]}
               onValueChange={(next) =>
                 set(
-                  'lump_sums',
-                  (body.lump_sums ?? []).map((row) =>
-                    row.id === lump.id ? { ...row, amount: blankToAbsent(next) } : row,
+                  'lumpSums',
+                  (body.lumpSums ?? []).map((row) =>
+                    row.id === lump.id ? { ...row, amount: next } : row,
                   ),
                 )
               }
@@ -397,11 +398,11 @@ export function Plan({ caseId }: PlanProps) {
             <TextField
               label={`Lump sum ${index + 1}: source`}
               value={lump.description ?? ''}
-              error={errors[`lump_sums[${index}].description`]}
+              error={errors[`lumpSums[${index}].description`]}
               onValueChange={(next) =>
                 set(
-                  'lump_sums',
-                  (body.lump_sums ?? []).map((row) =>
+                  'lumpSums',
+                  (body.lumpSums ?? []).map((row) =>
                     row.id === lump.id ? { ...row, description: blankToAbsent(next) } : row,
                   ),
                 )
@@ -414,8 +415,8 @@ export function Plan({ caseId }: PlanProps) {
                 setBody((current) =>
                   withList(
                     current,
-                    'lump_sums',
-                    (current.lump_sums ?? []).filter((row) => row.id !== lump.id),
+                    'lumpSums',
+                    (current.lumpSums ?? []).filter((row) => row.id !== lump.id),
                   ),
                 )
               }
@@ -430,7 +431,7 @@ export function Plan({ caseId }: PlanProps) {
           onPress={() =>
             setBody((current) => ({
               ...current,
-              lump_sums: [...(current.lump_sums ?? []), { id: newRowId() }],
+              lumpSums: [...(current.lumpSums ?? []), { id: newRowId() }],
             }))
           }
         >
@@ -443,19 +444,17 @@ export function Plan({ caseId }: PlanProps) {
           <Text style={[styles.note, muted]}>This case has no secured claims.</Text>
         ) : null}
         {claims.map((claim) => {
-          const name = `${creditorNames.get(claim.creditor_id ?? '') || 'Unnamed creditor'}${
-            claim.account_last4 ? ` (…${claim.account_last4})` : ''
+          const name = `${creditorNames.get(claim.body.creditorId ?? '') || 'Unnamed creditor'}${
+            claim.body.accountLast4 ? ` (…${claim.body.accountLast4})` : ''
           }`;
           const treatment = treatmentFor(body, claim.id);
-          const index = (body.secured_treatments ?? []).findIndex(
-            (row) => row.claim_id === claim.id,
-          );
+          const index = (body.securedTreatments ?? []).findIndex((row) => row.claimId === claim.id);
           const errorFor = (key: string) =>
-            index < 0 ? undefined : errors[`secured_treatments[${index}].${key}`];
+            index < 0 ? undefined : errors[`securedTreatments[${index}].${key}`];
           return (
             <View key={claim.id} style={styles.rowGroup}>
               <Heading level={3} size="body">
-                {`${name} — ${moneyText(claim.amount ?? null)}`}
+                {`${name} — ${moneyText(claim.body.amount === undefined ? null : String(claim.body.amount))}`}
               </Heading>
               <Field.Root invalid={Boolean(errorFor('treatment'))}>
                 <Field.Label>{`Treatment of ${name}`}</Field.Label>
@@ -485,19 +484,14 @@ export function Plan({ caseId }: PlanProps) {
               {treatment?.treatment === undefined
                 ? null
                 : TREATMENT_FIELDS[treatment.treatment].map((field) => (
-                    <TextField
+                    <MoneyField
                       key={field.key}
                       label={`${name}: ${field.label}`}
-                      value={String(treatment[field.key] ?? '')}
+                      value={treatment[field.key]}
                       error={errorFor(field.key)}
                       onValueChange={(next) =>
                         setBody((current) =>
-                          withTreatment(
-                            current,
-                            claim.id,
-                            { [field.key]: blankToAbsent(next) },
-                            newRowId,
-                          ),
+                          withTreatment(current, claim.id, { [field.key]: next }, newRowId),
                         )
                       }
                     />
@@ -508,26 +502,26 @@ export function Plan({ caseId }: PlanProps) {
       </Section>
 
       <Section title="Priority and unsecured claims">
-        <TextField
+        <MoneyField
           label="Share of each priority claim paid (blank: 100%)"
-          value={body.priority_percentage ?? ''}
-          error={errors.priority_percentage}
-          onValueChange={(next) => set('priority_percentage', blankToAbsent(next))}
+          value={body.priorityPercentage}
+          error={errors.priorityPercentage}
+          onValueChange={(next) => set('priorityPercentage', next)}
         />
-        <TextField
+        <MoneyField
           label="Interest on priority claims (% a year, blank: none)"
-          value={body.priority_interest_rate ?? ''}
-          error={errors.priority_interest_rate}
-          onValueChange={(next) => set('priority_interest_rate', blankToAbsent(next))}
+          value={body.priorityInterestRate}
+          error={errors.priorityInterestRate}
+          onValueChange={(next) => set('priorityInterestRate', next)}
         />
-        <Field.Root invalid={Boolean(errors.unsecured_treatment)}>
+        <Field.Root invalid={Boolean(errors.unsecuredTreatment)}>
           <Field.Label>What general unsecured creditors receive</Field.Label>
           <Select
             options={UNSECURED_OPTIONS}
-            value={body.unsecured_treatment ?? null}
+            value={body.unsecuredTreatment ?? null}
             onValueChange={(next) =>
               set(
-                'unsecured_treatment',
+                'unsecuredTreatment',
                 UNSECURED_TREATMENTS.includes(next as UnsecuredTreatment)
                   ? (next as UnsecuredTreatment)
                   : undefined,
@@ -535,52 +529,52 @@ export function Plan({ caseId }: PlanProps) {
             }
             placeholder="Whatever remains (a pot plan)"
           />
-          {errors.unsecured_treatment ? (
-            <Field.Error match>{errors.unsecured_treatment}</Field.Error>
+          {errors.unsecuredTreatment ? (
+            <Field.Error match>{errors.unsecuredTreatment}</Field.Error>
           ) : null}
         </Field.Root>
-        {body.unsecured_treatment === 'percentage' ? (
-          <TextField
+        {body.unsecuredTreatment === 'percentage' ? (
+          <MoneyField
             label="Promised percentage of unsecured claims"
-            value={body.unsecured_percentage ?? ''}
-            error={errors.unsecured_percentage}
-            onValueChange={(next) => set('unsecured_percentage', blankToAbsent(next))}
+            value={body.unsecuredPercentage}
+            error={errors.unsecuredPercentage}
+            onValueChange={(next) => set('unsecuredPercentage', next)}
           />
         ) : null}
-        {body.unsecured_treatment === 'amount' ? (
-          <TextField
+        {body.unsecuredTreatment === 'amount' ? (
+          <MoneyField
             label="Promised amount to unsecured creditors"
-            value={body.unsecured_amount ?? ''}
-            error={errors.unsecured_amount}
-            onValueChange={(next) => set('unsecured_amount', blankToAbsent(next))}
+            value={body.unsecuredAmount}
+            error={errors.unsecuredAmount}
+            onValueChange={(next) => set('unsecuredAmount', next)}
           />
         ) : null}
-        <TextField
+        <MoneyField
           label="Interest on unsecured claims (% a year, blank: none)"
-          value={body.unsecured_interest_rate ?? ''}
-          error={errors.unsecured_interest_rate}
-          onValueChange={(next) => set('unsecured_interest_rate', blankToAbsent(next))}
+          value={body.unsecuredInterestRate}
+          error={errors.unsecuredInterestRate}
+          onValueChange={(next) => set('unsecuredInterestRate', next)}
         />
       </Section>
 
       <Section title="The liquidation comparison (§ 1325(a)(4))">
-        <TextField
+        <MoneyField
           label="Other Chapter 7 costs (sale costs, beyond the trustee’s commission)"
-          value={body.chapter_7_other_costs ?? ''}
-          error={errors.chapter_7_other_costs}
-          onValueChange={(next) => set('chapter_7_other_costs', blankToAbsent(next))}
+          value={body.chapter7OtherCosts}
+          error={errors.chapter7OtherCosts}
+          onValueChange={(next) => set('chapter7OtherCosts', next)}
         />
         <TextField
           label="What those costs are"
-          value={body.chapter_7_other_costs_description ?? ''}
-          error={errors.chapter_7_other_costs_description}
-          onValueChange={(next) => set('chapter_7_other_costs_description', blankToAbsent(next))}
+          value={body.chapter7OtherCostsDescription ?? ''}
+          error={errors.chapter7OtherCostsDescription}
+          onValueChange={(next) => set('chapter7OtherCostsDescription', blankToAbsent(next))}
         />
-        <TextField
+        <MoneyField
           label="Present-value discount rate (% a year, blank: compare nominally)"
-          value={body.present_value_rate ?? ''}
-          error={errors.present_value_rate}
-          onValueChange={(next) => set('present_value_rate', blankToAbsent(next))}
+          value={body.presentValueRate}
+          error={errors.presentValueRate}
+          onValueChange={(next) => set('presentValueRate', next)}
         />
         {ready === null ? null : <LiquidationTable calculation={ready} />}
       </Section>
@@ -639,6 +633,26 @@ function TextField({
       <Field.Label>{label}</Field.Label>
       <Input value={value} onValueChange={onValueChange} autoCorrect={false} />
       {description !== undefined ? <Field.Description>{description}</Field.Description> : null}
+      {error ? <Field.Error match>{error}</Field.Error> : null}
+    </Field.Root>
+  );
+}
+
+function MoneyField({
+  label,
+  value,
+  error,
+  onValueChange,
+}: {
+  readonly label: string;
+  readonly value: number | undefined;
+  readonly error: string | undefined;
+  readonly onValueChange: (next: number | undefined) => void;
+}) {
+  return (
+    <Field.Root invalid={Boolean(error)}>
+      <Field.Label>{label}</Field.Label>
+      <MoneyInput value={value} onValueChange={onValueChange} />
       {error ? <Field.Error match>{error}</Field.Error> : null}
     </Field.Root>
   );
@@ -864,9 +878,9 @@ function ScenarioPanel({
 
   const alternative: PlanBody = {
     ...body,
-    payment_source: 'fixed',
-    monthly_payment: blankToAbsent(payment),
-    ...(wholeNumberOf(term) === undefined ? {} : { term_months: wholeNumberOf(term) }),
+    paymentSource: 'fixed',
+    monthlyPayment: moneyOf(payment),
+    ...(wholeNumberOf(term) === undefined ? {} : { termMonths: wholeNumberOf(term) }),
   };
 
   const compare = async () => {
@@ -912,7 +926,7 @@ function ScenarioPanel({
         <Button
           size="lg"
           intent="secondary"
-          disabled={blankToAbsent(payment) === undefined}
+          disabled={moneyOf(payment) === undefined}
           onPress={() => void compare()}
         >
           Compare

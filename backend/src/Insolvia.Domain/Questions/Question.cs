@@ -74,7 +74,7 @@ public static class QuestionRules
     public const int MaxPendingAnswers = 200;
 
     /// <summary>The members an address input carries — never <c>raw</c>, a machine's fallback.</summary>
-    public static readonly IReadOnlyList<string> AddressMembers = ["line1", "line2", "city", "state", "postal_code", "county"];
+    public static readonly IReadOnlyList<string> AddressMembers = ["line1", "line2", "city", "state", "postalCode", "county"];
 
     /// <summary>The questions, in the order the portal asks them.</summary>
     public static readonly ValueCollection<Question> Catalogue =
@@ -137,7 +137,7 @@ public static class QuestionRules
         new("property.real_estate", Questionnaire.Property, "Do you own a home, land or other real estate?", "assets",
             [
                 new("description", "Address or description", AnswerInputType.LongText, Required: true),
-                new("value_entire", "What it is worth today", AnswerInputType.Money),
+                new("valueEntire", "What it is worth today", AnswerInputType.Money),
             ])
         {
             Help = "Add each property you own or have a share in.",
@@ -150,7 +150,7 @@ public static class QuestionRules
                 new("make", "Make", AnswerInputType.Text, Required: true),
                 new("model", "Model", AnswerInputType.Text),
                 new("mileage", "Approximate mileage", AnswerInputType.WholeNumber),
-                new("value_entire", "What it is worth today", AnswerInputType.Money),
+                new("valueEntire", "What it is worth today", AnswerInputType.Money),
             ])
         {
             Help = "Add each vehicle, including ones you are still paying for.",
@@ -160,7 +160,7 @@ public static class QuestionRules
         new("property.bank_account", Questionnaire.Property, "Do you have checking, savings or other bank accounts?", "assets",
             [
                 new("description", "Bank and type of account", AnswerInputType.Text, Required: true, Help: "For example: First Example Bank, checking"),
-                new("value_entire", "Balance today", AnswerInputType.Money),
+                new("valueEntire", "Balance today", AnswerInputType.Money),
             ])
         {
             Help = "Add each account, with the bank's name and today's balance.",
@@ -170,7 +170,7 @@ public static class QuestionRules
         new("property.retirement_account", Questionnaire.Property, "Do you have a 401(k), IRA, pension or other retirement account?", "assets",
             [
                 new("description", "Type of account and who holds it", AnswerInputType.Text, Required: true),
-                new("value_entire", "Balance today", AnswerInputType.Money),
+                new("valueEntire", "Balance today", AnswerInputType.Money),
             ])
         {
             Repeats = true,
@@ -187,10 +187,10 @@ public static class QuestionRules
         },
         new("income.employment", Questionnaire.Income, "Where do you work?", "employments",
             [
-                new("employer_name", "Employer", AnswerInputType.Text, Required: true),
+                new("employerName", "Employer", AnswerInputType.Text, Required: true),
                 new("occupation", "Your job title", AnswerInputType.Text),
-                Address("employer_address", "Employer's address"),
-                new("employed_since", "When you started", AnswerInputType.Date),
+                Address("employerAddress", "Employer's address"),
+                new("employedSince", "When you started", AnswerInputType.Date),
             ])
         {
             Help = "Add each job you have now.",
@@ -207,7 +207,7 @@ public static class QuestionRules
         },
         new("other.lease", Questionnaire.Other, "Are you part of a lease or contract that is still in effect?", "contract_leases",
             [
-                new("counterparty_name", "Who the lease or contract is with", AnswerInputType.Text, Required: true),
+                new("counterpartyName", "Who the lease or contract is with", AnswerInputType.Text, Required: true),
                 new("description", "What it is for", AnswerInputType.LongText),
             ])
         {
@@ -309,7 +309,8 @@ public static class QuestionRules
         var errors = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var input in entry.Inputs)
         {
-            if (input.Required && answered[input.Key] is null)
+            // The server no longer trims text, so a blank answer is no answer.
+            if (input.Required && (answered[input.Key] is null || (Json.AsString(answered[input.Key]) is { } text && text.Trim().Length == 0)))
             {
                 errors[$"value.{input.Key}"] = "This is required.";
             }
@@ -532,7 +533,7 @@ public static class QuestionRules
         return raw.DeepClone();
     }
 
-    /// <summary>The payload through the TARGET'S OWN PARSER, and back as the canonical pruned body. Provenance is not enforced.</summary>
+    /// <summary>The payload read as the TARGET'S body (a debtor through its parser), and back as the canonical pruned body. Provenance is not enforced.</summary>
     private static JsonObject ValidateTarget(Question entry, JsonObject payload)
     {
         if (entry.Target == DebtorsTarget)
@@ -540,7 +541,7 @@ public static class QuestionRules
             return BodyJson.Prune(DebtorRules.BodyNode(DebtorRules.Parse(payload, enforceProvenance: false).Body));
         }
 
-        return BodyJson.Prune(CaseCollections.ByCollection[entry.Target].ParseDraft(payload, enforceProvenance: false).BodyNode());
+        return BodyJson.Prune(BodyJson.ToNode(BodyJson.Read(payload, CaseCollections.ByCollection[entry.Target].BodyType)));
     }
 
     private static string ErrorKey(Question entry, string path)

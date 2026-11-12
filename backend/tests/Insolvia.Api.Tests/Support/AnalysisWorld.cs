@@ -18,6 +18,7 @@ using Insolvia.Domain.MeansTest;
 using Insolvia.Domain.Petitions;
 using Insolvia.Domain.Plans;
 using Insolvia.Domain.Ports;
+using Insolvia.Domain.Provenance;
 using Insolvia.Domain.Sofa;
 using Insolvia.Domain.TaxIds;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -166,7 +167,7 @@ internal sealed class AnalysisWorld : IDisposable
             // Creation order is print order: one second per record keeps the
             // stores' (created_at, id) listing in the file's order.
             var at = created.AddSeconds(position++);
-            var entity = kind.Restore(id, caseId, at, at, kind.ParseDraft((JsonObject)body.DeepClone(), enforceProvenance: false));
+            var entity = kind.Restore(id, caseId, at, at, BodyJson.Read(body, kind.BodyType), ValueCollections.EmptyDictionary<string, ProvenanceEntry>(), amended: false);
             await Entities.CreateAsync(entity, HttpAssert.Ct);
         }
 
@@ -238,30 +239,29 @@ internal sealed class AnalysisWorld : IDisposable
         };
     }
 
-    /// <summary>A record stored directly — the Python tests' <c>entity_store.create(create_entity(...))</c>.</summary>
+    /// <summary>A record stored directly, its body <paramref name="json"/> and no provenance — the Python tests' <c>entity_store.create(create_entity(...))</c>.</summary>
     public async Task<string> StoreAsync(IEntityKind kind, string caseId, string json, string? id = null)
     {
         var now = _pinned ? ParityToday : DateTimeOffset.UtcNow;
-        var entity = kind.Restore(id ?? Guid.NewGuid().ToString(), caseId, now, now, kind.ParseDraft(JsonNode.Parse(json)!.AsObject()));
+        var entity = kind.Restore(id ?? Guid.NewGuid().ToString(), caseId, now, now, BodyJson.Read(JsonNode.Parse(json), kind.BodyType), ValueCollections.EmptyDictionary<string, ProvenanceEntry>(), amended: false);
         await Entities.CreateAsync(entity, HttpAssert.Ct);
         return entity.Id;
     }
 
     /// <summary>
-    /// The route suites' <c>{**body, "provenance": dict.fromkeys(body, TYPED)}</c>:
-    /// <paramref name="json"/> with every top-level member marked staff-typed.
+    /// A collection request for the body <paramref name="json"/>, every
+    /// populated path marked staff-typed: <c>{body, provenance}</c>.
     /// </summary>
     public static string Typed(string json)
     {
         var body = JsonNode.Parse(json)!.AsObject();
         var provenance = new JsonObject();
-        foreach (var (key, _) in body)
+        foreach (var key in ProvenanceRules.PopulatedPaths(body))
         {
             provenance[key] = new JsonObject { ["source"] = "staff_typed" };
         }
 
-        body["provenance"] = provenance;
-        return body.ToJsonString();
+        return new JsonObject { ["body"] = body, ["provenance"] = provenance }.ToJsonString();
     }
 
     /// <summary>test_*_route.py's <c>open_case</c>: a case opened over HTTP (an unpinned world only), its id.</summary>

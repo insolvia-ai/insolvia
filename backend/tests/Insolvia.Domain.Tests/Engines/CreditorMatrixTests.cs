@@ -126,7 +126,7 @@ public sealed class CreditorMatrixTests
     [InlineData("line1", "address.line1")]
     [InlineData("city", "address.city")]
     [InlineData("state", "address.state")]
-    [InlineData("postal_code", "address.postal_code")]
+    [InlineData("postal_code", "address.postalCode")]
     public void Each_missing_address_part_is_named(string missing, string field)
     {
         var creditor = missing switch
@@ -155,7 +155,7 @@ public sealed class CreditorMatrixTests
     [InlineData("33301 1234")]
     [InlineData("3330A")]
     public void A_zip_must_be_five_or_hyphenated_nine_digits(string postalCode) =>
-        Assert.Equal([("creditor-1", "address.postal_code")], ProblemFields(Generate([Creditor(postalCode: postalCode)])));
+        Assert.Equal([("creditor-1", "address.postalCode")], ProblemFields(Generate([Creditor(postalCode: postalCode)])));
 
     [Fact]
     public void A_forty_character_line_is_the_boundary()

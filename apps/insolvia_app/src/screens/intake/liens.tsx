@@ -41,16 +41,7 @@ export function formatMoney(value: string): string {
 const claimsSpec = COLLECTION_SPECS.find((spec) => spec.collection === 'claims');
 
 function claimLabel(claim: CaseEntity<'claims'>, index: number): string {
-  const {
-    id: _id,
-    case_id: _c,
-    created_at: _a,
-    updated_at: _u,
-    provenance: _p,
-    amended: _amended,
-    ...body
-  } = claim;
-  return `Claim ${index + 1} — ${claimsSpec?.summary(body as Body) ?? claim.id}`;
+  return `Claim ${index + 1} — ${claimsSpec?.summary(claim.body as Body) ?? claim.id}`;
 }
 
 type ClaimPanelState =
@@ -212,20 +203,11 @@ export function AssetLiensPanel({
       // `amended` (issue #370) is stripped the same way — a generic entity
       // attribute, not case data, so re-sending it here would be resending
       // a fact this action never touches.
-      const {
-        id,
-        case_id: _c,
-        created_at: _a,
-        updated_at: _u,
-        provenance,
-        amended: _amended,
-        ...body
-      } = claim;
+      const { id, body, provenance } = claim;
       const result = await call((client) =>
         client.putCaseEntity(caseId, 'claims', id, {
-          ...body,
-          asset_id: assetId,
-          provenance: { ...provenance, asset_id: { source: 'staff_typed' } },
+          body: { ...body, assetId },
+          provenance: { ...provenance, assetId: { source: 'staff_typed' } },
         }),
       );
       if (!result.ok) {
@@ -286,7 +268,7 @@ export function AssetLiensPanel({
   // not offered a second time.
   const linkable = state.claims
     .map((claim, index) => ({ claim, index }))
-    .filter(({ claim }) => claim.claim_class === 'secured' && claim.asset_id !== assetId)
+    .filter(({ claim }) => claim.body.claimClass === 'secured' && claim.body.assetId !== assetId)
     .map(({ claim, index }) => ({ value: claim.id, label: claimLabel(claim, index) }));
 
   return (
@@ -326,7 +308,7 @@ export function AssetLiensPanel({
         <Button
           size="lg"
           intent="secondary"
-          onPress={() => onAddSecuredClaim({ claim_class: 'secured', asset_id: assetId })}
+          onPress={() => onAddSecuredClaim({ claimClass: 'secured', assetId: assetId })}
         >
           Add a secured claim
         </Button>

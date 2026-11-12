@@ -7,11 +7,11 @@ describe('computeScheduleILines', () => {
   // preview and the filed figure cannot silently diverge.
   test('derives lines 4, 6, 7, 9 and 10 from an entered summary', () => {
     const summary: IncomeSummaryBody = {
-      wages: '3000.00',
-      overtime: '200.00',
-      deduction_tax: '500.00',
-      deduction_insurance: '100.00',
-      business_net_income: '150.00',
+      wages: 3000,
+      overtime: 200,
+      deductionTax: 500,
+      deductionInsurance: 100,
+      businessNetIncome: 150,
     };
 
     const lines = computeScheduleILines(summary);
@@ -39,7 +39,7 @@ describe('computeScheduleILines', () => {
     // 106I has no zero floor on line 7 the way B122A-1's business/rental
     // lines do — a debtor whose deductions exceed gross pay is a fact this
     // preview must show, not hide.
-    const lines = computeScheduleILines({ wages: '100.00', deduction_tax: '400.00' });
+    const lines = computeScheduleILines({ wages: 100, deductionTax: 400 });
 
     expect(lines.takeHomePay).toBe('-300.00');
   });
@@ -47,13 +47,13 @@ describe('computeScheduleILines', () => {
 
 describe('summarizePayRecordsByEmployer', () => {
   function record(overrides: PayPeriodRecordBody): PayPeriodRecordBody {
-    return { employment_id: 'em-1', frequency: 'monthly', ...overrides };
+    return { employmentId: 'em-1', frequency: 'monthly', ...overrides };
   }
 
-  test('groups records by employment_id', () => {
+  test('groups records by employmentId', () => {
     const rows = [
-      record({ employment_id: 'em-1', gross: '1000.00', net: '800.00' }),
-      record({ employment_id: 'em-2', gross: '2000.00', net: '1600.00' }),
+      record({ employmentId: 'em-1', gross: 1000, net: 800 }),
+      record({ employmentId: 'em-2', gross: 2000, net: 1600 }),
     ];
 
     const summary = summarizePayRecordsByEmployer(rows);
@@ -63,10 +63,7 @@ describe('summarizePayRecordsByEmployer', () => {
   });
 
   test('averages gross and net across an employer’s records', () => {
-    const rows = [
-      record({ gross: '1000.00', net: '800.00' }),
-      record({ gross: '1200.00', net: '900.00' }),
-    ];
+    const rows = [record({ gross: 1000, net: 800 }), record({ gross: 1200, net: 900 })];
 
     const [summary] = summarizePayRecordsByEmployer(rows);
 
@@ -77,13 +74,13 @@ describe('summarizePayRecordsByEmployer', () => {
   });
 
   test('a record naming no employer is excluded rather than grouped under "undefined"', () => {
-    const rows = [record({ employment_id: undefined, gross: '500.00' })];
+    const rows = [record({ employmentId: undefined, gross: 500 })];
 
     expect(summarizePayRecordsByEmployer(rows)).toEqual([]);
   });
 
   test('a record with no gross or net figure counts toward the average as zero', () => {
-    const rows = [record({ gross: '1000.00' }), record({ gross: undefined, net: undefined })];
+    const rows = [record({ gross: 1000 }), record({ gross: undefined, net: undefined })];
 
     const [summary] = summarizePayRecordsByEmployer(rows);
 

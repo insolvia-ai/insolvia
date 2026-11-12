@@ -20,19 +20,19 @@ public sealed class PlanRouteTests : IAsyncLifetime, IDisposable
     // $500 a month over the commitment period, the mortgage kept current
     // outside the plan, the car paid in full at 7%.
     private const string ReferencePlan = """
-        {"payment_source": "fixed", "monthly_payment": "500.00", "trustee_percentage": "10", "attorney_fees": "3500.00",
-         "secured_treatments": [
-           {"id": "t-home", "claim_id": "claim-mortgage", "treatment": "cure_and_maintain"},
-           {"id": "t-car", "claim_id": "claim-auto", "treatment": "cramdown", "interest_rate": "7"}],
-         "unsecured_treatment": "pot"}
+        {"paymentSource": "fixed", "monthlyPayment": 500.00, "trusteePercentage": 10, "attorneyFees": 3500.00,
+         "securedTreatments": [
+           {"id": "t-home", "claimId": "claim-mortgage", "treatment": "cure_and_maintain"},
+           {"id": "t-car", "claimId": "claim-auto", "treatment": "cramdown", "interestRate": 7}],
+         "unsecuredTreatment": "pot"}
         """;
 
     private const string Provenance = """
-        {"payment_source": {"source": "staff_typed"}, "monthly_payment": {"source": "staff_typed"}, "trustee_percentage": {"source": "staff_typed"},
-         "attorney_fees": {"source": "staff_typed"},
-         "secured_treatments[t-home].claim_id": {"source": "staff_typed"}, "secured_treatments[t-home].treatment": {"source": "staff_typed"},
-         "secured_treatments[t-car].claim_id": {"source": "staff_typed"}, "secured_treatments[t-car].treatment": {"source": "staff_typed"},
-         "secured_treatments[t-car].interest_rate": {"source": "staff_typed"}, "unsecured_treatment": {"source": "staff_typed"}}
+        {"paymentSource": {"source": "staff_typed"}, "monthlyPayment": {"source": "staff_typed"}, "trusteePercentage": {"source": "staff_typed"},
+         "attorneyFees": {"source": "staff_typed"},
+         "securedTreatments[t-home].claimId": {"source": "staff_typed"}, "securedTreatments[t-home].treatment": {"source": "staff_typed"},
+         "securedTreatments[t-car].claimId": {"source": "staff_typed"}, "securedTreatments[t-car].treatment": {"source": "staff_typed"},
+         "securedTreatments[t-car].interestRate": {"source": "staff_typed"}, "unsecuredTreatment": {"source": "staff_typed"}}
         """;
 
     private readonly AnalysisWorld _world = new();
@@ -106,7 +106,7 @@ public sealed class PlanRouteTests : IAsyncLifetime, IDisposable
     {
         var caseId = await SeedChapter13Async();
 
-        Assert.Equal(400, (await _world.Post($"/v1/cases/{caseId}/plans", ReferencePlan)).Status);
+        Assert.Equal(400, (await _world.Post($"/v1/cases/{caseId}/plans", $$"""{"body": {{ReferencePlan}}}""")).Status);
     }
 
     [Fact]
@@ -143,7 +143,7 @@ public sealed class PlanRouteTests : IAsyncLifetime, IDisposable
     public async Task The_reference_case_has_a_feasible_plan_that_clears_the_floor()
     {
         var caseId = await SeedChapter13Async();
-        await _world.StoreAsync(PlanRules.Kind, caseId, WithProvenance(ReferencePlan));
+        await _world.StoreAsync(PlanRules.Kind, caseId, ReferencePlan);
 
         var body = (await Calculation(caseId)).Object;
 
@@ -161,7 +161,7 @@ public sealed class PlanRouteTests : IAsyncLifetime, IDisposable
     public async Task The_generic_amended_flag_changes_nothing_on_a_plan()
     {
         var caseId = await SeedChapter13Async();
-        await _world.StoreAsync(PlanRules.Kind, caseId, WithProvenance(ReferencePlan));
+        await _world.StoreAsync(PlanRules.Kind, caseId, ReferencePlan);
         var plain = (await Calculation(caseId)).Body;
         var stored = (CaseEntity<PlanBody>)Assert.Single(await _world.Entities.ListForCaseAsync(caseId, PlanRules.Kind, HttpAssert.Ct));
         Assert.True(await _world.Entities.PutAsync(stored with { Amended = true }, HttpAssert.Ct));
@@ -179,8 +179,8 @@ public sealed class PlanRouteTests : IAsyncLifetime, IDisposable
         foreach (var payment in new[] { "500.00", "900.00" })
         {
             var plan = JsonNode.Parse(ReferencePlan)!.AsObject();
-            plan["monthly_payment"] = payment;
-            await _world.StoreAsync(PlanRules.Kind, caseId, WithProvenance(plan.ToJsonString()));
+            plan["monthlyPayment"] = decimal.Parse(payment, CultureInfo.InvariantCulture);
+            await _world.StoreAsync(PlanRules.Kind, caseId, plan.ToJsonString());
         }
 
         var body = (await Calculation(caseId)).Object;
@@ -195,7 +195,7 @@ public sealed class PlanRouteTests : IAsyncLifetime, IDisposable
     {
         var caseId = await SeedChapter13Async();
         var cheaper = JsonNode.Parse(ReferencePlan)!.AsObject();
-        cheaper["monthly_payment"] = "300";
+        cheaper["monthlyPayment"] = 300;
 
         var answer = await Scenarios(caseId, $$"""{"scenarios": [{"label": "$500 a month", "plan": {{ReferencePlan}}}, {"label": "$300", "plan": {{cheaper.ToJsonString()}}}]}""");
 
@@ -226,10 +226,10 @@ public sealed class PlanRouteTests : IAsyncLifetime, IDisposable
     {
         var caseId = await SeedChapter13Async();
 
-        var answer = await Scenarios(caseId, """{"scenarios": [{"plan": {"term_months": 84}}]}""");
+        var answer = await Scenarios(caseId, """{"scenarios": [{"plan": {"termMonths": 84}}]}""");
 
         Assert.Equal(400, answer.Status);
-        Assert.Contains("scenarios[0].plan.term_months", answer.FieldErrors);
+        Assert.Contains("scenarios[0].plan.termMonths", answer.FieldErrors);
     }
 
     [Fact]
@@ -268,9 +268,7 @@ public sealed class PlanRouteTests : IAsyncLifetime, IDisposable
 
     private static string WithProvenance(string plan)
     {
-        var body = JsonNode.Parse(plan)!.AsObject();
-        body["provenance"] = JsonNode.Parse(Provenance);
-        return body.ToJsonString();
+        return new JsonObject { ["body"] = JsonNode.Parse(plan), ["provenance"] = JsonNode.Parse(Provenance) }.ToJsonString();
     }
 
     private static decimal Percent(JsonNode? node) => decimal.Parse(node!.GetValue<string>(), CultureInfo.InvariantCulture);

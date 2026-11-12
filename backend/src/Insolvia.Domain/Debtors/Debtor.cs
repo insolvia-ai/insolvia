@@ -166,7 +166,7 @@ public static class DebtorRules
     }
 
     /// <summary>The body as plain nested JSON (Python's <c>debtor_body</c>).</summary>
-    public static JsonObject BodyNode(DebtorBody body) => BodyJson.ToNode(body);
+    public static JsonObject BodyNode(DebtorBody body) => BodyJson.ToSnakeNode(body);
 
     /// <summary>
     /// A questionnaire save may KEEP <c>client</c> (and <c>client_answered</c>)

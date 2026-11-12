@@ -125,7 +125,7 @@ internal sealed class SeedWorld : IDisposable
                 },
                 ["collections"] = new JsonObject
                 {
-                    ["creditors"] = new JsonArray(new JsonObject { ["name"] = "Example Bank", ["provenance"] = new JsonObject { ["name"] = Typed.DeepClone() } }),
+                    ["creditors"] = new JsonArray(new JsonObject { ["body"] = new JsonObject { ["name"] = "Example Bank" }, ["provenance"] = new JsonObject { ["name"] = Typed.DeepClone() } }),
                 },
                 ["documents"] = new JsonArray(new JsonObject
                 {

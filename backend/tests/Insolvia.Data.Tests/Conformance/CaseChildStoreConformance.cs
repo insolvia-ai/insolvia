@@ -262,7 +262,7 @@ public abstract class CaseChildStoreConformance : CaseConformance
                 ["address.line1"] = new(ProvenanceSource.StaffTyped),
                 ["address.city"] = new(ProvenanceSource.StaffTyped),
                 ["address.state"] = new(ProvenanceSource.StaffTyped),
-                ["address.postal_code"] = new(ProvenanceSource.StaffTyped),
+                ["address.postalCode"] = new(ProvenanceSource.StaffTyped),
             }.ToValueDictionary());
 
     private static Document Document(string caseId, string? id = null, DateTimeOffset? at = null)

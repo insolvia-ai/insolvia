@@ -33,16 +33,15 @@ public static class ApiDocument
             RefineAsync)));
 
     // What the handlers' types cannot say: a candidate's payload is its
-    // entityType's request shape, and a job's result is its kind's.
+    // entityType's body (a debtor's, its request shape), and a job's result is its kind's.
     private static async Task RefineAsync(OpenApiDocument document, OpenApiDocumentTransformerContext context, CancellationToken cancellationToken)
     {
         var schemas = document.Components!.Schemas!;
         var payloads = new Dictionary<string, IOpenApiSchema>(StringComparer.Ordinal);
         foreach (var kind in CaseCollections.Kinds)
         {
-            var request = typeof(EntityRequest<>).MakeGenericType(kind.BodyType);
-            var name = $"EntityRequestOf{kind.BodyType.Name}";
-            schemas[name] = await context.GetOrCreateSchemaAsync(request, null, cancellationToken).ConfigureAwait(false);
+            var name = kind.BodyType.Name;
+            schemas[name] = await context.GetOrCreateSchemaAsync(kind.BodyType, null, cancellationToken).ConfigureAwait(false);
             payloads[kind.Collection] = new OpenApiSchemaReference(name, document);
         }
 

@@ -122,7 +122,7 @@ public sealed class PacketAssemblyWorkerTests
     public async Task A_blocked_case_stores_nothing_and_pins_nothing()
     {
         var data = PipelineWorld.Reference("reference-ch7");
-        var broken = new CaseEntity<ClaimBody>(ClaimRules.Kind, "claim-broken", data.Case.Id, CaseDatas.EntityTime.AddDays(1), CaseDatas.EntityTime.AddDays(1), ClaimRules.Kind.ParseBody(JsonNode.Parse("""{"creditor_id": "no-such"}""")!.AsObject()), ValueCollections.EmptyDictionary<string, ProvenanceEntry>());
+        var broken = new CaseEntity<ClaimBody>(ClaimRules.Kind, "claim-broken", data.Case.Id, CaseDatas.EntityTime.AddDays(1), CaseDatas.EntityTime.AddDays(1), new ClaimBody(CreditorId: "no-such"), ValueCollections.EmptyDictionary<string, ProvenanceEntry>());
         var world = await PipelineWorld.SeedAsync(data with { Claims = [.. data.Claims, broken] });
 
         var result = await PacketAssemblyWorker.RunAsync(Accept(world.CaseId), world.PacketDeps, Ct);

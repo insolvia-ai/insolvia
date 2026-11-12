@@ -73,9 +73,9 @@ public sealed class ExemptionAnalysisRouteTests : IAsyncLifetime, IDisposable
     {
         var caseId = await _world.OpenCaseAsync();
         await PutDebtor1Async(caseId, "FL");
-        var house = await _world.AddAsync(caseId, "assets", """{"category": "real_property", "description": "12 Byron Court", "value_entire": "300000.00"}""");
-        await _world.AddAsync(caseId, "claims", $$"""{"claim_class": "secured", "amount": "250000.00", "asset_id": "{{house}}", "lien_position": 1}""");
-        var exemption = await _world.AddAsync(caseId, "exemptions", $$"""{"asset_id": "{{house}}", "statute_citation": "Fla. Const. art. X, § 4(a)(2)", "amount": "1000.00", "claims_full_fmv": false}""");
+        var house = await _world.AddAsync(caseId, "assets", """{"category": "real_property", "description": "12 Byron Court", "valueEntire": 300000.00}""");
+        await _world.AddAsync(caseId, "claims", $$"""{"claimClass": "secured", "amount": 250000.00, "assetId": "{{house}}", "lienPosition": 1}""");
+        var exemption = await _world.AddAsync(caseId, "exemptions", $$"""{"assetId": "{{house}}", "statuteCitation": "Fla. Const. art. X, § 4(a)(2)", "amount": 1000.00, "claimsFullFmv": false}""");
 
         var body = (await Analysis(caseId)).Object;
 
@@ -97,7 +97,7 @@ public sealed class ExemptionAnalysisRouteTests : IAsyncLifetime, IDisposable
     {
         var caseId = await _world.OpenCaseAsync();
         await PutDebtor1Async(caseId, "GA");
-        await _world.AddAsync(caseId, "petitions", """{"expected_filing_date": "2026-06-01"}""");
+        await _world.AddAsync(caseId, "petitions", """{"expectedFilingDate": "2026-06-01"}""");
 
         var body = (await Analysis(caseId)).Object;
 
@@ -132,7 +132,7 @@ public sealed class ExemptionAnalysisRouteTests : IAsyncLifetime, IDisposable
     {
         var caseId = await _world.OpenCaseAsync();
         await PutDebtor1Async(caseId, "FL");
-        await _world.AddAsync(caseId, "assets", """{"category": "vehicle", "value_entire": "8412.66"}""");
+        await _world.AddAsync(caseId, "assets", """{"category": "vehicle", "valueEntire": 8412.66}""");
 
         var row = Assert.Single((await Analysis(caseId)).Object["assets"]!.AsArray())!.AsObject();
 

@@ -55,7 +55,7 @@ function describeField(field: string): string {
     'address.line2': 'Address — apartment, suite or unit',
     'address.city': 'Address — city',
     'address.state': 'Address — state',
-    'address.postal_code': 'Address — ZIP code',
+    'address.postalCode': 'Address — ZIP code',
     creditors: 'Creditors',
   };
   return labels[field] ?? field.replace(/_/g, ' ');
@@ -107,7 +107,7 @@ export function CreditorMatrixScreen({ caseId }: { readonly caseId: string }) {
         if (!result.ok || cancelled) return;
         const loaded: Record<string, string> = {};
         for (const record of result.value) {
-          const name = (record as { name?: unknown }).name;
+          const name = record.body.name;
           if (typeof name === 'string' && name !== '') {
             loaded[record.id] = name;
           }

@@ -4,6 +4,8 @@ import type {
   PortalQuestionInput,
 } from '@insolvia-ai/api-client';
 
+import { moneyOf } from '@/components/money-input';
+
 /**
  * The portal questionnaire's form state, and the two conversions between
  * it and an answer's wire `value` (ADR 0023 PR 4). Pure, so the rules are
@@ -21,7 +23,7 @@ export const ADDRESS_MEMBERS = [
   { key: 'line2', label: 'Apartment, suite or unit' },
   { key: 'city', label: 'City' },
   { key: 'state', label: 'State' },
-  { key: 'postal_code', label: 'ZIP code' },
+  { key: 'postalCode', label: 'ZIP code' },
   { key: 'county', label: 'County' },
 ] as const;
 
@@ -69,8 +71,10 @@ function inputValue(input: PortalQuestionInput, raw: string | AddressDraft): unk
     return /^\d+$/.test(text) ? Number(text) : text;
   }
   if (input.type === 'money') {
-    // "$1,200" is how people write it; the API wants "1200".
-    return text.replace(/[$,\s]/g, '');
+    // "$1,200" is how people write it; the API wants the number 1200. Text
+    // that is not an amount is sent as typed, so the server's refusal lands
+    // beside the box.
+    return moneyOf(text) ?? text;
   }
   return text;
 }
@@ -102,7 +106,7 @@ export function summary(question: PortalQuestion, value: PortalAnswerValue): str
           .join(', '),
       );
     } else if (input.type === 'money') {
-      parts.push(`$${String(given)}`);
+      parts.push(`$${typeof given === 'number' ? given.toFixed(2) : String(given)}`);
     } else {
       parts.push(String(given));
     }

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Insolvia.Data.Storage;
 using Insolvia.Domain;
 using Insolvia.Domain.Candidates;
@@ -166,10 +167,9 @@ internal static class CaseRowMapping
 
     public static ICaseEntity ToDomain(CaseEntityRow row, IEntityKind kind)
     {
-        var payload = StoredJson.ToObject(row.Body);
-        payload["provenance"] = StoredJson.ToObject(row.Provenance);
-        payload["amended"] = row.Amended;
-        return kind.Restore(row.Id, row.CaseId, row.CreatedAt, row.UpdatedAt, kind.ParseDraft(payload, enforceProvenance: false));
+        // The stored body IS the record serialized (BodyJson): read back, never re-parsed.
+        var body = StoredJson.ToObject(row.Body).Deserialize(kind.BodyType, BodyJson.Options)!;
+        return kind.Restore(row.Id, row.CaseId, row.CreatedAt, row.UpdatedAt, body, ProvenanceRules.Parse(StoredJson.ToObject(row.Provenance)), row.Amended);
     }
 
     // ── Documents, candidates, tasks, requests ──────────────────────

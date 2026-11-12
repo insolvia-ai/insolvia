@@ -16,7 +16,7 @@ import type {
  * - an income override is one row per column per line, addressed by
  *   `(column, category)`; setting a blank amount removes the row rather than
  *   storing an empty override;
- * - a per-claim secured payment is one row per `claim_id`; the engine reads
+ * - a per-claim secured payment is one row per `claimId`; the engine reads
  *   it by `bucket`, the panel finds it by claim.
  *
  * NOTHING HERE COMPUTES A FIGURE. The verdict, the CMI lines and the
@@ -25,75 +25,60 @@ import type {
  * dumb).
  */
 
-/** The stored record minus its identity — what a PUT sends back. */
-export function inputBodyOf(record: Record<string, unknown>): MeansTestInputBody {
-  const {
-    id: _id,
-    case_id: _caseId,
-    created_at: _created,
-    updated_at: _updated,
-    provenance: _provenance,
-    amended: _amended,
-    ...body
-  } = record;
-  return body as MeansTestInputBody;
-}
-
 export function overrideFor(
   body: MeansTestInputBody,
   column: IncomeColumn,
   category: IncomeLineCategory,
 ): IncomeLineOverride | undefined {
-  return body.income_overrides?.find((row) => row.column === column && row.category === category);
+  return body.incomeOverrides?.find((row) => row.column === column && row.category === category);
 }
 
 /**
  * The record with one column's line overridden by `monthlyAmount`, or with
- * that override removed when the amount is blank. `mintId` names a new row
+ * that override removed when the amount is absent. `mintId` names a new row
  * (the API requires a client-chosen id so provenance can address it).
  */
 export function withOverride(
   body: MeansTestInputBody,
   column: IncomeColumn,
   category: IncomeLineCategory,
-  monthlyAmount: string | undefined,
+  monthlyAmount: number | undefined,
   mintId: () => string,
 ): MeansTestInputBody {
-  const others = (body.income_overrides ?? []).filter(
+  const others = (body.incomeOverrides ?? []).filter(
     (row) => !(row.column === column && row.category === category),
   );
-  const trimmed = monthlyAmount?.trim() ?? '';
-  if (trimmed === '') {
+  if (monthlyAmount === undefined) {
     return others.length === 0
-      ? withoutKey(body, 'income_overrides')
-      : { ...body, income_overrides: others };
+      ? withoutKey(body, 'incomeOverrides')
+      : { ...body, incomeOverrides: others };
   }
   const existing = overrideFor(body, column, category);
   const row: IncomeLineOverride = {
     id: existing?.id ?? mintId(),
     column,
     category,
-    monthly_amount: trimmed,
+    monthlyAmount,
   };
-  return { ...body, income_overrides: [...others, row] };
+  return { ...body, incomeOverrides: [...others, row] };
 }
 
 export function securedPaymentFor(
   body: MeansTestInputBody,
   claimId: string,
 ): OtherSecuredPayment | undefined {
-  return body.other_secured_payments?.find((row) => row.claim_id === claimId);
+  return body.otherSecuredPayments?.find((row) => row.claimId === claimId);
 }
 
-/** The record with the row for `row.claim_id` replaced (or added). */
+/** The record with the row for `row.claimId` replaced (or added). */
 export function withSecuredPayment(
   body: MeansTestInputBody,
   row: OtherSecuredPayment,
 ): MeansTestInputBody {
-  const others = (body.other_secured_payments ?? []).filter(
-    (candidate) => candidate.id !== row.id && candidate.claim_id !== row.claim_id,
+  const others = (body.otherSecuredPayments ?? []).filter(
+    (candidate) => candidate.id !== row.id && candidate.claimId !== row.claimId,
   );
-  return { ...body, other_secured_payments: [...others, row] };
+  return { ...body, otherSecuredPayments: [...others, row] };
 }
 
 /** The record without any row entered beside `claimId`. */
@@ -101,10 +86,10 @@ export function withoutSecuredPayment(
   body: MeansTestInputBody,
   claimId: string,
 ): MeansTestInputBody {
-  const others = (body.other_secured_payments ?? []).filter((row) => row.claim_id !== claimId);
+  const others = (body.otherSecuredPayments ?? []).filter((row) => row.claimId !== claimId);
   return others.length === 0
-    ? withoutKey(body, 'other_secured_payments')
-    : { ...body, other_secured_payments: others };
+    ? withoutKey(body, 'otherSecuredPayments')
+    : { ...body, otherSecuredPayments: others };
 }
 
 function withoutKey(body: MeansTestInputBody, key: keyof MeansTestInputBody): MeansTestInputBody {

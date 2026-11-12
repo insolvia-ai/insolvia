@@ -56,7 +56,7 @@ export function NotesPanel({ caseId, notes, formSeries, onChanged }: NotesPanelP
   // Fail closed exactly as the server does: no firm answer yet, no button.
   const mayAdd = firm !== undefined && permits(firm.permissions.notes, 'add_edit');
   const isAdmin = firm?.isAdmin ?? false;
-  const mayEdit = (note: Note) => mayAdd && (isAdmin || note.author_subject === subject);
+  const mayEdit = (note: Note) => mayAdd && (isAdmin || note.body.authorSubject === subject);
 
   const muted = { color: theme.colors.muted, fontFamily: theme.typography.body };
 
@@ -67,10 +67,7 @@ export function NotesPanel({ caseId, notes, formSeries, onChanged }: NotesPanelP
     setError(null);
     try {
       const result = await call((client) =>
-        client.addNote(
-          caseId,
-          formSeries === undefined ? { text } : { text, form_series: formSeries },
-        ),
+        client.addNote(caseId, formSeries === undefined ? { text } : { text, formSeries }),
       );
       if (result.ok) {
         setDraft('');
@@ -89,7 +86,7 @@ export function NotesPanel({ caseId, notes, formSeries, onChanged }: NotesPanelP
 
   const startEdit = (note: Note) => {
     setEditingId(note.id);
-    setEditingText(note.text ?? '');
+    setEditingText(note.body.text ?? '');
     setError(null);
   };
 
@@ -100,13 +97,13 @@ export function NotesPanel({ caseId, notes, formSeries, onChanged }: NotesPanelP
     setError(null);
     try {
       // PUT replaces the record whole, so the anchor has to be sent back
-      // explicitly — THE NOTE'S OWN `form_series`, never this panel's
+      // explicitly — THE NOTE'S OWN `formSeries`, never this panel's
       // `formSeries` prop. On the case overview `formSeries` is undefined
       // for every note; sending that through unchanged would silently strip
       // the anchor off a form-anchored note the first time someone edited it
       // from the whole-case feed rather than from the form's own panel.
       const result = await call((client) =>
-        client.putNote(caseId, note.id, { text, form_series: note.form_series }),
+        client.putNote(caseId, note.id, { text, formSeries: note.body.formSeries }),
       );
       if (result.ok) {
         setEditingId(null);
@@ -186,13 +183,13 @@ export function NotesPanel({ caseId, notes, formSeries, onChanged }: NotesPanelP
                         { color: theme.colors.ink, fontFamily: theme.typography.body },
                       ]}
                     >
-                      {note.text}
+                      {note.body.text}
                     </Text>
                     <View style={styles.metaRow}>
                       <Text style={[styles.meta, muted]}>
-                        {note.author_name} · {note.created_at.slice(0, 10)}
-                        {formSeries === undefined && note.form_series !== undefined
-                          ? ` · ${anchorLabel(note.form_series)}`
+                        {note.body.authorName} · {note.createdAt.slice(0, 10)}
+                        {formSeries === undefined && note.body.formSeries !== undefined
+                          ? ` · ${anchorLabel(note.body.formSeries)}`
                           : ''}
                       </Text>
                       {mayEdit(note) ? (

@@ -136,9 +136,9 @@ internal static class CaseFiles
 
     public static TBody Parse<TBody>(EntityKind<TBody> kind, JsonObject body)
         where TBody : class =>
-        CaseEntityRules.ParseEntity(kind, (JsonObject)body.DeepClone(), enforceProvenance: false).Body;
+        (TBody)BodyJson.Read(body, typeof(TBody));
 
-    /// <summary>A body from a JSON literal, through its kind's parser — the C# spelling of the Python tests' dataclass literals.</summary>
+    /// <summary>A body from a JSON literal (camelCase, money a number), read and checked as a request's — the C# spelling of the Python tests' dataclass literals.</summary>
     public static TBody Body<TBody>(EntityKind<TBody> kind, string json)
         where TBody : class => Parse(kind, JsonNode.Parse(json)!.AsObject());
 

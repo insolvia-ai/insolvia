@@ -289,7 +289,7 @@ function EmployerSummary({
       </Text>
     );
   }
-  const rows = summarizePayRecordsByEmployer(payPeriods.value);
+  const rows = summarizePayRecordsByEmployer(payPeriods.value.map((record) => record.body));
   if (rows.length === 0) {
     return (
       <Text style={[styles.note, { color: theme.colors.muted, fontFamily: theme.typography.body }]}>
@@ -298,7 +298,7 @@ function EmployerSummary({
     );
   }
   const nameFor = (employmentId: string) =>
-    employments.value.find((employment) => employment.id === employmentId)?.employer_name ??
+    employments.value.find((employment) => employment.id === employmentId)?.body.employerName ??
     'Unnamed employer';
   return (
     <Table.Root dense>
@@ -360,8 +360,8 @@ function ScheduleIPreview({
       </Table.Head>
       <Table.Body>
         {incomeSummaries.value.map((record) => {
-          const lines = computeScheduleILines(record);
-          const debtor = debtors.find((candidate) => candidate.id === record.debtor_id);
+          const lines = computeScheduleILines(record.body);
+          const debtor = debtors.find((candidate) => candidate.id === record.body.debtorId);
           return (
             <Table.Row key={record.id}>
               <Table.Cell>{debtor !== undefined ? debtorLabel(debtor) : 'Unassigned'}</Table.Cell>
@@ -411,7 +411,7 @@ function ScheduleJGroups({
       </Text>
     );
   }
-  const groups = groupExpenseTotals(expenses.value);
+  const groups = groupExpenseTotals(expenses.value.map((record) => record.body));
   return (
     <>
       <Table.Root dense>

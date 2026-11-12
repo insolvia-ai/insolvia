@@ -54,7 +54,7 @@ function draftFrom(creditor: LibraryCreditor): DraftState {
     line2: creditor.address.line2 ?? '',
     city: creditor.address.city ?? '',
     state: creditor.address.state ?? '',
-    postalCode: creditor.address.postal_code ?? '',
+    postalCode: creditor.address.postalCode ?? '',
     county: creditor.address.county ?? '',
     preferred: creditor.preferred,
     notes: creditor.notes ?? '',
@@ -72,7 +72,7 @@ function draftToRequest(draft: DraftState): LibraryCreditorDraft {
     line2: undefinedIfBlank(draft.line2),
     city: undefinedIfBlank(draft.city),
     state: undefinedIfBlank(draft.state),
-    postal_code: undefinedIfBlank(draft.postalCode),
+    postalCode: undefinedIfBlank(draft.postalCode),
     county: undefinedIfBlank(draft.county),
   };
   return {
@@ -373,7 +373,7 @@ function CreditorForm({
         />
       </Field.Root>
 
-      <Field.Root name="address.postal_code" invalid={Boolean(errors['address.postal_code'])}>
+      <Field.Root name="address.postalCode" invalid={Boolean(errors['address.postalCode'])}>
         <Field.Label>ZIP code</Field.Label>
         <Input
           value={draft.postalCode}

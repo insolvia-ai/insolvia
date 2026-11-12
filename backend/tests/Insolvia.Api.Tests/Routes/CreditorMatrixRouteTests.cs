@@ -13,7 +13,7 @@ namespace Insolvia.Api.Tests.Routes;
 public sealed class CreditorMatrixRouteTests : IAsyncLifetime, IDisposable
 {
     private const string Typed = """{"source": "staff_typed"}""";
-    private const string MailableCreditor = $$$"""{"name": "Example Bank", "address": {"line1": "PO Box 15168", "city": "Wilmington", "state": "DE", "postal_code": "19850"}, "provenance": {"name": {{{Typed}}}, "address.line1": {{{Typed}}}, "address.city": {{{Typed}}}, "address.state": {{{Typed}}}, "address.postal_code": {{{Typed}}}}}""";
+    private const string MailableCreditor = $$$"""{"body": {"name": "Example Bank", "address": {"line1": "PO Box 15168", "city": "Wilmington", "state": "DE", "postalCode": "19850"}}, "provenance": {"name": {{{Typed}}}, "address.line1": {{{Typed}}}, "address.city": {{{Typed}}}, "address.state": {{{Typed}}}, "address.postalCode": {{{Typed}}}}}""";
 
     private readonly AnalysisWorld _world = new();
 
@@ -66,7 +66,7 @@ public sealed class CreditorMatrixRouteTests : IAsyncLifetime, IDisposable
     public async Task An_unmailable_creditor_answers_problems_instead_of_a_file()
     {
         var caseId = await OpenAsync();
-        var creditorId = await AddCreditorAsync(caseId, $$$"""{"name": "Example Bank", "address": {"line1": "PO Box 15168"}, "provenance": {"name": {{{Typed}}}, "address.line1": {{{Typed}}}}}""");
+        var creditorId = await AddCreditorAsync(caseId, $$$"""{"body": {"name": "Example Bank", "address": {"line1": "PO Box 15168"}}, "provenance": {"name": {{{Typed}}}, "address.line1": {{{Typed}}}}}""");
 
         var body = (await Matrix(caseId)).Object;
 
@@ -74,7 +74,7 @@ public sealed class CreditorMatrixRouteTests : IAsyncLifetime, IDisposable
         Assert.Equal(0, body["creditorCount"]!.GetValue<int>());
         var reported = body["problems"]!.AsArray().Select(p => (p!.AsObject().Str("creditorId"), p.AsObject().Str("field"))).ToHashSet();
         Assert.Equal(
-            new HashSet<(string?, string?)> { (creditorId, "address.city"), (creditorId, "address.state"), (creditorId, "address.postal_code") },
+            new HashSet<(string?, string?)> { (creditorId, "address.city"), (creditorId, "address.state"), (creditorId, "address.postalCode") },
             reported);
     }
 

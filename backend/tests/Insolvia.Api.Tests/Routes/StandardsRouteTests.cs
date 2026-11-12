@@ -135,7 +135,7 @@ public sealed class StandardsRouteTests : IAsyncLifetime, IDisposable
     {
         var caseId = await _world.OpenCaseAsync();
         await PutDebtor1Async(caseId, state: "FL", county: "Alachua County");
-        await _world.AddAsync(caseId, "dependents", """{"household_id": "no-household-yet", "relationship": "child", "age": 9, "lives_with_debtor": true}""");
+        await _world.AddAsync(caseId, "dependents", """{"householdId": "no-household-yet", "relationship": "child", "age": 9, "livesWithDebtor": true}""");
 
         var body = (await Standards(caseId)).Object;
 

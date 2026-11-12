@@ -69,7 +69,7 @@ public sealed class MeansTestEngineTests
     [Fact]
     public void The_middle_band_compares_against_a_quarter_of_unsecured_debt()
     {
-        var inputs = Household(under65: 1, extra: """{"taxes": "2000.00", "health_insurance": "760.00"}""");
+        var inputs = Household(under65: 1, extra: """{"taxes": 2000.00, "healthInsurance": 760.00}""");
         var presumed = Run(CaseFor("6000.00", inputs, nonpriority: "40000.00"));
         Assert.Equal("15000.00", Line(presumed, "39d").Amount);
         Assert.Equal("10000.00", Line(presumed, "41b").Amount);
@@ -169,24 +169,24 @@ public sealed class MeansTestEngineTests
     [Fact]
     public void An_unknown_district_refuses_when_ch13_applies()
     {
-        var inputs = Household(under65: 1, extra: """{"ch13_eligible": true, "ch13_projected_plan_payment": "500.00"}""");
+        var inputs = Household(under65: 1, extra: """{"ch13Eligible": true, "ch13ProjectedPlanPayment": 500.00}""");
         Assert.Contains("no district", Assert.Throws<MeansTestException>(() => Run(CaseFor("9000.00", inputs, district: "Outer Nowhere"))).Message, StringComparison.Ordinal);
     }
 
     [Fact]
     public void Statutory_caps_refuse_rather_than_clamp()
     {
-        var overEducation = CaseFor("9000.00", Household(under65: 1, extra: """{"education_under_18": "500.00"}"""), children: 1);
+        var overEducation = CaseFor("9000.00", Household(under65: 1, extra: """{"educationUnder18": 500.00}"""), children: 1);
         Assert.Contains("707(b)(2)(A)(ii)(IV)", Assert.Throws<MeansTestException>(() => Run(overEducation)).Message, StringComparison.Ordinal);
 
-        var overFood = CaseFor("9000.00", Household(under65: 1, extra: """{"additional_food_clothing": "100.00"}"""));
+        var overFood = CaseFor("9000.00", Household(under65: 1, extra: """{"additionalFoodClothing": 100.00}"""));
         Assert.Contains("5% food-and-clothing cap", Assert.Throws<MeansTestException>(() => Run(overFood)).Message, StringComparison.Ordinal);
     }
 
     [Fact]
     public void A_marital_adjustment_without_column_b_is_an_error()
     {
-        var inputs = Household(under65: 1, extra: """{"marital_adjustments": [{"id": "ma1", "description": "Spouse 401(k)", "amount": "300.00"}]}""");
+        var inputs = Household(under65: 1, extra: """{"maritalAdjustments": [{"id": "ma1", "description": "Spouse 401(k)", "amount": 300.00}]}""");
         Assert.Contains("no Column B", Assert.Throws<MeansTestException>(() => Run(CaseFor("9000.00", inputs))).Message, StringComparison.Ordinal);
     }
 
@@ -198,7 +198,7 @@ public sealed class MeansTestEngineTests
     public void Marital_adjustment_subtracts_when_column_b_exists()
     {
         var cmi = PaidCmi("d-2", FilingRole.Debtor2, 8000.00m);
-        var inputs = Household(under65: 2, extra: """{"marital_adjustments": [{"id": "ma1", "description": "Spouse's own student loan", "amount": "300.00"}]}""");
+        var inputs = Household(under65: 2, extra: """{"maritalAdjustments": [{"id": "ma1", "description": "Spouse's own student loan", "amount": 300.00}]}""");
         var result = Run(CaseFor("unused", inputs, cmi: cmi));
         Assert.Equal("8000.00", Line(result, "1").Amount);
         Assert.Equal("300.00", Line(result, "3").Amount);
@@ -209,7 +209,7 @@ public sealed class MeansTestEngineTests
     [Fact]
     public void Two_vehicles_take_the_per_vehicle_ownership_standard()
     {
-        var inputs = Household(under65: 1, extra: """{"vehicle_count": 2, "vehicle_1_loan_monthly": "800.00", "vehicle_2_loan_monthly": "100.00"}""");
+        var inputs = Household(under65: 1, extra: """{"vehicleCount": 2, "vehicle1LoanMonthly": 800.00, "vehicle2LoanMonthly": 100.00}""");
         var result = Run(CaseFor("9000.00", inputs, county: "Miami-Dade"));
         Assert.Equal("846.00", Line(result, "12").Amount);
         Assert.Equal("0.00", Line(result, "13c").Amount);
@@ -220,7 +220,7 @@ public sealed class MeansTestEngineTests
     [Fact]
     public void Unused_secured_rows_and_sixty_month_math()
     {
-        var inputs = Household(under65: 1, extra: """{"other_secured_payments": [{"id": "os1", "creditor_name": "Marina Finance", "property_description": "Boat", "monthly_payment": "120.00"}]}""");
+        var inputs = Household(under65: 1, extra: """{"otherSecuredPayments": [{"id": "os1", "creditorName": "Marina Finance", "propertyDescription": "Boat", "monthlyPayment": 120.00}]}""");
         Assert.IsType<OtherSecuredPayment>(inputs.OtherSecuredPayments[0]);
         var result = Run(CaseFor("9000.00", inputs, priority: "9001.00"));
         Assert.Equal("120.00", Line(result, "33d").Amount);
@@ -231,14 +231,14 @@ public sealed class MeansTestEngineTests
     // ── issue #349: the screen's inputs ──
 
     [Theory]
-    [InlineData("non_consumer_debts")]
-    [InlineData("disabled_veteran")]
-    [InlineData("reservist_national_guard")]
-    public void An_exemption_ends_the_test_before_any_line(string flag)
+    [InlineData("nonConsumerDebts", "non_consumer_debts")]
+    [InlineData("disabledVeteran", "disabled_veteran")]
+    [InlineData("reservistNationalGuard", "reservist_national_guard")]
+    public void An_exemption_ends_the_test_before_any_line(string flag, string determinedBy)
     {
         var result = Run(CaseFor("9000.00", Household(extra: $$"""{"{{flag}}": true}""")));
         Assert.Equal("exempt", result.Outcome);
-        Assert.Equal(flag, result.DeterminedBy);
+        Assert.Equal(determinedBy, result.DeterminedBy);
         Assert.Empty(result.Lines);
         Assert.NotNull(result.Comparison);
         Assert.True(result.Comparison.AboveMedian);
@@ -247,36 +247,36 @@ public sealed class MeansTestEngineTests
     [Fact]
     public void An_exempt_debtor_needs_no_household_at_all()
     {
-        var result = Run(CaseFor("9000.00", Inputs("""{"non_consumer_debts": true}""")));
+        var result = Run(CaseFor("9000.00", Inputs("""{"nonConsumerDebts": true}""")));
         Assert.Equal("exempt", result.Outcome);
         Assert.Null(result.Comparison);
     }
 
     [Fact]
     public void A_declined_exemption_is_not_an_exemption() =>
-        Assert.Equal("below_median", Run(CaseFor("4000.00", Household(extra: """{"disabled_veteran": false}"""))).Outcome);
+        Assert.Equal("below_median", Run(CaseFor("4000.00", Household(extra: """{"disabledVeteran": false}"""))).Outcome);
 
     [Fact]
     public void The_median_household_size_override_wins_the_comparison()
     {
-        var result = Run(CaseFor("8000.00", Household(under65: 2, extra: """{"median_household_size": 4}""")));
+        var result = Run(CaseFor("8000.00", Household(under65: 2, extra: """{"medianHouseholdSize": 4}""")));
         Assert.Equal(4, result.Comparison!.HouseholdSize);
         Assert.Equal("below_median", result.Outcome);
     }
 
     [Fact]
     public void The_median_size_alone_decides_a_below_median_case() =>
-        Assert.Equal("below_median", Run(CaseFor("4000.00", Inputs("""{"median_household_size": 4}"""))).Outcome);
+        Assert.Equal("below_median", Run(CaseFor("4000.00", Inputs("""{"medianHouseholdSize": 4}"""))).Outcome);
 
     [Fact]
     public void Above_the_median_the_age_bands_are_still_required() =>
-        Assert.Contains("age bands", Assert.Throws<MeansTestException>(() => Run(CaseFor("9000.00", Inputs("""{"median_household_size": 1}""")))).Message, StringComparison.Ordinal);
+        Assert.Contains("age bands", Assert.Throws<MeansTestException>(() => Run(CaseFor("9000.00", Inputs("""{"medianHouseholdSize": 1}""")))).Message, StringComparison.Ordinal);
 
     [Fact]
     public void The_irs_family_size_drives_lines_5_and_6_only()
     {
         var baseline = Run(CaseFor("9000.00", Household(under65: 2)));
-        var sized = Run(CaseFor("9000.00", Household(under65: 2, extra: """{"irs_family_size": 3}""")));
+        var sized = Run(CaseFor("9000.00", Household(under65: 2, extra: """{"irsFamilySize": 3}""")));
         Assert.Equal("3.00", Line(sized, "5").Amount);
         Assert.Contains("irs_family_size", Line(sized, "5").Source, StringComparison.Ordinal);
         Assert.NotEqual(Line(baseline, "6").Amount, Line(sized, "6").Amount);
@@ -289,7 +289,7 @@ public sealed class MeansTestEngineTests
     public void The_housing_family_size_drives_lines_8_and_9a_only()
     {
         var baseline = Run(CaseFor("9000.00", Household(under65: 2)));
-        var sized = Run(CaseFor("9000.00", Household(under65: 2, extra: """{"irs_housing_family_size": 4}""")));
+        var sized = Run(CaseFor("9000.00", Household(under65: 2, extra: """{"irsHousingFamilySize": 4}""")));
         Assert.NotEqual(Line(baseline, "8").Amount, Line(sized, "8").Amount);
         Assert.Contains("household of 4", Line(sized, "8").Source, StringComparison.Ordinal);
         Assert.Contains("irs_housing_family_size", Line(sized, "9a").Source, StringComparison.Ordinal);
@@ -301,7 +301,7 @@ public sealed class MeansTestEngineTests
     public void Bucketed_claim_rows_feed_the_home_and_vehicle_lines()
     {
         var rows = string.Join(", ", SecuredRow("h1", "home", "1200.00", "600.00"), SecuredRow("h2", "home", "300.00"), SecuredRow("v1", "vehicle_1", "400.00", "60.00"), SecuredRow("v2", "vehicle_2", "250.00"), SecuredRow("o1", "other", "95.00"), SecuredRow("legacy", null, "50.00"));
-        var result = Run(CaseFor("9000.00", Household(under65: 1, extra: $$"""{"vehicle_count": 2, "other_secured_payments": [{{rows}}]}""")));
+        var result = Run(CaseFor("9000.00", Household(under65: 1, extra: $$"""{"vehicleCount": 2, "otherSecuredPayments": [{{rows}}]}""")));
         Assert.Equal("1500.00", Line(result, "9b").Amount);
         Assert.Contains("bucket home", Line(result, "9b").Source, StringComparison.Ordinal);
         Assert.Equal("400.00", Line(result, "13b").Amount);
@@ -316,7 +316,7 @@ public sealed class MeansTestEngineTests
     public void A_typed_total_wins_over_the_bucketed_rows_rather_than_adding()
     {
         var row = SecuredRow("h1", "home", "1200.00", "6000.00");
-        var result = Run(CaseFor("9000.00", Household(under65: 1, extra: $$"""{"home_secured_monthly_total": "1000.00", "priority_cure_total": "600.00", "other_secured_payments": [{{row}}]}""")));
+        var result = Run(CaseFor("9000.00", Household(under65: 1, extra: $$"""{"homeSecuredMonthlyTotal": 1000.00, "priorityCureTotal": 600.00, "otherSecuredPayments": [{{row}}]}""")));
         Assert.Equal("1000.00", Line(result, "9b").Amount);
         Assert.Contains("home_secured_monthly_total", Line(result, "9b").Source, StringComparison.Ordinal);
         Assert.Equal("10.00", Line(result, "34").Amount);
@@ -439,7 +439,7 @@ public sealed class MeansTestEngineTests
     [Fact]
     public void The_marital_adjustment_comes_off_before_the_median_on_122c1()
     {
-        var inputs = Household(under65: 2, extra: """{"marital_adjustments": [{"id": "ma1", "description": "Spouse's own student loan", "amount": "300.00"}]}""");
+        var inputs = Household(under65: 2, extra: """{"maritalAdjustments": [{"id": "ma1", "description": "Spouse's own student loan", "amount": 300.00}]}""");
         var result = Run(CaseFor("unused", inputs, cmi: PaidCmi("d-s", FilingRole.NonFilingSpouse, 7400.00m)) with { Chapter = 13 });
         Assert.Equal("below_median", result.Outcome);
         Assert.Equal("7100.00", result.Comparison!.MonthlyCmi);
@@ -456,7 +456,7 @@ public sealed class MeansTestEngineTests
     [Fact]
     public void Contending_the_adjustment_for_the_commitment_period_shortens_it()
     {
-        var inputs = Household(under65: 2, extra: """{"marital_adjustments": [{"id": "ma1", "description": "Spouse's own student loan", "amount": "300.00"}], "commitment_period_marital_adjustment": true}""");
+        var inputs = Household(under65: 2, extra: """{"maritalAdjustments": [{"id": "ma1", "description": "Spouse's own student loan", "amount": 300.00}], "commitmentPeriodMaritalAdjustment": true}""");
         var result = Run(CaseFor("unused", inputs, cmi: PaidCmi("d-s", FilingRole.NonFilingSpouse, 7400.00m)) with { Chapter = 13 });
         Assert.Equal("300.00", C1(result, "19a").Amount);
         Assert.Contains("§ 1325(b)(4)", C1(result, "19a").Source, StringComparison.Ordinal);
@@ -469,7 +469,7 @@ public sealed class MeansTestEngineTests
     [Fact]
     public void A_chapter_13_marital_adjustment_without_column_b_is_an_error()
     {
-        var inputs = Household(under65: 1, extra: """{"marital_adjustments": [{"id": "ma1", "description": "x", "amount": "300.00"}]}""");
+        var inputs = Household(under65: 1, extra: """{"maritalAdjustments": [{"id": "ma1", "description": "x", "amount": 300.00}]}""");
         Assert.Contains("Form 122C-1 has no Column B", Assert.Throws<MeansTestException>(() => Run(CaseFor("4000.00", inputs) with { Chapter = 13 })).Message, StringComparison.Ordinal);
     }
 
@@ -486,7 +486,7 @@ public sealed class MeansTestEngineTests
     [Fact]
     public void The_presumption_exemptions_never_apply_to_chapter_13()
     {
-        var result = Run(CaseFor("4000.00", Household(under65: 2, extra: """{"disabled_veteran": true}""")) with { Chapter = 13 });
+        var result = Run(CaseFor("4000.00", Household(under65: 2, extra: """{"disabledVeteran": true}""")) with { Chapter = 13 });
         Assert.Equal("below_median", result.Outcome);
         Assert.NotNull(result.Commitment);
     }
@@ -513,41 +513,41 @@ public sealed class MeansTestEngineTests
     public void The_line_36_product_on_a_half_cent_rounds_up()
     {
         // 500.05 x 0.1 = 50.005 → 50.01.
-        var inputs = Household(under65: 1, extra: """{"ch13_eligible": true, "ch13_projected_plan_payment": "500.05"}""");
+        var inputs = Household(under65: 1, extra: """{"ch13Eligible": true, "ch13ProjectedPlanPayment": 500.05}""");
         Assert.Equal("50.01", Line(Run(CaseFor("9000.00", inputs)), "36").Amount);
     }
 
     private static MeansTestResult Run(MeansTestCase @case) => MeansTestEngine.Run(@case, Data);
 
-    private static MeansTestInputBody Inputs(string json) => MeansTestInputRules.Parse(Build.Json(json));
+    private static MeansTestInputBody Inputs(string json) => Insolvia.Domain.Tests.Body.Read<MeansTestInputBody>(Insolvia.Domain.Tests.Body.Of(json));
 
     private static MeansTestInputBody Household(int under65 = 2, int over65 = 0, string? extra = null)
     {
-        var body = Trees.Merge($$"""{"people_under_65": {{under65}}, "people_65_or_older": {{over65}}}""", extra);
-        return MeansTestInputRules.Parse(body);
+        var body = Trees.Merge($$"""{"peopleUnder65": {{under65}}, "people65OrOlder": {{over65}}}""", extra);
+        return Insolvia.Domain.Tests.Body.Read<MeansTestInputBody>(body);
     }
 
     private static MeansTestInputBody FullInputs() => Household(extra: """
-        {"home_secured_monthly_total": "1750.00", "vehicle_count": 1, "vehicle_1_loan_monthly": "450.00", "taxes": "1500.00",
-         "involuntary_deductions": "120.00", "term_life_insurance": "40.00", "healthcare_above_allowance": "100.00", "optional_telecom": "60.00",
-         "health_insurance": "400.00", "health_savings_account": "50.00", "education_under_18": "200.00", "additional_food_clothing": "50.00",
-         "charitable_contributions": "25.00", "priority_cure_total": "3000.00", "ch13_eligible": true, "ch13_projected_plan_payment": "500.00"}
+        {"homeSecuredMonthlyTotal": 1750.00, "vehicleCount": 1, "vehicle1LoanMonthly": 450.00, "taxes": 1500.00,
+         "involuntaryDeductions": 120.00, "termLifeInsurance": 40.00, "healthcareAboveAllowance": 100.00, "optionalTelecom": 60.00,
+         "healthInsurance": 400.00, "healthSavingsAccount": 50.00, "educationUnder18": 200.00, "additionalFoodClothing": 50.00,
+         "charitableContributions": 25.00, "priorityCureTotal": 3000.00, "ch13Eligible": true, "ch13ProjectedPlanPayment": 500.00}
         """);
 
     private static MeansTestInputBody Ch13Inputs() => Household(extra: """
-        {"home_secured_monthly_total": "1750.00", "vehicle_count": 1, "vehicle_1_loan_monthly": "450.00", "taxes": "1500.00",
-         "involuntary_deductions": "120.00", "term_life_insurance": "40.00", "healthcare_above_allowance": "100.00", "optional_telecom": "60.00",
-         "health_insurance": "400.00", "health_savings_account": "50.00", "education_under_18": "200.00", "additional_food_clothing": "50.00",
-         "charitable_contributions": "25.00", "priority_cure_total": "3000.00", "ch13_projected_plan_payment": "500.00",
-         "child_support_for_dependents": "250.00", "qualified_retirement_deductions": "150.00",
-         "special_circumstances": [{"id": "sc-1", "description": "Dialysis travel", "amount": "100.00"}]}
+        {"homeSecuredMonthlyTotal": 1750.00, "vehicleCount": 1, "vehicle1LoanMonthly": 450.00, "taxes": 1500.00,
+         "involuntaryDeductions": 120.00, "termLifeInsurance": 40.00, "healthcareAboveAllowance": 100.00, "optionalTelecom": 60.00,
+         "healthInsurance": 400.00, "healthSavingsAccount": 50.00, "educationUnder18": 200.00, "additionalFoodClothing": 50.00,
+         "charitableContributions": 25.00, "priorityCureTotal": 3000.00, "ch13ProjectedPlanPayment": 500.00,
+         "childSupportForDependents": 250.00, "qualifiedRetirementDeductions": 150.00,
+         "specialCircumstances": [{"id": "sc-1", "description": "Dialysis travel", "amount": 100.00}]}
         """);
 
     private static MeansTestCase FullCase() => CaseFor("7500.00", FullInputs(), priority: "6000.00", nonpriority: "30000.00", children: 1);
 
     private static string SecuredRow(string id, string? bucket, string monthly, string? cure = null)
     {
-        var row = new JsonObject { ["id"] = id, ["creditor_name"] = $"Lender {id}", ["property_description"] = "Collateral", ["monthly_payment"] = monthly };
+        var row = new JsonObject { ["id"] = id, ["creditorName"] = $"Lender {id}", ["propertyDescription"] = "Collateral", ["monthlyPayment"] = decimal.Parse(monthly, System.Globalization.CultureInfo.InvariantCulture) };
         if (bucket is not null)
         {
             row["bucket"] = bucket;
@@ -555,7 +555,7 @@ public sealed class MeansTestEngineTests
 
         if (cure is not null)
         {
-            row["cure_total"] = cure;
+            row["cureTotal"] = decimal.Parse(cure, System.Globalization.CultureInfo.InvariantCulture);
         }
 
         return row.ToJsonString();

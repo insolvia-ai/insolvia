@@ -1,4 +1,3 @@
-using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using Insolvia.Domain.CaseEntities;
 using Insolvia.Domain.Fields;
@@ -7,80 +6,40 @@ namespace Insolvia.Domain.Expenses;
 
 /// <summary>106J's household header — one per household (from <c>expenses.py</c>).</summary>
 public sealed record HouseholdBody(
-    WhichHousehold? WhichHousehold,
-    bool? SeparateHousehold,
-    bool? ExpensesIncludeOthers,
-    bool? ChangeExpected,
-    string? ChangeExplanation);
+    WhichHousehold? WhichHousehold = null,
+    bool? SeparateHousehold = null,
+    bool? ExpensesIncludeOthers = null,
+    bool? ChangeExpected = null,
+    [property: Narrative] string? ChangeExplanation = null);
 
 /// <summary>One 106J expense line, in its household.</summary>
-public sealed record ExpenseBody(string? HouseholdId, ExpenseCategory? Category, string? SpecifyText, decimal? Amount);
+public sealed record ExpenseBody(
+    [property: Text(64)] string? HouseholdId = null,
+    ExpenseCategory? Category = null,
+    [property: Text] string? SpecifyText = null,
+    [property: Money] decimal? Amount = null);
 
 /// <summary>
-/// One 106J line-2 dependent. NO NAME: the form does not ask for one, and a
-/// name sent is refused rather than stored.
+/// One 106J line-2 dependent. NO NAME: the form does not ask for one, so the
+/// record has no member to hold it — a name sent is dropped, never stored.
 /// </summary>
-public sealed record DependentBody(string? HouseholdId, string? Relationship, int? Age, bool? LivesWithDebtor);
+public sealed record DependentBody(
+    [property: Text(64)] string? HouseholdId = null,
+    [property: Text] string? Relationship = null,
+    [property: Count(150)] int? Age = null,
+    bool? LivesWithDebtor = null);
 
 /// <summary>The three 106J collections.</summary>
 public static class ExpenseRules
 {
     /// <summary>The household collection's kind.</summary>
-    public static readonly EntityKind<HouseholdBody> Household = new("household", "households", "HOUSEHOLD", ParseHousehold);
+    public static readonly EntityKind<HouseholdBody> Household = new("household", "households", "HOUSEHOLD");
 
     /// <summary>The expense collection's kind.</summary>
-    public static readonly EntityKind<ExpenseBody> Expense = new("expense", "expenses", "EXPENSE", ParseExpense);
+    public static readonly EntityKind<ExpenseBody> Expense = new("expense", "expenses", "EXPENSE");
 
     /// <summary>The dependent collection's kind.</summary>
-    public static readonly EntityKind<DependentBody> Dependent = new("dependent", "dependents", "DEPENDENT", ParseDependent);
-
-    /// <summary>Validates a household body (Python's <c>parse_household</c>).</summary>
-    public static HouseholdBody ParseHousehold(JsonObject payload)
-    {
-        ArgumentNullException.ThrowIfNull(payload);
-        var errors = new Dictionary<string, string>(StringComparer.Ordinal);
-        var body = new HouseholdBody(
-            WhichHousehold: FieldParsers.Choice<WhichHousehold>(payload["which_household"], "which_household", errors),
-            SeparateHousehold: FieldParsers.Boolean(payload["separate_household"], "separate_household", errors),
-            ExpensesIncludeOthers: FieldParsers.Boolean(payload["expenses_include_others"], "expenses_include_others", errors),
-            ChangeExpected: FieldParsers.Boolean(payload["change_expected"], "change_expected", errors),
-            ChangeExplanation: FieldParsers.Narrative(payload["change_explanation"], "change_explanation", errors));
-        IdRows.ThrowIfAny(errors);
-        return body;
-    }
-
-    /// <summary>Validates an expense body (Python's <c>parse_expense</c>).</summary>
-    public static ExpenseBody ParseExpense(JsonObject payload)
-    {
-        ArgumentNullException.ThrowIfNull(payload);
-        var errors = new Dictionary<string, string>(StringComparer.Ordinal);
-        var body = new ExpenseBody(
-            HouseholdId: FieldParsers.Text(payload["household_id"], "household_id", errors, limit: 64),
-            Category: FieldParsers.Choice<ExpenseCategory>(payload["category"], "category", errors),
-            SpecifyText: FieldParsers.Text(payload["specify_text"], "specify_text", errors),
-            Amount: FieldParsers.Money(payload["amount"], "amount", errors));
-        IdRows.ThrowIfAny(errors);
-        return body;
-    }
-
-    /// <summary>Validates a dependent body (Python's <c>parse_dependent</c>).</summary>
-    public static DependentBody ParseDependent(JsonObject payload)
-    {
-        ArgumentNullException.ThrowIfNull(payload);
-        var errors = new Dictionary<string, string>(StringComparer.Ordinal);
-        if (payload["name"] is not null)
-        {
-            errors["name"] = "Dependents' names are not stored — the form does not ask for them.";
-        }
-
-        var body = new DependentBody(
-            HouseholdId: FieldParsers.Text(payload["household_id"], "household_id", errors, limit: 64),
-            Relationship: FieldParsers.Text(payload["relationship"], "relationship", errors),
-            Age: FieldParsers.WholeNumber(payload["age"], "age", errors, maximum: 150),
-            LivesWithDebtor: FieldParsers.Boolean(payload["lives_with_debtor"], "lives_with_debtor", errors));
-        IdRows.ThrowIfAny(errors);
-        return body;
-    }
+    public static readonly EntityKind<DependentBody> Dependent = new("dependent", "dependents", "DEPENDENT");
 }
 
 /// <summary>106J's household: the main one, or Debtor 2's separate one (Python's <c>WHICH_HOUSEHOLDS</c>).</summary>

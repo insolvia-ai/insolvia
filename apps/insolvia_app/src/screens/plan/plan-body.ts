@@ -15,28 +15,6 @@ import type {
  * sends — ADR 0001, the client stays dumb.
  */
 
-/**
- * The stored record minus its identity — what a PUT sends back.
- *
- * `amended` (issue #370) is stripped with the identity: it is not body data,
- * a PUT that omits it keeps the stored flag, and it means nothing on a plan
- * (the amendment packet prints schedule items; a plan changed after
- * confirmation is a § 1329 modification, not a Rule 1009 amendment). Left
- * in, it would also earn a provenance entry the server does not expect.
- */
-export function planBodyOf(record: Record<string, unknown>): PlanBody {
-  const {
-    id: _id,
-    case_id: _caseId,
-    created_at: _created,
-    updated_at: _updated,
-    provenance: _provenance,
-    amended: _amended,
-    ...body
-  } = record;
-  return body as PlanBody;
-}
-
 /** A blank text box is an absent value, never `""` on the wire. */
 export function blankToAbsent(next: string): string | undefined {
   return next.trim() === '' ? undefined : next;
@@ -49,7 +27,7 @@ export function wholeNumberOf(next: string): number | undefined {
 }
 
 export function treatmentFor(body: PlanBody, claimId: string): PlanSecuredTreatment | undefined {
-  return body.secured_treatments?.find((row) => row.claim_id === claimId);
+  return body.securedTreatments?.find((row) => row.claimId === claimId);
 }
 
 /**
@@ -61,29 +39,29 @@ export function treatmentFor(body: PlanBody, claimId: string): PlanSecuredTreatm
 export function withTreatment(
   body: PlanBody,
   claimId: string,
-  patch: Partial<Omit<PlanSecuredTreatment, 'id' | 'claim_id'>>,
+  patch: Partial<Omit<PlanSecuredTreatment, 'id' | 'claimId'>>,
   mintId: () => string,
 ): PlanBody {
-  const rows = body.secured_treatments ?? [];
-  const existing = rows.find((row) => row.claim_id === claimId);
+  const rows = body.securedTreatments ?? [];
+  const existing = rows.find((row) => row.claimId === claimId);
   if ('treatment' in patch && patch.treatment === undefined) {
-    const rest = rows.filter((row) => row.claim_id !== claimId);
-    return withList(body, 'secured_treatments', rest);
+    const rest = rows.filter((row) => row.claimId !== claimId);
+    return withList(body, 'securedTreatments', rest);
   }
   if (existing === undefined) {
     return {
       ...body,
-      secured_treatments: [...rows, { id: mintId(), claim_id: claimId, ...patch }],
+      securedTreatments: [...rows, { id: mintId(), claimId: claimId, ...patch }],
     };
   }
   return {
     ...body,
-    secured_treatments: rows.map((row) => (row.claim_id === claimId ? { ...row, ...patch } : row)),
+    securedTreatments: rows.map((row) => (row.claimId === claimId ? { ...row, ...patch } : row)),
   };
 }
 
 /** Set an embedded list, dropping the key when it empties (the server's prune rule). */
-export function withList<K extends 'secured_treatments' | 'step_payments' | 'lump_sums'>(
+export function withList<K extends 'securedTreatments' | 'stepPayments' | 'lumpSums'>(
   body: PlanBody,
   key: K,
   rows: NonNullable<PlanBody[K]>,
@@ -93,26 +71,26 @@ export function withList<K extends 'secured_treatments' | 'step_payments' | 'lum
   return without;
 }
 
+/** A treatment's money and rate figures — every one a JSON number. */
+export type TreatmentFigure = Exclude<keyof PlanSecuredTreatment, 'id' | 'claimId' | 'treatment'>;
+
 /** The fields each treatment asks for, in the order the screen shows them. */
 export const TREATMENT_FIELDS: Readonly<
-  Record<
-    SecuredTreatmentKind,
-    readonly { readonly key: keyof PlanSecuredTreatment; readonly label: string }[]
-  >
+  Record<SecuredTreatmentKind, readonly { readonly key: TreatmentFigure; readonly label: string }[]>
 > = {
   cure_and_maintain: [
     { key: 'arrearage', label: 'Arrearage cured through the plan' },
-    { key: 'arrearage_interest_rate', label: 'Interest on the arrearage (% a year)' },
+    { key: 'arrearageInterestRate', label: 'Interest on the arrearage (% a year)' },
     {
-      key: 'maintenance_payment',
+      key: 'maintenancePayment',
       label: 'Ongoing monthly payment through the plan (blank: paid directly)',
     },
-    { key: 'monthly_payment', label: 'Fixed monthly payment on the arrearage (blank: amortised)' },
+    { key: 'monthlyPayment', label: 'Fixed monthly payment on the arrearage (blank: amortised)' },
   ],
   cramdown: [
-    { key: 'cramdown_value', label: 'Value paid (blank: the derived secured portion)' },
-    { key: 'interest_rate', label: 'Interest rate (% a year)' },
-    { key: 'monthly_payment', label: 'Fixed monthly payment (blank: amortised)' },
+    { key: 'cramdownValue', label: 'Value paid (blank: the derived secured portion)' },
+    { key: 'interestRate', label: 'Interest rate (% a year)' },
+    { key: 'monthlyPayment', label: 'Fixed monthly payment (blank: amortised)' },
   ],
   surrender: [],
 };

@@ -214,10 +214,10 @@ public sealed class DocumentExtractionTests
         Assert.Equal(CandidateStatus.Pending, bank.Status);
 
         // Candidate-id indirection: each claim names its creditor CANDIDATE.
-        Assert.Equal(bank.Id, card.Payload["creditor_id"]!.GetValue<string>());
-        Assert.Equal(bank.Id, auto.Payload["creditor_id"]!.GetValue<string>());
-        Assert.Equal(collections.Id, collectionsClaim.Payload["creditor_id"]!.GetValue<string>());
-        Assert.Equal("1234.56", card.Payload["amount"]!.GetValue<string>());
+        Assert.Equal(bank.Id, card.Payload["creditorId"]!.GetValue<string>());
+        Assert.Equal(bank.Id, auto.Payload["creditorId"]!.GetValue<string>());
+        Assert.Equal(collections.Id, collectionsClaim.Payload["creditorId"]!.GetValue<string>());
+        Assert.Equal(1234.56m, card.Payload["amount"]!.GetValue<decimal>());
         Assert.False(card.Payload["disputed"]!.GetValue<bool>());
         Assert.StartsWith("PO Box 9", collections.Payload["address"]!["raw"]!.GetValue<string>(), StringComparison.Ordinal);
     }
@@ -228,9 +228,9 @@ public sealed class DocumentExtractionTests
         var (created, deps, blobs, candidates, _) = await BuildAsync(new ScriptedExtractionModel(Raw(CreditReportRaw)));
         var document = await StoredAsync(deps, blobs, created.Id);
         await DocumentExtraction.RunAsync(Accept(created.Id, document.Id), deps, Ct);
-        var secured = (await candidates.ListForCaseAsync(created.Id, Ct)).Single(c => Json.AsString(c.Payload["claim_class"]) == "secured");
-        Assert.Equal("2222", secured.Payload["account_last4"]!.GetValue<string>());
-        Assert.Equal("8050.00", secured.Payload["amount"]!.GetValue<string>());
+        var secured = (await candidates.ListForCaseAsync(created.Id, Ct)).Single(c => Json.AsString(c.Payload["claimClass"]) == "secured");
+        Assert.Equal("2222", secured.Payload["accountLast4"]!.GetValue<string>());
+        Assert.Equal(8050.00m, secured.Payload["amount"]!.GetValue<decimal>());
     }
 
     [Fact]
@@ -323,16 +323,16 @@ public sealed class DocumentExtractionTests
         Assert.Equal(3, stored.Count);
         var (employment, first, second) = (stored[0], stored[1], stored[2]);
         Assert.Equal("employments", employment.EntityType);
-        Assert.Equal("Example Industries Inc", employment.Payload["employer_name"]!.GetValue<string>());
+        Assert.Equal("Example Industries Inc", employment.Payload["employerName"]!.GetValue<string>());
         Assert.Equal("employed", employment.Payload["status"]!.GetValue<string>());
         Assert.Equal("pay_period_records", first.EntityType);
-        Assert.Equal(employment.Id, first.Payload["employment_id"]!.GetValue<string>());
-        Assert.Equal(employment.Id, second.Payload["employment_id"]!.GetValue<string>());
-        Assert.Equal(("2026-08-01", "2026-08-14"), (first.Payload["period_start"]!.GetValue<string>(), first.Payload["period_end"]!.GetValue<string>()));
-        Assert.Equal("2026-08-19", first.Payload["pay_date"]!.GetValue<string>());
-        Assert.Equal("2026-09-02", second.Payload["pay_date"]!.GetValue<string>());
-        Assert.Equal("2400.00", first.Payload["gross"]!.GetValue<string>());
-        Assert.Equal("1890.50", first.Payload["net"]!.GetValue<string>());
+        Assert.Equal(employment.Id, first.Payload["employmentId"]!.GetValue<string>());
+        Assert.Equal(employment.Id, second.Payload["employmentId"]!.GetValue<string>());
+        Assert.Equal(("2026-08-01", "2026-08-14"), (first.Payload["periodStart"]!.GetValue<string>(), first.Payload["periodEnd"]!.GetValue<string>()));
+        Assert.Equal("2026-08-19", first.Payload["payDate"]!.GetValue<string>());
+        Assert.Equal("2026-09-02", second.Payload["payDate"]!.GetValue<string>());
+        Assert.Equal(2400.00m, first.Payload["gross"]!.GetValue<decimal>());
+        Assert.Equal(1890.50m, first.Payload["net"]!.GetValue<decimal>());
         Assert.Equal("biweekly", first.Payload["frequency"]!.GetValue<string>());
         var deductions = first.Payload["deductions"]!.AsArray();
         Assert.Equal(["tax", "insurance"], deductions.Select(d => d!["category"]!.GetValue<string>()));

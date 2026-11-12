@@ -108,7 +108,7 @@ public sealed class ArgumentTests : IDisposable
             new JsonObject { ["caseId"] = found.Id, ["proposals"] = new JsonArray(new JsonObject { ["entityType"] = "creditors", ["payload"] = new JsonObject { ["name"] = 42 } }) },
             McpHost.Auth())).Result;
         Assert.Equal(
-            "{\"error\": {\"code\": \"validation_failed\", \"message\": \"validation failed: proposals[0].payload.name\", \"fields\": {\"proposals[0].payload.name\": \"Must be text.\"}}}",
+            "{\"error\": {\"code\": \"validation_failed\", \"message\": \"validation failed: proposals[0].payload.name\", \"fields\": {\"proposals[0].payload.name\": \"Not the expected type.\"}}}",
             (string?)result["content"]![0]!["text"]);
     }
 }

@@ -13,7 +13,6 @@ namespace Insolvia.Api.Tests.Routes;
 /// </summary>
 public sealed class CaseSummaryRouteTests : IAsyncLifetime, IDisposable
 {
-    private const string Typed = """{"source": "staff_typed"}""";
 
     private readonly CaseWorld _world = new();
 
@@ -27,14 +26,7 @@ public sealed class CaseSummaryRouteTests : IAsyncLifetime, IDisposable
 
     private async Task<string> AddAsync(string caseId, string collection, JsonObject body)
     {
-        var provenance = new JsonObject();
-        foreach (var (key, _) in body)
-        {
-            provenance[key] = JsonNode.Parse(Typed);
-        }
-
-        body["provenance"] = provenance;
-        var answer = await _world.Post($"/v1/cases/{caseId}/{collection}", body.ToJsonString());
+        var answer = await _world.Post($"/v1/cases/{caseId}/{collection}", AnalysisWorld.Typed(body.ToJsonString()));
         Assert.True(answer.Status == 201, answer.Body);
         return answer.Str("id")!;
     }
@@ -43,7 +35,7 @@ public sealed class CaseSummaryRouteTests : IAsyncLifetime, IDisposable
 
     private Task<string> AddClaimAsync(string caseId, string creditorId, string claimClass, params (string Key, JsonNode Value)[] fields)
     {
-        var body = new JsonObject { ["creditor_id"] = creditorId, ["claim_class"] = claimClass };
+        var body = new JsonObject { ["creditorId"] = creditorId, ["claimClass"] = claimClass };
         foreach (var (key, value) in fields)
         {
             body[key] = value;
@@ -88,9 +80,9 @@ public sealed class CaseSummaryRouteTests : IAsyncLifetime, IDisposable
     {
         var caseId = await _world.OpenCaseIdAsync();
         var creditorId = await AddCreditorAsync(caseId);
-        await AddClaimAsync(caseId, creditorId, "nonpriority_unsecured", ("amount", "8412.66"));
-        await AddClaimAsync(caseId, creditorId, "secured", ("amount", "14500.00"));
-        await AddClaimAsync(caseId, creditorId, "priority_unsecured", ("priority_amount", "50.00"));
+        await AddClaimAsync(caseId, creditorId, "nonpriority_unsecured", ("amount", 8412.66m));
+        await AddClaimAsync(caseId, creditorId, "secured", ("amount", 14500.00m));
+        await AddClaimAsync(caseId, creditorId, "priority_unsecured", ("priorityAmount", 50.00m));
 
         var totals = (await Summary(caseId)).Object["totals"]!.AsObject();
 
@@ -106,8 +98,8 @@ public sealed class CaseSummaryRouteTests : IAsyncLifetime, IDisposable
     {
         var caseId = await _world.OpenCaseIdAsync();
         var creditorId = await AddCreditorAsync(caseId);
-        var assetId = await AddAsync(caseId, "assets", new JsonObject { ["category"] = "vehicle", ["value_entire"] = "9000.00" });
-        var claimId = await AddClaimAsync(caseId, creditorId, "secured", ("amount", "12000.00"), ("asset_id", assetId), ("lien_position", 1));
+        var assetId = await AddAsync(caseId, "assets", new JsonObject { ["category"] = "vehicle", ["valueEntire"] = 9000.00m });
+        var claimId = await AddClaimAsync(caseId, creditorId, "secured", ("amount", 12000.00m), ("assetId", assetId), ("lienPosition", 1));
 
         var body = (await Summary(caseId)).Object;
 

@@ -54,13 +54,13 @@ public static partial class ProvenanceRules
     [GeneratedRegex("^[A-Za-z0-9_-]+$")]
     public static partial Regex AddressableId();
 
-    [GeneratedRegex("^[a-z][a-z0-9_]*$")]
+    [GeneratedRegex("^[a-z][A-Za-z0-9_]*$")]
     private static partial Regex FieldName();
 
-    [GeneratedRegex(@"^[a-z][a-z0-9_]*(?:\[[A-Za-z0-9_-]+\])?(?:\.[a-z][a-z0-9_]*(?:\[[A-Za-z0-9_-]+\])?)*$")]
+    [GeneratedRegex(@"^[a-z][A-Za-z0-9_]*(?:\[[A-Za-z0-9_-]+\])?(?:\.[a-z][A-Za-z0-9_]*(?:\[[A-Za-z0-9_-]+\])?)*$")]
     private static partial Regex FieldPath();
 
-    [GeneratedRegex(@"^([a-z][a-z0-9_]*)(?:\[([A-Za-z0-9_-]+)\])?$")]
+    [GeneratedRegex(@"^([a-z][A-Za-z0-9_]*)(?:\[([A-Za-z0-9_-]+)\])?$")]
     private static partial Regex PathSegment();
 
     /// <summary>
@@ -105,6 +105,14 @@ public static partial class ProvenanceRules
 
         return entries.ToValueDictionary();
     }
+
+    /// <summary>
+    /// A typed request's map, checked and normalised as <see cref="Parse(JsonNode?)"/>
+    /// checks a raw one — the same keys, the same entry rules, the same messages.
+    /// </summary>
+    /// <exception cref="FieldValidationException">An entry failed.</exception>
+    public static ValueDictionary<string, ProvenanceEntry> Check(IReadOnlyDictionary<string, ProvenanceEntry>? entries) =>
+        Parse(ToJson(entries ?? ValueCollections.EmptyDictionary<string, ProvenanceEntry>()));
 
     /// <summary>
     /// Every field path in <paramref name="record"/> that actually holds a
