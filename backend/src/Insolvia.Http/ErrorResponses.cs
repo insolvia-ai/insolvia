@@ -53,6 +53,26 @@ public static class ErrorResponses
         _ => null,
     };
 
+    /// <summary>
+    /// The status and body for a request the framework refused before the
+    /// handler: a body that is not the route's request record names the field
+    /// the reader stopped at, as a <c>ValidationError</c>; any other refusal
+    /// is its status's own body (<see cref="ForStatus"/>).
+    /// </summary>
+    /// <param name="error">The framework's refusal.</param>
+    /// <returns>The status and body, or null when this host never makes the refusal.</returns>
+    public static (int Status, ErrorBody Body)? ForBadRequest(BadHttpRequestException error)
+    {
+        ArgumentNullException.ThrowIfNull(error);
+        if (error.InnerException is System.Text.Json.JsonException { Path: { } path })
+        {
+            var field = path.StartsWith("$.", StringComparison.Ordinal) ? path[2..] : path.TrimStart('$');
+            return (400, new ErrorBody("ValidationError", null, new Dictionary<string, string> { [field.Length == 0 ? "body" : field] = "Not the expected type." }));
+        }
+
+        return ForStatus(error.StatusCode) is { } refusal ? (error.StatusCode, refusal) : null;
+    }
+
     /// <summary>The body for a refusal the framework makes, or null when this host never makes it.</summary>
     /// <param name="status">An HTTP status code.</param>
     /// <returns>The body.</returns>
