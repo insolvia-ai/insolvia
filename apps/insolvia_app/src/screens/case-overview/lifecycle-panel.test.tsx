@@ -178,8 +178,8 @@ describe('the lifecycle panel', () => {
         respond: () =>
           jsonResponse(400, {
             error: 'ValidationError',
-            message: 'validation failed: filed_at',
-            fields: { filed_at: 'A filed case needs its filed date.' },
+            message: 'validation failed: filedAt',
+            fields: { filedAt: 'A filed case needs its filed date.' },
           }),
       },
     ]);
@@ -192,7 +192,7 @@ describe('the lifecycle panel', () => {
     const patch = sent(fetchMock, 'PATCH', `/v1/cases/${CASE_ID}`);
     expect(JSON.parse(String(patch?.[1]?.body))).toEqual({
       status: 'filed',
-      case_number: '8:26-bk-01234',
+      caseNumber: '8:26-bk-01234',
     });
   });
 

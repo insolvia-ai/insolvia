@@ -95,9 +95,9 @@ public static class WireViews
     }
 
     /// <summary>
-    /// <c>debtor_json</c> (without <c>differs_from_client</c>, which the tools
-    /// never compute): identity, <c>client_id</c> when linked, provenance, the
-    /// pruned body, and the tax id as the LAST-FOUR VIEW only — the full value
+    /// The API's debtor view (without <c>differsFromClient</c>, which the
+    /// tools never compute): identity, <c>clientId</c> when linked, the body,
+    /// provenance, and the tax id as the LAST-FOUR VIEW only — the full value
     /// has no wire shape at all.
     /// </summary>
     /// <param name="debtor">The debtor.</param>
@@ -108,17 +108,17 @@ public static class WireViews
         var body = new JsonObject
         {
             ["id"] = debtor.Id,
-            ["case_id"] = debtor.CaseId,
-            ["filing_role"] = debtor.FilingRole.ToWire(),
-            ["created_at"] = Micros(debtor.CreatedAt),
-            ["updated_at"] = Micros(debtor.UpdatedAt),
+            ["caseId"] = debtor.CaseId,
+            ["filingRole"] = debtor.FilingRole.ToWire(),
+            ["createdAt"] = Micros(debtor.CreatedAt),
+            ["updatedAt"] = Micros(debtor.UpdatedAt),
+            ["body"] = DebtorRules.BodyNode(debtor.Body),
+            ["provenance"] = ProvenanceRules.ToJson(debtor.Provenance),
         };
-        AddIfPresent(body, "client_id", debtor.ClientId);
-        body["provenance"] = ProvenanceRules.ToJson(debtor.Provenance);
-        Spread(body, BodyJson.Prune(DebtorRules.BodyNode(debtor.Body)));
+        AddIfPresent(body, "clientId", debtor.ClientId);
         if (debtor.TaxId is { } taxId)
         {
-            body["tax_id"] = new JsonObject { ["kind"] = taxId.Kind.ToWire(), ["last_four"] = taxId.LastFour };
+            body["taxId"] = new JsonObject { ["kind"] = taxId.Kind.ToWire(), ["lastFour"] = taxId.LastFour };
         }
 
         return body;

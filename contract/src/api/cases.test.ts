@@ -127,15 +127,15 @@ describe('the client directory', () => {
       (await admin.api.createCase({ chapter: 7, ...SCRATCH_COURT, clientIds: [duplicate.id] })).id,
     );
     const debtor1 = async () =>
-      (await admin.api.listDebtors(duplicateCase)).find((d) => d.filing_role === 'debtor_1');
+      (await admin.api.listDebtors(duplicateCase)).find((d) => d.filingRole === 'debtor_1');
     const before = await debtor1();
     const merged = await admin.api.mergeFirmClient(created.id, duplicate.id);
     admin.wire(200, { client: FIRM_CLIENT, merged: FIRM_CLIENT });
     expect(merged.merged.merged_into).toBe(created.id);
     expect(merged.merged.status).toBe('archived');
     const after = await debtor1();
-    expect(after?.client_id).toBe(created.id);
-    expect(after?.name).toEqual(before?.name);
+    expect(after?.clientId).toBe(created.id);
+    expect(after?.body.name).toEqual(before?.body.name);
     const survivorCases = await admin.api.listFirmClientCases(created.id);
     expect(survivorCases.map((c) => c.case.id)).toContain(duplicateCase);
     await expectApiError(admin.api.mergeFirmClient(created.id, duplicate.id), 409, 'ConflictError');
@@ -160,7 +160,7 @@ describe('the seeded clients', () => {
     const found: { caseId: string; debtor: Debtor }[] = [];
     for (const fixture of await fixtureCases()) {
       for (const debtor of await api.listDebtors(fixture.case.id)) {
-        if (debtor.filing_role === 'debtor_1' || debtor.filing_role === 'debtor_2') {
+        if (debtor.filingRole === 'debtor_1' || debtor.filingRole === 'debtor_2') {
           found.push({ caseId: fixture.case.id, debtor });
         }
       }
@@ -172,34 +172,34 @@ describe('the seeded clients', () => {
   it('every seeded debtor is a copy of a client it still agrees with', async () => {
     const api = firmAdmin().api;
     for (const { caseId, debtor } of await seededDebtors()) {
-      withMessage(`${caseId} ${debtor.filing_role}`, () => expect(debtor.client_id).toBeTruthy());
-      const client = await api.getFirmClient(debtor.client_id!);
+      withMessage(`${caseId} ${debtor.filingRole}`, () => expect(debtor.clientId).toBeTruthy());
+      const client = await api.getFirmClient(debtor.clientId!);
       expect(client.status).toBe('active');
-      expect(client.name).toEqual(debtor.name);
-      expect(debtor.differs_from_client).toEqual([]);
+      expect(client.name).toEqual(debtor.body.name);
+      expect(debtor.differsFromClient).toEqual([]);
       const copied = Object.entries(debtor.provenance)
         .filter(([path]) => path.split('.')[0]!.split('[')[0] === 'name')
         .map(([, entry]) => entry);
       expect(copied.length).toBeGreaterThan(0);
       for (const entry of copied) {
-        expect(entry).toEqual({ source: 'client', client_id: debtor.client_id });
+        expect(entry).toEqual({ source: 'client', client_id: debtor.clientId });
       }
     }
   });
 
   it('the seeded clients are in the firm’s directory', async () => {
     const listed = (await firmAdmin().api.listFirmClients()).map((c) => c.id);
-    const seededIds = (await seededDebtors()).map(({ debtor }) => debtor.client_id);
+    const seededIds = (await seededDebtors()).map(({ debtor }) => debtor.clientId);
     expect(listed).toEqual(expect.arrayContaining(seededIds));
   });
 
   it('each seeded client lists its fixture case in the role it holds', async () => {
     const api = firmAdmin().api;
     for (const { caseId, debtor } of await seededDebtors()) {
-      const entries = await api.listFirmClientCases(debtor.client_id!);
-      const roles = new Map(entries.map((e) => [e.case.id, e.filing_role]));
-      withMessage(`client ${debtor.client_id}`, () =>
-        expect(roles.get(caseId)).toBe(debtor.filing_role),
+      const entries = await api.listFirmClientCases(debtor.clientId!);
+      const roles = new Map(entries.map((e) => [e.case.id, e.filingRole]));
+      withMessage(`client ${debtor.clientId}`, () =>
+        expect(roles.get(caseId)).toBe(debtor.filingRole),
       );
     }
   });
@@ -240,7 +240,8 @@ describe('a case, opened from a client', () => {
 
     const updated = await admin.api.updateCase(opened.id, {
       chapter: 13,
-      court: { court: 'flnb', division: 'tallahassee' },
+      court: 'flnb',
+      division: 'tallahassee',
       filedAt: '2026-01-15',
     });
     admin.wire(200, CASE);
@@ -331,7 +332,7 @@ describe('a case, opened from a client', () => {
     expect(copied.map((c) => c.body.name)).toEqual(['Example Bank']);
     // The copy's Debtor 1 names its source on every value…
     const copyDebtor = (await admin.api.listDebtors(copy.id)).find(
-      (d) => d.filing_role === 'debtor_1',
+      (d) => d.filingRole === 'debtor_1',
     );
     const sources = Object.values(copyDebtor?.provenance ?? {}).map(
       (entry) => (entry as { copied_from_case_id?: string }).copied_from_case_id,
@@ -391,26 +392,25 @@ describe('the debtors of a case', () => {
     const debtors = await admin.api.listDebtors(caseId);
     admin.wire(200, { debtors: [DEBTOR] });
     expect(debtors).toHaveLength(1);
-    expect(debtors[0]?.client_id).toBe(client.id);
+    expect(debtors[0]?.clientId).toBe(client.id);
 
     const saved = await admin.api.putDebtor(caseId, 'debtor_1', {
-      name: { given: 'Changed', surname: client.name.surname ?? 'x' },
-      phone: '555-0199',
-      tax_id: { kind: 'ssn', value: '987-65-4320' },
-      provenance: { 'name.given': TYPED, 'name.surname': TYPED, phone: TYPED, tax_id: TYPED },
+      body: { name: { given: 'Changed', surname: client.name.surname ?? 'x' }, phone: '555-0199' },
+      taxId: { kind: 'ssn', value: '987-65-4320' },
+      provenance: { 'name.given': TYPED, 'name.surname': TYPED, phone: TYPED, taxId: TYPED },
     });
     const body = admin.wire(200, DEBTOR) as Record<string, unknown>;
-    expect(saved.tax_id).toEqual({ kind: 'ssn', last_four: '4320' });
+    expect(saved.taxId).toEqual({ kind: 'ssn', lastFour: '4320' });
     // The full number never comes back.
     expect(JSON.stringify(body)).not.toContain('987-65-4320');
     // A debtor saved with provenance is a debtor read back with it.
     const reread = (await admin.api.listDebtors(caseId)).find((d) => d.id === saved.id);
-    expect(reread?.name?.given).toBe('Changed');
+    expect(reread?.body.name?.given).toBe('Changed');
     expect(reread?.provenance['name.given']).toMatchObject(TYPED);
 
     await expectApiError(
       admin.api.putDebtor(caseId, 'debtor_1', {
-        name: { given: 'NoProvenance' },
+        body: { name: { given: 'NoProvenance' } },
       }),
       400,
       'ValidationError',
@@ -419,30 +419,22 @@ describe('the debtors of a case', () => {
     // The case's copy now differs from the client: re-copy it from the client.
     const recopied = await admin.api.copyDebtorFromClient(caseId, 'debtor_1');
     admin.wire(200, DEBTOR);
-    expect(recopied.name?.given).toBe(client.name.given);
-    expect(recopied.differs_from_client).toEqual([]);
+    expect(recopied.body.name?.given).toBe(client.name.given);
+    expect(recopied.differsFromClient).toEqual([]);
     const fromClient = { source: 'client', client_id: client.id };
     expect(recopied.provenance['name.given']).toEqual(fromClient);
     // The questionnaire echoing what it loaded keeps the client's provenance.
-    const SERVER_OWNED = new Set([
-      'id',
-      'case_id',
-      'filing_role',
-      'created_at',
-      'updated_at',
-      'client_id',
-      'differs_from_client',
-    ]);
-    const echo = Object.fromEntries(
-      Object.entries(recopied).filter(([key]) => !SERVER_OWNED.has(key)),
-    );
-    const echoed = await admin.api.putDebtor(caseId, 'debtor_1', echo as never);
+    const echoed = await admin.api.putDebtor(caseId, 'debtor_1', {
+      body: recopied.body,
+      taxId: recopied.taxId,
+      provenance: recopied.provenance,
+    });
     admin.wire(200, DEBTOR);
     expect(echoed.provenance['name.given']).toEqual(fromClient);
 
     // …or push the case's copy back to the client.
     await admin.api.putDebtor(caseId, 'debtor_1', {
-      name: { given: 'Pushed', surname: client.name.surname ?? 'x' },
+      body: { name: { given: 'Pushed', surname: client.name.surname ?? 'x' } },
       provenance: { 'name.given': TYPED, 'name.surname': TYPED },
     });
     await admin.api.copyDebtorToClient(caseId, 'debtor_1');
@@ -453,8 +445,8 @@ describe('the debtors of a case', () => {
     const spouse = await scratchClient('Spouse');
     const linked = await admin.api.linkDebtorClient(caseId, 'debtor_2', spouse.id);
     admin.wire(201, DEBTOR);
-    expect(linked.filing_role).toBe('debtor_2');
-    expect(linked.client_id).toBe(spouse.id);
+    expect(linked.filingRole).toBe('debtor_2');
+    expect(linked.clientId).toBe(spouse.id);
     // Re-linking an existing debtor moves only the link (200).
     await admin.api.linkDebtorClient(caseId, 'debtor_2', spouse.id);
     admin.wire(200, DEBTOR);
@@ -466,8 +458,8 @@ describe('the debtors of a case', () => {
     );
 
     const clientCases = await admin.api.listFirmClientCases(spouse.id);
-    admin.wire(200, { cases: [{ filing_role: 'string', case: CASE }] });
-    expect(clientCases[0]?.filing_role).toBe('debtor_2');
+    admin.wire(200, { cases: [{ filingRole: 'string', case: CASE }] });
+    expect(clientCases[0]?.filingRole).toBe('debtor_2');
 
     await expectApiError(admin.api.listDebtors('no-such-case'), 404, 'NotFoundError');
   });

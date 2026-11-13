@@ -26,12 +26,7 @@ public sealed class TaxIdTests
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
-    private static TaxIdInput? Parse(JsonNode? value)
-    {
-        var errors = new Dictionary<string, string>();
-        var result = TaxIdRules.Parse(value, "tax_id", errors);
-        return errors.Count > 0 ? throw new FieldValidationException(errors) : result;
-    }
+    private static TaxIdInput? Parse(JsonNode? value) => Body.Read<DebtorDraft>(new JsonObject { ["taxId"] = value?.DeepClone() }).TaxId;
 
     private Task<TaxIdRef?> StoreAsync(TaxIdInput? given, TaxIdRef? existing = null) =>
         TaxIdRules.StoreAsync(given, existing, Firm, CaseId, _cipher, _store, cancellationToken: Ct);
@@ -48,26 +43,26 @@ public sealed class TaxIdTests
     [InlineData("987-65-4321")]
     [InlineData("987654321")]
     [InlineData("987 65 4321")]
-    public void Dashes_and_spaces_are_stripped(string spelling) =>
-        Assert.Equal(new TaxIdInput(TaxIdKind.Ssn, Value: Ssn), Parse(new JsonObject { ["kind"] = "ssn", ["value"] = spelling }));
+    public void Dashes_and_spaces_are_accepted(string spelling) =>
+        Assert.Equal(new TaxIdInput(TaxIdKind.Ssn, Value: spelling), Parse(new JsonObject { ["kind"] = "ssn", ["value"] = spelling }));
 
     [Fact]
     public void An_itin_is_nine_digits_starting_with_nine() =>
-        Assert.Equal(new TaxIdInput(TaxIdKind.Itin, Value: Itin), Parse(Body.Of("""{"kind": "itin", "value": "987-65-4329"}""")));
+        Assert.Equal(new TaxIdInput(TaxIdKind.Itin, Value: "987-65-4329"), Parse(Body.Of("""{"kind": "itin", "value": "987-65-4329"}""")));
 
     [Theory]
-    [InlineData("ssn", "12345", "tax_id.value")]
-    [InlineData("ssn", "987-65-432A", "tax_id.value")]
-    [InlineData("ssn", "000-12-3456", "tax_id.value")]
-    [InlineData("ssn", "666-12-3456", "tax_id.value")]
-    [InlineData("ssn", "900-12-3456", "tax_id.value")]
-    [InlineData("ssn", "987-65-4330", "tax_id.value")]
-    [InlineData("ssn", "123-00-3456", "tax_id.value")]
-    [InlineData("ssn", "123-45-0000", "tax_id.value")]
-    [InlineData("itin", "123-45-6789", "tax_id.value")]
-    [InlineData("itin", "987-66-4329", "tax_id.value")]
-    [InlineData("itin", "987-89-4329", "tax_id.value")]
-    [InlineData("ein", "987-65-4321", "tax_id.kind")]
+    [InlineData("ssn", "12345", "taxId.value")]
+    [InlineData("ssn", "987-65-432A", "taxId.value")]
+    [InlineData("ssn", "000-12-3456", "taxId.value")]
+    [InlineData("ssn", "666-12-3456", "taxId.value")]
+    [InlineData("ssn", "900-12-3456", "taxId.value")]
+    [InlineData("ssn", "987-65-4330", "taxId.value")]
+    [InlineData("ssn", "123-00-3456", "taxId.value")]
+    [InlineData("ssn", "123-45-0000", "taxId.value")]
+    [InlineData("itin", "123-45-6789", "taxId.value")]
+    [InlineData("itin", "987-66-4329", "taxId.value")]
+    [InlineData("itin", "987-89-4329", "taxId.value")]
+    [InlineData("ein", "987-65-4321", "taxId.kind")]
     public void Rejects_a_value_that_is_not_the_claimed_kind(string kind, string value, string path) =>
         Assert.Contains(path, Assert.Throws<FieldValidationException>(() => Parse(new JsonObject { ["kind"] = kind, ["value"] = value })).Fields.Keys);
 
@@ -94,7 +89,7 @@ public sealed class TaxIdTests
 
     [Fact]
     public void The_last_four_alone_means_keep() =>
-        Assert.Equal(new TaxIdInput(TaxIdKind.Ssn, LastFour: "4321"), Parse(Body.Of("""{"kind": "ssn", "last_four": "4321"}""")));
+        Assert.Equal(new TaxIdInput(TaxIdKind.Ssn, LastFour: "4321"), Parse(Body.Of("""{"kind": "ssn", "lastFour": "4321"}""")));
 
     [Theory]
     [InlineData("\"432\"")]
@@ -102,18 +97,18 @@ public sealed class TaxIdTests
     [InlineData("\"abcd\"")]
     [InlineData("4321")]
     public void A_malformed_last_four_is_refused(string kept) =>
-        Assert.Contains("tax_id.last_four", Assert.Throws<FieldValidationException>(() => Parse(new JsonObject { ["kind"] = "ssn", ["last_four"] = Body.Value(kept) })).Fields.Keys);
+        Assert.Contains("taxId.lastFour", Assert.Throws<FieldValidationException>(() => Parse(new JsonObject { ["kind"] = "ssn", ["lastFour"] = Body.Value(kept) })).Fields.Keys);
 
     [Fact]
     public void Both_or_neither_member_is_refused()
     {
-        Assert.Contains("tax_id", Assert.Throws<FieldValidationException>(() => Parse(Body.Of("""{"kind": "ssn", "value": "987-65-4321", "last_four": "4321"}"""))).Fields.Keys);
-        Assert.Contains("tax_id", Assert.Throws<FieldValidationException>(() => Parse(Body.Of("""{"kind": "ssn"}"""))).Fields.Keys);
+        Assert.Contains("taxId", Assert.Throws<FieldValidationException>(() => Parse(Body.Of("""{"kind": "ssn", "value": "987-65-4321", "lastFour": "4321"}"""))).Fields.Keys);
+        Assert.Contains("taxId", Assert.Throws<FieldValidationException>(() => Parse(Body.Of("""{"kind": "ssn"}"""))).Fields.Keys);
     }
 
     [Fact]
     public void A_non_object_is_refused() =>
-        Assert.Contains("tax_id", Assert.Throws<FieldValidationException>(() => Parse(JsonValue.Create("987-65-4321"))).Fields.Keys);
+        Assert.Contains("taxId", Assert.Throws<FieldValidationException>(() => Parse(JsonValue.Create("987-65-4321"))).Fields.Keys);
 
     // ── Printing ────────────────────────────────────────────────────
 
@@ -200,7 +195,7 @@ public sealed class TaxIdTests
     {
         var stored = await StoreAsync(new TaxIdInput(TaxIdKind.Ssn, Value: Ssn));
         var error = await Assert.ThrowsAsync<FieldValidationException>(() => StoreAsync(new TaxIdInput(kind, LastFour: lastFour), stored));
-        Assert.Contains("tax_id", error.Fields.Keys);
+        Assert.Contains("taxId", error.Fields.Keys);
     }
 
     [Fact]

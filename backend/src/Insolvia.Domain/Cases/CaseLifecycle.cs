@@ -1,4 +1,4 @@
-using System.Text.Json.Nodes;
+using System.Globalization;
 using System.Text.Json.Serialization;
 
 namespace Insolvia.Domain.Cases;
@@ -167,7 +167,7 @@ public static class CaseLifecycle
     /// <summary>A lifecycle write raced another event. 409, like <see cref="CaseRules.StatusMoved"/>.</summary>
     public const string HistoryMoved = "This case's history changed since it was read — reload it and try again.";
 
-    private const string EffectiveOnField = "effective_on";
+    private const string EffectiveOnField = "effectiveOn";
 
     /// <summary>
     /// The event for a write that moved <paramref name="before"/> to
@@ -218,7 +218,7 @@ public static class CaseLifecycle
         {
             // Into filed: the petition date IS the event's date, and the
             // chapter it was filed under is the petition chapter.
-            var petitionDate = after.FiledAt ?? throw Invalid("A filed case needs its filed date.", "filed_at");
+            var petitionDate = after.FiledAt ?? throw Invalid("A filed case needs its filed date.", "filedAt");
             courtDate = effectiveOn is null || effectiveOn == petitionDate
                 ? petitionDate
                 : throw Invalid("A move into filed takes the petition date.");
@@ -267,10 +267,14 @@ public static class CaseLifecycle
         }
 
         var errors = new Dictionary<string, string>(StringComparer.Ordinal);
-        var date = CaseRules.ParseCourtDate(JsonValue.Create(filedAt), "filed_at", errors);
+        if (!DateOnly.TryParseExact(filedAt, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date))
+        {
+            errors["filedAt"] = "Must be a date in YYYY-MM-DD form.";
+        }
+
         if (TextRules.Strip(caseNumber).Length == 0)
         {
-            errors["case_number"] = "A filed case needs its case number.";
+            errors["caseNumber"] = "A filed case needs its case number.";
         }
 
         if (errors.Count > 0)
@@ -284,7 +288,7 @@ public static class CaseLifecycle
             {
                 Status = CaseStatus.Filed,
                 FiledAt = date,
-                Texts = new Dictionary<string, string?> { ["case_number"] = TextRules.Strip(caseNumber) }.ToValueDictionary(),
+                CaseNumber = TextRules.Strip(caseNumber),
             },
             clock);
         return StatusMove(current, after, history, recordedBy, provenance: provenance, filingId: filingId)
@@ -316,12 +320,12 @@ public static class CaseLifecycle
 
         if (!CaseRules.Chapters.Contains(toChapter))
         {
-            throw Invalid("Chapter must be one of " + string.Join(", ", CaseRules.Chapters) + ".", "to_chapter");
+            throw Invalid("Chapter must be one of " + string.Join(", ", CaseRules.Chapters) + ".", "toChapter");
         }
 
         if (toChapter == current.Chapter)
         {
-            throw Invalid($"The case is already in Chapter {current.Chapter}.", "to_chapter");
+            throw Invalid($"The case is already in Chapter {current.Chapter}.", "toChapter");
         }
 
         var after = current with { Chapter = toChapter, UpdatedAt = Clock.Now(clock) };

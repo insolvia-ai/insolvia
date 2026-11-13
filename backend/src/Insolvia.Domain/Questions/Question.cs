@@ -97,23 +97,23 @@ public static class QuestionRules
                 new("given", "First name", AnswerInputType.Text),
                 new("middle", "Middle name", AnswerInputType.Text),
                 new("surname", "Last name", AnswerInputType.Text),
-                new("business_name", "Business name", AnswerInputType.Text),
+                new("businessName", "Business name", AnswerInputType.Text),
             ])
         {
             Help = "Include maiden names, earlier married names, and business names you used. Add one at a time.",
             Placement = AnswerPlacement.Append,
-            DebtorField = "other_names_used",
+            DebtorField = "otherNamesUsed",
             PerDebtor = true,
             Repeats = true,
         },
         new("personal_information.residence_address", Questionnaire.PersonalInformation, "Where do you live?", DebtorsTarget,
-            [Address("residence_address", "Home address")])
+            [Address("residenceAddress", "Home address")])
         {
             Help = "The address of the home you live in now, including the county.",
             PerDebtor = true,
         },
         new("personal_information.mailing_address", Questionnaire.PersonalInformation, "Do you get mail somewhere else?", DebtorsTarget,
-            [Address("mailing_address", "Mailing address")])
+            [Address("mailingAddress", "Mailing address")])
         {
             Help = "Only if your mail goes to a different address than your home.",
             PerDebtor = true,
@@ -538,7 +538,7 @@ public static class QuestionRules
     {
         if (entry.Target == DebtorsTarget)
         {
-            return BodyJson.Prune(DebtorRules.BodyNode(DebtorRules.Parse(payload, enforceProvenance: false).Body));
+            return DebtorRules.BodyNode(DebtorRules.ReadBody(payload));
         }
 
         return BodyJson.Prune(BodyJson.ToNode(BodyJson.Read(payload, CaseCollections.ByCollection[entry.Target].BodyType)));

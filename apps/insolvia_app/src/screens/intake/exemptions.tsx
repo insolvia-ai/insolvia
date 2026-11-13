@@ -142,7 +142,7 @@ export function AssetExemptionsPanel({
         await load();
       } catch (cause) {
         if (cause instanceof ApiValidationException) {
-          setElectionError(cause.fields.exemption_set ?? 'That election is not available.');
+          setElectionError(cause.fields.exemptionSet ?? 'That election is not available.');
           setStatus('');
         } else {
           setStatus('Could not save the election. Try again.');

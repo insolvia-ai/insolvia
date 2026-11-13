@@ -379,19 +379,19 @@ public sealed class SeedLoader
         var linked = new Dictionary<FilingRole, string>();
         foreach (var (name, role) in roles)
         {
-            var clientId = resolvedDebtors[name] is JsonObject body ? body["client_id"] : null;
+            var clientId = resolvedDebtors[name] is JsonObject body ? body["clientId"] : null;
             if (clientId is null)
             {
                 if (ClientRoles.Contains(role))
                 {
                     throw new SeedRefusedException(
-                        $"case '{handle}': {name} names no client — every Debtor 1 and Debtor 2 carries \"client_id\": {{\"$ref\": \"clients/<handle>\"}}");
+                        $"case '{handle}': {name} names no client — every Debtor 1 and Debtor 2 carries \"clientId\": {{\"$ref\": \"clients/<handle>\"}}");
                 }
 
                 continue;
             }
 
-            linked[role] = SeedJson.Text(clientId) ?? throw new SeedRefusedException($"case '{handle}': {name}'s client_id is not a $ref");
+            linked[role] = SeedJson.Text(clientId) ?? throw new SeedRefusedException($"case '{handle}': {name}'s clientId is not a $ref");
         }
 
         if (linked.Values.Distinct(StringComparer.Ordinal).Count() != linked.Count)
@@ -427,10 +427,11 @@ public sealed class SeedLoader
             await _out.WriteLineAsync($"    client '{name}': created").ConfigureAwait(false);
         }
 
-        // Every debtor body parsed before the first case write.
+        // Every debtor, what a request carries ({body, taxId, provenance}), checked before the first case write.
+        DebtorDraft Draft(string name) => DebtorRules.Checked((DebtorDraft)BodyJson.Read(resolvedDebtors[name], typeof(DebtorDraft)));
         foreach (var (name, _) in roles)
         {
-            DebtorRules.Parse(SeedJson.Body(resolvedDebtors[name]));
+            Draft(name);
         }
 
         // A debtor's record, drafted — and its tax id SEALED, as the API seals
@@ -438,7 +439,7 @@ public sealed class SeedLoader
         // envelope — only when it is about to be written.
         async Task<Debtor> DebtorRecordAsync(string name, FilingRole role, DateTimeOffset caseCreatedAt, ITaxIdStore? sealInto = null)
         {
-            var draft = DebtorRules.Parse(SeedJson.Body(resolvedDebtors[name]));
+            var draft = Draft(name);
             var taxId = await TaxIdRules.StoreAsync(draft.TaxId, null, firmId, caseId, _stores.TaxIdCipher, sealInto ?? _stores.TaxIds, _clock, cancellationToken).ConfigureAwait(false);
             var clientId = linked.GetValueOrDefault(role);
             return DebtorRules.Create(draft, caseId, role, taxId, clientId, clientId is null ? null : caseCreatedAt, _clock) with { Id = debtorIds[name] };
@@ -458,13 +459,15 @@ public sealed class SeedLoader
             }
             else
             {
-                var draft = CaseRules.ParseCreation(new JsonObject
-                {
-                    ["chapter"] = spec["chapter"]?.DeepClone(),
-                    ["court"] = spec["court"]?.DeepClone(),
-                    ["division"] = spec["division"]?.DeepClone(),
-                    ["client_ids"] = new JsonArray([.. ClientRoles.Where(linked.ContainsKey).Select(role => (JsonNode)linked[role])]),
-                });
+                var draft = (NewCase)BodyJson.Read(
+                    new JsonObject
+                    {
+                        ["chapter"] = spec["chapter"]?.DeepClone(),
+                        ["court"] = spec["court"]?.DeepClone(),
+                        ["division"] = spec["division"]?.DeepClone(),
+                        ["clientIds"] = new JsonArray([.. ClientRoles.Where(linked.ContainsKey).Select(role => (JsonNode)linked[role])]),
+                    },
+                    typeof(NewCase));
                 var (minted, _) = CaseRules.Create(draft, firmId, createdBy, _clock);
                 var created = minted with { Id = caseId };
                 // The opening debtors' tax ids are sealed now and STORED once

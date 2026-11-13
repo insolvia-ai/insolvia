@@ -1,8 +1,7 @@
-using System.Text.Json.Nodes;
+using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 using Insolvia.Domain.AccessLog;
 using Insolvia.Domain.Debtors;
-using Insolvia.Domain.Fields;
 using Insolvia.Domain.Ports;
 
 namespace Insolvia.Domain.TaxIds;
@@ -15,12 +14,38 @@ namespace Insolvia.Domain.TaxIds;
 // later matter can point at the same sealed number (ADR 0022).
 
 /// <summary>
-/// What a write carries after parsing. EXACTLY ONE of <see cref="Value"/>
-/// (the nine digits, freshly typed) and <see cref="LastFour"/> (the client
+/// What a write carries. EXACTLY ONE of <see cref="Value"/> (nine digits,
+/// freshly typed, dashes allowed) and <see cref="LastFour"/> (the client
 /// echoing the view it was given: "keep what is stored") is set.
 /// </summary>
-public sealed record TaxIdInput(TaxIdKind Kind, string? Value = null, string? LastFour = null)
+/// <param name="Kind">SSN or ITIN — the number must be that kind.</param>
+/// <param name="Value">The number being entered.</param>
+/// <param name="LastFour">The last four being kept.</param>
+public sealed record TaxIdInput(TaxIdKind Kind, string? Value = null, string? LastFour = null) : IValidatableObject
 {
+    /// <summary>The shape rules; a failure on the whole input names the input.</summary>
+    /// <param name="validationContext">Unused.</param>
+    /// <returns>The failures.</returns>
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        if (Value is not null && LastFour is not null)
+        {
+            yield return new ValidationResult("Send either the number or the last four, not both.");
+        }
+        else if (Value is null && LastFour is null)
+        {
+            yield return new ValidationResult("A tax id needs its number (or the last four, to keep it).");
+        }
+        else if (LastFour is not null && (LastFour.Length != 4 || !TextRules.IsDigits(LastFour)))
+        {
+            yield return new ValidationResult("Must be exactly four digits.", [nameof(LastFour)]);
+        }
+        else if (Value is not null && TaxIdRules.ValueProblem(Kind, Value) is { } problem)
+        {
+            yield return new ValidationResult(problem, [nameof(Value)]);
+        }
+    }
+
     /// <inheritdoc />
     public override string ToString() => $"TaxIdInput {{ Kind = {Kind}, LastFour = {LastFour ?? Value?[^4..]} }}";
 }
@@ -65,80 +90,10 @@ public static class TaxIdRules
             ["tax_id_ref"] = reference,
         }.ToValueDictionary();
 
-    /// <summary>
-    /// Validate a <c>tax_id</c> member: <c>{kind, value}</c> for a number being
-    /// entered, <c>{kind, last_four}</c> for one being kept. Absent is fine; every
-    /// problem lands in <paramref name="errors"/> under <paramref name="path"/>.
-    /// </summary>
-    public static TaxIdInput? Parse(JsonNode? value, string path, IDictionary<string, string> errors)
-    {
-        ArgumentNullException.ThrowIfNull(errors);
-        if (value is null)
-        {
-            return null;
-        }
-
-        var raw = FieldParsers.Mapping(value, path, errors);
-        if (raw.Count == 0 && errors.ContainsKey(path))
-        {
-            return null;
-        }
-
-        if (!Wire.TryParse<TaxIdKind>(Json.AsString(raw["kind"]), out var kind))
-        {
-            errors[$"{path}.kind"] = "Must be one of " + string.Join(", ", Wire.Names<TaxIdKind>()) + ".";
-            return null;
-        }
-
-        var full = raw["value"];
-        var kept = raw["last_four"];
-        if (full is not null && kept is not null)
-        {
-            errors[path] = "Send either the number or the last four, not both.";
-            return null;
-        }
-
-        if (full is null && kept is null)
-        {
-            errors[path] = "A tax id needs its number (or the last four, to keep it).";
-            return null;
-        }
-
-        if (kept is not null)
-        {
-            var keptText = Json.AsString(kept);
-            if (keptText is null || keptText.Length != 4 || !TextRules.IsDigits(keptText))
-            {
-                errors[$"{path}.last_four"] = "Must be exactly four digits.";
-                return null;
-            }
-
-            return new TaxIdInput(kind, LastFour: keptText);
-        }
-
-        var fullText = Json.AsString(full);
-        if (fullText is null)
-        {
-            errors[$"{path}.value"] = "Must be text.";
-            return null;
-        }
-
-        var digits = Digits(fullText);
-        if (digits is null)
-        {
-            errors[$"{path}.value"] = "Must be nine digits, with or without dashes.";
-            return null;
-        }
-
-        var problem = kind == TaxIdKind.Ssn ? SsnProblem(digits) : ItinProblem(digits);
-        if (problem is not null)
-        {
-            errors[$"{path}.value"] = problem;
-            return null;
-        }
-
-        return new TaxIdInput(kind, Value: digits);
-    }
+    /// <summary>Why <paramref name="value"/> is not a <paramref name="kind"/> number, or null when it is.</summary>
+    public static string? ValueProblem(TaxIdKind kind, string value) =>
+        Digits(value) is not { } digits ? "Must be nine digits, with or without dashes."
+        : kind == TaxIdKind.Ssn ? SsnProblem(digits) : ItinProblem(digits);
 
     /// <summary>
     /// How B121 prints the number: an SSN as <c>000-00-0000</c>; an ITIN as the
@@ -182,7 +137,7 @@ public static class TaxIdRules
             {
                 throw new FieldValidationException(new Dictionary<string, string>
                 {
-                    ["tax_id"] = "The stored tax id does not match — enter the full number to replace it.",
+                    ["taxId"] = "The stored tax id does not match — enter the full number to replace it.",
                 });
             }
 
@@ -192,8 +147,9 @@ public static class TaxIdRules
         var reference = existing?.Ref ?? NewRef();
         var now = Clock.Now(clock);
         var previous = await store.GetAsync(caseId, reference, cancellationToken).ConfigureAwait(false);
-        var envelope = await cipher.SealAsync(given.Value, EncryptionContext(firmId, reference), cancellationToken).ConfigureAwait(false);
-        var lastFour = given.Value[^4..];
+        var digits = Digits(given.Value) ?? throw new FieldValidationException(new Dictionary<string, string> { ["taxId.value"] = "Must be nine digits, with or without dashes." });
+        var envelope = await cipher.SealAsync(digits, EncryptionContext(firmId, reference), cancellationToken).ConfigureAwait(false);
+        var lastFour = digits[^4..];
         await store.PutAsync(
             caseId,
             new SealedTaxId(reference, firmId, given.Kind, lastFour, envelope, previous?.CreatedAt ?? now, now),

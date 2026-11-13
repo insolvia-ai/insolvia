@@ -69,8 +69,8 @@ public sealed partial class FormsHubRouteTests : IAsyncLifetime, IDisposable
     private async Task AddDebtor1Async(string caseId, bool withTaxId = false)
     {
         var body = withTaxId
-            ? $$$"""{"name": {"given": "Ada"}, "tax_id": {"kind": "ssn", "value": "987-65-4321"}, "provenance": {"name.given": {{{Typed}}}, "tax_id": {{{Typed}}}}}"""
-            : $$$"""{"name": {"given": "Ada"}, "provenance": {"name.given": {{{Typed}}}}}""";
+            ? $$$"""{"body": {"name": {"given": "Ada"}}, "taxId": {"kind": "ssn", "value": "987-65-4321"}, "provenance": {"name.given": {{{Typed}}}, "taxId": {{{Typed}}}}}"""
+            : $$$"""{"body": {"name": {"given": "Ada"}}, "provenance": {"name.given": {{{Typed}}}}}""";
         var answer = await _world.Put($"/v1/cases/{caseId}/debtors/debtor_1", body);
         Assert.True(answer.Status == 200, answer.Body);
     }

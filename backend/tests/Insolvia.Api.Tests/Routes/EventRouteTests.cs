@@ -144,7 +144,7 @@ public sealed class EventRouteTests : IAsyncLifetime, IDisposable
     {
         var caseId = await _world.OpenCaseIdAsync();
 
-        Assert.Contains("meeting_341_at", (await _world.Patch($"/v1/cases/{caseId}", """{"filed_at": "2026-03-02", "meeting_341_at": "2026-03-01"}""")).FieldErrors);
+        Assert.Contains("meeting341At", (await _world.Patch($"/v1/cases/{caseId}", """{"filedAt": "2026-03-02", "meeting341At": "2026-03-01"}""")).FieldErrors);
     }
 
     // ── The deadline engine's hook (14.6 / #358) ───────────────────
@@ -155,7 +155,7 @@ public sealed class EventRouteTests : IAsyncLifetime, IDisposable
         var caseId = await _world.OpenCaseIdAsync();
         Assert.Empty(await GeneratedAsync(caseId));
 
-        var body = await _world.Patch($"/v1/cases/{caseId}", """{"filed_at": "2026-03-02"}""");
+        var body = await _world.Patch($"/v1/cases/{caseId}", """{"filedAt": "2026-03-02"}""");
 
         Assert.Equal("2026-03-02", body.Str("filedAt"));
         var rules = await GeneratedAsync(caseId);
@@ -169,11 +169,11 @@ public sealed class EventRouteTests : IAsyncLifetime, IDisposable
     public async Task Setting_the_341_date_regenerates_and_keeps_a_dismissal()
     {
         var caseId = await _world.OpenCaseIdAsync();
-        await _world.Patch($"/v1/cases/{caseId}", """{"filed_at": "2026-03-02"}""");
+        await _world.Patch($"/v1/cases/{caseId}", """{"filedAt": "2026-03-02"}""");
         var schedules = (await GeneratedAsync(caseId))["frbp-1007c1-schedules"];
         Assert.True((await _world.Patch($"/v1/cases/{caseId}/events/{schedules.Str("id")}", """{"dismissed": true}""")).Object["dismissed"]!.GetValue<bool>());
 
-        await _world.Patch($"/v1/cases/{caseId}", """{"meeting_341_at": "2026-04-07"}""");
+        await _world.Patch($"/v1/cases/{caseId}", """{"meeting341At": "2026-04-07"}""");
 
         var rules = await GeneratedAsync(caseId);
         Assert.DoesNotContain("frbp-2003a1a-341-window", rules.Keys);
@@ -187,10 +187,10 @@ public sealed class EventRouteTests : IAsyncLifetime, IDisposable
     public async Task Clearing_the_filed_date_removes_every_generated_event_and_keeps_the_hand_made()
     {
         var caseId = await _world.OpenCaseIdAsync();
-        await _world.Patch($"/v1/cases/{caseId}", """{"filed_at": "2026-03-02", "meeting_341_at": "2026-04-07"}""");
+        await _world.Patch($"/v1/cases/{caseId}", """{"filedAt": "2026-03-02", "meeting341At": "2026-04-07"}""");
         await Add(caseId);
 
-        var body = await _world.Patch($"/v1/cases/{caseId}", """{"filed_at": null}""");
+        var body = await _world.Patch($"/v1/cases/{caseId}", """{"filedAt": null}""");
 
         Assert.False(body.Object.ContainsKey("filedAt"));
         Assert.Equal([false], (await _world.Get($"/v1/cases/{caseId}/events")).Object["events"]!.AsArray().Select(e => e!["generated"]!.GetValue<bool>()));
@@ -200,7 +200,7 @@ public sealed class EventRouteTests : IAsyncLifetime, IDisposable
     public async Task A_generated_deadline_cannot_be_edited_or_deleted_only_dismissed()
     {
         var caseId = await _world.OpenCaseIdAsync();
-        await _world.Patch($"/v1/cases/{caseId}", """{"filed_at": "2026-03-02"}""");
+        await _world.Patch($"/v1/cases/{caseId}", """{"filedAt": "2026-03-02"}""");
         var url = $"/v1/cases/{caseId}/events/{(await GeneratedAsync(caseId))["frbp-1007c1-schedules"].Str("id")}";
 
         Assert.Equal(400, (await _world.Put(url, """{"title": "Moved", "start": "2026-12-25"}""")).Status);
@@ -217,7 +217,7 @@ public sealed class EventRouteTests : IAsyncLifetime, IDisposable
         var first = await _world.OpenCaseIdAsync();
         var second = await _world.OpenCaseIdAsync();
         await Add(first, """{"title": "Meeting of creditors", "start": "2026-03-25T14:00:00Z"}""");
-        await _world.Patch($"/v1/cases/{second}", """{"filed_at": "2026-03-02"}""");
+        await _world.Patch($"/v1/cases/{second}", """{"filedAt": "2026-03-02"}""");
         await Add(second, """{"title": "Client call", "start": "2026-03-10T15:00:00Z"}""");
         await Add(second, """{"title": "In May", "start": "2026-05-04"}""");
         await _world.Post("/v1/firm/events", """{"title": "Office closed", "start": "2026-03-20"}""");

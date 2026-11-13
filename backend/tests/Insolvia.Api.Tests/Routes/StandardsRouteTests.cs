@@ -154,20 +154,20 @@ public sealed class StandardsRouteTests : IAsyncLifetime, IDisposable
             if (state is not null)
             {
                 address["state"] = state;
-                provenance["residence_address.state"] = new JsonObject { ["source"] = "staff_typed" };
+                provenance["residenceAddress.state"] = new JsonObject { ["source"] = "staff_typed" };
             }
 
             if (county is not null)
             {
                 address["county"] = county;
-                provenance["residence_address.county"] = new JsonObject { ["source"] = "staff_typed" };
+                provenance["residenceAddress.county"] = new JsonObject { ["source"] = "staff_typed" };
             }
 
-            body["residence_address"] = address;
+            body["residenceAddress"] = address;
         }
 
-        body["provenance"] = provenance;
-        var answer = await _world.Put($"/v1/cases/{caseId}/debtors/debtor_1", body.ToJsonString());
+        var request = new JsonObject { ["body"] = body, ["provenance"] = provenance };
+        var answer = await _world.Put($"/v1/cases/{caseId}/debtors/debtor_1", request.ToJsonString());
         Assert.True(answer.Status == 200, answer.Body);
     }
 

@@ -18,9 +18,9 @@ public static class BodyJson
     public static JsonSerializerOptions Options { get; } = CreateOptions();
 
     /// <summary>
-    /// The port's snake_case with money as text — a debtor's and a firm
-    /// client's body, which still travel and are stored that way until their
-    /// own routes are converted (ADR 0032, build steps 3 and 4).
+    /// The port's snake_case with money as text — a firm client's body, which
+    /// still travels and is stored that way until its routes are converted
+    /// (ADR 0032, build step 4).
     /// </summary>
     public static JsonSerializerOptions SnakeOptions { get; } = CreateSnakeOptions();
 
@@ -31,7 +31,7 @@ public static class BodyJson
         return Prune(JsonSerializer.SerializeToNode(body, body.GetType(), Options)!.AsObject());
     }
 
-    /// <summary>A debtor's or firm client's body as a JSON object, in <see cref="SnakeOptions"/>.</summary>
+    /// <summary>A firm client's body as a JSON object, in <see cref="SnakeOptions"/>.</summary>
     public static JsonObject ToSnakeNode(object body)
     {
         ArgumentNullException.ThrowIfNull(body);

@@ -123,7 +123,7 @@ internal static class CaseRowMapping
         Id = debtor.Id,
         CreatedAt = debtor.CreatedAt,
         UpdatedAt = debtor.UpdatedAt,
-        Body = StoredJson.FromNode(BodyJson.Prune(DebtorRules.BodyNode(debtor.Body))),
+        Body = StoredJson.FromNode(DebtorRules.BodyNode(debtor.Body)),
         Provenance = StoredJson.FromNode(ProvenanceRules.ToJson(debtor.Provenance)),
         TaxIdKind = debtor.TaxId?.Kind,
         TaxIdLastFour = debtor.TaxId?.LastFour,
@@ -132,21 +132,16 @@ internal static class CaseRowMapping
         CaseCreatedAt = debtor.CaseCreatedAt,
     };
 
-    /// <summary>
-    /// A stored debtor through the domain's own parser, provenance NOT
-    /// enforced (a rule tightening never makes stored rows unreadable).
-    /// </summary>
     public static Debtor ToDomain(DebtorRow row)
     {
-        var payload = StoredJson.ToObject(row.Body);
-        payload["provenance"] = StoredJson.ToObject(row.Provenance);
-        var draft = DebtorRules.Parse(payload, enforceProvenance: false);
-        return new Debtor(row.Id, row.CaseId, row.FilingRole, row.CreatedAt, row.UpdatedAt, draft.Body)
+        // The stored body IS the record serialized (BodyJson): read back, never re-parsed.
+        var body = StoredJson.ToObject(row.Body).Deserialize<DebtorBody>(BodyJson.Options)!;
+        return new Debtor(row.Id, row.CaseId, row.FilingRole, row.CreatedAt, row.UpdatedAt, body)
         {
             TaxId = row.TaxIdKind is { } kind && row.TaxIdLastFour is not null && row.TaxIdRef is not null
                 ? new TaxIdRef(kind, row.TaxIdLastFour, row.TaxIdRef)
                 : null,
-            Provenance = draft.Provenance,
+            Provenance = ProvenanceRules.Parse(StoredJson.ToObject(row.Provenance)),
             ClientId = row.ClientId,
             CaseCreatedAt = row.CaseCreatedAt,
         };

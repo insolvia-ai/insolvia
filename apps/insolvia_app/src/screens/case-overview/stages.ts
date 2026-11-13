@@ -102,7 +102,7 @@ function count(n: number | null, one: string, many: string, none: string): strin
 export function filingStages(input: StageInput): readonly Stage[] {
   const { matter, debtors, documents, creditors, packets, pendingReview, problems } = input;
 
-  const named = debtors.filter((debtor) => debtor.name !== undefined);
+  const named = debtors.filter((debtor) => debtor.body.name !== undefined);
   const intakeBlockers = blockers(problems, 'intake');
   const petitionBlockers = blockers(problems, 'petition');
   const creditorBlockers = blockers(problems, 'creditors');

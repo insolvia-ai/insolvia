@@ -33,9 +33,9 @@ import { fontSizes, spacing, useTheme } from '@/theme';
 
 const ROOT_LABELS: Readonly<Record<string, string>> = {
   name: 'Name',
-  other_names_used: 'Other name',
-  residence_address: 'Residence',
-  mailing_address: 'Mailing address',
+  otherNamesUsed: 'Other name',
+  residenceAddress: 'Residence',
+  mailingAddress: 'Mailing address',
   phone: 'Phone',
   mobile: 'Mobile',
   email: 'Email',
@@ -46,7 +46,7 @@ const PART_LABELS: Readonly<Record<string, string>> = {
   middle: 'middle name',
   surname: 'last name',
   suffix: 'suffix',
-  business_name: 'business name',
+  businessName: 'business name',
   line1: 'street',
   line2: 'apartment, suite or unit',
   city: 'city',
@@ -55,9 +55,23 @@ const PART_LABELS: Readonly<Record<string, string>> = {
   county: 'county',
 };
 
-const SEGMENT_RE = /^([a-z][a-z0-9_]*)(?:\[([A-Za-z0-9_-]+)\])?$/;
+const SEGMENT_RE = /^([a-z][A-Za-z0-9_]*)(?:\[([A-Za-z0-9_-]+)\])?$/;
 
-/** A `differs_from_client` path in words — "Residence · city". */
+// The client record is still snake_case (ADR 0032 step 4): a debtor path's
+// first segment, as the client spells it.
+const CLIENT_ROOTS: Readonly<Record<string, string>> = {
+  otherNamesUsed: 'other_names_used',
+  residenceAddress: 'residence_address',
+  mailingAddress: 'mailing_address',
+};
+
+function clientPath(path: string): string {
+  const [root = '', ...rest] = path.split('.');
+  const name = SEGMENT_RE.exec(root)?.[1] ?? root;
+  return [root.replace(name, CLIENT_ROOTS[name] ?? name), ...rest].join('.');
+}
+
+/** A `differsFromClient` path in words — "Residence · city". */
 export function pathLabel(path: string): string {
   const names = path.split('.').map((segment) => SEGMENT_RE.exec(segment)?.[1] ?? segment);
   const root = ROOT_LABELS[names[0] ?? ''] ?? names[0] ?? path;
@@ -95,7 +109,7 @@ export interface LinkedClientProps {
 
 /**
  * Who this debtor is in the directory, where the two records now disagree,
- * and the two acts. `differs_from_client` absent means the caller cannot see
+ * and the two acts. `differsFromClient` absent means the caller cannot see
  * the directory, so only the fact of the link is shown.
  */
 export function LinkedClient({
@@ -111,7 +125,7 @@ export function LinkedClient({
   const [error, setError] = useState<string | null>(null);
   const muted = { color: theme.colors.muted, fontFamily: theme.typography.body };
   const ink = { color: theme.colors.ink, fontFamily: theme.typography.body };
-  const differs = debtor.differs_from_client;
+  const differs = debtor.differsFromClient;
 
   const run = async (act: Act) => {
     setConfirming(null);
@@ -156,8 +170,8 @@ export function LinkedClient({
             {differs.map((path) => (
               <Text key={path} style={[styles.line, muted]}>
                 <Text style={[styles.label, ink]}>{pathLabel(path)}</Text>
-                {`  This case: ${valueAt(debtor, path) ?? '(empty)'} · Client: ${
-                  client === null ? '…' : (valueAt(client, path) ?? '(empty)')
+                {`  This case: ${valueAt(debtor.body, path) ?? '(empty)'} · Client: ${
+                  client === null ? '…' : (valueAt(client, clientPath(path)) ?? '(empty)')
                 }`}
               </Text>
             ))}

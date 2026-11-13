@@ -1,5 +1,8 @@
+using System.Collections.Immutable;
+using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 using Insolvia.Domain.Debtors;
+using Insolvia.Domain.Fields;
 
 namespace Insolvia.Domain.Cases;
 
@@ -100,63 +103,145 @@ public sealed record CaseAssignment(string CaseId, string Subject, DateTimeOffse
 public sealed record CourtReference(string Court, string Division, string District);
 
 /// <summary>
-/// A validated creation request. <see cref="ClientIds"/> are the firm clients
-/// it is opened for, Debtor 1 first (ADR 0022) — whether each is this firm's
-/// is the route's question, not the parser's.
+/// Opening a case (<c>POST /v1/cases</c>). Every case starts at intake.
+/// Whether each client is this firm's is the route's question.
 /// </summary>
-public sealed record CaseDraft(int Chapter, CourtReference Court, ValueCollection<string> ClientIds);
+/// <param name="Chapter">7, 11, 12 or 13.</param>
+/// <param name="Court">The court's CM/ECF code, from <c>GET /v1/courts</c>.</param>
+/// <param name="Division">The court division's code.</param>
+/// <param name="ClientIds">The firm clients it is opened for: Debtor 1, then Debtor 2 for a joint case.</param>
+public sealed record NewCase(
+    [property: AllowedValues(7, 11, 12, 13, ErrorMessage = CaseRules.ChapterMessage)] int Chapter,
+    [property: Required(ErrorMessage = CaseRules.CourtRequired)] string? Court,
+    [property: Required(ErrorMessage = CaseRules.DivisionRequired)] string? Division,
+    [property: Required(ErrorMessage = NewCase.ClientRequired), MinLength(1, ErrorMessage = NewCase.ClientRequired), MaxLength(CaseRules.MaxCaseClients, ErrorMessage = "A case is opened for one client, or two filing jointly.")] IReadOnlyList<string>? ClientIds) : IValidatableObject
+{
+    private const string ClientRequired = "Choose the client this case is for.";
+
+    /// <summary>Each client named once, by id; the court in the registry.</summary>
+    /// <param name="validationContext">Unused.</param>
+    /// <returns>The failures.</returns>
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        if (ClientIds!.Any(string.IsNullOrWhiteSpace))
+        {
+            yield return new ValidationResult("Each client must be a client id.", [nameof(ClientIds)]);
+        }
+        else if (ClientIds!.Distinct(StringComparer.Ordinal).Count() != ClientIds!.Count)
+        {
+            yield return new ValidationResult("The same client cannot be both debtors on one case.", [nameof(ClientIds)]);
+        }
+
+        if (CaseRules.CourtProblem(Court!, Division!) is { } problem)
+        {
+            yield return problem;
+        }
+    }
+}
 
 /// <summary>One entry of a client's case list: a case the caller may see, and which debtor of it the client is.</summary>
 public sealed record ClientCase(Case Case, FilingRole FilingRole);
 
 /// <summary>
-/// A validated PATCH body. Null means "leave unchanged". The two dates are the
-/// one place that is not enough — an explicit JSON null clears one, recorded
-/// as <see cref="ClearFiledAt"/>/<see cref="ClearMeeting341At"/>.
-/// <see cref="Texts"/> holds the post-filing text fields the body NAMED: a
-/// value sets, null clears, absent from the map is unchanged.
+/// Editing a case (<c>PATCH /v1/cases/{caseId}</c>): only the keys sent
+/// change, and a body with none is a 400. The petition date, the § 341 date
+/// and the four docket facts may be cleared — an explicit null, which
+/// <see cref="Names"/> tells apart from a key not sent.
 /// </summary>
-public sealed record CaseChanges
+public sealed record CaseChanges : IValidatableObject
 {
-    /// <summary>A new chapter.</summary>
+    private readonly ImmutableHashSet<string> _named = [];
+
+    /// <summary>A new chapter; a filed case's chapter changes only by a conversion (409).</summary>
+    [AllowedValues(null, 7, 11, 12, 13, ErrorMessage = CaseRules.ChapterMessage)]
     public int? Chapter { get; init; }
 
-    /// <summary>A new court reference (court, division and district together).</summary>
-    public CourtReference? Court { get; init; }
+    /// <summary>A new court's CM/ECF code, sent with <see cref="Division"/>.</summary>
+    public string? Court { get; init; }
 
-    /// <summary>A status move.</summary>
+    /// <summary>A new division's code, sent with <see cref="Court"/>.</summary>
+    public string? Division { get; init; }
+
+    /// <summary>A status move — a lifecycle event; a move off the lifecycle is a 409.</summary>
     public CaseStatus? Status { get; init; }
 
-    /// <summary>A new 106C election.</summary>
-    public ExemptionSet? ExemptionSet { get; init; }
-
-    /// <summary>A new petition date.</summary>
-    public DateOnly? FiledAt { get; init; }
-
-    /// <summary>A new § 341 date.</summary>
-    public DateOnly? Meeting341At { get; init; }
-
-    /// <summary>
-    /// The court's date for a status move after filing (<c>effective_on</c>;
-    /// ADR 0027) — today when absent. Only beside <see cref="Status"/>.
-    /// </summary>
+    /// <summary>The court's date for a status move after filing (ADR 0027); today when absent. Only beside <see cref="Status"/>.</summary>
     public DateOnly? EffectiveOn { get; init; }
 
-    /// <summary>Clear the petition date.</summary>
-    public bool ClearFiledAt { get; init; }
+    /// <summary>Form 106C line 1's election.</summary>
+    public ExemptionSet? ExemptionSet { get; init; }
 
-    /// <summary>Clear the § 341 date.</summary>
-    public bool ClearMeeting341At { get; init; }
+    /// <summary>The petition date; null clears it.</summary>
+    public DateOnly? FiledAt { get; init { field = value; _named = _named.Add(nameof(FiledAt)); } }
 
-    /// <summary>The post-filing text fields named, by their wire names.</summary>
-    public ValueDictionary<string, string?> Texts { get; init; } = ValueCollections.EmptyDictionary<string, string?>();
+    /// <summary>The first § 341(a) meeting date; null clears it.</summary>
+    public DateOnly? Meeting341At { get; init { field = value; _named = _named.Add(nameof(Meeting341At)); } }
+
+    /// <summary>The court's case number; null clears it.</summary>
+    [Text(40)]
+    public string? CaseNumber { get; init { field = value; _named = _named.Add(nameof(CaseNumber)); } }
+
+    /// <summary>The judge's name; null clears it.</summary>
+    [Text(120)]
+    public string? Judge { get; init { field = value; _named = _named.Add(nameof(Judge)); } }
+
+    /// <summary>The trustee's name; null clears it.</summary>
+    [Text(120)]
+    public string? Trustee { get; init { field = value; _named = _named.Add(nameof(Trustee)); } }
+
+    /// <summary>The firm's own file number; null clears it.</summary>
+    [Text(40)]
+    public string? OfficeFileNumber { get; init { field = value; _named = _named.Add(nameof(OfficeFileNumber)); } }
+
+    /// <summary>Whether nothing would change.</summary>
+    [JsonIgnore]
+    public bool IsEmpty => _named.IsEmpty && Chapter is null && Court is null && Division is null && Status is null && EffectiveOn is null && ExemptionSet is null;
 
     /// <summary>
     /// Whether applying this changes anything the deadline engine reads — a
     /// date, a cleared date, or the chapter. The case route regenerates on exactly this.
     /// </summary>
-    public bool TouchesDeadlineAnchors =>
-        FiledAt is not null || Meeting341At is not null || ClearFiledAt || ClearMeeting341At || Chapter is not null;
+    [JsonIgnore]
+    public bool TouchesDeadlineAnchors => Names(nameof(FiledAt)) || Names(nameof(Meeting341At)) || Chapter is not null;
+
+    /// <summary>Whether the request named <paramref name="member"/> — a clearable member set to null clears it.</summary>
+    /// <param name="member">The C# member's name.</param>
+    /// <returns>Whether it was sent.</returns>
+    public bool Names(string member) => _named.Contains(member);
+
+    /// <summary>The court pair travels together; a status move's date only beside a status; the § 341 meeting not before the petition.</summary>
+    /// <param name="validationContext">Unused.</param>
+    /// <returns>The failures.</returns>
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        if (Court is not null || Division is not null)
+        {
+            if (string.IsNullOrWhiteSpace(Court))
+            {
+                yield return new ValidationResult(CaseRules.CourtRequired, [nameof(Court)]);
+            }
+            else if (string.IsNullOrWhiteSpace(Division))
+            {
+                yield return new ValidationResult(CaseRules.DivisionRequired, [nameof(Division)]);
+            }
+            else if (CaseRules.CourtProblem(Court, Division) is { } problem)
+            {
+                yield return problem;
+            }
+        }
+
+        if (EffectiveOn is not null && Status is null)
+        {
+            yield return new ValidationResult("Only a status move takes an effective date.", [nameof(EffectiveOn)]);
+        }
+
+        // Only checkable when both arrive together; against a stored date it
+        // is a slip the deadline engine tolerates rather than a refused save.
+        if (FiledAt is not null && Meeting341At is not null && Meeting341At < FiledAt)
+        {
+            yield return new ValidationResult("The § 341 meeting cannot precede the petition.", [nameof(Meeting341At)]);
+        }
+    }
 }
 
 /// <summary>One page of the cases a caller may see, newest first.</summary>

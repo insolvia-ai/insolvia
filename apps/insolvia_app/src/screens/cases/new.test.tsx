@@ -218,7 +218,7 @@ describe('the new-case screen', () => {
 
     await waitFor(() => {
       expect(posted(fetchMock, '/v1/cases')).toEqual([
-        { chapter: 13, court: 'flmb', division: 'orlando', client_ids: [JORDAN.id] },
+        { chapter: 13, court: 'flmb', division: 'orlando', clientIds: [JORDAN.id] },
       ]);
     });
     // On the new case, not back on a list: the next thing anyone does with a
@@ -248,7 +248,7 @@ describe('the new-case screen', () => {
     await userEvent.press(screen.getByRole('button', { name: 'Open case' }));
 
     await waitFor(() => {
-      expect(posted(fetchMock, '/v1/cases')[0]).toMatchObject({ client_ids: [RILEY.id] });
+      expect(posted(fetchMock, '/v1/cases')[0]).toMatchObject({ clientIds: [RILEY.id] });
     });
   });
 
@@ -271,7 +271,7 @@ describe('the new-case screen', () => {
 
     await waitFor(() => {
       expect(posted(fetchMock, '/v1/cases')[0]).toMatchObject({
-        client_ids: [JORDAN.id, RILEY.id],
+        clientIds: [JORDAN.id, RILEY.id],
       });
     });
   });
@@ -309,7 +309,7 @@ describe('the new-case screen', () => {
       expect(posted(fetchMock, '/v1/firm/clients')).toEqual([
         { name: { given: 'Sam', surname: 'Sample' } },
       ]);
-      expect(posted(fetchMock, '/v1/cases')[0]).toMatchObject({ client_ids: [JORDAN.id] });
+      expect(posted(fetchMock, '/v1/cases')[0]).toMatchObject({ clientIds: [JORDAN.id] });
     });
   });
 
@@ -408,7 +408,7 @@ describe('the new-case screen', () => {
         chapter: 13,
         court: 'txsb',
         division: 'houston',
-        client_ids: [JORDAN.id],
+        clientIds: [JORDAN.id],
       });
     });
   });
@@ -418,7 +418,7 @@ describe('the new-case screen', () => {
       '/v1/cases': () =>
         jsonResponse(400, {
           error: 'ValidationError',
-          fields: { client_ids: 'Choose the client this case is for.' },
+          fields: { clientIds: 'Choose the client this case is for.' },
         }),
     });
     await ready();

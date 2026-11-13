@@ -13,6 +13,7 @@ using Insolvia.Domain.Firms;
 using Insolvia.Domain.Petitions;
 using Insolvia.Domain.Ports;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Mvc;
 
 namespace Insolvia.Api.Routes;
 
@@ -30,7 +31,7 @@ namespace Insolvia.Api.Routes;
 /// edit (<see cref="ICaseStore.UpdateAsync"/>), conditioned on the status read.</para>
 /// <para><b>A filed case's chapter changes only by a conversion</b>
 /// (<c>POST …/conversions</c>) — a different <c>chapter</c> in its PATCH is
-/// a 409 (ADR 0027 row 3, #509). Its <c>filed_at</c> stays EDITABLE:
+/// a 409 (ADR 0027 row 3, #509). Its <c>filedAt</c> stays EDITABLE:
 /// a mistyped petition date must be correctable, and the filed event
 /// keeps the date it was recorded with (a correction is not a court event).</para>
 /// <para><b>The engines' two hooks</b> (Insolvia.Domain.Engines): the 106C opt-out
@@ -46,20 +47,20 @@ public sealed class CaseRoutes : IEndpointModule
     private const int MaxRequestBytes = 64 * 1024;
     private const string Logger = "insolvia_api.api.routes.cases";
 
-    // client_ids[0] is Debtor 1, client_ids[1] Debtor 2 — B101's order.
+    // clientIds[0] is Debtor 1, clientIds[1] Debtor 2 — B101's order.
     private static readonly FilingRole[] OpeningRoles = [FilingRole.Debtor1, FilingRole.Debtor2];
 
     /// <inheritdoc />
     public void Map(IEndpointRouteBuilder routes)
     {
         ArgumentNullException.ThrowIfNull(routes);
-        routes.MapPost("/v1/cases", CreateAsync).RequestBody<CaseCreateRequest>().RequireAuth().Requires(Feature.Cases, PermissionLevel.AddEdit).Requires(Feature.Clients, PermissionLevel.ViewOnly);
+        routes.MapPost("/v1/cases", CreateAsync).WithMetadata(new RequestSizeLimitAttribute(MaxRequestBytes)).RequireAuth().Requires(Feature.Cases, PermissionLevel.AddEdit).Requires(Feature.Clients, PermissionLevel.ViewOnly);
         routes.MapGet("/v1/cases", ListAsync).RequireAuth().Requires(Feature.Cases, PermissionLevel.ViewOnly)
             .QueryParameter("limit", "How many cases a page holds, 1 to 100; 50 when absent.")
             .QueryParameter("cursor", "The previous page's nextCursor, to read the page after it.")
             .QueryParameter("archived", "`true` for the archived cases instead of the live ones; `false` when absent.");
         routes.MapGet("/v1/cases/{caseId}", GetAsync).RequireAuth().Requires(Feature.Cases, PermissionLevel.ViewOnly);
-        routes.MapPatch("/v1/cases/{caseId}", UpdateAsync).RequestBody<CaseUpdateRequest>().RequireAuth().Requires(Feature.Cases, PermissionLevel.AddEdit);
+        routes.MapPatch("/v1/cases/{caseId}", UpdateAsync).WithMetadata(new RequestSizeLimitAttribute(MaxRequestBytes)).RequireAuth().Requires(Feature.Cases, PermissionLevel.AddEdit);
         routes.MapGet("/v1/cases/{caseId}/assignees", ListAssigneesAsync).RequireAuth().Requires(Feature.Cases, PermissionLevel.ViewOnly);
         routes.MapPut("/v1/cases/{caseId}/assignees/{subject}", AssignAsync).RequireAuth().Requires(Feature.Cases, PermissionLevel.AddEdit);
         routes.MapDelete("/v1/cases/{caseId}/assignees/{subject}", UnassignAsync).RequireAuth().Requires(Feature.Cases, PermissionLevel.AddEdit);
@@ -102,14 +103,13 @@ public sealed class CaseRoutes : IEndpointModule
     /// The firm is the caller's, never the body's. The caller is linked to the
     /// case, and each client's identity is copied to its debtor (Debtor 1,
     /// then Debtor 2) in the same write. An unknown, archived or merged client
-    /// is a 400 on <c>client_ids</c>.
+    /// is a 400 on <c>clientIds</c>.
     /// </remarks>
-    internal static async Task<Created<CaseView>> CreateAsync(HttpContext context, CancellationToken cancellationToken)
+    internal static async Task<Created<CaseView>> CreateAsync(HttpContext context, NewCase draft, CancellationToken cancellationToken)
     {
         var store = context.Cases();
-        var draft = CaseRules.ParseCreation(await context.BodyAsync(MaxRequestBytes));
         var accessor = await context.CurrentAccessorAsync();
-        var clients = await ClientsToOpenForAsync(context, draft.ClientIds, cancellationToken);
+        var clients = await ClientsToOpenForAsync(context, draft.ClientIds!, cancellationToken);
         var clock = context.Clock();
 
         var (created, assignment) = CaseRules.Create(draft, accessor.FirmId, accessor.Subject, clock);
@@ -122,7 +122,7 @@ public sealed class CaseRoutes : IEndpointModule
         {
             // A merge claimed (or someone archived) the client after the read.
             var reread = await context.FirmStore().GetClientAsync(accessor.FirmId, refused.ClientId, cancellationToken);
-            throw new FieldValidationException(new Dictionary<string, string> { ["client_ids"] = FirmClientRules.RefusalForRefusedLink(reread) });
+            throw new FieldValidationException(new Dictionary<string, string> { ["clientIds"] = FirmClientRules.RefusalForRefusedLink(reread) });
         }
 
         await context.RecordCaseAccessAsync(created.Id, AccessAction.CaseCreate, allowed: true, cancellationToken);
@@ -146,12 +146,12 @@ public sealed class CaseRoutes : IEndpointModule
             await context.RecordClientAccessAsync(clientId, AccessAction.ClientRead, client is not null, cancellationToken);
             if (client is null)
             {
-                throw new FieldValidationException(new Dictionary<string, string> { ["client_ids"] = "No such client." });
+                throw new FieldValidationException(new Dictionary<string, string> { ["clientIds"] = "No such client." });
             }
 
             if (client.RefusalForNewCase() is { } refused)
             {
-                throw new FieldValidationException(new Dictionary<string, string> { ["client_ids"] = refused });
+                throw new FieldValidationException(new Dictionary<string, string> { ["clientIds"] = refused });
             }
 
             clients.Add(client);
@@ -184,15 +184,19 @@ public sealed class CaseRoutes : IEndpointModule
     /// <summary>Edit a case, or move its status.</summary>
     /// <remarks>
     /// A status move is recorded as a lifecycle event; a move off the lifecycle
-    /// is a 409, and reaching <c>filed</c> needs <c>filed_at</c> and
-    /// <c>case_number</c>. A filed case's chapter changes only by a conversion
+    /// is a 409, and reaching <c>filed</c> needs <c>filedAt</c> and
+    /// <c>caseNumber</c>. A filed case's chapter changes only by a conversion
     /// (409). A change to the petition date, the § 341 date or the chapter
     /// regenerates the case's deadlines.
     /// </remarks>
-    internal static async Task<CaseView> UpdateAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
+    internal static async Task<CaseView> UpdateAsync(HttpContext context, string caseId, CaseChanges changes, CancellationToken cancellationToken)
     {
+        if (changes.IsEmpty)
+        {
+            throw new ValidationException("no supported fields to update");
+        }
+
         var store = context.Cases();
-        var changes = CaseRules.ParseUpdate(await context.BodyAsync(MaxRequestBytes));
         var accessor = await context.CurrentAccessorAsync();
 
         var existing = await store.GetAsync(caseId, accessor, cancellationToken);
@@ -253,7 +257,7 @@ public sealed class CaseRoutes : IEndpointModule
             asOf);
         if (refusal is not null)
         {
-            throw new FieldValidationException(new Dictionary<string, string> { ["exemption_set"] = refusal });
+            throw new FieldValidationException(new Dictionary<string, string> { ["exemptionSet"] = refusal });
         }
     }
 

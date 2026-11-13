@@ -17,28 +17,33 @@ namespace Insolvia.Domain.FirmClients;
 public static class ClientCopies
 {
     /// <summary>
-    /// The identity a case copies from a client, and the ONLY fields
-    /// <see cref="DiffersFromClient"/> compares. Date of birth is not here (no
-    /// form prints it), nor the tax id (entered on the case for now).
+    /// The identity a case copies from a client, as the debtor body names it,
+    /// and the ONLY fields <see cref="DiffersFromClient"/> compares. Date of
+    /// birth is not here (no form prints it), nor the tax id (entered on the
+    /// case for now).
     /// </summary>
     public static readonly IReadOnlyList<string> CopiedFields =
+        ["name", "otherNamesUsed", "residenceAddress", "mailingAddress", "phone", "mobile", "email"];
+
+    // The same fields in the client body's snake_case, until the client routes are converted (ADR 0032 step 4).
+    private static readonly IReadOnlyList<string> ClientFields =
         ["name", "other_names_used", "residence_address", "mailing_address", "phone", "mobile", "email"];
 
     /// <summary>
     /// A NEW debtor of <paramref name="target"/> carrying the client's identity,
     /// every copied field with provenance <c>{source: client, client_id}</c> —
-    /// round-tripped through the debtor parser with invariant 1 ENFORCED, so a
-    /// value the debtor parser would refuse fails here, at the copy.
+    /// checked as a debtor write is, so a value a debtor save would refuse
+    /// fails here, at the copy.
     /// </summary>
     public static Debtor DebtorFromClient(FirmClient client, Case target, FilingRole filingRole, TimeProvider? clock = null)
     {
         ArgumentNullException.ThrowIfNull(client);
         ArgumentNullException.ThrowIfNull(target);
-        var body = CopiedBody(ClientCopied(client));
+        var body = Copied(DebtorBody.Empty, client);
+        RecordValidator.ThrowIfInvalid(body, BodyJson.Options);
         var entry = new ProvenanceEntry(ProvenanceSource.Client) { ClientId = client.Id };
-        var provenance = ProvenanceRules.PopulatedPaths(body).ToDictionary(path => path, _ => entry, StringComparer.Ordinal);
-        body["provenance"] = ProvenanceRules.ToJson(provenance);
-        var draft = DebtorRules.Parse(body);
+        var provenance = ProvenanceRules.PopulatedPaths(DebtorRules.BodyNode(body)).ToDictionary(path => path, _ => entry, StringComparer.Ordinal);
+        var draft = DebtorRules.Checked(new DebtorDraft(body, Provenance: provenance));
         return DebtorRules.Create(draft, target.Id, filingRole, clientId: client.Id, caseCreatedAt: target.CreatedAt, clock: clock);
     }
 
@@ -51,8 +56,8 @@ public static class ClientCopies
     {
         ArgumentNullException.ThrowIfNull(debtor);
         ArgumentNullException.ThrowIfNull(client);
-        var ours = Leaves(CopiedBody(DebtorCopied(debtor.Body)));
-        var theirs = Leaves(CopiedBody(ClientCopied(client)));
+        var ours = Leaves(CopiedBody(debtor.Body));
+        var theirs = Leaves(CopiedBody(Copied(DebtorBody.Empty, client)));
         return [.. ours.Keys.Union(theirs.Keys, StringComparer.Ordinal)
             .Where(path => !JsonNode.DeepEquals(ours.GetValueOrDefault(path), theirs.GetValueOrDefault(path)))
             .Order(StringComparer.Ordinal)];
@@ -70,13 +75,7 @@ public static class ClientCopies
     {
         ArgumentNullException.ThrowIfNull(debtor);
         ArgumentNullException.ThrowIfNull(client);
-        var body = DebtorRules.BodyNode(debtor.Body);
-        var copied = BodyJson.ToSnakeNode(ClientCopied(client));
-        foreach (var key in CopiedFields)
-        {
-            body[key] = copied[key]?.DeepClone();
-        }
-
+        var body = Copied(debtor.Body, client);
         var entry = new ProvenanceEntry(ProvenanceSource.Client) { ClientId = client.Id };
         var provenance = new Dictionary<string, ProvenanceEntry>(StringComparer.Ordinal);
         foreach (var (path, kept) in debtor.Provenance)
@@ -87,14 +86,12 @@ public static class ClientCopies
             }
         }
 
-        foreach (var path in ProvenanceRules.PopulatedPaths(CopiedBody(ClientCopied(client))))
+        foreach (var path in ProvenanceRules.PopulatedPaths(CopiedBody(body)))
         {
             provenance[path] = entry;
         }
 
-        var payload = BodyJson.Prune(body);
-        payload["provenance"] = ProvenanceRules.ToJson(provenance);
-        return DebtorRules.Replace(debtor, DebtorRules.Parse(payload), debtor.TaxId, clock);
+        return DebtorRules.Replace(debtor, DebtorRules.Checked(new DebtorDraft(body, Provenance: provenance)), debtor.TaxId, clock);
     }
 
     /// <summary>
@@ -121,7 +118,7 @@ public static class ClientCopies
             client.ReferredBy,
             client.FirstRetainedAt));
         var ours = BodyJson.ToSnakeNode(DebtorCopied(debtor.Body));
-        foreach (var key in CopiedFields)
+        foreach (var key in ClientFields)
         {
             whole[key] = ours[key]?.DeepClone();
         }
@@ -136,13 +133,27 @@ public static class ClientCopies
         return CopiedFields.Contains(root, StringComparer.Ordinal);
     }
 
-    private static CopiedIdentity ClientCopied(FirmClient client) =>
-        new(client.Name, client.OtherNamesUsed, client.ResidenceAddress, client.MailingAddress, client.Phone, client.Mobile, client.Email);
+    // The debtor body with the client's identity in place of its own.
+    private static DebtorBody Copied(DebtorBody body, FirmClient client) => body with
+    {
+        Name = client.Name,
+        OtherNamesUsed = client.OtherNamesUsed,
+        ResidenceAddress = client.ResidenceAddress,
+        MailingAddress = client.MailingAddress,
+        Phone = client.Phone,
+        Mobile = client.Mobile,
+        Email = client.Email,
+    };
+
+    // The copied members of a debtor body, as provenance paths address them.
+    private static JsonObject CopiedBody(DebtorBody body)
+    {
+        var whole = DebtorRules.BodyNode(body);
+        return new JsonObject([.. whole.Where(pair => CopiedFields.Contains(pair.Key)).Select(pair => KeyValuePair.Create(pair.Key, pair.Value?.DeepClone()))]);
+    }
 
     private static CopiedIdentity DebtorCopied(DebtorBody body) =>
         new(body.Name, body.OtherNamesUsed, body.ResidenceAddress, body.MailingAddress, body.Phone, body.Mobile, body.Email);
-
-    private static JsonObject CopiedBody(CopiedIdentity identity) => BodyJson.Prune(BodyJson.ToSnakeNode(identity));
 
     /// <summary>
     /// Field path to value for every populated leaf, list elements addressed by

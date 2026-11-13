@@ -1,6 +1,5 @@
 using System.Text.Json.Nodes;
 using Insolvia.Domain.Access;
-using Insolvia.Domain.CaseEntities;
 using Insolvia.Domain.Cases;
 using Insolvia.Domain.Clients;
 using Insolvia.Domain.Debtors;
@@ -43,7 +42,7 @@ public sealed class ClientCopyTests
     }
 
     private static (Case Case, CaseAssignment Assignment) ACase(string firmId = Ids.Firm, string createdBy = Ids.Alice, TimeProvider? clock = null) =>
-        CaseRules.Create(CaseRules.ParseCreation(Body.Of("""{"chapter": 7, "court": "flmb", "division": "tampa"}"""), requireClients: false), firmId, createdBy, clock);
+        CaseRules.Create(new NewCase(7, "flmb", "tampa", []), firmId, createdBy, clock);
 
     private static Debtor ACopy(FirmClient? client = null, FilingRole role = FilingRole.Debtor1) =>
         ClientCopies.DebtorFromClient(client ?? AClient(), ACase().Case, role);
@@ -51,7 +50,7 @@ public sealed class ClientCopyTests
     /// <summary>The debtor as the questionnaire would send it back, with changes and extra provenance.</summary>
     private static DebtorDraft AsSent(Debtor debtor, Action<JsonObject>? changes = null, JsonObject? provenance = null)
     {
-        var body = BodyJson.Prune(DebtorRules.BodyNode(debtor.Body));
+        var body = DebtorRules.BodyNode(debtor.Body);
         changes?.Invoke(body);
         var entries = ProvenanceRules.ToJson(debtor.Provenance);
         foreach (var (path, entry) in provenance ?? [])
@@ -59,8 +58,7 @@ public sealed class ClientCopyTests
             entries[path] = entry?.DeepClone();
         }
 
-        body["provenance"] = entries;
-        return DebtorRules.Parse(body);
+        return DebtorRules.Checked(Body.Read<DebtorDraft>(new JsonObject { ["body"] = body, ["provenance"] = entries }));
     }
 
     // ── The client source ───────────────────────────────────────────
@@ -99,7 +97,7 @@ public sealed class ClientCopyTests
         Assert.Equal(("555-0100", "jordan@example.test"), (debtor.Body.Phone, debtor.Body.Email));
         var entry = new ProvenanceEntry(ProvenanceSource.Client) { ClientId = client.Id };
         Assert.Equal(
-            ["email", "name.given", "name.suffix", "name.surname", "other_names_used[alias-1].surname", "phone", "residence_address.city", "residence_address.county", "residence_address.line1", "residence_address.postalCode", "residence_address.state"],
+            ["email", "name.given", "name.suffix", "name.surname", "otherNamesUsed[alias-1].surname", "phone", "residenceAddress.city", "residenceAddress.county", "residenceAddress.line1", "residenceAddress.postalCode", "residenceAddress.state"],
             debtor.Provenance.Keys.Order(StringComparer.Ordinal));
         Assert.All(debtor.Provenance.Values, value => Assert.Equal(entry, value));
     }
@@ -107,10 +105,8 @@ public sealed class ClientCopyTests
     [Fact]
     public void The_firms_own_fields_are_never_copied()
     {
-        var body = BodyJson.Prune(DebtorRules.BodyNode(ACopy().Body));
-        Assert.False(body.ContainsKey("date_of_birth"));
-        Assert.False(body.ContainsKey("lead_source"));
-        Assert.All(body.Select(pair => pair.Key).Where(key => Body.Of(ClientBody).ContainsKey(key)), key => Assert.Contains(key, ClientCopies.CopiedFields));
+        var body = DebtorRules.BodyNode(ACopy().Body);
+        Assert.All(body.Select(pair => pair.Key), key => Assert.Contains(key, ClientCopies.CopiedFields));
     }
 
     [Fact]
@@ -120,7 +116,7 @@ public sealed class ClientCopyTests
     public void A_questionnaire_save_keeps_the_link_whatever_its_body_says()
     {
         var debtor = ACopy();
-        var draft = DebtorRules.Parse(Body.Of("""{"client_id": "someone-else", "name": {"given": "Typed"}, "provenance": {"name.given": {"source": "staff_typed"}}}"""));
+        var draft = DebtorRules.Checked(Body.Read<DebtorDraft>(Body.Of("""{"clientId": "someone-else", "body": {"name": {"given": "Typed"}}, "provenance": {"name.given": {"source": "staff_typed"}}}""")));
         var saved = DebtorRules.Replace(debtor, draft);
         Assert.Equal((debtor.ClientId, debtor.CaseCreatedAt), (saved.ClientId, saved.CaseCreatedAt));
         Assert.Equal("Typed", saved.Body.Name.Given);
@@ -128,11 +124,11 @@ public sealed class ClientCopyTests
 
     [Fact]
     public void Client_id_is_server_owned_so_an_echo_needs_no_provenance() =>
-        DebtorRules.Parse(Body.Of("""{"client_id": "c-1"}"""));
+        DebtorRules.Checked(Body.Read<DebtorDraft>(Body.Of("""{"clientId": "c-1"}""")));
 
     [Fact]
     public void A_link_and_an_index_sort_key_travel_together() =>
-        Assert.Contains("together", Assert.Throws<ArgumentException>(() => DebtorRules.Create(DebtorRules.Parse([]), "k", FilingRole.Debtor1, clientId: "c-1")).Message, StringComparison.Ordinal);
+        Assert.Contains("together", Assert.Throws<ArgumentException>(() => DebtorRules.Create(new DebtorDraft(), "k", FilingRole.Debtor1, clientId: "c-1")).Message, StringComparison.Ordinal);
 
     [Fact]
     public void Re_linking_changes_the_client_and_never_the_copied_fields()
@@ -163,7 +159,7 @@ public sealed class ClientCopyTests
         var debtor = ACopy(client);
         debtor = debtor with { Body = debtor.Body with { Phone = "555-0199" } };
         client = client with { Mobile = "555-0111", ResidenceAddress = client.ResidenceAddress with { County = "Cook" } };
-        Assert.Equal(["mobile", "phone", "residence_address.county"], ClientCopies.DiffersFromClient(debtor, client));
+        Assert.Equal(["mobile", "phone", "residenceAddress.county"], ClientCopies.DiffersFromClient(debtor, client));
     }
 
     [Fact]
@@ -172,7 +168,7 @@ public sealed class ClientCopyTests
         var client = AClient(overrides: body => body["other_names_used"] = Body.Value("""[{"id": "alias-1", "surname": "Sample"}, {"id": "alias-2", "surname": "Other"}]"""));
         var debtor = ACopy(client);
         Assert.Empty(ClientCopies.DiffersFromClient(debtor, client with { OtherNamesUsed = client.OtherNamesUsed.Reverse().ToValueCollection() }));
-        Assert.Equal(["other_names_used[alias-2].surname"], ClientCopies.DiffersFromClient(debtor, client with { OtherNamesUsed = client.OtherNamesUsed.Take(1).ToValueCollection() }));
+        Assert.Equal(["otherNamesUsed[alias-2].surname"], ClientCopies.DiffersFromClient(debtor, client with { OtherNamesUsed = client.OtherNamesUsed.Take(1).ToValueCollection() }));
     }
 
     [Fact]
@@ -237,9 +233,9 @@ public sealed class ClientCopyTests
 
     [Theory]
     [InlineData("name.given", "\"Jordan\"")]
-    [InlineData("other_names_used[alias-1].surname", "\"Sample\"")]
-    [InlineData("other_names_used[no-such-row].surname", null)]
-    [InlineData("residence_address.postalCode", "\"62701\"")]
+    [InlineData("otherNamesUsed[alias-1].surname", "\"Sample\"")]
+    [InlineData("otherNamesUsed[no-such-row].surname", null)]
+    [InlineData("residenceAddress.postalCode", "\"62701\"")]
     [InlineData("phone", "\"555-0100\"")]
     [InlineData("not_a_field", null)]
     public void A_path_resolves_to_the_value_it_names(string path, string? expected) =>
@@ -306,7 +302,7 @@ public sealed class ClientCopyTests
         Body = stored.Body with { Phone = "555-0199", Venue = new Venue(VenueBasis.LivedLongest180Days) },
         TaxId = new TaxIdRef(TaxIdKind.Ssn, "4321", "ref-1"),
         Provenance = stored.Provenance
-            .Concat(new Dictionary<string, ProvenanceEntry> { ["phone"] = Typed, ["venue.basis"] = Typed, ["tax_id"] = Typed })
+            .Concat(new Dictionary<string, ProvenanceEntry> { ["phone"] = Typed, ["venue.basis"] = Typed, ["taxId"] = Typed })
             .ToValueDictionary(),
     };
 
@@ -329,7 +325,7 @@ public sealed class ClientCopyTests
         Assert.Equal(stored.Body.Venue, recopied.Body.Venue);
         Assert.Equal(stored.TaxId, recopied.TaxId);
         Assert.Equal(Typed, recopied.Provenance["venue.basis"]);
-        Assert.Equal(Typed, recopied.Provenance["tax_id"]);
+        Assert.Equal(Typed, recopied.Provenance["taxId"]);
         Assert.Equal(stored.ClientId, recopied.ClientId);
     }
 

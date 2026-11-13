@@ -71,12 +71,12 @@ const DIRECTORY = {
 function debtor(given: string, surname: string) {
   return {
     id: 'debtor_1',
-    case_id: CASE_ID,
-    filing_role: 'debtor_1',
-    created_at: '2026-08-04T10:00:00.000000Z',
-    updated_at: '2026-08-04T10:00:00.000000Z',
+    caseId: CASE_ID,
+    filingRole: 'debtor_1',
+    createdAt: '2026-08-04T10:00:00.000000Z',
+    updatedAt: '2026-08-04T10:00:00.000000Z',
     provenance: {},
-    name: { given, surname },
+    body: { name: { given, surname } },
   };
 }
 

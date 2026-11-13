@@ -47,33 +47,41 @@ public enum ProvenanceSource
 /// entries for exact equality. <see cref="Locator"/> is kept as the JSON
 /// object that was validated, unknown members included, as stored maps hold it.
 /// </remarks>
+// The members are named here, snake_case, so a camelCase reader (BodyJson, a typed request) reads the stored and wire map alike.
 public sealed record ProvenanceEntry([property: JsonRequired] ProvenanceSource Source)
 {
     /// <summary>The person who confirmed the value.</summary>
+    [JsonPropertyName("confirmed_by")]
     public string? ConfirmedBy { get; init; }
 
     /// <summary>When they confirmed it — a UTC timestamp ending in <c>Z</c>.</summary>
+    [JsonPropertyName("confirmed_at")]
     public string? ConfirmedAt { get; init; }
 
     /// <summary>The document the value was read from.</summary>
+    [JsonPropertyName("document_id")]
     public string? DocumentId { get; init; }
 
     /// <summary>Where on the page: <c>{document_id, page, region: {x, y, width, height}}</c>, region in page fractions.</summary>
     public JsonObject? Locator { get; init; }
 
     /// <summary>The extraction candidate the value was accepted from.</summary>
+    [JsonPropertyName("extraction_id")]
     public string? ExtractionId { get; init; }
 
     /// <summary>The extractor's confidence, 0 to 1.</summary>
     public double? Confidence { get; init; }
 
     /// <summary>The library creditor a <see cref="ProvenanceSource.Library"/> value was copied from. Shape and type only — never validated against the store.</summary>
+    [JsonPropertyName("library_creditor_id")]
     public string? LibraryCreditorId { get; init; }
 
     /// <summary>The firm client a <see cref="ProvenanceSource.Client"/> value was copied from. Shape and type only.</summary>
+    [JsonPropertyName("client_id")]
     public string? ClientId { get; init; }
 
     /// <summary>The case this value was COPIED FROM (issue 14.3), orthogonal to <see cref="Source"/>.</summary>
+    [JsonPropertyName("copied_from_case_id")]
     public string? CopiedFromCaseId { get; init; }
 
     /// <inheritdoc />

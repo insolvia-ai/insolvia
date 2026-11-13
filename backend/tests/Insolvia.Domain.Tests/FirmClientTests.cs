@@ -176,17 +176,8 @@ public sealed class FirmClientTests
     {
         // ADR 0022 copies a client's identity onto a debtor; a value the
         // client record accepts must be one the debtor's own parser accepts.
-        var full = Body.Of(Full);
-        var copied = new JsonObject();
-        foreach (var key in FirmClients.ClientCopies.CopiedFields)
-        {
-            if (full[key] is { } value)
-            {
-                copied[key] = value.DeepClone();
-            }
-        }
-
-        _ = Debtors.DebtorRules.Parse(copied, enforceProvenance: false);
+        var client = FirmClientRules.Parse(Body.Of(Full));
+        _ = Debtors.DebtorRules.ReadBody(Debtors.DebtorRules.BodyNode(new Debtors.DebtorBody(client.Name, client.OtherNamesUsed, null, client.ResidenceAddress, client.MailingAddress, client.Phone, client.Mobile, client.Email)));
     }
 
     // ── The feature ─────────────────────────────────────────────────

@@ -650,11 +650,11 @@
                         "surname": {
                           "type": ["null", "string"]
                         },
-                        "business_name": {
+                        "businessName": {
                           "type": ["null", "string"]
                         }
                       },
-                      "description": "An 8-year-lookback alias. Carries its own client-chosen string OtherName.Id\nso provenance addresses it as \u0060other_names_used[\u0026lt;id\u0026gt;].surname\u0060\n\u2014 position would reattach on reorder."
+                      "description": "An 8-year-lookback alias. Carries its own client-chosen string OtherName.Id\nso provenance addresses it as \u0060otherNamesUsed[\u0026lt;id\u0026gt;].surname\u0060\n\u2014 position would reattach on reorder. string? OtherName.BusinessName is\n\u0060businessName\u0060 under every serializer: the row sits in a debtor\u0027s\ncamelCase body and a firm client\u0027s snake_case one alike (ADR 0032)."
                     },
                     "description": "Names used in the last eight years."
                   },
@@ -863,11 +863,11 @@
                         "surname": {
                           "type": ["null", "string"]
                         },
-                        "business_name": {
+                        "businessName": {
                           "type": ["null", "string"]
                         }
                       },
-                      "description": "An 8-year-lookback alias. Carries its own client-chosen string OtherName.Id\nso provenance addresses it as \u0060other_names_used[\u0026lt;id\u0026gt;].surname\u0060\n\u2014 position would reattach on reorder."
+                      "description": "An 8-year-lookback alias. Carries its own client-chosen string OtherName.Id\nso provenance addresses it as \u0060otherNamesUsed[\u0026lt;id\u0026gt;].surname\u0060\n\u2014 position would reattach on reorder. string? OtherName.BusinessName is\n\u0060businessName\u0060 under every serializer: the row sits in a debtor\u0027s\ncamelCase body and a firm client\u0027s snake_case one alike (ADR 0032)."
                     },
                     "description": "Names used in the last eight years."
                   },
@@ -1851,36 +1851,12 @@
       "post": {
         "tags": ["Case"],
         "summary": "Open a case for one client, or two filing jointly",
-        "description": "The firm is the caller\u0027s, never the body\u0027s. The caller is linked to the\ncase, and each client\u0027s identity is copied to its debtor (Debtor 1,\nthen Debtor 2) in the same write. An unknown, archived or merged client\nis a 400 on \u0060client_ids\u0060.",
+        "description": "The firm is the caller\u0027s, never the body\u0027s. The caller is linked to the\ncase, and each client\u0027s identity is copied to its debtor (Debtor 1,\nthen Debtor 2) in the same write. An unknown, archived or merged client\nis a 400 on \u0060clientIds\u0060.",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "required": ["chapter", "court", "division", "client_ids"],
-                "type": "object",
-                "properties": {
-                  "chapter": {
-                    "type": "integer",
-                    "description": "7, 11, 12 or 13.",
-                    "format": "int32"
-                  },
-                  "court": {
-                    "type": "string",
-                    "description": "The court\u0027s CM/ECF code, from \u0060GET /v1/courts\u0060."
-                  },
-                  "division": {
-                    "type": "string",
-                    "description": "The court division\u0027s code."
-                  },
-                  "client_ids": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    },
-                    "description": "The firm clients it is opened for: Debtor 1, then Debtor 2 for a joint case."
-                  }
-                },
-                "description": "Opening a case (\u0060POST /v1/cases\u0060). Parsed by \u0060CaseRules.ParseCreation\u0060,\nwhich owns validation; unknown keys are ignored, and a typed \u0060district\u0060\nis refused. Every case starts at intake."
+                "$ref": "#/components/schemas/NewCase"
               }
             }
           },
@@ -2000,7 +1976,7 @@
       "patch": {
         "tags": ["Case"],
         "summary": "Edit a case, or move its status",
-        "description": "A status move is recorded as a lifecycle event; a move off the lifecycle\nis a 409, and reaching \u0060filed\u0060 needs \u0060filed_at\u0060 and\n\u0060case_number\u0060. A filed case\u0027s chapter changes only by a conversion\n(409). A change to the petition date, the \u00A7 341 date or the chapter\nregenerates the case\u0027s deadlines.",
+        "description": "A status move is recorded as a lifecycle event; a move off the lifecycle\nis a 409, and reaching \u0060filed\u0060 needs \u0060filedAt\u0060 and\n\u0060caseNumber\u0060. A filed case\u0027s chapter changes only by a conversion\n(409). A change to the petition date, the \u00A7 341 date or the chapter\nregenerates the case\u0027s deadlines.",
         "parameters": [
           {
             "name": "caseId",
@@ -2015,65 +1991,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "chapter": {
-                    "type": ["null", "integer"],
-                    "description": "A new chapter; a filed case\u0027s chapter changes only by a conversion (409).",
-                    "format": "int32"
-                  },
-                  "court": {
-                    "type": ["null", "string"],
-                    "description": "A new court\u0027s CM/ECF code, sent with Division."
-                  },
-                  "division": {
-                    "type": ["null", "string"],
-                    "description": "A new division\u0027s code, sent with Court."
-                  },
-                  "status": {
-                    "enum": [
-                      "intake",
-                      "ready_to_file",
-                      "filed",
-                      "discharged",
-                      "dismissed",
-                      "closed",
-                      null
-                    ]
-                  },
-                  "effective_on": {
-                    "type": ["null", "string"],
-                    "description": "The court\u0027s date for a status move after filing, YYYY-MM-DD; today when absent. Only beside Status."
-                  },
-                  "exemption_set": {
-                    "enum": ["state_and_federal_nonbankruptcy", "federal", null]
-                  },
-                  "filed_at": {
-                    "type": ["null", "string"],
-                    "description": "The petition date, YYYY-MM-DD; null clears it."
-                  },
-                  "meeting_341_at": {
-                    "type": ["null", "string"],
-                    "description": "The \u00A7 341(a) meeting date, YYYY-MM-DD; null clears it."
-                  },
-                  "case_number": {
-                    "type": ["null", "string"],
-                    "description": "The court\u0027s case number; null clears it."
-                  },
-                  "judge": {
-                    "type": ["null", "string"],
-                    "description": "The judge\u0027s name; null clears it."
-                  },
-                  "trustee": {
-                    "type": ["null", "string"],
-                    "description": "The trustee\u0027s name; null clears it."
-                  },
-                  "office_file_number": {
-                    "type": ["null", "string"],
-                    "description": "The firm\u0027s own file number; null clears it."
-                  }
-                },
-                "description": "Editing a case (\u0060PATCH /v1/cases/{caseId}\u0060): only the keys sent are\nchanged, and a body with none is a 400. Parsed by \u0060CaseRules.ParseUpdate\u0060,\nwhich owns validation."
+                "$ref": "#/components/schemas/CaseChanges"
               }
             }
           },
@@ -2389,7 +2307,7 @@
       "post": {
         "tags": ["Case lifecycle"],
         "summary": "Record the court\u0027s conversion of a filed case to another chapter",
-        "description": "Filed cases only (409). The new chapter must differ from the current one\n(400 on \u0060to_chapter\u0060), and the date may not precede the petition or\nthe previous court event (400 on \u0060effective_on\u0060). The case\u0027s\ndeadlines are not regenerated.",
+        "description": "Filed cases only (409). The new chapter must differ from the current one\n(400 on \u0060toChapter\u0060), and the date may not precede the petition or\nthe previous court event (400 on \u0060effectiveOn\u0060). The case\u0027s\ndeadlines are not regenerated.",
         "parameters": [
           {
             "name": "caseId",
@@ -2404,20 +2322,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": ["toChapter", "effectiveOn"],
-                "type": "object",
-                "properties": {
-                  "toChapter": {
-                    "type": "integer",
-                    "description": "The chapter the court converted the case to: 7, 11, 12 or 13, and not the current one.",
-                    "format": "int32"
-                  },
-                  "effectiveOn": {
-                    "type": "string",
-                    "description": "The court\u0027s date, YYYY-MM-DD; no earlier than the petition or the previous court event."
-                  }
-                },
-                "description": "Recording a conversion (\u0060POST /v1/cases/{caseId}/conversions\u0060). Its\nfield errors are keyed \u0060to_chapter\u0060 and \u0060effective_on\u0060."
+                "$ref": "#/components/schemas/ConversionRequest"
               }
             }
           },
@@ -2465,15 +2370,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": ["archived"],
-                "type": "object",
-                "properties": {
-                  "archived": {
-                    "type": "boolean",
-                    "description": "True to archive, false to restore."
-                  }
-                },
-                "description": "Archiving or restoring a case (\u0060PUT /v1/cases/{caseId}/archived\u0060)."
+                "$ref": "#/components/schemas/CaseArchiveRequest"
               }
             }
           },
@@ -2544,7 +2441,7 @@
       "put": {
         "tags": ["Debtor"],
         "summary": "Save a debtor, whole",
-        "description": "Replaces the record for the filing role, or creates it \u2014 201 \u2014 for the\nnon-filing spouse. Debtor 1 and Debtor 2 are created by linking a client\nfirst; a save to either before then is a 400 on \u0060client_id\u0060.",
+        "description": "Replaces the record for the filing role, or creates it \u2014 201 \u2014 for the\nnon-filing spouse. Debtor 1 and Debtor 2 are created by linking a client\nfirst; a save to either before then is a 400 on \u0060clientId\u0060.",
         "parameters": [
           {
             "name": "caseId",
@@ -2567,230 +2464,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "tax_id": {
-                    "type": ["null", "object"],
-                    "properties": {
-                      "kind": {
-                        "enum": ["ssn", "itin"],
-                        "description": "Which kind of taxpayer number (Python\u0027s \u0060TAX_ID_KINDS\u0060). The first digit decides it."
-                      },
-                      "value": {
-                        "type": ["null", "string"]
-                      },
-                      "last_four": {
-                        "type": ["null", "string"]
-                      }
-                    },
-                    "description": "What a write carries after parsing. EXACTLY ONE of string? TaxIdInput.Value\n(the nine digits, freshly typed) and string? TaxIdInput.LastFour (the client\nechoing the view it was given: \u0022keep what is stored\u0022) is set."
-                  },
-                  "provenance": {
-                    "type": ["null", "object"],
-                    "additionalProperties": {
-                      "type": "object",
-                      "properties": {
-                        "source": {
-                          "enum": [
-                            "staff_typed",
-                            "ai_extracted",
-                            "imported",
-                            "library",
-                            "client",
-                            "client_answered"
-                          ],
-                          "description": "Who supplied a value. Order is Python\u0027s \u0060SOURCES\u0060 tuple \u2014 it is the\norder the \u0022Source must be one of \u2026\u0022 message lists them in."
-                        },
-                        "confirmed_by": {
-                          "type": ["null", "string"],
-                          "description": "The person who confirmed the value."
-                        },
-                        "confirmed_at": {
-                          "type": ["null", "string"],
-                          "description": "When they confirmed it \u2014 a UTC timestamp ending in \u0060Z\u0060."
-                        },
-                        "document_id": {
-                          "type": ["null", "string"],
-                          "description": "The document the value was read from."
-                        },
-                        "locator": {
-                          "type": "object"
-                        },
-                        "extraction_id": {
-                          "type": ["null", "string"],
-                          "description": "The extraction candidate the value was accepted from."
-                        },
-                        "confidence": {
-                          "type": ["null", "number"],
-                          "description": "The extractor\u0027s confidence, 0 to 1.",
-                          "format": "double"
-                        },
-                        "library_creditor_id": {
-                          "type": ["null", "string"],
-                          "description": "The library creditor a ProvenanceSource.Library value was copied from. Shape and type only \u2014 never validated against the store."
-                        },
-                        "client_id": {
-                          "type": ["null", "string"],
-                          "description": "The firm client a ProvenanceSource.Client value was copied from. Shape and type only."
-                        },
-                        "copied_from_case_id": {
-                          "type": ["null", "string"],
-                          "description": "The case this value was COPIED FROM (issue 14.3), orthogonal to ProvenanceSource ProvenanceEntry.Source."
-                        }
-                      },
-                      "description": "Where one field\u0027s value came from. string? ProvenanceEntry.ConfirmedBy and\nstring? ProvenanceEntry.ConfirmedAt are one act \u2014 a human said \u0022yes, that is right\u0022\nat a moment \u2014 and exactly what accepting an extraction candidate writes."
-                    },
-                    "description": "Where each populated field came from, by body path."
-                  },
-                  "name": {
-                    "type": "object",
-                    "properties": {
-                      "given": {
-                        "type": ["null", "string"]
-                      },
-                      "middle": {
-                        "type": ["null", "string"]
-                      },
-                      "surname": {
-                        "type": ["null", "string"]
-                      },
-                      "suffix": {
-                        "type": ["null", "string"]
-                      }
-                    },
-                    "description": "Four discrete parts, never one string \u2014 the IEPD has no single-string fallback for names."
-                  },
-                  "other_names_used": {
-                    "type": "array",
-                    "items": {
-                      "type": "object",
-                      "properties": {
-                        "id": {
-                          "type": "string"
-                        },
-                        "given": {
-                          "type": ["null", "string"]
-                        },
-                        "middle": {
-                          "type": ["null", "string"]
-                        },
-                        "surname": {
-                          "type": ["null", "string"]
-                        },
-                        "business_name": {
-                          "type": ["null", "string"]
-                        }
-                      },
-                      "description": "An 8-year-lookback alias. Carries its own client-chosen string OtherName.Id\nso provenance addresses it as \u0060other_names_used[\u0026lt;id\u0026gt;].surname\u0060\n\u2014 position would reattach on reorder."
-                    },
-                    "description": "An immutable list with VALUE equality \u2014 the C# shape of a Python tuple on\na frozen dataclass. A record holding a plain array or \u0060List\u0060 compares\nit by reference, so two records describing the same client would be\nunequal; the stores\u0027 \u0022round-trips\u0022 and \u0022unchanged since\u0022 checks need\nequality by contents."
-                  },
-                  "employer_ids": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    },
-                    "description": "An immutable list with VALUE equality \u2014 the C# shape of a Python tuple on\na frozen dataclass. A record holding a plain array or \u0060List\u0060 compares\nit by reference, so two records describing the same client would be\nunequal; the stores\u0027 \u0022round-trips\u0022 and \u0022unchanged since\u0022 checks need\nequality by contents."
-                  },
-                  "residence_address": {
-                    "type": "object",
-                    "properties": {
-                      "line1": {
-                        "type": ["null", "string"]
-                      },
-                      "line2": {
-                        "type": ["null", "string"]
-                      },
-                      "city": {
-                        "type": ["null", "string"]
-                      },
-                      "state": {
-                        "type": ["null", "string"]
-                      },
-                      "postalCode": {
-                        "type": ["null", "string"]
-                      },
-                      "county": {
-                        "type": ["null", "string"]
-                      },
-                      "raw": {
-                        "type": ["null", "string"]
-                      }
-                    },
-                    "description": "Structured parts AND a raw fallback (the IEPD\u0027s free-text form, for a\ncreditor block that will not parse). string? Address.County is B101 line 5\u0027s box.\nstring? Address.PostalCode is \u0060postalCode\u0060 under every serializer, the\nsnake_case ones included: an address sits in a case collection\u0027s camelCase\nbody and in a debtor\u0027s, a firm\u0027s and a client\u0027s snake_case one alike (ADR 0032)."
-                  },
-                  "mailing_address": {
-                    "type": "object",
-                    "properties": {
-                      "line1": {
-                        "type": ["null", "string"]
-                      },
-                      "line2": {
-                        "type": ["null", "string"]
-                      },
-                      "city": {
-                        "type": ["null", "string"]
-                      },
-                      "state": {
-                        "type": ["null", "string"]
-                      },
-                      "postalCode": {
-                        "type": ["null", "string"]
-                      },
-                      "county": {
-                        "type": ["null", "string"]
-                      },
-                      "raw": {
-                        "type": ["null", "string"]
-                      }
-                    },
-                    "description": "Structured parts AND a raw fallback (the IEPD\u0027s free-text form, for a\ncreditor block that will not parse). string? Address.County is B101 line 5\u0027s box.\nstring? Address.PostalCode is \u0060postalCode\u0060 under every serializer, the\nsnake_case ones included: an address sits in a case collection\u0027s camelCase\nbody and in a debtor\u0027s, a firm\u0027s and a client\u0027s snake_case one alike (ADR 0032)."
-                  },
-                  "phone": {
-                    "type": ["null", "string"]
-                  },
-                  "mobile": {
-                    "type": ["null", "string"]
-                  },
-                  "email": {
-                    "type": ["null", "string"]
-                  },
-                  "venue": {
-                    "type": "object",
-                    "properties": {
-                      "basis": {
-                        "enum": ["lived_longest_180_days", "other", null]
-                      },
-                      "explanation": {
-                        "type": ["null", "string"]
-                      }
-                    },
-                    "description": "B101 line 6."
-                  },
-                  "credit_counseling": {
-                    "type": "object",
-                    "properties": {
-                      "status": {
-                        "enum": [
-                          "completed_with_certificate",
-                          "completed_certificate_pending",
-                          "exigent_circumstances_waiver_requested",
-                          "not_required",
-                          null
-                        ]
-                      },
-                      "exemption_reason": {
-                        "enum": ["incapacity", "disability", "active_duty", null]
-                      }
-                    },
-                    "description": "B101 line 15."
-                  },
-                  "signed_at": {
-                    "type": ["null", "string"],
-                    "format": "date"
-                  }
-                },
-                "description": "A debtor as written (\u0060PUT \u2026/debtors/{filingRole}\u0060): the whole body,\neach unanswered field absent. Parsed by \u0060DebtorRules.Parse\u0060, which\nowns validation; this record is its shape for the OpenAPI document."
+                "$ref": "#/components/schemas/DebtorDraft"
               }
             }
           },
@@ -2893,15 +2567,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": ["client_id"],
-                "type": "object",
-                "properties": {
-                  "client_id": {
-                    "type": "string",
-                    "description": "The client, in the case\u0027s firm."
-                  }
-                },
-                "description": "Which firm client a debtor is (\u0060PUT \u2026/debtors/{filingRole}/client\u0060)."
+                "$ref": "#/components/schemas/DebtorLinkRequest"
               }
             }
           },
@@ -14263,7 +13929,7 @@
                 "$ref": "#/components/schemas/CandidateStatus"
               },
               "payload": {
-                "$ref": "#/components/schemas/DebtorRequest"
+                "$ref": "#/components/schemas/DebtorBody"
               },
               "origin": {
                 "description": "Who proposed it.",
@@ -14307,7 +13973,7 @@
                 "description": "When it was reviewed, ISO 8601 UTC."
               },
               "correctedPayload": {
-                "$ref": "#/components/schemas/DebtorRequest"
+                "$ref": "#/components/schemas/DebtorBody"
               },
               "resultingRecordId": {
                 "type": "string",
@@ -14325,6 +13991,89 @@
           }
         ],
         "description": "A candidate in the review queue: a record proposed by extraction, an MCP\nharness or the client portal, with everything a reviewer needs to verify\nit. Optional members are absent, never null."
+      },
+      "CaseArchiveRequest": {
+        "required": ["archived"],
+        "type": "object",
+        "properties": {
+          "archived": {
+            "type": ["null", "boolean"],
+            "description": "True to archive, false to restore."
+          }
+        },
+        "description": "Archiving or restoring a case (\u0060PUT /v1/cases/{caseId}/archived\u0060)."
+      },
+      "CaseChanges": {
+        "type": "object",
+        "properties": {
+          "chapter": {
+            "type": ["null", "integer"],
+            "description": "A new chapter; a filed case\u0027s chapter changes only by a conversion (409).",
+            "format": "int32"
+          },
+          "court": {
+            "type": ["null", "string"],
+            "description": "A new court\u0027s CM/ECF code, sent with string? CaseChanges.Division."
+          },
+          "division": {
+            "type": ["null", "string"],
+            "description": "A new division\u0027s code, sent with string? CaseChanges.Court."
+          },
+          "status": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "A status move \u2014 a lifecycle event; a move off the lifecycle is a 409.",
+                "$ref": "#/components/schemas/CaseStatus"
+              }
+            ]
+          },
+          "effectiveOn": {
+            "type": ["null", "string"],
+            "description": "The court\u0027s date for a status move after filing (ADR 0027); today when absent. Only beside CaseStatus? CaseChanges.Status.",
+            "format": "date"
+          },
+          "exemptionSet": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "Form 106C line 1\u0027s election.",
+                "$ref": "#/components/schemas/ExemptionSet"
+              }
+            ]
+          },
+          "filedAt": {
+            "type": ["null", "string"],
+            "description": "The petition date; null clears it.",
+            "format": "date"
+          },
+          "meeting341At": {
+            "type": ["null", "string"],
+            "description": "The first \u00A7 341(a) meeting date; null clears it.",
+            "format": "date"
+          },
+          "caseNumber": {
+            "type": ["null", "string"],
+            "description": "The court\u0027s case number; null clears it."
+          },
+          "judge": {
+            "type": ["null", "string"],
+            "description": "The judge\u0027s name; null clears it."
+          },
+          "trustee": {
+            "type": ["null", "string"],
+            "description": "The trustee\u0027s name; null clears it."
+          },
+          "officeFileNumber": {
+            "type": ["null", "string"],
+            "description": "The firm\u0027s own file number; null clears it."
+          }
+        },
+        "description": "Editing a case (\u0060PATCH /v1/cases/{caseId}\u0060): only the keys sent\nchange, and a body with none is a 400. The petition date, the \u00A7 341 date\nand the four docket facts may be cleared \u2014 an explicit null, which\nbool CaseChanges.Names(string member) tells apart from a key not sent."
       },
       "CaseList": {
         "required": ["cases"],
@@ -14925,10 +14674,10 @@
         "description": "A client\u0027s cases that the caller may see, newest first."
       },
       "ClientCaseView": {
-        "required": ["filing_role", "case"],
+        "required": ["filingRole", "case"],
         "type": "object",
         "properties": {
-          "filing_role": {
+          "filingRole": {
             "description": "The client\u0027s role on the case.",
             "$ref": "#/components/schemas/FilingRole"
           },
@@ -15417,6 +15166,23 @@
       "ContractLeaseIntention": {
         "enum": ["assume", "reject", null]
       },
+      "ConversionRequest": {
+        "required": ["toChapter", "effectiveOn"],
+        "type": "object",
+        "properties": {
+          "toChapter": {
+            "type": "integer",
+            "description": "The chapter the court converted the case to: 7, 11, 12 or 13, and not the current one.",
+            "format": "int32"
+          },
+          "effectiveOn": {
+            "type": ["null", "string"],
+            "description": "The court\u0027s date, YYYY-MM-DD; no earlier than the petition or the previous court event.",
+            "format": "date"
+          }
+        },
+        "description": "Recording a conversion (\u0060POST /v1/cases/{caseId}/conversions\u0060)."
+      },
       "ConversionView": {
         "required": ["case", "event"],
         "type": "object",
@@ -15509,7 +15275,7 @@
         "description": "One bankruptcy court."
       },
       "CourthouseView": {
-        "required": ["name", "line1", "line2", "city", "state", "postal_code"],
+        "required": ["name", "line1", "line2", "city", "state", "postalCode"],
         "type": "object",
         "properties": {
           "name": {
@@ -15532,7 +15298,7 @@
             "type": "string",
             "description": "The state\u0027s two-letter code."
           },
-          "postal_code": {
+          "postalCode": {
             "type": "string",
             "description": "The ZIP code."
           }
@@ -15571,7 +15337,7 @@
           "status": {
             "$ref": "#/components/schemas/CounselingStatus"
           },
-          "exemption_reason": {
+          "exemptionReason": {
             "$ref": "#/components/schemas/CounselingExemption"
           }
         },
@@ -15670,95 +15436,21 @@
       "DebtorAttribution": {
         "enum": ["debtor_1", "debtor_2", "both", "at_least_one_plus_another", null]
       },
-      "DebtorList": {
-        "required": ["debtors"],
+      "DebtorBody": {
         "type": "object",
         "properties": {
-          "debtors": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/DebtorView"
-            },
-            "description": "The debtors."
-          }
-        },
-        "description": "A case\u0027s debtors, one per filing role."
-      },
-      "DebtorRequest": {
-        "type": "object",
-        "properties": {
-          "tax_id": {
-            "type": "object",
-            "properties": {
-              "kind": {
-                "enum": ["ssn", "itin"],
-                "description": "Which kind of taxpayer number (Python\u0027s \u0060TAX_ID_KINDS\u0060). The first digit decides it."
-              },
-              "value": {
-                "type": ["null", "string"]
-              },
-              "last_four": {
-                "type": ["null", "string"]
-              }
-            },
-            "description": "What a write carries after parsing. EXACTLY ONE of string? TaxIdInput.Value\n(the nine digits, freshly typed) and string? TaxIdInput.LastFour (the client\nechoing the view it was given: \u0022keep what is stored\u0022) is set."
+          "phone": {
+            "type": "string"
           },
-          "provenance": {
-            "type": "object",
-            "additionalProperties": {
-              "type": "object",
-              "properties": {
-                "source": {
-                  "enum": [
-                    "staff_typed",
-                    "ai_extracted",
-                    "imported",
-                    "library",
-                    "client",
-                    "client_answered"
-                  ],
-                  "description": "Who supplied a value. Order is Python\u0027s \u0060SOURCES\u0060 tuple \u2014 it is the\norder the \u0022Source must be one of \u2026\u0022 message lists them in."
-                },
-                "confirmed_by": {
-                  "type": ["null", "string"],
-                  "description": "The person who confirmed the value."
-                },
-                "confirmed_at": {
-                  "type": ["null", "string"],
-                  "description": "When they confirmed it \u2014 a UTC timestamp ending in \u0060Z\u0060."
-                },
-                "document_id": {
-                  "type": ["null", "string"],
-                  "description": "The document the value was read from."
-                },
-                "locator": {
-                  "type": "object"
-                },
-                "extraction_id": {
-                  "type": ["null", "string"],
-                  "description": "The extraction candidate the value was accepted from."
-                },
-                "confidence": {
-                  "type": ["null", "number"],
-                  "description": "The extractor\u0027s confidence, 0 to 1.",
-                  "format": "double"
-                },
-                "library_creditor_id": {
-                  "type": ["null", "string"],
-                  "description": "The library creditor a ProvenanceSource.Library value was copied from. Shape and type only \u2014 never validated against the store."
-                },
-                "client_id": {
-                  "type": ["null", "string"],
-                  "description": "The firm client a ProvenanceSource.Client value was copied from. Shape and type only."
-                },
-                "copied_from_case_id": {
-                  "type": ["null", "string"],
-                  "description": "The case this value was COPIED FROM (issue 14.3), orthogonal to ProvenanceSource ProvenanceEntry.Source."
-                }
-              },
-              "description": "Where one field\u0027s value came from. string? ProvenanceEntry.ConfirmedBy and\nstring? ProvenanceEntry.ConfirmedAt are one act \u2014 a human said \u0022yes, that is right\u0022\nat a moment \u2014 and exactly what accepting an extraction candidate writes."
-            },
-            "description": "Where each populated field came from, by body path."
+          "mobile": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "signedAt": {
+            "type": "string",
+            "format": "date"
           },
           "name": {
             "type": "object",
@@ -15778,7 +15470,7 @@
             },
             "description": "Four discrete parts, never one string \u2014 the IEPD has no single-string fallback for names."
           },
-          "other_names_used": {
+          "otherNamesUsed": {
             "type": "array",
             "items": {
               "type": "object",
@@ -15795,22 +15487,22 @@
                 "surname": {
                   "type": ["null", "string"]
                 },
-                "business_name": {
+                "businessName": {
                   "type": ["null", "string"]
                 }
               },
-              "description": "An 8-year-lookback alias. Carries its own client-chosen string OtherName.Id\nso provenance addresses it as \u0060other_names_used[\u0026lt;id\u0026gt;].surname\u0060\n\u2014 position would reattach on reorder."
+              "description": "An 8-year-lookback alias. Carries its own client-chosen string OtherName.Id\nso provenance addresses it as \u0060otherNamesUsed[\u0026lt;id\u0026gt;].surname\u0060\n\u2014 position would reattach on reorder. string? OtherName.BusinessName is\n\u0060businessName\u0060 under every serializer: the row sits in a debtor\u0027s\ncamelCase body and a firm client\u0027s snake_case one alike (ADR 0032)."
             },
-            "description": "An immutable list with VALUE equality \u2014 the C# shape of a Python tuple on\na frozen dataclass. A record holding a plain array or \u0060List\u0060 compares\nit by reference, so two records describing the same client would be\nunequal; the stores\u0027 \u0022round-trips\u0022 and \u0022unchanged since\u0022 checks need\nequality by contents."
+            "description": "The 8-year aliases, each addressed by its id."
           },
-          "employer_ids": {
+          "employerIds": {
             "type": "array",
             "items": {
               "type": "string"
             },
-            "description": "An immutable list with VALUE equality \u2014 the C# shape of a Python tuple on\na frozen dataclass. A record holding a plain array or \u0060List\u0060 compares\nit by reference, so two records describing the same client would be\nunequal; the stores\u0027 \u0022round-trips\u0022 and \u0022unchanged since\u0022 checks need\nequality by contents."
+            "description": "Employer identification numbers."
           },
-          "residence_address": {
+          "residenceAddress": {
             "type": "object",
             "properties": {
               "line1": {
@@ -15837,7 +15529,7 @@
             },
             "description": "Structured parts AND a raw fallback (the IEPD\u0027s free-text form, for a\ncreditor block that will not parse). string? Address.County is B101 line 5\u0027s box.\nstring? Address.PostalCode is \u0060postalCode\u0060 under every serializer, the\nsnake_case ones included: an address sits in a case collection\u0027s camelCase\nbody and in a debtor\u0027s, a firm\u0027s and a client\u0027s snake_case one alike (ADR 0032)."
           },
-          "mailing_address": {
+          "mailingAddress": {
             "type": "object",
             "properties": {
               "line1": {
@@ -15863,15 +15555,6 @@
               }
             },
             "description": "Structured parts AND a raw fallback (the IEPD\u0027s free-text form, for a\ncreditor block that will not parse). string? Address.County is B101 line 5\u0027s box.\nstring? Address.PostalCode is \u0060postalCode\u0060 under every serializer, the\nsnake_case ones included: an address sits in a case collection\u0027s camelCase\nbody and in a debtor\u0027s, a firm\u0027s and a client\u0027s snake_case one alike (ADR 0032)."
-          },
-          "phone": {
-            "type": "string"
-          },
-          "mobile": {
-            "type": "string"
-          },
-          "email": {
-            "type": "string"
           },
           "venue": {
             "type": "object",
@@ -15885,7 +15568,7 @@
             },
             "description": "B101 line 6."
           },
-          "credit_counseling": {
+          "creditCounseling": {
             "type": "object",
             "properties": {
               "status": {
@@ -15897,52 +15580,105 @@
                   null
                 ]
               },
-              "exemption_reason": {
+              "exemptionReason": {
                 "enum": ["incapacity", "disability", "active_duty", null]
               }
             },
             "description": "B101 line 15."
-          },
-          "signed_at": {
-            "type": "string",
-            "format": "date"
           }
         },
-        "description": "A debtor as written (\u0060PUT \u2026/debtors/{filingRole}\u0060): the whole body,\neach unanswered field absent. Parsed by \u0060DebtorRules.Parse\u0060, which\nowns validation; this record is its shape for the OpenAPI document."
+        "description": "A debtor\u0027s case data \u2014 what provenance paths address and what is stored,\ncamelCase with its unanswered members left out (ADR 0032). Identity,\nprovenance, the tax id and the client link are NOT here: the server set\nthem, nobody sent them."
+      },
+      "DebtorDraft": {
+        "type": "object",
+        "properties": {
+          "taxId": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The number being entered (\u0060value\u0060), or the last four being kept (\u0060lastFour\u0060); absent removes it.",
+                "$ref": "#/components/schemas/TaxIdInput"
+              }
+            ]
+          },
+          "body": {
+            "description": "The case data.",
+            "$ref": "#/components/schemas/DebtorBody"
+          },
+          "provenance": {
+            "type": ["null", "object"],
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ProvenanceEntry"
+            },
+            "description": "Where each populated field came from."
+          }
+        },
+        "description": "A debtor as written (\u0060PUT \u2026/debtors/{filingRole}\u0060): the body, the\ntax id being entered or kept, and where each populated field came from.\nTaxIdInput? DebtorDraft.TaxId holds the digits only between the request and\nTask\u0026lt;TaxIdRef?\u0026gt; TaxIdRules.StoreAsync(TaxIdInput? given, TaxIdRef? existing, string firmId, string caseId, ITaxIdCipher cipher, ITaxIdStore store, TimeProvider? clock = null, CancellationToken cancellationToken = default(CancellationToken))."
+      },
+      "DebtorLinkRequest": {
+        "required": ["clientId"],
+        "type": "object",
+        "properties": {
+          "clientId": {
+            "type": ["null", "string"],
+            "description": "The client, in the case\u0027s firm."
+          }
+        },
+        "description": "Which firm client a debtor is (\u0060PUT \u2026/debtors/{filingRole}/client\u0060)."
+      },
+      "DebtorList": {
+        "required": ["debtors"],
+        "type": "object",
+        "properties": {
+          "debtors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DebtorView"
+            },
+            "description": "The debtors."
+          }
+        },
+        "description": "A case\u0027s debtors, one per filing role."
       },
       "DebtorView": {
-        "required": ["id", "case_id", "filing_role", "created_at", "updated_at", "provenance"],
+        "required": ["id", "caseId", "filingRole", "createdAt", "updatedAt", "body", "provenance"],
         "type": "object",
         "properties": {
           "id": {
             "type": "string",
             "description": "The debtor\u0027s id, stable across saves."
           },
-          "case_id": {
+          "caseId": {
             "type": "string",
             "description": "The case."
           },
-          "filing_role": {
+          "filingRole": {
             "description": "Which debtor on the petition.",
             "$ref": "#/components/schemas/FilingRole"
           },
-          "created_at": {
+          "createdAt": {
             "type": "string",
             "description": "First saved, ISO 8601 UTC."
           },
-          "updated_at": {
+          "updatedAt": {
             "type": "string",
             "description": "Last saved, ISO 8601 UTC."
           },
-          "tax_id": {
+          "body": {
+            "description": "The case data; its unanswered fields are absent.",
+            "$ref": "#/components/schemas/DebtorBody"
+          },
+          "taxId": {
             "description": "The tax id\u0027s kind and last four; absent when none is stored.",
             "$ref": "#/components/schemas/TaxIdView"
           },
-          "client_id": {
+          "clientId": {
             "type": "string",
             "description": "The firm client this debtor was copied from; absent when unlinked."
           },
-          "differs_from_client": {
+          "differsFromClient": {
             "type": "array",
             "items": {
               "type": "string"
@@ -15955,43 +15691,9 @@
               "$ref": "#/components/schemas/ProvenanceEntry"
             },
             "description": "Where each populated field came from, by body path."
-          },
-          "name": {
-            "$ref": "#/components/schemas/PersonName"
-          },
-          "other_names_used": {
-            "$ref": "#/components/schemas/ValueCollectionOfOtherName"
-          },
-          "employer_ids": {
-            "$ref": "#/components/schemas/ValueCollectionOfstring"
-          },
-          "residence_address": {
-            "$ref": "#/components/schemas/Address"
-          },
-          "mailing_address": {
-            "$ref": "#/components/schemas/Address"
-          },
-          "phone": {
-            "type": "string"
-          },
-          "mobile": {
-            "type": "string"
-          },
-          "email": {
-            "type": "string"
-          },
-          "venue": {
-            "$ref": "#/components/schemas/Venue"
-          },
-          "credit_counseling": {
-            "$ref": "#/components/schemas/CreditCounseling"
-          },
-          "signed_at": {
-            "type": "string",
-            "format": "date"
           }
         },
-        "description": "A debtor as staff read it: the stored body at the top level, beside the\nserver\u0027s own fields. The tax id leaves as its kind and last four only."
+        "description": "A debtor as staff read it: the server\u0027s own fields, and the stored body\nunder \u0060body\u0060. The tax id leaves as its kind and last four only."
       },
       "DeductionCategory": {
         "enum": [
@@ -16408,14 +16110,14 @@
         "type": "object",
         "properties": {
           "provenance": {
-            "type": "object",
+            "type": ["null", "object"],
             "additionalProperties": {
               "$ref": "#/components/schemas/ProvenanceEntry"
             },
             "description": "Where each populated field came from, by body path; every populated field needs an entry."
           },
           "amended": {
-            "type": "boolean",
+            "type": ["null", "boolean"],
             "description": "Whether this record amends a filed one \u2014 only once the case is filed. A PUT that omits it keeps the stored value."
           },
           "body": {
@@ -16429,14 +16131,14 @@
         "type": "object",
         "properties": {
           "provenance": {
-            "type": "object",
+            "type": ["null", "object"],
             "additionalProperties": {
               "$ref": "#/components/schemas/ProvenanceEntry"
             },
             "description": "Where each populated field came from, by body path; every populated field needs an entry."
           },
           "amended": {
-            "type": "boolean",
+            "type": ["null", "boolean"],
             "description": "Whether this record amends a filed one \u2014 only once the case is filed. A PUT that omits it keeps the stored value."
           },
           "body": {
@@ -16450,14 +16152,14 @@
         "type": "object",
         "properties": {
           "provenance": {
-            "type": "object",
+            "type": ["null", "object"],
             "additionalProperties": {
               "$ref": "#/components/schemas/ProvenanceEntry"
             },
             "description": "Where each populated field came from, by body path; every populated field needs an entry."
           },
           "amended": {
-            "type": "boolean",
+            "type": ["null", "boolean"],
             "description": "Whether this record amends a filed one \u2014 only once the case is filed. A PUT that omits it keeps the stored value."
           },
           "body": {
@@ -16471,14 +16173,14 @@
         "type": "object",
         "properties": {
           "provenance": {
-            "type": "object",
+            "type": ["null", "object"],
             "additionalProperties": {
               "$ref": "#/components/schemas/ProvenanceEntry"
             },
             "description": "Where each populated field came from, by body path; every populated field needs an entry."
           },
           "amended": {
-            "type": "boolean",
+            "type": ["null", "boolean"],
             "description": "Whether this record amends a filed one \u2014 only once the case is filed. A PUT that omits it keeps the stored value."
           },
           "body": {
@@ -16492,14 +16194,14 @@
         "type": "object",
         "properties": {
           "provenance": {
-            "type": "object",
+            "type": ["null", "object"],
             "additionalProperties": {
               "$ref": "#/components/schemas/ProvenanceEntry"
             },
             "description": "Where each populated field came from, by body path; every populated field needs an entry."
           },
           "amended": {
-            "type": "boolean",
+            "type": ["null", "boolean"],
             "description": "Whether this record amends a filed one \u2014 only once the case is filed. A PUT that omits it keeps the stored value."
           },
           "body": {
@@ -16513,14 +16215,14 @@
         "type": "object",
         "properties": {
           "provenance": {
-            "type": "object",
+            "type": ["null", "object"],
             "additionalProperties": {
               "$ref": "#/components/schemas/ProvenanceEntry"
             },
             "description": "Where each populated field came from, by body path; every populated field needs an entry."
           },
           "amended": {
-            "type": "boolean",
+            "type": ["null", "boolean"],
             "description": "Whether this record amends a filed one \u2014 only once the case is filed. A PUT that omits it keeps the stored value."
           },
           "body": {
@@ -16534,14 +16236,14 @@
         "type": "object",
         "properties": {
           "provenance": {
-            "type": "object",
+            "type": ["null", "object"],
             "additionalProperties": {
               "$ref": "#/components/schemas/ProvenanceEntry"
             },
             "description": "Where each populated field came from, by body path; every populated field needs an entry."
           },
           "amended": {
-            "type": "boolean",
+            "type": ["null", "boolean"],
             "description": "Whether this record amends a filed one \u2014 only once the case is filed. A PUT that omits it keeps the stored value."
           },
           "body": {
@@ -16555,14 +16257,14 @@
         "type": "object",
         "properties": {
           "provenance": {
-            "type": "object",
+            "type": ["null", "object"],
             "additionalProperties": {
               "$ref": "#/components/schemas/ProvenanceEntry"
             },
             "description": "Where each populated field came from, by body path; every populated field needs an entry."
           },
           "amended": {
-            "type": "boolean",
+            "type": ["null", "boolean"],
             "description": "Whether this record amends a filed one \u2014 only once the case is filed. A PUT that omits it keeps the stored value."
           },
           "body": {
@@ -16576,14 +16278,14 @@
         "type": "object",
         "properties": {
           "provenance": {
-            "type": "object",
+            "type": ["null", "object"],
             "additionalProperties": {
               "$ref": "#/components/schemas/ProvenanceEntry"
             },
             "description": "Where each populated field came from, by body path; every populated field needs an entry."
           },
           "amended": {
-            "type": "boolean",
+            "type": ["null", "boolean"],
             "description": "Whether this record amends a filed one \u2014 only once the case is filed. A PUT that omits it keeps the stored value."
           },
           "body": {
@@ -16597,14 +16299,14 @@
         "type": "object",
         "properties": {
           "provenance": {
-            "type": "object",
+            "type": ["null", "object"],
             "additionalProperties": {
               "$ref": "#/components/schemas/ProvenanceEntry"
             },
             "description": "Where each populated field came from, by body path; every populated field needs an entry."
           },
           "amended": {
-            "type": "boolean",
+            "type": ["null", "boolean"],
             "description": "Whether this record amends a filed one \u2014 only once the case is filed. A PUT that omits it keeps the stored value."
           },
           "body": {
@@ -16618,14 +16320,14 @@
         "type": "object",
         "properties": {
           "provenance": {
-            "type": "object",
+            "type": ["null", "object"],
             "additionalProperties": {
               "$ref": "#/components/schemas/ProvenanceEntry"
             },
             "description": "Where each populated field came from, by body path; every populated field needs an entry."
           },
           "amended": {
-            "type": "boolean",
+            "type": ["null", "boolean"],
             "description": "Whether this record amends a filed one \u2014 only once the case is filed. A PUT that omits it keeps the stored value."
           },
           "body": {
@@ -16639,14 +16341,14 @@
         "type": "object",
         "properties": {
           "provenance": {
-            "type": "object",
+            "type": ["null", "object"],
             "additionalProperties": {
               "$ref": "#/components/schemas/ProvenanceEntry"
             },
             "description": "Where each populated field came from, by body path; every populated field needs an entry."
           },
           "amended": {
-            "type": "boolean",
+            "type": ["null", "boolean"],
             "description": "Whether this record amends a filed one \u2014 only once the case is filed. A PUT that omits it keeps the stored value."
           },
           "body": {
@@ -16660,14 +16362,14 @@
         "type": "object",
         "properties": {
           "provenance": {
-            "type": "object",
+            "type": ["null", "object"],
             "additionalProperties": {
               "$ref": "#/components/schemas/ProvenanceEntry"
             },
             "description": "Where each populated field came from, by body path; every populated field needs an entry."
           },
           "amended": {
-            "type": "boolean",
+            "type": ["null", "boolean"],
             "description": "Whether this record amends a filed one \u2014 only once the case is filed. A PUT that omits it keeps the stored value."
           },
           "body": {
@@ -16681,14 +16383,14 @@
         "type": "object",
         "properties": {
           "provenance": {
-            "type": "object",
+            "type": ["null", "object"],
             "additionalProperties": {
               "$ref": "#/components/schemas/ProvenanceEntry"
             },
             "description": "Where each populated field came from, by body path; every populated field needs an entry."
           },
           "amended": {
-            "type": "boolean",
+            "type": ["null", "boolean"],
             "description": "Whether this record amends a filed one \u2014 only once the case is filed. A PUT that omits it keeps the stored value."
           },
           "body": {
@@ -16702,14 +16404,14 @@
         "type": "object",
         "properties": {
           "provenance": {
-            "type": "object",
+            "type": ["null", "object"],
             "additionalProperties": {
               "$ref": "#/components/schemas/ProvenanceEntry"
             },
             "description": "Where each populated field came from, by body path; every populated field needs an entry."
           },
           "amended": {
-            "type": "boolean",
+            "type": ["null", "boolean"],
             "description": "Whether this record amends a filed one \u2014 only once the case is filed. A PUT that omits it keeps the stored value."
           },
           "body": {
@@ -16723,14 +16425,14 @@
         "type": "object",
         "properties": {
           "provenance": {
-            "type": "object",
+            "type": ["null", "object"],
             "additionalProperties": {
               "$ref": "#/components/schemas/ProvenanceEntry"
             },
             "description": "Where each populated field came from, by body path; every populated field needs an entry."
           },
           "amended": {
-            "type": "boolean",
+            "type": ["null", "boolean"],
             "description": "Whether this record amends a filed one \u2014 only once the case is filed. A PUT that omits it keeps the stored value."
           },
           "body": {
@@ -16744,14 +16446,14 @@
         "type": "object",
         "properties": {
           "provenance": {
-            "type": "object",
+            "type": ["null", "object"],
             "additionalProperties": {
               "$ref": "#/components/schemas/ProvenanceEntry"
             },
             "description": "Where each populated field came from, by body path; every populated field needs an entry."
           },
           "amended": {
-            "type": "boolean",
+            "type": ["null", "boolean"],
             "description": "Whether this record amends a filed one \u2014 only once the case is filed. A PUT that omits it keeps the stored value."
           },
           "body": {
@@ -16765,14 +16467,14 @@
         "type": "object",
         "properties": {
           "provenance": {
-            "type": "object",
+            "type": ["null", "object"],
             "additionalProperties": {
               "$ref": "#/components/schemas/ProvenanceEntry"
             },
             "description": "Where each populated field came from, by body path; every populated field needs an entry."
           },
           "amended": {
-            "type": "boolean",
+            "type": ["null", "boolean"],
             "description": "Whether this record amends a filed one \u2014 only once the case is filed. A PUT that omits it keeps the stored value."
           },
           "body": {
@@ -16786,14 +16488,14 @@
         "type": "object",
         "properties": {
           "provenance": {
-            "type": "object",
+            "type": ["null", "object"],
             "additionalProperties": {
               "$ref": "#/components/schemas/ProvenanceEntry"
             },
             "description": "Where each populated field came from, by body path; every populated field needs an entry."
           },
           "amended": {
-            "type": "boolean",
+            "type": ["null", "boolean"],
             "description": "Whether this record amends a filed one \u2014 only once the case is filed. A PUT that omits it keeps the stored value."
           },
           "body": {
@@ -16807,14 +16509,14 @@
         "type": "object",
         "properties": {
           "provenance": {
-            "type": "object",
+            "type": ["null", "object"],
             "additionalProperties": {
               "$ref": "#/components/schemas/ProvenanceEntry"
             },
             "description": "Where each populated field came from, by body path; every populated field needs an entry."
           },
           "amended": {
-            "type": "boolean",
+            "type": ["null", "boolean"],
             "description": "Whether this record amends a filed one \u2014 only once the case is filed. A PUT that omits it keeps the stored value."
           },
           "body": {
@@ -16828,14 +16530,14 @@
         "type": "object",
         "properties": {
           "provenance": {
-            "type": "object",
+            "type": ["null", "object"],
             "additionalProperties": {
               "$ref": "#/components/schemas/ProvenanceEntry"
             },
             "description": "Where each populated field came from, by body path; every populated field needs an entry."
           },
           "amended": {
-            "type": "boolean",
+            "type": ["null", "boolean"],
             "description": "Whether this record amends a filed one \u2014 only once the case is filed. A PUT that omits it keeps the stored value."
           },
           "body": {
@@ -16849,14 +16551,14 @@
         "type": "object",
         "properties": {
           "provenance": {
-            "type": "object",
+            "type": ["null", "object"],
             "additionalProperties": {
               "$ref": "#/components/schemas/ProvenanceEntry"
             },
             "description": "Where each populated field came from, by body path; every populated field needs an entry."
           },
           "amended": {
-            "type": "boolean",
+            "type": ["null", "boolean"],
             "description": "Whether this record amends a filed one \u2014 only once the case is filed. A PUT that omits it keeps the stored value."
           },
           "body": {
@@ -20710,6 +20412,34 @@
         },
         "description": "The IRS National Standards."
       },
+      "NewCase": {
+        "type": "object",
+        "properties": {
+          "chapter": {
+            "type": "integer",
+            "description": "7, 11, 12 or 13.",
+            "format": "int32"
+          },
+          "court": {
+            "type": ["null", "string"],
+            "description": "The court\u0027s CM/ECF code, from \u0060GET /v1/courts\u0060."
+          },
+          "division": {
+            "type": ["null", "string"],
+            "description": "The court division\u0027s code."
+          },
+          "clientIds": {
+            "maxItems": 2,
+            "minItems": 1,
+            "type": ["null", "array"],
+            "items": {
+              "type": "string"
+            },
+            "description": "The firm clients it is opened for: Debtor 1, then Debtor 2 for a joint case."
+          }
+        },
+        "description": "Opening a case (\u0060POST /v1/cases\u0060). Every case starts at intake.\nWhether each client is this firm\u0027s is the route\u0027s question."
+      },
       "NonpriorityType": {
         "enum": [
           "student_loan",
@@ -20755,11 +20485,11 @@
         "type": "object",
         "properties": {
           "text": {
-            "type": "string",
+            "type": ["null", "string"],
             "description": "The note, one line of at most 2000 characters."
           },
           "formSeries": {
-            "type": "string",
+            "type": ["null", "string"],
             "description": "The form series the note is about, e.g. \u0060form/b106ab\u0060."
           }
         },
@@ -20913,11 +20643,11 @@
           "surname": {
             "type": "string"
           },
-          "business_name": {
+          "businessName": {
             "type": "string"
           }
         },
-        "description": "An 8-year-lookback alias. Carries its own client-chosen string OtherName.Id\nso provenance addresses it as \u0060other_names_used[\u0026lt;id\u0026gt;].surname\u0060\n\u2014 position would reattach on reorder."
+        "description": "An 8-year-lookback alias. Carries its own client-chosen string OtherName.Id\nso provenance addresses it as \u0060otherNamesUsed[\u0026lt;id\u0026gt;].surname\u0060\n\u2014 position would reattach on reorder. string? OtherName.BusinessName is\n\u0060businessName\u0060 under every serializer: the row sits in a debtor\u0027s\ncamelCase body and a firm client\u0027s snake_case one alike (ADR 0032)."
       },
       "OtherSecuredPayment": {
         "type": "object",
@@ -23283,19 +23013,37 @@
         },
         "description": "A case task, with whether it is overdue judged against one UTC day for the whole response."
       },
+      "TaxIdInput": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "description": "SSN or ITIN \u2014 the number must be that kind.",
+            "$ref": "#/components/schemas/TaxIdKind"
+          },
+          "value": {
+            "type": "string",
+            "description": "The number being entered."
+          },
+          "lastFour": {
+            "type": "string",
+            "description": "The last four being kept."
+          }
+        },
+        "description": "What a write carries. EXACTLY ONE of string? TaxIdInput.Value (nine digits,\nfreshly typed, dashes allowed) and string? TaxIdInput.LastFour (the client\nechoing the view it was given: \u0022keep what is stored\u0022) is set."
+      },
       "TaxIdKind": {
         "enum": ["ssn", "itin"],
         "description": "Which kind of taxpayer number (Python\u0027s \u0060TAX_ID_KINDS\u0060). The first digit decides it."
       },
       "TaxIdView": {
-        "required": ["kind", "last_four"],
+        "required": ["kind", "lastFour"],
         "type": "object",
         "properties": {
           "kind": {
             "description": "SSN or ITIN.",
             "$ref": "#/components/schemas/TaxIdKind"
           },
-          "last_four": {
+          "lastFour": {
             "type": "string",
             "description": "The last four digits."
           }
@@ -23451,20 +23199,6 @@
           }
         },
         "description": "A firm member\u0027s whole record (\u0060firm_user_json\u0060), for the firm\u0027s\nadministrators. \u0060permissions\u0060 is the STORED map, not the effective one."
-      },
-      "ValueCollectionOfOtherName": {
-        "type": "array",
-        "items": {
-          "$ref": "#/components/schemas/OtherName"
-        },
-        "description": "An immutable list with VALUE equality \u2014 the C# shape of a Python tuple on\na frozen dataclass. A record holding a plain array or \u0060List\u0060 compares\nit by reference, so two records describing the same client would be\nunequal; the stores\u0027 \u0022round-trips\u0022 and \u0022unchanged since\u0022 checks need\nequality by contents."
-      },
-      "ValueCollectionOfstring": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "description": "An immutable list with VALUE equality \u2014 the C# shape of a Python tuple on\na frozen dataclass. A record holding a plain array or \u0060List\u0060 compares\nit by reference, so two records describing the same client would be\nunequal; the stores\u0027 \u0022round-trips\u0022 and \u0022unchanged since\u0022 checks need\nequality by contents."
       },
       "Venue": {
         "type": "object",

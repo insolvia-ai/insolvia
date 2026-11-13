@@ -416,7 +416,7 @@ describe('the exemptions panel', () => {
 
     await waitFor(() =>
       expect(lastBody(fetchMock, 'PATCH', `/v1/cases/${CASE_ID}`)).toEqual({
-        exemption_set: 'federal',
+        exemptionSet: 'federal',
       }),
     );
     // The table is now the federal list, read back from the server.

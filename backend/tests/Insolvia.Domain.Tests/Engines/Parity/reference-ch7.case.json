@@ -478,60 +478,49 @@
  "debtors": [
   {
    "body": {
-    "credit_counseling": {
-     "exemption_reason": null,
+    "creditCounseling": {
      "status": "completed_with_certificate"
     },
     "email": "ada@example.com",
-    "employer_ids": [
+    "employerIds": [
      "12-3456789"
     ],
-    "mailing_address": {
+    "mailingAddress": {
      "city": "Tampa",
-     "county": null,
      "line1": "4501 Postal Way",
      "line2": "PO Box 99",
      "postalCode": "33602",
-     "raw": null,
      "state": "FL"
     },
     "mobile": "(813) 555-0102",
     "name": {
      "given": "Ada",
      "middle": "Quinn",
-     "suffix": null,
      "surname": "Lovelace"
     },
-    "other_names_used": [
+    "otherNamesUsed": [
      {
-      "business_name": null,
       "given": "Ada",
       "id": "alias-1",
-      "middle": null,
       "surname": "Byron"
      },
      {
-      "business_name": "Ada's Analytical Engines",
-      "given": null,
-      "id": "alias-2",
-      "middle": null,
-      "surname": null
+      "businessName": "Ada's Analytical Engines",
+      "id": "alias-2"
      }
     ],
     "phone": "(813) 555-0101",
-    "residence_address": {
+    "residenceAddress": {
      "city": "Tampa",
      "county": "Hillsborough",
      "line1": "12 Byron Court",
      "line2": "Apt 4",
      "postalCode": "33601",
-     "raw": null,
      "state": "FL"
     },
-    "signed_at": "2026-08-30",
+    "signedAt": "2026-08-30",
     "venue": {
-     "basis": "lived_longest_180_days",
-     "explanation": null
+     "basis": "lived_longest_180_days"
     }
    },
    "created_at": "2026-08-01T12:00:00Z",
@@ -546,40 +535,24 @@
   },
   {
    "body": {
-    "credit_counseling": {
-     "exemption_reason": "disability",
+    "creditCounseling": {
+     "exemptionReason": "disability",
      "status": "not_required"
     },
-    "email": null,
-    "employer_ids": [],
-    "mailing_address": {
-     "city": null,
-     "county": null,
-     "line1": null,
-     "line2": null,
-     "postalCode": null,
-     "raw": null,
-     "state": null
-    },
-    "mobile": null,
     "name": {
      "given": "Ben",
-     "middle": null,
      "suffix": "Jr.",
      "surname": "Lovelace"
     },
-    "other_names_used": [],
-    "phone": null,
-    "residence_address": {
+    "residenceAddress": {
      "city": "Tampa",
      "county": "Hillsborough",
      "line1": "12 Byron Court",
      "line2": "Apt 4",
      "postalCode": "33601",
-     "raw": null,
      "state": "FL"
     },
-    "signed_at": "2026-08-30",
+    "signedAt": "2026-08-30",
     "venue": {
      "basis": "other",
      "explanation": "Moved from Georgia in July; the greater part of the last 180 days was spent in this district."

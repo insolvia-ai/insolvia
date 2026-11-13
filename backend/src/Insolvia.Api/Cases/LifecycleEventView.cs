@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 using Insolvia.Domain.Cases;
 
@@ -101,9 +102,10 @@ public sealed record StatusHistory(IReadOnlyList<StatusChangeView> History);
 public sealed record ConversionView(CaseView Case, LifecycleEventView Event);
 
 /// <summary>
-/// Recording a conversion (<c>POST /v1/cases/{caseId}/conversions</c>). Its
-/// field errors are keyed <c>to_chapter</c> and <c>effective_on</c>.
+/// Recording a conversion (<c>POST /v1/cases/{caseId}/conversions</c>).
 /// </summary>
 /// <param name="ToChapter">The chapter the court converted the case to: 7, 11, 12 or 13, and not the current one.</param>
 /// <param name="EffectiveOn">The court's date, YYYY-MM-DD; no earlier than the petition or the previous court event.</param>
-public sealed record ConversionRequest(int ToChapter, string EffectiveOn);
+public sealed record ConversionRequest(
+    [property: AllowedValues(7, 11, 12, 13, ErrorMessage = CaseRules.ChapterMessage)] int ToChapter,
+    [property: Required] DateOnly? EffectiveOn);

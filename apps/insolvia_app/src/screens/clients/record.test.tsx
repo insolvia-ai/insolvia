@@ -44,7 +44,7 @@ function record(
   return (url, init) => {
     if (url.endsWith('/cases')) {
       return jsonResponse(200, {
-        cases: overrides.cases ?? [{ filing_role: 'debtor_2', case: JOINT }],
+        cases: overrides.cases ?? [{ filingRole: 'debtor_2', case: JOINT }],
       });
     }
     if (url.endsWith('/prospect-stage') && init?.method === 'PUT') {

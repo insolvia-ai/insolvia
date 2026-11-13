@@ -17,7 +17,7 @@ namespace Insolvia.Api.Tests.Routes;
 /// </summary>
 public sealed class CaseLifecycleRouteTests : IAsyncLifetime, IDisposable
 {
-    private const string Filing = """ "status": "filed", "filed_at": "2026-09-01", "case_number": "8:26-bk-01234" """;
+    private const string Filing = """ "status": "filed", "filedAt": "2026-09-01", "caseNumber": "8:26-bk-01234" """;
 
     private readonly CaseWorld _world = new();
 
@@ -35,7 +35,7 @@ public sealed class CaseLifecycleRouteTests : IAsyncLifetime, IDisposable
         var caseId = await _world.OpenCaseIdAsync();
         Assert.Equal(200, (await _world.Patch($"/v1/cases/{caseId}", """{"status": "ready_to_file"}""")).Status);
 
-        var filed = await _world.Patch($"/v1/cases/{caseId}", "{" + Filing + """, "meeting_341_at": "2026-10-05", "judge": "Hon. Example Judge", "trustee": "Example Trustee", "office_file_number": "F-1001"}""");
+        var filed = await _world.Patch($"/v1/cases/{caseId}", "{" + Filing + """, "meeting341At": "2026-10-05", "judge": "Hon. Example Judge", "trustee": "Example Trustee", "officeFileNumber": "F-1001"}""");
 
         Assert.Equal(200, filed.Status);
         Assert.Equal("filed", filed.Str("status"));
@@ -53,10 +53,10 @@ public sealed class CaseLifecycleRouteTests : IAsyncLifetime, IDisposable
     {
         var caseId = await _world.OpenCaseIdAsync();
 
-        var answer = await _world.Patch($"/v1/cases/{caseId}", """{"status": "filed", "filed_at": "2026-09-01"}""");
+        var answer = await _world.Patch($"/v1/cases/{caseId}", """{"status": "filed", "filedAt": "2026-09-01"}""");
 
         Assert.Equal(400, answer.Status);
-        Assert.Equal(["case_number"], answer.FieldErrors);
+        Assert.Equal(["caseNumber"], answer.FieldErrors);
     }
 
     [Fact]
@@ -86,7 +86,7 @@ public sealed class CaseLifecycleRouteTests : IAsyncLifetime, IDisposable
         var caseId = await _world.OpenCaseIdAsync(chapter: 13);
         await _world.Patch($"/v1/cases/{caseId}", """{"status": "ready_to_file"}""");
         await _world.Patch($"/v1/cases/{caseId}", "{" + Filing + "}");
-        Assert.Equal(200, (await _world.Patch($"/v1/cases/{caseId}", """{"status": "dismissed", "effective_on": "2026-11-20"}""")).Status);
+        Assert.Equal(200, (await _world.Patch($"/v1/cases/{caseId}", """{"status": "dismissed", "effectiveOn": "2026-11-20"}""")).Status);
 
         var answer = await _world.Get($"/v1/cases/{caseId}/lifecycle");
 
@@ -106,11 +106,11 @@ public sealed class CaseLifecycleRouteTests : IAsyncLifetime, IDisposable
     {
         var caseId = await _world.OpenCaseIdAsync();
 
-        Assert.Equal(["effective_on"], (await _world.Patch($"/v1/cases/{caseId}", """{"judge": "X", "effective_on": "2026-09-01"}""")).FieldErrors);
-        Assert.Equal(["effective_on"], (await _world.Patch($"/v1/cases/{caseId}", """{"status": "ready_to_file", "effective_on": "2026-09-01"}""")).FieldErrors);
+        Assert.Equal(["effectiveOn"], (await _world.Patch($"/v1/cases/{caseId}", """{"judge": "X", "effectiveOn": "2026-09-01"}""")).FieldErrors);
+        Assert.Equal(["effectiveOn"], (await _world.Patch($"/v1/cases/{caseId}", """{"status": "ready_to_file", "effectiveOn": "2026-09-01"}""")).FieldErrors);
 
         await _world.Patch($"/v1/cases/{caseId}", "{" + Filing + "}");
-        Assert.Equal(["effective_on"], (await _world.Patch($"/v1/cases/{caseId}", """{"status": "dismissed", "effective_on": "2026-08-01"}""")).FieldErrors);
+        Assert.Equal(["effectiveOn"], (await _world.Patch($"/v1/cases/{caseId}", """{"status": "dismissed", "effectiveOn": "2026-08-01"}""")).FieldErrors);
         Assert.Equal("filed", (await _world.StoredAsync(caseId))!.Status.ToWire());
     }
 
@@ -141,11 +141,11 @@ public sealed class CaseLifecycleRouteTests : IAsyncLifetime, IDisposable
         var caseId = await _world.OpenCaseIdAsync();
         await _world.Patch($"/v1/cases/{caseId}", "{" + Filing + "}");
 
-        var corrected = await _world.Patch($"/v1/cases/{caseId}", """{"filed_at": "2026-09-02"}""");
+        var corrected = await _world.Patch($"/v1/cases/{caseId}", """{"filedAt": "2026-09-02"}""");
 
         Assert.Equal(200, corrected.Status);
         Assert.Equal("2026-09-02", corrected.Str("filedAt"));
-        Assert.Equal(400, (await _world.Patch($"/v1/cases/{caseId}", """{"filed_at": null}""")).Status);
+        Assert.Equal(400, (await _world.Patch($"/v1/cases/{caseId}", """{"filedAt": null}""")).Status);
     }
 
     // ── ADR 0027: conversions ───────────────────────────────────────
@@ -184,12 +184,12 @@ public sealed class CaseLifecycleRouteTests : IAsyncLifetime, IDisposable
     }
 
     [Theory]
-    [InlineData("""{"toChapter": 7, "effectiveOn": "2026-12-01"}""", "to_chapter")]
-    [InlineData("""{"toChapter": 9, "effectiveOn": "2026-12-01"}""", "to_chapter")]
-    [InlineData("""{"toChapter": "13", "effectiveOn": "2026-12-01"}""", "to_chapter")]
-    [InlineData("""{"toChapter": 13}""", "effective_on")]
-    [InlineData("""{"toChapter": 13, "effectiveOn": "12/01/2026"}""", "effective_on")]
-    [InlineData("""{"toChapter": 13, "effectiveOn": "2026-08-31"}""", "effective_on")]
+    [InlineData("""{"toChapter": 7, "effectiveOn": "2026-12-01"}""", "toChapter")]
+    [InlineData("""{"toChapter": 9, "effectiveOn": "2026-12-01"}""", "toChapter")]
+    [InlineData("""{"toChapter": "13", "effectiveOn": "2026-12-01"}""", "toChapter")]
+    [InlineData("""{"toChapter": 13}""", "effectiveOn")]
+    [InlineData("""{"toChapter": 13, "effectiveOn": "12/01/2026"}""", "effectiveOn")]
+    [InlineData("""{"toChapter": 13, "effectiveOn": "2026-08-31"}""", "effectiveOn")]
     public async Task A_conversion_is_checked_naming_the_field(string body, string field)
     {
         var caseId = await _world.OpenCaseIdAsync(chapter: 7);
@@ -210,7 +210,7 @@ public sealed class CaseLifecycleRouteTests : IAsyncLifetime, IDisposable
 
         Assert.Equal(409, (await _world.Post($"/v1/cases/{caseId}/conversions", body)).Status);
         await _world.Patch($"/v1/cases/{caseId}", "{" + Filing + "}");
-        await _world.Patch($"/v1/cases/{caseId}", """{"status": "dismissed", "effective_on": "2026-11-01"}""");
+        await _world.Patch($"/v1/cases/{caseId}", """{"status": "dismissed", "effectiveOn": "2026-11-01"}""");
         Assert.Equal(409, (await _world.Post($"/v1/cases/{caseId}/conversions", body)).Status);
         Assert.Equal(404, (await _world.Post($"/v1/cases/{caseId}/conversions", body, Carol)).Status);
         Assert.Equal((AccessAction.CaseUpdate, AccessOutcome.Denied), (_world.Events[^1].Action, _world.Events[^1].Outcome));
@@ -223,7 +223,7 @@ public sealed class CaseLifecycleRouteTests : IAsyncLifetime, IDisposable
     public async Task A_case_never_opens_as_a_prospect()
     {
         var clientId = await _world.AddClientAsync();
-        var answer = await _world.Post("/v1/cases", $$"""{ {{Tampa}}, "status": "prospect", "prospect_stage": "possible", "client_ids": ["{{clientId}}"]}""");
+        var answer = await _world.Post("/v1/cases", $$"""{ {{Tampa}}, "status": "prospect", "prospectStage": "possible", "clientIds": ["{{clientId}}"]}""");
 
         Assert.Equal("intake", answer.Str("status"));
         Assert.False(answer.Object.ContainsKey("prospectStage"));
@@ -238,7 +238,7 @@ public sealed class CaseLifecycleRouteTests : IAsyncLifetime, IDisposable
             Assert.Equal(value, (await Stage(clientId, value)).Str("prospect_stage"));
         }
 
-        await _world.Post("/v1/cases", $$"""{ {{Tampa}}, "client_ids": ["{{clientId}}"]}""");
+        await _world.Post("/v1/cases", $$"""{ {{Tampa}}, "clientIds": ["{{clientId}}"]}""");
 
         var retained = (await _world.Get($"/v1/firm/clients/{clientId}")).Object;
         Assert.Equal(Insolvia.Http.WireFormat.Date(Clock.Today()), retained.Str("first_retained_at"));
@@ -251,7 +251,7 @@ public sealed class CaseLifecycleRouteTests : IAsyncLifetime, IDisposable
     public async Task A_retained_client_takes_no_stage()
     {
         var clientId = await _world.AddClientAsync();
-        await _world.Post("/v1/cases", $$"""{ {{Tampa}}, "client_ids": ["{{clientId}}"]}""");
+        await _world.Post("/v1/cases", $$"""{ {{Tampa}}, "clientIds": ["{{clientId}}"]}""");
 
         Assert.Equal(409, (await Stage(clientId, "possible")).Status);
     }
@@ -260,7 +260,7 @@ public sealed class CaseLifecycleRouteTests : IAsyncLifetime, IDisposable
     public async Task An_earlier_retained_date_is_never_overwritten()
     {
         var clientId = await _world.AddClientAsync(extra: """ "name": {"given": "Jordan", "surname": "Example"}, "first_retained_at": "2020-01-02" """);
-        await _world.Post("/v1/cases", $$"""{ {{Tampa}}, "client_ids": ["{{clientId}}"]}""");
+        await _world.Post("/v1/cases", $$"""{ {{Tampa}}, "clientIds": ["{{clientId}}"]}""");
 
         Assert.Equal("2020-01-02", (await _world.Get($"/v1/firm/clients/{clientId}")).Str("first_retained_at"));
     }
@@ -269,7 +269,7 @@ public sealed class CaseLifecycleRouteTests : IAsyncLifetime, IDisposable
     public async Task A_copy_retains_its_clients_too()
     {
         var clientId = await _world.AddClientAsync();
-        var source = (await _world.Post("/v1/cases", $$"""{ {{Tampa}}, "client_ids": ["{{clientId}}"]}""")).Str("id");
+        var source = (await _world.Post("/v1/cases", $$"""{ {{Tampa}}, "clientIds": ["{{clientId}}"]}""")).Str("id");
         var stored = (await _world.Firms.GetClientAsync(Ids.FirmA, clientId, HttpAssert.Ct))!;
         await _world.Firms.UpdateClientAsync(stored with { FirstRetainedAt = null }, HttpAssert.Ct);
 
@@ -334,7 +334,7 @@ public sealed class CaseLifecycleRouteTests : IAsyncLifetime, IDisposable
     public async Task An_admin_deletes_an_unfiled_case_and_it_is_gone_from_every_read()
     {
         var clientId = await _world.AddClientAsync();
-        var caseId = (await _world.Post("/v1/cases", $$"""{ {{Tampa}}, "client_ids": ["{{clientId}}"]}""")).Str("id");
+        var caseId = (await _world.Post("/v1/cases", $$"""{ {{Tampa}}, "clientIds": ["{{clientId}}"]}""")).Str("id");
 
         var answer = await _world.Delete($"/v1/cases/{caseId}");
 
@@ -387,7 +387,7 @@ public sealed class CaseLifecycleRouteTests : IAsyncLifetime, IDisposable
     public async Task A_copy_is_a_new_case_whose_values_name_their_source()
     {
         var clientId = await _world.AddClientAsync();
-        var source = (await _world.Post("/v1/cases", $$"""{ {{Tampa}}, "client_ids": ["{{clientId}}"]}""")).Str("id");
+        var source = (await _world.Post("/v1/cases", $$"""{ {{Tampa}}, "clientIds": ["{{clientId}}"]}""")).Str("id");
         var creditor = await _world.Post($"/v1/cases/{source}/creditors", """{"name": "Example Bank", "provenance": {"name": {"source": "staff_typed"}}}""");
         await _world.Patch($"/v1/cases/{source}", "{" + Filing + """, "judge": "Hon. Example"}""");
 
@@ -400,7 +400,7 @@ public sealed class CaseLifecycleRouteTests : IAsyncLifetime, IDisposable
         Assert.False(copy.ContainsKey("caseNumber"));
         Assert.False(copy.ContainsKey("judge"));
         var debtor = Assert.Single((await _world.Get($"/v1/cases/{copy.Str("id")}/debtors")).Object["debtors"]!.AsArray())!.AsObject();
-        Assert.Equal(clientId, debtor.Str("client_id"));
+        Assert.Equal(clientId, debtor.Str("clientId"));
         Assert.All(debtor["provenance"]!.AsObject(), entry => Assert.Equal(source, entry.Value!["copied_from_case_id"]!.GetValue<string>()));
         var copied = Assert.Single((await _world.Get($"/v1/cases/{copy.Str("id")}/creditors")).Object["creditors"]!.AsArray())!.AsObject();
         Assert.Equal(creditor.Str("id"), copied.Str("id"));
@@ -413,7 +413,7 @@ public sealed class CaseLifecycleRouteTests : IAsyncLifetime, IDisposable
     public async Task A_copy_of_a_case_whose_client_is_archived_is_refused()
     {
         var clientId = await _world.AddClientAsync();
-        var source = (await _world.Post("/v1/cases", $$"""{ {{Tampa}}, "client_ids": ["{{clientId}}"]}""")).Str("id");
+        var source = (await _world.Post("/v1/cases", $$"""{ {{Tampa}}, "clientIds": ["{{clientId}}"]}""")).Str("id");
         await _world.Put($"/v1/firm/clients/{clientId}/status", """{"status": "archived"}""");
 
         Assert.Equal(409, (await _world.Post($"/v1/cases/{source}/copy", null)).Status);
@@ -425,7 +425,7 @@ public sealed class CaseLifecycleRouteTests : IAsyncLifetime, IDisposable
     public async Task A_copy_whose_client_is_being_merged_is_refused_and_writes_no_case()
     {
         var clientId = await _world.AddClientAsync();
-        var source = (await _world.Post("/v1/cases", $$"""{ {{Tampa}}, "client_ids": ["{{clientId}}"]}""")).Str("id");
+        var source = (await _world.Post("/v1/cases", $$"""{ {{Tampa}}, "clientIds": ["{{clientId}}"]}""")).Str("id");
         var survivor = await _world.AddClientAsync(extra: """ "name": {"given": "Jordan B."} """);
         Assert.True(await _world.Firms.ClaimClientMergeAsync(Ids.FirmA, clientId, survivor, HttpAssert.Ct));
 
@@ -450,15 +450,15 @@ public sealed class CaseLifecycleRouteTests : IAsyncLifetime, IDisposable
         var source = await _world.OpenCaseIdAsync();
         var stored = Assert.Single((await _world.Get($"/v1/cases/{source}/debtors")).Object["debtors"]!.AsArray())!.AsObject();
         var provenance = stored["provenance"]!.AsObject().DeepClone().AsObject();
-        provenance["tax_id"] = new JsonObject { ["source"] = "staff_typed" };
-        var body = new JsonObject { ["name"] = stored["name"]!.DeepClone(), ["tax_id"] = new JsonObject { ["kind"] = "ssn", ["value"] = "987-65-4321" }, ["provenance"] = provenance };
+        provenance["taxId"] = new JsonObject { ["source"] = "staff_typed" };
+        var body = new JsonObject { ["body"] = stored["body"]!.DeepClone(), ["taxId"] = new JsonObject { ["kind"] = "ssn", ["value"] = "987-65-4321" }, ["provenance"] = provenance };
         var saved = await _world.Put($"/v1/cases/{source}/debtors/debtor_1", body.ToJsonString());
         Assert.True(saved.Status == 200, saved.Body);
 
         var copyId = (await _world.Post($"/v1/cases/{source}/copy", null)).Str("id");
 
         var copied = Assert.Single((await _world.Get($"/v1/cases/{copyId}/debtors")).Object["debtors"]!.AsArray())!.AsObject();
-        Assert.Equal("""{"kind":"ssn","last_four":"4321"}""", Support.SortedJson.Serialize(copied["tax_id"]));
+        Assert.Equal("""{"kind":"ssn","lastFour":"4321"}""", Support.SortedJson.Serialize(copied["taxId"]));
         var items = _world.Service<Insolvia.Domain.Ports.ITaxIdStore>() as MemoryTaxIdStore;
         Assert.Equal(new[] { source, copyId }.Order(StringComparer.Ordinal), items!.Items.Keys.Select(key => key.CaseId).Order(StringComparer.Ordinal));
     }

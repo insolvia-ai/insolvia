@@ -32,12 +32,12 @@ public static class WireJson
 {
     private const string DomainNamespace = "Insolvia.Domain";
 
-    // The case collections' bodies, converted to typed requests (ADR 0032).
+    // The case collections' bodies, the case and debtor requests, converted to typed requests (ADR 0032).
     private static readonly HashSet<string> CamelNamespaces = new(StringComparer.Ordinal)
     {
-        "Insolvia.Domain.Assets", "Insolvia.Domain.Claims", "Insolvia.Domain.Codebtors", "Insolvia.Domain.ContractLeases",
-        "Insolvia.Domain.Creditors", "Insolvia.Domain.Exemptions", "Insolvia.Domain.Expenses", "Insolvia.Domain.Income",
-        "Insolvia.Domain.MeansTest", "Insolvia.Domain.Notes", "Insolvia.Domain.Petitions", "Insolvia.Domain.Plans", "Insolvia.Domain.Sofa",
+        "Insolvia.Domain.Assets", "Insolvia.Domain.Cases", "Insolvia.Domain.Claims", "Insolvia.Domain.Codebtors", "Insolvia.Domain.ContractLeases",
+        "Insolvia.Domain.Creditors", "Insolvia.Domain.Debtors", "Insolvia.Domain.Exemptions", "Insolvia.Domain.Expenses", "Insolvia.Domain.Income",
+        "Insolvia.Domain.MeansTest", "Insolvia.Domain.Notes", "Insolvia.Domain.Petitions", "Insolvia.Domain.Plans", "Insolvia.Domain.Sofa", "Insolvia.Domain.TaxIds",
     };
 
     /// <summary>The settings, for a serializer outside the HTTP pipeline (a test, a log).</summary>

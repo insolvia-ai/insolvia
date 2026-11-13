@@ -137,7 +137,7 @@ internal static class World
     {
         accessor ??= MakeAccessor();
         var (created, assignment) = CaseRules.Create(
-            CaseRules.ParseCreation(new JsonObject { ["chapter"] = 7, ["court"] = "flmb", ["division"] = "tampa" }, requireClients: false),
+            new NewCase(7, "flmb", "tampa", []),
             accessor.FirmId,
             accessor.Subject);
         await cases.CreateAsync(created, assignment, cancellationToken: Ct);

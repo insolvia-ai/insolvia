@@ -49,7 +49,7 @@
      "given": "Sample",
      "surname": "Debtor"
     },
-    "residence_address": {
+    "residenceAddress": {
      "city": "Tampa",
      "county": "Hillsborough",
      "line1": "123 Fixture Street",

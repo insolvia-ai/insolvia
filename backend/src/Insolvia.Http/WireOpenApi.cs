@@ -3,6 +3,7 @@ using System.Text.Json.Nodes;
 using System.Text.Json.Serialization.Metadata;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http.Metadata;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
@@ -279,10 +280,16 @@ public static partial class WireOpenApi
             }
         }
 
+        // A record the framework reads a body into is never written, so its null stays: a PATCH clears with it.
+        var bound = context.ApplicationServices.GetRequiredService<EndpointDataSource>().Endpoints
+            .SelectMany(e => e.Metadata.OfType<IAcceptsMetadata>()).Any(m => m.RequestType == type.Type);
         foreach (var property in type.Properties.Where(p => p.ShouldSerialize is not null))
         {
             schema.Required.Remove(property.Name);
-            Absent(schema).Add(property.Name);
+            if (!bound)
+            {
+                Absent(schema).Add(property.Name);
+            }
         }
 
         if (request)

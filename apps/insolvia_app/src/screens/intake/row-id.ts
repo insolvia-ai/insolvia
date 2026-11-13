@@ -4,7 +4,7 @@
  *
  * The CLIENT has to mint these. A row's provenance is written in the same
  * request that creates it, so the caller must be able to name the row it is
- * describing: `other_names_used[<id>].surname`. A server-assigned id would need
+ * describing: `otherNamesUsed[<id>].surname`. A server-assigned id would need
  * a round trip between "add a row" and "say where it came from", and
  * progressive autosave has no such moment. The API refuses a row without one.
  *

@@ -114,13 +114,13 @@ internal sealed class SeedWorld : IDisposable
                 {
                     ["debtor_1"] = new JsonObject
                     {
-                        ["client_id"] = new JsonObject { ["$ref"] = "clients/sample-client" },
-                        ["name"] = new JsonObject { ["given"] = "Sample" },
+                        ["clientId"] = new JsonObject { ["$ref"] = "clients/sample-client" },
+                        ["body"] = new JsonObject { ["name"] = new JsonObject { ["given"] = "Sample" } },
 
                         // The SSA's never-issued advertising block — the
                         // fixture value the parser accepts on purpose.
-                        ["tax_id"] = new JsonObject { ["kind"] = "ssn", ["value"] = "987-65-4321" },
-                        ["provenance"] = new JsonObject { ["name.given"] = Typed.DeepClone(), ["tax_id"] = Typed.DeepClone() },
+                        ["taxId"] = new JsonObject { ["kind"] = "ssn", ["value"] = "987-65-4321" },
+                        ["provenance"] = new JsonObject { ["name.given"] = Typed.DeepClone(), ["taxId"] = Typed.DeepClone() },
                     },
                 },
                 ["collections"] = new JsonObject

@@ -3,6 +3,7 @@ using Insolvia.Api.Cases;
 using Insolvia.Domain;
 using Insolvia.Domain.Candidates;
 using Insolvia.Domain.CaseEntities;
+using Insolvia.Domain.Debtors;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.OpenApi;
 
@@ -33,7 +34,7 @@ public static class ApiDocument
             RefineAsync)));
 
     // What the handlers' types cannot say: a candidate's payload is its
-    // entityType's body (a debtor's, its request shape), and a job's result is its kind's.
+    // entityType's body, and a job's result is its kind's.
     private static async Task RefineAsync(OpenApiDocument document, OpenApiDocumentTransformerContext context, CancellationToken cancellationToken)
     {
         var schemas = document.Components!.Schemas!;
@@ -45,8 +46,8 @@ public static class ApiDocument
             payloads[kind.Collection] = new OpenApiSchemaReference(name, document);
         }
 
-        schemas[nameof(DebtorRequest)] = await context.GetOrCreateSchemaAsync(typeof(DebtorRequest), null, cancellationToken).ConfigureAwait(false);
-        payloads[CandidateRules.Debtors] = new OpenApiSchemaReference(nameof(DebtorRequest), document);
+        schemas[nameof(DebtorBody)] = await context.GetOrCreateSchemaAsync(typeof(DebtorBody), null, cancellationToken).ConfigureAwait(false);
+        payloads[CandidateRules.Debtors] = new OpenApiSchemaReference(nameof(DebtorBody), document);
         WireOpenApi.Discriminate(document, nameof(CandidateView), "entityType", payloads.ToDictionary(
             pair => pair.Key,
             pair => (IReadOnlyDictionary<string, IOpenApiSchema>)new Dictionary<string, IOpenApiSchema> { ["payload"] = pair.Value, ["correctedPayload"] = pair.Value }));

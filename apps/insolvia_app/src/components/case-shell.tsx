@@ -128,7 +128,7 @@ export function personName(name: PersonName | undefined): string | null {
  */
 export function caseTitle(matter: Case, debtors: readonly Debtor[]): string {
   const names = debtors
-    .map((debtor) => personName(debtor.name))
+    .map((debtor) => personName(debtor.body.name))
     .filter((name): name is string => name !== null);
   if (names.length > 0) return names.join(' & ');
   return chapterAndDistrict(matter);

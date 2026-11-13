@@ -7,7 +7,7 @@ import {
 import type {
   CaseCollection,
   Debtor,
-  DebtorBody,
+  PutDebtorRequest,
   FilingRole,
   FirmClient,
 } from '@insolvia-ai/api-client';
@@ -76,9 +76,11 @@ type Section = 'debtor' | CaseCollection;
  * and the alternative is a `useMemo` dependency array holding a freshly
  * mapped array every render anyway.
  */
-function visibleSpecs(bodies: Partial<Record<FilingRole, DebtorBody>>): typeof COLLECTION_SPECS {
-  const communityPropertyState = Object.values(bodies).some((body) =>
-    isCommunityPropertyState(body?.residence_address?.state),
+function visibleSpecs(
+  bodies: Partial<Record<FilingRole, PutDebtorRequest>>,
+): typeof COLLECTION_SPECS {
+  const communityPropertyState = Object.values(bodies).some((draft) =>
+    isCommunityPropertyState(draft?.body?.residenceAddress?.state),
   );
   return communityPropertyState
     ? COLLECTION_SPECS
@@ -106,22 +108,10 @@ type LoadState =
   | { readonly kind: 'ready' }
   | { readonly kind: 'error'; readonly message: string };
 
-function bodyOf(debtor: Debtor): DebtorBody {
-  const {
-    id: _id,
-    case_id: _caseId,
-    filing_role: _role,
-    created_at: _created,
-    updated_at: _updated,
-    provenance: _provenance,
-    // Server-owned (ADR 0022): the link to the firm client and the computed
-    // divergence from it are not answers on this form. Left in the body they
-    // would be walked by `staffTypedProvenance` and sent back as "typed".
-    client_id: _clientId,
-    differs_from_client: _differs,
-    ...body
-  } = debtor;
-  return body;
+// The form's answers: the body and tax id. The client link and divergence are
+// server-owned (ADR 0022) and stay on the record, never in what is sent.
+function bodyOf(debtor: Debtor): PutDebtorRequest {
+  return { body: debtor.body, taxId: debtor.taxId };
 }
 
 /** The `message` of a 409 body (`{"error": "ConflictError", "message": …}`). */
@@ -152,7 +142,7 @@ export function Intake() {
     readonly body: Record<string, unknown>;
   } | null>(null);
   const [role, setRole] = useState<FilingRole>('debtor_1');
-  const [bodies, setBodies] = useState<Partial<Record<FilingRole, DebtorBody>>>({});
+  const [bodies, setBodies] = useState<Partial<Record<FilingRole, PutDebtorRequest>>>({});
   const [load, setLoad] = useState<LoadState>({ kind: 'loading' });
   // KEYED BY ROLE, both of them. A flush fired by switching debtor resolves
   // AFTER the switch, so a single shared slot renders the outgoing record's
@@ -166,7 +156,7 @@ export function Intake() {
 
   // The last record the SERVER returned for each role — what the screen was
   // loaded with, then each save's answer. Two things read it: the client
-  // panel (the link, and `differs_from_client` as of the last save), and
+  // panel (the link, and `differsFromClient` as of the last save), and
   // `persist`, which diffs the form against it so a field nobody touched
   // keeps the provenance it arrived with (ADR 0022 — a copied field stays
   // `client` until a person changes THAT field). A ref beside the state
@@ -174,7 +164,7 @@ export function Intake() {
   const [records, setRecordsState] = useState<Partial<Record<FilingRole, Debtor>>>({});
   const recordsRef = useRef<Partial<Record<FilingRole, Debtor>>>({});
   const remember = useCallback((debtor: Debtor) => {
-    recordsRef.current = { ...recordsRef.current, [debtor.filing_role]: debtor };
+    recordsRef.current = { ...recordsRef.current, [debtor.filingRole]: debtor };
     setRecordsState(recordsRef.current);
   }, []);
   // The linked clients' records, by id, for the panel's name and diff.
@@ -182,7 +172,7 @@ export function Intake() {
 
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // What the timer is holding, so it can be flushed rather than dropped.
-  const pending = useRef<{ role: FilingRole; body: DebtorBody } | null>(null);
+  const pending = useRef<{ role: FilingRole; body: PutDebtorRequest } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -191,7 +181,7 @@ export function Intake() {
         const result = await call((client) => client.listDebtors(caseId));
         if (!result.ok || cancelled) return;
         setBodies(
-          Object.fromEntries(result.value.map((debtor) => [debtor.filing_role, bodyOf(debtor)])),
+          Object.fromEntries(result.value.map((debtor) => [debtor.filingRole, bodyOf(debtor)])),
         );
         for (const debtor of result.value) remember(debtor);
         setLoad({ kind: 'ready' });
@@ -205,11 +195,11 @@ export function Intake() {
   }, [call, caseId, remember]);
 
   // Read each linked client once — only when the caller may see the
-  // directory, which the server signals by sending `differs_from_client` at
+  // directory, which the server signals by sending `differsFromClient` at
   // all. A failure leaves the panel on "Linked client"; nothing depends on it.
   const linkedIds = Object.values(records)
-    .filter((debtor) => debtor.client_id !== undefined && debtor.differs_from_client !== undefined)
-    .map((debtor) => debtor.client_id as string);
+    .filter((debtor) => debtor.clientId !== undefined && debtor.differsFromClient !== undefined)
+    .map((debtor) => debtor.clientId as string);
   const missing = linkedIds.filter((id) => !(id in clients)).join(',');
   const refreshClient = useCallback(
     async (id: string) => {
@@ -227,7 +217,7 @@ export function Intake() {
   }, [missing, refreshClient]);
 
   const persist = useCallback(
-    async (which: FilingRole, body: DebtorBody) => {
+    async (which: FilingRole, body: PutDebtorRequest) => {
       pending.current = null;
       setSave((current) => ({ ...current, [which]: { kind: 'saving' } }));
       try {
@@ -278,7 +268,7 @@ export function Intake() {
     [call, caseId, remember],
   );
 
-  const change = (next: DebtorBody) => {
+  const change = (next: PutDebtorRequest) => {
     setBodies((current) => ({ ...current, [role]: next }));
     if (timer.current !== null) clearTimeout(timer.current);
     pending.current = { role, body: next };
@@ -351,8 +341,8 @@ export function Intake() {
    * flushed first, and what the server holds now IS the record. */
   const adopt = (debtor: Debtor) => {
     remember(debtor);
-    setBodies((current) => ({ ...current, [debtor.filing_role]: bodyOf(debtor) }));
-    setFieldErrors((current) => ({ ...current, [debtor.filing_role]: {} }));
+    setBodies((current) => ({ ...current, [debtor.filingRole]: bodyOf(debtor) }));
+    setFieldErrors((current) => ({ ...current, [debtor.filingRole]: {} }));
     // The case's title is its debtors' names.
     void reload();
   };
@@ -372,7 +362,7 @@ export function Intake() {
         adopt(result.value);
       } else {
         remember(result.value);
-        if (result.value.client_id !== undefined) await refreshClient(result.value.client_id);
+        if (result.value.clientId !== undefined) await refreshClient(result.value.clientId);
       }
       return null;
     } catch (cause) {
@@ -489,11 +479,11 @@ export function Intake() {
                     : 'Changes save automatically'}
             </Text>
 
-            {record?.client_id !== undefined ? (
+            {record?.clientId !== undefined ? (
               <LinkedClient
-                key={`${role}:${record.client_id}`}
+                key={`${role}:${record.clientId}`}
                 debtor={record}
-                client={clients[record.client_id] ?? null}
+                client={clients[record.clientId] ?? null}
                 filed={isFiledStatus(matter.status)}
                 onRecopy={() => act(role, 'copyDebtorFromClient')}
                 onUpdateClient={() => act(role, 'copyDebtorToClient')}
@@ -505,8 +495,8 @@ export function Intake() {
                 role={role}
                 required={role !== 'non_filing_spouse'}
                 taken={Object.values(records)
-                  .filter((debtor) => debtor.filing_role !== role)
-                  .flatMap((debtor) => (debtor.client_id === undefined ? [] : [debtor.client_id]))}
+                  .filter((debtor) => debtor.filingRole !== role)
+                  .flatMap((debtor) => (debtor.clientId === undefined ? [] : [debtor.clientId]))}
                 onLinked={adopt}
               />
             )}
@@ -517,7 +507,7 @@ export function Intake() {
                 so their fields are always here. */}
             {record !== undefined || role === 'non_filing_spouse' ? (
               <DebtorFields
-                body={bodies[role] ?? {}}
+                draft={bodies[role] ?? {}}
                 onChange={change}
                 errors={fieldErrors[role] ?? {}}
               />

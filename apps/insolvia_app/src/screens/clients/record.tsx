@@ -502,7 +502,7 @@ export function ClientRecord({
             <Text style={[styles.body, muted]}>No cases you can open for this client.</Text>
           ) : (
             <View role="list" style={styles.cases}>
-              {cases.cases.map(({ case: matter, filing_role: role }) => (
+              {cases.cases.map(({ case: matter, filingRole: role }) => (
                 <View
                   key={matter.id}
                   role="listitem"

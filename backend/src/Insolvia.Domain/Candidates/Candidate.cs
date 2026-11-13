@@ -228,7 +228,7 @@ public static class CandidateRules
     {
         if (entityType == Debtors)
         {
-            _ = DebtorRules.Parse(payload, enforceProvenance: false);
+            _ = DebtorRules.ReadBody(payload);
             return;
         }
 

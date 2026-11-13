@@ -467,14 +467,14 @@
  "debtors": [
   {
    "body": {
-    "credit_counseling": {
+    "creditCounseling": {
      "status": "completed_with_certificate"
     },
     "email": "debtor-one@example.test",
-    "employer_ids": [
+    "employerIds": [
      "12-3456789"
     ],
-    "mailing_address": {
+    "mailingAddress": {
      "city": "Tampa",
      "line1": "4501 Postal Way",
      "line2": "PO Box 99",
@@ -487,19 +487,19 @@
      "middle": "Quinn",
      "surname": "Sampleton"
     },
-    "other_names_used": [
+    "otherNamesUsed": [
      {
       "given": "Avery",
       "id": "alias-1",
       "surname": "Example"
      },
      {
-      "business_name": "Avery's Fixture Repair",
+      "businessName": "Avery's Fixture Repair",
       "id": "alias-2"
      }
     ],
     "phone": "(813) 555-0101",
-    "residence_address": {
+    "residenceAddress": {
      "city": "Tampa",
      "county": "Hillsborough",
      "line1": "12 Fixture Court",
@@ -507,7 +507,7 @@
      "postalCode": "33601",
      "state": "FL"
     },
-    "signed_at": "2026-08-30",
+    "signedAt": "2026-08-30",
     "venue": {
      "basis": "lived_longest_180_days"
     }
@@ -524,8 +524,8 @@
   },
   {
    "body": {
-    "credit_counseling": {
-     "exemption_reason": "disability",
+    "creditCounseling": {
+     "exemptionReason": "disability",
      "status": "not_required"
     },
     "name": {
@@ -533,7 +533,7 @@
      "suffix": "Jr.",
      "surname": "Sampleton"
     },
-    "residence_address": {
+    "residenceAddress": {
      "city": "Tampa",
      "county": "Hillsborough",
      "line1": "12 Fixture Court",
@@ -541,7 +541,7 @@
      "postalCode": "33601",
      "state": "FL"
     },
-    "signed_at": "2026-08-30",
+    "signedAt": "2026-08-30",
     "venue": {
      "basis": "other",
      "explanation": "Moved from Georgia in July; the greater part of the last 180 days was spent in this district."

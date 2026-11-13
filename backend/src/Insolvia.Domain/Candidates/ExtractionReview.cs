@@ -242,18 +242,18 @@ public static partial class ExtractionReview
         var source = SourceFor(OriginChannel.Client);
         var storedBody = DebtorRules.BodyNode(stored.Body);
         var merged = MergeAnswer(storedBody, payload);
-        var answeredBody = DebtorRules.BodyNode(DebtorRules.Parse(payload, enforceProvenance: false).Body);
+        var answeredBody = DebtorRules.BodyNode(DebtorRules.ReadBody(payload));
         JsonObject original;
         try
         {
-            original = DebtorRules.BodyNode(DebtorRules.Parse(candidate.Payload, enforceProvenance: false).Body);
+            original = DebtorRules.BodyNode(DebtorRules.ReadBody(candidate.Payload));
         }
         catch (FieldValidationException)
         {
             original = (JsonObject)candidate.Payload.DeepClone();
         }
 
-        var answeredPaths = ProvenanceRules.PopulatedPaths(BodyJson.Prune(answeredBody));
+        var answeredPaths = ProvenanceRules.PopulatedPaths(answeredBody);
         var replacedRoots = payload.Select(pair => pair.Key).ToHashSet(StringComparer.Ordinal);
         var provenance = new JsonObject();
         foreach (var (path, entry) in ProvenanceRules.ToJson(stored.Provenance))
@@ -280,8 +280,7 @@ public static partial class ExtractionReview
             };
         }
 
-        merged["provenance"] = provenance;
-        return DebtorRules.Parse(merged);
+        return DebtorRules.Checked(new DebtorDraft(DebtorRules.ReadBody(merged), Provenance: ProvenanceRules.Parse(provenance)));
     }
 
     /// <summary>A client record answer's link field, filled from the case — only for the client channel and only when empty.</summary>

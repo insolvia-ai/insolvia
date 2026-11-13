@@ -45,7 +45,7 @@ public sealed class CaseViewsTests
     [Fact]
     public void The_public_status_and_the_tax_id_are_the_two_short_shapes()
     {
-        Same("""{"kind":"ssn","last_four":"4321"}""", TaxIdView.Of(new TaxIdRef(TaxIdKind.Ssn, "4321", "ref-1")));
+        Same("""{"kind":"ssn","lastFour":"4321"}""", TaxIdView.Of(new TaxIdRef(TaxIdKind.Ssn, "4321", "ref-1")));
         var stored = new Case("case-1", "firm-1", "sub", 13, "Middle District of Florida", CaseStatus.Filed, At, At);
         Same("""{"chapter":13,"stage":"filed"}""", PublicStatusView.Of(CasePublicStatuses.From(stored, "firm-1")!));
     }
