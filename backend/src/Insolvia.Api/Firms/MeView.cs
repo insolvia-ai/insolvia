@@ -50,7 +50,10 @@ public sealed record MeView(
 /// <param name="AccessAllCases">Whether the caller sees every case.</param>
 /// <param name="Permissions">The caller's effective level for every feature.</param>
 /// <param name="SignatureBlock">The caller's signature block, its unanswered fields absent; null when none.</param>
-/// <param name="Defaults">The firm's defaults and letterhead.</param>
+/// <param name="DefaultCourt">The firm's default court's id; null when unset.</param>
+/// <param name="DefaultDivision">The default division's id within that court; null when unset.</param>
+/// <param name="DefaultChapter">The firm's default chapter; null when unset.</param>
+/// <param name="Letterhead">The firm's letterhead, its unanswered fields absent; null when unset.</param>
 public sealed record MeFirm(
     string Id,
     string Name,
@@ -62,7 +65,10 @@ public sealed record MeFirm(
     bool AccessAllCases,
     IReadOnlyDictionary<Feature, PermissionLevel> Permissions,
     SignatureBlock? SignatureBlock,
-    [property: Flatten] FirmDefaults Defaults)
+    string? DefaultCourt,
+    string? DefaultDivision,
+    int? DefaultChapter,
+    Letterhead? Letterhead)
 {
     /// <summary>The view of <paramref name="accessor"/>.</summary>
     /// <param name="accessor">The caller's membership.</param>
@@ -71,9 +77,10 @@ public sealed record MeFirm(
     {
         ArgumentNullException.ThrowIfNull(accessor);
         var user = accessor.User;
+        var firm = accessor.Firm;
         return new(
-            accessor.Firm.Id,
-            accessor.Firm.Name,
+            firm.Id,
+            firm.Name,
             user.Role,
             user.FirstName,
             user.LastName,
@@ -82,18 +89,9 @@ public sealed record MeFirm(
             user.AccessAllCases,
             Wire.Members<Feature>().ToDictionary(feature => feature, feature => Insolvia.Domain.Firms.Permissions.PermissionFor(user, feature)),
             user.SignatureBlock,
-            FirmDefaults.Of(accessor.Firm));
+            firm.DefaultCourt?.Court,
+            firm.DefaultCourt?.Division,
+            firm.DefaultChapter,
+            firm.Letterhead);
     }
 }
-
-/// <summary>
-/// The caller's change to themselves (<c>PATCH /v1/me</c>): their name
-/// (either half alone) and their signature block; nothing else is read.
-/// Parsed by <c>FirmParser.ParseSelfUpdate</c>, which owns validation; this
-/// record is its shape for the OpenAPI document.
-/// </summary>
-/// <param name="FirstName">The caller's first name.</param>
-/// <param name="LastName">The caller's last name.</param>
-/// <param name="DisplayName">Legacy: one string split on its last space, read only when neither half is sent.</param>
-/// <param name="SignatureBlock">The caller's signature block, whole; null removes it.</param>
-public sealed record MeUpdateRequest(string? FirstName, string? LastName, string? DisplayName, SignatureBlock? SignatureBlock);

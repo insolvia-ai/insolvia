@@ -70,7 +70,7 @@ public sealed class FirmClientRouteTests : IAsyncLifetime, IDisposable
             await _world.Get(url, subject),
             await _world.Put(url, """{"name": {"surname": "X"}}""", subject),
             await _world.Put($"{url}/status", """{"status": "archived"}""", subject),
-            await _world.Put($"{url}/prospect-stage", """{"prospect_stage": "possible"}""", subject),
+            await _world.Put($"{url}/prospect-stage", """{"prospectStage": "possible"}""", subject),
         ];
 
         Assert.All(answers, answer =>
@@ -105,16 +105,16 @@ public sealed class FirmClientRouteTests : IAsyncLifetime, IDisposable
     [Fact]
     public async Task A_created_client_is_returned_and_then_listed()
     {
-        var created = await Add(extra: """, "residence_address": {"line1": "1 Example St", "county": "Sangamon"}, "date_of_birth": "1980-02-29", "lead_source": "Referral" """);
+        var created = await Add(extra: """, "residenceAddress": {"line1": "1 Example St", "county": "Sangamon"}, "dateOfBirth": "1980-02-29", "leadSource": "Referral" """);
 
         Assert.Equal(201, created.Status);
         var body = created.Object;
         Assert.Equal("""{"given":"Jordan","surname":"Example"}""", body["name"]!.ToJsonString());
-        Assert.Equal("""{"county":"Sangamon","line1":"1 Example St"}""", Support.SortedJson.Serialize(body["residence_address"]));
+        Assert.Equal("""{"county":"Sangamon","line1":"1 Example St"}""", Support.SortedJson.Serialize(body["residenceAddress"]));
         Assert.Equal("active", body["status"]!.GetValue<string>());
-        Assert.Equal(Admin, body["created_by"]!.GetValue<string>());
-        Assert.Equal("Referral", body["lead_source"]!.GetValue<string>());
-        Assert.Equal("1980-02-29", body["date_of_birth"]!.GetValue<string>());
+        Assert.Equal(Admin, body["createdBy"]!.GetValue<string>());
+        Assert.Equal("Referral", body["leadSource"]!.GetValue<string>());
+        Assert.Equal("1980-02-29", body["dateOfBirth"]!.GetValue<string>());
 
         var listed = (await _world.Get("/v1/firm/clients", Admin)).Object["clients"]!.AsArray();
         Assert.Equal([body["id"]!.GetValue<string>()], listed.Select(client => client!["id"]!.GetValue<string>()));
@@ -125,8 +125,8 @@ public sealed class FirmClientRouteTests : IAsyncLifetime, IDisposable
     {
         var created = await Add();
 
-        Assert.Equal(["created_at", "created_by", "id", "name", "status", "updated_at"], Answer.Keys(created.Json));
-        Assert.Matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{6}Z$", created.Str("created_at")!);
+        Assert.Equal(["createdAt", "createdBy", "id", "name", "status", "updatedAt"], Answer.Keys(created.Json));
+        Assert.Matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{6}Z$", created.Str("createdAt")!);
     }
 
     [Fact]
@@ -139,12 +139,13 @@ public sealed class FirmClientRouteTests : IAsyncLifetime, IDisposable
     }
 
     [Fact]
-    public async Task A_tax_id_in_the_body_is_a_400_not_a_silent_drop()
+    public async Task A_tax_id_in_the_body_is_not_a_field_and_is_never_stored()
     {
-        var answer = await Add(extra: """, "tax_id": {"kind": "ssn", "value": "987-65-4320"}""");
+        var answer = await Add(extra: """, "taxId": {"kind": "ssn", "value": "987-65-4320"}, "taxIdLastFour": "4320" """);
 
-        Assert.Equal(400, answer.Status);
-        Assert.Contains("tax_id", answer.FieldErrors);
+        Assert.Equal(201, answer.Status);
+        Assert.False(answer.Object.ContainsKey("taxIdLastFour"));
+        Assert.DoesNotContain("4320", answer.Body, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -160,19 +161,19 @@ public sealed class FirmClientRouteTests : IAsyncLifetime, IDisposable
     [Fact]
     public async Task A_replace_is_whole_record_and_keeps_the_server_owned_fields()
     {
-        var created = await Add(extra: """, "lead_source": "Referral" """);
+        var created = await Add(extra: """, "leadSource": "Referral" """);
         var id = created.Str("id");
 
-        var replaced = await _world.Put($"/v1/firm/clients/{id}", $$"""{"name": {"surname": "Renamed"}, "status": "archived", "created_by": "{{OtherAdmin}}"}""", Admin);
+        var replaced = await _world.Put($"/v1/firm/clients/{id}", $$"""{"name": {"surname": "Renamed"}, "status": "archived", "createdBy": "{{OtherAdmin}}"}""", Admin);
 
         Assert.Equal(200, replaced.Status);
         var body = replaced.Object;
         Assert.Equal(id, body["id"]!.GetValue<string>());
         Assert.Equal("""{"surname":"Renamed"}""", body["name"]!.ToJsonString());
-        Assert.False(body.ContainsKey("lead_source")); // PUT, whole-record: omitted is cleared
+        Assert.False(body.ContainsKey("leadSource")); // PUT, whole-record: omitted is cleared
         Assert.Equal("active", body["status"]!.GetValue<string>());
-        Assert.Equal(Admin, body["created_by"]!.GetValue<string>());
-        Assert.Equal(created.Str("created_at"), body["created_at"]!.GetValue<string>());
+        Assert.Equal(Admin, body["createdBy"]!.GetValue<string>());
+        Assert.Equal(created.Str("createdAt"), body["createdAt"]!.GetValue<string>());
     }
 
     [Fact]
@@ -285,7 +286,7 @@ public sealed class FirmClientRouteTests : IAsyncLifetime, IDisposable
         {
             var answer = await Stage(id, $"\"{value}\"");
             Assert.Equal(200, answer.Status);
-            Assert.Equal(value, answer.Str("prospect_stage"));
+            Assert.Equal(value, answer.Str("prospectStage"));
         }
     }
 
@@ -305,10 +306,10 @@ public sealed class FirmClientRouteTests : IAsyncLifetime, IDisposable
     [Fact]
     public async Task A_client_saved_with_a_retained_date_takes_no_stage_and_shows_none()
     {
-        var id = (await Add(extra: """, "first_retained_at": "2020-01-02" """)).Str("id")!;
+        var id = (await Add(extra: """, "firstRetainedAt": "2020-01-02" """)).Str("id")!;
 
         Assert.Equal(409, (await Stage(id, "\"possible\"")).Status);
-        Assert.Equal("2020-01-02", (await _world.Get($"/v1/firm/clients/{id}", Admin)).Str("first_retained_at"));
+        Assert.Equal("2020-01-02", (await _world.Get($"/v1/firm/clients/{id}", Admin)).Str("firstRetainedAt"));
     }
 
     [Fact]
@@ -319,11 +320,11 @@ public sealed class FirmClientRouteTests : IAsyncLifetime, IDisposable
 
         var cleared = await Stage(id, "null");
         Assert.Equal(200, cleared.Status);
-        Assert.False(cleared.Object.ContainsKey("prospect_stage"));
+        Assert.False(cleared.Object.ContainsKey("prospectStage"));
 
         var unknown = await Stage(id, "\"won\"");
         Assert.Equal(400, unknown.Status);
-        Assert.Contains("prospect_stage", unknown.FieldErrors);
+        Assert.Contains("prospectStage", unknown.FieldErrors);
     }
 
     [Fact]
@@ -334,7 +335,7 @@ public sealed class FirmClientRouteTests : IAsyncLifetime, IDisposable
         var answer = await _world.Put($"/v1/firm/clients/{id}/prospect-stage", "{}", Admin);
 
         Assert.Equal(400, answer.Status);
-        Assert.Contains("prospect_stage", answer.FieldErrors);
+        Assert.Contains("prospectStage", answer.FieldErrors);
     }
 
     [Fact]
@@ -352,9 +353,9 @@ public sealed class FirmClientRouteTests : IAsyncLifetime, IDisposable
         var id = await AddAsync();
         await Stage(id, "\"consultation_scheduled\"");
 
-        var edited = await _world.Put($"/v1/firm/clients/{id}", """{"name": {"surname": "Example"}, "lead_source": "Referral"}""", Admin);
+        var edited = await _world.Put($"/v1/firm/clients/{id}", """{"name": {"surname": "Example"}, "leadSource": "Referral"}""", Admin);
 
-        Assert.Equal("consultation_scheduled", edited.Str("prospect_stage"));
+        Assert.Equal("consultation_scheduled", edited.Str("prospectStage"));
     }
 
     // ── Merge (ADR 0022 PR 7) ────────────────────────────────────────
@@ -374,10 +375,10 @@ public sealed class FirmClientRouteTests : IAsyncLifetime, IDisposable
         Assert.Equal("active", answer.Object["client"]!["status"]!.GetValue<string>());
         Assert.Equal(dupe, answer.Object["merged"]!["id"]!.GetValue<string>());
         Assert.Equal("archived", answer.Object["merged"]!["status"]!.GetValue<string>());
-        Assert.Equal(keep, answer.Object["merged"]!["merged_into"]!.GetValue<string>());
+        Assert.Equal(keep, answer.Object["merged"]!["mergedInto"]!.GetValue<string>());
         Assert.Equal([theirs], _world.Host.DebtorLinks.CasesOf(keep));
         Assert.Empty(_world.Host.DebtorLinks.CasesOf(dupe));
-        Assert.Equal(keep, (await _world.Get($"/v1/firm/clients/{dupe}", Admin)).Str("merged_into"));
+        Assert.Equal(keep, (await _world.Get($"/v1/firm/clients/{dupe}", Admin)).Str("mergedInto"));
     }
 
     [Fact]
@@ -416,7 +417,7 @@ public sealed class FirmClientRouteTests : IAsyncLifetime, IDisposable
     [Theory]
     [InlineData("", """{"name": {"surname": "Revived"}}""")]
     [InlineData("/status", """{"status": "active"}""")]
-    [InlineData("/prospect-stage", """{"prospect_stage": "possible"}""")]
+    [InlineData("/prospect-stage", """{"prospectStage": "possible"}""")]
     public async Task A_merged_client_cannot_be_edited_or_restored(string suffix, string body)
     {
         var keep = await AddAsync();
@@ -446,7 +447,7 @@ public sealed class FirmClientRouteTests : IAsyncLifetime, IDisposable
 
     [Theory]
     [InlineData("{}")]
-    [InlineData("""{"merged_client_id": "no-such-client"}""")]
+    [InlineData("""{"mergedClientId": "no-such-client"}""")]
     public async Task The_merged_client_must_be_named_and_exist(string body)
     {
         var keep = await AddAsync();
@@ -454,7 +455,7 @@ public sealed class FirmClientRouteTests : IAsyncLifetime, IDisposable
         var answer = await _world.Post($"/v1/firm/clients/{keep}/merge", body, Admin);
 
         Assert.Equal(400, answer.Status);
-        Assert.Contains("merged_client_id", answer.FieldErrors);
+        Assert.Contains("mergedClientId", answer.FieldErrors);
     }
 
     [Fact]
@@ -465,7 +466,7 @@ public sealed class FirmClientRouteTests : IAsyncLifetime, IDisposable
         var answer = await Merge(keep, keep);
 
         Assert.Equal(400, answer.Status);
-        Assert.Contains("merged_client_id", answer.FieldErrors);
+        Assert.Contains("mergedClientId", answer.FieldErrors);
     }
 
     [Fact]
@@ -539,7 +540,7 @@ public sealed class FirmClientRouteTests : IAsyncLifetime, IDisposable
         var keep = (await world.Post("/v1/firm/clients", """{"name": {"given": "Jordan"}}""", Admin)).Str("id");
         var dupe = (await world.Post("/v1/firm/clients", """{"name": {"given": "Jordy"}}""", Admin)).Str("id");
 
-        var answer = await world.Post($"/v1/firm/clients/{keep}/merge", $$"""{"merged_client_id": "{{dupe}}"}""", Admin);
+        var answer = await world.Post($"/v1/firm/clients/{keep}/merge", $$"""{"mergedClientId": "{{dupe}}"}""", Admin);
 
         Assert.Equal(500, answer.Status);
         Assert.Equal("active", (await world.Get($"/v1/firm/clients/{dupe}", Admin)).Str("status"));
@@ -556,10 +557,10 @@ public sealed class FirmClientRouteTests : IAsyncLifetime, IDisposable
     }
 
     private Task<Answer> Stage(string id, string value, string subject = Admin) =>
-        _world.Put($"/v1/firm/clients/{id}/prospect-stage", "{\"prospect_stage\": " + value + "}", subject);
+        _world.Put($"/v1/firm/clients/{id}/prospect-stage", "{\"prospectStage\": " + value + "}", subject);
 
     private Task<Answer> Merge(string survivor, string merged, string subject = Admin) =>
-        _world.Post($"/v1/firm/clients/{survivor}/merge", $$"""{"merged_client_id": "{{merged}}"}""", subject);
+        _world.Post($"/v1/firm/clients/{survivor}/merge", $$"""{"mergedClientId": "{{merged}}"}""", subject);
 
     private List<(string Action, string? ClientId, string Principal, string Outcome)> Rows() =>
         [.. _world.Host.AccessLog.Events.Select(e => (e.Action.ToWire(), e.ClientId, e.Principal, e.Outcome.ToWire()))];

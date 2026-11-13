@@ -1,7 +1,6 @@
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using Insolvia.Domain.AccessLog;
 using Insolvia.Domain.Auth;
@@ -108,7 +107,8 @@ public static class FilingAuthorizationRules
     /// older version's signature supersedes it.
     /// </summary>
     public static async Task<FilingAuthorization> SignAsync(
-        JsonNode? payload,
+        string version,
+        string digest,
         string firmId,
         string attorneyId,
         long? authenticatedAt,
@@ -121,7 +121,6 @@ public static class FilingAuthorizationRules
         ArgumentNullException.ThrowIfNull(store);
         ArgumentNullException.ThrowIfNull(accessLog);
         var fresh = TokenVerification.RequireRecentAuthentication(authenticatedAt, now, SignatureMaxAgeSeconds);
-        var (version, digest) = ParseSignature(payload);
         var expected = TextDigest(AuthorizationText());
         if (version != TextVersion || digest != expected)
         {
@@ -140,20 +139,6 @@ public static class FilingAuthorizationRules
             AccessEvents.Record(attorneyId, AccessAction.AuthorizationSign, authorizationId: authorization.AuthorizationId, clock: clock),
             cancellationToken).ConfigureAwait(false);
         return authorization;
-    }
-
-    private static (string Version, string Digest) ParseSignature(JsonNode? payload)
-    {
-        if (payload is not JsonObject body)
-        {
-            throw new ValidationException("request body must be a JSON object");
-        }
-
-        var version = Json.AsString(body["text_version"]);
-        var digest = Json.AsString(body["text_digest"]);
-        return version is null || digest is null
-            ? throw new ValidationException("text_version and text_digest are required")
-            : (version, digest);
     }
 }
 

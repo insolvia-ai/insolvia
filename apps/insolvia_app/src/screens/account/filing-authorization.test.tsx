@@ -29,14 +29,14 @@ const TEXT = {
   digest: DIGEST,
   text: 'DRAFT, pending review.\n\nI allow Insolvia to file under my login.\n',
 };
-const UNSIGNED = { text: TEXT, current_version: VERSION, current: false, signature: null };
+const UNSIGNED = { text: TEXT, currentVersion: VERSION, current: false, signature: null };
 const SIGNATURE = {
   id: 'a0700000-0000-4000-8000-000000000001',
-  text_version: VERSION,
-  text_digest: DIGEST,
-  signed_at: '2100-01-01T00:01:00.000000Z',
+  textVersion: VERSION,
+  textDigest: DIGEST,
+  signedAt: '2100-01-01T00:01:00.000000Z',
 };
-const SIGNED = { text: TEXT, current_version: VERSION, current: true, signature: SIGNATURE };
+const SIGNED = { text: TEXT, currentVersion: VERSION, current: true, signature: SIGNATURE };
 
 function membership(electronicFiling: 'view_only' | 'add_edit') {
   return {
@@ -153,8 +153,8 @@ describe('the filing authorization', () => {
       ([url, init]) => init?.method === 'POST' && url.includes('/v1/me/filing-authorization'),
     );
     expect(JSON.parse(post?.[1]?.body as string)).toEqual({
-      text_version: VERSION,
-      text_digest: DIGEST,
+      textVersion: VERSION,
+      textDigest: DIGEST,
     });
     expect(screen.getByText(/You signed version 2026-10-07-draft on 2100-01-01/)).toBeTruthy();
     // Signed: the login form is offered now.
@@ -188,7 +188,7 @@ describe('the filing authorization', () => {
     render({
       status: {
         ...UNSIGNED,
-        signature: { ...SIGNATURE, text_version: '2026-01-01-older' },
+        signature: { ...SIGNATURE, textVersion: '2026-01-01-older' },
       },
       signedInSecondsAgo: 3600,
     });
@@ -203,7 +203,7 @@ describe('the filing authorization', () => {
     const fetchMock = render({
       status: SIGNED,
       signedInSecondsAgo: 3600,
-      write: () => jsonResponse(200, { credentials_revoked: 1 }),
+      write: () => jsonResponse(200, { credentialsRevoked: 1 }),
     });
     const user = userEvent.setup();
 

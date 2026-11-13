@@ -285,8 +285,8 @@ public sealed class ToolTests
             }
         }
 
-        Assert.Equal("6789", (string?)read["record"]!["tax_id_last_four"]);
-        Assert.False(listed["records"]![1]!.AsObject().ContainsKey("tax_id_last_four"));
+        Assert.Equal("6789", (string?)read["record"]!["taxIdLastFour"]);
+        Assert.False(listed["records"]![1]!.AsObject().ContainsKey("taxIdLastFour"));
     }
 
     [Fact]

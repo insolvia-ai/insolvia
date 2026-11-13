@@ -1,4 +1,4 @@
-using System.Text.Json.Nodes;
+using System.ComponentModel.DataAnnotations;
 using Insolvia.Domain.Fields;
 
 namespace Insolvia.Domain.Questionnaires;
@@ -108,8 +108,6 @@ public static class Questionnaire
     /// <summary>The catalogue's ids, in order.</summary>
     public static readonly IReadOnlyList<string> SectionIds = [.. Catalogue.Select(section => section.Id)];
 
-    private static readonly Dictionary<string, Section> ById = Catalogue.ToDictionary(section => section.Id, StringComparer.Ordinal);
-
     /// <summary>
     /// Every catalogue section, in order, with <paramref name="config"/>
     /// applied. A section the config does not name takes its default (a new
@@ -132,83 +130,6 @@ public static class Questionnaire
     public static IReadOnlyList<ResolvedSection> ClientSections(QuestionnaireConfig? config) =>
         [.. Resolve(config).Where(section => section.Enabled)];
 
-    /// <summary>
-    /// Validate PUT <c>/v1/firm/questionnaire</c>: <c>{"sections": [...]}</c>,
-    /// every catalogue section named exactly once — a whole-record save.
-    /// Instructions sent blank, or identical to the default, are stored as
-    /// none, so the default keeps following the catalogue.
-    /// </summary>
-    public static ValueDictionary<string, SectionSetting> ParseUpdate(JsonObject payload)
-    {
-        ArgumentNullException.ThrowIfNull(payload);
-        if (payload["sections"] is not JsonArray raw)
-        {
-            throw new FieldValidationException(new Dictionary<string, string> { ["sections"] = "Must be a list of sections." });
-        }
-
-        var errors = new Dictionary<string, string>(StringComparer.Ordinal);
-        var settings = new List<KeyValuePair<string, SectionSetting>>();
-        var named = new HashSet<string>(StringComparer.Ordinal);
-        for (var index = 0; index < raw.Count; index++)
-        {
-            if (raw[index] is not JsonObject entry)
-            {
-                errors[$"sections.{index}"] = "Must be an object.";
-                continue;
-            }
-
-            var sectionId = Json.AsString(entry["id"]);
-            if (sectionId is null || !ById.TryGetValue(sectionId, out var section))
-            {
-                // No trailing period, exactly as the contract's message reads.
-                errors[$"sections.{index}.id"] = "Must be one of " + string.Join(", ", SectionIds);
-                continue;
-            }
-
-            if (named.Contains(sectionId))
-            {
-                errors[$"sections.{sectionId}"] = "Named more than once.";
-                continue;
-            }
-
-            var path = $"sections.{sectionId}";
-            var enabled = FieldParsers.Boolean(entry["enabled"], $"{path}.enabled", errors);
-            if (enabled is null && !errors.ContainsKey($"{path}.enabled"))
-            {
-                errors[$"{path}.enabled"] = "Must be true or false.";
-            }
-
-            if (enabled == false && !section.Switchable)
-            {
-                errors[$"{path}.enabled"] = $"{section.Title} is always on.";
-            }
-
-            var instructions = FieldParsers.Narrative(entry["instructions"], $"{path}.instructions", errors, MaxInstructions);
-            if (instructions == section.DefaultInstructions)
-            {
-                instructions = null;
-            }
-
-            named.Add(sectionId);
-            settings.Add(new(sectionId, new SectionSetting(enabled ?? false, instructions)));
-        }
-
-        foreach (var sectionId in SectionIds)
-        {
-            if (!named.Contains(sectionId) && !errors.ContainsKey($"sections.{sectionId}"))
-            {
-                errors[$"sections.{sectionId}"] = "Missing from the save.";
-            }
-        }
-
-        if (errors.Count > 0)
-        {
-            throw new FieldValidationException(errors);
-        }
-
-        return settings.ToValueDictionary();
-    }
-
     /// <summary>The config a save writes.</summary>
     public static QuestionnaireConfig BuildConfig(IReadOnlyDictionary<string, SectionSetting> settings, string firmId, string updatedBy, TimeProvider? clock = null)
     {
@@ -216,3 +137,65 @@ public static class Questionnaire
         return new QuestionnaireConfig(firmId, settings.ToValueDictionary(), Clock.Now(clock), updatedBy);
     }
 }
+
+/// <summary>
+/// The firm's questionnaire config as saved (<c>PUT /v1/firm/questionnaire</c>):
+/// every catalogue section named exactly once — a whole-record save.
+/// </summary>
+/// <param name="Sections">One entry for every section.</param>
+public sealed record QuestionnaireRequest(
+    [property: Required(ErrorMessage = "Must be a list of sections.")] IReadOnlyList<QuestionnaireSectionRequest>? Sections) : IValidatableObject
+{
+    /// <summary>
+    /// The settings a save stores. Instructions sent blank, or identical to
+    /// the default, are stored as none, so the default keeps following the catalogue.
+    /// </summary>
+    /// <returns>Section id to setting, in the order sent.</returns>
+    public ValueDictionary<string, SectionSetting> Settings() =>
+        Sections!.Select(entry => KeyValuePair.Create(
+            entry.Id!,
+            new SectionSetting(
+                entry.Enabled!.Value,
+                string.IsNullOrWhiteSpace(entry.Instructions) || entry.Instructions == Questionnaire.Catalogue.First(section => section.Id == entry.Id).DefaultInstructions ? null : entry.Instructions)))
+        .ToValueDictionary();
+
+    /// <summary>Each id a catalogue section's, named once; every section named; an unswitchable section on.</summary>
+    /// <param name="validationContext">Unused.</param>
+    /// <returns>The failures.</returns>
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        var named = new HashSet<string>(StringComparer.Ordinal);
+        for (var index = 0; index < Sections!.Count; index++)
+        {
+            var entry = Sections[index];
+            var section = Questionnaire.Catalogue.FirstOrDefault(candidate => candidate.Id == entry.Id);
+            if (section is null)
+            {
+                yield return new ValidationResult("Must be one of " + string.Join(", ", Questionnaire.SectionIds), [$"sections[{index}].id"]);
+            }
+            else if (!named.Add(section.Id))
+            {
+                yield return new ValidationResult("Named more than once.", [$"sections[{index}].id"]);
+            }
+            else if (entry.Enabled == false && !section.Switchable)
+            {
+                yield return new ValidationResult($"{section.Title} is always on.", [$"sections[{index}].enabled"]);
+            }
+        }
+
+        var missing = Questionnaire.SectionIds.Where(id => !named.Contains(id)).ToList();
+        if (missing.Count > 0 && named.Count == Sections.Count)
+        {
+            yield return new ValidationResult("Missing from the save: " + string.Join(", ", missing) + ".", [nameof(Sections)]);
+        }
+    }
+}
+
+/// <summary>The firm's choice for one questionnaire section.</summary>
+/// <param name="Id">The section's id.</param>
+/// <param name="Enabled">Whether clients see it; an unswitchable section must be true.</param>
+/// <param name="Instructions">The firm's instructions; absent, or the default text, means the default.</param>
+public sealed record QuestionnaireSectionRequest(
+    string? Id,
+    [property: Required(ErrorMessage = "Must be true or false.")] bool? Enabled,
+    [property: Narrative(Questionnaire.MaxInstructions)] string? Instructions);

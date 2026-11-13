@@ -171,9 +171,7 @@ export interface FirmMembership {
 
 /**
  * What the firm prints at the top of a letter and on the signer block's firm
- * lines (issue #360). Snake_case inside, like every case-domain body: the
- * address IS the case domain's {@link Address}, and the block is copied onto
- * a {@link FilingProfessionalBody} by key.
+ * lines (issue #360). The address IS the case domain's {@link Address}.
  */
 export interface Letterhead {
   readonly name?: string | undefined;
@@ -189,9 +187,9 @@ export interface Letterhead {
  * without a mapping. The name is not here: it is the firm user's own.
  */
 export interface SignatureBlock {
-  readonly bar_number?: string | undefined;
-  readonly bar_state?: string | undefined;
-  readonly firm_name?: string | undefined;
+  readonly barNumber?: string | undefined;
+  readonly barState?: string | undefined;
+  readonly firmName?: string | undefined;
   readonly address?: Address | undefined;
   readonly phone?: string | undefined;
   readonly email?: string | undefined;
@@ -238,22 +236,6 @@ export interface UpdateMeRequest {
    * omitted leaves it alone.
    */
   readonly signatureBlock?: SignatureBlock | null;
-}
-
-/**
- * The `PATCH /v1/me` body.
- *
- * Omit-when-absent, this package's standing rule: an unsent half means "leave
- * it alone", and sending `''` would mean "erase it" — a difference the server
- * acts on, so it must not be blurred here.
- */
-export function updateMeRequestToJson(request: UpdateMeRequest): Record<string, unknown> {
-  const body: Record<string, unknown> = {};
-  if (request.firstName !== undefined) body.firstName = request.firstName;
-  if (request.lastName !== undefined) body.lastName = request.lastName;
-  // `null` IS sent: it is the clear instruction, distinct from "leave alone".
-  if (request.signatureBlock !== undefined) body.signatureBlock = request.signatureBlock;
-  return body;
 }
 
 /**
@@ -309,17 +291,6 @@ export interface UpdateFirmRequest {
   readonly defaultDivision?: string | null;
   readonly defaultChapter?: CaseChapter | null;
   readonly letterhead?: Letterhead | null;
-}
-
-/** The `PATCH /v1/firm` body, absent fields omitted; `null` is sent as the clear instruction. */
-export function updateFirmRequestToJson(request: UpdateFirmRequest): Record<string, unknown> {
-  const body: Record<string, unknown> = {};
-  if (request.name !== undefined) body.name = request.name;
-  if (request.defaultCourt !== undefined) body.defaultCourt = request.defaultCourt;
-  if (request.defaultDivision !== undefined) body.defaultDivision = request.defaultDivision;
-  if (request.defaultChapter !== undefined) body.defaultChapter = request.defaultChapter;
-  if (request.letterhead !== undefined) body.letterhead = request.letterhead;
-  return body;
 }
 
 /**
@@ -455,24 +426,6 @@ export interface AddFirmUserRequest {
   readonly permissions?: Partial<Record<FirmFeature, PermissionLevel>>;
 }
 
-/** The `POST /v1/firm/users` body, with absent optionals omitted entirely. */
-export function addFirmUserRequestToJson(request: AddFirmUserRequest): Record<string, unknown> {
-  const body: Record<string, unknown> = {
-    email: request.email,
-    firstName: request.firstName,
-    lastName: request.lastName,
-    role: request.role,
-  };
-  // Omitted rather than sent as `undefined`: the server treats an absent key
-  // as "use the default" and a present one as an instruction, and
-  // JSON.stringify would drop `undefined` anyway — being explicit here means
-  // the request test can assert the exact body.
-  if (request.isAdmin !== undefined) body.isAdmin = request.isAdmin;
-  if (request.accessAllCases !== undefined) body.accessAllCases = request.accessAllCases;
-  if (request.permissions !== undefined) body.permissions = request.permissions;
-  return body;
-}
-
 /**
  * The `PATCH /v1/firm/users/{subject}` request body. Every field optional;
  * an empty body is a 400 rather than a no-op.
@@ -497,28 +450,11 @@ export interface UpdateFirmUserRequest {
   readonly signatureBlock?: SignatureBlock | null;
 }
 
-/** The `PATCH /v1/firm/users/{subject}` body, absent fields omitted. */
-export function updateFirmUserRequestToJson(
-  request: UpdateFirmUserRequest,
-): Record<string, unknown> {
-  const body: Record<string, unknown> = {};
-  if (request.firstName !== undefined) body.firstName = request.firstName;
-  if (request.lastName !== undefined) body.lastName = request.lastName;
-  if (request.role !== undefined) body.role = request.role;
-  if (request.isAdmin !== undefined) body.isAdmin = request.isAdmin;
-  if (request.accessAllCases !== undefined) body.accessAllCases = request.accessAllCases;
-  if (request.permissions !== undefined) body.permissions = request.permissions;
-  if (request.status !== undefined) body.status = request.status;
-  if (request.signatureBlock !== undefined) body.signatureBlock = request.signatureBlock;
-  return body;
-}
-
 /**
  * One of the caller's own CM/ECF credentials in the vault (ADR 0024,
  * guardrail 3) — `GET /v1/me/filing-credentials`, gated by
  * `electronic_filing`. THE STATUS VIEW, and all a client ever receives: no
- * password, no TOTP seed, nothing sealed. Snake_case, as
- * `insolvia_core.filing_credentials.credential_json` writes it.
+ * password, no TOTP seed, nothing sealed.
  */
 export interface FilingCredential {
   readonly id: string;
@@ -528,8 +464,8 @@ export interface FilingCredential {
   readonly courts: readonly string[];
   /** `active` is the only stored status: revoking DELETES the credential. */
   readonly status: 'active';
-  readonly created_at: string;
-  readonly updated_at: string;
+  readonly createdAt: string;
+  readonly updatedAt: string;
 }
 
 /**
@@ -549,22 +485,21 @@ export interface FilingAuthorizationText {
 /** The caller's signature, as `GET /v1/me/filing-authorization` shows it. */
 export interface FilingAuthorizationSignature {
   readonly id: string;
-  readonly text_version: string;
-  readonly text_digest: string;
-  readonly signed_at: string;
+  readonly textVersion: string;
+  readonly textDigest: string;
+  readonly signedAt: string;
 }
 
 /**
  * `GET`/`POST /v1/me/filing-authorization` — the text, and the caller's
  * signature over it. `current` is false with no signature, and false with a
- * signature over an OLDER text version (`signature.text_version !==
- * current_version`): a new version invalidates older signatures, and nothing
- * can be enrolled or filed until it is signed. Snake_case, as
- * `insolvia_core.filing_authorization.authorization_json` writes it.
+ * signature over an OLDER text version (`signature.textVersion !==
+ * currentVersion`): a new version invalidates older signatures, and nothing
+ * can be enrolled or filed until it is signed.
  */
 export interface FilingAuthorizationStatus {
   readonly text: FilingAuthorizationText;
-  readonly current_version: string;
+  readonly currentVersion: string;
   readonly current: boolean;
   readonly signature: FilingAuthorizationSignature | null;
 }
@@ -577,34 +512,28 @@ export interface FilingCredentialEnrolment {
   readonly login: string;
   readonly password: string;
   /** The authenticator key PACER shows at MFA enrolment (base32). */
-  readonly totp_seed: string;
+  readonly totpSeed: string;
   readonly courts?: readonly string[] | undefined;
 }
 
 /**
  * A firm's reusable creditor (issue 13.9 / #350) — `/v1/firm/creditors`, gated
- * by the `creditor_library` feature.
- *
- * **Snake_case, unlike every other type on this page.** Every other
- * firm-domain response (`Firm`, `FirmUser`) is camelCase because `firm.py`
- * invented its own field names; this one reuses `claims.py`'s `NoticeParty`
- * and the case domain's `Address` verbatim (the issue specifies "the same
- * shape `claim.notice_parties` uses"), so the wire follows the case domain's
- * snake_case rather than adding a second, camelCase copy of the same fields.
+ * by the `creditor_library` feature. Its notice parties are a claim's
+ * {@link NoticeParty} shape, its address the case domain's {@link Address}.
  */
 export interface LibraryCreditor {
   readonly id: string;
   readonly name: string;
   readonly address: Address;
   /** Other parties to notify about a debt to this creditor — copy target for
-   * a claim's {@link ClaimBody.notice_parties} once the claim exists; not
+   * a claim's notice parties once the claim exists; not
    * copied onto the case creditor itself, which carries no such field. */
-  readonly additional_notice_parties: readonly LibraryNoticeParty[];
+  readonly additionalNoticeParties: readonly LibraryNoticeParty[];
   /** Surfaced first by a picker; set by whoever curates the library. */
   readonly preferred: boolean;
   readonly notes?: string | undefined;
-  readonly created_at: string;
-  readonly updated_at: string;
+  readonly createdAt: string;
+  readonly updatedAt: string;
 }
 
 /**
@@ -618,49 +547,17 @@ export interface LibraryCreditorDraft {
   /** Required — a library entry with no name is not a record the picker can show. */
   readonly name: string;
   readonly address?: Address | undefined;
-  readonly additional_notice_parties?: readonly LibraryNoticeParty[] | undefined;
+  readonly additionalNoticeParties?: readonly LibraryNoticeParty[] | undefined;
   readonly preferred?: boolean | undefined;
   readonly notes?: string | undefined;
 }
 
-/**
- * A library entry's notice party: a claim's {@link NoticeParty} as the
- * library still spells it — snake_case until the firm routes move (ADR 0032),
- * its address camelCase like every {@link Address}.
- */
+/** A library entry's notice party: a claim's {@link NoticeParty}. */
 export interface LibraryNoticeParty {
   readonly id: string;
   readonly name?: string | undefined;
   readonly address?: Address | undefined;
-  readonly account_last4?: string | undefined;
-}
-
-function noticePartyToJson(party: LibraryNoticeParty): Record<string, unknown> {
-  return assignDefined(
-    { id: party.id },
-    {
-      name: party.name,
-      address: addressToJson(party.address),
-      account_last4: party.account_last4,
-    },
-  );
-}
-
-/** The `POST`/`PUT /v1/firm/creditors[/{id}]` body, snake_case, absent
- * optionals omitted entirely. */
-export function libraryCreditorDraftToJson(draft: LibraryCreditorDraft): Record<string, unknown> {
-  return assignDefined(
-    { name: draft.name },
-    {
-      address: addressToJson(draft.address),
-      additional_notice_parties:
-        draft.additional_notice_parties === undefined
-          ? undefined
-          : draft.additional_notice_parties.map(noticePartyToJson),
-      preferred: draft.preferred,
-      notes: draft.notes,
-    },
-  );
+  readonly accountLast4?: string | undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -682,58 +579,58 @@ export type FirmClientStatus = 'active' | 'archived';
  * `clients` feature. One client has many cases over time; a prospect is a
  * client with no case yet.
  *
- * **Snake_case**, for {@link LibraryCreditor}'s reason: the identity fields
- * are the case domain's own shapes ({@link PersonName}, {@link Address},
- * {@link OtherName}), reused verbatim so a client copied onto a debtor needs
- * no mapping. Absent optional fields are omitted by the server, never `null`.
+ * The identity fields are the case domain's own shapes ({@link PersonName},
+ * {@link Address}, {@link OtherName}), reused verbatim so a client copied onto
+ * a debtor needs no mapping. Absent optional fields are omitted by the
+ * server, never `null`.
  */
 export interface FirmClient {
   readonly id: string;
   readonly status: FirmClientStatus;
   /** Always present; at least one of `surname` / `given` is set. */
   readonly name: PersonName;
-  readonly other_names_used?: readonly OtherName[] | undefined;
+  readonly otherNamesUsed?: readonly OtherName[] | undefined;
   /** `YYYY-MM-DD`. */
-  readonly date_of_birth?: string | undefined;
-  readonly residence_address?: Address | undefined;
-  readonly mailing_address?: Address | undefined;
+  readonly dateOfBirth?: string | undefined;
+  readonly residenceAddress?: Address | undefined;
+  readonly mailingAddress?: Address | undefined;
   readonly phone?: string | undefined;
   readonly mobile?: string | undefined;
   readonly email?: string | undefined;
   /** Free text in v1; a firm pick-list is a later issue. */
-  readonly lead_source?: string | undefined;
-  readonly referred_by?: string | undefined;
+  readonly leadSource?: string | undefined;
+  readonly referredBy?: string | undefined;
   /** `YYYY-MM-DD`. */
-  readonly first_retained_at?: string | undefined;
+  readonly firstRetainedAt?: string | undefined;
   /**
    * The last four digits of the client's tax ID — the only tax-ID fact any
    * response carries. It cannot be set through this API: the full value is
    * sealed once and entered on a case.
    */
-  readonly tax_id_last_four?: string | undefined;
+  readonly taxIdLastFour?: string | undefined;
   /**
    * Present only on a client that was MERGED into another (ADR 0022): the
    * surviving client's id. Such a client is `archived` for good — it cannot
    * be edited, restored, merged again or opened for a case; its cases now
    * belong to the survivor.
    */
-  readonly merged_into?: string | undefined;
+  readonly mergedInto?: string | undefined;
   /**
    * Where a PROSPECT sits in the funnel (issue #355) — present only while
-   * {@link first_retained_at} is absent and a stage has been set through
+   * {@link firstRetainedAt} is absent and a stage has been set through
    * `setFirmClientProspectStage`. Server-owned: the whole-record PUT never
    * sends it.
    */
-  readonly prospect_stage?: ProspectStage | undefined;
-  readonly created_at: string;
-  readonly updated_at: string;
+  readonly prospectStage?: ProspectStage | undefined;
+  readonly createdAt: string;
+  readonly updatedAt: string;
   /** The subject of the firm user who created the record. */
-  readonly created_by: string;
+  readonly createdBy: string;
 }
 
 /**
  * `POST /v1/firm/clients/{id}/merge`'s answer: the survivor as it now stands
- * and the merged client, archived with `merged_into`. Deliberately no count of
+ * and the merged client, archived with `mergedInto`. Deliberately no count of
  * the cases moved — it would include cases the caller may not see.
  */
 export interface FirmClientMerge {
@@ -744,23 +641,23 @@ export interface FirmClientMerge {
 /**
  * The `POST` / `PUT /v1/firm/clients/{id}` body — a WHOLE record, never a
  * partial PATCH ({@link LibraryCreditorDraft}'s reason): a field omitted from
- * a PUT is cleared. `status`, `created_by` and the tax ID are the server's and
+ * a PUT is cleared. `status`, `createdBy` and the tax ID are the server's and
  * are not part of the draft; archive with `setFirmClientStatus`.
  */
 export interface FirmClientDraft {
   /** `surname` or `given` is required. */
   readonly name: PersonName;
   /** Each row needs its own client-chosen `id`, as a debtor's does. */
-  readonly other_names_used?: readonly OtherName[] | undefined;
-  readonly date_of_birth?: string | undefined;
-  readonly residence_address?: Address | undefined;
-  readonly mailing_address?: Address | undefined;
+  readonly otherNamesUsed?: readonly OtherName[] | undefined;
+  readonly dateOfBirth?: string | undefined;
+  readonly residenceAddress?: Address | undefined;
+  readonly mailingAddress?: Address | undefined;
   readonly phone?: string | undefined;
   readonly mobile?: string | undefined;
   readonly email?: string | undefined;
-  readonly lead_source?: string | undefined;
-  readonly referred_by?: string | undefined;
-  readonly first_retained_at?: string | undefined;
+  readonly leadSource?: string | undefined;
+  readonly referredBy?: string | undefined;
+  readonly firstRetainedAt?: string | undefined;
 }
 
 /**
@@ -770,46 +667,6 @@ export interface FirmClientDraft {
 export interface FirmClientCase {
   readonly filingRole: FilingRole;
   readonly case: Case;
-}
-
-/**
- * An address WITH its county — unlike {@link addressToJson}, which drops it
- * for the entities whose write paths never send one. A client's residence
- * county is B101 line 5's County box once it is copied onto a debtor, so it
- * travels on a client and on a debtor alike.
- */
-function clientAddressToJson(address: Address | undefined): Record<string, unknown> | undefined {
-  if (address === undefined) {
-    return undefined;
-  }
-  return definedMembersOrUndefined({
-    line1: address.line1,
-    line2: address.line2,
-    city: address.city,
-    state: address.state,
-    postalCode: address.postalCode,
-    county: address.county,
-  });
-}
-
-/** The `POST`/`PUT /v1/firm/clients[/{id}]` body, snake_case, absent
- * optionals omitted entirely. */
-export function firmClientDraftToJson(draft: FirmClientDraft): Record<string, unknown> {
-  return assignDefined(
-    { name: personNameToJson(draft.name) ?? {} },
-    {
-      other_names_used: otherNamesToJson(draft.other_names_used),
-      date_of_birth: draft.date_of_birth,
-      residence_address: clientAddressToJson(draft.residence_address),
-      mailing_address: clientAddressToJson(draft.mailing_address),
-      phone: draft.phone,
-      mobile: draft.mobile,
-      email: draft.email,
-      lead_source: draft.lead_source,
-      referred_by: draft.referred_by,
-      first_retained_at: draft.first_retained_at,
-    },
-  );
 }
 
 // ---------------------------------------------------------------------------
@@ -3271,66 +3128,6 @@ function assignDefined(
     }
   }
   return target;
-}
-
-/**
- * {@link assignDefined} into a fresh object, or `undefined` when no member had
- * a value — which is how an all-empty sub-object comes to be omitted rather
- * than sent as `{}`.
- */
-function definedMembersOrUndefined(
-  members: Record<string, unknown>,
-): Record<string, unknown> | undefined {
-  const json = assignDefined({}, members);
-  return Object.keys(json).length === 0 ? undefined : json;
-}
-
-function personNameToJson(name: PersonName | undefined): Record<string, unknown> | undefined {
-  if (name === undefined) {
-    return undefined;
-  }
-  return definedMembersOrUndefined({
-    given: name.given,
-    middle: name.middle,
-    surname: name.surname,
-    suffix: name.suffix,
-  });
-}
-
-function addressToJson(address: Address | undefined): Record<string, unknown> | undefined {
-  if (address === undefined) {
-    return undefined;
-  }
-  return definedMembersOrUndefined({
-    line1: address.line1,
-    line2: address.line2,
-    city: address.city,
-    state: address.state,
-    postalCode: address.postalCode,
-  });
-}
-
-/**
- * Alias rows, each keeping its `id` — the row's address, which provenance
- * paths already reference and which the server will not replace.
- */
-function otherNamesToJson(
-  names: readonly OtherName[] | undefined,
-): Record<string, unknown>[] | undefined {
-  if (names === undefined || names.length === 0) {
-    return undefined;
-  }
-  return names.map((name) =>
-    assignDefined(
-      { id: name.id },
-      {
-        given: name.given,
-        middle: name.middle,
-        surname: name.surname,
-        businessName: name.businessName,
-      },
-    ),
-  );
 }
 
 /**

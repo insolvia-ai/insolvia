@@ -25,7 +25,7 @@ public sealed class MemoryFirmStoreTests
         FirmsTests.User(subject: subject, firmId: firmId, firstName: firstName, lastName: lastName);
 
     private static LibraryCreditor Creditor(string firmId = Ids.Firm, string name = "Acme Collections") =>
-        LibraryCreditorRules.Create(LibraryCreditorRules.Parse(Body.Of($$"""{"name": "{{name}}", "preferred": true}""")), firmId);
+        LibraryCreditorRules.Create(Body.Read<LibraryCreditorDraft>(Body.Of($$"""{"name": "{{name}}", "preferred": true}""")), firmId);
 
     private static FirmClient Client(string firmId = Ids.Firm, string surname = "Example") =>
         FirmClientTests.Make($$$"""{"name": {"given": "Jordan", "surname": "{{{surname}}}"}}""", firmId);
@@ -253,7 +253,7 @@ public sealed class MemoryFirmStoreTests
     // ── The prospect funnel (test_client_funnel.py) ─────────────────
 
     private static FirmClient AClient(string? retained = null) =>
-        FirmClientTests.Make(retained is null ? """{"name": {"surname": "Example"}}""" : $$"""{"name": {"surname": "Example"}, "first_retained_at": "{{retained}}"}""");
+        FirmClientTests.Make(retained is null ? """{"name": {"surname": "Example"}}""" : $$"""{"name": {"surname": "Example"}, "firstRetainedAt": "{{retained}}"}""");
 
     [Fact]
     public async Task A_prospects_stage_is_set_and_cleared()
@@ -314,7 +314,7 @@ public sealed class MemoryFirmStoreTests
     {
         var sections = string.Join(", ", Questionnaires.Questionnaire.SectionIds.Select(id =>
             $$"""{"id": "{{id}}", "enabled": {{(id != "other" || other ? "true" : "false")}}}"""));
-        return Questionnaires.Questionnaire.BuildConfig(Questionnaires.Questionnaire.ParseUpdate(Body.Of($$"""{"sections": [{{sections}}]}""")), firmId, Ids.Alice);
+        return Questionnaires.Questionnaire.BuildConfig(Body.Read<Questionnaires.QuestionnaireRequest>(Body.Of($$"""{"sections": [{{sections}}]}""")).Settings(), firmId, Ids.Alice);
     }
 
     [Fact]

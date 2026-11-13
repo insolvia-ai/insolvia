@@ -5,6 +5,7 @@ using Insolvia.Domain;
 using Insolvia.Domain.Firms;
 using Insolvia.Domain.Ports;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Mvc;
 
 namespace Insolvia.Api.Routes;
 
@@ -28,11 +29,12 @@ public sealed class FirmRoutes : IEndpointModule
     {
         ArgumentNullException.ThrowIfNull(routes);
         routes.MapGet("/v1/firm", ReadFirmAsync).RequireAuth().Requires(Feature.FirmAdministration, PermissionLevel.ViewOnly);
-        routes.MapPatch("/v1/firm", UpdateFirmAsync).RequestBody<FirmUpdateRequest>().RequireAuth().Requires(Feature.FirmAdministration, PermissionLevel.AddEdit);
+        var sizeLimit = new RequestSizeLimitAttribute(MaxRequestBytes);
+        routes.MapPatch("/v1/firm", UpdateFirmAsync).WithMetadata(sizeLimit).RequireAuth().Requires(Feature.FirmAdministration, PermissionLevel.AddEdit);
         routes.MapGet("/v1/firm/directory", DirectoryAsync).RequireAuth().Requires(Feature.Cases, PermissionLevel.ViewOnly);
         routes.MapGet("/v1/firm/users", ListUsersAsync).RequireAuth().Requires(Feature.FirmAdministration, PermissionLevel.ViewOnly);
-        routes.MapPost("/v1/firm/users", AddUserAsync).RequestBody<FirmUserCreateRequest>().RequireAuth().Requires(Feature.FirmAdministration, PermissionLevel.AddEdit);
-        routes.MapPatch("/v1/firm/users/{subject}", UpdateUserAsync).RequestBody<FirmUserUpdateRequest>().RequireAuth().Requires(Feature.FirmAdministration, PermissionLevel.AddEdit);
+        routes.MapPost("/v1/firm/users", AddUserAsync).WithMetadata(sizeLimit).RequireAuth().Requires(Feature.FirmAdministration, PermissionLevel.AddEdit);
+        routes.MapPatch("/v1/firm/users/{subject}", UpdateUserAsync).WithMetadata(sizeLimit).RequireAuth().Requires(Feature.FirmAdministration, PermissionLevel.AddEdit);
         routes.MapDelete("/v1/firm/users/{subject}", RemoveUserAsync).RequireAuth().Requires(Feature.FirmAdministration, PermissionLevel.AddEdit);
     }
 
@@ -43,13 +45,15 @@ public sealed class FirmRoutes : IEndpointModule
 
     /// <summary>Update your firm.</summary>
     /// <remarks>Rename it, or change its defaults or letterhead. A status is refused: a firm suspending itself would lock out its own administrators.</remarks>
-    internal static async Task<FirmSummaryView> UpdateFirmAsync(HttpContext context, CancellationToken cancellationToken)
+    internal static async Task<FirmSummaryView> UpdateFirmAsync(HttpContext context, FirmChanges changes, CancellationToken cancellationToken)
     {
+        if (changes.IsEmpty)
+        {
+            throw new ValidationException("no supported fields to update");
+        }
+
         var store = context.FirmStore();
         var accessor = await context.CurrentAccessorAsync();
-        var courts = context.RequestServices.GetRequiredService<ICourtRegistry>();
-        var changes = FirmParser.ParseFirmUpdate(await context.BodyAsync(MaxRequestBytes), courts);
-
         var updated = FirmLifecycle.ApplyFirmChanges(accessor.Firm, changes, context.Clock());
         var written = await store.UpdateFirmAsync(updated, cancellationToken)
             ?? throw new NotFoundException("firm not found"); // vanished between resolving and writing
@@ -82,11 +86,11 @@ public sealed class FirmRoutes : IEndpointModule
 
     /// <summary>Add a user to the firm.</summary>
     /// <remarks>Creates their sign-in account first. Supplied permissions merge over the role's defaults.</remarks>
-    internal static async Task<Created<UserView>> AddUserAsync(HttpContext context, CancellationToken cancellationToken)
+    internal static async Task<Created<UserView>> AddUserAsync(HttpContext context, NewFirmUser request, CancellationToken cancellationToken)
     {
         var store = context.FirmStore();
         var accessor = await context.CurrentAccessorAsync();
-        var draft = FirmParser.ParseFirmUserCreation(await context.BodyAsync(MaxRequestBytes));
+        var draft = request.ToDraft();
 
         // Separate from the store so the read routes work without it.
         var directory = context.RequestServices.GetService<IUserDirectory>()
@@ -106,11 +110,15 @@ public sealed class FirmRoutes : IEndpointModule
     /// replaces the stored map. A change that would leave the firm with no
     /// active administrator is a 409.
     /// </remarks>
-    internal static async Task<UserView> UpdateUserAsync(HttpContext context, string subject, CancellationToken cancellationToken)
+    internal static async Task<UserView> UpdateUserAsync(HttpContext context, string subject, FirmUserChanges changes, CancellationToken cancellationToken)
     {
+        if (changes.IsEmpty)
+        {
+            throw new ValidationException("no supported fields to update");
+        }
+
         var store = context.FirmStore();
         var accessor = await context.CurrentAccessorAsync();
-        var changes = FirmParser.ParseFirmUserUpdate(await context.BodyAsync(MaxRequestBytes));
 
         var existing = await store.GetUserAsync(accessor.FirmId, subject, cancellationToken)
             ?? throw new NotFoundException(UserNotFound);

@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
@@ -17,25 +16,11 @@ public static class BodyJson
     /// <summary>The settings every collection body is written and read with.</summary>
     public static JsonSerializerOptions Options { get; } = CreateOptions();
 
-    /// <summary>
-    /// The port's snake_case with money as text — a firm client's body, which
-    /// still travels and is stored that way until its routes are converted
-    /// (ADR 0032, build step 4).
-    /// </summary>
-    public static JsonSerializerOptions SnakeOptions { get; } = CreateSnakeOptions();
-
     /// <summary>The body as a JSON object, its unanswered members left out (<see cref="Prune"/>).</summary>
     public static JsonObject ToNode(object body)
     {
         ArgumentNullException.ThrowIfNull(body);
         return Prune(JsonSerializer.SerializeToNode(body, body.GetType(), Options)!.AsObject());
-    }
-
-    /// <summary>A firm client's body as a JSON object, in <see cref="SnakeOptions"/>.</summary>
-    public static JsonObject ToSnakeNode(object body)
-    {
-        ArgumentNullException.ThrowIfNull(body);
-        return JsonSerializer.SerializeToNode(body, body.GetType(), SnakeOptions)!.AsObject();
     }
 
     /// <summary>
@@ -125,27 +110,5 @@ public static class BodyJson
         options.Converters.Add(new JsonStringEnumConverter(allowIntegerValues: false));
         options.MakeReadOnly(populateMissingResolver: true);
         return options;
-    }
-
-    private static JsonSerializerOptions CreateSnakeOptions()
-    {
-        var options = new JsonSerializerOptions
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
-        };
-        options.Converters.Add(new JsonStringEnumConverter());
-        options.Converters.Add(new DecimalAsTextConverter());
-        options.MakeReadOnly(populateMissingResolver: true);
-        return options;
-    }
-
-    // The port's money: a decimal as its own text, never a JSON number.
-    private sealed class DecimalAsTextConverter : JsonConverter<decimal>
-    {
-        public override decimal Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
-            decimal.Parse(reader.GetString()!, NumberStyles.Number, CultureInfo.InvariantCulture);
-
-        public override void Write(Utf8JsonWriter writer, decimal value, JsonSerializerOptions options) =>
-            writer.WriteStringValue(value.ToString(CultureInfo.InvariantCulture));
     }
 }

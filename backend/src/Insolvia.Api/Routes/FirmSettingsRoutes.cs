@@ -4,6 +4,7 @@ using Insolvia.Api.Hosting;
 using Insolvia.Domain.DocumentRequests;
 using Insolvia.Domain.Firms;
 using Insolvia.Domain.Questionnaires;
+using Microsoft.AspNetCore.Mvc;
 
 namespace Insolvia.Api.Routes;
 
@@ -25,7 +26,7 @@ public sealed class FirmQuestionnaireRoutes : IEndpointModule
     {
         ArgumentNullException.ThrowIfNull(routes);
         routes.MapGet("/v1/firm/questionnaire", ReadAsync).RequireAuth().Requires(Feature.FirmAdministration, PermissionLevel.ViewOnly);
-        routes.MapPut("/v1/firm/questionnaire", SaveAsync).RequestBody<QuestionnaireRequest>().RequireAuth().Requires(Feature.FirmAdministration, PermissionLevel.AddEdit);
+        routes.MapPut("/v1/firm/questionnaire", SaveAsync).WithMetadata(new RequestSizeLimitAttribute(MaxRequestBytes)).RequireAuth().Requires(Feature.FirmAdministration, PermissionLevel.AddEdit);
         routes.MapDelete("/v1/firm/questionnaire", ResetAsync).RequireAuth().Requires(Feature.FirmAdministration, PermissionLevel.AddEdit);
     }
 
@@ -39,11 +40,10 @@ public sealed class FirmQuestionnaireRoutes : IEndpointModule
 
     /// <summary>Save the questionnaire config.</summary>
     /// <remarks>Answers what was saved, so the screen renders the server's normalisation rather than what it sent.</remarks>
-    internal static async Task<QuestionnaireView> SaveAsync(HttpContext context, CancellationToken cancellationToken)
+    internal static async Task<QuestionnaireView> SaveAsync(HttpContext context, QuestionnaireRequest request, CancellationToken cancellationToken)
     {
         var accessor = await context.CurrentAccessorAsync();
-        var settings = Questionnaire.ParseUpdate(await context.BodyAsync(MaxRequestBytes));
-        var config = Questionnaire.BuildConfig(settings, accessor.FirmId, accessor.Subject, context.Clock());
+        var config = Questionnaire.BuildConfig(request.Settings(), accessor.FirmId, accessor.Subject, context.Clock());
         await context.FirmStore().PutQuestionnaireAsync(config, cancellationToken);
         context.Log(Logger, "questionnaire config saved");
         return QuestionnaireView.Of(config);
@@ -80,7 +80,7 @@ public sealed class DocumentChecklistRoutes : IEndpointModule
     {
         ArgumentNullException.ThrowIfNull(routes);
         routes.MapGet("/v1/firm/document-checklist", ReadAsync).RequireAuth().Requires(Feature.FirmAdministration, PermissionLevel.ViewOnly);
-        routes.MapPut("/v1/firm/document-checklist", SaveAsync).RequestBody<ChecklistRequest>().RequireAuth().Requires(Feature.FirmAdministration, PermissionLevel.AddEdit);
+        routes.MapPut("/v1/firm/document-checklist", SaveAsync).WithMetadata(new RequestSizeLimitAttribute(MaxRequestBytes)).RequireAuth().Requires(Feature.FirmAdministration, PermissionLevel.AddEdit);
         routes.MapDelete("/v1/firm/document-checklist", ResetAsync).RequireAuth().Requires(Feature.FirmAdministration, PermissionLevel.AddEdit);
     }
 
@@ -93,10 +93,10 @@ public sealed class DocumentChecklistRoutes : IEndpointModule
     }
 
     /// <summary>Save the document checklist, whole.</summary>
-    internal static async Task<ChecklistView> SaveAsync(HttpContext context, CancellationToken cancellationToken)
+    internal static async Task<ChecklistView> SaveAsync(HttpContext context, ChecklistRequest request, CancellationToken cancellationToken)
     {
         var accessor = await context.CurrentAccessorAsync();
-        var items = DocumentChecklists.ParseUpdate(await context.BodyAsync(MaxRequestBytes));
+        var items = request.Items!;
         var checklist = DocumentChecklists.Build(items, accessor.FirmId, accessor.Subject, context.Clock());
         await context.FirmStore().PutDocumentChecklistAsync(checklist, cancellationToken);
         context.Log(Logger, "document checklist saved", ("items", items.Count));

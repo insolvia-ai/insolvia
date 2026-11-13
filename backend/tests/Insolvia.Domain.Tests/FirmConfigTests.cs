@@ -12,16 +12,16 @@ public sealed class LibraryCreditorTests
 {
     [Fact]
     public void A_name_is_required() =>
-        Assert.Contains("name", Assert.Throws<FieldValidationException>(() => LibraryCreditorRules.Parse(Body.Of("{}"))).Fields.Keys);
+        Assert.Contains("name", Assert.Throws<FieldValidationException>(() => Body.Read<LibraryCreditorDraft>(Body.Of("{}"))).Fields.Keys);
 
     [Fact]
     public void A_blank_name_is_also_refused() =>
-        Assert.Contains("name", Assert.Throws<FieldValidationException>(() => LibraryCreditorRules.Parse(Body.Of("""{"name": "   "}"""))).Fields.Keys);
+        Assert.Contains("name", Assert.Throws<FieldValidationException>(() => Body.Read<LibraryCreditorDraft>(Body.Of("""{"name": "   "}"""))).Fields.Keys);
 
     [Fact]
     public void Everything_but_the_name_is_optional()
     {
-        var draft = LibraryCreditorRules.Parse(Body.Of("""{"name": "Acme Collections"}"""));
+        var draft = Body.Read<LibraryCreditorDraft>(Body.Of("""{"name": "Acme Collections"}"""));
         Assert.Equal("Acme Collections", draft.Name);
         Assert.Equal(new Address(), draft.Address);
         Assert.Empty(draft.AdditionalNoticeParties);
@@ -32,7 +32,7 @@ public sealed class LibraryCreditorTests
     [Fact]
     public void The_address_is_parsed()
     {
-        var draft = LibraryCreditorRules.Parse(Body.Of("""{"name": "Acme Collections", "address": {"line1": "1 Main St", "city": "Springfield", "state": "IL"}}"""));
+        var draft = Body.Read<LibraryCreditorDraft>(Body.Of("""{"name": "Acme Collections", "address": {"line1": "1 Main St", "city": "Springfield", "state": "IL"}}"""));
         Assert.Equal("1 Main St", draft.Address.Line1);
         Assert.Equal("Springfield", draft.Address.City);
     }
@@ -40,8 +40,8 @@ public sealed class LibraryCreditorTests
     [Fact]
     public void Additional_notice_parties_use_the_claim_notice_party_shape()
     {
-        var draft = LibraryCreditorRules.Parse(Body.Of("""
-            {"name": "Acme Collections", "additional_notice_parties": [{"id": "np1", "name": "Acme Legal Dept", "account_last4": "1234"}]}
+        var draft = Body.Read<LibraryCreditorDraft>(Body.Of("""
+            {"name": "Acme Collections", "additionalNoticeParties": [{"id": "np1", "name": "Acme Legal Dept", "accountLast4": "1234"}]}
             """));
         var party = Assert.Single(draft.AdditionalNoticeParties);
         Assert.Equal(("np1", "Acme Legal Dept", "1234"), (party.Id, party.Name, party.AccountLast4));
@@ -50,24 +50,24 @@ public sealed class LibraryCreditorTests
     [Fact]
     public void A_notice_party_with_no_id_is_refused_under_the_library_field_name()
     {
-        var fields = Assert.Throws<FieldValidationException>(() => LibraryCreditorRules.Parse(
-            Body.Of("""{"name": "Acme Collections", "additional_notice_parties": [{"name": "x"}]}"""))).Fields;
-        Assert.Contains("additional_notice_parties[0].id", fields.Keys);
-        Assert.DoesNotContain(fields.Keys, key => key.StartsWith("notice_parties", StringComparison.Ordinal));
+        var fields = Assert.Throws<FieldValidationException>(() => Body.Read<LibraryCreditorDraft>(
+            Body.Of("""{"name": "Acme Collections", "additionalNoticeParties": [{"name": "x"}]}"""))).Fields;
+        Assert.Contains("additionalNoticeParties[0].id", fields.Keys);
+        Assert.DoesNotContain(fields.Keys, key => key.StartsWith("noticeParties", StringComparison.Ordinal));
     }
 
     [Fact]
     public void Preferred_defaults_to_false_but_is_settable() =>
-        Assert.True(LibraryCreditorRules.Parse(Body.Of("""{"name": "Acme Collections", "preferred": true}""")).Preferred);
+        Assert.True(Body.Read<LibraryCreditorDraft>(Body.Of("""{"name": "Acme Collections", "preferred": true}""")).Preferred);
 
     [Fact]
     public void Notes_accepts_multiple_lines() =>
-        Assert.Equal("Line one\nLine two", LibraryCreditorRules.Parse(Body.Of("""{"name": "Acme Collections", "notes": "Line one\nLine two"}""")).Notes);
+        Assert.Equal("Line one\nLine two", Body.Read<LibraryCreditorDraft>(Body.Of("""{"name": "Acme Collections", "notes": "Line one\nLine two"}""")).Notes);
 
     [Fact]
     public void Creation_mints_an_id_and_stamps_the_firm()
     {
-        var creditor = LibraryCreditorRules.Create(LibraryCreditorRules.Parse(Body.Of("""{"name": "Acme Collections"}""")), Ids.Firm);
+        var creditor = LibraryCreditorRules.Create(Body.Read<LibraryCreditorDraft>(Body.Of("""{"name": "Acme Collections"}""")), Ids.Firm);
         Assert.Equal(Ids.Firm, creditor.FirmId);
         Assert.False(string.IsNullOrEmpty(creditor.Id));
         Assert.Equal(creditor.CreatedAt, creditor.UpdatedAt);
@@ -76,8 +76,8 @@ public sealed class LibraryCreditorTests
     [Fact]
     public void Replace_keeps_identity_and_bumps_updated_at()
     {
-        var original = LibraryCreditorRules.Create(LibraryCreditorRules.Parse(Body.Of("""{"name": "Acme Collections"}""")), Ids.Firm);
-        var edited = LibraryCreditorRules.Replace(original, LibraryCreditorRules.Parse(Body.Of("""{"name": "Acme Collections LLC"}""")));
+        var original = LibraryCreditorRules.Create(Body.Read<LibraryCreditorDraft>(Body.Of("""{"name": "Acme Collections"}""")), Ids.Firm);
+        var edited = LibraryCreditorRules.Replace(original, Body.Read<LibraryCreditorDraft>(Body.Of("""{"name": "Acme Collections LLC"}""")));
         Assert.Equal((original.Id, original.FirmId, original.CreatedAt), (edited.Id, edited.FirmId, edited.CreatedAt));
         Assert.Equal("Acme Collections LLC", edited.Name);
         Assert.True(edited.UpdatedAt >= original.UpdatedAt);
@@ -126,10 +126,10 @@ public sealed class QuestionnaireTests
     }
 
     private static QuestionnaireConfig ConfigFrom(string body) =>
-        Questionnaire.BuildConfig(Questionnaire.ParseUpdate(Body.Of(body)), Ids.Firm, Ids.Alice);
+        Questionnaire.BuildConfig(Body.Read<QuestionnaireRequest>(Body.Of(body)).Settings(), Ids.Firm, Ids.Alice);
 
     private static IReadOnlyDictionary<string, string> Refused(string body) =>
-        Assert.Throws<FieldValidationException>(() => Questionnaire.ParseUpdate(Body.Of(body))).Fields;
+        Assert.Throws<FieldValidationException>(() => Body.Read<QuestionnaireRequest>(Body.Of(body))).Fields;
 
     [Fact]
     public void The_catalogue_ids_are_the_contract_the_answers_will_hang_off() =>
@@ -166,7 +166,7 @@ public sealed class QuestionnaireTests
     {
         var body = Save(("personal_information", """{"enabled": false}"""));
         Assert.Equal(
-            new Dictionary<string, string> { ["sections.personal_information.enabled"] = "Personal information is always on." },
+            new Dictionary<string, string> { ["sections[0].enabled"] = "Personal information is always on." },
             Refused(body));
     }
 
@@ -184,7 +184,7 @@ public sealed class QuestionnaireTests
     [Fact]
     public void The_firms_instructions_replace_the_default_for_the_client()
     {
-        var config = ConfigFrom(Save(("debts", """{"instructions": "  Bring your last statement.  "}""")));
+        var config = ConfigFrom(Save(("debts", """{"instructions": "Bring your last statement."}""")));
         var debts = Questionnaire.ClientSections(config)[2];
         Assert.Equal(("debts", "Debts", "Bring your last statement."), (debts.Section.Id, debts.Section.Title, debts.Instructions));
     }
@@ -208,7 +208,7 @@ public sealed class QuestionnaireTests
     [Fact]
     public void Overlong_instructions_are_refused_beside_their_section() =>
         Assert.Equal(
-            new Dictionary<string, string> { ["sections.property.instructions"] = $"Must be {Questionnaire.MaxInstructions} characters or fewer." },
+            new Dictionary<string, string> { ["sections[1].instructions"] = $"Must be {Questionnaire.MaxInstructions} characters or fewer." },
             Refused(Save(("property", $$"""{"instructions": "{{new string('x', Questionnaire.MaxInstructions + 1)}}"}"""))));
 
     public static TheoryData<string, string, string> NotOneWholeRecord()
@@ -219,11 +219,11 @@ public sealed class QuestionnaireTests
         return new()
         {
             { "{}", "sections", "Must be a list of sections." },
-            { $$"""{"sections": [{{allButLast}}]}""", "sections.other", "Missing from the save." },
-            { $$"""{"sections": [{{string.Join(", ", all)}}, {"id": "debts", "enabled": false}]}""", "sections.debts", "Named more than once." },
-            { $$"""{"sections": [{{string.Join(", ", all)}}, {"id": "hobbies", "enabled": true}]}""", "sections.6.id", "Must be one of " + string.Join(", ", Questionnaire.SectionIds) },
-            { Save(("debts", """{"enabled": "no"}""")), "sections.debts.enabled", "Must be true or false." },
-            { $$"""{"sections": [{{withIncomeFlagAbsent}}]}""", "sections.income.enabled", "Must be true or false." },
+            { $$"""{"sections": [{{allButLast}}]}""", "sections", "Missing from the save: other." },
+            { $$"""{"sections": [{{string.Join(", ", all)}}, {"id": "debts", "enabled": false}]}""", "sections[6].id", "Named more than once." },
+            { $$"""{"sections": [{{string.Join(", ", all)}}, {"id": "hobbies", "enabled": true}]}""", "sections[6].id", "Must be one of " + string.Join(", ", Questionnaire.SectionIds) },
+            { Save(("debts", """{"enabled": "no"}""")), "sections[2].enabled", "Not the expected type." },
+            { $$"""{"sections": [{{withIncomeFlagAbsent}}]}""", "sections[3].enabled", "Must be true or false." },
         };
     }
 
@@ -267,27 +267,29 @@ public sealed class DocumentChecklistTests
         Assert.Empty(DocumentChecklists.Resolve(DocumentChecklists.Build([], Ids.Firm, Ids.Alice)));
 
     [Fact]
-    public void A_checklist_save_is_parsed_whole_and_trimmed() =>
+    public void A_checklist_save_is_read_whole() =>
         Assert.Equal(
             [new ChecklistItem("Lease", DocumentKind.Other), new ChecklistItem("Pay stubs", DocumentKind.PayStub, "Six months")],
-            DocumentChecklists.ParseUpdate(Body.Of("""
-                {"items": [{"title": "  Lease  ", "kind": "other", "description": " "},
+            Body.Read<ChecklistRequest>(Body.Of("""
+                {"items": [{"title": "Lease", "kind": "other"},
                            {"title": "Pay stubs", "kind": "pay_stub", "description": "Six months"}]}
-                """)));
+                """)).Items);
 
-    [Fact]
-    public void Every_bad_checklist_entry_is_reported_by_index() =>
-        Assert.Equal(
-            ["items.0.title", "items.1.kind", "items.2"],
-            Assert.Throws<FieldValidationException>(() => DocumentChecklists.ParseUpdate(Body.Of("""
-                {"items": [{"title": "", "kind": "pay_stub"}, {"title": "Car", "kind": "vehicle"}, "not an object"]}
-                """))).Fields.Keys.Order(StringComparer.Ordinal));
+    [Theory]
+    [InlineData("""{"title": "", "kind": "pay_stub"}""", "items[1].title")]
+    [InlineData("""{"title": "Car", "kind": "vehicle"}""", "items[1].kind")]
+    [InlineData("""{"title": "Car"}""", "items[1]")]
+    [InlineData("\"not an object\"", "items[1]")]
+    public void A_bad_checklist_entry_is_reported_by_index(string entry, string key) =>
+        Assert.Contains(
+            key,
+            Assert.Throws<FieldValidationException>(() => Body.Read<ChecklistRequest>(Body.Of($$"""{"items": [{"title": "Lease", "kind": "other"}, {{entry}}]}"""))).Fields.Keys);
 
     [Fact]
     public void Two_entries_with_the_same_title_are_refused() =>
         Assert.Equal(
-            ["items.1.title"],
-            Assert.Throws<FieldValidationException>(() => DocumentChecklists.ParseUpdate(Body.Of("""
+            ["items[1].title"],
+            Assert.Throws<FieldValidationException>(() => Body.Read<ChecklistRequest>(Body.Of("""
                 {"items": [{"title": "Bank statements", "kind": "bank_statement"}, {"title": "bank  STATEMENTS", "kind": "other"}]}
                 """))).Fields.Keys);
 
@@ -295,7 +297,7 @@ public sealed class DocumentChecklistTests
     public void A_checklist_has_a_ceiling()
     {
         var entries = string.Join(", ", Enumerable.Range(0, 41).Select(n => $$"""{"title": "Doc {{n}}", "kind": "other"}"""));
-        Assert.Throws<FieldValidationException>(() => DocumentChecklists.ParseUpdate(Body.Of($$"""{"items": [{{entries}}]}""")));
+        Assert.Contains("items", Assert.Throws<FieldValidationException>(() => Body.Read<ChecklistRequest>(Body.Of($$"""{"items": [{{entries}}]}"""))).Fields.Keys);
     }
 
     [Fact]

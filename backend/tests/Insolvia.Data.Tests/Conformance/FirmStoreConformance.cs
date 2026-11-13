@@ -198,7 +198,7 @@ public abstract class FirmStoreConformance : IAsyncLifetime
     {
         var store = await SeededAsync();
         await store.AddUserAsync(Make.User(), Ct);
-        var changed = FirmLifecycle.ApplyUserChanges(Make.User(), new FirmUserChanges(LastName: "Advocate", IsAdmin: true), Clock);
+        var changed = FirmLifecycle.ApplyUserChanges(Make.User(), new FirmUserChanges { LastName = "Advocate", IsAdmin = true }, Clock);
         Assert.Equal(changed, await store.UpdateUserAsync(changed, Ct));
         Assert.Equal(changed, await Connect().GetUserAsync(Ids.Firm, Ids.Alice, Ct));
     }
@@ -241,9 +241,9 @@ public abstract class FirmStoreConformance : IAsyncLifetime
     {
         var store = await SeededAsync();
         var creditor = LibraryCreditorRules.Create(
-            LibraryCreditorRules.Parse(Make.Json("""
-                {"name": "Acme Collections", "address": {"line1": "PO Box 1", "city": "Dover", "state": "DE", "postal_code": "19901"},
-                 "additional_notice_parties": [{"id": "np-1", "name": "Acme Legal", "address": {"raw": "c/o Counsel, Dover DE"}, "account_last4": "1234"}],
+            Make.Read<LibraryCreditorDraft>(Make.Json("""
+                {"name": "Acme Collections", "address": {"line1": "PO Box 1", "city": "Dover", "state": "DE", "postalCode": "19901"},
+                 "additionalNoticeParties": [{"id": "np-1", "name": "Acme Legal", "address": {"raw": "c/o Counsel, Dover DE"}, "accountLast4": "1234"}],
                  "notes": "Prefers fax."}
                 """)),
             Ids.Firm);
@@ -287,7 +287,7 @@ public abstract class FirmStoreConformance : IAsyncLifetime
         var store = await SeededAsync();
         var creditor = Make.Creditor();
         await store.CreateLibraryCreditorAsync(creditor, Ct);
-        var replaced = LibraryCreditorRules.Replace(creditor, LibraryCreditorRules.Parse(Make.Json("""{"name": "Acme Recovery", "preferred": false}""")), Clock);
+        var replaced = LibraryCreditorRules.Replace(creditor, Make.Read<LibraryCreditorDraft>(Make.Json("""{"name": "Acme Recovery", "preferred": false}""")), Clock);
         Assert.Equal(replaced, await store.UpdateLibraryCreditorAsync(replaced, Ct));
         Assert.Equal(replaced, await Connect().GetLibraryCreditorAsync(Ids.Firm, creditor.Id, Ct));
     }
@@ -330,14 +330,14 @@ public abstract class FirmStoreConformance : IAsyncLifetime
     {
         var store = await SeededAsync();
         var client = FirmClientRules.Create(
-            FirmClientRules.Parse(Make.Json("""
+            Make.Read<FirmClientDraft>(Make.Json("""
                 {"name": {"given": "Jordan", "middle": "Q", "surname": "Example", "suffix": "Jr."},
-                 "other_names_used": [{"id": "on-1", "given": "Jordy", "surname": "Sample"}],
-                 "date_of_birth": "1980-02-29",
-                 "residence_address": {"line1": "1 Main St", "city": "Tampa", "state": "FL", "postal_code": "33602", "county": "Hillsborough"},
-                 "mailing_address": {"raw": "PO Box 9, Tampa FL"},
+                 "otherNamesUsed": [{"id": "on-1", "given": "Jordy", "surname": "Sample"}],
+                 "dateOfBirth": "1980-02-29",
+                 "residenceAddress": {"line1": "1 Main St", "city": "Tampa", "state": "FL", "postalCode": "33602", "county": "Hillsborough"},
+                 "mailingAddress": {"raw": "PO Box 9, Tampa FL"},
                  "phone": "555-0100", "mobile": "555-0101", "email": "jordan@example.test",
-                 "lead_source": "Website", "referred_by": "A. Friend", "first_retained_at": "2026-07-20"}
+                 "leadSource": "Website", "referredBy": "A. Friend", "firstRetainedAt": "2026-07-20"}
                 """)),
             Ids.Firm,
             Ids.Alice) with
@@ -701,7 +701,7 @@ public abstract class FirmStoreConformance : IAsyncLifetime
     {
         var sections = string.Join(", ", Questionnaire.SectionIds.Select(id =>
             $$"""{"id": "{{id}}", "enabled": {{(id != "other" || other ? "true" : "false")}}{{(id == "property" && propertyInstructions is not null ? $", \"instructions\": \"{propertyInstructions}\"" : "")}}}"""));
-        return Questionnaire.BuildConfig(Questionnaire.ParseUpdate(Make.Json($$"""{"sections": [{{sections}}]}""")), firmId, Ids.Alice);
+        return Questionnaire.BuildConfig(((Insolvia.Domain.Questionnaires.QuestionnaireRequest)Insolvia.Domain.CaseEntities.BodyJson.Read(Make.Json($$"""{"sections": [{{sections}}]}"""), typeof(Insolvia.Domain.Questionnaires.QuestionnaireRequest))).Settings(), firmId, Ids.Alice);
     }
 
     [Fact]

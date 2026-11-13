@@ -1,15 +1,12 @@
-using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using Insolvia.Domain.Fields;
-using Insolvia.Domain.Provenance;
 
 namespace Insolvia.Domain.Debtors;
 
-// The two pieces of debtors.py the FIRM side needs before the case half is
-// ported (18.7): the 8-year alias row and its parser, which a firm client's
-// `other_names_used` shares with a debtor's (ADR 0022 copies one onto the
-// other, so both must accept exactly the same rows), and the filing roles a
-// client merge re-points. 18.7 ports the rest of debtors.py beside these.
+// The two pieces of debtors.py the FIRM side shares: the 8-year alias row,
+// which a firm client's `otherNamesUsed` shares with a debtor's (ADR 0022
+// copies one onto the other, so both must accept exactly the same rows), and
+// the filing roles a client merge re-points.
 
 /// <summary>A debtor's role on the petition (Python's <c>FILING_ROLES</c>).</summary>
 public enum FilingRole
@@ -31,8 +28,8 @@ public enum FilingRole
 /// An 8-year-lookback alias. Carries its own client-chosen <see cref="Id"/>
 /// so provenance addresses it as <c>otherNamesUsed[&lt;id&gt;].surname</c>
 /// — position would reattach on reorder. <see cref="BusinessName"/> is
-/// <c>businessName</c> under every serializer: the row sits in a debtor's
-/// camelCase body and a firm client's snake_case one alike (ADR 0032).
+/// <c>businessName</c> under every serializer, the stored client body's
+/// snake_case one included.
 /// </summary>
 public sealed record OtherName(
     string Id,
@@ -40,56 +37,3 @@ public sealed record OtherName(
     [property: Text] string? Middle = null,
     [property: Text] string? Surname = null,
     [property: Text, JsonPropertyName("businessName")] string? BusinessName = null) : IRow;
-
-/// <summary>The alias-list parser (Python's <c>debtors.parse_other_names</c>).</summary>
-public static class OtherNames
-{
-    /// <summary>
-    /// The 8-year alias list. Each row's <c>id</c> is REQUIRED and supplied by
-    /// the caller — minting one here would demand provenance at a path the
-    /// caller cannot have sent, and every retry would mint another.
-    /// </summary>
-    public static ValueCollection<OtherName> Parse(JsonNode? value, IDictionary<string, string> errors)
-    {
-        ArgumentNullException.ThrowIfNull(errors);
-        if (value is null)
-        {
-            return [];
-        }
-
-        if (value is not JsonArray list)
-        {
-            errors["other_names_used"] = "Must be a list.";
-            return [];
-        }
-
-        var names = new List<OtherName>();
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-        for (var index = 0; index < list.Count; index++)
-        {
-            var path = $"other_names_used[{index}]";
-            var entry = FieldParsers.Mapping(list[index], path, errors);
-            var givenId = Json.AsString(entry["id"]);
-            if (givenId is null || !ProvenanceRules.AddressableId().IsMatch(givenId))
-            {
-                errors[$"{path}.id"] = "Required, and must be letters, digits, hyphen or underscore — generate one per row so provenance can name it.";
-                continue;
-            }
-
-            if (!seen.Add(givenId))
-            {
-                errors[$"{path}.id"] = "Duplicate id.";
-                continue;
-            }
-
-            names.Add(new OtherName(
-                Id: givenId,
-                Given: FieldParsers.Text(entry["given"], $"{path}.given", errors),
-                Middle: FieldParsers.Text(entry["middle"], $"{path}.middle", errors),
-                Surname: FieldParsers.Text(entry["surname"], $"{path}.surname", errors),
-                BusinessName: FieldParsers.Text(entry["businessName"], $"{path}.businessName", errors)));
-        }
-
-        return names.ToValueCollection();
-    }
-}

@@ -4,6 +4,7 @@ using Insolvia.Api.Hosting;
 using Insolvia.Domain;
 using Insolvia.Domain.Access;
 using Insolvia.Domain.Firms;
+using Microsoft.AspNetCore.Mvc;
 
 namespace Insolvia.Api.Routes;
 
@@ -32,7 +33,7 @@ public sealed class MeRoutes : IEndpointModule
     {
         ArgumentNullException.ThrowIfNull(routes);
         routes.MapGet("/v1/me", ReadAsync).RequireAuth();
-        routes.MapPatch("/v1/me", UpdateAsync).RequestBody<MeUpdateRequest>().RequireAuth();
+        routes.MapPatch("/v1/me", UpdateAsync).WithMetadata(new RequestSizeLimitAttribute(MaxRequestBytes)).RequireAuth();
     }
 
     /// <summary>Read who you are.</summary>
@@ -42,13 +43,16 @@ public sealed class MeRoutes : IEndpointModule
 
     /// <summary>Update yourself.</summary>
     /// <remarks>Changes your own name or signature block. Needs no permission, only an active membership (403 without); answers the same body as the read.</remarks>
-    internal static async Task<MeView> UpdateAsync(HttpContext context, CancellationToken cancellationToken)
+    internal static async Task<MeView> UpdateAsync(HttpContext context, SelfChanges changes, CancellationToken cancellationToken)
     {
         var store = context.FirmStore();
         var accessor = await context.CurrentAccessorAsync();
-        var changes = FirmParser.ParseSelfUpdate(await context.BodyAsync(MaxRequestBytes));
+        if (changes.IsEmpty)
+        {
+            throw new ValidationException("no supported fields to update");
+        }
 
-        var updated = FirmLifecycle.ApplyUserChanges(accessor.User, changes, context.Clock());
+        var updated = FirmLifecycle.ApplyUserChanges(accessor.User, changes.ToUserChanges(), context.Clock());
         var written = await store.UpdateUserAsync(updated, cancellationToken)
             ?? throw new NotFoundException("firm user not found"); // removed between resolving and writing
 

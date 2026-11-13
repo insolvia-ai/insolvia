@@ -29,19 +29,19 @@ const CREDENTIAL = {
   login: LOGIN,
   courts: [],
   status: 'active',
-  created_at: '2026-07-23T09:15:00.123Z',
-  updated_at: '2026-07-23T09:15:00.123Z',
+  createdAt: '2026-07-23T09:15:00.123Z',
+  updatedAt: '2026-07-23T09:15:00.123Z',
 };
 
 const SIGNED_AUTHORIZATION = {
   text: { version: '2026-10-07-draft', digest: 'f'.repeat(64), text: 'DRAFT.' },
-  current_version: '2026-10-07-draft',
+  currentVersion: '2026-10-07-draft',
   current: true,
   signature: {
     id: 'a0700000-0000-4000-8000-000000000001',
-    text_version: '2026-10-07-draft',
-    text_digest: 'f'.repeat(64),
-    signed_at: '2100-01-01T00:01:00.000000Z',
+    textVersion: '2026-10-07-draft',
+    textDigest: 'f'.repeat(64),
+    signedAt: '2100-01-01T00:01:00.000000Z',
   },
 };
 
@@ -141,7 +141,7 @@ describe('the court filing login', () => {
     expect(JSON.parse(post?.[1]?.body as string)).toEqual({
       login: LOGIN,
       password: PASSWORD,
-      totp_seed: SEED,
+      totpSeed: SEED,
     });
     // The secret's last moment on the device was the request.
     expect(screen.queryByDisplayValue(PASSWORD)).toBeNull();

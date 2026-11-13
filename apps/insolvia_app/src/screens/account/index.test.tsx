@@ -136,7 +136,7 @@ describe('the account screen', () => {
     const fetchMock = signedIn({ '/v1/me': () => jsonResponse(200, saved) }, () =>
       jsonResponse(200, {
         ...saved,
-        firm: { ...saved.firm, signatureBlock: { bar_number: '0123456', bar_state: 'FL' } },
+        firm: { ...saved.firm, signatureBlock: { barNumber: '0123456', barState: 'FL' } },
       }),
     );
     await screen.findByDisplayValue('Attorney');
@@ -151,7 +151,7 @@ describe('the account screen', () => {
       ([url, init]) => url.includes('/v1/me') && init?.method === 'PATCH',
     );
     expect(JSON.parse(String(patch?.[1]?.body))).toEqual({
-      signatureBlock: { bar_number: '0123456', bar_state: 'FL' },
+      signatureBlock: { barNumber: '0123456', barState: 'FL' },
     });
   });
 

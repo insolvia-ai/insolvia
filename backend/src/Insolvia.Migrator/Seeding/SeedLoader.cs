@@ -399,8 +399,8 @@ public sealed class SeedLoader
             throw new SeedRefusedException($"case '{handle}': one client names two debtors — one client, one role");
         }
 
-        // The clients before the case that names them, parsed by the route's
-        // own parser and converged like every other seeded row.
+        // The clients before the case that names them, read into the route's
+        // own request record and converged like every other seeded row.
         foreach (var (name, clientId) in clientIds.OrderBy(pair => pair.Key, StringComparer.Ordinal))
         {
             if (!linked.ContainsValue(clientId))
@@ -410,7 +410,7 @@ public sealed class SeedLoader
 
             var body = SeedJson.Body(clients[name]);
             body.Remove("handle");
-            var draft = FirmClientRules.Parse(body, clock: _clock);
+            var draft = (FirmClientDraft)BodyJson.Read(body, typeof(FirmClientDraft));
             if (await _stores.Firms.GetClientAsync(firmId, clientId, cancellationToken).ConfigureAwait(false) is not null)
             {
                 continue;

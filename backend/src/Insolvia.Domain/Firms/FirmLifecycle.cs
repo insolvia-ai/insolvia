@@ -45,35 +45,24 @@ public static partial class FirmLifecycle
     }
 
     /// <summary>
-    /// A validated firm PATCH applied. Touches nothing the changes do not
-    /// name — provenance survives a rename, and status cannot appear at all.
+    /// A firm PATCH applied. Touches nothing the changes do not name —
+    /// provenance survives a rename, and status cannot appear at all.
     /// </summary>
     public static Firm ApplyFirmChanges(Firm firm, FirmChanges changes, TimeProvider? clock = null)
     {
         ArgumentNullException.ThrowIfNull(firm);
         ArgumentNullException.ThrowIfNull(changes);
-        var updated = firm with { UpdatedAt = Clock.NowMillis(clock) };
-        if (changes.Name is not null)
+        var court = changes.Names(nameof(FirmChanges.DefaultCourt)) || changes.Names(nameof(FirmChanges.DefaultDivision))
+            ? changes.DefaultCourt is { } code && changes.DefaultDivision is { } division ? new DefaultCourt(code, division) : null
+            : firm.DefaultCourt;
+        return firm with
         {
-            updated = updated with { Name = changes.Name };
-        }
-
-        if (changes.DefaultCourt is not null)
-        {
-            updated = updated with { DefaultCourt = changes.DefaultCourt.Value };
-        }
-
-        if (changes.DefaultChapter is not null)
-        {
-            updated = updated with { DefaultChapter = changes.DefaultChapter.Value };
-        }
-
-        if (changes.Letterhead is not null)
-        {
-            updated = updated with { Letterhead = changes.Letterhead.Value };
-        }
-
-        return updated;
+            Name = changes.Name ?? firm.Name,
+            DefaultCourt = court,
+            DefaultChapter = changes.Names(nameof(FirmChanges.DefaultChapter)) ? changes.DefaultChapter : firm.DefaultChapter,
+            Letterhead = changes.Names(nameof(FirmChanges.Letterhead)) ? changes.Letterhead : firm.Letterhead,
+            UpdatedAt = Clock.NowMillis(clock),
+        };
     }
 
     /// <summary>
@@ -108,7 +97,7 @@ public static partial class FirmLifecycle
     }
 
     /// <summary>
-    /// The supplied changes applied. CHANGING A ROLE DOES NOT RESET THE
+    /// The changes applied. CHANGING A ROLE DOES NOT RESET THE
     /// PERMISSION MAP — roles supply defaults at creation and nothing after.
     /// The two name halves apply independently.
     /// </summary>
@@ -123,9 +112,9 @@ public static partial class FirmLifecycle
             Role = changes.Role ?? user.Role,
             IsAdmin = changes.IsAdmin ?? user.IsAdmin,
             AccessAllCases = changes.AccessAllCases ?? user.AccessAllCases,
-            Permissions = changes.Permissions ?? user.Permissions,
+            Permissions = changes.Permissions?.ToValueDictionary() ?? user.Permissions,
             Status = changes.Status ?? user.Status,
-            SignatureBlock = changes.SignatureBlock is null ? user.SignatureBlock : changes.SignatureBlock.Value,
+            SignatureBlock = changes.SignatureBlockSent ? changes.SignatureBlock : user.SignatureBlock,
             UpdatedAt = Clock.NowMillis(clock),
         };
     }

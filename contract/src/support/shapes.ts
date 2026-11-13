@@ -14,9 +14,9 @@ export const ADDRESS: Spec = {
 };
 
 export const SIGNATURE_BLOCK: Spec = {
-  'bar_number?': 'string',
-  'bar_state?': 'string',
-  'firm_name?': 'string',
+  'barNumber?': 'string',
+  'barState?': 'string',
+  'firmName?': 'string',
   'address?': ADDRESS,
   'phone?': 'string',
   'email?': 'string',
@@ -90,15 +90,15 @@ export const FIRM_CLIENT: Spec = {
   id: 'string',
   name: PERSON_NAME,
   status: 'string',
-  created_at: 'string',
-  updated_at: 'string',
-  'prospect_stage?': 'string',
+  createdAt: 'string',
+  updatedAt: 'string',
+  'prospectStage?': 'string',
   'email?': 'string',
   'phone?': 'string',
-  'residence_address?': ADDRESS,
-  'tax_id_last_four?': 'string',
-  'merged_into?': 'string',
-  created_by: 'string',
+  'residenceAddress?': ADDRESS,
+  'taxIdLastFour?': 'string',
+  'mergedInto?': 'string',
+  createdBy: 'string',
 };
 
 export const DEBTOR: Spec = {

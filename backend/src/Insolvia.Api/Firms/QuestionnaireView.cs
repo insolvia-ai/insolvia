@@ -45,20 +45,6 @@ public sealed record QuestionnaireSectionView(string Id, string Title, string Co
 }
 
 /// <summary>
-/// The firm's questionnaire config as saved (<c>PUT /v1/firm/questionnaire</c>):
-/// every section, each named once. Parsed by <c>Questionnaire.ParseUpdate</c>,
-/// which owns validation; this record is its shape for the OpenAPI document.
-/// </summary>
-/// <param name="Sections">One entry for every section.</param>
-public sealed record QuestionnaireRequest(IReadOnlyList<QuestionnaireSectionRequest> Sections);
-
-/// <summary>The firm's choice for one questionnaire section.</summary>
-/// <param name="Id">The section's id.</param>
-/// <param name="Enabled">Whether clients see it; an unswitchable section must be true.</param>
-/// <param name="Instructions">The firm's instructions; absent, or the default text, means the default.</param>
-public sealed record QuestionnaireSectionRequest(string Id, bool Enabled, string? Instructions);
-
-/// <summary>
 /// The firm's document checklist (<c>checklist_json</c>): the list in force
 /// and the shipped default beside it.
 /// </summary>
@@ -95,11 +81,3 @@ public sealed record ChecklistItemView(string Title, DocumentKind Kind, string? 
         return new(item.Title, item.Kind, item.Description);
     }
 }
-
-/// <summary>
-/// The firm's document checklist as saved (<c>PUT /v1/firm/document-checklist</c>).
-/// Parsed by <c>DocumentChecklists.ParseUpdate</c>, which owns validation;
-/// this record is its shape for the OpenAPI document.
-/// </summary>
-/// <param name="Items">The whole list, in order.</param>
-public sealed record ChecklistRequest(IReadOnlyList<ChecklistItem> Items);

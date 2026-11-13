@@ -117,7 +117,7 @@ internal static class World
     public static async Task<FirmClient> MakeFirmClientAsync(IFirmStore firms, string surname = "Example", string firmId = FirmId, bool withTaxId = true)
     {
         var client = FirmClientRules.Create(
-            FirmClientRules.Parse(new JsonObject { ["name"] = new JsonObject { ["given"] = "Pat", ["surname"] = surname } }),
+            new FirmClientDraft(new Insolvia.Domain.Fields.PersonName(Given: "Pat", Surname: surname)),
             firmId,
             Subject);
         if (withTaxId)

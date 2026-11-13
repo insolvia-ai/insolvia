@@ -25,10 +25,6 @@ public static class ClientCopies
     public static readonly IReadOnlyList<string> CopiedFields =
         ["name", "otherNamesUsed", "residenceAddress", "mailingAddress", "phone", "mobile", "email"];
 
-    // The same fields in the client body's snake_case, until the client routes are converted (ADR 0032 step 4).
-    private static readonly IReadOnlyList<string> ClientFields =
-        ["name", "other_names_used", "residence_address", "mailing_address", "phone", "mobile", "email"];
-
     /// <summary>
     /// A NEW debtor of <paramref name="target"/> carrying the client's identity,
     /// every copied field with provenance <c>{source: client, client_id}</c> —
@@ -98,32 +94,25 @@ public static class ClientCopies
     /// ADR 0022's <em>update client from this case</em>: the client with every
     /// copied field replaced by what the case says — the whole-record client
     /// write. The client's own fields and everything server-owned are kept;
-    /// re-parsed through the client parser, so an emptied name is refused with
-    /// the client's own message. The debtor is not written.
+    /// checked as a client save is, so an emptied name is refused with the
+    /// client's own message. The debtor is not written.
     /// </summary>
     public static FirmClient ClientUpdatedFromDebtor(FirmClient client, Debtor debtor, TimeProvider? clock = null)
     {
         ArgumentNullException.ThrowIfNull(client);
         ArgumentNullException.ThrowIfNull(debtor);
-        var whole = BodyJson.ToSnakeNode(new FirmClientDraft(
-            client.Name,
-            client.OtherNamesUsed,
-            client.DateOfBirth,
-            client.ResidenceAddress,
-            client.MailingAddress,
-            client.Phone,
-            client.Mobile,
-            client.Email,
-            client.LeadSource,
-            client.ReferredBy,
-            client.FirstRetainedAt));
-        var ours = BodyJson.ToSnakeNode(DebtorCopied(debtor.Body));
-        foreach (var key in ClientFields)
+        var draft = FirmClientRules.DraftOf(client) with
         {
-            whole[key] = ours[key]?.DeepClone();
-        }
-
-        return FirmClientRules.Replace(client, FirmClientRules.Parse(BodyJson.Prune(whole), clock: clock), clock);
+            Name = debtor.Body.Name,
+            OtherNamesUsed = debtor.Body.OtherNamesUsed,
+            ResidenceAddress = debtor.Body.ResidenceAddress,
+            MailingAddress = debtor.Body.MailingAddress,
+            Phone = debtor.Body.Phone,
+            Mobile = debtor.Body.Mobile,
+            Email = debtor.Body.Email,
+        };
+        RecordValidator.ThrowIfInvalid(draft, BodyJson.Options);
+        return FirmClientRules.Replace(client, draft, clock);
     }
 
     /// <summary>Whether a provenance path addresses one of <see cref="CopiedFields"/>.</summary>
@@ -151,9 +140,6 @@ public static class ClientCopies
         var whole = DebtorRules.BodyNode(body);
         return new JsonObject([.. whole.Where(pair => CopiedFields.Contains(pair.Key)).Select(pair => KeyValuePair.Create(pair.Key, pair.Value?.DeepClone()))]);
     }
-
-    private static CopiedIdentity DebtorCopied(DebtorBody body) =>
-        new(body.Name, body.OtherNamesUsed, body.ResidenceAddress, body.MailingAddress, body.Phone, body.Mobile, body.Email);
 
     /// <summary>
     /// Field path to value for every populated leaf, list elements addressed by
@@ -202,14 +188,4 @@ public static class ClientCopies
                 return output;
         }
     }
-
-    /// <summary>The seven copied members, as one record, so both sides serialize alike.</summary>
-    private sealed record CopiedIdentity(
-        PersonName Name,
-        ValueCollection<OtherName> OtherNamesUsed,
-        Address ResidenceAddress,
-        Address MailingAddress,
-        string? Phone,
-        string? Mobile,
-        string? Email);
 }

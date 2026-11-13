@@ -178,21 +178,26 @@ public sealed class FirmsTests
              "permissions": {"documents": "full_control"}}
             """)));
 
+    private static FirmUserChanges UserPatch(System.Text.Json.Nodes.JsonObject body) => Body.Read<FirmUserChanges>(body);
+
+    private static SelfChanges SelfPatch(System.Text.Json.Nodes.JsonObject body) => Body.Read<SelfChanges>(body);
+
+    private static FirmChanges FirmPatch(System.Text.Json.Nodes.JsonObject body) => Body.Read<FirmChanges>(body);
+
     [Fact]
     public void A_patch_replaces_the_permission_map()
     {
-        var changes = FirmParser.ParseFirmUserUpdate(Body.Of("""{"permissions": {"cases": "view_only"}}"""));
+        var changes = UserPatch(Body.Of("""{"permissions": {"cases": "view_only"}}"""));
         Assert.Equal(Map((Feature.Cases, PermissionLevel.ViewOnly)), changes.Permissions);
         var updated = FirmLifecycle.ApplyUserChanges(User(), changes);
         Assert.Equal(PermissionLevel.Hidden, Permissions.PermissionFor(updated, Feature.Documents));
     }
 
-    [Fact]
-    public void A_patch_cannot_change_an_email() =>
-        Assert.Throws<ValidationException>(() => FirmParser.ParseFirmUserUpdate(Body.Of("""{"email": "elsewhere@example.test"}""")));
-
-    [Fact]
-    public void An_empty_patch_is_refused() => Assert.Throws<ValidationException>(() => FirmParser.ParseFirmUserUpdate(Body.Of("{}")));
+    [Theory]
+    [InlineData("""{"email": "elsewhere@example.test"}""")]
+    [InlineData("{}")]
+    public void A_patch_without_a_changeable_field_is_empty(string payload) =>
+        Assert.True(UserPatch(Body.Of(payload)).IsEmpty);
 
     [Fact]
     public void Changing_a_role_leaves_the_permission_map_alone()
@@ -200,7 +205,7 @@ public sealed class FirmsTests
         var tuned = User(
             role: FirmRole.Staff,
             permissions: Permissions.DefaultFor(FirmRole.Staff).Append(new(Feature.Cases, PermissionLevel.Hidden)).ToValueDictionary());
-        var promoted = FirmLifecycle.ApplyUserChanges(tuned, FirmParser.ParseFirmUserUpdate(Body.Of("""{"role": "attorney"}""")));
+        var promoted = FirmLifecycle.ApplyUserChanges(tuned, UserPatch(Body.Of("""{"role": "attorney"}""")));
         Assert.Equal(FirmRole.Attorney, promoted.Role);
         Assert.Equal(PermissionLevel.Hidden, Permissions.PermissionFor(promoted, Feature.Cases));
     }
@@ -208,7 +213,7 @@ public sealed class FirmsTests
     [Fact]
     public void A_self_update_renames_and_nothing_else()
     {
-        var updated = FirmLifecycle.ApplyUserChanges(User(), FirmParser.ParseSelfUpdate(Body.Of("""{"firstName": "Robert", "lastName": "Attorney"}""")));
+        var updated = FirmLifecycle.ApplyUserChanges(User(), SelfPatch(Body.Of("""{"firstName": "Robert", "lastName": "Attorney"}""")).ToUserChanges());
         Assert.Equal(("Robert", "Attorney"), (updated.FirstName, updated.LastName));
         Assert.Equal((User().Role, User().IsAdmin, User().Status), (updated.Role, updated.IsAdmin, updated.Status));
     }
@@ -218,35 +223,25 @@ public sealed class FirmsTests
     [InlineData("""{"lastName": "Barrister"}""", "Alice", "Barrister")]
     public void A_self_update_takes_either_half_alone(string payload, string first, string last)
     {
-        var updated = FirmLifecycle.ApplyUserChanges(User(), FirmParser.ParseSelfUpdate(Body.Of(payload)));
+        var updated = FirmLifecycle.ApplyUserChanges(User(), SelfPatch(Body.Of(payload)).ToUserChanges());
         Assert.Equal((first, last), (updated.FirstName, updated.LastName));
     }
-
-    [Fact]
-    public void A_self_update_still_accepts_one_display_name()
-    {
-        var updated = FirmLifecycle.ApplyUserChanges(User(), FirmParser.ParseSelfUpdate(Body.Of("""{"displayName": "Robert Barrister"}""")));
-        Assert.Equal(("Robert", "Barrister"), (updated.FirstName, updated.LastName));
-    }
-
-    [Fact]
-    public void A_legacy_self_update_refuses_a_single_token_name() =>
-        Assert.Contains("displayName", Refused(() => FirmParser.ParseSelfUpdate(Body.Of("""{"displayName": "Cher"}"""))).Keys);
 
     [Theory]
     [InlineData("""{"role": "attorney"}""")]
     [InlineData("""{"isAdmin": true}""")]
     [InlineData("""{"status": "disabled"}""")]
+    [InlineData("""{"displayName": "Robert Barrister"}""")]
     [InlineData("{}")]
-    public void A_self_update_without_a_name_is_refused(string payload) =>
-        Assert.Throws<ValidationException>(() => FirmParser.ParseSelfUpdate(Body.Of(payload)));
+    public void A_self_update_reads_only_the_name_and_signature_block(string payload) =>
+        Assert.True(SelfPatch(Body.Of(payload)).IsEmpty);
 
     public static TheoryData<string, string> BadHalves()
     {
         var data = new TheoryData<string, string>();
         foreach (var field in new[] { "firstName", "lastName" })
         {
-            foreach (var value in new[] { "\"\"", "\"   \"", "null", "7", "\"" + new string('x', 101) + "\"" })
+            foreach (var value in new[] { "\"\"", "\"   \"", "7", "\"" + new string('x', 101) + "\"" })
             {
                 data.Add(field, value);
             }
@@ -258,7 +253,7 @@ public sealed class FirmsTests
     [Theory]
     [MemberData(nameof(BadHalves))]
     public void A_self_update_validates_each_half_like_any_other_name(string field, string value) =>
-        Assert.Contains(field, Refused(() => FirmParser.ParseSelfUpdate(Body.Of($$"""{"{{field}}": {{value}}}"""))).Keys);
+        Assert.Contains(field, Refused(() => SelfPatch(Body.Of($$"""{"{{field}}": {{value}}}"""))).Keys);
 
     [Fact]
     public void A_subject_must_be_a_cognito_sub()
@@ -334,7 +329,7 @@ public sealed class FirmsTests
     public void A_firm_update_renames_and_keeps_provenance()
     {
         var firm = FirmLifecycle.CreateFirm(FirmParser.ParseFirmCreation(Body.Of("""{"name": "Example"}""")), "staff-subject", "operator@example.test");
-        var renamed = FirmLifecycle.ApplyFirmChanges(firm, FirmParser.ParseFirmUpdate(Body.Of("""{"name": "Example, LLP"}"""), FakeCourtRegistry.Instance));
+        var renamed = FirmLifecycle.ApplyFirmChanges(firm, FirmPatch(Body.Of("""{"name": "Example, LLP"}""")));
         Assert.Equal("Example, LLP", renamed.Name);
         Assert.True(renamed.UpdatedAt >= firm.UpdatedAt);
         Assert.Equal((firm.Id, firm.Status, firm.CreatedBy, firm.CreatedByEmail), (renamed.Id, renamed.Status, renamed.CreatedBy, renamed.CreatedByEmail));
@@ -343,30 +338,30 @@ public sealed class FirmsTests
     [Theory]
     [InlineData("""{"status": "suspended"}""")]
     [InlineData("""{"status": "active"}""")]
+    [InlineData("""{"name": null}""")]
     [InlineData("{}")]
     public void A_firm_update_cannot_touch_status(string payload) =>
-        Assert.Throws<ValidationException>(() => FirmParser.ParseFirmUpdate(Body.Of(payload), FakeCourtRegistry.Instance));
+        Assert.True(FirmPatch(Body.Of(payload)).IsEmpty);
 
     [Theory]
     [InlineData("\"\"")]
     [InlineData("\"   \"")]
-    [InlineData("null")]
     [InlineData("7")]
     public void A_firm_update_validates_the_name(string value) =>
-        Assert.Contains("name", Refused(() => FirmParser.ParseFirmUpdate(Body.Of($$"""{"name": {{value}}}"""), FakeCourtRegistry.Instance)).Keys);
+        Assert.Contains("name", Refused(() => FirmPatch(Body.Of($$"""{"name": {{value}}}"""))).Keys);
 
     [Fact]
     public void A_firm_update_validates_the_name_length() =>
-        Assert.Contains("name", Refused(() => FirmParser.ParseFirmUpdate(Body.Of($$"""{"name": "{{new string('x', 201)}}"}"""), FakeCourtRegistry.Instance)).Keys);
+        Assert.Contains("name", Refused(() => FirmPatch(Body.Of($$"""{"name": "{{new string('x', 201)}}"}"""))).Keys);
 
     // ── Firm defaults and signature blocks (issue #360) ────────────
 
     [Fact]
     public void A_default_court_is_validated_against_the_registry()
     {
-        var changes = FirmParser.ParseFirmUpdate(Body.Of("""{"defaultCourt": "flmb", "defaultDivision": "tampa"}"""), FakeCourtRegistry.Instance);
-        Assert.NotNull(changes.DefaultCourt);
-        Assert.Equal(new DefaultCourt("flmb", "tampa"), changes.DefaultCourt.Value);
+        var changes = FirmPatch(Body.Of("""{"defaultCourt": "flmb", "defaultDivision": "tampa"}"""));
+        Assert.Equal(("flmb", "tampa"), (changes.DefaultCourt, changes.DefaultDivision));
+        Assert.Equal(new DefaultCourt("flmb", "tampa"), FirmLifecycle.ApplyFirmChanges(FirmLifecycle.CreateFirm(FirmParser.ParseFirmCreation(Body.Of("""{"name": "Example"}"""))), changes).DefaultCourt);
     }
 
     [Theory]
@@ -379,28 +374,28 @@ public sealed class FirmsTests
     [InlineData("""{"letterhead": "Example & Partners"}""", "letterhead")]
     [InlineData("""{"letterhead": {"phone": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"}}""", "letterhead.phone")]
     public void A_bad_default_names_its_field(string payload, string field) =>
-        Assert.Contains(field, Refused(() => FirmParser.ParseFirmUpdate(Body.Of(payload), FakeCourtRegistry.Instance)).Keys);
+        Assert.Contains(field, Refused(() => FirmPatch(Body.Of(payload))).Keys);
 
     [Fact]
     public void Defaults_are_applied_and_can_be_cleared()
     {
         var firm = FirmLifecycle.CreateFirm(FirmParser.ParseFirmCreation(Body.Of("""{"name": "Example"}""")));
-        var withDefaults = FirmLifecycle.ApplyFirmChanges(firm, FirmParser.ParseFirmUpdate(Body.Of("""
+        var withDefaults = FirmLifecycle.ApplyFirmChanges(firm, FirmPatch(Body.Of("""
             {"defaultCourt": "flmb", "defaultDivision": "tampa", "defaultChapter": 13,
              "letterhead": {"name": "Example & Partners, P.A.", "address": {"line1": "1 Main St", "city": "Tampa", "state": "FL"}, "phone": "813-555-0100"}}
-            """), FakeCourtRegistry.Instance));
+            """)));
         Assert.Equal(new DefaultCourt("flmb", "tampa"), withDefaults.DefaultCourt);
         Assert.Equal(13, withDefaults.DefaultChapter);
         Assert.NotNull(withDefaults.Letterhead);
         Assert.Equal("Tampa", withDefaults.Letterhead.Address.City);
 
         // A rename leaves every default alone: null means "leave unchanged".
-        var renamed = FirmLifecycle.ApplyFirmChanges(withDefaults, FirmParser.ParseFirmUpdate(Body.Of("""{"name": "Ex"}"""), FakeCourtRegistry.Instance));
+        var renamed = FirmLifecycle.ApplyFirmChanges(withDefaults, FirmPatch(Body.Of("""{"name": "Ex"}""")));
         Assert.Equal(withDefaults.DefaultCourt, renamed.DefaultCourt);
 
         // `null` clears — the one thing a bare null cannot express.
-        var cleared = FirmLifecycle.ApplyFirmChanges(withDefaults, FirmParser.ParseFirmUpdate(
-            Body.Of("""{"defaultCourt": null, "defaultDivision": null, "letterhead": null}"""), FakeCourtRegistry.Instance));
+        var cleared = FirmLifecycle.ApplyFirmChanges(withDefaults, FirmPatch(
+            Body.Of("""{"defaultCourt": null, "defaultDivision": null, "letterhead": null}""")));
         Assert.Null(cleared.DefaultCourt);
         Assert.Null(cleared.Letterhead);
         Assert.Equal(13, cleared.DefaultChapter);
@@ -409,30 +404,29 @@ public sealed class FirmsTests
     [Fact]
     public void A_signature_block_is_the_filing_professionals_shape()
     {
-        var changes = FirmParser.ParseSelfUpdate(Body.Of("""
-            {"signatureBlock": {"bar_number": "0123456", "bar_state": "FL", "firm_name": "Example & Partners",
+        var changes = SelfPatch(Body.Of("""
+            {"signatureBlock": {"barNumber": "0123456", "barState": "FL", "firmName": "Example & Partners",
              "address": {"line1": "1 Main St", "city": "Tampa", "state": "FL"}, "phone": "813-555-0100", "email": "alice@example.test"}}
             """));
-        Assert.NotNull(changes.SignatureBlock);
-        var block = changes.SignatureBlock.Value;
+        var block = changes.SignatureBlock;
         Assert.NotNull(block);
         Assert.Equal("0123456", block.BarNumber);
-        Assert.Equal(block, FirmLifecycle.ApplyUserChanges(User(), changes).SignatureBlock);
+        Assert.Equal(block, FirmLifecycle.ApplyUserChanges(User(), changes.ToUserChanges()).SignatureBlock);
     }
 
     [Theory]
     [InlineData("""{"signatureBlock": "0123456"}""", "signatureBlock")]
-    [InlineData("""{"signatureBlock": {"bar_state": "FLA"}}""", "signatureBlock.bar_state")]
-    [InlineData("""{"signatureBlock": {"bar_number": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"}}""", "signatureBlock.bar_number")]
+    [InlineData("""{"signatureBlock": {"barState": "FLA"}}""", "signatureBlock.barState")]
+    [InlineData("""{"signatureBlock": {"barNumber": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"}}""", "signatureBlock.barNumber")]
     public void A_bad_signature_block_names_its_field(string payload, string field) =>
-        Assert.Contains(field, Refused(() => FirmParser.ParseFirmUserUpdate(Body.Of(payload))).Keys);
+        Assert.Contains(field, Refused(() => UserPatch(Body.Of(payload))).Keys);
 
     [Fact]
     public void A_signature_block_can_be_cleared_by_admin_or_self()
     {
-        var withBlock = FirmLifecycle.ApplyUserChanges(User(), FirmParser.ParseFirmUserUpdate(Body.Of("""{"signatureBlock": {"bar_number": "1"}}""")));
+        var withBlock = FirmLifecycle.ApplyUserChanges(User(), UserPatch(Body.Of("""{"signatureBlock": {"barNumber": "1"}}""")));
         Assert.NotNull(withBlock.SignatureBlock);
-        var cleared = FirmLifecycle.ApplyUserChanges(withBlock, FirmParser.ParseSelfUpdate(Body.Of("""{"signatureBlock": null}""")));
+        var cleared = FirmLifecycle.ApplyUserChanges(withBlock, SelfPatch(Body.Of("""{"signatureBlock": null}""")).ToUserChanges());
         Assert.Null(cleared.SignatureBlock);
     }
 

@@ -50,9 +50,9 @@ export function firmClient(
     id,
     status: 'active',
     name: { given, surname },
-    created_at: '2026-09-27T09:00:00.000000Z',
-    updated_at: '2026-09-27T09:00:00.000000Z',
-    created_by: ALICE,
+    createdAt: '2026-09-27T09:00:00.000000Z',
+    updatedAt: '2026-09-27T09:00:00.000000Z',
+    createdBy: ALICE,
     ...extra,
   };
 }

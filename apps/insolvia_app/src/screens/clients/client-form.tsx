@@ -80,15 +80,15 @@ export function formFromClient(client: FirmClient): ClientFormState {
     middle: client.name.middle ?? '',
     surname: client.name.surname ?? '',
     suffix: client.name.suffix ?? '',
-    dateOfBirth: client.date_of_birth ?? '',
+    dateOfBirth: client.dateOfBirth ?? '',
     phone: client.phone ?? '',
     mobile: client.mobile ?? '',
     email: client.email ?? '',
-    residence: addressState(client.residence_address),
-    mailing: addressState(client.mailing_address),
-    leadSource: client.lead_source ?? '',
-    referredBy: client.referred_by ?? '',
-    firstRetainedAt: client.first_retained_at ?? '',
+    residence: addressState(client.residenceAddress),
+    mailing: addressState(client.mailingAddress),
+    leadSource: client.leadSource ?? '',
+    referredBy: client.referredBy ?? '',
+    firstRetainedAt: client.firstRetainedAt ?? '',
   };
 }
 
@@ -113,7 +113,7 @@ function addressOrUndefined(address: AddressState): Address | undefined {
  * The WHOLE-RECORD body `POST`/`PUT /v1/firm/clients` takes.
  *
  * `stored` is the record being edited, and it matters: a PUT clears anything
- * it omits, and this form does not edit `other_names_used` (an alias list is
+ * it omits, and this form does not edit `otherNamesUsed` (an alias list is
  * the intake's job, with its own row ids) — so an edit carries the stored
  * aliases through untouched rather than erasing them by not showing them.
  */
@@ -125,16 +125,16 @@ export function requestFromForm(form: ClientFormState, stored?: FirmClient): Fir
       surname: blankToUndefined(form.surname),
       suffix: blankToUndefined(form.suffix),
     },
-    other_names_used: stored?.other_names_used,
-    date_of_birth: blankToUndefined(form.dateOfBirth),
-    residence_address: addressOrUndefined(form.residence),
-    mailing_address: addressOrUndefined(form.mailing),
+    otherNamesUsed: stored?.otherNamesUsed,
+    dateOfBirth: blankToUndefined(form.dateOfBirth),
+    residenceAddress: addressOrUndefined(form.residence),
+    mailingAddress: addressOrUndefined(form.mailing),
     phone: blankToUndefined(form.phone),
     mobile: blankToUndefined(form.mobile),
     email: blankToUndefined(form.email),
-    lead_source: blankToUndefined(form.leadSource),
-    referred_by: blankToUndefined(form.referredBy),
-    first_retained_at: blankToUndefined(form.firstRetainedAt),
+    leadSource: blankToUndefined(form.leadSource),
+    referredBy: blankToUndefined(form.referredBy),
+    firstRetainedAt: blankToUndefined(form.firstRetainedAt),
   };
 }
 
@@ -143,7 +143,7 @@ export function requestFromForm(form: ClientFormState, stored?: FirmClient): Fir
  * edit mode, so the two cannot disagree about what a client is.
  *
  * Errors are the SERVER's, keyed by its field paths (`name`,
- * `date_of_birth`, `residence_address.postalCode`, …) and rendered on the
+ * `dateOfBirth`, `residenceAddress.postalCode`, …) and rendered on the
  * box they name (ADR 0001): the rule lives in `insolvia_core.firm_clients`,
  * not in a second copy here. `name` — "a surname or a first name" — is
  * shown under the surname, the box a person reaches for first.
@@ -203,7 +203,7 @@ export function ClientForm({
   );
 
   const address = (
-    root: 'residence_address' | 'mailing_address',
+    root: 'residenceAddress' | 'mailingAddress',
     key: 'residence' | 'mailing',
     title: string,
   ) => {
@@ -236,7 +236,7 @@ export function ClientForm({
             {text(`${root}.postalCode`, label('ZIP code'), current.postalCode, put('postalCode'))}
           </View>
         </View>
-        {root === 'residence_address'
+        {root === 'residenceAddress'
           ? text(`${root}.county`, 'County', current.county, put('county'))
           : null}
       </View>
@@ -281,7 +281,7 @@ export function ClientForm({
             {text('name.suffix', 'Suffix', value.suffix, (next) => set('suffix', next))}
           </View>
         </View>
-        {date('date_of_birth', 'Date of birth', value.dateOfBirth, (next) =>
+        {date('dateOfBirth', 'Date of birth', value.dateOfBirth, (next) =>
           set('dateOfBirth', next),
         )}
       </View>
@@ -301,8 +301,8 @@ export function ClientForm({
         </View>
       </View>
 
-      {address('residence_address', 'residence', 'Where they live')}
-      {address('mailing_address', 'mailing', 'Mailing address, if different')}
+      {address('residenceAddress', 'residence', 'Where they live')}
+      {address('mailingAddress', 'mailing', 'Mailing address, if different')}
 
       <View style={styles.section}>
         <Heading level={headingLevel} size="body">
@@ -310,17 +310,13 @@ export function ClientForm({
         </Heading>
         <View style={styles.row}>
           <View style={styles.grow}>
-            {text('lead_source', 'Lead source', value.leadSource, (next) =>
-              set('leadSource', next),
-            )}
+            {text('leadSource', 'Lead source', value.leadSource, (next) => set('leadSource', next))}
           </View>
           <View style={styles.grow}>
-            {text('referred_by', 'Referred by', value.referredBy, (next) =>
-              set('referredBy', next),
-            )}
+            {text('referredBy', 'Referred by', value.referredBy, (next) => set('referredBy', next))}
           </View>
         </View>
-        {date('first_retained_at', 'First retained', value.firstRetainedAt, (next) =>
+        {date('firstRetainedAt', 'First retained', value.firstRetainedAt, (next) =>
           set('firstRetainedAt', next),
         )}
       </View>

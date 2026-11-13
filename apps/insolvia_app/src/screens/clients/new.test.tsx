@@ -78,7 +78,7 @@ describe('adding a client', () => {
     expect(router.getSearchParams()).toMatchObject({ client: SAM.id });
     // Only what was typed: blank boxes are absent, never empty strings.
     expect(bodiesOf(fetchMock, 'POST', '/v1/firm/clients')).toEqual([
-      { name: { given: 'Sam', surname: 'Sample' }, residence_address: { city: 'Orlando' } },
+      { name: { given: 'Sam', surname: 'Sample' }, residenceAddress: { city: 'Orlando' } },
     ]);
   });
 

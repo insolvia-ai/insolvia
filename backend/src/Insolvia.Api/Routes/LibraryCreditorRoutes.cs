@@ -5,13 +5,14 @@ using Insolvia.Domain;
 using Insolvia.Domain.Firms;
 using Insolvia.Domain.LibraryCreditors;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Mvc;
 
 namespace Insolvia.Api.Routes;
 
 /// <summary>
 /// The firm's reusable creditor library (13.9 / #350; services/api
 /// routes/library_creditors.py), gated by <c>creditor_library</c> and scoped
-/// to the caller's firm. Whole-record POST/PUT, snake_case wire. A case
+/// to the caller's firm. Whole-record POST/PUT. A case
 /// copies from the library with provenance; editing the library never
 /// touches a case.
 /// </summary>
@@ -27,9 +28,10 @@ public sealed class LibraryCreditorRoutes : IEndpointModule
     {
         ArgumentNullException.ThrowIfNull(routes);
         routes.MapGet("/v1/firm/creditors", ListAsync).RequireAuth().Requires(Feature.CreditorLibrary, PermissionLevel.ViewOnly);
-        routes.MapPost("/v1/firm/creditors", AddAsync).RequestBody<LibraryCreditorRequest>().RequireAuth().Requires(Feature.CreditorLibrary, PermissionLevel.AddEdit);
+        var sizeLimit = new RequestSizeLimitAttribute(MaxRequestBytes);
+        routes.MapPost("/v1/firm/creditors", AddAsync).WithMetadata(sizeLimit).RequireAuth().Requires(Feature.CreditorLibrary, PermissionLevel.AddEdit);
         routes.MapGet("/v1/firm/creditors/{creditorId}", GetAsync).RequireAuth().Requires(Feature.CreditorLibrary, PermissionLevel.ViewOnly);
-        routes.MapPut("/v1/firm/creditors/{creditorId}", UpdateAsync).RequestBody<LibraryCreditorRequest>().RequireAuth().Requires(Feature.CreditorLibrary, PermissionLevel.AddEdit);
+        routes.MapPut("/v1/firm/creditors/{creditorId}", UpdateAsync).WithMetadata(sizeLimit).RequireAuth().Requires(Feature.CreditorLibrary, PermissionLevel.AddEdit);
         routes.MapDelete("/v1/firm/creditors/{creditorId}", DeleteAsync).RequireAuth().Requires(Feature.CreditorLibrary, PermissionLevel.AddEdit);
     }
 
@@ -43,10 +45,9 @@ public sealed class LibraryCreditorRoutes : IEndpointModule
     }
 
     /// <summary>Add a creditor to the library.</summary>
-    internal static async Task<Created<LibraryCreditorView>> AddAsync(HttpContext context, CancellationToken cancellationToken)
+    internal static async Task<Created<LibraryCreditorView>> AddAsync(HttpContext context, LibraryCreditorDraft draft, CancellationToken cancellationToken)
     {
         var accessor = await context.CurrentAccessorAsync();
-        var draft = LibraryCreditorRules.Parse(await context.BodyAsync(MaxRequestBytes));
         var creditor = LibraryCreditorRules.Create(draft, accessor.FirmId, context.Clock());
         await context.FirmStore().CreateLibraryCreditorAsync(creditor, cancellationToken);
 
@@ -66,11 +67,10 @@ public sealed class LibraryCreditorRoutes : IEndpointModule
 
     /// <summary>Save a library creditor, whole.</summary>
     /// <remarks>PUT, not PATCH: a field the body omits is cleared. A case that copied it is never touched.</remarks>
-    internal static async Task<LibraryCreditorView> UpdateAsync(HttpContext context, string creditorId, CancellationToken cancellationToken)
+    internal static async Task<LibraryCreditorView> UpdateAsync(HttpContext context, string creditorId, LibraryCreditorDraft draft, CancellationToken cancellationToken)
     {
         var store = context.FirmStore();
         var accessor = await context.CurrentAccessorAsync();
-        var draft = LibraryCreditorRules.Parse(await context.BodyAsync(MaxRequestBytes));
 
         var existing = await store.GetLibraryCreditorAsync(accessor.FirmId, creditorId, cancellationToken)
             ?? throw new NotFoundException(NotFound);

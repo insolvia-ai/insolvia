@@ -4319,9 +4319,9 @@ describe('signature blocks (issue #360)', () => {
   // /v1/me firm block; PATCH /v1/me and PATCH /v1/firm/users/{subject}
   // both write it, with null as the clear instruction.
   const BLOCK = {
-    bar_number: '0123456',
-    bar_state: 'FL',
-    firm_name: 'Example & Partners',
+    barNumber: '0123456',
+    barState: 'FL',
+    firmName: 'Example & Partners',
     address: { line1: '1 Main St', city: 'Tampa', state: 'FL', postalCode: '33602' },
     phone: '813-555-0100',
     email: 'alice@example.test',
@@ -4764,9 +4764,7 @@ describe('the firm user endpoints', () => {
 });
 
 // ---------------------------------------------------------------------------
-// The firm's reusable creditor library (issue 13.9 / #350). SNAKE_CASE on the
-// wire, unlike every other firm-domain endpoint above — see
-// insolvia_core.library_creditors' module docstring for why.
+// The firm's reusable creditor library (issue 13.9 / #350).
 // ---------------------------------------------------------------------------
 
 describe('the library creditor endpoints', () => {
@@ -4775,25 +4773,21 @@ describe('the library creditor endpoints', () => {
     id: CREDITOR_ID,
     name: 'Acme Collections',
     address: { line1: '1 Main St', city: 'Springfield', state: 'IL', postalCode: '62701' },
-    additional_notice_parties: [
-      { id: 'np1', name: 'Legal Dept', address: {}, account_last4: '1234' },
-    ],
+    additionalNoticeParties: [{ id: 'np1', name: 'Legal Dept', address: {}, accountLast4: '1234' }],
     preferred: true,
     notes: 'Reach the legal department directly.',
-    created_at: '2026-07-23T09:15:00.123Z',
-    updated_at: '2026-07-23T09:15:00.123Z',
+    createdAt: '2026-07-23T09:15:00.123Z',
+    updatedAt: '2026-07-23T09:15:00.123Z',
   };
   const CREDITOR: LibraryCreditor = {
     id: CREDITOR_ID,
     name: 'Acme Collections',
     address: { line1: '1 Main St', city: 'Springfield', state: 'IL', postalCode: '62701' },
-    additional_notice_parties: [
-      { id: 'np1', name: 'Legal Dept', address: {}, account_last4: '1234' },
-    ],
+    additionalNoticeParties: [{ id: 'np1', name: 'Legal Dept', address: {}, accountLast4: '1234' }],
     preferred: true,
     notes: 'Reach the legal department directly.',
-    created_at: '2026-07-23T09:15:00.123Z',
-    updated_at: '2026-07-23T09:15:00.123Z',
+    createdAt: '2026-07-23T09:15:00.123Z',
+    updatedAt: '2026-07-23T09:15:00.123Z',
   };
 
   test('GETs /v1/firm/creditors and maps the whole library', async () => {
@@ -4810,7 +4804,7 @@ describe('the library creditor endpoints', () => {
     expect(creditors).toEqual([CREDITOR]);
   });
 
-  test('POSTs a draft and maps the 201 back, snake_case throughout', async () => {
+  test('POSTs a draft and maps the 201 back', async () => {
     const stub = stubFetch(() => jsonResponse(CREDITOR_JSON, 201));
     const client = new InsolviaApiClient(BASE_URL, {
       fetch: stub.fetch,
@@ -4820,7 +4814,7 @@ describe('the library creditor endpoints', () => {
     const created = await client.addLibraryCreditor({
       name: 'Acme Collections',
       address: { line1: '1 Main St', city: 'Springfield', state: 'IL', postalCode: '62701' },
-      additional_notice_parties: [{ id: 'np1', name: 'Legal Dept', account_last4: '1234' }],
+      additionalNoticeParties: [{ id: 'np1', name: 'Legal Dept', accountLast4: '1234' }],
       preferred: true,
       notes: 'Reach the legal department directly.',
     });
@@ -4830,7 +4824,7 @@ describe('the library creditor endpoints', () => {
     expect(JSON.parse(stub.lastRequest().body as string)).toEqual({
       name: 'Acme Collections',
       address: { line1: '1 Main St', city: 'Springfield', state: 'IL', postalCode: '62701' },
-      additional_notice_parties: [{ id: 'np1', name: 'Legal Dept', account_last4: '1234' }],
+      additionalNoticeParties: [{ id: 'np1', name: 'Legal Dept', accountLast4: '1234' }],
       preferred: true,
       notes: 'Reach the legal department directly.',
     });
@@ -4916,8 +4910,8 @@ describe('the filing credential endpoints', () => {
     login: 'FAKE-ECF-USER',
     courts: ['txsb'],
     status: 'active',
-    created_at: '2026-07-23T09:15:00.123Z',
-    updated_at: '2026-07-23T09:15:00.123Z',
+    createdAt: '2026-07-23T09:15:00.123Z',
+    updatedAt: '2026-07-23T09:15:00.123Z',
   };
 
   test('GETs /v1/me/filing-credentials and maps the status views', async () => {
@@ -4934,7 +4928,7 @@ describe('the filing credential endpoints', () => {
     expect(credentials).toEqual([CREDENTIAL_JSON]);
   });
 
-  test('POSTs the enrolment snake_case, omits absent courts, maps the 201', async () => {
+  test('POSTs the enrolment, omits absent courts, maps the 201', async () => {
     const stub = stubFetch(() => jsonResponse(CREDENTIAL_JSON, 201));
     const client = new InsolviaApiClient(BASE_URL, {
       fetch: stub.fetch,
@@ -4944,7 +4938,7 @@ describe('the filing credential endpoints', () => {
     const enrolled = await client.enrolFilingCredential({
       login: 'FAKE-ECF-USER',
       password: 'FAKE-ECF-PASSWORD',
-      totp_seed: 'FAKEFAKEFAKEFAKE',
+      totpSeed: 'FAKEFAKEFAKEFAKE',
     });
 
     expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/me/filing-credentials`);
@@ -4952,7 +4946,7 @@ describe('the filing credential endpoints', () => {
     expect(JSON.parse(stub.lastRequest().body as string)).toEqual({
       login: 'FAKE-ECF-USER',
       password: 'FAKE-ECF-PASSWORD',
-      totp_seed: 'FAKEFAKEFAKEFAKE',
+      totpSeed: 'FAKEFAKEFAKEFAKE',
     });
     expect(enrolled).toEqual(CREDENTIAL_JSON);
   });
@@ -4967,7 +4961,7 @@ describe('the filing credential endpoints', () => {
     await client.enrolFilingCredential({
       login: 'FAKE-ECF-USER',
       password: 'FAKE-ECF-PASSWORD',
-      totp_seed: 'FAKEFAKEFAKEFAKE',
+      totpSeed: 'FAKEFAKEFAKEFAKE',
       courts: ['txsb'],
     });
 
@@ -4977,7 +4971,7 @@ describe('the filing credential endpoints', () => {
   test('a 400 surfaces the per-field messages', async () => {
     const stub = stubFetch(() =>
       jsonResponse(
-        { error: 'validation failed', fields: { totp_seed: 'Enter the authenticator key.' } },
+        { error: 'validation failed', fields: { totpSeed: 'Enter the authenticator key.' } },
         400,
       ),
     );
@@ -4987,11 +4981,11 @@ describe('the filing credential endpoints', () => {
     });
 
     const error = await client
-      .enrolFilingCredential({ login: 'FAKE-ECF-USER', password: 'x', totp_seed: 'x' })
+      .enrolFilingCredential({ login: 'FAKE-ECF-USER', password: 'x', totpSeed: 'x' })
       .catch((thrown: unknown) => thrown);
 
     expect(error).toBeInstanceOf(ApiValidationException);
-    expect((error as ApiValidationException).fields.totp_seed).toBe('Enter the authenticator key.');
+    expect((error as ApiValidationException).fields.totpSeed).toBe('Enter the authenticator key.');
   });
 
   test('DELETEs /v1/me/filing-credentials/{id} and resolves on 204', async () => {
@@ -5032,18 +5026,18 @@ describe('the filing authorization endpoints', () => {
   // authorization_json's exact shape, with the text beside it.
   const SIGNED_JSON = {
     text: TEXT,
-    current_version: TEXT.version,
+    currentVersion: TEXT.version,
     current: true,
     signature: {
       id: 'a0700000-0000-4000-8000-000000000001',
-      text_version: TEXT.version,
-      text_digest: TEXT.digest,
-      signed_at: '2100-01-01T00:01:00.000000Z',
+      textVersion: TEXT.version,
+      textDigest: TEXT.digest,
+      signedAt: '2100-01-01T00:01:00.000000Z',
     },
   };
   const UNSIGNED_JSON = {
     text: TEXT,
-    current_version: TEXT.version,
+    currentVersion: TEXT.version,
     current: false,
     signature: null,
   };
@@ -5062,7 +5056,7 @@ describe('the filing authorization endpoints', () => {
     expect(status).toEqual(UNSIGNED_JSON);
   });
 
-  test('POSTs the version and digest it was shown, snake_case, and maps the 201', async () => {
+  test('POSTs the version and digest it was shown, and maps the 201', async () => {
     const stub = stubFetch(() => jsonResponse(SIGNED_JSON, 201));
 
     const signed = await client(stub).signFilingAuthorization(TEXT);
@@ -5070,8 +5064,8 @@ describe('the filing authorization endpoints', () => {
     expect(stub.lastRequest().method).toBe('POST');
     expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/me/filing-authorization`);
     expect(JSON.parse(stub.lastRequest().body as string)).toEqual({
-      text_version: TEXT.version,
-      text_digest: TEXT.digest,
+      textVersion: TEXT.version,
+      textDigest: TEXT.digest,
     });
     expect(signed).toEqual(SIGNED_JSON);
   });
@@ -5107,7 +5101,7 @@ describe('the filing authorization endpoints', () => {
   });
 
   test('DELETEs /v1/me/filing-authorization and resolves to how many were destroyed', async () => {
-    const stub = stubFetch(() => jsonResponse({ credentials_revoked: 2 }, 200));
+    const stub = stubFetch(() => jsonResponse({ credentialsRevoked: 2 }, 200));
 
     await expect(client(stub).withdrawFilingAuthorization()).resolves.toBe(2);
     expect(stub.lastRequest().method).toBe('DELETE');
@@ -5115,10 +5109,10 @@ describe('the filing authorization endpoints', () => {
   });
 
   test('a signature without its digest is refused as malformed', async () => {
-    const { text_digest: _dropped, ...partial } = SIGNED_JSON.signature;
+    const { textDigest: _dropped, ...partial } = SIGNED_JSON.signature;
     const stub = stubFetch(() => jsonResponse({ ...SIGNED_JSON, signature: partial }, 200));
 
-    await expect(client(stub).getFilingAuthorization()).rejects.toThrow(/text_digest/);
+    await expect(client(stub).getFilingAuthorization()).rejects.toThrow(/textDigest/);
   });
 });
 
@@ -5434,34 +5428,34 @@ describe('the per-filing approval endpoints (ADR 0024, guardrail 1)', () => {
 describe('the firm client endpoints (ADR 0022)', () => {
   const FIRM_CLIENT_ID = 'c11e0000-0000-4000-8000-000000000001';
   const CREATOR = 'a11c0000-0000-4000-8000-00000000a11c';
-  // firm_client_json's exact shape — snake_case, absent fields omitted.
+  // The client view's exact shape — absent fields omitted.
   const FIRM_CLIENT_JSON = {
     id: FIRM_CLIENT_ID,
     status: 'active',
     name: { given: 'Jordan', surname: 'Example' },
-    other_names_used: [{ id: 'alias-1', surname: 'Sample' }],
-    date_of_birth: '1980-02-29',
-    residence_address: { line1: '1 Example St', city: 'Springfield', county: 'Sangamon' },
+    otherNamesUsed: [{ id: 'alias-1', surname: 'Sample' }],
+    dateOfBirth: '1980-02-29',
+    residenceAddress: { line1: '1 Example St', city: 'Springfield', county: 'Sangamon' },
     email: 'jordan@example.test',
-    lead_source: 'Referral',
-    tax_id_last_four: '4320',
-    created_at: '2026-09-26T09:15:00.123456Z',
-    updated_at: '2026-09-26T09:15:00.123456Z',
-    created_by: CREATOR,
+    leadSource: 'Referral',
+    taxIdLastFour: '4320',
+    createdAt: '2026-09-26T09:15:00.123456Z',
+    updatedAt: '2026-09-26T09:15:00.123456Z',
+    createdBy: CREATOR,
   };
   const FIRM_CLIENT: FirmClient = {
     id: FIRM_CLIENT_ID,
     status: 'active',
     name: { given: 'Jordan', surname: 'Example' },
-    other_names_used: [{ id: 'alias-1', surname: 'Sample' }],
-    date_of_birth: '1980-02-29',
-    residence_address: { line1: '1 Example St', city: 'Springfield', county: 'Sangamon' },
+    otherNamesUsed: [{ id: 'alias-1', surname: 'Sample' }],
+    dateOfBirth: '1980-02-29',
+    residenceAddress: { line1: '1 Example St', city: 'Springfield', county: 'Sangamon' },
     email: 'jordan@example.test',
-    lead_source: 'Referral',
-    tax_id_last_four: '4320',
-    created_at: '2026-09-26T09:15:00.123456Z',
-    updated_at: '2026-09-26T09:15:00.123456Z',
-    created_by: CREATOR,
+    leadSource: 'Referral',
+    taxIdLastFour: '4320',
+    createdAt: '2026-09-26T09:15:00.123456Z',
+    updatedAt: '2026-09-26T09:15:00.123456Z',
+    createdBy: CREATOR,
   };
 
   function clientWith(stub: ReturnType<typeof stubFetch>): InsolviaApiClient {
@@ -5481,27 +5475,27 @@ describe('the firm client endpoints (ADR 0022)', () => {
     expect(clients).toEqual([FIRM_CLIENT]);
   });
 
-  test('POSTs a snake_case draft, county included, and maps the 201 back', async () => {
+  test('POSTs a draft, county included, and maps the 201 back', async () => {
     const stub = stubFetch(() => jsonResponse(FIRM_CLIENT_JSON, 201));
 
     const created = await clientWith(stub).createFirmClient({
       name: { given: 'Jordan', surname: 'Example' },
-      other_names_used: [{ id: 'alias-1', surname: 'Sample' }],
-      date_of_birth: '1980-02-29',
-      residence_address: { line1: '1 Example St', city: 'Springfield', county: 'Sangamon' },
+      otherNamesUsed: [{ id: 'alias-1', surname: 'Sample' }],
+      dateOfBirth: '1980-02-29',
+      residenceAddress: { line1: '1 Example St', city: 'Springfield', county: 'Sangamon' },
       email: 'jordan@example.test',
-      lead_source: 'Referral',
+      leadSource: 'Referral',
     });
 
     expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/firm/clients`);
     expect(stub.lastRequest().method).toBe('POST');
     expect(JSON.parse(stub.lastRequest().body as string)).toEqual({
       name: { given: 'Jordan', surname: 'Example' },
-      other_names_used: [{ id: 'alias-1', surname: 'Sample' }],
-      date_of_birth: '1980-02-29',
-      residence_address: { line1: '1 Example St', city: 'Springfield', county: 'Sangamon' },
+      otherNamesUsed: [{ id: 'alias-1', surname: 'Sample' }],
+      dateOfBirth: '1980-02-29',
+      residenceAddress: { line1: '1 Example St', city: 'Springfield', county: 'Sangamon' },
       email: 'jordan@example.test',
-      lead_source: 'Referral',
+      leadSource: 'Referral',
     });
     expect(created).toEqual(FIRM_CLIENT);
   });
@@ -5556,9 +5550,9 @@ describe('the firm client endpoints (ADR 0022)', () => {
       id: FIRM_CLIENT_ID,
       status: 'active',
       name: { given: 'Mononym' },
-      created_at: '2026-09-26T09:15:00.123456Z',
-      updated_at: '2026-09-26T09:15:00.123456Z',
-      created_by: CREATOR,
+      createdAt: '2026-09-26T09:15:00.123456Z',
+      updatedAt: '2026-09-26T09:15:00.123456Z',
+      createdBy: CREATOR,
     };
     const stub = stubFetch(() => jsonResponse(minimal, 200));
 
@@ -5599,7 +5593,7 @@ describe('the firm client endpoints (ADR 0022)', () => {
     ...FIRM_CLIENT_JSON,
     id: MERGED_ID,
     status: 'archived',
-    merged_into: FIRM_CLIENT_ID,
+    mergedInto: FIRM_CLIENT_ID,
   };
 
   test('merges with a POST to the survivor carrying only merged_client_id', async () => {
@@ -5612,11 +5606,11 @@ describe('the firm client endpoints (ADR 0022)', () => {
     expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/firm/clients/${FIRM_CLIENT_ID}/merge`);
     expect(stub.lastRequest().method).toBe('POST');
     expect(JSON.parse(stub.lastRequest().body as string)).toEqual({
-      merged_client_id: MERGED_ID,
+      mergedClientId: MERGED_ID,
     });
     expect(result.client).toEqual(FIRM_CLIENT);
     expect(result.merged.status).toBe('archived');
-    expect(result.merged.merged_into).toBe(FIRM_CLIENT_ID);
+    expect(result.merged.mergedInto).toBe(FIRM_CLIENT_ID);
   });
 
   test('a merged client read on its own carries merged_into', async () => {
@@ -5624,7 +5618,7 @@ describe('the firm client endpoints (ADR 0022)', () => {
 
     const fetched = await clientWith(stub).getFirmClient(MERGED_ID);
 
-    expect(fetched.merged_into).toBe(FIRM_CLIENT_ID);
+    expect(fetched.mergedInto).toBe(FIRM_CLIENT_ID);
   });
 
   test('a merge answer missing either client is a contract break', async () => {
@@ -5650,7 +5644,7 @@ describe('the firm client endpoints (ADR 0022)', () => {
   test('an unknown merged client is a 400 keyed merged_client_id', async () => {
     const stub = stubFetch(() =>
       jsonResponse(
-        { error: 'ValidationError', fields: { merged_client_id: 'No such client.' } },
+        { error: 'ValidationError', fields: { mergedClientId: 'No such client.' } },
         400,
       ),
     );
@@ -5658,7 +5652,7 @@ describe('the firm client endpoints (ADR 0022)', () => {
     const error = await rejection(clientWith(stub).mergeFirmClient(FIRM_CLIENT_ID, 'nope'));
 
     expect(error).toBeInstanceOf(ApiValidationException);
-    expect((error as ApiValidationException).fields.merged_client_id).toBe('No such client.');
+    expect((error as ApiValidationException).fields.mergedClientId).toBe('No such client.');
   });
 });
 
@@ -5743,10 +5737,10 @@ describe('the case lifecycle (issue #355)', () => {
       id: FIRM_CLIENT_ID_LIFECYCLE,
       status: 'active',
       name: { surname: 'Example' },
-      prospect_stage: 'consultation_scheduled',
-      created_at: '2026-09-30T10:00:00.000000Z',
-      updated_at: '2026-10-01T10:00:00.000000Z',
-      created_by: SUBJECT,
+      prospectStage: 'consultation_scheduled',
+      createdAt: '2026-09-30T10:00:00.000000Z',
+      updatedAt: '2026-10-01T10:00:00.000000Z',
+      createdBy: SUBJECT,
     };
     const stub = stubFetch(() => jsonResponse(staged, 200));
 
@@ -5758,8 +5752,8 @@ describe('the case lifecycle (issue #355)', () => {
     const seen = stub.lastRequest();
     expect(seen.method).toBe('PUT');
     expect(seen.url).toBe(`${BASE_URL}/v1/firm/clients/${FIRM_CLIENT_ID_LIFECYCLE}/prospect-stage`);
-    expect(JSON.parse(seen.body)).toEqual({ prospect_stage: 'consultation_scheduled' });
-    expect(client.prospect_stage).toBe('consultation_scheduled');
+    expect(JSON.parse(seen.body)).toEqual({ prospectStage: 'consultation_scheduled' });
+    expect(client.prospectStage).toBe('consultation_scheduled');
   });
 
   test('null takes a prospect out of the funnel, sent as null', async () => {
@@ -5769,9 +5763,9 @@ describe('the case lifecycle (issue #355)', () => {
           id: FIRM_CLIENT_ID_LIFECYCLE,
           status: 'active',
           name: { surname: 'Example' },
-          created_at: '2026-09-30T10:00:00.000000Z',
-          updated_at: '2026-10-01T10:00:00.000000Z',
-          created_by: SUBJECT,
+          createdAt: '2026-09-30T10:00:00.000000Z',
+          updatedAt: '2026-10-01T10:00:00.000000Z',
+          createdBy: SUBJECT,
         },
         200,
       ),
@@ -5782,8 +5776,8 @@ describe('the case lifecycle (issue #355)', () => {
       null,
     );
 
-    expect(JSON.parse(stub.lastRequest().body)).toEqual({ prospect_stage: null });
-    expect('prospect_stage' in client).toBe(false);
+    expect(JSON.parse(stub.lastRequest().body)).toEqual({ prospectStage: null });
+    expect('prospectStage' in client).toBe(false);
   });
 
   test('a retained client refuses a stage with a 409', async () => {

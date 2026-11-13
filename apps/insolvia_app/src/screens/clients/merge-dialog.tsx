@@ -124,7 +124,7 @@ export function MergeDialog({
         ) : candidates.clients.length === 0 ? (
           <Text style={[styles.body, muted]}>There is no other active client to merge into.</Text>
         ) : (
-          <Field.Root name="merged_into" invalid={error !== ''}>
+          <Field.Root name="mergedInto" invalid={error !== ''}>
             <Field.Label>Client to keep</Field.Label>
             <Select
               options={candidates.clients.map((other) => ({

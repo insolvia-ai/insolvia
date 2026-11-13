@@ -318,7 +318,7 @@
             "type": "string"
           }
         },
-        "description": "Structured parts AND a raw fallback (the IEPD\u0027s free-text form, for a\ncreditor block that will not parse). string? Address.County is B101 line 5\u0027s box.\nstring? Address.PostalCode is \u0060postalCode\u0060 under every serializer, the\nsnake_case ones included: an address sits in a case collection\u0027s camelCase\nbody and in a debtor\u0027s, a firm\u0027s and a client\u0027s snake_case one alike (ADR 0032)."
+        "description": "Structured parts AND a raw fallback (the IEPD\u0027s free-text form, for a\ncreditor block that will not parse). string? Address.County is B101 line 5\u0027s box.\nstring? Address.PostalCode is \u0060postalCode\u0060 under every serializer, the\nstored rows\u0027 snake_case one included (ADR 0032)."
       },
       "ErrorBody": {
         "required": ["error"],
@@ -669,13 +669,13 @@
       "SignatureBlock": {
         "type": "object",
         "properties": {
-          "bar_number": {
+          "barNumber": {
             "type": "string"
           },
-          "bar_state": {
+          "barState": {
             "type": "string"
           },
-          "firm_name": {
+          "firmName": {
             "type": "string"
           },
           "phone": {
@@ -689,7 +689,7 @@
             "$ref": "#/components/schemas/Address"
           }
         },
-        "description": "An attorney\u0027s standing signature block (issue #360). The member names are\na \u0060filing_professional\u0060 body\u0027s, so \u0022use firm default\u0022 copies it with\nno mapping. The name is not here \u2014 it is the firm user\u0027s own."
+        "description": "An attorney\u0027s standing signature block (issue #360). The member names and\nlimits are a \u0060filingProfessional\u0060 body\u0027s, so \u0022use firm default\u0022 copies\nit with no mapping. The name is not here \u2014 it is the firm user\u0027s own."
       }
     },
     "responses": {

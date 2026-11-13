@@ -20,23 +20,17 @@ import {
   PORTAL_INPUT_TYPES,
   QUESTIONNAIRE_SECTION_IDS,
   SIGNATURE_PAGES_MODES,
-  addFirmUserRequestToJson,
   calendarEventDraftToJson,
   calendarWindowQuery,
   caseEntityRequestToJson,
   createDocumentRequestToJson,
   createTaskRequestToJson,
-  firmClientDraftToJson,
   formPreviewQuery,
-  libraryCreditorDraftToJson,
   listCasesQuery,
   listMyTasksQuery,
   noteRequestToJson,
   outputOptionsRequestToJson,
   putDebtorRequestToJson,
-  updateFirmRequestToJson,
-  updateFirmUserRequestToJson,
-  updateMeRequestToJson,
   updateTaskRequestToJson,
   waitlistSubmissionToJson,
 } from './models.ts';
@@ -420,7 +414,7 @@ export class InsolviaApiClient {
     const response = await this.#fetch(`${this.#baseUrl}/v1/me`, {
       method: 'PATCH',
       headers: { ...headers, 'Content-Type': 'application/json' },
-      body: JSON.stringify(updateMeRequestToJson(request)),
+      body: JSON.stringify(request),
     });
     const decoded = await decodeExpected(response, 200);
     const firm = optionalFirmMembership(decoded);
@@ -1890,7 +1884,7 @@ export class InsolviaApiClient {
     const response = await this.#fetch(`${this.#baseUrl}/v1/firm`, {
       method: 'PATCH',
       headers: { ...headers, 'Content-Type': 'application/json' },
-      body: JSON.stringify(updateFirmRequestToJson(request)),
+      body: JSON.stringify(request),
     });
     const decoded = await decodeExpected(response, 200);
     return firmFromJson(decoded);
@@ -2038,7 +2032,7 @@ export class InsolviaApiClient {
     const response = await this.#fetch(`${this.#baseUrl}/v1/firm/users`, {
       method: 'POST',
       headers: { ...headers, 'Content-Type': 'application/json' },
-      body: JSON.stringify(addFirmUserRequestToJson(request)),
+      body: JSON.stringify(request),
     });
     const decoded = await decodeExpected(response, 201);
     return firmUserFromJson(decoded);
@@ -2064,7 +2058,7 @@ export class InsolviaApiClient {
     const response = await this.#fetch(this.#firmUserUrl(subject), {
       method: 'PATCH',
       headers: { ...headers, 'Content-Type': 'application/json' },
-      body: JSON.stringify(updateFirmUserRequestToJson(request)),
+      body: JSON.stringify(request),
     });
     const decoded = await decodeExpected(response, 200);
     return firmUserFromJson(decoded);
@@ -2345,7 +2339,7 @@ export class InsolviaApiClient {
     const response = await this.#fetch(`${this.#baseUrl}/v1/firm/creditors`, {
       method: 'POST',
       headers: { ...headers, 'Content-Type': 'application/json' },
-      body: JSON.stringify(libraryCreditorDraftToJson(draft)),
+      body: JSON.stringify(draft),
     });
     const decoded = await decodeExpected(response, 201);
     return libraryCreditorFromJson(decoded);
@@ -2364,7 +2358,7 @@ export class InsolviaApiClient {
     const response = await this.#fetch(this.#libraryCreditorUrl(id), {
       method: 'PUT',
       headers: { ...headers, 'Content-Type': 'application/json' },
-      body: JSON.stringify(libraryCreditorDraftToJson(draft)),
+      body: JSON.stringify(draft),
     });
     const decoded = await decodeExpected(response, 200);
     return libraryCreditorFromJson(decoded);
@@ -2410,21 +2404,15 @@ export class InsolviaApiClient {
    * `POST /v1/me/filing-credentials` — seal and store one credential for the
    * caller. The server answers the status view; nothing sent is echoed.
    * Throws {@link ApiValidationException} on a 400 (per field: `login`,
-   * `password`, `totp_seed`, `courts`) and a 409 when that login is already
+   * `password`, `totpSeed`, `courts`) and a 409 when that login is already
    * enrolled. Needs `electronic_filing` at `add_edit`.
    */
   async enrolFilingCredential(enrolment: FilingCredentialEnrolment): Promise<FilingCredential> {
     const headers = await this.#protectedHeaders();
-    const body: Record<string, unknown> = {
-      login: enrolment.login,
-      password: enrolment.password,
-      totp_seed: enrolment.totp_seed,
-    };
-    if (enrolment.courts !== undefined) body.courts = enrolment.courts;
     const response = await this.#fetch(`${this.#baseUrl}/v1/me/filing-credentials`, {
       method: 'POST',
       headers: { ...headers, 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      body: JSON.stringify(enrolment),
     });
     const decoded = await decodeExpected(response, 201);
     return filingCredentialFromJson(decoded);
@@ -2477,7 +2465,7 @@ export class InsolviaApiClient {
     const response = await this.#fetch(`${this.#baseUrl}/v1/me/filing-authorization`, {
       method: 'POST',
       headers: { ...headers, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text_version: text.version, text_digest: text.digest }),
+      body: JSON.stringify({ textVersion: text.version, textDigest: text.digest }),
     });
     return filingAuthorizationFromJson(await decodeExpected(response, 201));
   }
@@ -2493,7 +2481,7 @@ export class InsolviaApiClient {
       method: 'DELETE',
       headers,
     });
-    return requireNumber(await decodeExpected(response, 200), 'credentials_revoked');
+    return requireNumber(await decodeExpected(response, 200), 'credentialsRevoked');
   }
 
   // -------------------------------------------------------------------------
@@ -2536,7 +2524,7 @@ export class InsolviaApiClient {
     const response = await this.#fetch(`${this.#baseUrl}/v1/firm/clients`, {
       method: 'POST',
       headers: { ...headers, 'Content-Type': 'application/json' },
-      body: JSON.stringify(firmClientDraftToJson(draft)),
+      body: JSON.stringify(draft),
     });
     const decoded = await decodeExpected(response, 201);
     return firmClientFromJson(decoded);
@@ -2563,7 +2551,7 @@ export class InsolviaApiClient {
     const response = await this.#fetch(this.#firmClientUrl(id), {
       method: 'PUT',
       headers: { ...headers, 'Content-Type': 'application/json' },
-      body: JSON.stringify(firmClientDraftToJson(draft)),
+      body: JSON.stringify(draft),
     });
     const decoded = await decodeExpected(response, 200);
     return firmClientFromJson(decoded);
@@ -2580,7 +2568,7 @@ export class InsolviaApiClient {
     const response = await this.#fetch(`${this.#firmClientUrl(id)}/prospect-stage`, {
       method: 'PUT',
       headers: { ...headers, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prospect_stage: stage }),
+      body: JSON.stringify({ prospectStage: stage }),
     });
     const decoded = await decodeExpected(response, 200);
     return firmClientFromJson(decoded);
@@ -2631,7 +2619,7 @@ export class InsolviaApiClient {
    *
    * Needs `clients` at `add_edit`. A 404 means the survivor is not in the
    * caller's firm. Throws {@link ApiValidationException} on a 400 keyed
-   * `merged_client_id` (unknown client, or the same id twice), and a plain
+   * `mergedClientId` (unknown client, or the same id twice), and a plain
    * {@link ApiException} with `statusCode` **409** when either client is
    * merged or archived, another merge involving either is in progress, or
    * both are debtors on one case — its `message` says which. Nothing is
@@ -2642,7 +2630,7 @@ export class InsolviaApiClient {
     const response = await this.#fetch(`${this.#firmClientUrl(survivorId)}/merge`, {
       method: 'POST',
       headers: { ...headers, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ merged_client_id: mergedId }),
+      body: JSON.stringify({ mergedClientId: mergedId }),
     });
     const decoded = await decodeExpected(response, 200);
     return {
@@ -5527,9 +5515,9 @@ function nullableSignatureBlock(response: DecodedResponse, key: string): Signatu
   const nested = objectOrNone(response, key);
   if (nested === undefined) return null;
   return definedMembers<SignatureBlock>({
-    bar_number: optionalString(nested, 'bar_number'),
-    bar_state: optionalString(nested, 'bar_state'),
-    firm_name: optionalString(nested, 'firm_name'),
+    barNumber: optionalString(nested, 'barNumber'),
+    barState: optionalString(nested, 'barState'),
+    firmName: optionalString(nested, 'firmName'),
     address: libraryAddress(nested, 'address'),
     phone: optionalString(nested, 'phone'),
     email: optionalString(nested, 'email'),
@@ -5589,7 +5577,7 @@ function courtDivisionFromJson(response: DecodedResponse): CourtDivision {
 }
 
 /**
- * A snake_case address decoder, `county` included — it is the same
+ * An address decoder, `county` included — it is the same
  * `fields.Address` the debtor's residence address is, and the county is there
  * because it exists on that shared shape. `{}` when absent;
  * {@link optionalAddress} is the absent-means-undefined wrapper debtors use.
@@ -5614,7 +5602,7 @@ function libraryNoticePartyFromJson(response: DecodedResponse): LibraryNoticePar
     id: requireString(response, 'id'),
     name: optionalString(response, 'name'),
     address: libraryAddress(response, 'address'),
-    account_last4: optionalString(response, 'account_last4'),
+    accountLast4: optionalString(response, 'accountLast4'),
   };
 }
 
@@ -5624,8 +5612,8 @@ function filingCredentialFromJson(response: DecodedResponse): FilingCredential {
     login: requireString(response, 'login'),
     courts: requireStringArray(response, 'courts'),
     status: requireChoice(response, 'status', ['active'] as const),
-    created_at: requireString(response, 'created_at'),
-    updated_at: requireString(response, 'updated_at'),
+    createdAt: requireString(response, 'createdAt'),
+    updatedAt: requireString(response, 'updatedAt'),
   };
 }
 
@@ -5638,27 +5626,27 @@ function filingAuthorizationFromJson(response: DecodedResponse): FilingAuthoriza
       digest: requireString(text, 'digest'),
       text: requireString(text, 'text'),
     },
-    current_version: requireString(response, 'current_version'),
+    currentVersion: requireString(response, 'currentVersion'),
     current: requireBoolean(response, 'current'),
     signature:
       signature === null
         ? null
         : {
             id: requireString(signature, 'id'),
-            text_version: requireString(signature, 'text_version'),
-            text_digest: requireString(signature, 'text_digest'),
-            signed_at: requireString(signature, 'signed_at'),
+            textVersion: requireString(signature, 'textVersion'),
+            textDigest: requireString(signature, 'textDigest'),
+            signedAt: requireString(signature, 'signedAt'),
           },
   };
 }
 
 function libraryCreditorFromJson(response: DecodedResponse): LibraryCreditor {
   const parties =
-    response.json.additional_notice_parties === undefined
+    response.json.additionalNoticeParties === undefined
       ? []
       : requireArrayOf(
           response,
-          'additional_notice_parties',
+          'additionalNoticeParties',
           'LibraryNoticeParty',
           libraryNoticePartyFromJson,
         );
@@ -5666,11 +5654,11 @@ function libraryCreditorFromJson(response: DecodedResponse): LibraryCreditor {
     id: requireString(response, 'id'),
     name: requireString(response, 'name'),
     address: libraryAddress(response, 'address'),
-    additional_notice_parties: parties,
+    additionalNoticeParties: parties,
     preferred: requireBoolean(response, 'preferred'),
     notes: optionalString(response, 'notes'),
-    created_at: requireString(response, 'created_at'),
-    updated_at: requireString(response, 'updated_at'),
+    createdAt: requireString(response, 'createdAt'),
+    updatedAt: requireString(response, 'updatedAt'),
   };
 }
 
@@ -5690,12 +5678,12 @@ function firmClientCaseFromJson(response: DecodedResponse): FirmClientCase {
 }
 
 /**
- * `firm_client_json`'s exact shape. `name` is required (the server always
+ * The client view's exact shape. `name` is required (the server always
  * sends it); the addresses use {@link libraryAddress}, `county` included.
  */
 function firmClientFromJson(response: DecodedResponse): FirmClient {
-  const residence = optionalObject(response, 'residence_address');
-  const mailing = optionalObject(response, 'mailing_address');
+  const residence = optionalObject(response, 'residenceAddress');
+  const mailing = optionalObject(response, 'mailingAddress');
   const name = optionalPersonName(response, 'name');
   if (name === undefined) {
     throw malformedField(response, 'name', 'object');
@@ -5704,24 +5692,23 @@ function firmClientFromJson(response: DecodedResponse): FirmClient {
     id: requireString(response, 'id'),
     status: requireChoice(response, 'status', FIRM_CLIENT_STATUSES),
     name,
-    other_names_used: optionalOtherNames(response, 'other_names_used'),
-    date_of_birth: optionalString(response, 'date_of_birth'),
-    residence_address:
-      residence === undefined ? undefined : libraryAddress(response, 'residence_address'),
-    mailing_address:
-      mailing === undefined ? undefined : libraryAddress(response, 'mailing_address'),
+    otherNamesUsed: optionalOtherNames(response, 'otherNamesUsed'),
+    dateOfBirth: optionalString(response, 'dateOfBirth'),
+    residenceAddress:
+      residence === undefined ? undefined : libraryAddress(response, 'residenceAddress'),
+    mailingAddress: mailing === undefined ? undefined : libraryAddress(response, 'mailingAddress'),
     phone: optionalString(response, 'phone'),
     mobile: optionalString(response, 'mobile'),
     email: optionalString(response, 'email'),
-    lead_source: optionalString(response, 'lead_source'),
-    referred_by: optionalString(response, 'referred_by'),
-    first_retained_at: optionalString(response, 'first_retained_at'),
-    tax_id_last_four: optionalString(response, 'tax_id_last_four'),
-    merged_into: optionalString(response, 'merged_into'),
-    prospect_stage: optionalChoice(response, 'prospect_stage', PROSPECT_STAGES),
-    created_at: requireString(response, 'created_at'),
-    updated_at: requireString(response, 'updated_at'),
-    created_by: requireString(response, 'created_by'),
+    leadSource: optionalString(response, 'leadSource'),
+    referredBy: optionalString(response, 'referredBy'),
+    firstRetainedAt: optionalString(response, 'firstRetainedAt'),
+    taxIdLastFour: optionalString(response, 'taxIdLastFour'),
+    mergedInto: optionalString(response, 'mergedInto'),
+    prospectStage: optionalChoice(response, 'prospectStage', PROSPECT_STAGES),
+    createdAt: requireString(response, 'createdAt'),
+    updatedAt: requireString(response, 'updatedAt'),
+    createdBy: requireString(response, 'createdBy'),
   });
 }
 

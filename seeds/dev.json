@@ -61,7 +61,7 @@
   ],
   "cases": [
     {
-      "fixture": "v6",
+      "fixture": "v7",
       "case": "chapter-7-sample",
       "firm": "Dev Firm",
       "openedBy": "admin",
@@ -75,7 +75,7 @@
       ]
     },
     {
-      "fixture": "v6",
+      "fixture": "v7",
       "case": "chapter-13-sample",
       "firm": "Dev Firm",
       "openedBy": "admin"

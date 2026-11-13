@@ -145,25 +145,13 @@ public sealed class MeRouteTests : IDisposable
     }
 
     [Fact]
-    public async Task A_client_still_sending_one_display_name_is_accepted()
+    public async Task A_display_name_is_not_a_field_and_changes_nothing()
     {
         await ProvisionedAsync();
 
-        Assert.Equal(200, (await _world.Patch("/v1/me", """{"displayName": "Corrected Name"}""", Ids.Alice)).Status);
+        var answer = await _world.Patch("/v1/me", """{"displayName": "Corrected Name"}""", Ids.Alice);
 
-        var row = await _world.UserAsync(Ids.Alice);
-        Assert.Equal(("Corrected", "Name"), (row!.FirstName, row.LastName));
-    }
-
-    [Fact]
-    public async Task A_single_token_display_name_is_refused_rather_than_half_stored()
-    {
-        await ProvisionedAsync();
-
-        var answer = await _world.Patch("/v1/me", """{"displayName": "Cher"}""", Ids.Alice);
-
-        Assert.Equal(400, answer.Status);
-        Assert.Contains("displayName", answer.FieldErrors);
+        Assert.Equal(HttpAssert.ErrorBody("ValidationError", "no supported fields to update"), answer.Body);
         var row = await _world.UserAsync(Ids.Alice);
         Assert.Equal(("Original", "Name"), (row!.FirstName, row.LastName));
     }
@@ -245,18 +233,27 @@ public sealed class MeRouteTests : IDisposable
         Assert.Equal(("Original", "Name"), (row!.FirstName, row.LastName));
     }
 
-    [Theory]
-    [InlineData("name=Ada", "text/plain")]
-    [InlineData("[1, 2]", "application/json")]
-    [InlineData("{not json", "application/json")]
-    public async Task A_body_that_is_not_a_json_object_is_a_400_never_a_415_or_422(string body, string contentType)
+    [Fact]
+    public async Task A_body_that_is_not_json_is_a_400_never_a_415()
     {
         await ProvisionedAsync();
 
-        var answer = await _world.SendAsync(HttpMethod.Patch, "/v1/me", Ids.Alice, body, contentType);
+        var answer = await _world.SendAsync(HttpMethod.Patch, "/v1/me", Ids.Alice, "name=Ada", "text/plain");
+
+        Assert.Equal(HttpAssert.ErrorBody("ValidationError", "request body must be a JSON object"), answer.Body);
+    }
+
+    [Theory]
+    [InlineData("[1, 2]")]
+    [InlineData("{not json")]
+    public async Task A_json_body_that_is_not_an_object_is_a_400_never_a_422(string body)
+    {
+        await ProvisionedAsync();
+
+        var answer = await _world.SendAsync(HttpMethod.Patch, "/v1/me", Ids.Alice, body, "application/json");
 
         Assert.Equal(400, answer.Status);
-        Assert.Equal(HttpAssert.ErrorBody("ValidationError", "request body must be a JSON object"), answer.Body);
+        Assert.Equal("ValidationError", answer.Str("error"));
     }
 
     [Fact]

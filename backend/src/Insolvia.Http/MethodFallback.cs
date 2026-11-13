@@ -16,6 +16,7 @@ namespace Insolvia.Http;
 /// filter (it gets its CORS headers from the host's CORS middleware like any response).</item>
 /// <item>A path no route has is a JSON 404; a method the path does not take is
 /// a JSON 405 with <c>Allow</c> (<see cref="ErrorResponses.ForStatus"/>).</item>
+/// <item>A body that is not JSON, on a route that reads one, is a 400 <c>ValidationError</c>.</item>
 /// </list>
 /// </summary>
 public static class MethodFallback
@@ -56,6 +57,12 @@ public static class MethodFallback
             if (endpoint is null)
             {
                 return ErrorResponses.WriteAsync(context, StatusCodes.Status404NotFound, ErrorResponses.ForStatus(StatusCodes.Status404NotFound)!);
+            }
+
+            // Routing's 415 endpoint: the route reads a JSON body and this is not JSON — Flask's 400, never a 415.
+            if (endpoint.DisplayName?.StartsWith("415 ", StringComparison.Ordinal) == true)
+            {
+                return ErrorResponses.WriteAsync(context, StatusCodes.Status400BadRequest, new ErrorBody("ValidationError", "request body must be a JSON object", null));
             }
 
             // Routing's own 405 endpoint: the path exists under other methods.

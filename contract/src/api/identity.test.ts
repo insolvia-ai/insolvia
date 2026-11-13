@@ -112,7 +112,7 @@ describe('who am I', () => {
       const updated = await client.api.updateMe({
         firstName,
         lastName,
-        signatureBlock: { bar_number: '12345', bar_state: 'FL', firm_name: 'Contract & Co' },
+        signatureBlock: { barNumber: '12345', barState: 'FL', firmName: 'Contract & Co' },
       });
       expect(client.last().status).toBe(200);
       expectShape(client.last().body, PRINCIPAL);

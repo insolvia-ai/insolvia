@@ -69,7 +69,7 @@ public sealed class LibraryCreditorRouteTests : IAsyncLifetime, IDisposable
         Assert.False(body["preferred"]!.GetValue<bool>());
 
         // `notes` omitted when absent; `address` and the parties always present.
-        Assert.Equal(["additional_notice_parties", "address", "created_at", "id", "name", "preferred", "updated_at"], Answer.Keys(created.Json));
+        Assert.Equal(["additionalNoticeParties", "address", "createdAt", "id", "name", "preferred", "updatedAt"], Answer.Keys(created.Json));
 
         var listed = (await _world.Get("/v1/firm/creditors", Admin)).Object["creditors"]!.AsArray();
         Assert.Equal([created.Str("id")], listed.Select(c => c!["id"]!.GetValue<string>()));
@@ -156,20 +156,20 @@ public sealed class LibraryCreditorRouteTests : IAsyncLifetime, IDisposable
     [Fact]
     public async Task Additional_notice_parties_round_trip()
     {
-        var created = await Add(extra: """, "additional_notice_parties": [{"id": "np1", "name": "Legal Dept", "account_last4": "1234"}]""");
+        var created = await Add(extra: """, "additionalNoticeParties": [{"id": "np1", "name": "Legal Dept", "accountLast4": "1234"}]""");
 
         Assert.True(JsonNode.DeepEquals(
-            JsonNode.Parse("""[{"account_last4":"1234","address":{},"id":"np1","name":"Legal Dept"}]"""),
-            created.Object["additional_notice_parties"]));
+            JsonNode.Parse("""[{"accountLast4":"1234","address":{},"id":"np1","name":"Legal Dept"}]"""),
+            created.Object["additionalNoticeParties"]));
     }
 
     [Fact]
     public async Task A_bad_notice_party_is_reported_under_the_field_the_caller_sent()
     {
-        var answer = await Add(extra: """, "additional_notice_parties": [{"name": "No id"}]""");
+        var answer = await Add(extra: """, "additionalNoticeParties": [{"name": "No id"}]""");
 
         Assert.Equal(400, answer.Status);
-        Assert.Contains("additional_notice_parties[0].id", answer.FieldErrors);
+        Assert.Contains("additionalNoticeParties[0].id", answer.FieldErrors);
     }
 
     private Task<Answer> Add(string name = "Acme Collections", string subject = Admin, string extra = "") =>

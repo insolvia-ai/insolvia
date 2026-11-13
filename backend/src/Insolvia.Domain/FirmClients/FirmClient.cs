@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 using Insolvia.Domain.Debtors;
 using Insolvia.Domain.Fields;
@@ -138,18 +139,56 @@ public sealed record FirmClient(
 }
 
 /// <summary>
-/// A validated whole-record save — POST to create, PUT to replace. The
-/// caller-editable fields only.
+/// A client as written — <c>POST /v1/firm/clients</c> to create,
+/// <c>PUT …/{clientId}</c> to replace: the caller-editable fields only, so a
+/// PUT clears what it omits. Server-owned fields an echoed read sends
+/// (status, the tax id's last four, the stage) are not members and are ignored.
 /// </summary>
+/// <param name="Name">The client's name; a given name or a surname is required.</param>
+/// <param name="OtherNamesUsed">Names used in the last eight years, each addressed by its id.</param>
+/// <param name="DateOfBirth">Date of birth — never in the future (<see cref="FirmClientRules.Create"/> checks it against the clock).</param>
+/// <param name="ResidenceAddress">Where the client lives.</param>
+/// <param name="MailingAddress">Where the client's mail goes.</param>
+/// <param name="Phone">A phone number — the debtor's cap, so what a client accepts a debtor accepts.</param>
+/// <param name="Mobile">A mobile number.</param>
+/// <param name="Email">An email address (free text; a directory contact value).</param>
+/// <param name="LeadSource">How the firm heard of them (free text in v1).</param>
+/// <param name="ReferredBy">Who referred them.</param>
+/// <param name="FirstRetainedAt">When the firm was first retained; absent for a prospect.</param>
 public sealed record FirmClientDraft(
-    PersonName Name,
-    ValueCollection<OtherName> OtherNamesUsed,
-    DateOnly? DateOfBirth,
-    Address ResidenceAddress,
-    Address MailingAddress,
-    string? Phone,
-    string? Mobile,
-    string? Email,
-    string? LeadSource,
-    string? ReferredBy,
-    DateOnly? FirstRetainedAt);
+    PersonName? Name = null,
+    ValueCollection<OtherName>? OtherNamesUsed = null,
+    DateOnly? DateOfBirth = null,
+    Address? ResidenceAddress = null,
+    Address? MailingAddress = null,
+    [property: Text(40)] string? Phone = null,
+    [property: Text(40)] string? Mobile = null,
+    [property: Text] string? Email = null,
+    [property: Text] string? LeadSource = null,
+    [property: Text] string? ReferredBy = null,
+    DateOnly? FirstRetainedAt = null) : IValidatableObject
+{
+    /// <summary>The client's name.</summary>
+    public PersonName Name { get; init; } = Name ?? new();
+
+    /// <summary>The 8-year aliases.</summary>
+    [Rows]
+    public ValueCollection<OtherName> OtherNamesUsed { get; init; } = OtherNamesUsed ?? [];
+
+    /// <summary>Where the client lives.</summary>
+    public Address ResidenceAddress { get; init; } = ResidenceAddress ?? new();
+
+    /// <summary>Where the client's mail goes.</summary>
+    public Address MailingAddress { get; init; } = MailingAddress ?? new();
+
+    /// <summary>A surname or a given name (a mononym is a given name).</summary>
+    /// <param name="validationContext">Unused.</param>
+    /// <returns>The failures.</returns>
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        if (string.IsNullOrWhiteSpace(Name.Surname) && string.IsNullOrWhiteSpace(Name.Given))
+        {
+            yield return new ValidationResult("A surname or a given name is required.", [nameof(Name)]);
+        }
+    }
+}

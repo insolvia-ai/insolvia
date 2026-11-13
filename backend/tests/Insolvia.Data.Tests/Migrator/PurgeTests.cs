@@ -96,7 +96,7 @@ public sealed class PurgeTests(PostgresFixture postgres)
 
     private static async Task<FirmClient> ClientAsync(World world)
     {
-        var client = FirmClientRules.Create(FirmClientRules.Parse(new JsonObject { ["name"] = new JsonObject { ["given"] = "Sample" } }), world.FirmId, Opener);
+        var client = FirmClientRules.Create(new FirmClientDraft(new Insolvia.Domain.Fields.PersonName(Given: "Sample")), world.FirmId, Opener);
         await world.Firms.CreateClientAsync(client, Ct);
         return client;
     }

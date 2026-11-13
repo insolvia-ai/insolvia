@@ -442,9 +442,9 @@ describe('the intake screen', () => {
     const CLIENT = {
       id: CLIENT_ID,
       status: 'active',
-      created_at: '2026-08-01T10:00:00.000000Z',
-      updated_at: '2026-08-01T10:00:00.000000Z',
-      created_by: '00000000-0000-4000-8000-00000000a11c',
+      createdAt: '2026-08-01T10:00:00.000000Z',
+      updatedAt: '2026-08-01T10:00:00.000000Z',
+      createdBy: '00000000-0000-4000-8000-00000000a11c',
       name: { given: 'Ada', surname: 'Lovelace' },
       phone: '555-0100',
     };

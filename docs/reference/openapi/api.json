@@ -66,70 +66,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "firstName": {
-                    "type": ["null", "string"],
-                    "description": "The caller\u0027s first name."
-                  },
-                  "lastName": {
-                    "type": ["null", "string"],
-                    "description": "The caller\u0027s last name."
-                  },
-                  "displayName": {
-                    "type": ["null", "string"],
-                    "description": "Legacy: one string split on its last space, read only when neither half is sent."
-                  },
-                  "signatureBlock": {
-                    "type": ["null", "object"],
-                    "properties": {
-                      "bar_number": {
-                        "type": ["null", "string"]
-                      },
-                      "bar_state": {
-                        "type": ["null", "string"]
-                      },
-                      "firm_name": {
-                        "type": ["null", "string"]
-                      },
-                      "phone": {
-                        "type": ["null", "string"]
-                      },
-                      "email": {
-                        "type": ["null", "string"]
-                      },
-                      "address": {
-                        "type": "object",
-                        "properties": {
-                          "line1": {
-                            "type": ["null", "string"]
-                          },
-                          "line2": {
-                            "type": ["null", "string"]
-                          },
-                          "city": {
-                            "type": ["null", "string"]
-                          },
-                          "state": {
-                            "type": ["null", "string"]
-                          },
-                          "postalCode": {
-                            "type": ["null", "string"]
-                          },
-                          "county": {
-                            "type": ["null", "string"]
-                          },
-                          "raw": {
-                            "type": ["null", "string"]
-                          }
-                        },
-                        "description": "Structured parts AND a raw fallback (the IEPD\u0027s free-text form, for a\ncreditor block that will not parse). string? Address.County is B101 line 5\u0027s box.\nstring? Address.PostalCode is \u0060postalCode\u0060 under every serializer, the\nsnake_case ones included: an address sits in a case collection\u0027s camelCase\nbody and in a debtor\u0027s, a firm\u0027s and a client\u0027s snake_case one alike (ADR 0032)."
-                      }
-                    },
-                    "description": "An attorney\u0027s standing signature block (issue #360). The member names are\na \u0060filing_professional\u0060 body\u0027s, so \u0022use firm default\u0022 copies it with\nno mapping. The name is not here \u2014 it is the firm user\u0027s own."
-                  }
-                },
-                "description": "The caller\u0027s change to themselves (\u0060PATCH /v1/me\u0060): their name\n(either half alone) and their signature block; nothing else is read.\nParsed by \u0060FirmParser.ParseSelfUpdate\u0060, which owns validation; this\nrecord is its shape for the OpenAPI document."
+                "$ref": "#/components/schemas/SelfChanges"
               }
             }
           },
@@ -192,69 +129,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "name": {
-                    "type": ["null", "string"],
-                    "description": "The firm\u0027s name."
-                  },
-                  "defaultCourt": {
-                    "type": ["null", "string"],
-                    "description": "The default court\u0027s id; sent with DefaultDivision as a pair."
-                  },
-                  "defaultDivision": {
-                    "type": ["null", "string"],
-                    "description": "The default division\u0027s id within that court."
-                  },
-                  "defaultChapter": {
-                    "type": ["null", "integer"],
-                    "description": "The default chapter.",
-                    "format": "int32"
-                  },
-                  "letterhead": {
-                    "type": ["null", "object"],
-                    "properties": {
-                      "name": {
-                        "type": ["null", "string"]
-                      },
-                      "phone": {
-                        "type": ["null", "string"]
-                      },
-                      "email": {
-                        "type": ["null", "string"]
-                      },
-                      "address": {
-                        "type": "object",
-                        "properties": {
-                          "line1": {
-                            "type": ["null", "string"]
-                          },
-                          "line2": {
-                            "type": ["null", "string"]
-                          },
-                          "city": {
-                            "type": ["null", "string"]
-                          },
-                          "state": {
-                            "type": ["null", "string"]
-                          },
-                          "postalCode": {
-                            "type": ["null", "string"]
-                          },
-                          "county": {
-                            "type": ["null", "string"]
-                          },
-                          "raw": {
-                            "type": ["null", "string"]
-                          }
-                        },
-                        "description": "Structured parts AND a raw fallback (the IEPD\u0027s free-text form, for a\ncreditor block that will not parse). string? Address.County is B101 line 5\u0027s box.\nstring? Address.PostalCode is \u0060postalCode\u0060 under every serializer, the\nsnake_case ones included: an address sits in a case collection\u0027s camelCase\nbody and in a debtor\u0027s, a firm\u0027s and a client\u0027s snake_case one alike (ADR 0032)."
-                      }
-                    },
-                    "description": "What the firm prints at the top of a letter and on the signer block\u0027s firm\nlines (issue #360). Every field optional."
-                  }
-                },
-                "description": "A change to the firm\u0027s own record (\u0060PATCH /v1/firm\u0060); every member\noptional, a present null clears it. Parsed by \u0060FirmParser.ParseFirmUpdate\u0060,\nwhich owns validation; this record is its shape for the OpenAPI document.\nA status is not accepted: a firm cannot suspend itself."
+                "$ref": "#/components/schemas/FirmChanges"
               }
             }
           },
@@ -346,47 +221,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": ["email", "role"],
-                "type": "object",
-                "properties": {
-                  "email": {
-                    "type": "string",
-                    "description": "Their email address; the sign-in account is created for it."
-                  },
-                  "firstName": {
-                    "type": ["null", "string"],
-                    "description": "Their first name; sent with LastName."
-                  },
-                  "lastName": {
-                    "type": ["null", "string"],
-                    "description": "Their last name."
-                  },
-                  "displayName": {
-                    "type": ["null", "string"],
-                    "description": "Legacy: one string split on its last space, read only when neither half is sent."
-                  },
-                  "role": {
-                    "enum": ["attorney", "paralegal", "staff"],
-                    "description": "A job title, and NOT a level of access: it drives the DEFAULT permission\nmap a new user gets and nothing else. What someone can reach is\n\u0060IsAdmin\u0060, \u0060AccessAllCases\u0060 and the permission map."
-                  },
-                  "isAdmin": {
-                    "type": ["null", "boolean"],
-                    "description": "Whether they administer the firm; false when absent."
-                  },
-                  "accessAllCases": {
-                    "type": ["null", "boolean"],
-                    "description": "Whether they see every case; false when absent."
-                  },
-                  "permissions": {
-                    "type": ["null", "object"],
-                    "additionalProperties": {
-                      "enum": ["hidden", "view_only", "add_edit"],
-                      "description": "What a permission can be set to, ordered weakest to strongest. THE ORDER IS\nLOAD-BEARING \u2014 bool Permissions.Permits(FirmUser user, Feature feature, PermissionLevel required) compares the numeric\nvalues, so inserting a level in the middle changes every existing check."
-                    },
-                    "description": "Levels that MERGE over the role\u0027s defaults."
-                  }
-                },
-                "description": "Someone to add to the firm (\u0060POST /v1/firm/users\u0060). Parsed by\n\u0060FirmParser.ParseFirmUserCreation\u0060, which owns validation; this\nrecord is its shape for the OpenAPI document."
+                "$ref": "#/components/schemas/NewFirmUser"
               }
             }
           },
@@ -434,92 +269,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "firstName": {
-                    "type": ["null", "string"],
-                    "description": "Their first name."
-                  },
-                  "lastName": {
-                    "type": ["null", "string"],
-                    "description": "Their last name."
-                  },
-                  "displayName": {
-                    "type": ["null", "string"],
-                    "description": "Legacy: one string split on its last space, read only when neither half is sent."
-                  },
-                  "role": {
-                    "enum": ["attorney", "paralegal", "staff", null]
-                  },
-                  "isAdmin": {
-                    "type": ["null", "boolean"],
-                    "description": "Whether they administer the firm."
-                  },
-                  "accessAllCases": {
-                    "type": ["null", "boolean"],
-                    "description": "Whether they see every case."
-                  },
-                  "permissions": {
-                    "type": ["null", "object"],
-                    "additionalProperties": {
-                      "enum": ["hidden", "view_only", "add_edit"],
-                      "description": "What a permission can be set to, ordered weakest to strongest. THE ORDER IS\nLOAD-BEARING \u2014 bool Permissions.Permits(FirmUser user, Feature feature, PermissionLevel required) compares the numeric\nvalues, so inserting a level in the middle changes every existing check."
-                    },
-                    "description": "The whole permission map; it REPLACES the stored one."
-                  },
-                  "status": {
-                    "enum": ["active", "disabled", null]
-                  },
-                  "signatureBlock": {
-                    "type": ["null", "object"],
-                    "properties": {
-                      "bar_number": {
-                        "type": ["null", "string"]
-                      },
-                      "bar_state": {
-                        "type": ["null", "string"]
-                      },
-                      "firm_name": {
-                        "type": ["null", "string"]
-                      },
-                      "phone": {
-                        "type": ["null", "string"]
-                      },
-                      "email": {
-                        "type": ["null", "string"]
-                      },
-                      "address": {
-                        "type": "object",
-                        "properties": {
-                          "line1": {
-                            "type": ["null", "string"]
-                          },
-                          "line2": {
-                            "type": ["null", "string"]
-                          },
-                          "city": {
-                            "type": ["null", "string"]
-                          },
-                          "state": {
-                            "type": ["null", "string"]
-                          },
-                          "postalCode": {
-                            "type": ["null", "string"]
-                          },
-                          "county": {
-                            "type": ["null", "string"]
-                          },
-                          "raw": {
-                            "type": ["null", "string"]
-                          }
-                        },
-                        "description": "Structured parts AND a raw fallback (the IEPD\u0027s free-text form, for a\ncreditor block that will not parse). string? Address.County is B101 line 5\u0027s box.\nstring? Address.PostalCode is \u0060postalCode\u0060 under every serializer, the\nsnake_case ones included: an address sits in a case collection\u0027s camelCase\nbody and in a debtor\u0027s, a firm\u0027s and a client\u0027s snake_case one alike (ADR 0032)."
-                      }
-                    },
-                    "description": "An attorney\u0027s standing signature block (issue #360). The member names are\na \u0060filing_professional\u0060 body\u0027s, so \u0022use firm default\u0022 copies it with\nno mapping. The name is not here \u2014 it is the firm user\u0027s own."
-                  }
-                },
-                "description": "A change to a firm member (\u0060PATCH /v1/firm/users/{subject}\u0060); every\nmember optional. The email is not changeable. Parsed by\n\u0060FirmParser.ParseFirmUserUpdate\u0060, which owns validation; this record\nis its shape for the OpenAPI document."
+                "$ref": "#/components/schemas/FirmUserChanges"
               }
             }
           },
@@ -607,141 +357,12 @@
       "post": {
         "tags": ["Firm client"],
         "summary": "Add a client",
-        "description": "Logged as \u0060client.create\u0060. A tax id is refused here; it is entered on a case.",
+        "description": "Logged as \u0060client.create\u0060. A tax id is not a member; it is entered on a case.",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "required": ["name"],
-                "type": "object",
-                "properties": {
-                  "name": {
-                    "type": "object",
-                    "properties": {
-                      "given": {
-                        "type": ["null", "string"]
-                      },
-                      "middle": {
-                        "type": ["null", "string"]
-                      },
-                      "surname": {
-                        "type": ["null", "string"]
-                      },
-                      "suffix": {
-                        "type": ["null", "string"]
-                      }
-                    },
-                    "description": "Four discrete parts, never one string \u2014 the IEPD has no single-string fallback for names."
-                  },
-                  "other_names_used": {
-                    "type": ["null", "array"],
-                    "items": {
-                      "type": "object",
-                      "properties": {
-                        "id": {
-                          "type": "string"
-                        },
-                        "given": {
-                          "type": ["null", "string"]
-                        },
-                        "middle": {
-                          "type": ["null", "string"]
-                        },
-                        "surname": {
-                          "type": ["null", "string"]
-                        },
-                        "businessName": {
-                          "type": ["null", "string"]
-                        }
-                      },
-                      "description": "An 8-year-lookback alias. Carries its own client-chosen string OtherName.Id\nso provenance addresses it as \u0060otherNamesUsed[\u0026lt;id\u0026gt;].surname\u0060\n\u2014 position would reattach on reorder. string? OtherName.BusinessName is\n\u0060businessName\u0060 under every serializer: the row sits in a debtor\u0027s\ncamelCase body and a firm client\u0027s snake_case one alike (ADR 0032)."
-                    },
-                    "description": "Names used in the last eight years."
-                  },
-                  "date_of_birth": {
-                    "type": ["null", "string"],
-                    "description": "Date of birth, YYYY-MM-DD, never in the future."
-                  },
-                  "residence_address": {
-                    "type": ["null", "object"],
-                    "properties": {
-                      "line1": {
-                        "type": ["null", "string"]
-                      },
-                      "line2": {
-                        "type": ["null", "string"]
-                      },
-                      "city": {
-                        "type": ["null", "string"]
-                      },
-                      "state": {
-                        "type": ["null", "string"]
-                      },
-                      "postalCode": {
-                        "type": ["null", "string"]
-                      },
-                      "county": {
-                        "type": ["null", "string"]
-                      },
-                      "raw": {
-                        "type": ["null", "string"]
-                      }
-                    },
-                    "description": "Structured parts AND a raw fallback (the IEPD\u0027s free-text form, for a\ncreditor block that will not parse). string? Address.County is B101 line 5\u0027s box.\nstring? Address.PostalCode is \u0060postalCode\u0060 under every serializer, the\nsnake_case ones included: an address sits in a case collection\u0027s camelCase\nbody and in a debtor\u0027s, a firm\u0027s and a client\u0027s snake_case one alike (ADR 0032)."
-                  },
-                  "mailing_address": {
-                    "type": ["null", "object"],
-                    "properties": {
-                      "line1": {
-                        "type": ["null", "string"]
-                      },
-                      "line2": {
-                        "type": ["null", "string"]
-                      },
-                      "city": {
-                        "type": ["null", "string"]
-                      },
-                      "state": {
-                        "type": ["null", "string"]
-                      },
-                      "postalCode": {
-                        "type": ["null", "string"]
-                      },
-                      "county": {
-                        "type": ["null", "string"]
-                      },
-                      "raw": {
-                        "type": ["null", "string"]
-                      }
-                    },
-                    "description": "Structured parts AND a raw fallback (the IEPD\u0027s free-text form, for a\ncreditor block that will not parse). string? Address.County is B101 line 5\u0027s box.\nstring? Address.PostalCode is \u0060postalCode\u0060 under every serializer, the\nsnake_case ones included: an address sits in a case collection\u0027s camelCase\nbody and in a debtor\u0027s, a firm\u0027s and a client\u0027s snake_case one alike (ADR 0032)."
-                  },
-                  "phone": {
-                    "type": ["null", "string"],
-                    "description": "A phone number."
-                  },
-                  "mobile": {
-                    "type": ["null", "string"],
-                    "description": "A mobile number."
-                  },
-                  "email": {
-                    "type": ["null", "string"],
-                    "description": "An email address."
-                  },
-                  "lead_source": {
-                    "type": ["null", "string"],
-                    "description": "How the firm heard of them."
-                  },
-                  "referred_by": {
-                    "type": ["null", "string"],
-                    "description": "Who referred them."
-                  },
-                  "first_retained_at": {
-                    "type": ["null", "string"],
-                    "description": "When the firm was first retained, YYYY-MM-DD; absent for a prospect."
-                  }
-                },
-                "description": "A client as written (\u0060POST /v1/firm/clients\u0060, \u0060PUT \u2026/{clientId}\u0060):\nthe whole record, each unanswered field absent; a PUT clears what it\nomits. Server-owned fields an echoed read sends are ignored, but a tax id\nis refused \u2014 it is entered on a case. Parsed by \u0060FirmClientRules.Parse\u0060,\nwhich owns validation; this record is its shape for the OpenAPI document."
+                "$ref": "#/components/schemas/FirmClientDraft"
               }
             }
           },
@@ -825,136 +446,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": ["name"],
-                "type": "object",
-                "properties": {
-                  "name": {
-                    "type": "object",
-                    "properties": {
-                      "given": {
-                        "type": ["null", "string"]
-                      },
-                      "middle": {
-                        "type": ["null", "string"]
-                      },
-                      "surname": {
-                        "type": ["null", "string"]
-                      },
-                      "suffix": {
-                        "type": ["null", "string"]
-                      }
-                    },
-                    "description": "Four discrete parts, never one string \u2014 the IEPD has no single-string fallback for names."
-                  },
-                  "other_names_used": {
-                    "type": ["null", "array"],
-                    "items": {
-                      "type": "object",
-                      "properties": {
-                        "id": {
-                          "type": "string"
-                        },
-                        "given": {
-                          "type": ["null", "string"]
-                        },
-                        "middle": {
-                          "type": ["null", "string"]
-                        },
-                        "surname": {
-                          "type": ["null", "string"]
-                        },
-                        "businessName": {
-                          "type": ["null", "string"]
-                        }
-                      },
-                      "description": "An 8-year-lookback alias. Carries its own client-chosen string OtherName.Id\nso provenance addresses it as \u0060otherNamesUsed[\u0026lt;id\u0026gt;].surname\u0060\n\u2014 position would reattach on reorder. string? OtherName.BusinessName is\n\u0060businessName\u0060 under every serializer: the row sits in a debtor\u0027s\ncamelCase body and a firm client\u0027s snake_case one alike (ADR 0032)."
-                    },
-                    "description": "Names used in the last eight years."
-                  },
-                  "date_of_birth": {
-                    "type": ["null", "string"],
-                    "description": "Date of birth, YYYY-MM-DD, never in the future."
-                  },
-                  "residence_address": {
-                    "type": ["null", "object"],
-                    "properties": {
-                      "line1": {
-                        "type": ["null", "string"]
-                      },
-                      "line2": {
-                        "type": ["null", "string"]
-                      },
-                      "city": {
-                        "type": ["null", "string"]
-                      },
-                      "state": {
-                        "type": ["null", "string"]
-                      },
-                      "postalCode": {
-                        "type": ["null", "string"]
-                      },
-                      "county": {
-                        "type": ["null", "string"]
-                      },
-                      "raw": {
-                        "type": ["null", "string"]
-                      }
-                    },
-                    "description": "Structured parts AND a raw fallback (the IEPD\u0027s free-text form, for a\ncreditor block that will not parse). string? Address.County is B101 line 5\u0027s box.\nstring? Address.PostalCode is \u0060postalCode\u0060 under every serializer, the\nsnake_case ones included: an address sits in a case collection\u0027s camelCase\nbody and in a debtor\u0027s, a firm\u0027s and a client\u0027s snake_case one alike (ADR 0032)."
-                  },
-                  "mailing_address": {
-                    "type": ["null", "object"],
-                    "properties": {
-                      "line1": {
-                        "type": ["null", "string"]
-                      },
-                      "line2": {
-                        "type": ["null", "string"]
-                      },
-                      "city": {
-                        "type": ["null", "string"]
-                      },
-                      "state": {
-                        "type": ["null", "string"]
-                      },
-                      "postalCode": {
-                        "type": ["null", "string"]
-                      },
-                      "county": {
-                        "type": ["null", "string"]
-                      },
-                      "raw": {
-                        "type": ["null", "string"]
-                      }
-                    },
-                    "description": "Structured parts AND a raw fallback (the IEPD\u0027s free-text form, for a\ncreditor block that will not parse). string? Address.County is B101 line 5\u0027s box.\nstring? Address.PostalCode is \u0060postalCode\u0060 under every serializer, the\nsnake_case ones included: an address sits in a case collection\u0027s camelCase\nbody and in a debtor\u0027s, a firm\u0027s and a client\u0027s snake_case one alike (ADR 0032)."
-                  },
-                  "phone": {
-                    "type": ["null", "string"],
-                    "description": "A phone number."
-                  },
-                  "mobile": {
-                    "type": ["null", "string"],
-                    "description": "A mobile number."
-                  },
-                  "email": {
-                    "type": ["null", "string"],
-                    "description": "An email address."
-                  },
-                  "lead_source": {
-                    "type": ["null", "string"],
-                    "description": "How the firm heard of them."
-                  },
-                  "referred_by": {
-                    "type": ["null", "string"],
-                    "description": "Who referred them."
-                  },
-                  "first_retained_at": {
-                    "type": ["null", "string"],
-                    "description": "When the firm was first retained, YYYY-MM-DD; absent for a prospect."
-                  }
-                },
-                "description": "A client as written (\u0060POST /v1/firm/clients\u0060, \u0060PUT \u2026/{clientId}\u0060):\nthe whole record, each unanswered field absent; a PUT clears what it\nomits. Server-owned fields an echoed read sends are ignored, but a tax id\nis refused \u2014 it is entered on a case. Parsed by \u0060FirmClientRules.Parse\u0060,\nwhich owns validation; this record is its shape for the OpenAPI document."
+                "$ref": "#/components/schemas/FirmClientDraft"
               }
             }
           },
@@ -1002,15 +494,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": ["status"],
-                "type": "object",
-                "properties": {
-                  "status": {
-                    "enum": ["active", "archived"],
-                    "description": "A directory entry\u0027s status. Archiving is its own act, never a side effect of an edit."
-                  }
-                },
-                "description": "Archive a client, or bring one back (\u0060PUT \u2026/{clientId}/status\u0060)."
+                "$ref": "#/components/schemas/ClientStatusRequest"
               }
             }
           },
@@ -1058,19 +542,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "prospect_stage": {
-                    "enum": [
-                      "possible",
-                      "consultation_scheduled",
-                      "awaiting_signed_agreement",
-                      "exhausted",
-                      null
-                    ]
-                  }
-                },
-                "description": "Place a prospect in the funnel, or take them out (\u0060PUT \u2026/{clientId}/prospect-stage\u0060)."
+                "$ref": "#/components/schemas/ProspectStageRequest"
               }
             }
           },
@@ -1118,15 +590,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": ["merged_client_id"],
-                "type": "object",
-                "properties": {
-                  "merged_client_id": {
-                    "type": "string",
-                    "description": "The client to fold away, in the same firm."
-                  }
-                },
-                "description": "Fold another client into this one (\u0060POST \u2026/{clientId}/merge\u0060)."
+                "$ref": "#/components/schemas/ClientMergeRequest"
               }
             }
           },
@@ -1189,97 +653,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": ["name"],
-                "type": "object",
-                "properties": {
-                  "name": {
-                    "type": "string",
-                    "description": "The creditor\u0027s name; the one required field."
-                  },
-                  "address": {
-                    "type": ["null", "object"],
-                    "properties": {
-                      "line1": {
-                        "type": ["null", "string"]
-                      },
-                      "line2": {
-                        "type": ["null", "string"]
-                      },
-                      "city": {
-                        "type": ["null", "string"]
-                      },
-                      "state": {
-                        "type": ["null", "string"]
-                      },
-                      "postalCode": {
-                        "type": ["null", "string"]
-                      },
-                      "county": {
-                        "type": ["null", "string"]
-                      },
-                      "raw": {
-                        "type": ["null", "string"]
-                      }
-                    },
-                    "description": "Structured parts AND a raw fallback (the IEPD\u0027s free-text form, for a\ncreditor block that will not parse). string? Address.County is B101 line 5\u0027s box.\nstring? Address.PostalCode is \u0060postalCode\u0060 under every serializer, the\nsnake_case ones included: an address sits in a case collection\u0027s camelCase\nbody and in a debtor\u0027s, a firm\u0027s and a client\u0027s snake_case one alike (ADR 0032)."
-                  },
-                  "additional_notice_parties": {
-                    "type": ["null", "array"],
-                    "items": {
-                      "type": "object",
-                      "properties": {
-                        "id": {
-                          "type": "string"
-                        },
-                        "name": {
-                          "type": ["null", "string"]
-                        },
-                        "accountLast4": {
-                          "pattern": "^[0-9]*$",
-                          "type": ["null", "string"]
-                        },
-                        "address": {
-                          "type": "object",
-                          "properties": {
-                            "line1": {
-                              "type": ["null", "string"]
-                            },
-                            "line2": {
-                              "type": ["null", "string"]
-                            },
-                            "city": {
-                              "type": ["null", "string"]
-                            },
-                            "state": {
-                              "type": ["null", "string"]
-                            },
-                            "postalCode": {
-                              "type": ["null", "string"]
-                            },
-                            "county": {
-                              "type": ["null", "string"]
-                            },
-                            "raw": {
-                              "type": ["null", "string"]
-                            }
-                          },
-                          "description": "Structured parts AND a raw fallback (the IEPD\u0027s free-text form, for a\ncreditor block that will not parse). string? Address.County is B101 line 5\u0027s box.\nstring? Address.PostalCode is \u0060postalCode\u0060 under every serializer, the\nsnake_case ones included: an address sits in a case collection\u0027s camelCase\nbody and in a debtor\u0027s, a firm\u0027s and a client\u0027s snake_case one alike (ADR 0032)."
-                        }
-                      },
-                      "description": "106D Part 2 / 106E/F Part 3: someone else to be notified about a debt.\nCarries its own client-chosen string NoticeParty.Id for provenance paths."
-                    },
-                    "description": "Others to notify about a debt to this creditor."
-                  },
-                  "preferred": {
-                    "type": ["null", "boolean"],
-                    "description": "Whether to pin it to the top of the picker; false when absent."
-                  },
-                  "notes": {
-                    "type": ["null", "string"],
-                    "description": "The firm\u0027s notes."
-                  }
-                },
-                "description": "A library creditor as written (\u0060POST /v1/firm/creditors\u0060,\n\u0060PUT \u2026/{creditorId}\u0060): the whole record; a PUT clears what it omits.\nParsed by \u0060LibraryCreditorRules.Parse\u0060, which owns validation; this\nrecord is its shape for the OpenAPI document."
+                "$ref": "#/components/schemas/LibraryCreditorDraft"
               }
             }
           },
@@ -1362,97 +736,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": ["name"],
-                "type": "object",
-                "properties": {
-                  "name": {
-                    "type": "string",
-                    "description": "The creditor\u0027s name; the one required field."
-                  },
-                  "address": {
-                    "type": ["null", "object"],
-                    "properties": {
-                      "line1": {
-                        "type": ["null", "string"]
-                      },
-                      "line2": {
-                        "type": ["null", "string"]
-                      },
-                      "city": {
-                        "type": ["null", "string"]
-                      },
-                      "state": {
-                        "type": ["null", "string"]
-                      },
-                      "postalCode": {
-                        "type": ["null", "string"]
-                      },
-                      "county": {
-                        "type": ["null", "string"]
-                      },
-                      "raw": {
-                        "type": ["null", "string"]
-                      }
-                    },
-                    "description": "Structured parts AND a raw fallback (the IEPD\u0027s free-text form, for a\ncreditor block that will not parse). string? Address.County is B101 line 5\u0027s box.\nstring? Address.PostalCode is \u0060postalCode\u0060 under every serializer, the\nsnake_case ones included: an address sits in a case collection\u0027s camelCase\nbody and in a debtor\u0027s, a firm\u0027s and a client\u0027s snake_case one alike (ADR 0032)."
-                  },
-                  "additional_notice_parties": {
-                    "type": ["null", "array"],
-                    "items": {
-                      "type": "object",
-                      "properties": {
-                        "id": {
-                          "type": "string"
-                        },
-                        "name": {
-                          "type": ["null", "string"]
-                        },
-                        "accountLast4": {
-                          "pattern": "^[0-9]*$",
-                          "type": ["null", "string"]
-                        },
-                        "address": {
-                          "type": "object",
-                          "properties": {
-                            "line1": {
-                              "type": ["null", "string"]
-                            },
-                            "line2": {
-                              "type": ["null", "string"]
-                            },
-                            "city": {
-                              "type": ["null", "string"]
-                            },
-                            "state": {
-                              "type": ["null", "string"]
-                            },
-                            "postalCode": {
-                              "type": ["null", "string"]
-                            },
-                            "county": {
-                              "type": ["null", "string"]
-                            },
-                            "raw": {
-                              "type": ["null", "string"]
-                            }
-                          },
-                          "description": "Structured parts AND a raw fallback (the IEPD\u0027s free-text form, for a\ncreditor block that will not parse). string? Address.County is B101 line 5\u0027s box.\nstring? Address.PostalCode is \u0060postalCode\u0060 under every serializer, the\nsnake_case ones included: an address sits in a case collection\u0027s camelCase\nbody and in a debtor\u0027s, a firm\u0027s and a client\u0027s snake_case one alike (ADR 0032)."
-                        }
-                      },
-                      "description": "106D Part 2 / 106E/F Part 3: someone else to be notified about a debt.\nCarries its own client-chosen string NoticeParty.Id for provenance paths."
-                    },
-                    "description": "Others to notify about a debt to this creditor."
-                  },
-                  "preferred": {
-                    "type": ["null", "boolean"],
-                    "description": "Whether to pin it to the top of the picker; false when absent."
-                  },
-                  "notes": {
-                    "type": ["null", "string"],
-                    "description": "The firm\u0027s notes."
-                  }
-                },
-                "description": "A library creditor as written (\u0060POST /v1/firm/creditors\u0060,\n\u0060PUT \u2026/{creditorId}\u0060): the whole record; a PUT clears what it omits.\nParsed by \u0060LibraryCreditorRules.Parse\u0060, which owns validation; this\nrecord is its shape for the OpenAPI document."
+                "$ref": "#/components/schemas/LibraryCreditorDraft"
               }
             }
           },
@@ -1544,34 +828,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": ["sections"],
-                "type": "object",
-                "properties": {
-                  "sections": {
-                    "type": "array",
-                    "items": {
-                      "required": ["id", "enabled"],
-                      "type": "object",
-                      "properties": {
-                        "id": {
-                          "type": "string",
-                          "description": "The section\u0027s id."
-                        },
-                        "enabled": {
-                          "type": "boolean",
-                          "description": "Whether clients see it; an unswitchable section must be true."
-                        },
-                        "instructions": {
-                          "type": ["null", "string"],
-                          "description": "The firm\u0027s instructions; absent, or the default text, means the default."
-                        }
-                      },
-                      "description": "The firm\u0027s choice for one questionnaire section."
-                    },
-                    "description": "One entry for every section."
-                  }
-                },
-                "description": "The firm\u0027s questionnaire config as saved (\u0060PUT /v1/firm/questionnaire\u0060):\nevery section, each named once. Parsed by \u0060Questionnaire.ParseUpdate\u0060,\nwhich owns validation; this record is its shape for the OpenAPI document."
+                "$ref": "#/components/schemas/QuestionnaireRequest"
               }
             }
           },
@@ -1660,39 +917,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": ["items"],
-                "type": "object",
-                "properties": {
-                  "items": {
-                    "type": "array",
-                    "items": {
-                      "type": "object",
-                      "properties": {
-                        "title": {
-                          "type": "string"
-                        },
-                        "kind": {
-                          "enum": [
-                            "credit_report",
-                            "pay_stub",
-                            "bank_statement",
-                            "tax_return",
-                            "identification",
-                            "court_notice",
-                            "other"
-                          ],
-                          "description": "What a document is (Python\u0027s \u0060documents.KINDS\u0060). Here first because a\nfirm\u0027s document checklist files each entry under one; the rest of\n\u0060documents.py\u0060 is the case half\u0027s (18.7) and lands beside it."
-                        },
-                        "description": {
-                          "type": ["null", "string"]
-                        }
-                      },
-                      "description": "One document a firm asks for. DocumentKind ChecklistItem.Kind is what an upload against\nit is filed under (the client never chooses one); string? ChecklistItem.Description\nis what the client reads under the title."
-                    },
-                    "description": "The whole list, in order."
-                  }
-                },
-                "description": "The firm\u0027s document checklist as saved (\u0060PUT /v1/firm/document-checklist\u0060).\nParsed by \u0060DocumentChecklists.ParseUpdate\u0060, which owns validation;\nthis record is its shape for the OpenAPI document."
+                "$ref": "#/components/schemas/ChecklistRequest"
               }
             }
           },
@@ -1756,35 +981,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": ["name", "firm", "email"],
-                "type": "object",
-                "properties": {
-                  "name": {
-                    "type": "string",
-                    "description": "The person\u0027s name (required, up to 200 characters)."
-                  },
-                  "firm": {
-                    "type": "string",
-                    "description": "Their firm\u0027s name (required, up to 200 characters)."
-                  },
-                  "email": {
-                    "type": "string",
-                    "description": "A work email (required, up to 320 characters)."
-                  },
-                  "currentSoftware": {
-                    "type": ["null", "string"],
-                    "description": "What they use today (up to 100 characters)."
-                  },
-                  "message": {
-                    "type": ["null", "string"],
-                    "description": "Anything else (up to 2000 characters)."
-                  },
-                  "host": {
-                    "type": ["null", "string"],
-                    "description": "The marketing host the form was sent from (up to 253 characters)."
-                  }
-                },
-                "description": "A waitlist sign-up (\u0060POST /v1/waitlist\u0060). Parsed by\n\u0060WaitlistSubmissions.Parse\u0060, which owns validation: values are\ntrimmed, a non-string counts as missing, and unknown keys are ignored."
+                "$ref": "#/components/schemas/WaitlistRequest"
               }
             }
           },
@@ -1816,15 +1013,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": ["token"],
-                "type": "object",
-                "properties": {
-                  "token": {
-                    "type": "string",
-                    "description": "The signed token from the email\u0027s unsubscribe link."
-                  }
-                },
-                "description": "An unsubscribe click (\u0060POST /v1/unsubscribe\u0060)."
+                "$ref": "#/components/schemas/UnsubscribeRequest"
               }
             }
           },
@@ -10785,30 +9974,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": ["login", "password", "totp_seed", "courts"],
-                "type": "object",
-                "properties": {
-                  "login": {
-                    "type": "string",
-                    "description": "The PACER username: letters, digits and \u0060. _ @ -\u0060, at most 64 characters."
-                  },
-                  "password": {
-                    "type": "string",
-                    "description": "The PACER password."
-                  },
-                  "totp_seed": {
-                    "type": "string",
-                    "description": "The authenticator key PACER showed: base32, at least 16 characters."
-                  },
-                  "courts": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    },
-                    "description": "The court codes the attorney e-files in."
-                  }
-                },
-                "description": "A CM/ECF credential to enrol (\u0060POST /v1/me/filing-credentials\u0060).\nParsed by \u0060FilingCredentialRules.ParseEnrolment\u0060, which owns\nvalidation; the password and key are sealed on arrival and never returned."
+                "$ref": "#/components/schemas/FilingEnrolmentRequest"
               }
             }
           },
@@ -10903,19 +10069,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": ["text_version", "text_digest"],
-                "type": "object",
-                "properties": {
-                  "text_version": {
-                    "type": "string",
-                    "description": "The version shown."
-                  },
-                  "text_digest": {
-                    "type": "string",
-                    "description": "Its digest."
-                  }
-                },
-                "description": "A signature (\u0060POST /v1/me/filing-authorization\u0060): the version and\ndigest of the text as shown, which must be the current one. Parsed by\n\u0060FilingAuthorizationRules.SignAsync\u0060."
+                "$ref": "#/components/schemas/AuthorizationSignRequest"
               }
             }
           },
@@ -11409,7 +10563,7 @@
             "type": "string"
           }
         },
-        "description": "Structured parts AND a raw fallback (the IEPD\u0027s free-text form, for a\ncreditor block that will not parse). string? Address.County is B101 line 5\u0027s box.\nstring? Address.PostalCode is \u0060postalCode\u0060 under every serializer, the\nsnake_case ones included: an address sits in a case collection\u0027s camelCase\nbody and in a debtor\u0027s, a firm\u0027s and a client\u0027s snake_case one alike (ADR 0032)."
+        "description": "Structured parts AND a raw fallback (the IEPD\u0027s free-text form, for a\ncreditor block that will not parse). string? Address.County is B101 line 5\u0027s box.\nstring? Address.PostalCode is \u0060postalCode\u0060 under every serializer, the\nstored rows\u0027 snake_case one included (ADR 0032)."
       },
       "AnswerInputType": {
         "enum": ["text", "long_text", "date", "money", "whole_number", "address"],
@@ -11712,27 +10866,42 @@
         "description": "One person linked to a case: a subject, never a name (the firm directory resolves it)."
       },
       "AuthorizationSignatureView": {
-        "required": ["id", "text_version", "text_digest", "signed_at"],
+        "required": ["id", "textVersion", "textDigest", "signedAt"],
         "type": "object",
         "properties": {
           "id": {
             "type": "string",
             "description": "The signature\u0027s id."
           },
-          "text_version": {
+          "textVersion": {
             "type": "string",
             "description": "The version signed."
           },
-          "text_digest": {
+          "textDigest": {
             "type": "string",
             "description": "SHA-256 of that version\u0027s text."
           },
-          "signed_at": {
+          "signedAt": {
             "type": "string",
             "description": "When, ISO 8601 UTC with microseconds."
           }
         },
         "description": "A signature on record."
+      },
+      "AuthorizationSignRequest": {
+        "required": ["textVersion", "textDigest"],
+        "type": "object",
+        "properties": {
+          "textVersion": {
+            "type": ["null", "string"],
+            "description": "The version shown."
+          },
+          "textDigest": {
+            "type": ["null", "string"],
+            "description": "Its digest."
+          }
+        },
+        "description": "A signature (\u0060POST /v1/me/filing-authorization\u0060): the version and\ndigest of the text as shown, which must be the current one (a 409 otherwise)."
       },
       "AuthorizationTextView": {
         "required": ["version", "digest", "text"],
@@ -11740,11 +10909,11 @@
         "properties": {
           "version": {
             "type": "string",
-            "description": "The text\u0027s version; post it back as \u0060text_version\u0060."
+            "description": "The text\u0027s version; post it back as \u0060textVersion\u0060."
           },
           "digest": {
             "type": "string",
-            "description": "SHA-256 of the text; post it back as \u0060text_digest\u0060."
+            "description": "SHA-256 of the text; post it back as \u0060textDigest\u0060."
           },
           "text": {
             "type": "string",
@@ -11754,10 +10923,10 @@
         "description": "The authorization text an attorney is asked to sign, with what they must post back."
       },
       "AuthorizationWithdrawn": {
-        "required": ["credentials_revoked"],
+        "required": ["credentialsRevoked"],
         "type": "object",
         "properties": {
-          "credentials_revoked": {
+          "credentialsRevoked": {
             "type": "integer",
             "description": "How many credentials were destroyed with it.",
             "format": "int32"
@@ -14337,6 +13506,21 @@
         },
         "description": "A case\u0027s document requests after the firm\u0027s checklist was applied."
       },
+      "ChecklistItem": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/DocumentKind"
+          },
+          "description": {
+            "type": "string"
+          }
+        },
+        "description": "One document a firm asks for. DocumentKind ChecklistItem.Kind is what an upload against\nit is filed under (the client never chooses one); string? ChecklistItem.Description\nis what the client reads under the title."
+      },
       "ChecklistItemView": {
         "required": ["title", "kind", "description"],
         "type": "object",
@@ -14355,6 +13539,20 @@
           }
         },
         "description": "One document a firm asks its clients for."
+      },
+      "ChecklistRequest": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "maxItems": 40,
+            "type": ["null", "array"],
+            "items": {
+              "$ref": "#/components/schemas/ChecklistItem"
+            },
+            "description": "The whole list, in order."
+          }
+        },
+        "description": "The firm\u0027s document checklist as saved (\u0060PUT /v1/firm/document-checklist\u0060):\nthe WHOLE list. Two entries with the same title are refused \u2014 applying the\nchecklist dedupes by title, so the second could never be requested."
       },
       "ChecklistView": {
         "required": ["isDefault", "updatedAt", "updatedBy", "items", "defaultItems"],
@@ -14522,7 +13720,7 @@
                       "type": ["null", "string"]
                     }
                   },
-                  "description": "Structured parts AND a raw fallback (the IEPD\u0027s free-text form, for a\ncreditor block that will not parse). string? Address.County is B101 line 5\u0027s box.\nstring? Address.PostalCode is \u0060postalCode\u0060 under every serializer, the\nsnake_case ones included: an address sits in a case collection\u0027s camelCase\nbody and in a debtor\u0027s, a firm\u0027s and a client\u0027s snake_case one alike (ADR 0032)."
+                  "description": "Structured parts AND a raw fallback (the IEPD\u0027s free-text form, for a\ncreditor block that will not parse). string? Address.County is B101 line 5\u0027s box.\nstring? Address.PostalCode is \u0060postalCode\u0060 under every serializer, the\nstored rows\u0027 snake_case one included (ADR 0032)."
                 }
               },
               "description": "106D Part 2 / 106E/F Part 3: someone else to be notified about a debt.\nCarries its own client-chosen string NoticeParty.Id for provenance paths."
@@ -14702,6 +13900,17 @@
         },
         "description": "The firm\u0027s clients."
       },
+      "ClientMergeRequest": {
+        "required": ["mergedClientId"],
+        "type": "object",
+        "properties": {
+          "mergedClientId": {
+            "type": ["null", "string"],
+            "description": "The client to fold away, in the same firm \u2014 named for what happens to it, so the direction cannot be read backwards."
+          }
+        },
+        "description": "Fold another client into this one (\u0060POST \u2026/{clientId}/merge\u0060)."
+      },
       "ClientMergeView": {
         "required": ["client", "merged"],
         "type": "object",
@@ -14721,8 +13930,26 @@
         "enum": ["debtor_1", "debtor_2"],
         "description": "The filing roles a portal binding may answer for. \u0060non_filing_spouse\u0060\nis a filing role and deliberately NOT here: ADR 0023 gives a non-filing\nspouse no login in v1."
       },
+      "ClientStatusRequest": {
+        "required": ["status"],
+        "type": "object",
+        "properties": {
+          "status": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The status to set.",
+                "$ref": "#/components/schemas/FirmClientStatus"
+              }
+            ]
+          }
+        },
+        "description": "Archive a client, or bring one back (\u0060PUT \u2026/{clientId}/status\u0060)."
+      },
       "ClientView": {
-        "required": ["id", "status", "created_at", "updated_at", "created_by", "name"],
+        "required": ["id", "status", "createdAt", "updatedAt", "createdBy", "name"],
         "type": "object",
         "properties": {
           "id": {
@@ -14733,15 +13960,15 @@
             "description": "Active or archived; a merged client is archived.",
             "$ref": "#/components/schemas/FirmClientStatus"
           },
-          "created_at": {
+          "createdAt": {
             "type": "string",
             "description": "Added, ISO 8601 UTC to the microsecond."
           },
-          "updated_at": {
+          "updatedAt": {
             "type": "string",
             "description": "Last changed, ISO 8601 UTC to the microsecond."
           },
-          "created_by": {
+          "createdBy": {
             "type": "string",
             "description": "The subject of the staff member who added them."
           },
@@ -14749,22 +13976,22 @@
             "description": "The client\u0027s name, its unanswered parts absent.",
             "$ref": "#/components/schemas/PersonName"
           },
-          "other_names_used": {
+          "otherNamesUsed": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/OtherName"
             },
             "description": "Names used in the last eight years; absent when none."
           },
-          "date_of_birth": {
+          "dateOfBirth": {
             "type": "string",
             "description": "Date of birth, YYYY-MM-DD."
           },
-          "residence_address": {
+          "residenceAddress": {
             "description": "Where the client lives, its unanswered parts absent.",
             "$ref": "#/components/schemas/Address"
           },
-          "mailing_address": {
+          "mailingAddress": {
             "description": "Where the client\u0027s mail goes, its unanswered parts absent.",
             "$ref": "#/components/schemas/Address"
           },
@@ -14780,27 +14007,27 @@
             "type": "string",
             "description": "An email address."
           },
-          "lead_source": {
+          "leadSource": {
             "type": "string",
             "description": "How the firm heard of them."
           },
-          "referred_by": {
+          "referredBy": {
             "type": "string",
             "description": "Who referred them."
           },
-          "first_retained_at": {
+          "firstRetainedAt": {
             "type": "string",
             "description": "When the firm was first retained, YYYY-MM-DD; absent for a prospect."
           },
-          "tax_id_last_four": {
+          "taxIdLastFour": {
             "type": "string",
             "description": "The last four digits of the tax id entered on one of their cases."
           },
-          "merged_into": {
+          "mergedInto": {
             "type": "string",
             "description": "The client this one was merged into; once set, edit that one instead."
           },
-          "prospect_stage": {
+          "prospectStage": {
             "description": "Where a prospect is in the funnel; absent once retained.",
             "$ref": "#/components/schemas/ProspectStage"
           }
@@ -15024,7 +14251,7 @@
                 "type": ["null", "string"]
               }
             },
-            "description": "Structured parts AND a raw fallback (the IEPD\u0027s free-text form, for a\ncreditor block that will not parse). string? Address.County is B101 line 5\u0027s box.\nstring? Address.PostalCode is \u0060postalCode\u0060 under every serializer, the\nsnake_case ones included: an address sits in a case collection\u0027s camelCase\nbody and in a debtor\u0027s, a firm\u0027s and a client\u0027s snake_case one alike (ADR 0032)."
+            "description": "Structured parts AND a raw fallback (the IEPD\u0027s free-text form, for a\ncreditor block that will not parse). string? Address.County is B101 line 5\u0027s box.\nstring? Address.PostalCode is \u0060postalCode\u0060 under every serializer, the\nstored rows\u0027 snake_case one included (ADR 0032)."
           },
           "claimIds": {
             "type": "array",
@@ -15080,7 +14307,7 @@
                 "type": ["null", "string"]
               }
             },
-            "description": "Structured parts AND a raw fallback (the IEPD\u0027s free-text form, for a\ncreditor block that will not parse). string? Address.County is B101 line 5\u0027s box.\nstring? Address.PostalCode is \u0060postalCode\u0060 under every serializer, the\nsnake_case ones included: an address sits in a case collection\u0027s camelCase\nbody and in a debtor\u0027s, a firm\u0027s and a client\u0027s snake_case one alike (ADR 0032)."
+            "description": "Structured parts AND a raw fallback (the IEPD\u0027s free-text form, for a\ncreditor block that will not parse). string? Address.County is B101 line 5\u0027s box.\nstring? Address.PostalCode is \u0060postalCode\u0060 under every serializer, the\nstored rows\u0027 snake_case one included (ADR 0032)."
           }
         },
         "description": "106H line 2\u0027s spouse or former spouse in a community-property state (and\nB107 Q3\u0027s same fact) \u2014 its own record because the 8-year lookback can name\nmore than one person."
@@ -15158,7 +14385,7 @@
                 "type": ["null", "string"]
               }
             },
-            "description": "Structured parts AND a raw fallback (the IEPD\u0027s free-text form, for a\ncreditor block that will not parse). string? Address.County is B101 line 5\u0027s box.\nstring? Address.PostalCode is \u0060postalCode\u0060 under every serializer, the\nsnake_case ones included: an address sits in a case collection\u0027s camelCase\nbody and in a debtor\u0027s, a firm\u0027s and a client\u0027s snake_case one alike (ADR 0032)."
+            "description": "Structured parts AND a raw fallback (the IEPD\u0027s free-text form, for a\ncreditor block that will not parse). string? Address.County is B101 line 5\u0027s box.\nstring? Address.PostalCode is \u0060postalCode\u0060 under every serializer, the\nstored rows\u0027 snake_case one included (ADR 0032)."
           }
         },
         "description": "The executory contract / unexpired lease record \u2014 106G, one row each (from\n\u0060contract_leases.py\u0060). ContractLeaseIntention? ContractLeaseBody.Intention and\nbool? ContractLeaseBody.ListOnStatementOfIntention are Form 108\u0027s columns, stored on\nthe lease because the fact is the lease\u0027s (issue #347)."
@@ -15374,7 +14601,7 @@
                 "type": ["null", "string"]
               }
             },
-            "description": "Structured parts AND a raw fallback (the IEPD\u0027s free-text form, for a\ncreditor block that will not parse). string? Address.County is B101 line 5\u0027s box.\nstring? Address.PostalCode is \u0060postalCode\u0060 under every serializer, the\nsnake_case ones included: an address sits in a case collection\u0027s camelCase\nbody and in a debtor\u0027s, a firm\u0027s and a client\u0027s snake_case one alike (ADR 0032)."
+            "description": "Structured parts AND a raw fallback (the IEPD\u0027s free-text form, for a\ncreditor block that will not parse). string? Address.County is B101 line 5\u0027s box.\nstring? Address.PostalCode is \u0060postalCode\u0060 under every serializer, the\nstored rows\u0027 snake_case one included (ADR 0032)."
           }
         },
         "description": "One deduplicated name-and-address for the creditor matrix (from\n\u0060creditors.py\u0060). Separate from a claim on purpose: a debtor may owe\none creditor twice. The name is ONE line, not a PersonName\n\u2014 creditors are predominantly entities. Nothing here dedupes; matching is\na suggestion to a human."
@@ -15491,7 +14718,7 @@
                   "type": ["null", "string"]
                 }
               },
-              "description": "An 8-year-lookback alias. Carries its own client-chosen string OtherName.Id\nso provenance addresses it as \u0060otherNamesUsed[\u0026lt;id\u0026gt;].surname\u0060\n\u2014 position would reattach on reorder. string? OtherName.BusinessName is\n\u0060businessName\u0060 under every serializer: the row sits in a debtor\u0027s\ncamelCase body and a firm client\u0027s snake_case one alike (ADR 0032)."
+              "description": "An 8-year-lookback alias. Carries its own client-chosen string OtherName.Id\nso provenance addresses it as \u0060otherNamesUsed[\u0026lt;id\u0026gt;].surname\u0060\n\u2014 position would reattach on reorder. string? OtherName.BusinessName is\n\u0060businessName\u0060 under every serializer, the stored client body\u0027s\nsnake_case one included."
             },
             "description": "The 8-year aliases, each addressed by its id."
           },
@@ -15527,7 +14754,7 @@
                 "type": ["null", "string"]
               }
             },
-            "description": "Structured parts AND a raw fallback (the IEPD\u0027s free-text form, for a\ncreditor block that will not parse). string? Address.County is B101 line 5\u0027s box.\nstring? Address.PostalCode is \u0060postalCode\u0060 under every serializer, the\nsnake_case ones included: an address sits in a case collection\u0027s camelCase\nbody and in a debtor\u0027s, a firm\u0027s and a client\u0027s snake_case one alike (ADR 0032)."
+            "description": "Structured parts AND a raw fallback (the IEPD\u0027s free-text form, for a\ncreditor block that will not parse). string? Address.County is B101 line 5\u0027s box.\nstring? Address.PostalCode is \u0060postalCode\u0060 under every serializer, the\nstored rows\u0027 snake_case one included (ADR 0032)."
           },
           "mailingAddress": {
             "type": "object",
@@ -15554,7 +14781,7 @@
                 "type": ["null", "string"]
               }
             },
-            "description": "Structured parts AND a raw fallback (the IEPD\u0027s free-text form, for a\ncreditor block that will not parse). string? Address.County is B101 line 5\u0027s box.\nstring? Address.PostalCode is \u0060postalCode\u0060 under every serializer, the\nsnake_case ones included: an address sits in a case collection\u0027s camelCase\nbody and in a debtor\u0027s, a firm\u0027s and a client\u0027s snake_case one alike (ADR 0032)."
+            "description": "Structured parts AND a raw fallback (the IEPD\u0027s free-text form, for a\ncreditor block that will not parse). string? Address.County is B101 line 5\u0027s box.\nstring? Address.PostalCode is \u0060postalCode\u0060 under every serializer, the\nstored rows\u0027 snake_case one included (ADR 0032)."
           },
           "venue": {
             "type": "object",
@@ -16098,7 +15325,7 @@
                 "type": ["null", "string"]
               }
             },
-            "description": "Structured parts AND a raw fallback (the IEPD\u0027s free-text form, for a\ncreditor block that will not parse). string? Address.County is B101 line 5\u0027s box.\nstring? Address.PostalCode is \u0060postalCode\u0060 under every serializer, the\nsnake_case ones included: an address sits in a case collection\u0027s camelCase\nbody and in a debtor\u0027s, a firm\u0027s and a client\u0027s snake_case one alike (ADR 0032)."
+            "description": "Structured parts AND a raw fallback (the IEPD\u0027s free-text form, for a\ncreditor block that will not parse). string? Address.County is B101 line 5\u0027s box.\nstring? Address.PostalCode is \u0060postalCode\u0060 under every serializer, the\nstored rows\u0027 snake_case one included (ADR 0032)."
           }
         },
         "description": "106I Part 1: one job of one debtor."
@@ -18155,14 +17382,14 @@
         "description": "What a client sees of an attorney\u0027s approval to file."
       },
       "FilingAuthorizationView": {
-        "required": ["text", "current_version", "current", "signature"],
+        "required": ["text", "currentVersion", "current", "signature"],
         "type": "object",
         "properties": {
           "text": {
             "description": "The text in force.",
             "$ref": "#/components/schemas/AuthorizationTextView"
           },
-          "current_version": {
+          "currentVersion": {
             "type": "string",
             "description": "The version a signature must be over to be current."
           },
@@ -18264,7 +17491,7 @@
         "description": "The caller\u0027s own CM/ECF credentials."
       },
       "FilingCredentialView": {
-        "required": ["id", "login", "courts", "status", "created_at", "updated_at"],
+        "required": ["id", "login", "courts", "status", "createdAt", "updatedAt"],
         "type": "object",
         "properties": {
           "id": {
@@ -18286,11 +17513,11 @@
             "description": "Always \u0060active\u0060 while it exists: revoking destroys it.",
             "$ref": "#/components/schemas/CredentialStatus"
           },
-          "created_at": {
+          "createdAt": {
             "type": "string",
             "description": "When it was enrolled, ISO 8601 UTC with microseconds."
           },
-          "updated_at": {
+          "updatedAt": {
             "type": "string",
             "description": "When it was last written, ISO 8601 UTC with microseconds."
           }
@@ -18334,6 +17561,35 @@
           }
         },
         "description": "One document of the filing set."
+      },
+      "FilingEnrolmentRequest": {
+        "type": "object",
+        "properties": {
+          "login": {
+            "pattern": "^[A-Za-z0-9._@-]{1,64}$",
+            "type": ["null", "string"],
+            "description": "The PACER username: letters, digits and \u0060. _ @ -\u0060, at most 64 characters."
+          },
+          "password": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[^\\x00-\\x1F\\x7F]*$",
+            "type": ["null", "string"],
+            "description": "The PACER password."
+          },
+          "totpSeed": {
+            "type": ["null", "string"],
+            "description": "The authenticator key PACER showed: base32, at least 16 characters, spaces and case ignored."
+          },
+          "courts": {
+            "type": ["null", "array"],
+            "items": {
+              "type": "string"
+            },
+            "description": "The court codes the attorney e-files in."
+          }
+        },
+        "description": "A CM/ECF credential to enrol (\u0060POST /v1/me/filing-credentials\u0060). The\npassword and key are sealed on arrival and never returned, and no message\nechoes a submitted value. Its text form is redacted, so it cannot reach a log line."
       },
       "FilingProfessionalBody": {
         "type": "object",
@@ -18430,7 +17686,7 @@
                 "type": ["null", "string"]
               }
             },
-            "description": "Structured parts AND a raw fallback (the IEPD\u0027s free-text form, for a\ncreditor block that will not parse). string? Address.County is B101 line 5\u0027s box.\nstring? Address.PostalCode is \u0060postalCode\u0060 under every serializer, the\nsnake_case ones included: an address sits in a case collection\u0027s camelCase\nbody and in a debtor\u0027s, a firm\u0027s and a client\u0027s snake_case one alike (ADR 0032)."
+            "description": "Structured parts AND a raw fallback (the IEPD\u0027s free-text form, for a\ncreditor block that will not parse). string? Address.County is B101 line 5\u0027s box.\nstring? Address.PostalCode is \u0060postalCode\u0060 under every serializer, the\nstored rows\u0027 snake_case one included (ADR 0032)."
           }
         },
         "description": "B101 Part 7\u0027s attorney or petition-preparer block, and B2030\u0027s \u00A7 329(a)\ncompensation disclosure \u2014 facts about THIS engagement. The balance due is\nthe difference of the two amounts and is never stored."
@@ -18657,6 +17913,97 @@
         },
         "description": "A filing run as a reader sees it: its ids and state, what the court said,\nand the attorney\u0027s resolution of a hand-back \u2014 never the page\u0027s storage key."
       },
+      "FirmChanges": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "minLength": 1,
+            "pattern": ".*\\S.*",
+            "type": ["null", "string"],
+            "description": "A new name."
+          },
+          "defaultCourt": {
+            "type": ["null", "string"],
+            "description": "The default court\u0027s CM/ECF code, sent with string? FirmChanges.DefaultDivision; both null clear the pair."
+          },
+          "defaultDivision": {
+            "type": ["null", "string"],
+            "description": "The default division\u0027s code within that court."
+          },
+          "defaultChapter": {
+            "type": ["null", "integer"],
+            "description": "The default chapter; null clears it.",
+            "format": "int32"
+          },
+          "letterhead": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The letterhead, whole; null clears it.",
+                "$ref": "#/components/schemas/Letterhead"
+              }
+            ]
+          }
+        },
+        "description": "A PATCH of the firm\u0027s own record (\u0060PATCH /v1/firm\u0060, #217): only the\nkeys sent change. The defaults and the letterhead clear with an explicit\nnull, which bool FirmChanges.Names(string member) tells apart from a key not sent. There is no\nstatus here and never will be \u2014 suspending is the admin service\u0027s\nFirm FirmLifecycle.SetFirmStatus(Firm firm, FirmStatus status, TimeProvider? clock = null)."
+      },
+      "FirmClientDraft": {
+        "type": "object",
+        "properties": {
+          "dateOfBirth": {
+            "type": ["null", "string"],
+            "description": "Date of birth \u2014 never in the future (FirmClient FirmClientRules.Create(FirmClientDraft draft, string firmId, string createdBy, TimeProvider? clock = null) checks it against the clock).",
+            "format": "date"
+          },
+          "phone": {
+            "type": ["null", "string"],
+            "description": "A phone number \u2014 the debtor\u0027s cap, so what a client accepts a debtor accepts."
+          },
+          "mobile": {
+            "type": ["null", "string"],
+            "description": "A mobile number."
+          },
+          "email": {
+            "type": ["null", "string"],
+            "description": "An email address (free text; a directory contact value)."
+          },
+          "leadSource": {
+            "type": ["null", "string"],
+            "description": "How the firm heard of them (free text in v1)."
+          },
+          "referredBy": {
+            "type": ["null", "string"],
+            "description": "Who referred them."
+          },
+          "firstRetainedAt": {
+            "type": ["null", "string"],
+            "description": "When the firm was first retained; absent for a prospect.",
+            "format": "date"
+          },
+          "name": {
+            "description": "The client\u0027s name.",
+            "$ref": "#/components/schemas/PersonName"
+          },
+          "otherNamesUsed": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OtherName"
+            },
+            "description": "The 8-year aliases."
+          },
+          "residenceAddress": {
+            "description": "Where the client lives.",
+            "$ref": "#/components/schemas/Address"
+          },
+          "mailingAddress": {
+            "description": "Where the client\u0027s mail goes.",
+            "$ref": "#/components/schemas/Address"
+          }
+        },
+        "description": "A client as written \u2014 \u0060POST /v1/firm/clients\u0060 to create,\n\u0060PUT \u2026/{clientId}\u0060 to replace: the caller-editable fields only, so a\nPUT clears what it omits. Server-owned fields an echoed read sends\n(status, the tax id\u0027s last four, the stage) are not members and are ignored."
+      },
       "FirmClientStatus": {
         "enum": ["active", "archived"],
         "description": "A directory entry\u0027s status. Archiving is its own act, never a side effect of an edit."
@@ -18742,7 +18089,73 @@
             ]
           }
         },
-        "description": "The firm as its own members see it (\u0060firm_summary_json\u0060): no\nprovisioning provenance \u2014 who at Insolvia created it is not the firm\u0027s to\nread \u2014 and the defaults as explicit nulls until set."
+        "description": "The firm as its own members see it (\u0060firm_summary_json\u0060): no\nprovisioning provenance \u2014 who at Insolvia created it is not the firm\u0027s to\nread \u2014 and the defaults as explicit nulls until set, so \u0022not set\u0022 never\nreads as an older API that lacked the field. The defaults prefill a new\ncase; they never decide anything."
+      },
+      "FirmUserChanges": {
+        "type": "object",
+        "properties": {
+          "firstName": {
+            "minLength": 1,
+            "pattern": ".*\\S.*",
+            "type": ["null", "string"],
+            "description": "Their first name."
+          },
+          "lastName": {
+            "minLength": 1,
+            "pattern": ".*\\S.*",
+            "type": ["null", "string"],
+            "description": "Their last name."
+          },
+          "role": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "Their job title.",
+                "$ref": "#/components/schemas/FirmRole"
+              }
+            ]
+          },
+          "isAdmin": {
+            "type": ["null", "boolean"],
+            "description": "Whether they administer the firm."
+          },
+          "accessAllCases": {
+            "type": ["null", "boolean"],
+            "description": "Whether they see every case."
+          },
+          "permissions": {
+            "type": ["null", "object"],
+            "additionalProperties": {
+              "$ref": "#/components/schemas/PermissionLevel"
+            },
+            "description": "The whole permission map; it replaces the stored one."
+          },
+          "status": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "Active or disabled.",
+                "$ref": "#/components/schemas/FirmUserStatus"
+              }
+            ]
+          },
+          "signatureBlock": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "Their signature block, whole; null removes it.",
+                "$ref": "#/components/schemas/SignatureBlock"
+              }
+            ]
+          }
+        },
+        "description": "A firm-user PATCH (\u0060PATCH /v1/firm/users/{subject}\u0060): only the keys\nsent change \u2014 changing a role alone must not reset the permission map, and\nIReadOnlyDictionary\u0026lt;Feature, PermissionLevel\u0026gt;? FirmUserChanges.Permissions REPLACES the stored map (a merging PATCH could\nonly ever grant). The email is not changeable: it is a pool operation. The\nsignature block clears with an explicit null."
       },
       "FirmUserList": {
         "required": ["users"],
@@ -19373,6 +18786,36 @@
         },
         "description": "What the firm prints at the top of a letter and on the signer block\u0027s firm\nlines (issue #360). Every field optional."
       },
+      "LibraryCreditorDraft": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": ["null", "string"],
+            "description": "The creditor\u0027s name \u2014 the one required field, the one fact the picker shows."
+          },
+          "preferred": {
+            "type": "boolean",
+            "description": "Whether to pin it to the top of the picker.",
+            "default": false
+          },
+          "notes": {
+            "type": ["null", "string"],
+            "description": "The firm\u0027s notes."
+          },
+          "address": {
+            "description": "The creditor\u0027s address; an empty one when none was given.",
+            "$ref": "#/components/schemas/Address"
+          },
+          "additionalNoticeParties": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoticeParty"
+            },
+            "description": "The notice parties, each addressed by its id."
+          }
+        },
+        "description": "A library creditor as written \u2014 \u0060POST /v1/firm/creditors\u0060 to create,\n\u0060PUT \u2026/{creditorId}\u0060 to replace: a WHOLE record, so a PUT clears what\nit omits (no \u0022null means unchanged\u0022)."
+      },
       "LibraryCreditorList": {
         "required": ["creditors"],
         "type": "object",
@@ -19392,10 +18835,10 @@
           "id",
           "name",
           "address",
-          "additional_notice_parties",
+          "additionalNoticeParties",
           "preferred",
-          "created_at",
-          "updated_at"
+          "createdAt",
+          "updatedAt"
         ],
         "type": "object",
         "properties": {
@@ -19411,7 +18854,7 @@
             "description": "The creditor\u0027s address, its unanswered parts absent.",
             "$ref": "#/components/schemas/Address"
           },
-          "additional_notice_parties": {
+          "additionalNoticeParties": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/NoticePartyView"
@@ -19422,11 +18865,11 @@
             "type": "boolean",
             "description": "Whether the firm pins it to the top of the picker."
           },
-          "created_at": {
+          "createdAt": {
             "type": "string",
             "description": "Added, ISO 8601 UTC to the microsecond."
           },
-          "updated_at": {
+          "updatedAt": {
             "type": "string",
             "description": "Last changed, ISO 8601 UTC to the microsecond."
           },
@@ -20329,7 +19772,7 @@
           },
           "defaultCourt": {
             "type": ["null", "string"],
-            "description": "The default court\u0027s id; null when unset."
+            "description": "The firm\u0027s default court\u0027s id; null when unset."
           },
           "defaultDivision": {
             "type": ["null", "string"],
@@ -20337,7 +19780,7 @@
           },
           "defaultChapter": {
             "type": ["null", "integer"],
-            "description": "The default chapter; null when unset.",
+            "description": "The firm\u0027s default chapter; null when unset.",
             "format": "int32"
           },
           "letterhead": {
@@ -20346,7 +19789,7 @@
                 "type": "null"
               },
               {
-                "description": "What the firm prints at the top of a letter, its unanswered fields absent; null when unset.",
+                "description": "The firm\u0027s letterhead, its unanswered fields absent; null when unset.",
                 "$ref": "#/components/schemas/Letterhead"
               }
             ]
@@ -20439,6 +19882,58 @@
           }
         },
         "description": "Opening a case (\u0060POST /v1/cases\u0060). Every case starts at intake.\nWhether each client is this firm\u0027s is the route\u0027s question."
+      },
+      "NewFirmUser": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "maxLength": 320,
+            "pattern": "^[^@\\s]\u002B@[^@\\s]\u002B\\.[^@\\s]\u002B$",
+            "type": ["null", "string"],
+            "description": "Their email address; the sign-in account is created for it, lower-cased."
+          },
+          "firstName": {
+            "minLength": 1,
+            "pattern": ".*\\S.*",
+            "type": ["null", "string"],
+            "description": "Their first name."
+          },
+          "lastName": {
+            "minLength": 1,
+            "pattern": ".*\\S.*",
+            "type": ["null", "string"],
+            "description": "Their last name."
+          },
+          "role": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "Their job title; it sets the default permissions.",
+                "$ref": "#/components/schemas/FirmRole"
+              }
+            ]
+          },
+          "isAdmin": {
+            "type": "boolean",
+            "description": "Whether they administer the firm.",
+            "default": false
+          },
+          "accessAllCases": {
+            "type": "boolean",
+            "description": "Whether they see every case, not only those they are on.",
+            "default": false
+          },
+          "permissions": {
+            "type": ["null", "object"],
+            "additionalProperties": {
+              "$ref": "#/components/schemas/PermissionLevel"
+            },
+            "description": "Levels that merge over the role\u0027s defaults."
+          }
+        },
+        "description": "Adding someone to the firm (\u0060POST /v1/firm/users\u0060). No subject: it\ncomes back from Cognito when the pool user is created, never from the\ncaller. Supplied IReadOnlyDictionary\u0026lt;Feature, PermissionLevel\u0026gt;? NewFirmUser.Permissions MERGE over the role\u0027s defaults,\nso granting one feature does not silently revoke the rest."
       },
       "NonpriorityType": {
         "enum": [
@@ -20558,7 +20053,7 @@
             "description": "The party\u0027s address, its unanswered parts absent.",
             "$ref": "#/components/schemas/Address"
           },
-          "account_last4": {
+          "accountLast4": {
             "type": "string",
             "description": "The last four of the account number the party knows it by; absent when none."
           }
@@ -20647,7 +20142,7 @@
             "type": "string"
           }
         },
-        "description": "An 8-year-lookback alias. Carries its own client-chosen string OtherName.Id\nso provenance addresses it as \u0060otherNamesUsed[\u0026lt;id\u0026gt;].surname\u0060\n\u2014 position would reattach on reorder. string? OtherName.BusinessName is\n\u0060businessName\u0060 under every serializer: the row sits in a debtor\u0027s\ncamelCase body and a firm client\u0027s snake_case one alike (ADR 0032)."
+        "description": "An 8-year-lookback alias. Carries its own client-chosen string OtherName.Id\nso provenance addresses it as \u0060otherNamesUsed[\u0026lt;id\u0026gt;].surname\u0060\n\u2014 position would reattach on reorder. string? OtherName.BusinessName is\n\u0060businessName\u0060 under every serializer, the stored client body\u0027s\nsnake_case one included."
       },
       "OtherSecuredPayment": {
         "type": "object",
@@ -21200,7 +20695,7 @@
                     "type": ["null", "string"]
                   }
                 },
-                "description": "Structured parts AND a raw fallback (the IEPD\u0027s free-text form, for a\ncreditor block that will not parse). string? Address.County is B101 line 5\u0027s box.\nstring? Address.PostalCode is \u0060postalCode\u0060 under every serializer, the\nsnake_case ones included: an address sits in a case collection\u0027s camelCase\nbody and in a debtor\u0027s, a firm\u0027s and a client\u0027s snake_case one alike (ADR 0032)."
+                "description": "Structured parts AND a raw fallback (the IEPD\u0027s free-text form, for a\ncreditor block that will not parse). string? Address.County is B101 line 5\u0027s box.\nstring? Address.PostalCode is \u0060postalCode\u0060 under every serializer, the\nstored rows\u0027 snake_case one included (ADR 0032)."
               }
             },
             "description": "B101 line 14: property needing immediate attention."
@@ -22434,6 +21929,23 @@
           null
         ]
       },
+      "ProspectStageRequest": {
+        "type": "object",
+        "properties": {
+          "prospectStage": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The stage, or null to leave the funnel; the key itself is required.",
+                "$ref": "#/components/schemas/ProspectStage"
+              }
+            ]
+          }
+        },
+        "description": "Place a prospect in the funnel, or take them out (\u0060PUT \u2026/{clientId}/prospect-stage\u0060)."
+      },
       "ProvenanceEntry": {
         "type": "object",
         "properties": {
@@ -22483,6 +21995,37 @@
       "ProvenanceSource": {
         "enum": ["staff_typed", "ai_extracted", "imported", "library", "client", "client_answered"],
         "description": "Who supplied a value. Order is Python\u0027s \u0060SOURCES\u0060 tuple \u2014 it is the\norder the \u0022Source must be one of \u2026\u0022 message lists them in."
+      },
+      "QuestionnaireRequest": {
+        "type": "object",
+        "properties": {
+          "sections": {
+            "type": ["null", "array"],
+            "items": {
+              "$ref": "#/components/schemas/QuestionnaireSectionRequest"
+            },
+            "description": "One entry for every section."
+          }
+        },
+        "description": "The firm\u0027s questionnaire config as saved (\u0060PUT /v1/firm/questionnaire\u0060):\nevery catalogue section named exactly once \u2014 a whole-record save."
+      },
+      "QuestionnaireSectionRequest": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": ["null", "string"],
+            "description": "The section\u0027s id."
+          },
+          "enabled": {
+            "type": ["null", "boolean"],
+            "description": "Whether clients see it; an unswitchable section must be true."
+          },
+          "instructions": {
+            "type": ["null", "string"],
+            "description": "The firm\u0027s instructions; absent, or the default text, means the default."
+          }
+        },
+        "description": "The firm\u0027s choice for one questionnaire section."
       },
       "QuestionnaireSectionView": {
         "required": [
@@ -22699,16 +22242,45 @@
       "SecuredTreatmentKind": {
         "enum": ["cure_and_maintain", "cramdown", "surrender", null]
       },
+      "SelfChanges": {
+        "type": "object",
+        "properties": {
+          "firstName": {
+            "minLength": 1,
+            "pattern": ".*\\S.*",
+            "type": ["null", "string"],
+            "description": "The caller\u0027s first name."
+          },
+          "lastName": {
+            "minLength": 1,
+            "pattern": ".*\\S.*",
+            "type": ["null", "string"],
+            "description": "The caller\u0027s last name."
+          },
+          "signatureBlock": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The caller\u0027s signature block, whole; null removes it.",
+                "$ref": "#/components/schemas/SignatureBlock"
+              }
+            ]
+          }
+        },
+        "description": "The caller\u0027s change to themselves (\u0060PATCH /v1/me\u0060): their name\n(either half alone) and their signature block. Everything else on the row\nis somebody else\u0027s statement about the member and is not read."
+      },
       "SignatureBlock": {
         "type": "object",
         "properties": {
-          "bar_number": {
+          "barNumber": {
             "type": "string"
           },
-          "bar_state": {
+          "barState": {
             "type": "string"
           },
-          "firm_name": {
+          "firmName": {
             "type": "string"
           },
           "phone": {
@@ -22722,7 +22294,7 @@
             "$ref": "#/components/schemas/Address"
           }
         },
-        "description": "An attorney\u0027s standing signature block (issue #360). The member names are\na \u0060filing_professional\u0060 body\u0027s, so \u0022use firm default\u0022 copies it with\nno mapping. The name is not here \u2014 it is the firm user\u0027s own."
+        "description": "An attorney\u0027s standing signature block (issue #360). The member names and\nlimits are a \u0060filingProfessional\u0060 body\u0027s, so \u0022use firm default\u0022 copies\nit with no mapping. The name is not here \u2014 it is the firm user\u0027s own."
       },
       "SmallBusinessStatus": {
         "enum": [
@@ -22788,7 +22360,7 @@
                 "type": ["null", "string"]
               }
             },
-            "description": "Structured parts AND a raw fallback (the IEPD\u0027s free-text form, for a\ncreditor block that will not parse). string? Address.County is B101 line 5\u0027s box.\nstring? Address.PostalCode is \u0060postalCode\u0060 under every serializer, the\nsnake_case ones included: an address sits in a case collection\u0027s camelCase\nbody and in a debtor\u0027s, a firm\u0027s and a client\u0027s snake_case one alike (ADR 0032)."
+            "description": "Structured parts AND a raw fallback (the IEPD\u0027s free-text form, for a\ncreditor block that will not parse). string? Address.County is B101 line 5\u0027s box.\nstring? Address.PostalCode is \u0060postalCode\u0060 under every serializer, the\nstored rows\u0027 snake_case one included (ADR 0032)."
           }
         },
         "description": "B101 line 12: a business the debtor operates as a sole proprietor."
@@ -23064,6 +22636,17 @@
         },
         "description": "The one answer to a valid unsubscribe token."
       },
+      "UnsubscribeRequest": {
+        "required": ["token"],
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": ["null", "string"],
+            "description": "The signed token from the email\u0027s unsubscribe link."
+          }
+        },
+        "description": "An unsubscribe click (\u0060POST /v1/unsubscribe\u0060)."
+      },
       "UploadHeaders": {
         "required": ["Content-Type", "x-amz-tagging"],
         "type": "object",
@@ -23229,6 +22812,44 @@
           }
         },
         "description": "A stored waitlist sign-up."
+      },
+      "WaitlistRequest": {
+        "required": ["name", "firm", "email"],
+        "type": "object",
+        "properties": {
+          "name": {
+            "maxLength": 200,
+            "type": ["null", "string"],
+            "description": "The person\u0027s name."
+          },
+          "firm": {
+            "maxLength": 200,
+            "type": ["null", "string"],
+            "description": "Their firm\u0027s name."
+          },
+          "email": {
+            "maxLength": 320,
+            "pattern": "^[^@\\s]\u002B@[^@\\s]\u002B\\.[^@\\s]\u002B$",
+            "type": ["null", "string"],
+            "description": "A work email."
+          },
+          "currentSoftware": {
+            "maxLength": 100,
+            "type": ["null", "string"],
+            "description": "What they use today."
+          },
+          "message": {
+            "maxLength": 2000,
+            "type": ["null", "string"],
+            "description": "Anything else."
+          },
+          "host": {
+            "maxLength": 253,
+            "type": ["null", "string"],
+            "description": "The marketing host the form was sent from."
+          }
+        },
+        "description": "A waitlist sign-up (\u0060POST /v1/waitlist\u0060): the marketing form\u0027s caps,\nand the DNS name limit for the host the marketing action sends. Unknown\nkeys are ignored \u2014 the form\u0027s honeypot is checked in its action and never\nreaches this API."
       },
       "WhichHousehold": {
         "enum": ["main", "debtor_2_separate", null]

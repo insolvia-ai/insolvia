@@ -141,7 +141,7 @@ public sealed class ClientMergeTests
     private async Task<FirmClient> Client(string given, string surname = "Example")
     {
         var client = FirmClientRules.Create(
-            FirmClientRules.Parse(Body.Of($$$"""{"name": {"given": "{{{given}}}", "surname": "{{{surname}}}"}, "phone": "555-0100", "residence_address": {"line1": "1 Example St"}}""")),
+            FirmClientTests.Parse(Body.Of($$$"""{"name": {"given": "{{{given}}}", "surname": "{{{surname}}}"}, "phone": "555-0100", "residenceAddress": {"line1": "1 Example St"}}""")),
             Ids.Firm,
             Ids.Alice);
         await _firms.CreateClientAsync(client, Ct);
@@ -210,7 +210,7 @@ public sealed class ClientMergeTests
     {
         var one = await Client("Jordan");
         var refused = await Assert.ThrowsAsync<FieldValidationException>(() => Merge(one, one));
-        Assert.Contains("merged_client_id", refused.Fields.Keys);
+        Assert.Contains("mergedClientId", refused.Fields.Keys);
     }
 
     [Theory]

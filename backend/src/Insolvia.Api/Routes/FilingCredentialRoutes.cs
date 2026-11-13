@@ -8,6 +8,7 @@ using Insolvia.Domain.FilingCredentials;
 using Insolvia.Domain.Firms;
 using Insolvia.Domain.Ports;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Mvc;
 
 namespace Insolvia.Api.Routes;
 
@@ -45,10 +46,11 @@ public sealed partial class FilingCredentialRoutes : IEndpointModule
     {
         ArgumentNullException.ThrowIfNull(routes);
         routes.MapGet("/v1/me/filing-credentials", ListAsync).RequireAuth().Requires(Feature.ElectronicFiling, PermissionLevel.ViewOnly);
-        routes.MapPost("/v1/me/filing-credentials", EnrolAsync).RequestBody<FilingEnrolmentRequest>().RequireAuth().Requires(Feature.ElectronicFiling, PermissionLevel.AddEdit);
+        var sizeLimit = new RequestSizeLimitAttribute(MaxRequestBytes);
+        routes.MapPost("/v1/me/filing-credentials", EnrolAsync).WithMetadata(sizeLimit).RequireAuth().Requires(Feature.ElectronicFiling, PermissionLevel.AddEdit);
         routes.MapDelete("/v1/me/filing-credentials/{credentialId}", RevokeAsync).RequireAuth().Requires(Feature.ElectronicFiling, PermissionLevel.AddEdit);
         routes.MapGet("/v1/me/filing-authorization", ReadAuthorizationAsync).RequireAuth().Requires(Feature.ElectronicFiling, PermissionLevel.ViewOnly);
-        routes.MapPost("/v1/me/filing-authorization", SignAsync).RequestBody<AuthorizationSignRequest>().RequireAuth().Requires(Feature.ElectronicFiling, PermissionLevel.AddEdit);
+        routes.MapPost("/v1/me/filing-authorization", SignAsync).WithMetadata(sizeLimit).RequireAuth().Requires(Feature.ElectronicFiling, PermissionLevel.AddEdit);
         routes.MapDelete("/v1/me/filing-authorization", WithdrawAsync).RequireAuth().Requires(Feature.ElectronicFiling, PermissionLevel.ViewOnly);
     }
 
@@ -74,14 +76,13 @@ public sealed partial class FilingCredentialRoutes : IEndpointModule
     /// The password and authenticator key are sealed on arrival and never
     /// returned. A 403 until the caller has signed the current authorization text.
     /// </remarks>
-    internal static async Task<Created<FilingCredentialView>> EnrolAsync(HttpContext context, CancellationToken cancellationToken)
+    internal static async Task<Created<FilingCredentialView>> EnrolAsync(HttpContext context, FilingEnrolmentRequest request, CancellationToken cancellationToken)
     {
         var store = context.Port<IFilingCredentialStore>();
         var sealer = context.Port<IFilingCredentialSealer>();
         var accessor = await context.CurrentAccessorAsync();
-        var enrolment = FilingCredentialRules.ParseEnrolment(await context.BodyAsync(MaxRequestBytes), context.RequestServices.GetService<ICourtRegistry>());
         var credential = await FilingCredentialRules.EnrolAsync(
-            enrolment, accessor.FirmId, accessor.Subject, sealer, store, context.AccessLog(), context.Port<IFilingAuthorizationStore>(), context.Clock(), cancellationToken);
+            request.ToEnrolment(), accessor.FirmId, accessor.Subject, sealer, store, context.AccessLog(), context.Port<IFilingAuthorizationStore>(), context.Clock(), cancellationToken);
 
         // Metadata only: that an enrolment happened, never the login or the subject.
         context.Log(Logger, "filing credential enrolled");
@@ -115,13 +116,14 @@ public sealed partial class FilingCredentialRoutes : IEndpointModule
 
     /// <summary>Sign the filing authorization.</summary>
     /// <remarks>Signs the current authorization text; the version and digest posted must be the current text's. Needs a recent sign-in (403 <c>ReauthenticationRequired</c> otherwise).</remarks>
-    internal static async Task<Created<FilingAuthorizationView>> SignAsync(HttpContext context, CancellationToken cancellationToken)
+    internal static async Task<Created<FilingAuthorizationView>> SignAsync(HttpContext context, AuthorizationSignRequest request, CancellationToken cancellationToken)
     {
         var accessLog = context.AccessLog();
         var accessor = await context.CurrentAccessorAsync();
         var fresh = context.RequireFreshSignIn(FilingAuthorizationRules.SignatureMaxAgeSeconds);
         var signed = await FilingAuthorizationRules.SignAsync(
-            await context.BodyAsync(MaxRequestBytes),
+            request.TextVersion!,
+            request.TextDigest!,
             accessor.FirmId,
             accessor.Subject,
             fresh,
