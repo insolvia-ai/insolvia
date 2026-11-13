@@ -29,10 +29,17 @@ public enum FilingRole
 
 /// <summary>
 /// An 8-year-lookback alias. Carries its own client-chosen <see cref="Id"/>
-/// so provenance addresses it as <c>other_names_used[&lt;id&gt;].surname</c>
-/// — position would reattach on reorder.
+/// so provenance addresses it as <c>otherNamesUsed[&lt;id&gt;].surname</c>
+/// — position would reattach on reorder. <see cref="BusinessName"/> is
+/// <c>businessName</c> under every serializer: the row sits in a debtor's
+/// camelCase body and a firm client's snake_case one alike (ADR 0032).
 /// </summary>
-public sealed record OtherName(string Id, string? Given = null, string? Middle = null, string? Surname = null, string? BusinessName = null);
+public sealed record OtherName(
+    string Id,
+    [property: Text] string? Given = null,
+    [property: Text] string? Middle = null,
+    [property: Text] string? Surname = null,
+    [property: Text, JsonPropertyName("businessName")] string? BusinessName = null) : IRow;
 
 /// <summary>The alias-list parser (Python's <c>debtors.parse_other_names</c>).</summary>
 public static class OtherNames
@@ -80,7 +87,7 @@ public static class OtherNames
                 Given: FieldParsers.Text(entry["given"], $"{path}.given", errors),
                 Middle: FieldParsers.Text(entry["middle"], $"{path}.middle", errors),
                 Surname: FieldParsers.Text(entry["surname"], $"{path}.surname", errors),
-                BusinessName: FieldParsers.Text(entry["business_name"], $"{path}.business_name", errors)));
+                BusinessName: FieldParsers.Text(entry["businessName"], $"{path}.businessName", errors)));
         }
 
         return names.ToValueCollection();

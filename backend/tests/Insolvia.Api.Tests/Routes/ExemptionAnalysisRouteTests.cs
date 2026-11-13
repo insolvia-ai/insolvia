@@ -118,7 +118,7 @@ public sealed class ExemptionAnalysisRouteTests : IAsyncLifetime, IDisposable
         Assert.Null(before["election"]!["effective"]);
         Assert.Empty(before["entries"]!.AsArray());
 
-        var patched = await _world.Patch($"/v1/cases/{caseId}", """{"exemption_set": "federal"}""");
+        var patched = await _world.Patch($"/v1/cases/{caseId}", """{"exemptionSet": "federal"}""");
         Assert.True(patched.Status == 200, patched.Body);
 
         var after = (await Analysis(caseId)).Object;
@@ -146,7 +146,7 @@ public sealed class ExemptionAnalysisRouteTests : IAsyncLifetime, IDisposable
     {
         var answer = await _world.Put(
             $"/v1/cases/{caseId}/debtors/debtor_1",
-            $$"""{"name": {"given": "Ada"}, "residence_address": {"state": "{{state}}"}, "provenance": {"name.given": {"source": "staff_typed"}, "residence_address.state": {"source": "staff_typed"} } }""");
+            $$$"""{"body": {"name": {"given": "Ada"}, "residenceAddress": {"state": "{{{state}}}"}}, "provenance": {"name.given": {"source": "staff_typed"}, "residenceAddress.state": {"source": "staff_typed"} } }""");
         Assert.True(answer.Status == 200, answer.Body);
     }
 

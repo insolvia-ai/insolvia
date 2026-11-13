@@ -57,7 +57,7 @@ public sealed class PortalAnswerReviewTests : IAsyncLifetime, IDisposable
     {
         var answer = await _world.Get($"/v1/cases/{_caseId}/debtors");
         Assert.True(answer.Status == 200, answer.Body);
-        return answer.Object["debtors"]!.AsArray().Single(debtor => debtor!["filing_role"]!.GetValue<string>() == "debtor_1")!.AsObject();
+        return answer.Object["debtors"]!.AsArray().Single(debtor => debtor!["filingRole"]!.GetValue<string>() == "debtor_1")!.AsObject();
     }
 
     private const string LegalName = """{"questionId": "personal_information.legal_name", "value": {"given": "Patricia", "surname": "Example"}}""";
@@ -82,7 +82,7 @@ public sealed class PortalAnswerReviewTests : IAsyncLifetime, IDisposable
         var answer = await Review(answerId);
         Assert.True(answer.Status == 200, answer.Body);
         var debtor = await Debtor1Async();
-        Assert.Equal("""{"given":"Patricia","surname":"Example"}""", debtor["name"]!.ToJsonString());
+        Assert.Equal("""{"given":"Patricia","surname":"Example"}""", debtor["body"]!["name"]!.ToJsonString());
         var entry = debtor["provenance"]!["name.given"]!.AsObject();
         Assert.Equal("client_answered", entry.Str("source"));
         Assert.Equal(Alice, entry.Str("confirmed_by"));
@@ -98,8 +98,8 @@ public sealed class PortalAnswerReviewTests : IAsyncLifetime, IDisposable
         var answerId = await AnswerAsync("""{"questionId": "personal_information.phone", "value": {"phone": "555-0100"}}""");
         Assert.Equal(200, (await Review(answerId)).Status);
         var after = await Debtor1Async();
-        Assert.Equal("555-0100", after.Str("phone"));
-        Assert.True(JsonNode.DeepEquals(before["name"], after["name"]));
+        Assert.Equal("555-0100", after["body"]!["phone"]!.GetValue<string>());
+        Assert.True(JsonNode.DeepEquals(before["body"]!["name"], after["body"]!["name"]));
         Assert.True(JsonNode.DeepEquals(before["provenance"]!["name.given"], after["provenance"]!["name.given"]));
     }
 
@@ -123,7 +123,7 @@ public sealed class PortalAnswerReviewTests : IAsyncLifetime, IDisposable
             Assert.True(answer.Status == 200, answer.Body);
         }
 
-        Assert.Equal(["Formerly", "Earlier"], (await Debtor1Async())["other_names_used"]!.AsArray().Select(name => name!["surname"]!.GetValue<string>()));
+        Assert.Equal(["Formerly", "Earlier"], (await Debtor1Async())["body"]!["otherNamesUsed"]!.AsArray().Select(name => name!["surname"]!.GetValue<string>()));
     }
 
     [Fact]

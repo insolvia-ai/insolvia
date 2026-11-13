@@ -38,7 +38,7 @@ internal sealed class DebtorRow
 
     public DateTimeOffset UpdatedAt { get; set; }
 
-    /// <summary><c>BodyJson.Prune(DebtorRules.BodyNode(body))</c>.</summary>
+    /// <summary><c>DebtorRules.BodyNode(body)</c>: camelCase, unanswered members left out.</summary>
     public JsonDocument Body { get; set; } = JsonDocument.Parse("{}");
 
     /// <summary><c>ProvenanceRules.ToJson(provenance)</c>.</summary>

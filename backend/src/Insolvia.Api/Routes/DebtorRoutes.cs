@@ -1,4 +1,3 @@
-using System.Text.Json.Nodes;
 using Insolvia.Api.Auth;
 using Insolvia.Api.Cases;
 using Insolvia.Api.Hosting;
@@ -12,6 +11,7 @@ using Insolvia.Domain.Firms;
 using Insolvia.Domain.Ports;
 using Insolvia.Domain.TaxIds;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Mvc;
 
 namespace Insolvia.Api.Routes;
 
@@ -23,11 +23,11 @@ namespace Insolvia.Api.Routes;
 /// <remarks>
 /// <para><b>Debtor 1 and Debtor 2 are clients' copies</b>: their record is
 /// created by linking a client (<c>PUT …/client</c>), never by typing one —
-/// a PUT to an empty client role is a 400 on <c>client_id</c>. The non-filing
+/// a PUT to an empty client role is a 400 on <c>clientId</c>. The non-filing
 /// spouse may be typed.</para>
 /// <para><b>The tax id</b> is sealed on the way in (<see cref="TaxIdRules.StoreAsync"/>)
 /// and only its last four ever leave (<see cref="TaxIdView"/>).</para>
-/// <para><b><c>differs_from_client</c></b> is computed only for a caller who
+/// <para><b><c>differsFromClient</c></b> is computed only for a caller who
 /// may see the client directory: a caller without <c>clients</c> is not told
 /// how a client record reads.</para>
 /// </remarks>
@@ -42,9 +42,10 @@ public sealed class DebtorRoutes : IEndpointModule
     public void Map(IEndpointRouteBuilder routes)
     {
         ArgumentNullException.ThrowIfNull(routes);
-        routes.MapPut("/v1/cases/{caseId}/debtors/{filingRole}", PutAsync).RequestBody<DebtorRequest>().RequireAuth().Requires(Feature.Intake, PermissionLevel.AddEdit);
+        var sizeLimit = new RequestSizeLimitAttribute(MaxRequestBytes);
+        routes.MapPut("/v1/cases/{caseId}/debtors/{filingRole}", PutAsync).WithMetadata(sizeLimit).RequireAuth().Requires(Feature.Intake, PermissionLevel.AddEdit);
         routes.MapGet("/v1/cases/{caseId}/debtors", ListAsync).RequireAuth().Requires(Feature.Intake, PermissionLevel.ViewOnly);
-        routes.MapPut("/v1/cases/{caseId}/debtors/{filingRole}/client", LinkClientAsync).RequestBody<DebtorLinkRequest>().RequireAuth().Requires(Feature.Intake, PermissionLevel.AddEdit).Requires(Feature.Clients, PermissionLevel.ViewOnly);
+        routes.MapPut("/v1/cases/{caseId}/debtors/{filingRole}/client", LinkClientAsync).WithMetadata(sizeLimit).RequireAuth().Requires(Feature.Intake, PermissionLevel.AddEdit).Requires(Feature.Clients, PermissionLevel.ViewOnly);
         routes.MapPost("/v1/cases/{caseId}/debtors/{filingRole}/copy-from-client", CopyFromClientAsync).RequireAuth().Requires(Feature.Intake, PermissionLevel.AddEdit).Requires(Feature.Clients, PermissionLevel.ViewOnly);
         routes.MapPost("/v1/cases/{caseId}/debtors/{filingRole}/copy-to-client", CopyToClientAsync).RequireAuth().Requires(Feature.Intake, PermissionLevel.ViewOnly).Requires(Feature.Clients, PermissionLevel.AddEdit);
     }
@@ -53,23 +54,23 @@ public sealed class DebtorRoutes : IEndpointModule
     /// <remarks>
     /// Replaces the record for the filing role, or creates it — 201 — for the
     /// non-filing spouse. Debtor 1 and Debtor 2 are created by linking a client
-    /// first; a save to either before then is a 400 on <c>client_id</c>.
+    /// first; a save to either before then is a 400 on <c>clientId</c>.
     /// </remarks>
-    internal static async Task<Results<Created<DebtorView>, Ok<DebtorView>>> PutAsync(HttpContext context, string caseId, string filingRole, CancellationToken cancellationToken)
+    internal static async Task<Results<Created<DebtorView>, Ok<DebtorView>>> PutAsync(HttpContext context, string caseId, string filingRole, DebtorDraft request, CancellationToken cancellationToken)
     {
         var debtors = context.Port<IDebtorStore>();
         var accessor = await context.CurrentAccessorAsync();
         var clock = context.Clock();
 
-        var role = DebtorRules.ParseFilingRole(JsonValue.Create(filingRole));
-        var draft = DebtorRules.Parse(await context.BodyAsync(MaxRequestBytes));
+        var role = DebtorRules.ParseFilingRole(filingRole);
+        var draft = DebtorRules.Checked(request);
         var target = await context.ReachableCaseAsync(caseId, AccessAction.CaseUpdate, cancellationToken);
 
         var stored = await debtors.GetAsync(caseId, role, cancellationToken);
         DebtorRules.RequireClientProvenanceKept(draft, stored);
         if (stored is null && role is FilingRole.Debtor1 or FilingRole.Debtor2)
         {
-            throw new FieldValidationException(new Dictionary<string, string> { ["client_id"] = "Link a client to this debtor before entering their details." });
+            throw new FieldValidationException(new Dictionary<string, string> { ["clientId"] = "Link a client to this debtor before entering their details." });
         }
 
         if (stored is null)
@@ -111,13 +112,13 @@ public sealed class DebtorRoutes : IEndpointModule
     /// Creates the debtor as a copy of the client when the role is empty — 201 —
     /// else links the existing record. One client, one role per case.
     /// </remarks>
-    internal static async Task<Results<Created<DebtorView>, Ok<DebtorView>>> LinkClientAsync(HttpContext context, string caseId, string filingRole, CancellationToken cancellationToken)
+    internal static async Task<Results<Created<DebtorView>, Ok<DebtorView>>> LinkClientAsync(HttpContext context, string caseId, string filingRole, DebtorLinkRequest request, CancellationToken cancellationToken)
     {
         var debtors = context.Port<IDebtorStore>();
         var accessor = await context.CurrentAccessorAsync();
         var clock = context.Clock();
-        var role = DebtorRules.ParseFilingRole(JsonValue.Create(filingRole));
-        var clientId = ClientIdOf(await context.BodyAsync(MaxRequestBytes));
+        var role = DebtorRules.ParseFilingRole(filingRole);
+        var clientId = request.ClientId!;
         var target = await context.ReachableCaseAsync(caseId, AccessAction.CaseUpdate, cancellationToken);
         var client = await LinkableClientAsync(context, target, clientId, cancellationToken);
 
@@ -149,7 +150,7 @@ public sealed class DebtorRoutes : IEndpointModule
     {
         var debtors = context.Port<IDebtorStore>();
         var accessor = await context.CurrentAccessorAsync();
-        var role = DebtorRules.ParseFilingRole(JsonValue.Create(filingRole));
+        var role = DebtorRules.ParseFilingRole(filingRole);
         var target = await context.ReachableCaseAsync(caseId, AccessAction.CaseUpdate, cancellationToken);
         if (CaseRules.IsFiled(target.Status))
         {
@@ -169,7 +170,7 @@ public sealed class DebtorRoutes : IEndpointModule
     {
         var debtors = context.Port<IDebtorStore>();
         var accessor = await context.CurrentAccessorAsync();
-        var role = DebtorRules.ParseFilingRole(JsonValue.Create(filingRole));
+        var role = DebtorRules.ParseFilingRole(filingRole);
         var target = await context.ReachableCaseAsync(caseId, AccessAction.CaseRead, cancellationToken);
         var stored = await LinkedDebtorAsync(debtors, caseId, role, cancellationToken);
         var firms = context.FirmStore();
@@ -200,18 +201,18 @@ public sealed class DebtorRoutes : IEndpointModule
     }
 
     // The client, IN THE CASE'S FIRM, logged as client.read; absent or
-    // archived/merged is a 400 on client_id.
+    // archived/merged is a 400 on clientId.
     private static async Task<FirmClient> LinkableClientAsync(HttpContext context, Case target, string clientId, CancellationToken cancellationToken)
     {
         var client = await context.FirmStore().GetClientAsync(target.FirmId, clientId, cancellationToken);
         await context.RecordClientAccessAsync(clientId, AccessAction.ClientRead, client is not null, cancellationToken);
         if (client is null)
         {
-            throw new FieldValidationException(new Dictionary<string, string> { ["client_id"] = "No such client." });
+            throw new FieldValidationException(new Dictionary<string, string> { ["clientId"] = "No such client." });
         }
 
         return client.RefusalForNewCase() is { } refused
-            ? throw new FieldValidationException(new Dictionary<string, string> { ["client_id"] = refused })
+            ? throw new FieldValidationException(new Dictionary<string, string> { ["clientId"] = refused })
             : client;
     }
 
@@ -219,28 +220,20 @@ public sealed class DebtorRoutes : IEndpointModule
     {
         if (outcome == LinkOutcome.ClientTaken)
         {
-            throw new FieldValidationException(new Dictionary<string, string> { ["client_id"] = "That client is already another debtor on this case." });
+            throw new FieldValidationException(new Dictionary<string, string> { ["clientId"] = "That client is already another debtor on this case." });
         }
 
         if (outcome == LinkOutcome.ClientUnavailable)
         {
             var reread = await context.FirmStore().GetClientAsync(target.FirmId, clientId, cancellationToken);
-            throw new FieldValidationException(new Dictionary<string, string> { ["client_id"] = FirmClientRules.RefusalForRefusedLink(reread) });
+            throw new FieldValidationException(new Dictionary<string, string> { ["clientId"] = FirmClientRules.RefusalForRefusedLink(reread) });
         }
-    }
-
-    private static string ClientIdOf(JsonObject payload)
-    {
-        var clientId = Json.AsString(payload["client_id"]);
-        return clientId is null || TextRules.Strip(clientId).Length == 0
-            ? throw new FieldValidationException(new Dictionary<string, string> { ["client_id"] = "Choose a client." })
-            : TextRules.Strip(clientId);
     }
 
     private static Task<TaxIdRef?> ResolveTaxIdAsync(HttpContext context, DebtorDraft draft, Debtor? stored, Case target, CancellationToken cancellationToken) =>
         TaxIdRules.StoreAsync(draft.TaxId, stored?.TaxId, target.FirmId, target.Id, context.Port<ITaxIdCipher>(), context.Port<ITaxIdStore>(), context.Clock(), cancellationToken);
 
-    // differs_from_client only for a caller who may see the client directory.
+    // differsFromClient only for a caller who may see the client directory.
     private static async Task<DebtorView> ViewAsync(HttpContext context, Accessor accessor, Case target, Debtor debtor, FirmClient? client = null, CancellationToken cancellationToken = default)
     {
         if (debtor.ClientId is null || !accessor.May(Feature.Clients, PermissionLevel.ViewOnly))

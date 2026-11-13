@@ -26,13 +26,13 @@ const MATTER: Case = {
 function debtor(named: boolean): Debtor {
   return {
     id: 'debtor_1',
-    case_id: MATTER.id,
-    filing_role: 'debtor_1',
-    created_at: MATTER.createdAt,
-    updated_at: MATTER.createdAt,
+    caseId: MATTER.id,
+    filingRole: 'debtor_1',
+    createdAt: MATTER.createdAt,
+    updatedAt: MATTER.createdAt,
+    body: named ? { name: { given: 'Sample', surname: 'Debtor' } } : {},
     provenance: {},
-    ...(named ? { name: { given: 'Sample', surname: 'Debtor' } } : {}),
-  } as Debtor;
+  };
 }
 
 function problem(source: string, message = 'Something is missing.'): CaseProblem {

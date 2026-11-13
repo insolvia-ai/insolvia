@@ -62,13 +62,12 @@ function me(clientPortal: string | undefined) {
 function debtor(role: 'debtor_1' | 'debtor_2', given: string, email?: string) {
   return {
     id: role,
-    case_id: CASE_ID,
-    filing_role: role,
-    created_at: '2026-08-04T10:00:00.000000Z',
-    updated_at: '2026-08-04T10:00:00.000000Z',
+    caseId: CASE_ID,
+    filingRole: role,
+    createdAt: '2026-08-04T10:00:00.000000Z',
+    updatedAt: '2026-08-04T10:00:00.000000Z',
     provenance: {},
-    name: { given, surname: 'Example' },
-    ...(email === undefined ? {} : { email }),
+    body: { name: { given, surname: 'Example' }, ...(email === undefined ? {} : { email }) },
   };
 }
 

@@ -13,13 +13,13 @@ namespace Insolvia.Api.Tests.Routes;
 /// <summary>
 /// test_debtor_routes.py: the debtors of a case — tenancy, the save's 201/200,
 /// provenance, the sealed tax id and its last-four view, the client link
-/// (ADR 0022), <c>differs_from_client</c>, and the copies to and from the
+/// (ADR 0022), <c>differsFromClient</c>, and the copies to and from the
 /// client record. The other firm is Carol's; the linked-only colleague is Bob.
 /// </summary>
 public sealed class DebtorRouteTests : IAsyncLifetime, IDisposable
 {
     private const string Typed = """{"source": "staff_typed"}""";
-    private const string TaxId = """ "tax_id": {"kind": "ssn", "value": "987-65-4321"}, "provenance": {"tax_id": {"source": "staff_typed"}} """;
+    private const string TaxId = """ "taxId": {"kind": "ssn", "value": "987-65-4321"}, "provenance": {"taxId": {"source": "staff_typed"}} """;
 
     private readonly StaleOnce _stale = new();
     private readonly CaseWorld _world;
@@ -57,7 +57,7 @@ public sealed class DebtorRouteTests : IAsyncLifetime, IDisposable
     public async Task Another_firms_case_is_not_found_and_indistinguishable_from_a_missing_one()
     {
         var caseId = await _world.OpenCaseIdAsync();
-        await Put(caseId, """ "name": {"given": "Ada"}, "provenance": {"name.given": """ + Typed + "}");
+        await Put(caseId, """ "body": {"name": {"given": "Ada"}}, "provenance": {"name.given": """ + Typed + "}");
 
         Assert.Equal(404, (await Put(caseId, subject: Carol)).Status);
         var foreign = await _world.Get($"/v1/cases/{caseId}/debtors", Carol);
@@ -72,14 +72,14 @@ public sealed class DebtorRouteTests : IAsyncLifetime, IDisposable
     public async Task Creating_a_debtor_answers_201_and_updating_200_keeping_its_id()
     {
         var caseId = await _world.OpenCaseIdAsync();
-        var named = """ "name": {"given": "Ada"}, "provenance": {"name.given": """ + Typed + "}";
+        var named = """ "body": {"name": {"given": "Ada"}}, "provenance": {"name.given": """ + Typed + "}";
 
         var first = await Put(caseId, named, "non_filing_spouse");
         var second = await Put(caseId, named.Replace("Ada", "Augusta", StringComparison.Ordinal), "non_filing_spouse");
 
         Assert.Equal((201, 200), (first.Status, second.Status));
         Assert.Equal(first.Str("id"), second.Str("id"));
-        Assert.Equal("""{"given":"Augusta"}""", Support.SortedJson.Serialize(second.Object["name"]));
+        Assert.Equal("""{"given":"Augusta"}""", Support.SortedJson.Serialize(second.Object["body"]!["name"]));
     }
 
     [Fact]
@@ -87,7 +87,7 @@ public sealed class DebtorRouteTests : IAsyncLifetime, IDisposable
     {
         var caseId = await _world.OpenCaseIdAsync();
 
-        Assert.Equal(200, (await Put(caseId, """ "name": {"given": "Ada"}, "provenance": {"name.given": """ + Typed + "}")).Status);
+        Assert.Equal(200, (await Put(caseId, """ "body": {"name": {"given": "Ada"}}, "provenance": {"name.given": """ + Typed + "}")).Status);
         Assert.Equal(200, (await Put(caseId)).Status);
     }
 
@@ -96,10 +96,10 @@ public sealed class DebtorRouteTests : IAsyncLifetime, IDisposable
     {
         var caseId = await _world.OpenCaseIdAsync();
 
-        var refused = await Put(caseId, """ "name": {"given": "Sam"}, "provenance": {"name.given": """ + Typed + "}", "debtor_2");
+        var refused = await Put(caseId, """ "body": {"name": {"given": "Sam"}}, "provenance": {"name.given": """ + Typed + "}", "debtor_2");
 
         Assert.Equal(400, refused.Status);
-        Assert.Contains("client_id", refused.FieldErrors);
+        Assert.Contains("clientId", refused.FieldErrors);
         Assert.Equal(["debtor_1"], await RolesAsync(caseId));
     }
 
@@ -110,8 +110,8 @@ public sealed class DebtorRouteTests : IAsyncLifetime, IDisposable
     }
 
     [Theory]
-    [InlineData(""" "name": {"given": "Ada"} """)]
-    [InlineData(""" "name": {"given": "Ada"}, "provenance": {"name.given": {"source": "ai_extracted"}} """)]
+    [InlineData(""" "body": {"name": {"given": "Ada"}} """)]
+    [InlineData(""" "body": {"name": {"given": "Ada"}}, "provenance": {"name.given": {"source": "ai_extracted"}} """)]
     public async Task A_value_without_confirmed_provenance_is_rejected_with_its_field(string body)
     {
         var answer = await Put(await _world.OpenCaseIdAsync(), body);
@@ -131,8 +131,8 @@ public sealed class DebtorRouteTests : IAsyncLifetime, IDisposable
         var listed = await _world.Get($"/v1/cases/{caseId}/debtors");
 
         Assert.Equal(200, saved.Status);
-        Assert.Equal("""{"kind":"ssn","last_four":"4321"}""", Support.SortedJson.Serialize(saved.Object["tax_id"]));
-        Assert.Equal("""{"kind":"ssn","last_four":"4321"}""", Support.SortedJson.Serialize(listed.Object["debtors"]![0]!["tax_id"]));
+        Assert.Equal("""{"kind":"ssn","lastFour":"4321"}""", Support.SortedJson.Serialize(saved.Object["taxId"]));
+        Assert.Equal("""{"kind":"ssn","lastFour":"4321"}""", Support.SortedJson.Serialize(listed.Object["debtors"]![0]!["taxId"]));
         foreach (var body in new[] { saved.Body, listed.Body })
         {
             Assert.DoesNotContain("987654321", body, StringComparison.Ordinal);
@@ -159,8 +159,8 @@ public sealed class DebtorRouteTests : IAsyncLifetime, IDisposable
     {
         var caseId = await _world.OpenCaseIdAsync();
 
-        Assert.Contains("provenance.tax_id", (await Put(caseId, """ "tax_id": {"kind": "ssn", "value": "987-65-4321"} """)).FieldErrors);
-        Assert.Contains("tax_id.value", (await Put(caseId, TaxId.Replace("987-65-4321", "000-00-0000", StringComparison.Ordinal))).FieldErrors);
+        Assert.Contains("provenance.taxId", (await Put(caseId, """ "taxId": {"kind": "ssn", "value": "987-65-4321"} """)).FieldErrors);
+        Assert.Contains("taxId.value", (await Put(caseId, TaxId.Replace("987-65-4321", "000-00-0000", StringComparison.Ordinal))).FieldErrors);
     }
 
     [Fact]
@@ -169,17 +169,17 @@ public sealed class DebtorRouteTests : IAsyncLifetime, IDisposable
         var caseId = await _world.OpenCaseIdAsync();
         await Put(caseId, TaxId);
 
-        var kept = await Put(caseId, """ "name": {"given": "Ada"}, "tax_id": {"kind": "ssn", "last_four": "4321"}, "provenance": {"name.given": """ + Typed + """, "tax_id": """ + Typed + "}");
+        var kept = await Put(caseId, """ "body": {"name": {"given": "Ada"}}, "taxId": {"kind": "ssn", "lastFour": "4321"}, "provenance": {"name.given": """ + Typed + """, "taxId": """ + Typed + "}");
         Assert.Equal(200, kept.Status);
-        Assert.Equal("""{"kind":"ssn","last_four":"4321"}""", Support.SortedJson.Serialize(kept.Object["tax_id"]));
+        Assert.Equal("""{"kind":"ssn","lastFour":"4321"}""", Support.SortedJson.Serialize(kept.Object["taxId"]));
 
-        var wrong = await Put(caseId, """ "tax_id": {"kind": "ssn", "last_four": "9999"}, "provenance": {"tax_id": """ + Typed + "}");
+        var wrong = await Put(caseId, """ "taxId": {"kind": "ssn", "lastFour": "9999"}, "provenance": {"taxId": """ + Typed + "}");
         Assert.Equal(400, wrong.Status);
-        Assert.Contains("tax_id", wrong.FieldErrors);
+        Assert.Contains("taxId", wrong.FieldErrors);
 
         var cleared = await Put(caseId);
         Assert.Equal(200, cleared.Status);
-        Assert.False(cleared.Object.ContainsKey("tax_id"));
+        Assert.False(cleared.Object.ContainsKey("taxId"));
     }
 
     // ── The list ────────────────────────────────────────────────────
@@ -190,20 +190,20 @@ public sealed class DebtorRouteTests : IAsyncLifetime, IDisposable
         var caseId = await _world.OpenCaseIdAsync();
         await Put(caseId, role: "non_filing_spouse");
         await Link(caseId, "debtor_2", await _world.AddClientAsync());
-        await Put(caseId, """ "name": {"given": "Ada"}, "provenance": {"name.given": """ + Typed + "}");
+        await Put(caseId, """ "body": {"name": {"given": "Ada"}}, "provenance": {"name.given": """ + Typed + "}");
 
         Assert.Equal(["debtor_1", "debtor_2", "non_filing_spouse"], await RolesAsync(caseId));
         Assert.Equal("""{"name.given":{"source":"staff_typed"}}""", Support.SortedJson.Serialize((await DebtorsAsync(caseId))[0]["provenance"]));
     }
 
     [Fact]
-    public async Task The_body_is_flasks_key_order_with_identity_first_class()
+    public async Task The_debtor_carries_its_identity_beside_its_body()
     {
         var caseId = await _world.OpenCaseIdAsync();
 
         var debtor = (await DebtorsAsync(caseId))[0];
 
-        Assert.Equal(["case_id", "client_id", "created_at", "differs_from_client", "filing_role", "id", "name", "provenance", "updated_at"], Answer.Keys(debtor));
+        Assert.Equal(["body", "caseId", "clientId", "createdAt", "differsFromClient", "filingRole", "id", "provenance", "updatedAt"], Answer.Keys(debtor));
     }
 
     // ── The access log ──────────────────────────────────────────────
@@ -221,7 +221,7 @@ public sealed class DebtorRouteTests : IAsyncLifetime, IDisposable
         Assert.Equal((AccessOutcome.Denied, Carol), (_world.Events[^1].Outcome, _world.Events[^1].Principal));
 
         var before = _world.Events.Count;
-        await Put(caseId, """ "name": {"given": "Ada"} """);
+        await Put(caseId, """ "body": {"name": {"given": "Ada"}} """);
         Assert.Equal(before, _world.Events.Count);
     }
 
@@ -229,7 +229,7 @@ public sealed class DebtorRouteTests : IAsyncLifetime, IDisposable
     public async Task A_second_first_save_cannot_erase_the_first_ones_id()
     {
         var caseId = await _world.OpenCaseIdAsync();
-        var named = """ "name": {"given": "Ada"}, "provenance": {"name.given": """ + Typed + "}";
+        var named = """ "body": {"name": {"given": "Ada"}}, "provenance": {"name.given": """ + Typed + "}";
         var first = await Put(caseId, named, "non_filing_spouse");
         Assert.Equal(201, first.Status);
 
@@ -237,8 +237,8 @@ public sealed class DebtorRouteTests : IAsyncLifetime, IDisposable
         var second = await Put(caseId, named.Replace("Ada", "Augusta", StringComparison.Ordinal), "non_filing_spouse");
 
         Assert.Equal(200, second.Status);
-        Assert.Equal((first.Str("id"), first.Str("created_at")), (second.Str("id"), second.Str("created_at")));
-        Assert.Equal("""{"given":"Augusta"}""", Support.SortedJson.Serialize(second.Object["name"]));
+        Assert.Equal((first.Str("id"), first.Str("createdAt")), (second.Str("id"), second.Str("createdAt")));
+        Assert.Equal("""{"given":"Augusta"}""", Support.SortedJson.Serialize(second.Object["body"]!["name"]));
     }
 
     // ── Who may ─────────────────────────────────────────────────────
@@ -251,7 +251,7 @@ public sealed class DebtorRouteTests : IAsyncLifetime, IDisposable
 
         Assert.Equal(204, (await _world.Put($"/v1/cases/{caseId}/assignees/{Bob}", null)).Status);
 
-        Assert.Equal(200, (await Put(caseId, """ "name": {"given": "Ada"}, "provenance": {"name.given": """ + Typed + "}", subject: Bob)).Status);
+        Assert.Equal(200, (await Put(caseId, """ "body": {"name": {"given": "Ada"}}, "provenance": {"name.given": """ + Typed + "}", subject: Bob)).Status);
         Assert.Equal(200, (await _world.Get($"/v1/cases/{caseId}/debtors", Bob)).Status);
     }
 
@@ -265,7 +265,7 @@ public sealed class DebtorRouteTests : IAsyncLifetime, IDisposable
 
         await RestrictAliceAsync(Feature.Intake, PermissionLevel.ViewOnly);
         Assert.Equal(200, (await _world.Get($"/v1/cases/{caseId}/debtors")).Status);
-        Assert.Equal(403, (await Put(caseId, """ "name": {"given": "Ada"}, "provenance": {"name.given": """ + Typed + "}")).Status);
+        Assert.Equal(403, (await Put(caseId, """ "body": {"name": {"given": "Ada"}}, "provenance": {"name.given": """ + Typed + "}")).Status);
     }
 
     // ── The client link (ADR 0022) ──────────────────────────────────
@@ -279,9 +279,9 @@ public sealed class DebtorRouteTests : IAsyncLifetime, IDisposable
         var answer = await Link(caseId, "debtor_2", sam);
 
         Assert.Equal(201, answer.Status);
-        Assert.Equal(("debtor_2", sam, "sam@example.test"), (answer.Str("filing_role"), answer.Str("client_id"), answer.Str("email")));
+        Assert.Equal(("debtor_2", sam, "sam@example.test"), (answer.Str("filingRole"), answer.Str("clientId"), answer.Object["body"]!.AsObject().Str("email")));
         Assert.Equal($$"""{"client_id":"{{sam}}","source":"client"}""", Support.SortedJson.Serialize(answer.Object["provenance"]!["email"]));
-        Assert.Equal("[]", answer.Object["differs_from_client"]!.ToJsonString());
+        Assert.Equal("[]", answer.Object["differsFromClient"]!.ToJsonString());
     }
 
     [Fact]
@@ -294,9 +294,9 @@ public sealed class DebtorRouteTests : IAsyncLifetime, IDisposable
         var answer = await Link(caseId, "debtor_1", other);
 
         Assert.Equal(200, answer.Status);
-        Assert.Equal((original.Str("id"), other), (answer.Str("id"), answer.Str("client_id")));
-        Assert.Equal(Support.SortedJson.Serialize(original["name"]), Support.SortedJson.Serialize(answer.Object["name"]));
-        Assert.Equal("""["name.given","name.surname"]""", answer.Object["differs_from_client"]!.ToJsonString());
+        Assert.Equal((original.Str("id"), other), (answer.Str("id"), answer.Str("clientId")));
+        Assert.Equal(Support.SortedJson.Serialize(original["body"]!["name"]), Support.SortedJson.Serialize(answer.Object["body"]!["name"]));
+        Assert.Equal("""["name.given","name.surname"]""", answer.Object["differsFromClient"]!.ToJsonString());
     }
 
     [Fact]
@@ -305,10 +305,10 @@ public sealed class DebtorRouteTests : IAsyncLifetime, IDisposable
         var caseId = await _world.OpenCaseIdAsync();
         var debtor1 = (await DebtorsAsync(caseId))[0];
 
-        var answer = await Link(caseId, "debtor_2", debtor1.Str("client_id")!);
+        var answer = await Link(caseId, "debtor_2", debtor1.Str("clientId")!);
 
         Assert.Equal(400, answer.Status);
-        Assert.Contains("client_id", answer.FieldErrors);
+        Assert.Contains("clientId", answer.FieldErrors);
         Assert.Equal(["debtor_1"], await RolesAsync(caseId));
     }
 
@@ -328,9 +328,9 @@ public sealed class DebtorRouteTests : IAsyncLifetime, IDisposable
         var answer = await Link(caseId, role, sam);
 
         Assert.Equal(400, answer.Status);
-        Assert.Equal("""{"client_id":"That client is being merged into another client."}""", Support.SortedJson.Serialize(answer.Object["fields"]));
+        Assert.Equal("""{"clientId":"That client is being merged into another client."}""", Support.SortedJson.Serialize(answer.Object["fields"]));
         Assert.Equal(["debtor_1"], await RolesAsync(caseId));
-        Assert.Equal(before[0].Str("client_id"), (await DebtorsAsync(caseId))[0].Str("client_id"));
+        Assert.Equal(before[0].Str("clientId"), (await DebtorsAsync(caseId))[0].Str("clientId"));
     }
 
     [Fact]
@@ -344,7 +344,7 @@ public sealed class DebtorRouteTests : IAsyncLifetime, IDisposable
 
         Assert.Equal(400, foreign.Status);
         Assert.Equal(unknown.Body, foreign.Body);
-        Assert.Contains("client_id", (await Link(caseId, "debtor_2", "  ")).FieldErrors);
+        Assert.Contains("clientId", (await Link(caseId, "debtor_2", "  ")).FieldErrors);
     }
 
     [Fact]
@@ -363,11 +363,11 @@ public sealed class DebtorRouteTests : IAsyncLifetime, IDisposable
         var caseId = await _world.OpenCaseIdAsync();
         var before = (await DebtorsAsync(caseId))[0];
 
-        var saved = await Put(caseId, """ "client_id": "someone-else", "name": {"given": "Typed"}, "provenance": {"name.given": """ + Typed + "}");
+        var saved = await Put(caseId, """ "clientId": "someone-else", "body": {"name": {"given": "Typed"}}, "provenance": {"name.given": """ + Typed + "}");
 
         Assert.Equal(200, saved.Status);
-        Assert.Equal(before.Str("client_id"), saved.Str("client_id"));
-        Assert.Equal("""["name.given","name.surname"]""", saved.Object["differs_from_client"]!.ToJsonString());
+        Assert.Equal(before.Str("clientId"), saved.Str("clientId"));
+        Assert.Equal("""["name.given","name.surname"]""", saved.Object["differsFromClient"]!.ToJsonString());
     }
 
     [Fact]
@@ -378,8 +378,8 @@ public sealed class DebtorRouteTests : IAsyncLifetime, IDisposable
 
         var debtor = (await DebtorsAsync(caseId))[0];
 
-        Assert.True(debtor.ContainsKey("client_id"));
-        Assert.False(debtor.ContainsKey("differs_from_client"));
+        Assert.True(debtor.ContainsKey("clientId"));
+        Assert.False(debtor.ContainsKey("differsFromClient"));
     }
 
     // ── Client provenance across a save ─────────────────────────────
@@ -390,14 +390,14 @@ public sealed class DebtorRouteTests : IAsyncLifetime, IDisposable
         var caseId = await _world.OpenCaseIdAsync();
         var loaded = (await DebtorsAsync(caseId))[0];
         var body = Echo(loaded);
-        body["name"]!["given"] = "Jordy";
+        body["body"]!["name"]!["given"] = "Jordy";
         body["provenance"]!["name.given"] = JsonNode.Parse(Typed);
 
         var saved = await _world.Put($"/v1/cases/{caseId}/debtors/debtor_1", body.ToJsonString());
 
         Assert.True(saved.Status == 200, saved.Body);
         Assert.Equal("""{"source":"staff_typed"}""", Support.SortedJson.Serialize(saved.Object["provenance"]!["name.given"]));
-        Assert.Equal($$"""{"client_id":"{{loaded.Str("client_id")}}","source":"client"}""", Support.SortedJson.Serialize(saved.Object["provenance"]!["name.surname"]));
+        Assert.Equal($$"""{"client_id":"{{loaded.Str("clientId")}}","source":"client"}""", Support.SortedJson.Serialize(saved.Object["provenance"]!["name.surname"]));
     }
 
     [Fact]
@@ -407,12 +407,12 @@ public sealed class DebtorRouteTests : IAsyncLifetime, IDisposable
         var loaded = (await DebtorsAsync(caseId))[0];
 
         var changed = Echo(loaded);
-        changed["name"]!["surname"] = "Retyped";
+        changed["body"]!["name"]!["surname"] = "Retyped";
         Assert.Equal(["provenance.name.surname"], (await _world.Put($"/v1/cases/{caseId}/debtors/debtor_1", changed.ToJsonString())).FieldErrors);
 
         var claimed = Echo(loaded);
-        claimed["phone"] = "555-0100";
-        claimed["provenance"]!["phone"] = new JsonObject { ["source"] = "client", ["client_id"] = loaded.Str("client_id") };
+        claimed["body"]!["phone"] = "555-0100";
+        claimed["provenance"]!["phone"] = new JsonObject { ["source"] = "client", ["client_id"] = loaded.Str("clientId") };
         Assert.Equal(["provenance.phone"], (await _world.Put($"/v1/cases/{caseId}/debtors/debtor_1", claimed.ToJsonString())).FieldErrors);
     }
 
@@ -428,10 +428,10 @@ public sealed class DebtorRouteTests : IAsyncLifetime, IDisposable
         Assert.Equal(200, answer.Status);
         var body = answer.Object;
         Assert.Equal(before.Str("id"), body.Str("id"));
-        Assert.Equal("Jordan", body["name"]!["given"]!.GetValue<string>());
-        Assert.Equal($$"""{"client_id":"{{before.Str("client_id")}}","source":"client"}""", Support.SortedJson.Serialize(body["provenance"]!["name.given"]));
-        Assert.Equal("[]", body["differs_from_client"]!.ToJsonString());
-        Assert.Equal("""{"basis":"lived_longest_180_days"}""", Support.SortedJson.Serialize(body["venue"]));
+        Assert.Equal("Jordan", body["body"]!["name"]!["given"]!.GetValue<string>());
+        Assert.Equal($$"""{"client_id":"{{before.Str("clientId")}}","source":"client"}""", Support.SortedJson.Serialize(body["provenance"]!["name.given"]));
+        Assert.Equal("[]", body["differsFromClient"]!.ToJsonString());
+        Assert.Equal("""{"basis":"lived_longest_180_days"}""", Support.SortedJson.Serialize(body["body"]!["venue"]));
         Assert.Equal("""{"source":"staff_typed"}""", Support.SortedJson.Serialize(body["provenance"]!["venue.basis"]));
     }
 
@@ -440,13 +440,13 @@ public sealed class DebtorRouteTests : IAsyncLifetime, IDisposable
     {
         var (caseId, loaded) = await DivergedCaseAsync();
         var body = Echo(loaded);
-        body["email"] = "typed@example.test";
+        body["body"]!["email"] = "typed@example.test";
         body["provenance"]!["email"] = JsonNode.Parse(Typed);
         Assert.Equal(200, (await _world.Put($"/v1/cases/{caseId}/debtors/debtor_1", body.ToJsonString())).Status);
 
         var answer = await _world.Post($"/v1/cases/{caseId}/debtors/debtor_1/copy-from-client", null);
 
-        Assert.False(answer.Object.ContainsKey("email"));
+        Assert.False(answer.Object["body"]!.AsObject().ContainsKey("email"));
         Assert.False(answer.Object["provenance"]!.AsObject().ContainsKey("email"));
     }
 
@@ -457,7 +457,7 @@ public sealed class DebtorRouteTests : IAsyncLifetime, IDisposable
         await _world.FileAsync(caseId);
 
         Assert.Equal(409, (await _world.Post($"/v1/cases/{caseId}/debtors/debtor_1/copy-from-client", null)).Status);
-        Assert.Equal("Jordy", (await DebtorsAsync(caseId))[0]["name"]!["given"]!.GetValue<string>());
+        Assert.Equal("Jordy", (await DebtorsAsync(caseId))[0]["body"]!["name"]!["given"]!.GetValue<string>());
 
         var other = await _world.OpenCaseIdAsync();
         Assert.Equal(201, (await Put(other, role: "non_filing_spouse")).Status);
@@ -473,11 +473,11 @@ public sealed class DebtorRouteTests : IAsyncLifetime, IDisposable
         var answer = await _world.Post($"/v1/cases/{caseId}/debtors/debtor_1/copy-to-client", null);
 
         Assert.Equal(200, answer.Status);
-        Assert.Equal("[]", answer.Object["differs_from_client"]!.ToJsonString());
-        Assert.Equal(Support.SortedJson.Serialize(before["name"]), Support.SortedJson.Serialize(answer.Object["name"]));
+        Assert.Equal("[]", answer.Object["differsFromClient"]!.ToJsonString());
+        Assert.Equal(Support.SortedJson.Serialize(before["body"]!["name"]), Support.SortedJson.Serialize(answer.Object["body"]!["name"]));
         Assert.Equal(Support.SortedJson.Serialize(before["provenance"]), Support.SortedJson.Serialize(answer.Object["provenance"]));
         Assert.Equal((AccessAction.ClientUpdate, AccessOutcome.Allowed), (_world.Events[^1].Action, _world.Events[^1].Outcome));
-        Assert.Equal("""{"given":"Jordy","surname":"Example"}""", Support.SortedJson.Serialize((await _world.Get($"/v1/firm/clients/{before.Str("client_id")}")).Object["name"]));
+        Assert.Equal("""{"given":"Jordy","surname":"Example"}""", Support.SortedJson.Serialize((await _world.Get($"/v1/firm/clients/{before.Str("clientId")}")).Object["name"]));
     }
 
     [Fact]
@@ -489,27 +489,19 @@ public sealed class DebtorRouteTests : IAsyncLifetime, IDisposable
         Assert.Equal(403, (await _world.Post($"/v1/cases/{caseId}/debtors/debtor_1/copy-to-client", null)).Status);
     }
 
-    private static JsonObject Echo(JsonObject debtor)
-    {
-        var body = debtor.DeepClone().AsObject();
-        foreach (var key in new[] { "id", "case_id", "filing_role", "created_at", "updated_at", "client_id", "differs_from_client" })
-        {
-            body.Remove(key);
-        }
-
-        return body;
-    }
+    private static JsonObject Echo(JsonObject debtor) =>
+        new() { ["body"] = debtor["body"]!.DeepClone(), ["provenance"] = debtor["provenance"]!.DeepClone() };
 
     private async Task<(string CaseId, JsonObject Saved)> DivergedCaseAsync()
     {
         var caseId = await _world.OpenCaseIdAsync();
         var body = Echo((await DebtorsAsync(caseId))[0]);
-        body["name"]!["given"] = "Jordy";
-        body["venue"] = new JsonObject { ["basis"] = "lived_longest_180_days" };
+        body["body"]!["name"]!["given"] = "Jordy";
+        body["body"]!["venue"] = new JsonObject { ["basis"] = "lived_longest_180_days" };
         body["provenance"]!["name.given"] = JsonNode.Parse(Typed);
         body["provenance"]!["venue.basis"] = JsonNode.Parse(Typed);
         var saved = await _world.Put($"/v1/cases/{caseId}/debtors/debtor_1", body.ToJsonString());
-        Assert.Equal("""["name.given"]""", saved.Object["differs_from_client"]!.ToJsonString());
+        Assert.Equal("""["name.given"]""", saved.Object["differsFromClient"]!.ToJsonString());
         return (caseId, saved.Object);
     }
 
@@ -521,13 +513,13 @@ public sealed class DebtorRouteTests : IAsyncLifetime, IDisposable
         _world.Put($"/v1/cases/{caseId}/debtors/{role}", "{" + body + "}", subject);
 
     private Task<Answer> Link(string caseId, string role, string clientId) =>
-        _world.Put($"/v1/cases/{caseId}/debtors/{role}/client", $$"""{"client_id": "{{clientId}}"}""");
+        _world.Put($"/v1/cases/{caseId}/debtors/{role}/client", $$"""{"clientId": "{{clientId}}"}""");
 
     private async Task<List<JsonObject>> DebtorsAsync(string caseId) =>
         [.. (await _world.Get($"/v1/cases/{caseId}/debtors")).Object["debtors"]!.AsArray().Select(d => d!.AsObject())];
 
     private async Task<List<string?>> RolesAsync(string caseId) =>
-        [.. (await DebtorsAsync(caseId)).Select(d => d.Str("filing_role"))];
+        [.. (await DebtorsAsync(caseId)).Select(d => d.Str("filingRole"))];
 
     /// <summary>The memory debtor store, with one stale read on demand — the Python's monkeypatched <c>get</c>.</summary>
     private sealed class StaleOnce : IDebtorStore

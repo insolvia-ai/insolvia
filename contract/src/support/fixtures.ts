@@ -37,6 +37,7 @@ const creditorKeys = (items: readonly Record<string, unknown>[]): string[] =>
 async function find(spec: FixtureSpec): Promise<Case> {
   const api = firmAdmin().api;
   const debtor1 = spec.debtors?.debtor_1 ?? {};
+  const wantedName = (debtor1.body as { name?: unknown } | undefined)?.name;
   const wanted = creditorKeys(spec.collections?.creditors ?? []);
   const modified: string[] = [];
   let cursor: string | undefined;
@@ -52,19 +53,19 @@ async function find(spec: FixtureSpec): Promise<Case> {
         continue;
       }
       const debtors = await api.listDebtors(candidate.id);
-      const first = debtors.find((d) => d.filing_role === 'debtor_1');
-      if ('client_id' in debtor1 && !first?.client_id) continue;
+      const first = debtors.find((d) => d.filingRole === 'debtor_1');
+      if ('clientId' in debtor1 && !first?.clientId) continue;
       const creditors = await api.listCaseEntities(candidate.id, 'creditors');
       if (!isDeepStrictEqual(creditorKeys(creditors as never), wanted)) continue;
-      if (isDeepStrictEqual(first?.name, debtor1.name)) return candidate;
-      modified.push(`${candidate.id} (Debtor 1 is now ${JSON.stringify(first?.name)})`);
+      if (isDeepStrictEqual(first?.body.name, wantedName)) return candidate;
+      modified.push(`${candidate.id} (Debtor 1 is now ${JSON.stringify(first?.body.name)})`);
     }
     cursor = page.nextCursor;
   } while (cursor !== undefined);
   if (modified.length > 0) {
     throw new Error(
       `fixture case '${spec.handle}' was modified after seeding: ${modified.join(', ')}; ` +
-        `the fixture's Debtor 1 is ${JSON.stringify(debtor1.name)}. The loader leaves an ` +
+        `the fixture's Debtor 1 is ${JSON.stringify(wantedName)}. The loader leaves an ` +
         'existing row alone (ADR 0021), so re-seeding will not repair it — put Debtor 1 ' +
         'back through the API, and find what wrote to it: a spec writes only to scratch.',
     );

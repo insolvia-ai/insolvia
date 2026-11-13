@@ -83,7 +83,7 @@ export function PortalPanel({ caseId, debtors, canEdit }: PortalPanelProps) {
   const [revoking, setRevoking] = useState<PortalClient | null>(null);
 
   const debtorNames = namesByRole(debtors);
-  const joint = debtors.some((debtor) => debtor.filing_role === 'debtor_2');
+  const joint = debtors.some((debtor) => debtor.filingRole === 'debtor_2');
 
   const load = useCallback(async () => {
     try {
@@ -408,15 +408,15 @@ function InviteForm({
 function namesByRole(debtors: readonly Debtor[]): Partial<Record<ClientRole, string>> {
   const names: Partial<Record<ClientRole, string>> = {};
   for (const debtor of debtors) {
-    if (debtor.filing_role !== 'debtor_1' && debtor.filing_role !== 'debtor_2') continue;
-    const name = personName(debtor.name);
-    if (name !== null) names[debtor.filing_role] = name;
+    if (debtor.filingRole !== 'debtor_1' && debtor.filingRole !== 'debtor_2') continue;
+    const name = personName(debtor.body.name);
+    if (name !== null) names[debtor.filingRole] = name;
   }
   return names;
 }
 
 function debtorEmail(debtors: readonly Debtor[], role: ClientRole): string {
-  return debtors.find((debtor) => debtor.filing_role === role)?.email ?? '';
+  return debtors.find((debtor) => debtor.filingRole === role)?.body.email ?? '';
 }
 
 function rolesLabel(

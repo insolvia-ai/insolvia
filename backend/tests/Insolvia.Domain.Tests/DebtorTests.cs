@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using Insolvia.Domain.CaseEntities;
 using Insolvia.Domain.Debtors;
@@ -12,7 +13,17 @@ namespace Insolvia.Domain.Tests;
 /// <summary>The debtor record, translated from test_debtors.py.</summary>
 public sealed class DebtorTests
 {
-    private static DebtorDraft Draft(string json = "{}") => DebtorRules.Parse(Body.Of(json));
+    private static DebtorDraft Draft(string json = "{}") => Draft(Body.Of(json));
+
+    // A flat literal, split the way a request carries it: {body, taxId, provenance}.
+    private static DebtorDraft Draft(JsonObject flat)
+    {
+        var request = new JsonObject { ["provenance"] = flat["provenance"]?.DeepClone(), ["taxId"] = flat["taxId"]?.DeepClone() };
+        flat.Remove("provenance");
+        flat.Remove("taxId");
+        request["body"] = flat.DeepClone();
+        return DebtorRules.Checked(Body.Read<DebtorDraft>(request));
+    }
 
     // ── Progressive intake ──────────────────────────────────────────
 
@@ -29,92 +40,89 @@ public sealed class DebtorTests
         Assert.Equal("Ada", Draft("""{"name": {"given": "Ada"}, "provenance": {"name.given": {"source": "staff_typed"}}}""").Body.Name.Given);
 
     [Fact]
-    public void Whitespace_only_text_collapses_to_absent() =>
-        Assert.Null(Draft("""{"name": {"given": "   "}}""").Body.Name.Given);
-
-    [Fact]
-    public void A_cleared_field_therefore_needs_no_provenance() =>
-        Draft("""{"name": {"given": ""}, "phone": "  "}""");
+    public void Whitespace_is_a_value_and_needs_provenance() =>
+        Assert.Contains("provenance.name.given", Assert.Throws<FieldValidationException>(() => Draft("""{"name": {"given": "   "}}""")).Fields.Keys);
 
     // ── Shape validation ────────────────────────────────────────────
 
     [Fact]
     public void Rejects_a_non_string_where_text_belongs() =>
-        Assert.Contains("name.given", Assert.Throws<FieldValidationException>(() => Draft("""{"name": {"given": 7}}""")).Fields.Keys);
+        Assert.Contains("body.name.given", Assert.Throws<FieldValidationException>(() => Draft("""{"name": {"given": 7}}""")).Fields.Keys);
 
     [Fact]
     public void Rejects_a_multi_line_value() =>
-        Assert.Contains("name.surname", Assert.Throws<FieldValidationException>(() => Draft("""{"name": {"surname": "Love\nlace"}}""")).Fields.Keys);
+        Assert.Contains("body.name.surname", Assert.Throws<FieldValidationException>(() => Draft("""{"name": {"surname": "Love\nlace"}}""")).Fields.Keys);
 
     [Fact]
     public void Rejects_an_over_long_value() =>
-        Assert.Contains("email", Assert.Throws<FieldValidationException>(() => DebtorRules.Parse(new JsonObject { ["email"] = new string('a', 201) })).Fields.Keys);
+        Assert.Contains("body.email", Assert.Throws<FieldValidationException>(() => Draft(new JsonObject { ["email"] = new string('a', 201) })).Fields.Keys);
 
     [Fact]
     public void Rejects_an_unknown_venue_basis() =>
-        Assert.Contains("venue.basis", Assert.Throws<FieldValidationException>(() => Draft("""{"venue": {"basis": "felt_like_it"}}""")).Fields.Keys);
+        Assert.Contains("body.venue.basis", Assert.Throws<FieldValidationException>(() => Draft("""{"venue": {"basis": "felt_like_it"}}""")).Fields.Keys);
 
     [Theory]
     [InlineData("completed_with_certificate", CounselingStatus.CompletedWithCertificate)]
     [InlineData("completed_certificate_pending", CounselingStatus.CompletedCertificatePending)]
     [InlineData("exigent_circumstances_waiver_requested", CounselingStatus.ExigentCircumstancesWaiverRequested)]
     [InlineData("not_required", CounselingStatus.NotRequired)]
-    public void Accepts_the_four_credit_counseling_statuses(string status, CounselingStatus expected) =>
-        Assert.Equal(expected, Draft($$$$"""{"credit_counseling": {"status": "{{{{status}}}}"}, "provenance": {"credit_counseling.status": {"source": "staff_typed"}}}""").Body.CreditCounseling.Status);
+    public void Accepts_the_four_creditCounseling_statuses(string status, CounselingStatus expected) =>
+        Assert.Equal(expected, Draft($$$$"""{"creditCounseling": {"status": "{{{{status}}}}"}, "provenance": {"creditCounseling.status": {"source": "staff_typed"}}}""").Body.CreditCounseling.Status);
 
     [Fact]
     public void Reports_every_bad_field_at_once()
     {
-        var error = Assert.Throws<FieldValidationException>(() => Draft("""{"name": {"given": 1, "surname": 2}, "email": 3}"""));
-        Assert.Superset(new HashSet<string> { "name.given", "name.surname", "email" }, error.Fields.Keys.ToHashSet());
+        // A value of the wrong type stops the read where it stands; rule failures are reported together.
+        var error = Assert.Throws<FieldValidationException>(() => Draft(new JsonObject { ["phone"] = new string('1', 41), ["mobile"] = new string('1', 41), ["email"] = new string('a', 201) }));
+        Assert.Superset(new HashSet<string> { "body.phone", "body.mobile", "body.email" }, error.Fields.Keys.ToHashSet());
     }
 
     // ── Other names ─────────────────────────────────────────────────
 
     [Fact]
     public void Keeps_the_caller_supplied_id() =>
-        Assert.Equal("n1", Draft("""{"other_names_used": [{"id": "n1", "surname": "Byron"}], "provenance": {"other_names_used[n1].surname": {"source": "staff_typed"}}}""").Body.OtherNamesUsed[0].Id);
+        Assert.Equal("n1", Draft("""{"otherNamesUsed": [{"id": "n1", "surname": "Byron"}], "provenance": {"otherNamesUsed[n1].surname": {"source": "staff_typed"}}}""").Body.OtherNamesUsed[0].Id);
 
     [Fact]
     public void An_alias_without_an_id_is_refused() =>
-        Assert.Contains("other_names_used[0].id", Assert.Throws<FieldValidationException>(() => Draft("""{"other_names_used": [{"surname": "Smith"}]}""")).Fields.Keys);
+        Assert.Contains("body.otherNamesUsed[0].id", Assert.Throws<FieldValidationException>(() => Draft("""{"otherNamesUsed": [{"surname": "Smith"}]}""")).Fields.Keys);
 
     [Fact]
     public void The_refusal_is_stable_across_attempts()
     {
         IReadOnlyDictionary<string, string> Fields() =>
-            Assert.Throws<FieldValidationException>(() => Draft("""{"other_names_used": [{"surname": "Smith"}]}""")).Fields;
+            Assert.Throws<FieldValidationException>(() => Draft("""{"otherNamesUsed": [{"surname": "Smith"}]}""")).Fields;
         Assert.Equal(Fields(), Fields());
     }
 
     [Fact]
     public void Rejects_duplicate_ids() =>
-        Assert.Contains("other_names_used[1].id", Assert.Throws<FieldValidationException>(() => Draft("""{"other_names_used": [{"id": "n1"}, {"id": "n1"}]}""")).Fields.Keys);
+        Assert.Contains("body.otherNamesUsed[1].id", Assert.Throws<FieldValidationException>(() => Draft("""{"otherNamesUsed": [{"id": "n1"}, {"id": "n1"}]}""")).Fields.Keys);
 
     [Fact]
     public void Rejects_a_string_where_a_list_belongs() =>
-        Assert.Contains("other_names_used", Assert.Throws<FieldValidationException>(() => Draft("""{"other_names_used": "Byron"}""")).Fields.Keys);
+        Assert.Contains("body.otherNamesUsed", Assert.Throws<FieldValidationException>(() => Draft("""{"otherNamesUsed": "Byron"}""")).Fields.Keys);
 
     // ── The tax id (shape here; the sealing is TaxIdTests') ─────────
 
     [Fact]
-    public void A_tax_id_is_accepted_with_provenance_at_the_one_path() =>
-        Assert.Equal(new TaxIdInput(TaxIdKind.Ssn, Value: "987654321"), Draft("""{"tax_id": {"kind": "ssn", "value": "987-65-4321"}, "provenance": {"tax_id": {"source": "staff_typed"}}}""").TaxId);
+    public void A_taxId_is_accepted_with_provenance_at_the_one_path() =>
+        Assert.Equal(new TaxIdInput(TaxIdKind.Ssn, Value: "987-65-4321"), Draft("""{"taxId": {"kind": "ssn", "value": "987-65-4321"}, "provenance": {"taxId": {"source": "staff_typed"}}}""").TaxId);
 
     [Fact]
-    public void A_tax_id_needs_provenance_like_any_populated_field() =>
-        Assert.Contains("provenance.tax_id", Assert.Throws<FieldValidationException>(() => Draft("""{"tax_id": {"kind": "ssn", "value": "987-65-4321"}}""")).Fields.Keys);
+    public void A_taxId_needs_provenance_like_any_populated_field() =>
+        Assert.Contains("provenance.taxId", Assert.Throws<FieldValidationException>(() => Draft("""{"taxId": {"kind": "ssn", "value": "987-65-4321"}}""")).Fields.Keys);
 
     [Fact]
     public void A_malformed_number_is_refused_with_its_path() =>
-        Assert.Contains("tax_id.value", Assert.Throws<FieldValidationException>(() => Draft("""{"tax_id": {"kind": "ssn", "value": "000-00-0000"}}""")).Fields.Keys);
+        Assert.Contains("taxId.value", Assert.Throws<FieldValidationException>(() => Draft("""{"taxId": {"kind": "ssn", "value": "000-00-0000"}}""")).Fields.Keys);
 
     [Fact]
     public void The_digits_never_enter_the_body()
     {
-        var result = Draft("""{"tax_id": {"kind": "ssn", "value": "987-65-4321"}, "provenance": {"tax_id": {"source": "staff_typed"}}}""");
-        Assert.False(DebtorRules.BodyNode(result.Body).ContainsKey("tax_id"));
-        Assert.DoesNotContain("987654321", DebtorRules.BodyNode(result.Body).ToJsonString(), StringComparison.Ordinal);
+        var result = Draft("""{"taxId": {"kind": "ssn", "value": "987-65-4321"}, "provenance": {"taxId": {"source": "staff_typed"}}}""");
+        Assert.False(DebtorRules.BodyNode(result.Body).ContainsKey("taxId"));
+        Assert.DoesNotContain("4321", DebtorRules.BodyNode(result.Body).ToJsonString(), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -123,7 +131,7 @@ public sealed class DebtorTests
         var reference = new TaxIdRef(TaxIdKind.Ssn, "4321", "ref-0001");
         var debtor = DebtorRules.Create(Draft(), "c1", FilingRole.Debtor1, taxId: reference);
         Assert.Equal(reference, debtor.TaxId);
-        Assert.False(DebtorRules.BodyNode(debtor.Body).ContainsKey("tax_id"));
+        Assert.False(DebtorRules.BodyNode(debtor.Body).ContainsKey("taxId"));
     }
 
     // test_the_record_carries_a_reference_and_serves_the_last_four (the JSON
@@ -141,7 +149,7 @@ public sealed class DebtorTests
     }
 
     [Fact]
-    public void An_explicit_null_tax_id_is_not_an_error() => Assert.Null(Draft("""{"tax_id": null}""").TaxId);
+    public void An_explicit_null_taxId_is_not_an_error() => Assert.Null(Draft("""{"taxId": null}""").TaxId);
 
     // ── Provenance ──────────────────────────────────────────────────
 
@@ -158,14 +166,10 @@ public sealed class DebtorTests
         Assert.Equal("staff-1", Draft("""{"name": {"given": "Ada"}, "provenance": {"name.given": {"source": "ai_extracted", "confirmed_by": "staff-1", "confirmed_at": "2026-08-05T12:00:00.000000Z"}}}""").Provenance["name.given"].ConfirmedBy);
 
     [Fact]
-    public void Provenance_is_checked_against_the_stored_shape_not_the_raw_body() =>
-        Draft("""{"name": {"given": "   "}, "provenance": {}}""");
-
-    [Fact]
     public void A_bad_field_is_reported_before_bad_provenance()
     {
         var error = Assert.Throws<FieldValidationException>(() => Draft("""{"name": {"given": 7}, "provenance": {"!!": {"source": "staff_typed"}}}"""));
-        Assert.Contains("name.given", error.Fields.Keys);
+        Assert.Contains("body.name.given", error.Fields.Keys);
         Assert.DoesNotContain(error.Fields.Keys, key => key.StartsWith("provenance", StringComparison.Ordinal));
     }
 
@@ -176,11 +180,11 @@ public sealed class DebtorTests
     [InlineData("debtor_2", FilingRole.Debtor2)]
     [InlineData("non_filing_spouse", FilingRole.NonFilingSpouse)]
     public void Accepts_the_three_roles(string role, FilingRole expected) =>
-        Assert.Equal(expected, DebtorRules.ParseFilingRole(JsonValue.Create(role)));
+        Assert.Equal(expected, DebtorRules.ParseFilingRole(role));
 
     [Fact]
     public void Rejects_anything_else() =>
-        Assert.Throws<FieldValidationException>(() => DebtorRules.ParseFilingRole(JsonValue.Create("debtor_3")));
+        Assert.Throws<FieldValidationException>(() => DebtorRules.ParseFilingRole("debtor_3"));
 
     [Fact]
     public void The_filing_roles_keep_their_wire_strings() =>
@@ -230,22 +234,16 @@ public sealed class DebtorTests
     public void A_stored_body_round_trips()
     {
         var draft = Draft("""
-            {"name": {"given": "Ada", "surname": "Lovelace"}, "other_names_used": [{"id": "n1", "surname": "Byron"}],
-             "residence_address": {"city": "London"}, "venue": {"basis": "lived_longest_180_days"},
+            {"name": {"given": "Ada", "surname": "Lovelace"}, "otherNamesUsed": [{"id": "n1", "surname": "Byron"}],
+             "residenceAddress": {"city": "London"}, "venue": {"basis": "lived_longest_180_days"},
              "provenance": {"name.given": {"source": "staff_typed"}, "name.surname": {"source": "staff_typed"},
-                            "other_names_used[n1].surname": {"source": "staff_typed"}, "residence_address.city": {"source": "staff_typed"},
+                            "otherNamesUsed[n1].surname": {"source": "staff_typed"}, "residenceAddress.city": {"source": "staff_typed"},
                             "venue.basis": {"source": "staff_typed"}}}
             """);
-        var stored = BodyJson.Prune(DebtorRules.BodyNode(draft.Body));
-        stored["provenance"] = ProvenanceRules.ToJson(draft.Provenance);
-        var restored = DebtorRules.Parse(stored, enforceProvenance: false);
-        Assert.Equal(draft.Body, restored.Body);
-        Assert.Equal(draft.Provenance, restored.Provenance);
+        var stored = DebtorRules.BodyNode(draft.Body);
+        Assert.Equal(draft.Body, stored.Deserialize<DebtorBody>(BodyJson.Options));
+        Assert.Equal(draft.Provenance, ProvenanceRules.Parse(ProvenanceRules.ToJson(draft.Provenance)));
     }
-
-    [Fact]
-    public void A_stored_body_is_re_parsed_rather_than_trusted() =>
-        Assert.Throws<FieldValidationException>(() => DebtorRules.Parse(Body.Of("""{"name": {"given": 7}}"""), enforceProvenance: false));
 
     [Fact]
     public void A_bare_debtor_needs_only_identity()
@@ -263,15 +261,15 @@ public sealed class DebtorTests
     [InlineData("n 1")]
     [InlineData("urn:x:1")]
     public void An_unaddressable_id_is_refused_with_a_reason(string bad) =>
-        Assert.Contains("other_names_used[0].id", Assert.Throws<FieldValidationException>(() => Draft($$$"""{"other_names_used": [{"id": "{{{bad}}}", "surname": "Byron"}]}""")).Fields.Keys);
+        Assert.Contains("body.otherNamesUsed[0].id", Assert.Throws<FieldValidationException>(() => Draft($$$"""{"otherNamesUsed": [{"id": "{{{bad}}}", "surname": "Byron"}]}""")).Fields.Keys);
 
     [Fact]
     public void A_uuid_is_fine() =>
-        Assert.StartsWith("3f9c", Draft("""{"other_names_used": [{"id": "3f9c1a2b-0000-4000-8000-000000000000"}]}""").Body.OtherNamesUsed[0].Id, StringComparison.Ordinal);
+        Assert.StartsWith("3f9c", Draft("""{"otherNamesUsed": [{"id": "3f9c1a2b-0000-4000-8000-000000000000"}]}""").Body.OtherNamesUsed[0].Id, StringComparison.Ordinal);
 
     [Fact]
     public void An_accepted_id_is_always_addressable() =>
-        Assert.All(Draft("""{"other_names_used": [{"id": "n1"}, {"id": "3f9c-1a2b"}]}""").Body.OtherNamesUsed, alias => Assert.Matches(ProvenanceRules.AddressableId(), alias.Id));
+        Assert.All(Draft("""{"otherNamesUsed": [{"id": "n1"}, {"id": "3f9c-1a2b"}]}""").Body.OtherNamesUsed, alias => Assert.Matches(ProvenanceRules.AddressableId(), alias.Id));
 
     // ── Role ordering ───────────────────────────────────────────────
 
@@ -295,7 +293,7 @@ public sealed class DebtorTests
 
     [Fact]
     public void Accepts_an_iso_calendar_date() =>
-        Assert.Equal(new DateOnly(2026, 8, 5), Draft("""{"signed_at": "2026-08-05", "provenance": {"signed_at": {"source": "staff_typed"}}}""").Body.SignedAt);
+        Assert.Equal(new DateOnly(2026, 8, 5), Draft("""{"signedAt": "2026-08-05", "provenance": {"signedAt": {"source": "staff_typed"}}}""").Body.SignedAt);
 
     [Theory]
     [InlineData("yesterday")]
@@ -303,7 +301,7 @@ public sealed class DebtorTests
     [InlineData("2026-08-05T12:00:00Z")]
     [InlineData("20260805")]
     public void Rejects_anything_but_a_calendar_date(string signedAt) =>
-        Assert.Contains("signed_at", Assert.Throws<FieldValidationException>(() => DebtorRules.Parse(new JsonObject { ["signed_at"] = signedAt })).Fields.Keys);
+        Assert.Contains("body.signedAt", Assert.Throws<FieldValidationException>(() => Draft(new JsonObject { ["signedAt"] = signedAt })).Fields.Keys);
 
     [Fact]
     public void The_debtor_vocabularies_keep_their_wire_strings()

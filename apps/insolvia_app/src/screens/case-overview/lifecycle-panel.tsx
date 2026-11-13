@@ -26,19 +26,17 @@ import { CASE_STATUS_INTENT, CASE_STATUS_LABEL } from '@/components/case-status'
 import { Heading } from '@/components/heading';
 import { fontSizes, spacing, useTheme } from '@/theme';
 
-/** The four docket facts this panel edits, keyed as the case carries them. */
+/** The four docket facts this panel edits, keyed as the case and its errors carry them. */
 const DOCKET_FIELDS = [
   {
     key: 'caseNumber',
-    wire: 'case_number',
     label: 'Case number',
     hint: 'As the notice of filing prints it, e.g. 8:26-bk-01234.',
   },
-  { key: 'judge', wire: 'judge', label: 'Judge', hint: null },
-  { key: 'trustee', wire: 'trustee', label: 'Trustee', hint: null },
+  { key: 'judge', label: 'Judge', hint: null },
+  { key: 'trustee', label: 'Trustee', hint: null },
   {
     key: 'officeFileNumber',
-    wire: 'office_file_number',
     label: 'Office file number',
     hint: 'The firm’s own number for this matter.',
   },
@@ -302,7 +300,7 @@ export function LifecyclePanel({ colleagues }: { colleagues: readonly FirmCollea
 
       <View style={styles.fields}>
         {DOCKET_FIELDS.map((field) => (
-          <Field.Root key={field.key} name={field.wire} invalid={Boolean(errors[field.wire])}>
+          <Field.Root key={field.key} name={field.key} invalid={Boolean(errors[field.key])}>
             <Field.Label>{field.label}</Field.Label>
             <Input
               value={docket[field.key]}
@@ -310,15 +308,15 @@ export function LifecyclePanel({ colleagues }: { colleagues: readonly FirmCollea
               onValueChange={(next) => setDocket((current) => ({ ...current, [field.key]: next }))}
             />
             {field.hint !== null ? <Field.Description>{field.hint}</Field.Description> : null}
-            {errors[field.wire] ? <Field.Error match>{errors[field.wire]}</Field.Error> : null}
+            {errors[field.key] ? <Field.Error match>{errors[field.key]}</Field.Error> : null}
           </Field.Root>
         ))}
-        {errors.filed_at ? (
+        {errors.filedAt ? (
           <Text
             aria-live="assertive"
             style={[styles.body, { color: theme.colors.danger, fontFamily: theme.typography.body }]}
           >
-            {`${errors.filed_at} Record it under “Events and deadlines”.`}
+            {`${errors.filedAt} Record it under “Events and deadlines”.`}
           </Text>
         ) : null}
         {mayEdit ? (

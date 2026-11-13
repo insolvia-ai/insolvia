@@ -99,5 +99,4 @@ public sealed record DivisionView(
 /// <param name="City">The city.</param>
 /// <param name="State">The state's two-letter code.</param>
 /// <param name="PostalCode">The ZIP code.</param>
-[SnakeCase]
 public sealed record CourthouseView(string Name, string Line1, string? Line2, string City, string State, string PostalCode);

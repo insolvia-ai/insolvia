@@ -751,7 +751,7 @@ describe('createCase', () => {
       chapter: 7,
       court: 'flmb',
       division: 'tampa',
-      client_ids: [CLIENT_ID_1],
+      clientIds: [CLIENT_ID_1],
     });
 
     expect(created).toEqual({
@@ -1120,10 +1120,11 @@ describe('updateCase', () => {
 
     await client.updateCase(CASE_ID, {
       chapter: 13,
-      court: { court: 'flmb', division: 'orlando' },
+      court: 'flmb',
+      division: 'orlando',
     });
 
-    // The court pair is two wire keys, sent together and never apart.
+    // The court pair is two wire keys, sent together.
     const body = JSON.parse(stub.lastRequest().body) as Record<string, unknown>;
     expect(body).toEqual({ chapter: 13, court: 'flmb', division: 'orlando' });
     expect('status' in body).toBe(false);
@@ -1146,7 +1147,7 @@ describe('updateCase', () => {
     expect(body).toEqual({ status: 'ready_to_file' });
   });
 
-  test('sends the deadline anchors as filed_at / meeting_341_at, null meaning clear', async () => {
+  test('sends the deadline anchors, null meaning clear', async () => {
     // Issue 14.6 / #358: the two dates the deadline engine counts from. An
     // explicit null is the ONE null this PATCH sends on purpose — it clears
     // the date and, server-side, the deadlines generated from it.
@@ -1164,8 +1165,8 @@ describe('updateCase', () => {
     });
 
     expect(JSON.parse(stub.lastRequest().body)).toEqual({
-      filed_at: '2026-03-02',
-      meeting_341_at: null,
+      filedAt: '2026-03-02',
+      meeting341At: null,
     });
     expect(updated.filedAt).toBe('2026-03-02');
     expect(updated.meeting341At).toBe('2026-04-07');
@@ -1173,7 +1174,7 @@ describe('updateCase', () => {
     expect('filedAt' in UPDATED_CASE).toBe(false);
   });
 
-  test('sends the 106C election as exemption_set, and maps it back as exemptionSet', async () => {
+  test('sends the 106C election as exemptionSet, and maps it back', async () => {
     // Issue #346: the election is a case-level field, written by this PATCH
     // and echoed by `case_json` under its camelCase name.
     const stub = stubFetch(() =>
@@ -1189,7 +1190,7 @@ describe('updateCase', () => {
     });
 
     const body = JSON.parse(stub.lastRequest().body) as Record<string, unknown>;
-    expect(body).toEqual({ exemption_set: 'state_and_federal_nonbankruptcy' });
+    expect(body).toEqual({ exemptionSet: 'state_and_federal_nonbankruptcy' });
     expect(updated.exemptionSet).toBe('state_and_federal_nonbankruptcy');
   });
 
@@ -1205,13 +1206,13 @@ describe('updateCase', () => {
     expect('exemptionSet' in updated).toBe(false);
   });
 
-  test('maps the opt-out refusal — a 400 keyed exemption_set — to ApiValidationException', async () => {
+  test('maps the opt-out refusal — a 400 keyed exemptionSet — to ApiValidationException', async () => {
     const stub = stubFetch(() =>
       jsonResponse(
         {
           error: 'ValidationError',
           fields: {
-            exemption_set:
+            exemptionSet:
               'FL has opted out of the federal § 522(d) exemptions (Fla. Stat. § 222.20); the state scheme is the only answer.',
           },
         },
@@ -1228,7 +1229,7 @@ describe('updateCase', () => {
     );
 
     expect(error.statusCode).toBe(400);
-    expect(Object.keys(error.fields)).toEqual(['exemption_set']);
+    expect(Object.keys(error.fields)).toEqual(['exemptionSet']);
   });
 
   test('maps a 400 {"error","fields"} body to ApiValidationException', async () => {
@@ -2682,59 +2683,50 @@ describe('uploadDocument', () => {
   });
 });
 
-// The debtor endpoints are pinned against
-// services/api/src/insolvia_api/api/routes/debtors.py and
-// .../core/{debtors,provenance}.py. Two things about them differ from every
-// other endpoint above and are deliberate on both sides:
-//
-//   1. THE BODIES ARE snake_case. `case_json` emits `createdAt`; `debtor_json`
-//      emits `created_at` and `filing_role`. The models mirror the wire rather
-//      than translating, so these literals are the server's spelling verbatim.
-//   2. ABSENT MEANS ABSENT. The API omits empty values, empty sub-objects and
-//      empty lists entirely instead of sending nulls, because most of a
-//      progressive intake is empty most of the time. Several assertions below
-//      are `'k' in obj`, not `toBeUndefined()`, for exactly that reason.
+// The debtor endpoints (backend/src/Insolvia.Api/Routes/DebtorRoutes.cs).
+// A debtor is nested like every case record — identity beside a camelCase
+// `body` — and ABSENT MEANS ABSENT: the API omits empty values, sub-objects
+// and lists from the body entirely instead of sending nulls, because most of
+// a progressive intake is empty most of the time.
 const DEBTOR_CASE_ID = 'a3f1e9d0-4b2c-4d1e-9a7f-6c8e0d1f2a3b';
 
 /**
- * A saved debtor as `debtor_json` builds it: identity, an always-present
- * `provenance` map, and only the case-data fields that hold something. The
- * timestamps carry microseconds because the API formats them with
- * `timespec="microseconds"`.
+ * A saved debtor as the API answers it: identity, its `body` holding only the
+ * case-data fields that hold something, and an always-present `provenance`
+ * map. The timestamps carry microseconds, as the API formats them.
  */
 const DEBTOR = {
   id: '7c9e6679-7425-40de-944b-e07fc1f90ae7',
-  case_id: DEBTOR_CASE_ID,
-  filing_role: 'debtor_1',
-  created_at: '2026-08-05T09:15:00.123456Z',
-  updated_at: '2026-08-05T09:15:00.123456Z',
+  caseId: DEBTOR_CASE_ID,
+  filingRole: 'debtor_1',
+  createdAt: '2026-08-05T09:15:00.123456Z',
+  updatedAt: '2026-08-05T09:15:00.123456Z',
   provenance: {
     'name.given': { source: 'staff_typed' },
     'name.surname': { source: 'staff_typed' },
-    'residence_address.city': { source: 'staff_typed' },
-    'residence_address.state': { source: 'staff_typed' },
-    'other_names_used[n1].surname': { source: 'staff_typed' },
-    'credit_counseling.status': { source: 'staff_typed' },
+    'residenceAddress.city': { source: 'staff_typed' },
+    'residenceAddress.state': { source: 'staff_typed' },
+    'otherNamesUsed[n1].surname': { source: 'staff_typed' },
+    'creditCounseling.status': { source: 'staff_typed' },
   },
-  name: { given: 'Ada', surname: 'Lovelace' },
-  other_names_used: [{ id: 'n1', surname: 'Byron' }],
-  residence_address: { city: 'Wilmington', state: 'DE' },
-  credit_counseling: { status: 'completed_with_certificate' },
-};
+  body: {
+    name: { given: 'Ada', surname: 'Lovelace' },
+    otherNamesUsed: [{ id: 'n1', surname: 'Byron' }],
+    residenceAddress: { city: 'Wilmington', state: 'DE' },
+    creditCounseling: { status: 'completed_with_certificate' },
+  },
+} as const;
 
 describe('putDebtor', () => {
   const REQUEST: PutDebtorRequest = {
-    name: { given: 'Ada', surname: 'Lovelace' },
-    other_names_used: [{ id: 'n1', surname: 'Byron' }],
-    residence_address: { city: 'Wilmington', state: 'DE' },
-    credit_counseling: { status: 'completed_with_certificate' },
+    body: DEBTOR.body,
     provenance: {
       'name.given': { source: 'staff_typed' },
       'name.surname': { source: 'staff_typed' },
-      'residence_address.city': { source: 'staff_typed' },
-      'residence_address.state': { source: 'staff_typed' },
-      'other_names_used[n1].surname': { source: 'staff_typed' },
-      'credit_counseling.status': { source: 'staff_typed' },
+      'residenceAddress.city': { source: 'staff_typed' },
+      'residenceAddress.state': { source: 'staff_typed' },
+      'otherNamesUsed[n1].surname': { source: 'staff_typed' },
+      'creditCounseling.status': { source: 'staff_typed' },
     },
   };
 
@@ -2754,13 +2746,7 @@ describe('putDebtor', () => {
     );
     expect(seen.headers.get('authorization')).toBe(`Bearer ${ACCESS_TOKEN}`);
     expect(seen.headers.get('content-type')).toMatch(/^application\/json/);
-    expect(JSON.parse(seen.body)).toEqual({
-      name: { given: 'Ada', surname: 'Lovelace' },
-      other_names_used: [{ id: 'n1', surname: 'Byron' }],
-      residence_address: { city: 'Wilmington', state: 'DE' },
-      credit_counseling: { status: 'completed_with_certificate' },
-      provenance: REQUEST.provenance,
-    });
+    expect(JSON.parse(seen.body)).toEqual({ body: DEBTOR.body, provenance: REQUEST.provenance });
 
     expect(saved).toEqual(DEBTOR);
   });
@@ -2809,23 +2795,27 @@ describe('putDebtor', () => {
     });
 
     await client.putDebtor(DEBTOR_CASE_ID, 'debtor_2', {
-      name: { given: 'Ada', middle: undefined },
-      other_names_used: [],
-      employer_ids: [],
-      residence_address: {},
-      phone: undefined,
+      body: {
+        name: { given: 'Ada', middle: undefined, surname: '' },
+        otherNamesUsed: [],
+        employerIds: [],
+        residenceAddress: {},
+        phone: undefined,
+      },
       provenance: { 'name.given': { source: 'staff_typed' } },
     });
 
-    const body = JSON.parse(stub.lastRequest().body) as Record<string, unknown>;
-    expect(body).toEqual({
-      name: { given: 'Ada' },
+    const sent = JSON.parse(stub.lastRequest().body) as Record<string, unknown>;
+    expect(sent).toEqual({
+      body: { name: { given: 'Ada' } },
       provenance: { 'name.given': { source: 'staff_typed' } },
     });
-    expect('middle' in (body.name as Record<string, unknown>)).toBe(false);
-    expect('other_names_used' in body).toBe(false);
-    expect('employer_ids' in body).toBe(false);
-    expect('residence_address' in body).toBe(false);
+    const body = sent.body as Record<string, unknown>;
+    // A cleared input ('') is no answer, the same as an absent one.
+    expect(Object.keys(body.name as Record<string, unknown>)).toEqual(['given']);
+    expect('otherNamesUsed' in body).toBe(false);
+    expect('employerIds' in body).toBe(false);
+    expect('residenceAddress' in body).toBe(false);
     expect('phone' in body).toBe(false);
   });
 
@@ -2840,43 +2830,32 @@ describe('putDebtor', () => {
 
     await client.putDebtor(DEBTOR_CASE_ID, 'non_filing_spouse', { provenance: {} });
 
-    expect(JSON.parse(stub.lastRequest().body)).toEqual({});
+    expect(JSON.parse(stub.lastRequest().body)).toEqual({ body: {} });
   });
 
-  test('sends every body member under its exact snake_case wire name', async () => {
+  test('sends every body member under its exact wire name', async () => {
     const stub = stubFetch(() => jsonResponse(DEBTOR, 200));
     const client = new InsolviaApiClient('http://localhost:8080', {
       fetch: stub.fetch,
       accessToken: () => ACCESS_TOKEN,
     });
 
-    await client.putDebtor(DEBTOR_CASE_ID, 'debtor_1', {
+    const body = {
       name: { given: 'Ada', middle: 'Augusta', surname: 'Lovelace', suffix: 'Jr.' },
-      other_names_used: [{ id: 'n1', given: 'Ada', business_name: 'Analytical Engines' }],
-      employer_ids: ['12-3456789'],
-      residence_address: { line1: '1 Main St', line2: 'Apt 2', postalCode: '19801' },
-      mailing_address: { city: 'Wilmington' },
+      otherNamesUsed: [{ id: 'n1', given: 'Ada', businessName: 'Analytical Engines' }],
+      employerIds: ['12-3456789'],
+      residenceAddress: { line1: '1 Main St', line2: 'Apt 2', postalCode: '19801' },
+      mailingAddress: { city: 'Wilmington' },
       phone: '302-555-0100',
       mobile: '302-555-0101',
       email: 'ada@lovelace.law',
       venue: { basis: 'other', explanation: 'Moved 90 days ago.' },
-      credit_counseling: { status: 'not_required', exemption_reason: 'active_duty' },
-      signed_at: '2026-08-05',
-    });
+      creditCounseling: { status: 'not_required', exemptionReason: 'active_duty' },
+      signedAt: '2026-08-05',
+    } as const;
+    await client.putDebtor(DEBTOR_CASE_ID, 'debtor_1', { body });
 
-    expect(JSON.parse(stub.lastRequest().body)).toEqual({
-      name: { given: 'Ada', middle: 'Augusta', surname: 'Lovelace', suffix: 'Jr.' },
-      other_names_used: [{ id: 'n1', given: 'Ada', business_name: 'Analytical Engines' }],
-      employer_ids: ['12-3456789'],
-      residence_address: { line1: '1 Main St', line2: 'Apt 2', postalCode: '19801' },
-      mailing_address: { city: 'Wilmington' },
-      phone: '302-555-0100',
-      mobile: '302-555-0101',
-      email: 'ada@lovelace.law',
-      venue: { basis: 'other', explanation: 'Moved 90 days ago.' },
-      credit_counseling: { status: 'not_required', exemption_reason: 'active_duty' },
-      signed_at: '2026-08-05',
-    });
+    expect(JSON.parse(stub.lastRequest().body)).toEqual({ body });
   });
 
   test('sends a machine-sourced provenance entry whole, keeping an empty locator', async () => {
@@ -2890,7 +2869,7 @@ describe('putDebtor', () => {
     });
 
     await client.putDebtor(DEBTOR_CASE_ID, 'debtor_1', {
-      name: { given: 'Ada' },
+      body: { name: { given: 'Ada' } },
       provenance: {
         'name.given': {
           source: 'ai_extracted',
@@ -2942,9 +2921,9 @@ describe('putDebtor', () => {
           error: 'ValidationError',
           fields: {
             'name.given': 'Must be 200 characters or fewer.',
-            'other_names_used[0].id': 'Must be letters, digits, hyphen or underscore.',
-            'provenance.residence_address.city': 'This field has a value but no provenance.',
-            tax_id: 'The stored tax id does not match — enter the full number to replace it.',
+            'otherNamesUsed[0].id': 'Must be letters, digits, hyphen or underscore.',
+            'provenance.residenceAddress.city': 'This field has a value but no provenance.',
+            taxId: 'The stored tax id does not match — enter the full number to replace it.',
           },
         },
         400,
@@ -2961,10 +2940,10 @@ describe('putDebtor', () => {
 
     expect(error.statusCode).toBe(400);
     expect(error.fields['name.given']).toBe('Must be 200 characters or fewer.');
-    expect(error.fields['provenance.residence_address.city']).toBe(
+    expect(error.fields['provenance.residenceAddress.city']).toBe(
       'This field has a value but no provenance.',
     );
-    expect(error.fields['other_names_used[0].id']).toBe(
+    expect(error.fields['otherNamesUsed[0].id']).toBe(
       'Must be letters, digits, hyphen or underscore.',
     );
     expect(Object.keys(error.fields)).toHaveLength(4);
@@ -2999,8 +2978,8 @@ describe('putDebtor', () => {
     expect(error.source).toBe('client');
   });
 
-  test('a 200 whose filing_role is not one of the three roles is rejected, not cast', async () => {
-    const stub = stubFetch(() => jsonResponse({ ...DEBTOR, filing_role: 'debtor_3' }, 200));
+  test('a 200 whose filingRole is not one of the three roles is rejected, not cast', async () => {
+    const stub = stubFetch(() => jsonResponse({ ...DEBTOR, filingRole: 'debtor_3' }, 200));
     const client = new InsolviaApiClient('http://localhost:8080', {
       fetch: stub.fetch,
       accessToken: () => ACCESS_TOKEN,
@@ -3010,21 +2989,7 @@ describe('putDebtor', () => {
       await rejection(client.putDebtor(DEBTOR_CASE_ID, 'debtor_1', REQUEST)),
     );
 
-    expect(error.message).toContain('filing_role');
-  });
-
-  test('a malformed nested field is named by its dotted path, the way the API names it', async () => {
-    const stub = stubFetch(() => jsonResponse({ ...DEBTOR, residence_address: { city: 7 } }, 200));
-    const client = new InsolviaApiClient('http://localhost:8080', {
-      fetch: stub.fetch,
-      accessToken: () => ACCESS_TOKEN,
-    });
-
-    const error = asApiException(
-      await rejection(client.putDebtor(DEBTOR_CASE_ID, 'debtor_1', REQUEST)),
-    );
-
-    expect(error.message).toContain('residence_address.city');
+    expect(error.message).toContain('filingRole');
   });
 
   test('the record sent and the record returned hold the same keys', async () => {
@@ -3036,10 +3001,10 @@ describe('putDebtor', () => {
       jsonResponse(
         {
           id: DEBTOR.id,
-          case_id: DEBTOR_CASE_ID,
-          filing_role: 'debtor_1',
-          created_at: DEBTOR.created_at,
-          updated_at: DEBTOR.updated_at,
+          caseId: DEBTOR_CASE_ID,
+          filingRole: 'debtor_1',
+          createdAt: DEBTOR.createdAt,
+          updatedAt: DEBTOR.updatedAt,
           ...(JSON.parse(seen.body) as Record<string, unknown>),
         },
         200,
@@ -3053,12 +3018,8 @@ describe('putDebtor', () => {
     const saved = await client.putDebtor(DEBTOR_CASE_ID, 'debtor_1', REQUEST);
 
     const sent = JSON.parse(stub.lastRequest().body) as Record<string, unknown>;
-    const identity = ['id', 'case_id', 'filing_role', 'created_at', 'updated_at'];
-    expect(
-      Object.keys(saved)
-        .filter((key) => !identity.includes(key))
-        .sort(),
-    ).toEqual(Object.keys(sent).sort());
+    expect(saved.body).toEqual(sent.body);
+    expect(saved.provenance).toEqual(sent.provenance);
 
     // And it survives a second pass: handing the decoded record straight back
     // sends the same bytes.
@@ -3078,17 +3039,18 @@ describe('putDebtor', () => {
     });
 
     await client.putDebtor(DEBTOR_CASE_ID, 'debtor_1', {
-      tax_id: { kind: 'ssn', value: '987-65-4321' },
-      provenance: { tax_id: { source: 'staff_typed' } },
+      taxId: { kind: 'ssn', value: '987-65-4321' },
+      provenance: { taxId: { source: 'staff_typed' } },
     });
 
     expect(JSON.parse(stub.lastRequest().body)).toEqual({
-      tax_id: { kind: 'ssn', value: '987-65-4321' },
-      provenance: { tax_id: { source: 'staff_typed' } },
+      body: {},
+      taxId: { kind: 'ssn', value: '987-65-4321' },
+      provenance: { taxId: { source: 'staff_typed' } },
     });
   });
 
-  test('echoes the last four as {kind, last_four} to keep the stored number', async () => {
+  test('echoes the last four as {kind, lastFour} to keep the stored number', async () => {
     // A questionnaire only ever holds the view after a save; sending it back
     // is what "this save did not touch the number" looks like on the wire.
     const stub = stubFetch(() => jsonResponse(DEBTOR_WITH_TAX_ID, 200));
@@ -3098,13 +3060,13 @@ describe('putDebtor', () => {
     });
 
     await client.putDebtor(DEBTOR_CASE_ID, 'debtor_1', {
-      tax_id: { kind: 'ssn', last_four: '4321' },
-      provenance: { tax_id: { source: 'staff_typed' } },
+      taxId: { kind: 'ssn', lastFour: '4321' },
+      provenance: { taxId: { source: 'staff_typed' } },
     });
 
-    expect((JSON.parse(stub.lastRequest().body) as { tax_id: unknown }).tax_id).toEqual({
+    expect((JSON.parse(stub.lastRequest().body) as { taxId: unknown }).taxId).toEqual({
       kind: 'ssn',
-      last_four: '4321',
+      lastFour: '4321',
     });
   });
 
@@ -3116,16 +3078,16 @@ describe('putDebtor', () => {
     });
 
     await client.putDebtor(DEBTOR_CASE_ID, 'debtor_1', {
-      tax_id: { kind: 'ssn', value: '987654322', last_four: '4321' },
-      provenance: { tax_id: { source: 'staff_typed' } },
+      taxId: { kind: 'ssn', value: '987654322', lastFour: '4321' },
+      provenance: { taxId: { source: 'staff_typed' } },
     });
-    expect((JSON.parse(stub.lastRequest().body) as { tax_id: unknown }).tax_id).toEqual({
+    expect((JSON.parse(stub.lastRequest().body) as { taxId: unknown }).taxId).toEqual({
       kind: 'ssn',
       value: '987654322',
     });
 
-    await client.putDebtor(DEBTOR_CASE_ID, 'debtor_1', { tax_id: { kind: 'itin' } });
-    expect('tax_id' in (JSON.parse(stub.lastRequest().body) as object)).toBe(false);
+    await client.putDebtor(DEBTOR_CASE_ID, 'debtor_1', { taxId: { kind: 'itin' } });
+    expect('taxId' in (JSON.parse(stub.lastRequest().body) as object)).toBe(false);
   });
 
   test('a decoded record with a tax id hands its view straight back', async () => {
@@ -3136,48 +3098,50 @@ describe('putDebtor', () => {
     });
 
     const saved = await client.putDebtor(DEBTOR_CASE_ID, 'debtor_1', REQUEST);
-    expect(saved.tax_id).toEqual({ kind: 'ssn', last_four: '4321' });
+    expect(saved.taxId).toEqual({ kind: 'ssn', lastFour: '4321' });
 
     await client.putDebtor(DEBTOR_CASE_ID, 'debtor_1', {
       ...saved,
       provenance: staffTypedProvenance(saved),
     });
     const sent = JSON.parse(stub.lastRequest().body) as {
-      tax_id: unknown;
+      taxId: unknown;
       provenance: Record<string, unknown>;
     };
-    expect(sent.tax_id).toEqual({ kind: 'ssn', last_four: '4321' });
-    expect(sent.provenance.tax_id).toEqual({ source: 'staff_typed' });
+    expect(sent.taxId).toEqual({ kind: 'ssn', lastFour: '4321' });
+    expect(sent.provenance.taxId).toEqual({ source: 'staff_typed' });
   });
 });
 
 /** {@link DEBTOR} with the last-four view the API adds once a number is stored. */
 const DEBTOR_WITH_TAX_ID = {
   ...DEBTOR,
-  provenance: { ...DEBTOR.provenance, tax_id: { source: 'staff_typed' } },
-  tax_id: { kind: 'ssn', last_four: '4321' },
+  provenance: { ...DEBTOR.provenance, taxId: { source: 'staff_typed' } },
+  taxId: { kind: 'ssn', lastFour: '4321' },
 };
 
-// A debtor copied from a firm client (ADR 0022), exactly as `debtor_json`
-// writes one: `client_id` beside the identity, `differs_from_client` when the
-// caller may see the directory, `client` provenance with its `client_id`, and
+// A debtor copied from a firm client (ADR 0022), exactly as the API writes
+// one: `clientId` beside the identity, `differsFromClient` when the
+// caller may see the directory, `client` provenance with its `clientId`, and
 // the residence county the copy carries.
 const CLIENT_DEBTOR = {
   id: 'd1c10000-4b2c-4d1e-9a7f-6c8e0d1f2a3b',
-  case_id: 'a3f1e9d0-4b2c-4d1e-9a7f-6c8e0d1f2a3b',
-  filing_role: 'debtor_2',
-  created_at: '2026-09-27T09:15:00.000000Z',
-  updated_at: '2026-09-27T09:15:00.000000Z',
-  client_id: CLIENT_ID_1,
-  differs_from_client: ['phone'],
+  caseId: 'a3f1e9d0-4b2c-4d1e-9a7f-6c8e0d1f2a3b',
+  filingRole: 'debtor_2',
+  createdAt: '2026-09-27T09:15:00.000000Z',
+  updatedAt: '2026-09-27T09:15:00.000000Z',
+  clientId: CLIENT_ID_1,
+  differsFromClient: ['phone'],
   provenance: {
     'name.given': { source: 'client', client_id: CLIENT_ID_1 },
-    'residence_address.county': { source: 'client', client_id: CLIENT_ID_1 },
+    'residenceAddress.county': { source: 'client', client_id: CLIENT_ID_1 },
     phone: { source: 'staff_typed' },
   },
-  name: { given: 'Sam' },
-  residence_address: { state: 'FL', county: 'Hillsborough' },
-  phone: '555-0199',
+  body: {
+    name: { given: 'Sam' },
+    residenceAddress: { state: 'FL', county: 'Hillsborough' },
+    phone: '555-0199',
+  },
 } as const;
 
 describe('debtors linked to firm clients (ADR 0022)', () => {
@@ -3188,66 +3152,63 @@ describe('debtors linked to firm clients (ADR 0022)', () => {
       accessToken: () => ACCESS_TOKEN,
     });
 
-    const [debtor] = await client.listDebtors(CLIENT_DEBTOR.case_id);
+    const [debtor] = await client.listDebtors(CLIENT_DEBTOR.caseId);
 
     expect(debtor).toEqual(CLIENT_DEBTOR);
   });
 
-  test('putDebtor keeps the county and never sends client_id — the server owns it', async () => {
+  test('putDebtor keeps the county and never sends clientId — the server owns it', async () => {
     const stub = stubFetch(() => jsonResponse(CLIENT_DEBTOR, 200));
     const client = new InsolviaApiClient(BASE_URL, {
       fetch: stub.fetch,
       accessToken: () => ACCESS_TOKEN,
     });
 
-    await client.putDebtor(CLIENT_DEBTOR.case_id, 'debtor_2', {
-      name: CLIENT_DEBTOR.name,
-      residence_address: CLIENT_DEBTOR.residence_address,
-      phone: CLIENT_DEBTOR.phone,
-      provenance: CLIENT_DEBTOR.provenance,
-    });
+    await client.putDebtor(CLIENT_DEBTOR.caseId, 'debtor_2', CLIENT_DEBTOR);
 
     expect(JSON.parse(stub.lastRequest().body)).toEqual({
-      name: { given: 'Sam' },
-      residence_address: { state: 'FL', county: 'Hillsborough' },
-      phone: '555-0199',
+      body: {
+        name: { given: 'Sam' },
+        residenceAddress: { state: 'FL', county: 'Hillsborough' },
+        phone: '555-0199',
+      },
       provenance: CLIENT_DEBTOR.provenance,
     });
   });
 
-  test('linkDebtorClient PUTs {client_id} to the role and maps a 201 copy', async () => {
+  test('linkDebtorClient PUTs {clientId} to the role and maps a 201 copy', async () => {
     const stub = stubFetch(() => jsonResponse(CLIENT_DEBTOR, 201));
     const client = new InsolviaApiClient(BASE_URL, {
       fetch: stub.fetch,
       accessToken: () => ACCESS_TOKEN,
     });
 
-    const linked = await client.linkDebtorClient(CLIENT_DEBTOR.case_id, 'debtor_2', CLIENT_ID_1);
+    const linked = await client.linkDebtorClient(CLIENT_DEBTOR.caseId, 'debtor_2', CLIENT_ID_1);
 
     const seen = stub.lastRequest();
     expect(seen.method).toBe('PUT');
-    expect(seen.url).toBe(`${BASE_URL}/v1/cases/${CLIENT_DEBTOR.case_id}/debtors/debtor_2/client`);
+    expect(seen.url).toBe(`${BASE_URL}/v1/cases/${CLIENT_DEBTOR.caseId}/debtors/debtor_2/client`);
     expect(seen.headers.get('authorization')).toBe(`Bearer ${ACCESS_TOKEN}`);
     expect(seen.headers.get('content-type')).toMatch(/^application\/json/);
-    expect(JSON.parse(seen.body)).toEqual({ client_id: CLIENT_ID_1 });
-    expect(linked.client_id).toBe(CLIENT_ID_1);
+    expect(JSON.parse(seen.body)).toEqual({ clientId: CLIENT_ID_1 });
+    expect(linked.clientId).toBe(CLIENT_ID_1);
   });
 
-  test('linkDebtorClient accepts a 200 re-link and surfaces a client_id refusal', async () => {
+  test('linkDebtorClient accepts a 200 re-link and surfaces a clientId refusal', async () => {
     const ok = stubFetch(() => jsonResponse(CLIENT_DEBTOR, 200));
     const okClient = new InsolviaApiClient(BASE_URL, {
       fetch: ok.fetch,
       accessToken: () => ACCESS_TOKEN,
     });
     expect(
-      (await okClient.linkDebtorClient(CLIENT_DEBTOR.case_id, 'debtor_2', CLIENT_ID_1)).id,
+      (await okClient.linkDebtorClient(CLIENT_DEBTOR.caseId, 'debtor_2', CLIENT_ID_1)).id,
     ).toBe(CLIENT_DEBTOR.id);
 
     const refused = stubFetch(() =>
       jsonResponse(
         {
           error: 'ValidationError',
-          fields: { client_id: 'That client is already another debtor on this case.' },
+          fields: { clientId: 'That client is already another debtor on this case.' },
         },
         400,
       ),
@@ -3258,10 +3219,10 @@ describe('debtors linked to firm clients (ADR 0022)', () => {
     });
     const error = asApiValidationException(
       await rejection(
-        refusedClient.linkDebtorClient(CLIENT_DEBTOR.case_id, 'debtor_2', CLIENT_ID_1),
+        refusedClient.linkDebtorClient(CLIENT_DEBTOR.caseId, 'debtor_2', CLIENT_ID_1),
       ),
     );
-    expect(Object.keys(error.fields)).toEqual(['client_id']);
+    expect(Object.keys(error.fields)).toEqual(['clientId']);
   });
 
   // Jest's `each` typing takes mutable tuples only, so the pairs are typed
@@ -3270,21 +3231,21 @@ describe('debtors linked to firm clients (ADR 0022)', () => {
     ['copyDebtorFromClient', 'copy-from-client'],
     ['copyDebtorToClient', 'copy-to-client'],
   ])('%s POSTs no body to /%s and maps the debtor', async (method, act) => {
-    const recopied = { ...CLIENT_DEBTOR, differs_from_client: [] };
+    const recopied = { ...CLIENT_DEBTOR, differsFromClient: [] };
     const stub = stubFetch(() => jsonResponse(recopied, 200));
     const client = new InsolviaApiClient(BASE_URL, {
       fetch: stub.fetch,
       accessToken: () => ACCESS_TOKEN,
     });
 
-    const debtor = await client[method](CLIENT_DEBTOR.case_id, 'debtor_2');
+    const debtor = await client[method](CLIENT_DEBTOR.caseId, 'debtor_2');
 
     const seen = stub.lastRequest();
     expect(seen.method).toBe('POST');
-    expect(seen.url).toBe(`${BASE_URL}/v1/cases/${CLIENT_DEBTOR.case_id}/debtors/debtor_2/${act}`);
+    expect(seen.url).toBe(`${BASE_URL}/v1/cases/${CLIENT_DEBTOR.caseId}/debtors/debtor_2/${act}`);
     expect(seen.headers.get('authorization')).toBe(`Bearer ${ACCESS_TOKEN}`);
     expect(seen.body).toBe('');
-    expect(debtor.differs_from_client).toEqual([]);
+    expect(debtor.differsFromClient).toEqual([]);
     expect(debtor.provenance['name.given']).toEqual({ source: 'client', client_id: CLIENT_ID_1 });
   });
 
@@ -3303,7 +3264,7 @@ describe('debtors linked to firm clients (ADR 0022)', () => {
       fetch: stub.fetch,
       accessToken: () => ACCESS_TOKEN,
     });
-    const error = await rejection(client.copyDebtorFromClient(CLIENT_DEBTOR.case_id, 'debtor_1'));
+    const error = await rejection(client.copyDebtorFromClient(CLIENT_DEBTOR.caseId, 'debtor_1'));
     expect(error).toBeInstanceOf(ApiException);
     expect((error as ApiException).statusCode).toBe(409);
   });
@@ -3312,35 +3273,40 @@ describe('debtors linked to firm clients (ADR 0022)', () => {
 describe('revisedProvenance', () => {
   const COPIED = { source: 'client', client_id: CLIENT_ID_1 } as const;
   const LOADED = {
-    name: { given: 'Sam', surname: 'Example' },
-    other_names_used: [{ id: 'alias-1', surname: 'Sample' }],
-    phone: '555-0100',
-    tax_id: { kind: 'ssn', last_four: '4321' },
+    body: {
+      name: { given: 'Sam', surname: 'Example' },
+      otherNamesUsed: [{ id: 'alias-1', surname: 'Sample' }],
+      phone: '555-0100',
+    },
+    taxId: { kind: 'ssn', lastFour: '4321' },
     provenance: {
       'name.given': COPIED,
       'name.surname': COPIED,
-      'other_names_used[alias-1].surname': COPIED,
+      'otherNamesUsed[alias-1].surname': COPIED,
       phone: COPIED,
-      tax_id: { source: 'staff_typed' },
+      taxId: { source: 'staff_typed' },
     },
   } as const;
 
   test('an untouched record keeps every entry it was loaded with', () => {
-    const { provenance: _provenance, ...body } = LOADED;
-    expect(revisedProvenance(body, LOADED)).toEqual(LOADED.provenance);
+    const { provenance: _provenance, ...request } = LOADED;
+    expect(revisedProvenance(request, LOADED)).toEqual(LOADED.provenance);
   });
 
   test('only the field the person changed becomes staff_typed', () => {
-    const body = { ...LOADED, provenance: undefined, name: { ...LOADED.name, given: 'Samuel' } };
-    expect(revisedProvenance(body, LOADED)).toEqual({
+    const request = {
+      ...LOADED,
+      body: { ...LOADED.body, name: { ...LOADED.body.name, given: 'Samuel' } },
+    };
+    expect(revisedProvenance(request, LOADED)).toEqual({
       ...LOADED.provenance,
       'name.given': { source: 'staff_typed' },
     });
   });
 
   test('a field the person added is staff_typed, and a cleared one has no entry', () => {
-    const body = { name: LOADED.name, email: 'sam@example.test' };
-    expect(revisedProvenance(body, LOADED)).toEqual({
+    const request = { body: { name: LOADED.body.name, email: 'sam@example.test' } };
+    expect(revisedProvenance(request, LOADED)).toEqual({
       'name.given': COPIED,
       'name.surname': COPIED,
       email: { source: 'staff_typed' },
@@ -3348,37 +3314,42 @@ describe('revisedProvenance', () => {
   });
 
   test('an alias is matched by its id, not its position', () => {
-    const body = {
-      other_names_used: [
-        { id: 'alias-2', surname: 'New' },
-        { id: 'alias-1', surname: 'Sample' },
-      ],
+    const request = {
+      body: {
+        otherNamesUsed: [
+          { id: 'alias-2', surname: 'New' },
+          { id: 'alias-1', surname: 'Sample' },
+        ],
+      },
     };
-    expect(revisedProvenance(body, LOADED)).toEqual({
-      'other_names_used[alias-2].surname': { source: 'staff_typed' },
-      'other_names_used[alias-1].surname': COPIED,
+    expect(revisedProvenance(request, LOADED)).toEqual({
+      'otherNamesUsed[alias-2].surname': { source: 'staff_typed' },
+      'otherNamesUsed[alias-1].surname': COPIED,
     });
   });
 
   test('a tax ID echoed as loaded keeps its entry; a number typed into it does not', () => {
-    const echoed = revisedProvenance({ tax_id: { kind: 'ssn', last_four: '4321' } }, LOADED);
-    const retyped = revisedProvenance(
-      { tax_id: { kind: 'ssn', last_four: '4321', value: '987-65-4321' } },
+    const echoed = revisedProvenance(
+      { body: {}, taxId: { kind: 'ssn', lastFour: '4321' } },
       LOADED,
     );
-    expect(echoed.tax_id).toBe(LOADED.provenance.tax_id);
-    expect(retyped.tax_id).toEqual({ source: 'staff_typed' });
+    const retyped = revisedProvenance(
+      { body: {}, taxId: { kind: 'ssn', lastFour: '4321', value: '987-65-4321' } },
+      LOADED,
+    );
+    expect(echoed.taxId).toBe(LOADED.provenance.taxId);
+    expect(retyped.taxId).toEqual({ source: 'staff_typed' });
   });
 
   test('with nothing loaded it is staffTypedProvenance', () => {
-    const body = { name: { given: 'Sam' }, phone: '555-0100' };
-    expect(revisedProvenance(body, undefined)).toEqual(staffTypedProvenance(body));
+    const request = { body: { name: { given: 'Sam' }, phone: '555-0100' } };
+    expect(revisedProvenance(request, undefined)).toEqual(staffTypedProvenance(request));
   });
 });
 
 describe('listFirmClientCases', () => {
   const ENTRY = {
-    filing_role: 'debtor_2',
+    filingRole: 'debtor_2',
     case: {
       id: 'a3f1e9d0-4b2c-4d1e-9a7f-6c8e0d1f2a3b',
       createdBy: '3c9a1f7e-0d52-4a18-b6c3-9e14f7a20b55',
@@ -3418,7 +3389,7 @@ describe('listFirmClientCases', () => {
   });
 
   test('an entry without its case is refused rather than half-mapped', async () => {
-    const stub = stubFetch(() => jsonResponse({ cases: [{ filing_role: 'debtor_1' }] }, 200));
+    const stub = stubFetch(() => jsonResponse({ cases: [{ filingRole: 'debtor_1' }] }, 200));
     const client = new InsolviaApiClient(BASE_URL, {
       fetch: stub.fetch,
       accessToken: () => ACCESS_TOKEN,
@@ -3430,10 +3401,11 @@ describe('listFirmClientCases', () => {
 describe('listDebtors', () => {
   const SECOND_DEBTOR = {
     id: 'b7f1e9d0-4b2c-4d1e-9a7f-6c8e0d1f2a3c',
-    case_id: DEBTOR_CASE_ID,
-    filing_role: 'debtor_2',
-    created_at: '2026-08-05T09:16:00.000000Z',
-    updated_at: '2026-08-05T09:16:00.000000Z',
+    caseId: DEBTOR_CASE_ID,
+    filingRole: 'debtor_2',
+    createdAt: '2026-08-05T09:16:00.000000Z',
+    updatedAt: '2026-08-05T09:16:00.000000Z',
+    body: {},
     provenance: {},
   };
 
@@ -3455,7 +3427,7 @@ describe('listDebtors', () => {
 
     expect(debtors).toEqual([DEBTOR, SECOND_DEBTOR]);
     // The order is the order the forms print debtors in, and the API owns it.
-    expect(debtors.map((debtor) => debtor.filing_role)).toEqual(['debtor_1', 'debtor_2']);
+    expect(debtors.map((debtor) => debtor.filingRole)).toEqual(['debtor_1', 'debtor_2']);
   });
 
   test('a case with no debtors saved yet is an empty array, not a 404', async () => {
@@ -3476,12 +3448,12 @@ describe('listDebtors', () => {
     });
 
     const [debtor] = await client.listDebtors(DEBTOR_CASE_ID);
-    expect(debtor?.tax_id).toEqual({ kind: 'ssn', last_four: '4321' });
+    expect(debtor?.taxId).toEqual({ kind: 'ssn', lastFour: '4321' });
 
     // The API never sends a number; a decoder that tolerated a view missing
     // its last four would hand the screen a kind with nothing to show.
     const broken = stubFetch(() =>
-      jsonResponse({ debtors: [{ ...DEBTOR_WITH_TAX_ID, tax_id: { kind: 'ssn' } }] }, 200),
+      jsonResponse({ debtors: [{ ...DEBTOR_WITH_TAX_ID, taxId: { kind: 'ssn' } }] }, 200),
     );
     const brokenClient = new InsolviaApiClient('http://localhost:8080', {
       fetch: broken.fetch,
@@ -3502,9 +3474,7 @@ describe('listDebtors', () => {
     const [debtor] = await client.listDebtors(DEBTOR_CASE_ID);
 
     expect(debtor?.provenance).toEqual({});
-    expect(debtor !== undefined && 'name' in debtor).toBe(false);
-    expect(debtor !== undefined && 'phone' in debtor).toBe(false);
-    expect(debtor !== undefined && 'other_names_used' in debtor).toBe(false);
+    expect(debtor?.body).toEqual({});
   });
 
   test('maps every field of a populated record, provenance included', async () => {
@@ -3516,10 +3486,10 @@ describe('listDebtors', () => {
 
     const [debtor] = await client.listDebtors(DEBTOR_CASE_ID);
 
-    expect(debtor?.name).toEqual({ given: 'Ada', surname: 'Lovelace' });
-    expect(debtor?.other_names_used).toEqual([{ id: 'n1', surname: 'Byron' }]);
-    expect(debtor?.credit_counseling).toEqual({ status: 'completed_with_certificate' });
-    expect(debtor?.provenance['other_names_used[n1].surname']).toEqual({ source: 'staff_typed' });
+    expect(debtor?.body.name).toEqual({ given: 'Ada', surname: 'Lovelace' });
+    expect(debtor?.body.otherNamesUsed).toEqual([{ id: 'n1', surname: 'Byron' }]);
+    expect(debtor?.body.creditCounseling).toEqual({ status: 'completed_with_certificate' });
+    expect(debtor?.provenance['otherNamesUsed[n1].surname']).toEqual({ source: 'staff_typed' });
   });
 
   test('URL-encodes the caseId into the path', async () => {
@@ -3627,8 +3597,8 @@ describe('staffTypedProvenance', () => {
   });
 
   test('list elements are addressed by id, not by position', () => {
-    expect(paths({ other_names_used: [{ id: 'n1', surname: 'Byron' }] })).toEqual([
-      'other_names_used[n1].surname',
+    expect(paths({ otherNamesUsed: [{ id: 'n1', surname: 'Byron' }] })).toEqual([
+      'otherNamesUsed[n1].surname',
     ]);
   });
 
@@ -3652,7 +3622,7 @@ describe('staffTypedProvenance', () => {
   test('a list without element ids is attributed whole', () => {
     // Positional paths would be a lie, so the list gets one path instead of
     // element paths that reordering would silently reattach.
-    expect(paths({ employer_ids: ['12-3456789'] })).toEqual(['employer_ids']);
+    expect(paths({ employerIds: ['12-3456789'] })).toEqual(['employerIds']);
   });
 
   test('a mixed list does not discard the paths before the bad element', () => {
@@ -3678,15 +3648,15 @@ describe('staffTypedProvenance', () => {
   test('the tax id is ONE path, whichever shape it takes', () => {
     // Mirrors parse_debtor's one exception: the kind and the digits are one
     // identifier entered in one act, and the last-four echo is not a fact of
-    // its own. Walking the object would mint `tax_id.kind` and
-    // `tax_id.value`, which the API refuses as unattributed.
-    expect(paths({ tax_id: { kind: 'ssn', value: '987-65-4321' } })).toEqual(['tax_id']);
-    expect(paths({ tax_id: { kind: 'ssn', last_four: '4321' } })).toEqual(['tax_id']);
+    // its own. Walking the object would mint `taxId.kind` and
+    // `taxId.value`, which the API refuses as unattributed.
+    expect(paths({ body: {}, taxId: { kind: 'ssn', value: '987-65-4321' } })).toEqual(['taxId']);
+    expect(paths({ body: {}, taxId: { kind: 'ssn', lastFour: '4321' } })).toEqual(['taxId']);
   });
 
   test('a kind with nothing typed is not populated — it is not sent either', () => {
-    expect(paths({ tax_id: { kind: 'ssn' } })).toEqual([]);
-    expect(paths({ tax_id: { kind: 'ssn', value: '' } })).toEqual([]);
+    expect(paths({ body: {}, taxId: { kind: 'ssn' } })).toEqual([]);
+    expect(paths({ body: {}, taxId: { kind: 'ssn', value: '' } })).toEqual([]);
   });
 
   test('a key that is not a field name fails loudly, before any request', () => {
@@ -3707,10 +3677,7 @@ describe('staffTypedProvenance', () => {
     });
   });
 
-  test('skips server-stamped identity, so a fetched debtor can be handed straight back', async () => {
-    // `debtor_body()` drops the same six keys before the server checks the
-    // rule, so asking for provenance on them would be asking where an id came
-    // from.
+  test("walks a fetched debtor's body, so it can be handed straight back", async () => {
     const stub = stubFetch(() => jsonResponse({ debtors: [DEBTOR] }, 200));
     const client = new InsolviaApiClient('http://localhost:8080', {
       fetch: stub.fetch,
@@ -3730,34 +3697,36 @@ describe('staffTypedProvenance', () => {
     // `_FIELD_PATH_RE` in core/provenance.py is transcribed here, so a path
     // this helper can mint but the server would refuse fails the test rather
     // than the request.
-    const segment = '[a-z][a-z0-9_]*(?:\\[[A-Za-z0-9_-]+\\])?';
+    const segment = '[a-z][A-Za-z0-9_]*(?:\\[[A-Za-z0-9_-]+\\])?';
     const fieldPath = new RegExp(`^${segment}(?:\\.${segment})*$`);
 
-    const body: PutDebtorRequest = {
-      name: { given: 'Ada', surname: 'Lovelace' },
-      other_names_used: [{ id: 'n1', surname: 'Byron' }],
-      employer_ids: ['12-3456789'],
-      residence_address: { city: 'Wilmington', state: 'DE' },
-      venue: { basis: 'lived_longest_180_days' },
-      credit_counseling: { status: 'not_required', exemption_reason: 'active_duty' },
-      email: 'ada@lovelace.law',
+    const request: PutDebtorRequest = {
+      body: {
+        name: { given: 'Ada', surname: 'Lovelace' },
+        otherNamesUsed: [{ id: 'n1', surname: 'Byron' }],
+        employerIds: ['12-3456789'],
+        residenceAddress: { city: 'Wilmington', state: 'DE' },
+        venue: { basis: 'lived_longest_180_days' },
+        creditCounseling: { status: 'not_required', exemptionReason: 'active_duty' },
+        email: 'ada@lovelace.law',
+      },
     };
 
-    const provenance = staffTypedProvenance(body);
+    const provenance = staffTypedProvenance(request);
 
     for (const path of Object.keys(provenance)) {
       expect(path).toMatch(fieldPath);
     }
     expect(Object.keys(provenance).sort()).toEqual([
-      'credit_counseling.exemption_reason',
-      'credit_counseling.status',
+      'creditCounseling.exemptionReason',
+      'creditCounseling.status',
       'email',
-      'employer_ids',
+      'employerIds',
       'name.given',
       'name.surname',
-      'other_names_used[n1].surname',
-      'residence_address.city',
-      'residence_address.state',
+      'otherNamesUsed[n1].surname',
+      'residenceAddress.city',
+      'residenceAddress.state',
       'venue.basis',
     ]);
   });
@@ -3766,10 +3735,12 @@ describe('staffTypedProvenance', () => {
     // End to end: whatever the codec ends up sending, every value in it has an
     // entry. That equality is invariant 1, checked before the request rather
     // than by a 400 after it.
-    const body: PutDebtorRequest = {
-      name: { given: 'Ada' },
-      other_names_used: [{ id: 'n1', surname: 'Byron' }],
-      residence_address: { city: 'Wilmington' },
+    const request: PutDebtorRequest = {
+      body: {
+        name: { given: 'Ada' },
+        otherNamesUsed: [{ id: 'n1', surname: 'Byron' }],
+        residenceAddress: { city: 'Wilmington' },
+      },
     };
     const stub = stubFetch(() => jsonResponse(DEBTOR, 201));
     const client = new InsolviaApiClient('http://localhost:8080', {
@@ -3778,14 +3749,13 @@ describe('staffTypedProvenance', () => {
     });
 
     await client.putDebtor(DEBTOR_CASE_ID, 'debtor_1', {
-      ...body,
-      provenance: staffTypedProvenance(body),
+      ...request,
+      provenance: staffTypedProvenance(request),
     });
 
     const sent = JSON.parse(stub.lastRequest().body) as Record<string, unknown>;
-    const { provenance: _sentProvenance, ...sentBody } = sent;
-    expect(Object.keys(staffTypedProvenance(sentBody)).sort()).toEqual(
-      Object.keys(_sentProvenance as Record<string, unknown>).sort(),
+    expect(Object.keys(staffTypedProvenance(sent)).sort()).toEqual(
+      Object.keys(sent.provenance as Record<string, unknown>).sort(),
     );
   });
 });
@@ -4469,7 +4439,7 @@ describe('listCourts', () => {
               line2: 'Suite 555',
               city: 'Tampa',
               state: 'FL',
-              postal_code: '33602',
+              postalCode: '33602',
             },
             counties: [{ name: 'Hillsborough', fips: '12057' }],
           },
@@ -5828,7 +5798,7 @@ describe('the case lifecycle (issue #355)', () => {
     expect(error.statusCode).toBe(409);
   });
 
-  test('updateCase sends the docket facts snake_case, with null to clear', async () => {
+  test('updateCase sends the docket facts, with null to clear', async () => {
     const stub = stubFetch(() => jsonResponse(FILED_CASE, 200));
 
     await lifecycleClient(stub).updateCase(CASE_ID, {
@@ -5843,11 +5813,11 @@ describe('the case lifecycle (issue #355)', () => {
 
     expect(JSON.parse(stub.lastRequest().body)).toEqual({
       status: 'filed',
-      filed_at: '2026-09-01',
-      case_number: '8:26-bk-01234',
+      filedAt: '2026-09-01',
+      caseNumber: '8:26-bk-01234',
       judge: 'Hon. Example Judge',
       trustee: null,
-      office_file_number: 'F-1001',
+      officeFileNumber: 'F-1001',
     });
   });
 

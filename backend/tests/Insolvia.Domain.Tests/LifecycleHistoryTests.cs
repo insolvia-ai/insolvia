@@ -20,16 +20,16 @@ public sealed class LifecycleHistoryTests
         Intake() with { Status = CaseStatus.Filed, Chapter = chapter, FiledAt = Petition, CaseNumber = "8:26-bk-01234" };
 
     private static Case Moved(Case current, string payload) =>
-        CaseRules.ApplyChanges(current, CaseRules.ParseUpdate(Body.Of(payload)));
+        CaseRules.ApplyChanges(current, Body.Read<CaseChanges>(Body.Of(payload)));
 
     // ── The PATCH's effective date ──────────────────────────────────
 
     [Fact]
     public void A_status_move_may_carry_its_court_date_and_nothing_else_may()
     {
-        Assert.Equal(new DateOnly(2026, 12, 1), CaseRules.ParseUpdate(Body.Of("""{"status": "dismissed", "effective_on": "2026-12-01"}""")).EffectiveOn);
-        Assert.Equal(["effective_on"], Assert.Throws<FieldValidationException>(() => CaseRules.ParseUpdate(Body.Of("""{"judge": "J", "effective_on": "2026-12-01"}"""))).Fields.Keys);
-        Assert.Equal(["effective_on"], Assert.Throws<FieldValidationException>(() => CaseRules.ParseUpdate(Body.Of("""{"status": "dismissed", "effective_on": "December"}"""))).Fields.Keys);
+        Assert.Equal(new DateOnly(2026, 12, 1), Body.Read<CaseChanges>(Body.Of("""{"status": "dismissed", "effectiveOn": "2026-12-01"}""")).EffectiveOn);
+        Assert.Equal(["effectiveOn"], Assert.Throws<FieldValidationException>(() => Body.Read<CaseChanges>(Body.Of("""{"judge": "J", "effectiveOn": "2026-12-01"}"""))).Fields.Keys);
+        Assert.Equal(["effectiveOn"], Assert.Throws<FieldValidationException>(() => Body.Read<CaseChanges>(Body.Of("""{"status": "dismissed", "effectiveOn": "December"}"""))).Fields.Keys);
     }
 
     // ── Status events ───────────────────────────────────────────────
@@ -50,7 +50,7 @@ public sealed class LifecycleHistoryTests
     public void The_filed_event_carries_the_petition_chapter_and_the_petition_date()
     {
         var before = Intake() with { Chapter = 13 };
-        var after = Moved(before, """{"status": "filed", "filed_at": "2026-09-01", "case_number": "8:26-bk-01234"}""");
+        var after = Moved(before, """{"status": "filed", "filedAt": "2026-09-01", "caseNumber": "8:26-bk-01234"}""");
         var write = CaseLifecycle.StatusMove(before, after, [], Ids.Alice)!;
         Assert.Equal((13, Petition, CaseStatus.Filed), (write.Event.Chapter!.Value, write.Event.EffectiveOn!.Value, write.Event.ToStatus!.Value));
         Assert.True(write.FilesTheCase);
@@ -58,14 +58,14 @@ public sealed class LifecycleHistoryTests
 
         // A date that is not the petition's is refused on the way in.
         var error = Assert.Throws<FieldValidationException>(() => CaseLifecycle.StatusMove(before, after, [], Ids.Alice, Petition.AddDays(1)));
-        Assert.Equal(["effective_on"], error.Fields.Keys);
+        Assert.Equal(["effectiveOn"], error.Fields.Keys);
     }
 
     [Fact]
     public void A_chapter_chosen_in_the_same_write_as_filing_is_the_petition_chapter()
     {
         var before = Intake();
-        var after = Moved(before, """{"status": "filed", "chapter": 13, "filed_at": "2026-09-01", "case_number": "8:26-bk-01234"}""");
+        var after = Moved(before, """{"status": "filed", "chapter": 13, "filedAt": "2026-09-01", "caseNumber": "8:26-bk-01234"}""");
         Assert.Equal(13, CaseLifecycle.StatusMove(before, after, [], Ids.Alice)!.Event.Chapter);
     }
 
@@ -74,7 +74,7 @@ public sealed class LifecycleHistoryTests
     {
         var clock = new FixedClock(new DateTimeOffset(2026, 11, 3, 23, 59, 0, TimeSpan.Zero));
         var before = Filed();
-        var after = CaseRules.ApplyChanges(before, CaseRules.ParseUpdate(Body.Of("""{"status": "dismissed"}""")), clock);
+        var after = CaseRules.ApplyChanges(before, Body.Read<CaseChanges>(Body.Of("""{"status": "dismissed"}""")), clock);
         var write = CaseLifecycle.StatusMove(before, after, [], Ids.Alice)!;
         Assert.Equal(new DateOnly(2026, 11, 3), write.Event.EffectiveOn);
         Assert.Null(write.Event.Chapter);
@@ -86,13 +86,13 @@ public sealed class LifecycleHistoryTests
         var before = Filed();
         var dismissed = Moved(before, """{"status": "dismissed"}""");
         var early = Assert.Throws<FieldValidationException>(() => CaseLifecycle.StatusMove(before, dismissed, [], Ids.Alice, Petition.AddDays(-1)));
-        Assert.Contains("petition date (2026-09-01)", early.Fields["effective_on"], StringComparison.Ordinal);
+        Assert.Contains("petition date (2026-09-01)", early.Fields["effectiveOn"], StringComparison.Ordinal);
 
         var converted = CaseLifecycle.Convert(before, [], 13, new DateOnly(2026, 10, 15), Ids.Alice);
         var history = new[] { converted.Event };
         var stale = Assert.Throws<FieldValidationException>(() =>
             CaseLifecycle.StatusMove(converted.Case, Moved(converted.Case, """{"status": "dismissed"}"""), history, Ids.Alice, new DateOnly(2026, 10, 14)));
-        Assert.Contains("previous event (2026-10-15)", stale.Fields["effective_on"], StringComparison.Ordinal);
+        Assert.Contains("previous event (2026-10-15)", stale.Fields["effectiveOn"], StringComparison.Ordinal);
 
         // The same day is not earlier.
         Assert.NotNull(CaseLifecycle.StatusMove(converted.Case, Moved(converted.Case, """{"status": "dismissed"}"""), history, Ids.Alice, new DateOnly(2026, 10, 15)));
@@ -105,7 +105,7 @@ public sealed class LifecycleHistoryTests
         // preparation moves are recorded today, the petition is weeks old.
         var before = Intake();
         var ready = CaseLifecycle.StatusMove(before, Moved(before, """{"status": "ready_to_file"}"""), [], Ids.Alice)!;
-        var filed = CaseLifecycle.StatusMove(ready.Case, Moved(ready.Case, """{"status": "filed", "filed_at": "2020-01-02", "case_number": "8:20-bk-00001"}"""), [ready.Event], Ids.Alice)!;
+        var filed = CaseLifecycle.StatusMove(ready.Case, Moved(ready.Case, """{"status": "filed", "filedAt": "2020-01-02", "caseNumber": "8:20-bk-00001"}"""), [ready.Event], Ids.Alice)!;
         Assert.Equal(new DateOnly(2020, 1, 2), filed.Event.EffectiveOn);
     }
 
@@ -261,7 +261,7 @@ public sealed class LifecycleHistoryTests
     private static LifecycleWrite FileFromIntake(int chapter)
     {
         var before = Intake() with { Chapter = chapter };
-        return CaseLifecycle.StatusMove(before, Moved(before, """{"status": "filed", "filed_at": "2026-09-01", "case_number": "8:26-bk-01234"}"""), [], Ids.Alice)!;
+        return CaseLifecycle.StatusMove(before, Moved(before, """{"status": "filed", "filedAt": "2026-09-01", "caseNumber": "8:26-bk-01234"}"""), [], Ids.Alice)!;
     }
 
     private static LifecycleEvent[] Converted13To7To13()

@@ -343,7 +343,7 @@ export function CollectionEditor({ caseId, spec, initialForm }: CollectionEditor
             ...current,
             debtors: debtors.value.map((debtor) => ({
               value: debtor.id,
-              label: DEBTOR_LABELS[debtor.filing_role] ?? debtor.filing_role,
+              label: DEBTOR_LABELS[debtor.filingRole] ?? debtor.filingRole,
             })),
           }));
         }

@@ -98,13 +98,13 @@ public sealed class QuestionTests
     [Fact]
     public void An_address_answer_never_carries_the_raw_fallback() =>
         AssertJson(
-            """{"residence_address": {"line1": "1 Example Way", "city": "Testville"}}""",
-            Answer("""{"questionId": "personal_information.residence_address", "value": {"residence_address": {"line1": "1 Example Way", "city": "Testville", "raw": "unparsed"}}}""").Payload);
+            """{"residenceAddress": {"line1": "1 Example Way", "city": "Testville"}}""",
+            Answer("""{"questionId": "personal_information.residence_address", "value": {"residenceAddress": {"line1": "1 Example Way", "city": "Testville", "raw": "unparsed"}}}""").Payload);
 
     [Fact]
     public void An_appended_other_name_gets_an_id_provenance_can_address()
     {
-        var element = Assert.Single(Answer("""{"questionId": "personal_information.other_names", "value": {"surname": "Formerly"}}""").Payload["other_names_used"]!.AsArray())!;
+        var element = Assert.Single(Answer("""{"questionId": "personal_information.other_names", "value": {"surname": "Formerly"}}""").Payload["otherNamesUsed"]!.AsArray())!;
         Assert.Equal("Formerly", (string)element["surname"]!);
         Assert.False(string.IsNullOrEmpty((string?)element["id"]));
     }
@@ -205,8 +205,8 @@ public sealed class QuestionTests
         var candidate = Stored("""{"questionId": "personal_information.other_names", "value": {"surname": "A"}}""");
         var revised = QuestionRules.ReviseAnswer(candidate, QuestionRules.RefOf(candidate)!, Body.Of("""{"surname": "B"}"""));
         Assert.Same(candidate.Locator, revised.Locator);
-        Assert.Equal((string?)candidate.Payload["other_names_used"]![0]!["id"], (string?)revised.Payload["other_names_used"]![0]!["id"]);
-        Assert.Equal("B", (string?)revised.Payload["other_names_used"]![0]!["surname"]);
+        Assert.Equal((string?)candidate.Payload["otherNamesUsed"]![0]!["id"], (string?)revised.Payload["otherNamesUsed"]![0]!["id"]);
+        Assert.Equal("B", (string?)revised.Payload["otherNamesUsed"]![0]!["surname"]);
     }
 
     [Fact]

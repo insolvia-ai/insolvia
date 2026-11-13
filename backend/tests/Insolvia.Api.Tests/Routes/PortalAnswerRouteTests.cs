@@ -249,7 +249,7 @@ public sealed class PortalAnswerRouteTests : IAsyncLifetime, IDisposable
     {
         var answer = await _world.Get($"/v1/cases/{_caseId}/debtors");
         Assert.True(answer.Status == 200, answer.Body);
-        return answer.Object["debtors"]!.AsArray().Single(d => d!["filing_role"]!.GetValue<string>() == "debtor_1")!.ToJsonString();
+        return answer.Object["debtors"]!.AsArray().Single(d => d!["filingRole"]!.GetValue<string>() == "debtor_1")!.ToJsonString();
     }
 
     // The review route's state change, in the store (see the remarks).

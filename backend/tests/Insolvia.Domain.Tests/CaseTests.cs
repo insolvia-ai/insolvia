@@ -6,11 +6,15 @@ namespace Insolvia.Domain.Tests;
 /// <summary>Case creation and the court reference, translated from test_cases.py.</summary>
 public sealed class CaseTests
 {
+    private static NewCase Opened(System.Text.Json.Nodes.JsonObject payload) => Body.Read<NewCase>(payload);
+
+    private static CaseChanges Changes(string json) => Body.Read<CaseChanges>(Body.Of(json));
+
     [Fact]
     public void A_case_is_opened_for_one_client_or_two_in_filing_order()
     {
-        Assert.Equal([ClientA], CaseRules.ParseCreation(Opening()).ClientIds);
-        Assert.Equal([ClientA, ClientB], CaseRules.ParseCreation(Opening(ClientA, ClientB)).ClientIds);
+        Assert.Equal([ClientA], Opened(Opening()).ClientIds);
+        Assert.Equal([ClientA, ClientB], Opened(Opening(ClientA, ClientB)).ClientIds);
     }
 
     [Theory]
@@ -24,16 +28,9 @@ public sealed class CaseTests
     public void Client_ids_are_required_and_must_be_one_or_two_distinct_ids(string clientIds)
     {
         var payload = Opening();
-        payload["client_ids"] = Body.Value(clientIds);
-        var error = Assert.Throws<FieldValidationException>(() => CaseRules.ParseCreation(payload));
-        Assert.Equal(["client_ids"], error.Fields.Keys);
-    }
-
-    [Fact]
-    public void A_caller_with_no_request_behind_it_may_open_a_case_without_clients()
-    {
-        var draft = CaseRules.ParseCreation(Body.Of("""{"chapter": 7, "court": "flmb", "division": "tampa"}"""), requireClients: false);
-        Assert.Empty(draft.ClientIds);
+        payload["clientIds"] = Body.Value(clientIds);
+        var error = Assert.Throws<FieldValidationException>(() => Opened(payload));
+        Assert.StartsWith("clientIds", Assert.Single(error.Fields.Keys), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -49,10 +46,11 @@ public sealed class CaseTests
     [InlineData("""{"chapter": 7, "court": "flmb"}""", "division")]
     [InlineData("""{"chapter": 7, "court": "nyeb", "division": "brooklyn"}""", "court")]
     [InlineData("""{"chapter": 7, "court": "flmb", "division": "miami"}""", "division")]
-    [InlineData("""{"chapter": 7, "court": "flmb", "division": "tampa", "district": "x"}""", "district")]
     public void An_unknown_or_half_reference_is_refused_by_name(string payload, string field)
     {
-        var error = Assert.Throws<FieldValidationException>(() => CaseRules.ParseCreation(Body.Of(payload)));
+        var opening = Body.Of(payload);
+        opening["clientIds"] = new System.Text.Json.Nodes.JsonArray(ClientA);
+        var error = Assert.Throws<FieldValidationException>(() => Opened(opening));
         Assert.Contains(field, error.Fields.Keys);
     }
 
@@ -60,7 +58,7 @@ public sealed class CaseTests
     public void A_court_change_rewrites_all_three_fields_together()
     {
         var (created, _) = NewCase();
-        var moved = CaseRules.ApplyChanges(created, CaseRules.ParseUpdate(Body.Of("""{"court": "txsb", "division": "houston"}""")));
+        var moved = CaseRules.ApplyChanges(created, Changes("""{"court": "txsb", "division": "houston"}"""));
         Assert.Equal(("txsb", "houston", "Southern District of Texas"), (moved.Court, moved.Division, moved.District));
         var same = CaseRules.ApplyChanges(moved, new CaseChanges { Chapter = 13 });
         Assert.Equal(("txsb", "houston", "Southern District of Texas"), (same.Court, same.Division, same.District));
@@ -69,47 +67,44 @@ public sealed class CaseTests
     [Fact]
     public void A_patch_carrying_one_half_is_refused()
     {
-        var error = Assert.Throws<FieldValidationException>(() => CaseRules.ParseUpdate(Body.Of("""{"division": "orlando"}""")));
+        var error = Assert.Throws<FieldValidationException>(() => Changes("""{"division": "orlando"}"""));
         Assert.Contains("court", error.Fields.Keys);
     }
 
-    // test_the_item_round_trips_the_reference and
-    // test_a_row_written_before_the_registry_still_reads asserted on the
-    // DynamoDB item (`case_item`/`case_from_item`); dropped — 18.10's mapping.
-
-    // ── Beyond the Python suite: pins the parsers' edges ───────────────
-
     [Theory]
-    [InlineData("true", "Chapter must be a number.")]
-    [InlineData("7.0", "Chapter must be a number.")]
-    [InlineData("9", "Chapter must be one of 7, 11, 12, 13.")]
-    public void A_chapter_is_one_of_the_four_and_true_is_not_one(string chapter, string message)
+    [InlineData("true")]
+    [InlineData("7.5")]
+    [InlineData("9")]
+    public void A_chapter_is_one_of_the_four_and_true_is_not_one(string chapter)
     {
         var payload = Opening();
         payload["chapter"] = Body.Value(chapter);
-        var error = Assert.Throws<FieldValidationException>(() => CaseRules.ParseCreation(payload));
-        Assert.Equal(message, error.Fields["chapter"]);
+        var error = Assert.Throws<FieldValidationException>(() => Opened(payload));
+        Assert.Equal(["chapter"], error.Fields.Keys);
     }
 
     [Fact]
-    public void An_empty_patch_is_refused_rather_than_a_silent_no_op() =>
-        Assert.Throws<ValidationException>(() => CaseRules.ParseUpdate(Body.Of("{}")));
+    public void An_empty_patch_is_empty() =>
+        Assert.True(Changes("{}").IsEmpty);
 
     [Fact]
     public void A_meeting_before_the_petition_is_refused_when_both_arrive_together()
     {
         var error = Assert.Throws<FieldValidationException>(() =>
-            CaseRules.ParseUpdate(Body.Of("""{"filed_at": "2026-09-02", "meeting_341_at": "2026-09-01"}""")));
-        Assert.Equal(["meeting_341_at"], error.Fields.Keys);
+            Changes("""{"filedAt": "2026-09-02", "meeting341At": "2026-09-01"}"""));
+        Assert.Equal(["meeting341At"], error.Fields.Keys);
     }
 
     [Fact]
     public void A_null_date_clears_and_touches_the_deadline_anchors()
     {
-        var changes = CaseRules.ParseUpdate(Body.Of("""{"filed_at": null}"""));
-        Assert.True(changes.ClearFiledAt);
+        var changes = Changes("""{"filedAt": null}""");
+        Assert.True(changes.Names(nameof(CaseChanges.FiledAt)));
+        Assert.Null(changes.FiledAt);
+        Assert.False(changes.IsEmpty);
         Assert.True(changes.TouchesDeadlineAnchors);
-        Assert.False(CaseRules.ParseUpdate(Body.Of("""{"judge": "J"}""")).TouchesDeadlineAnchors);
+        Assert.False(Changes("""{"judge": "J"}""").TouchesDeadlineAnchors);
+        Assert.False(Changes("""{"judge": "J"}""").Names(nameof(CaseChanges.FiledAt)));
     }
 
     [Theory]

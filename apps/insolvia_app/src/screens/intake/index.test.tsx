@@ -24,11 +24,11 @@ const CASE_ID = '00000000-0000-4000-8000-0000000000c1';
 
 const SAVED = {
   id: '00000000-0000-4000-8000-0000000000d1',
-  case_id: CASE_ID,
-  filing_role: 'debtor_1',
-  created_at: '2026-08-05T10:00:00.000000Z',
-  updated_at: '2026-08-05T10:00:00.000000Z',
-  name: { given: 'Ada', surname: 'Lovelace' },
+  caseId: CASE_ID,
+  filingRole: 'debtor_1',
+  createdAt: '2026-08-05T10:00:00.000000Z',
+  updatedAt: '2026-08-05T10:00:00.000000Z',
+  body: { name: { given: 'Ada', surname: 'Lovelace' } },
   provenance: {
     'name.given': { source: 'staff_typed' },
     'name.surname': { source: 'staff_typed' },
@@ -45,12 +45,13 @@ const CLIENT_ID = '00000000-0000-4000-8000-0000000c11a0';
  */
 const OPENED = {
   id: '00000000-0000-4000-8000-0000000000d1',
-  case_id: CASE_ID,
-  filing_role: 'debtor_1',
-  created_at: '2026-08-05T10:00:00.000000Z',
-  updated_at: '2026-08-05T10:00:00.000000Z',
-  client_id: CLIENT_ID,
-  differs_from_client: [],
+  caseId: CASE_ID,
+  filingRole: 'debtor_1',
+  createdAt: '2026-08-05T10:00:00.000000Z',
+  updatedAt: '2026-08-05T10:00:00.000000Z',
+  body: {},
+  clientId: CLIENT_ID,
+  differsFromClient: [],
   provenance: {},
 };
 
@@ -85,12 +86,18 @@ describe('the intake screen', () => {
     return fetchMock;
   }
 
-  /** The body of the last PUT to a debtor, parsed. */
-  function lastSave(fetchMock: ReturnType<typeof signedIn>): Record<string, unknown> {
+  /** The last PUT to a debtor, parsed. */
+  function lastRequest(fetchMock: ReturnType<typeof signedIn>): Record<string, unknown> {
     const puts = fetchMock.mock.calls.filter(
       ([url, init]) => url.includes('/debtors/') && init?.method === 'PUT',
     );
     return JSON.parse(String(puts[puts.length - 1]?.[1]?.body ?? '{}'));
+  }
+
+  /** The debtor body of the last PUT, with its provenance and tax id beside it. */
+  function lastSave(fetchMock: ReturnType<typeof signedIn>): Record<string, unknown> {
+    const { body, ...rest } = lastRequest(fetchMock);
+    return { ...(body as object), ...rest };
   }
 
   const justOpened = () => jsonResponse(200, { debtors: [OPENED] });
@@ -132,13 +139,13 @@ describe('the intake screen', () => {
   });
 
   it('never sends back the client link or the divergence, which the server owns', async () => {
-    // ADR 0022: a debtor copied from a firm client carries `client_id` and a
-    // computed `differs_from_client`. Neither is an answer on this form; left
-    // in the body they would be sent, and walked into "typed" provenance.
+    // ADR 0022: a debtor copied from a firm client carries `clientId` and a
+    // computed `differsFromClient`. Neither is an answer on this form; sent,
+    // they would be walked into "typed" provenance.
     const linked = {
       ...SAVED,
-      client_id: '00000000-0000-4000-8000-0000000c11a0',
-      differs_from_client: [],
+      clientId: '00000000-0000-4000-8000-0000000c11a0',
+      differsFromClient: [],
     };
     const fetchMock = signedIn({
       [`/v1/cases/${CASE_ID}/debtors/debtor_1`]: () => jsonResponse(200, linked),
@@ -153,8 +160,7 @@ describe('the intake screen', () => {
       expect(lastSave(fetchMock).name).toEqual({ given: 'Adam', surname: 'Lovelace' }),
     );
     const body = lastSave(fetchMock);
-    expect('client_id' in body).toBe(false);
-    expect('differs_from_client' in body).toBe(false);
+    expect(Object.keys(lastRequest(fetchMock)).sort()).toEqual(['body', 'provenance']);
     expect(Object.keys(body.provenance as object).sort()).toEqual(['name.given', 'name.surname']);
   });
 
@@ -163,7 +169,7 @@ describe('the intake screen', () => {
       [`/v1/cases/${CASE_ID}/debtors/debtor_1`]: () =>
         jsonResponse(400, {
           error: 'validation failed',
-          fields: { 'name.given': 'Must be a single line.' },
+          fields: { 'body.name.given': 'Must be a single line.' },
         }),
       [`/v1/cases/${CASE_ID}/debtors`]: justOpened,
     });
@@ -196,8 +202,8 @@ describe('the intake screen', () => {
     await user.press(await screen.findByText('Add another name'));
     await user.type(await screen.findByLabelText('Business name'), 'Byron and Co');
 
-    await waitFor(() => expect(lastSave(fetchMock).other_names_used).toBeDefined());
-    const aliases = lastSave(fetchMock).other_names_used as { id: string }[];
+    await waitFor(() => expect(lastSave(fetchMock).otherNamesUsed).toBeDefined());
+    const aliases = lastSave(fetchMock).otherNamesUsed as { id: string }[];
     expect(aliases[0]?.id).toMatch(/^[A-Za-z0-9_-]+$/);
   });
 
@@ -206,8 +212,8 @@ describe('the intake screen', () => {
     // fixture value the API accepts on purpose. This repo is public.
     const withTaxId = {
       ...SAVED,
-      tax_id: { kind: 'ssn', last_four: '4321' },
-      provenance: { ...SAVED.provenance, tax_id: { source: 'staff_typed' } },
+      taxId: { kind: 'ssn', lastFour: '4321' },
+      provenance: { ...SAVED.provenance, taxId: { source: 'staff_typed' } },
     };
 
     it('collects the number masked, with a reveal toggle', async () => {
@@ -230,9 +236,9 @@ describe('the intake screen', () => {
       await user.type(screen.getByLabelText('Number'), '987-65-4321');
 
       await waitFor(() =>
-        expect(lastSave(fetchMock).tax_id).toEqual({ kind: 'ssn', value: '987-65-4321' }),
+        expect(lastSave(fetchMock).taxId).toEqual({ kind: 'ssn', value: '987-65-4321' }),
       );
-      expect(lastSave(fetchMock).provenance).toEqual({ tax_id: { source: 'staff_typed' } });
+      expect(lastSave(fetchMock).provenance).toEqual({ taxId: { source: 'staff_typed' } });
     });
 
     it('shows only the last four once stored, and echoes it back on the next save', async () => {
@@ -256,8 +262,8 @@ describe('the intake screen', () => {
           surname: 'Lovelace',
         }),
       );
-      expect(lastSave(fetchMock).tax_id).toEqual({ kind: 'ssn', last_four: '4321' });
-      expect(lastSave(fetchMock).provenance).toMatchObject({ tax_id: { source: 'staff_typed' } });
+      expect(lastSave(fetchMock).taxId).toEqual({ kind: 'ssn', lastFour: '4321' });
+      expect(lastSave(fetchMock).provenance).toMatchObject({ taxId: { source: 'staff_typed' } });
     });
 
     it('removes a stored number by leaving it out of the save', async () => {
@@ -272,7 +278,7 @@ describe('the intake screen', () => {
       await waitFor(() =>
         expect(lastSave(fetchMock).name).toEqual({ given: 'Ada', surname: 'Lovelace' }),
       );
-      expect('tax_id' in lastSave(fetchMock)).toBe(false);
+      expect('taxId' in lastSave(fetchMock)).toBe(false);
     });
 
     it('puts a server message about the number on its field', async () => {
@@ -281,7 +287,7 @@ describe('the intake screen', () => {
           jsonResponse(400, {
             error: 'validation failed',
             fields: {
-              'tax_id.value': 'Not a Social Security number — no SSN begins with 000, 666 or 9.',
+              'taxId.value': 'Not a Social Security number — no SSN begins with 000, 666 or 9.',
             },
           }),
         [`/v1/cases/${CASE_ID}/debtors`]: justOpened,
@@ -313,8 +319,8 @@ describe('the intake screen', () => {
   it('offers it once a debtor’s residence is in a community-property state', async () => {
     const inTexas = {
       ...SAVED,
-      residence_address: { city: 'Austin', state: 'TX' },
-      provenance: { ...SAVED.provenance, 'residence_address.city': { source: 'staff_typed' } },
+      body: { ...SAVED.body, residenceAddress: { city: 'Austin', state: 'TX' } },
+      provenance: { ...SAVED.provenance, 'residenceAddress.city': { source: 'staff_typed' } },
     };
     signedIn({ [`/v1/cases/${CASE_ID}/debtors`]: () => jsonResponse(200, { debtors: [inTexas] }) });
 
@@ -353,7 +359,7 @@ describe('the intake screen', () => {
         [`/v1/cases/${CASE_ID}/debtors/debtor_1`]: () =>
           jsonResponse(400, {
             error: 'validation failed',
-            fields: { 'name.given': 'Must be a single line.' },
+            fields: { 'body.name.given': 'Must be a single line.' },
           }),
         [`/v1/cases/${CASE_ID}/debtors`]: justOpened,
       });
@@ -399,7 +405,7 @@ describe('the intake screen', () => {
         [`/v1/cases/${CASE_ID}/debtors/debtor_1`]: () =>
           jsonResponse(400, {
             error: 'validation failed',
-            fields: { 'other_names_used[0].surname': 'Must be a single line.' },
+            fields: { 'body.otherNamesUsed[0].surname': 'Must be a single line.' },
           }),
         [`/v1/cases/${CASE_ID}/debtors`]: justOpened,
       });
@@ -444,14 +450,13 @@ describe('the intake screen', () => {
     };
     const COPY = {
       ...OPENED,
-      name: { given: 'Ada', surname: 'Lovelace' },
-      phone: '555-0100',
+      body: { name: { given: 'Ada', surname: 'Lovelace' }, phone: '555-0100' },
       provenance: { 'name.given': COPIED, 'name.surname': COPIED, phone: COPIED },
     };
     const DIVERGED = {
       ...COPY,
-      phone: '555-0199',
-      differs_from_client: ['phone'],
+      body: { ...COPY.body, phone: '555-0199' },
+      differsFromClient: ['phone'],
       provenance: { ...COPY.provenance, phone: { source: 'staff_typed' } },
     };
     const clientRecord = () => jsonResponse(200, CLIENT);
@@ -551,7 +556,7 @@ describe('the intake screen', () => {
     it('updates the client from the case after asking', async () => {
       const fetchMock = signedIn({
         [`/v1/cases/${CASE_ID}/debtors/debtor_1/copy-to-client`]: () =>
-          jsonResponse(200, { ...DIVERGED, differs_from_client: [] }),
+          jsonResponse(200, { ...DIVERGED, differsFromClient: [] }),
         [`/v1/cases/${CASE_ID}/debtors`]: () => jsonResponse(200, { debtors: [DIVERGED] }),
         [`/v1/firm/clients/${CLIENT_ID}`]: clientRecord,
       });
@@ -570,20 +575,20 @@ describe('the intake screen', () => {
       const second = {
         ...OPENED,
         id: '00000000-0000-4000-8000-0000000000d2',
-        filing_role: 'debtor_2',
-        client_id: '00000000-0000-4000-8000-0000000c11a2',
-        name: { given: 'Grace', surname: 'Hopper' },
+        filingRole: 'debtor_2',
+        clientId: '00000000-0000-4000-8000-0000000c11a2',
+        body: { name: { given: 'Grace', surname: 'Hopper' } },
         provenance: {
           'name.given': { source: 'client', client_id: '00000000-0000-4000-8000-0000000c11a2' },
           'name.surname': { source: 'client', client_id: '00000000-0000-4000-8000-0000000c11a2' },
         },
       };
-      const grace = { ...CLIENT, id: second.client_id, name: second.name };
+      const grace = { ...CLIENT, id: second.clientId, name: second.body.name };
       const fetchMock = signedIn({
         [`/v1/cases/${CASE_ID}/debtors/debtor_2/client`]: () => jsonResponse(201, second),
         [`/v1/cases/${CASE_ID}/debtors`]: () => jsonResponse(200, { debtors: [COPY] }),
         [`/v1/firm/clients/${CLIENT_ID}`]: clientRecord,
-        [`/v1/firm/clients/${second.client_id}`]: () => jsonResponse(200, grace),
+        [`/v1/firm/clients/${second.clientId}`]: () => jsonResponse(200, grace),
         '/v1/firm/clients': () => jsonResponse(200, { clients: [CLIENT, grace] }),
       });
 
@@ -605,7 +610,7 @@ describe('the intake screen', () => {
 
       expect(await screen.findByDisplayValue('Grace')).toBeTruthy();
       expect(requests(fetchMock, '/debtors/debtor_2/client')).toEqual([
-        { method: 'PUT', body: { client_id: second.client_id } },
+        { method: 'PUT', body: { clientId: second.clientId } },
       ]);
     });
 

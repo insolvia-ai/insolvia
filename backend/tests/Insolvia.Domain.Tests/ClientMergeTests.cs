@@ -32,7 +32,7 @@ internal sealed class RacingDebtorStore : IDebtorClientLinks
     }
 
     public Task LinkAsync(string caseId, FilingRole role, string clientId) =>
-        _inner.PutAsync(DebtorRules.Create(DebtorRules.Parse([]), caseId, role, clientId: clientId, caseCreatedAt: DateTimeOffset.UnixEpoch.AddDays(_cases)));
+        _inner.PutAsync(DebtorRules.Create(new DebtorDraft(), caseId, role, clientId: clientId, caseCreatedAt: DateTimeOffset.UnixEpoch.AddDays(_cases)));
 
     public async Task<string?> ClientOfAsync(string caseId, FilingRole role) => (await _inner.GetAsync(caseId, role))?.ClientId;
 

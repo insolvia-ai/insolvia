@@ -103,15 +103,15 @@ export const FIRM_CLIENT: Spec = {
 
 export const DEBTOR: Spec = {
   id: 'string',
-  case_id: 'string',
-  filing_role: 'string',
-  'client_id?': 'string',
-  'name?': PERSON_NAME,
-  'tax_id?': { kind: 'string', last_four: 'string' },
-  'provenance?': 'object',
-  'differs_from_client?': ['string'],
-  created_at: 'string',
-  updated_at: 'string',
+  caseId: 'string',
+  filingRole: 'string',
+  'clientId?': 'string',
+  body: { 'name?': PERSON_NAME },
+  'taxId?': { kind: 'string', lastFour: 'string' },
+  provenance: 'object',
+  'differsFromClient?': ['string'],
+  createdAt: 'string',
+  updatedAt: 'string',
 };
 
 export const DOCUMENT: Spec = {

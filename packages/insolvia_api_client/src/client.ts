@@ -7,12 +7,9 @@ import {
 import {
   CASE_STATUSES,
   DOCUMENT_STATUSES,
-  COUNSELING_EXEMPTIONS,
-  COUNSELING_STATUSES,
   FILING_ROLES,
   PROVENANCE_SOURCES,
   TAX_ID_KINDS,
-  VENUE_BASES,
   INCOME_COLUMNS,
   MARITAL_FILING_STATUSES,
   MEANS_TEST_FORMS,
@@ -27,7 +24,6 @@ import {
   calendarEventDraftToJson,
   calendarWindowQuery,
   caseEntityRequestToJson,
-  createCaseRequestToJson,
   createDocumentRequestToJson,
   createTaskRequestToJson,
   firmClientDraftToJson,
@@ -38,7 +34,6 @@ import {
   noteRequestToJson,
   outputOptionsRequestToJson,
   putDebtorRequestToJson,
-  updateCaseChangesToJson,
   updateFirmRequestToJson,
   updateFirmUserRequestToJson,
   updateMeRequestToJson,
@@ -129,10 +124,10 @@ import type {
   CreateCaseRequest,
   CreateDocumentRequest,
   CreateDocumentResult,
-  CreditCounseling,
   CreditorMatrix,
   CreditorMatrixProblem,
   Debtor,
+  DebtorBody,
   Document,
   DocumentDownload,
   DocumentStatus,
@@ -197,7 +192,6 @@ import type {
   PutDebtorRequest,
   ReviewCandidateRequest,
   ReviewedCandidate,
-  TaxIdView,
   Task,
   CreateTaskRequest,
   SignatureBlock,
@@ -207,7 +201,6 @@ import type {
   UpdateMeRequest,
   UpdateTaskRequest,
   UploadDocumentOptions,
-  Venue,
   WaitlistConfirmation,
   WaitlistSubmission,
 } from './models.ts';
@@ -453,7 +446,7 @@ export class InsolviaApiClient {
     const response = await this.#fetch(`${this.#baseUrl}/v1/cases`, {
       method: 'POST',
       headers: { ...headers, 'Content-Type': 'application/json' },
-      body: JSON.stringify(createCaseRequestToJson(request)),
+      body: JSON.stringify(request),
     });
     const decoded = await decodeExpected(response, 201);
     return caseFromJson(decoded);
@@ -517,7 +510,7 @@ export class InsolviaApiClient {
     const response = await this.#fetch(`${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}`, {
       method: 'PATCH',
       headers: { ...headers, 'Content-Type': 'application/json' },
-      body: JSON.stringify(updateCaseChangesToJson(changes)),
+      body: JSON.stringify(changes),
     });
     const decoded = await decodeExpected(response, 200);
     return caseFromJson(decoded);
@@ -1171,17 +1164,17 @@ export class InsolviaApiClient {
 
   /**
    * `PUT /v1/cases/{caseId}/debtors/{filingRole}/client` — link a firm client
-   * to one debtor of a case (ADR 0022). The only way a debtor's `client_id`
+   * to one debtor of a case (ADR 0022). The only way a debtor's `clientId`
    * changes after the case is opened: {@link putDebtor} keeps it.
    *
    * With no debtor in that role yet, the client is COPIED in (201) — how a
    * joint case gains its Debtor 2, since a questionnaire save can no longer
    * create one from nothing. With one already there, only the link moves
    * (200); the case's copied fields stay, and where they now disagree with
-   * the client is {@link Debtor.differs_from_client}.
+   * the client is {@link Debtor.differsFromClient}.
    *
    * Needs `intake` at `add_edit` and `clients` at `view_only`. Throws
-   * {@link ApiValidationException} keyed `client_id` for an unknown, foreign
+   * {@link ApiValidationException} keyed `clientId` for an unknown, foreign
    * or archived client, or one already holding another role on this case.
    */
   async linkDebtorClient(
@@ -1194,7 +1187,7 @@ export class InsolviaApiClient {
     const response = await this.#fetch(url, {
       method: 'PUT',
       headers: { ...headers, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ client_id: clientId }),
+      body: JSON.stringify({ clientId }),
     });
     const decoded = await decodeExpectedOneOf(response, [200, 201]);
     return debtorFromJson(decoded);
@@ -1205,14 +1198,14 @@ export class InsolviaApiClient {
    * 0022's *re-copy from client*: the debtor's copied fields (name, other
    * names, both addresses, phone, mobile, email) are overwritten with the
    * linked client's, each with `client` provenance again, and the saved
-   * debtor comes back (its `differs_from_client` now `[]`). The case's own
+   * debtor comes back (its `differsFromClient` now `[]`). The case's own
    * answers — venue, counselling, the signature date, the tax ID — are
    * untouched. No body.
    *
    * Throws a plain {@link ApiException} with `statusCode` **409** when the
    * case is filed (changing a filed petition is an amendment) or the debtor
    * has no linked client, and {@link ApiValidationException} keyed
-   * `client_id` when that client is archived. Needs `intake` at `add_edit`
+   * `clientId` when that client is archived. Needs `intake` at `add_edit`
    * and `clients` at `view_only`.
    */
   async copyDebtorFromClient(caseId: string, filingRole: FilingRole): Promise<Debtor> {
@@ -1224,7 +1217,7 @@ export class InsolviaApiClient {
    * 0022's *update client from this case*: the linked client's copied fields
    * are overwritten with what this debtor now says (the client's own date of
    * birth, lead source and so on are kept). Answers the DEBTOR, unchanged
-   * but for `differs_from_client`, now `[]`. No body.
+   * but for `differsFromClient`, now `[]`. No body.
    *
    * Allowed on a filed case — the petition does not change, the directory
    * does. Throws a plain {@link ApiException} with `statusCode` **409** when
@@ -4466,42 +4459,8 @@ function optionalPersonName(response: DecodedResponse, key: string): PersonName 
 }
 
 /**
- * A debtor's address, `county` included — B101 line 5's County box, which a
- * debtor copied from a firm client carries (ADR 0022). Absent when the
- * response has no such member, unlike {@link libraryAddress}'s `{}`.
- */
-function optionalAddress(response: DecodedResponse, key: string): Address | undefined {
-  return optionalObject(response, key) === undefined ? undefined : libraryAddress(response, key);
-}
-
-function optionalVenue(response: DecodedResponse, key: string): Venue | undefined {
-  const nested = optionalObject(response, key);
-  if (nested === undefined) {
-    return undefined;
-  }
-  return definedMembers<Venue>({
-    basis: optionalChoice(nested, 'basis', VENUE_BASES),
-    explanation: optionalString(nested, 'explanation'),
-  });
-}
-
-function optionalCreditCounseling(
-  response: DecodedResponse,
-  key: string,
-): CreditCounseling | undefined {
-  const nested = optionalObject(response, key);
-  if (nested === undefined) {
-    return undefined;
-  }
-  return definedMembers<CreditCounseling>({
-    status: optionalChoice(nested, 'status', COUNSELING_STATUSES),
-    exemption_reason: optionalChoice(nested, 'exemption_reason', COUNSELING_EXEMPTIONS),
-  });
-}
-
-/**
  * The alias rows, checked per element. Elements are reported by INDEX here
- * (`other_names_used[0]`) rather than by the id provenance addresses them
+ * (`otherNamesUsed[0]`) rather than by the id provenance addresses them
  * with: a malformed row is exactly the case where the id may be the thing
  * that is wrong, and the API's own per-row 400 keys are indexed the same way.
  */
@@ -4532,7 +4491,7 @@ function optionalOtherNames(
       given: optionalString(row, 'given'),
       middle: optionalString(row, 'middle'),
       surname: optionalString(row, 'surname'),
-      business_name: optionalString(row, 'business_name'),
+      businessName: optionalString(row, 'businessName'),
     });
   });
 }
@@ -4574,47 +4533,27 @@ function requireProvenanceMap(response: DecodedResponse, key: string): Provenanc
   return entries;
 }
 
-/** Decodes a {@link Debtor} from a response body — `debtor_json`'s exact shape. */
+/** Decodes a {@link Debtor}: the identity checked, the body as sent. */
 function debtorFromJson(response: DecodedResponse): Debtor {
+  const taxId = optionalObject(response, 'taxId');
   return definedMembers<Debtor>({
     id: requireString(response, 'id'),
-    case_id: requireString(response, 'case_id'),
-    filing_role: requireChoice(response, 'filing_role', FILING_ROLES),
-    created_at: requireString(response, 'created_at'),
-    updated_at: requireString(response, 'updated_at'),
-    client_id: optionalString(response, 'client_id'),
-    differs_from_client: optionalStringArray(response, 'differs_from_client'),
+    caseId: requireString(response, 'caseId'),
+    filingRole: requireChoice(response, 'filingRole', FILING_ROLES),
+    createdAt: requireString(response, 'createdAt'),
+    updatedAt: requireString(response, 'updatedAt'),
+    body: childObject(response, 'body').json as DebtorBody,
+    taxId:
+      taxId === undefined
+        ? undefined
+        : {
+            kind: requireChoice(taxId, 'kind', TAX_ID_KINDS),
+            lastFour: requireString(taxId, 'lastFour'),
+          },
+    clientId: optionalString(response, 'clientId'),
+    differsFromClient: optionalStringArray(response, 'differsFromClient'),
     provenance: requireProvenanceMap(response, 'provenance'),
-    name: optionalPersonName(response, 'name'),
-    other_names_used: optionalOtherNames(response, 'other_names_used'),
-    employer_ids: optionalStringArray(response, 'employer_ids'),
-    residence_address: optionalAddress(response, 'residence_address'),
-    mailing_address: optionalAddress(response, 'mailing_address'),
-    phone: optionalString(response, 'phone'),
-    mobile: optionalString(response, 'mobile'),
-    email: optionalString(response, 'email'),
-    venue: optionalVenue(response, 'venue'),
-    credit_counseling: optionalCreditCounseling(response, 'credit_counseling'),
-    signed_at: optionalString(response, 'signed_at'),
-    tax_id: optionalTaxId(response, 'tax_id'),
   });
-}
-
-/**
- * The last-four view (issue 13.12 / #382). Both members are REQUIRED once
- * the object is present — a `tax_id` without a `last_four` is not a view the
- * API ever sends, and a decoder that tolerated it would hand the screen a
- * kind with nothing to show.
- */
-function optionalTaxId(response: DecodedResponse, key: string): TaxIdView | undefined {
-  const nested = optionalObject(response, key);
-  if (nested === undefined) {
-    return undefined;
-  }
-  return {
-    kind: requireChoice(nested, 'kind', TAX_ID_KINDS),
-    last_four: requireString(nested, 'last_four'),
-  };
 }
 
 /**
@@ -5640,7 +5579,7 @@ function courtDivisionFromJson(response: DecodedResponse): CourtDivision {
             line2: requireNullableString(courthouse, 'line2'),
             city: requireString(courthouse, 'city'),
             state: requireString(courthouse, 'state'),
-            postal_code: requireString(courthouse, 'postal_code'),
+            postalCode: requireString(courthouse, 'postalCode'),
           },
     counties: requireArrayOf(response, 'counties', 'County', (county) => ({
       name: requireString(county, 'name'),
@@ -5745,7 +5684,7 @@ function firmClientCaseFromJson(response: DecodedResponse): FirmClientCase {
     throw malformedField(response, 'case', 'object');
   }
   return {
-    filing_role: requireChoice(response, 'filing_role', FILING_ROLES),
+    filingRole: requireChoice(response, 'filingRole', FILING_ROLES),
     case: caseFromJson(nested),
   };
 }

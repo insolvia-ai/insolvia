@@ -14,31 +14,55 @@ namespace Insolvia.Domain.Debtors;
 // well-formed if present.
 
 /// <summary>B101 line 6.</summary>
-public sealed record Venue(VenueBasis? Basis = null, string? Explanation = null);
+public sealed record Venue(VenueBasis? Basis = null, [property: Text(1000)] string? Explanation = null);
 
 /// <summary>B101 line 15.</summary>
 public sealed record CreditCounseling(CounselingStatus? Status = null, CounselingExemption? ExemptionReason = null);
 
 /// <summary>
-/// A debtor's case data — what provenance paths address and what is stored
-/// (Python's <c>debtor_body</c>). Identity, provenance, the tax id and the
-/// client link are NOT here: the server set them, nobody sent them.
+/// A debtor's case data — what provenance paths address and what is stored,
+/// camelCase with its unanswered members left out (ADR 0032). Identity,
+/// provenance, the tax id and the client link are NOT here: the server set
+/// them, nobody sent them.
 /// </summary>
 public sealed record DebtorBody(
-    PersonName Name,
-    ValueCollection<OtherName> OtherNamesUsed,
-    ValueCollection<string> EmployerIds,
-    Address ResidenceAddress,
-    Address MailingAddress,
-    string? Phone,
-    string? Mobile,
-    string? Email,
-    Venue Venue,
-    CreditCounseling CreditCounseling,
-    DateOnly? SignedAt)
+    PersonName? Name = null,
+    ValueCollection<OtherName>? OtherNamesUsed = null,
+    ValueCollection<string>? EmployerIds = null,
+    Address? ResidenceAddress = null,
+    Address? MailingAddress = null,
+    [property: Text(40)] string? Phone = null,
+    [property: Text(40)] string? Mobile = null,
+    [property: Text] string? Email = null,
+    Venue? Venue = null,
+    CreditCounseling? CreditCounseling = null,
+    DateOnly? SignedAt = null)
 {
     /// <summary>The empty body — a debtor with nothing filled in yet.</summary>
-    public static DebtorBody Empty { get; } = new(new PersonName(), [], [], new Address(), new Address(), null, null, null, new Venue(), new CreditCounseling(), null);
+    public static DebtorBody Empty { get; } = new();
+
+    /// <summary>The legal name.</summary>
+    public PersonName Name { get; init; } = Name ?? new();
+
+    /// <summary>The 8-year aliases, each addressed by its id.</summary>
+    [Rows]
+    public ValueCollection<OtherName> OtherNamesUsed { get; init; } = OtherNamesUsed ?? [];
+
+    /// <summary>Employer identification numbers.</summary>
+    [Text(20)]
+    public ValueCollection<string> EmployerIds { get; init; } = EmployerIds ?? [];
+
+    /// <summary>Where the debtor lives (B101 line 5).</summary>
+    public Address ResidenceAddress { get; init; } = ResidenceAddress ?? new();
+
+    /// <summary>Where mail goes, when not home.</summary>
+    public Address MailingAddress { get; init; } = MailingAddress ?? new();
+
+    /// <summary>B101 line 6.</summary>
+    public Venue Venue { get; init; } = Venue ?? new();
+
+    /// <summary>B101 line 15.</summary>
+    public CreditCounseling CreditCounseling { get; init; } = CreditCounseling ?? new();
 }
 
 /// <summary>
@@ -69,11 +93,25 @@ public sealed record Debtor(string Id, string CaseId, FilingRole FilingRole, Dat
 }
 
 /// <summary>
-/// A validated debtor body before identity. <see cref="TaxId"/> is the parsed
-/// WRITE (the digits being entered, or the last four being kept) — the digits
-/// exist only here, between the parse and <see cref="TaxIdRules.StoreAsync"/>.
+/// A debtor as written (<c>PUT …/debtors/{filingRole}</c>): the body, the
+/// tax id being entered or kept, and where each populated field came from.
+/// <see cref="TaxId"/> holds the digits only between the request and
+/// <see cref="TaxIdRules.StoreAsync"/>.
 /// </summary>
-public sealed record DebtorDraft(DebtorBody Body, TaxIdInput? TaxId, ValueDictionary<string, ProvenanceEntry> Provenance);
+/// <param name="Body">The case data; absent is empty.</param>
+/// <param name="TaxId">The number being entered (<c>value</c>), or the last four being kept (<c>lastFour</c>); absent removes it.</param>
+/// <param name="Provenance">Where each populated field came from, by body path; the tax id is the one path <c>taxId</c>.</param>
+public sealed record DebtorDraft(
+    DebtorBody? Body = null,
+    TaxIdInput? TaxId = null,
+    IReadOnlyDictionary<string, ProvenanceEntry>? Provenance = null)
+{
+    /// <summary>The case data.</summary>
+    public DebtorBody Body { get; init; } = Body ?? DebtorBody.Empty;
+
+    /// <summary>Where each populated field came from.</summary>
+    public IReadOnlyDictionary<string, ProvenanceEntry> Provenance { get; init; } = Provenance ?? ValueCollections.EmptyDictionary<string, ProvenanceEntry>();
+}
 
 /// <summary>What <c>IDebtorStore.LinkAsync</c> answers (Python's <c>LinkOutcome</c>).</summary>
 public enum LinkOutcome
@@ -101,72 +139,36 @@ public static class DebtorRules
     /// <summary>Every filing role, in the order the forms print debtors.</summary>
     public static IReadOnlyList<FilingRole> FilingRoles => Wire.Members<FilingRole>();
 
-    /// <summary>A whole-record filing-role value from a path segment or body.</summary>
-    public static FilingRole ParseFilingRole(JsonNode? value)
-    {
-        var errors = new Dictionary<string, string>(StringComparer.Ordinal);
-        var role = FieldParsers.Choice<FilingRole>(value, "filing_role", errors);
-        if (role is null)
-        {
-            throw new FieldValidationException(errors.Count > 0
-                ? errors
-                : new Dictionary<string, string> { ["filing_role"] = "Must be one of " + string.Join(", ", Wire.Names<FilingRole>()) + "." });
-        }
+    /// <summary>A filing role from a path segment.</summary>
+    public static FilingRole ParseFilingRole(string value) =>
+        Wire.TryParse<FilingRole>(value, out var role)
+            ? role
+            : throw new FieldValidationException(new Dictionary<string, string> { ["filingRole"] = "Must be one of " + string.Join(", ", Wire.Names<FilingRole>()) + "." });
 
-        return role.Value;
-    }
+    /// <summary>A body that arrived as JSON (a seed, a candidate, an answer), read and checked as a request's would be.</summary>
+    public static DebtorBody ReadBody(JsonNode? node) => (DebtorBody)BodyJson.Read(node, typeof(DebtorBody));
+
+    /// <summary>The body as stored and as provenance paths address it.</summary>
+    public static JsonObject BodyNode(DebtorBody body) => BodyJson.ToNode(body);
 
     /// <summary>
-    /// Validate a WHOLE debtor body; unknown keys are ignored. The tax id is
-    /// parsed for shape only. INVARIANT 1 runs against the body as it will be
-    /// stored, and the tax id is ONE field for provenance (<c>tax_id</c>, never
-    /// its members). <paramref name="enforceProvenance"/> is a write rule,
-    /// switched off on reads.
+    /// The draft a write may store: its provenance well formed, and an entry
+    /// for every populated field (invariant 1) — the tax id is ONE field,
+    /// <c>taxId</c>, never its members.
     /// </summary>
-    public static DebtorDraft Parse(JsonObject payload, bool enforceProvenance = true)
+    public static DebtorDraft Checked(DebtorDraft draft)
     {
-        ArgumentNullException.ThrowIfNull(payload);
-        var errors = new Dictionary<string, string>(StringComparer.Ordinal);
-
-        var taxId = TaxIdRules.Parse(payload["tax_id"], "tax_id", errors);
-        var name = FieldParsers.ParseName(payload["name"], "name", errors);
-        var otherNames = OtherNames.Parse(payload["other_names_used"], errors);
-        var employerIds = ParseEmployerIds(payload["employer_ids"], errors);
-        var residence = FieldParsers.ParseAddress(payload["residence_address"], "residence_address", errors);
-        var mailing = FieldParsers.ParseAddress(payload["mailing_address"], "mailing_address", errors);
-        var phone = FieldParsers.Text(payload["phone"], "phone", errors, limit: 40);
-        var mobile = FieldParsers.Text(payload["mobile"], "mobile", errors, limit: 40);
-        var email = FieldParsers.Text(payload["email"], "email", errors);
-        var venueRaw = FieldParsers.Mapping(payload["venue"], "venue", errors);
-        var venue = new Venue(
-            FieldParsers.Choice<VenueBasis>(venueRaw["basis"], "venue.basis", errors),
-            FieldParsers.Text(venueRaw["explanation"], "venue.explanation", errors, limit: 1000));
-        var counselingRaw = FieldParsers.Mapping(payload["credit_counseling"], "credit_counseling", errors);
-        var counseling = new CreditCounseling(
-            FieldParsers.Choice<CounselingStatus>(counselingRaw["status"], "credit_counseling.status", errors),
-            FieldParsers.Choice<CounselingExemption>(counselingRaw["exemption_reason"], "credit_counseling.exemption_reason", errors));
-        var signedAt = FieldParsers.FormDate(payload["signed_at"], "signed_at", errors);
-        IdRows.ThrowIfAny(errors);
-
-        // Provenance AFTER the body: the fixable thing is reported first.
-        var provenance = ProvenanceRules.Parse(payload["provenance"]);
-        var body = new DebtorBody(name, otherNames, employerIds, residence, mailing, phone, mobile, email, venue, counseling, signedAt);
-        if (enforceProvenance)
+        ArgumentNullException.ThrowIfNull(draft);
+        var provenance = ProvenanceRules.Check(draft.Provenance);
+        var body = BodyNode(draft.Body);
+        if (draft.TaxId is not null)
         {
-            var checkedBody = BodyNode(body);
-            if (taxId is not null)
-            {
-                checkedBody["tax_id"] = "present";
-            }
-
-            ProvenanceRules.RequireProvenance(checkedBody, provenance);
+            body["taxId"] = "present";
         }
 
-        return new DebtorDraft(body, taxId, provenance);
+        ProvenanceRules.RequireProvenance(body, provenance);
+        return draft with { Provenance = provenance };
     }
-
-    /// <summary>The body as plain nested JSON (Python's <c>debtor_body</c>).</summary>
-    public static JsonObject BodyNode(DebtorBody body) => BodyJson.ToSnakeNode(body);
 
     /// <summary>
     /// A questionnaire save may KEEP <c>client</c> (and <c>client_answered</c>)
@@ -200,14 +202,14 @@ public static class DebtorRules
         ArgumentNullException.ThrowIfNull(draft);
         if ((clientId is null) != (caseCreatedAt is null))
         {
-            throw new ArgumentException("client_id and case_created_at are set together");
+            throw new ArgumentException("clientId and caseCreatedAt are set together");
         }
 
         var now = Clock.Now(clock);
         return new Debtor(Guid.NewGuid().ToString(), caseId, filingRole, now, now, draft.Body)
         {
             TaxId = taxId,
-            Provenance = draft.Provenance,
+            Provenance = draft.Provenance.ToValueDictionary(),
             ClientId = clientId,
             CaseCreatedAt = caseCreatedAt,
         };
@@ -228,7 +230,7 @@ public static class DebtorRules
             UpdatedAt = Clock.Now(clock),
             Body = draft.Body,
             TaxId = taxId,
-            Provenance = draft.Provenance,
+            Provenance = draft.Provenance.ToValueDictionary(),
         };
     }
 
@@ -251,31 +253,6 @@ public static class DebtorRules
     {
         var index = FilingRoles.ToList().IndexOf(filingRole);
         return index < 0 ? FilingRoles.Count : index;
-    }
-
-    private static ValueCollection<string> ParseEmployerIds(JsonNode? value, Dictionary<string, string> errors)
-    {
-        if (value is null)
-        {
-            return [];
-        }
-
-        if (value is not JsonArray list)
-        {
-            errors["employer_ids"] = "Must be a list.";
-            return [];
-        }
-
-        var ids = new List<string>();
-        for (var index = 0; index < list.Count; index++)
-        {
-            if (FieldParsers.Text(list[index], $"employer_ids[{index}]", errors, limit: 20) is { } text)
-            {
-                ids.Add(text);
-            }
-        }
-
-        return ids.ToValueCollection();
     }
 }
 

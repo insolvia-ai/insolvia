@@ -54,7 +54,7 @@ const EMPTY_SLOT: Slot = { choice: null, given: '', surname: '' };
  */
 const SLOT_LABELS = [
   {
-    field: 'client_ids',
+    field: 'clientIds',
     nameField: 'clientName',
     picker: 'Client',
     given: 'Client’s first name',
@@ -64,7 +64,7 @@ const SLOT_LABELS = [
       'Debtor 1, and stay the case’s own.',
   },
   {
-    field: 'client_ids.1',
+    field: 'clientIds.1',
     nameField: 'client2Name',
     picker: 'Second client (Debtor 2)',
     given: 'Second client’s first name',
@@ -84,7 +84,7 @@ const SLOT_LABELS = [
  * than the person they just chose.
  *
  * A client is picked or added here, never skipped: `POST /v1/cases` requires
- * `client_ids`. A new client is added to the directory FIRST (its own
+ * `clientIds`. A new client is added to the directory FIRST (its own
  * `POST /v1/firm/clients`) and then chosen, so a case-level refusal after it
  * — no court, say — does not add the same person twice on the retry.
  *
@@ -232,7 +232,7 @@ export function NewCase({ initialClientId }: { initialClientId?: string | undefi
       const second = joint ? await resolveSlot(1) : undefined;
       if (second === null) return;
       if (joint && second === undefined) {
-        setFieldErrors({ 'client_ids.1': 'Choose the second client, or untick joint filing.' });
+        setFieldErrors({ 'clientIds.1': 'Choose the second client, or untick joint filing.' });
         return;
       }
       // The ids go as chosen, empty when not — the server's per-field message

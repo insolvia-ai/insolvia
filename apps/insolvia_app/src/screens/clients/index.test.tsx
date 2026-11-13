@@ -39,10 +39,10 @@ const SOLO = caseBody('00000000-0000-4000-8000-0000000000c2', { status: 'filed' 
 
 const CLIENT_CASES: Record<string, unknown[]> = {
   [JORDAN.id]: [
-    { filing_role: 'debtor_1', case: JOINT },
-    { filing_role: 'debtor_1', case: SOLO },
+    { filingRole: 'debtor_1', case: JOINT },
+    { filingRole: 'debtor_1', case: SOLO },
   ],
-  [RILEY.id]: [{ filing_role: 'debtor_2', case: JOINT }],
+  [RILEY.id]: [{ filingRole: 'debtor_2', case: JOINT }],
   [SAM.id]: [],
   [CASEY.id]: [],
 };

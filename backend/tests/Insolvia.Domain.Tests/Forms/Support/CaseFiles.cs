@@ -78,7 +78,7 @@ internal static class CaseFiles
         foreach (var node in data["debtors"]!.AsArray())
         {
             var item = node!.AsObject();
-            var draft = DebtorRules.Parse(item["body"]!.DeepClone().AsObject(), enforceProvenance: false);
+            var body = DebtorRules.ReadBody(item["body"]);
             var role = Wire.TryParse<FilingRole>(Str(item["filing_role"]), out var parsedRole) ? parsedRole : throw new InvalidDataException("filing_role");
             TaxIdRef? taxId = null;
             if (item["tax_id"] is JsonObject tax)
@@ -93,7 +93,7 @@ internal static class CaseFiles
                 role,
                 DateTimeOffset.Parse(Str(item["created_at"])!, CultureInfo.InvariantCulture),
                 DateTimeOffset.Parse(Str(item["updated_at"])!, CultureInfo.InvariantCulture),
-                draft.Body)
+                body)
             {
                 TaxId = taxId,
             });

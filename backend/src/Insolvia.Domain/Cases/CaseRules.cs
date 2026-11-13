@@ -4,7 +4,6 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Insolvia.Domain.Courts;
-using Insolvia.Domain.Fields;
 
 namespace Insolvia.Domain.Cases;
 
@@ -41,10 +40,6 @@ public static class CaseRules
             [CaseStatus.Closed] = new HashSet<CaseStatus> { CaseStatus.Filed },
         }.ToFrozenDictionary();
 
-    /// <summary>The post-filing facts the docket states, each free text, with its length cap.</summary>
-    public static readonly IReadOnlyList<(string Name, int Limit)> PostFilingTextFields =
-        [("case_number", 40), ("judge", 120), ("trustee", 120), ("office_file_number", 40)];
-
     /// <summary>The largest page a listing may ask for.</summary>
     public const int MaxListLimit = 100;
 
@@ -69,7 +64,14 @@ public static class CaseRules
     /// <summary>A whole-record write raced a status move. 409: the request was fine, the case moved underneath it.</summary>
     public const string StatusMoved = "This case's status changed since it was read — reload it and try again.";
 
-    private const string DateMessage = "Must be a date in YYYY-MM-DD form.";
+    /// <summary>The refusal of a chapter that is not one of <see cref="Chapters"/>.</summary>
+    public const string ChapterMessage = "Chapter must be one of 7, 11, 12, 13.";
+
+    /// <summary>The refusal of a missing court.</summary>
+    public const string CourtRequired = "Choose the bankruptcy court this case will be filed in.";
+
+    /// <summary>The refusal of a missing division.</summary>
+    public const string DivisionRequired = "Choose the court's division.";
 
     /// <summary>Whether a case in <paramref name="status"/> has a petition on the court's docket.</summary>
     public static bool IsFiled(CaseStatus status) => FiledStatuses.Contains(status);
@@ -84,131 +86,21 @@ public static class CaseRules
     /// <summary>The value BOTH listing indexes sort on, defined once: <c>&lt;createdAt&gt;#&lt;caseId&gt;</c>.</summary>
     public static string ListingSortKey(DateTimeOffset createdAt, string caseId) => $"{Iso(createdAt)}#{caseId}";
 
-    /// <summary>
-    /// Validate POST /v1/cases; unknown keys are ignored. Status is NOT
-    /// accepted — every case starts at intake. <c>client_ids</c> is REQUIRED
-    /// (ADR 0022); <paramref name="requireClients"/> false is for callers with
-    /// no request behind them (the seed loader, store tests), never a route.
-    /// </summary>
-    public static CaseDraft ParseCreation(JsonObject payload, bool requireClients = true, CourtRegistry? courts = null)
+    /// <summary>Why <paramref name="court"/> and <paramref name="division"/> are not a pair the registry knows, keyed to the half at fault; null when they are.</summary>
+    public static System.ComponentModel.DataAnnotations.ValidationResult? CourtProblem(string court, string division, CourtRegistry? courts = null)
     {
-        ArgumentNullException.ThrowIfNull(payload);
-        var errors = new Dictionary<string, string>(StringComparer.Ordinal);
-        var chapter = ParseChapter(payload["chapter"], errors);
-        RefuseTypedDistrict(payload, errors);
-        var court = ParseCourt(payload, errors, courts ?? CourtRegistry.Shipped);
-        ValueCollection<string> clientIds = requireClients ? ParseClientIds(payload["client_ids"], errors) : [];
-        if (errors.Count > 0 || chapter is null || court is null)
-        {
-            throw new FieldValidationException(errors);
-        }
-
-        return new CaseDraft(chapter.Value, court, clientIds);
+        var registry = courts ?? CourtRegistry.Shipped;
+        return registry.Division(court, division) is not null ? null
+            : registry.District(court) is null ? new("That court is not in the registry.", [nameof(NewCase.Court)])
+            : new("That division is not one of this court's.", [nameof(NewCase.Division)]);
     }
 
-    /// <summary>
-    /// Validate PATCH /v1/cases/&lt;id&gt;. Only supplied keys are validated; an
-    /// empty body is refused rather than treated as a no-op.
-    /// </summary>
-    public static CaseChanges ParseUpdate(JsonObject payload, CourtRegistry? courts = null)
+    /// <summary>The registry's reference for a pair <see cref="CourtProblem"/> passed.</summary>
+    public static CourtReference Court(string court, string division)
     {
-        ArgumentNullException.ThrowIfNull(payload);
-        var errors = new Dictionary<string, string>(StringComparer.Ordinal);
-        var changes = new CaseChanges();
-        var any = false;
-
-        if (payload.ContainsKey("chapter") && ParseChapter(payload["chapter"], errors) is { } chapter)
-        {
-            changes = changes with { Chapter = chapter };
-            any = true;
-        }
-
-        RefuseTypedDistrict(payload, errors);
-        if ((payload.ContainsKey("court") || payload.ContainsKey("division"))
-            && ParseCourt(payload, errors, courts ?? CourtRegistry.Shipped) is { } court)
-        {
-            changes = changes with { Court = court };
-            any = true;
-        }
-
-        if (payload.ContainsKey("status") && ParseStatus(payload["status"], errors) is { } status)
-        {
-            changes = changes with { Status = status };
-            any = true;
-        }
-
-        var texts = ParsePostFilingTexts(payload, errors);
-        if (texts.Count > 0)
-        {
-            changes = changes with { Texts = texts.ToValueDictionary() };
-            any = true;
-        }
-
-        if (payload.ContainsKey("exemption_set") && ParseExemptionSet(payload["exemption_set"], errors) is { } exemptionSet)
-        {
-            changes = changes with { ExemptionSet = exemptionSet };
-            any = true;
-        }
-
-        DateOnly? filedAt = null;
-        DateOnly? meetingAt = null;
-        if (payload.TryGetPropertyValue("filed_at", out var rawFiled))
-        {
-            if (rawFiled is null)
-            {
-                changes = changes with { ClearFiledAt = true };
-                any = true;
-            }
-            else if (ParseCourtDate(rawFiled, "filed_at", errors) is { } parsed)
-            {
-                filedAt = parsed;
-                changes = changes with { FiledAt = parsed };
-                any = true;
-            }
-        }
-
-        if (payload.TryGetPropertyValue("meeting_341_at", out var rawMeeting))
-        {
-            if (rawMeeting is null)
-            {
-                changes = changes with { ClearMeeting341At = true };
-                any = true;
-            }
-            else if (ParseCourtDate(rawMeeting, "meeting_341_at", errors) is { } parsed)
-            {
-                meetingAt = parsed;
-                changes = changes with { Meeting341At = parsed };
-                any = true;
-            }
-        }
-
-        // A status move's court date (ADR 0027): only beside a status, and
-        // checked against the history by the lifecycle writer, not here.
-        if (payload.TryGetPropertyValue("effective_on", out var rawEffective))
-        {
-            if (!payload.ContainsKey("status"))
-            {
-                errors["effective_on"] = "Only a status move takes an effective date.";
-            }
-            else if (ParseCourtDate(rawEffective, "effective_on", errors) is { } effective)
-            {
-                changes = changes with { EffectiveOn = effective };
-            }
-        }
-
-        // Only checkable when both arrive together; against a stored date it
-        // is a slip the deadline engine tolerates rather than a refused save.
-        if (filedAt is not null && meetingAt is not null && meetingAt < filedAt)
-        {
-            errors["meeting_341_at"] = "The § 341 meeting cannot precede the petition.";
-        }
-
-        if (errors.Count > 0)
-        {
-            throw new FieldValidationException(errors);
-        }
-
-        return any ? changes : throw new ValidationException("no supported fields to update");
+        var (record, chosen) = CourtRegistry.Shipped.Division(court, division)
+            ?? throw new FieldValidationException(new Dictionary<string, string> { ["court"] = "That court is not in the registry." });
+        return new CourtReference(record.Code, chosen.Code, record.Name);
     }
 
     /// <summary>
@@ -216,14 +108,15 @@ public static class CaseRules
     /// assignment is returned for the store to write TOGETHER with the case: a
     /// case whose creator is not linked is invisible to them.
     /// </summary>
-    public static (Case Case, CaseAssignment Assignment) Create(CaseDraft draft, string firmId, string createdBy, TimeProvider? clock = null)
+    public static (Case Case, CaseAssignment Assignment) Create(NewCase draft, string firmId, string createdBy, TimeProvider? clock = null)
     {
         ArgumentNullException.ThrowIfNull(draft);
         var now = Clock.Now(clock);
-        var created = new Case(Guid.NewGuid().ToString(), firmId, createdBy, draft.Chapter, draft.Court.District, CaseStatus.Intake, now, now)
+        var court = Court(draft.Court!, draft.Division!);
+        var created = new Case(Guid.NewGuid().ToString(), firmId, createdBy, draft.Chapter, court.District, CaseStatus.Intake, now, now)
         {
-            Court = draft.Court.Court,
-            Division = draft.Court.Division,
+            Court = court.Court,
+            Division = court.Division,
         };
         return (created, Assign(created, createdBy, createdBy, clock));
     }
@@ -259,24 +152,17 @@ public static class CaseRules
             Chapter = changes.Chapter ?? current.Chapter,
             Status = status,
             ExemptionSet = changes.ExemptionSet ?? current.ExemptionSet,
-            FiledAt = changes.ClearFiledAt ? null : changes.FiledAt ?? current.FiledAt,
-            Meeting341At = changes.ClearMeeting341At ? null : changes.Meeting341At ?? current.Meeting341At,
+            FiledAt = changes.Names(nameof(CaseChanges.FiledAt)) ? changes.FiledAt : current.FiledAt,
+            Meeting341At = changes.Names(nameof(CaseChanges.Meeting341At)) ? changes.Meeting341At : current.Meeting341At,
+            CaseNumber = changes.Names(nameof(CaseChanges.CaseNumber)) ? changes.CaseNumber : current.CaseNumber,
+            Judge = changes.Names(nameof(CaseChanges.Judge)) ? changes.Judge : current.Judge,
+            Trustee = changes.Names(nameof(CaseChanges.Trustee)) ? changes.Trustee : current.Trustee,
+            OfficeFileNumber = changes.Names(nameof(CaseChanges.OfficeFileNumber)) ? changes.OfficeFileNumber : current.OfficeFileNumber,
         };
-        if (changes.Court is not null)
+        if (changes.Court is not null && changes.Division is not null)
         {
-            updated = updated with { Court = changes.Court.Court, Division = changes.Court.Division, District = changes.Court.District };
-        }
-
-        foreach (var (name, value) in changes.Texts)
-        {
-            updated = name switch
-            {
-                "case_number" => updated with { CaseNumber = value },
-                "judge" => updated with { Judge = value },
-                "trustee" => updated with { Trustee = value },
-                "office_file_number" => updated with { OfficeFileNumber = value },
-                _ => throw new ArgumentException($"{name} is not a post-filing text field", nameof(changes)),
-            };
+            var court = Court(changes.Court, changes.Division);
+            updated = updated with { Court = court.Court, Division = court.Division, District = court.District };
         }
 
         var errors = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -285,14 +171,14 @@ public static class CaseRules
             // Checked on the way IN, and against a clear once there — a case
             // filed before these rules existed can still be edited.
             var entering = !IsFiled(current.Status);
-            if (updated.FiledAt is null && (entering || changes.ClearFiledAt || changes.FiledAt is not null))
+            if (updated.FiledAt is null && (entering || changes.Names(nameof(CaseChanges.FiledAt))))
             {
-                errors["filed_at"] = "A filed case needs its filed date.";
+                errors["filedAt"] = "A filed case needs its filed date.";
             }
 
-            if (updated.CaseNumber is null && (entering || changes.Texts.ContainsKey("case_number")))
+            if (string.IsNullOrWhiteSpace(updated.CaseNumber) && (entering || changes.Names(nameof(CaseChanges.CaseNumber))))
             {
-                errors["case_number"] = "A filed case needs its case number.";
+                errors["caseNumber"] = "A filed case needs its case number.";
             }
         }
 
@@ -302,14 +188,6 @@ public static class CaseRules
         }
 
         return updated with { UpdatedAt = Clock.Now(clock) };
-    }
-
-    /// <summary><c>PUT /v1/cases/&lt;id&gt;/archived</c>'s body: <c>{"archived": true|false}</c>.</summary>
-    public static bool ParseArchive(JsonObject payload)
-    {
-        ArgumentNullException.ThrowIfNull(payload);
-        return Json.AsBool(payload["archived"])
-            ?? throw new FieldValidationException(new Dictionary<string, string> { ["archived"] = "Must be true or false." });
     }
 
     /// <summary>
@@ -440,171 +318,4 @@ public static class CaseRules
     }
 
     private static readonly JsonSerializerOptions CompactJson = new() { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
-
-    private static int? ParseChapter(JsonNode? value, Dictionary<string, string> errors)
-    {
-        // JSON true is not chapter 1.
-        if (!Json.TryGetWholeNumber(value, out var chapter))
-        {
-            errors["chapter"] = "Chapter must be a number.";
-            return null;
-        }
-
-        if (!Chapters.Contains((int)Math.Clamp(chapter, int.MinValue, int.MaxValue)))
-        {
-            errors["chapter"] = "Chapter must be one of " + string.Join(", ", Chapters) + ".";
-            return null;
-        }
-
-        return (int)chapter;
-    }
-
-    /// <summary>
-    /// The court + division pair, validated against the registry. THE PAIR
-    /// TRAVELS TOGETHER; the message lands on the half that is missing.
-    /// </summary>
-    private static CourtReference? ParseCourt(JsonObject payload, Dictionary<string, string> errors, CourtRegistry courts)
-    {
-        var court = Json.AsString(payload["court"]);
-        var division = Json.AsString(payload["division"]);
-        if (court is null || TextRules.Strip(court).Length == 0)
-        {
-            errors["court"] = "Choose the bankruptcy court this case will be filed in.";
-            return null;
-        }
-
-        if (division is null || TextRules.Strip(division).Length == 0)
-        {
-            errors["division"] = "Choose the court's division.";
-            return null;
-        }
-
-        var found = courts.Division(TextRules.Strip(court), TextRules.Strip(division));
-        if (found is null)
-        {
-            if (courts.District(TextRules.Strip(court)) is null)
-            {
-                errors["court"] = "That court is not in the registry.";
-            }
-            else
-            {
-                errors["division"] = "That division is not one of this court's.";
-            }
-
-            return null;
-        }
-
-        var (record, chosen) = found.Value;
-        return new CourtReference(record.Code, chosen.Code, record.Name);
-    }
-
-    private static void RefuseTypedDistrict(JsonObject payload, Dictionary<string, string> errors)
-    {
-        if (payload.ContainsKey("district"))
-        {
-            errors["district"] = "The district is no longer typed — send `court` and `division` from the court registry (GET /v1/courts) and the district name is derived.";
-        }
-    }
-
-    private static CaseStatus? ParseStatus(JsonNode? value, Dictionary<string, string> errors)
-    {
-        if (!Wire.TryParse<CaseStatus>(Json.AsString(value), out var status))
-        {
-            errors["status"] = "Status must be one of " + string.Join(", ", Wire.Names<CaseStatus>()) + ".";
-            return null;
-        }
-
-        return status;
-    }
-
-    private static Dictionary<string, string?> ParsePostFilingTexts(JsonObject payload, Dictionary<string, string> errors)
-    {
-        var texts = new Dictionary<string, string?>(StringComparer.Ordinal);
-        foreach (var (name, limit) in PostFilingTextFields)
-        {
-            if (!payload.ContainsKey(name))
-            {
-                continue;
-            }
-
-            var before = errors.Count;
-            var parsed = FieldParsers.Text(payload[name], name, errors, limit);
-            if (errors.Count == before)
-            {
-                texts[name] = parsed;
-            }
-        }
-
-        return texts;
-    }
-
-    private static ExemptionSet? ParseExemptionSet(JsonNode? value, Dictionary<string, string> errors)
-    {
-        if (!Wire.TryParse<ExemptionSet>(Json.AsString(value), out var set))
-        {
-            errors["exemption_set"] = "Exemption set must be one of " + string.Join(", ", Wire.Names<ExemptionSet>()) + ".";
-            return null;
-        }
-
-        return set;
-    }
-
-    /// <summary>
-    /// <c>YYYY-MM-DD</c>, parsed rather than pattern-matched. Unlike
-    /// <see cref="FieldParsers.FormDate"/>, a blank string is an error here.
-    /// </summary>
-    internal static DateOnly? ParseCourtDate(JsonNode? value, string field, Dictionary<string, string> errors)
-    {
-        var raw = Json.AsString(value);
-        if (raw is null || TextRules.Strip(raw).Length == 0)
-        {
-            errors[field] = DateMessage;
-            return null;
-        }
-
-        var stripped = TextRules.Strip(raw);
-        if (!DateOnly.TryParseExact(stripped, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed)
-            || parsed.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) != stripped)
-        {
-            errors[field] = DateMessage;
-            return null;
-        }
-
-        return parsed;
-    }
-
-    /// <summary>
-    /// <c>client_ids</c>: one or two distinct client ids, Debtor 1 first. The
-    /// same client twice is refused — one client, one role per case.
-    /// </summary>
-    private static ValueCollection<string> ParseClientIds(JsonNode? value, Dictionary<string, string> errors)
-    {
-        if (value is not JsonArray list || list.Count == 0)
-        {
-            errors["client_ids"] = "Choose the client this case is for.";
-            return [];
-        }
-
-        if (list.Count > MaxCaseClients)
-        {
-            errors["client_ids"] = "A case is opened for one client, or two filing jointly.";
-            return [];
-        }
-
-        var ids = list.Select(item => Json.AsString(item)).ToList();
-        if (ids.Any(id => id is null || TextRules.Strip(id).Length == 0))
-        {
-            errors["client_ids"] = "Each client must be a client id.";
-            return [];
-        }
-
-        var stripped = ids.Select(id => TextRules.Strip(id!)).ToList();
-        if (stripped.Distinct(StringComparer.Ordinal).Count() != stripped.Count)
-        {
-            errors["client_ids"] = "The same client cannot be both debtors on one case.";
-            return [];
-        }
-
-        return stripped.ToValueCollection();
-    }
 }

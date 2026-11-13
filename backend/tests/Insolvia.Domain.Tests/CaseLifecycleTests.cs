@@ -15,7 +15,7 @@ namespace Insolvia.Domain.Tests;
 /// <summary>The case lifecycle (#355), translated from test_case_lifecycle.py.</summary>
 public sealed class CaseLifecycleTests
 {
-    private const string Filing = """{"status": "filed", "filed_at": "2026-09-01", "case_number": "8:26-bk-01234"}""";
+    private const string Filing = """{"status": "filed", "filedAt": "2026-09-01", "caseNumber": "8:26-bk-01234"}""";
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
@@ -48,7 +48,7 @@ public sealed class CaseLifecycleTests
     {
         var payload = Opening();
         payload["status"] = asked;
-        var (created, _) = CaseRules.Create(CaseRules.ParseCreation(payload), Ids.Firm, Ids.Alice);
+        var (created, _) = CaseRules.Create(Body.Read<NewCase>(payload), Ids.Firm, Ids.Alice);
         Assert.Equal(CaseStatus.Intake, created.Status);
     }
 
@@ -56,7 +56,7 @@ public sealed class CaseLifecycleTests
     public void Prospect_is_not_a_case_status()
     {
         Assert.DoesNotContain("prospect", Wire.Names<CaseStatus>());
-        Assert.Throws<FieldValidationException>(() => CaseRules.ParseUpdate(Body.Of("""{"status": "prospect"}""")));
+        Assert.Throws<FieldValidationException>(() => Body.Read<CaseChanges>(Body.Of("""{"status": "prospect"}""")));
     }
 
     [Fact]
@@ -66,8 +66,8 @@ public sealed class CaseLifecycleTests
         foreach (var payload in new[]
         {
             """{"status": "ready_to_file"}""",
-            """{"status": "filed", "filed_at": "2026-09-01", "case_number": "8:26-bk-01234", "judge": "Hon. Example Judge", "trustee": "Example Trustee"}""",
-            """{"meeting_341_at": "2026-10-05", "office_file_number": "F-1001"}""",
+            """{"status": "filed", "filedAt": "2026-09-01", "caseNumber": "8:26-bk-01234", "judge": "Hon. Example Judge", "trustee": "Example Trustee"}""",
+            """{"meeting341At": "2026-10-05", "officeFileNumber": "F-1001"}""",
             """{"status": "discharged"}""",
             """{"status": "closed"}""",
         })
@@ -104,9 +104,9 @@ public sealed class CaseLifecycleTests
     }
 
     [Theory]
-    [InlineData("""{"status": "filed"}""", new[] { "case_number", "filed_at" })]
-    [InlineData("""{"status": "filed", "filed_at": "2026-09-01"}""", new[] { "case_number" })]
-    [InlineData("""{"status": "filed", "case_number": "8:26-bk-1"}""", new[] { "filed_at" })]
+    [InlineData("""{"status": "filed"}""", new[] { "caseNumber", "filedAt" })]
+    [InlineData("""{"status": "filed", "filedAt": "2026-09-01"}""", new[] { "caseNumber" })]
+    [InlineData("""{"status": "filed", "caseNumber": "8:26-bk-1"}""", new[] { "filedAt" })]
     public void Filing_needs_the_date_and_the_case_number(string payload, string[] missing)
     {
         var error = Assert.Throws<FieldValidationException>(() => Moved(ACase() with { Status = CaseStatus.ReadyToFile }, payload));
@@ -114,8 +114,8 @@ public sealed class CaseLifecycleTests
     }
 
     [Theory]
-    [InlineData("filed_at")]
-    [InlineData("case_number")]
+    [InlineData("filedAt")]
+    [InlineData("caseNumber")]
     public void A_filed_case_keeps_its_anchors(string cleared)
     {
         var filed = Moved(ACase(), Filing);
@@ -127,24 +127,25 @@ public sealed class CaseLifecycleTests
     public void A_case_filed_before_the_rule_still_takes_other_edits()
     {
         var legacy = ACase() with { Status = CaseStatus.Filed };
-        Assert.NotNull(Moved(legacy, """{"meeting_341_at": "2026-10-05"}""").Meeting341At);
+        Assert.NotNull(Moved(legacy, """{"meeting341At": "2026-10-05"}""").Meeting341At);
     }
 
     [Theory]
-    [InlineData("""{"case_number": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"}""", "case_number")]
+    [InlineData("""{"caseNumber": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"}""", "caseNumber")]
     [InlineData("""{"judge": 7}""", "judge")]
     [InlineData("""{"trustee": "two\nlines"}""", "trustee")]
     public void The_docket_facts_are_single_lines_of_bounded_text(string payload, string field)
     {
-        var error = Assert.Throws<FieldValidationException>(() => CaseRules.ParseUpdate(Body.Of(payload)));
+        var error = Assert.Throws<FieldValidationException>(() => Body.Read<CaseChanges>(Body.Of(payload)));
         Assert.Equal([field], error.Fields.Keys);
     }
 
     [Fact]
-    public void A_blank_docket_fact_clears_it()
+    public void A_null_docket_fact_clears_it()
     {
         var withJudge = Moved(ACase(), """{"judge": "Hon. Example"}""");
-        Assert.Null(Moved(withJudge, """{"judge": ""}""").Judge);
+        Assert.Null(Moved(withJudge, """{"judge": null}""").Judge);
+        Assert.Equal("Hon. Example", Moved(withJudge, """{"trustee": "T"}""").Judge);
     }
 
     [Theory]
@@ -262,7 +263,7 @@ public sealed class CaseLifecycleTests
     [Fact]
     public void A_copy_is_a_new_retained_case_and_every_value_names_its_source()
     {
-        var source = Moved(ACase() with { ExemptionSet = ExemptionSet.Federal }, """{"status": "filed", "filed_at": "2026-09-01", "case_number": "8:26-bk-01234", "judge": "J"}""");
+        var source = Moved(ACase() with { ExemptionSet = ExemptionSet.Federal }, """{"status": "filed", "filedAt": "2026-09-01", "caseNumber": "8:26-bk-01234", "judge": "J"}""");
         var staff = new ProvenanceEntry(ProvenanceSource.StaffTyped);
         var confirmed = new ProvenanceEntry(ProvenanceSource.AiExtracted) { ConfirmedBy = Ids.Alice, ConfirmedAt = "2026-09-01T00:00:00.000000Z", DocumentId = "doc-1" };
         var debtor = new Debtor("d1", source.Id, FilingRole.Debtor1, new DateTimeOffset(2026, 8, 1, 0, 0, 0, TimeSpan.Zero), new DateTimeOffset(2026, 8, 1, 0, 0, 0, TimeSpan.Zero), DebtorBody.Empty with { Email = "a@example.test" })
@@ -326,11 +327,11 @@ public sealed class CaseLifecycleTests
         Assert.Equal(("filing-1", CaseRules.FilingWorkerActor), (change.FilingId, change.RecordedBy));
         Assert.Throws<ConflictException>(() => CaseLifecycle.FileCase(filed, [], "8:26-bk-1", "2026-09-01", CaseRules.FilingWorkerActor, "filing-2"));
         var error = Assert.Throws<FieldValidationException>(() => CaseLifecycle.FileCase(ready, [], " ", "September", CaseRules.FilingWorkerActor, "filing-3"));
-        Assert.Equal(["case_number", "filed_at"], error.Fields.Keys.Order(StringComparer.Ordinal));
+        Assert.Equal(["caseNumber", "filedAt"], error.Fields.Keys.Order(StringComparer.Ordinal));
     }
 
     private static Case ACase() => NewCase().Case;
 
     private static Case Moved(Case current, string payload) =>
-        CaseRules.ApplyChanges(current, CaseRules.ParseUpdate((JsonObject)JsonNode.Parse(payload)!));
+        CaseRules.ApplyChanges(current, Body.Read<CaseChanges>((JsonObject)JsonNode.Parse(payload)!));
 }

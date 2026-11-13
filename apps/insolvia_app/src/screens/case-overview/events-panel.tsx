@@ -195,7 +195,7 @@ export function EventsPanel({ colleagues }: { colleagues: readonly FirmColleague
       </View>
 
       <View style={styles.dates}>
-        <Field.Root name="filed_at" invalid={Boolean(dateErrors.filed_at)}>
+        <Field.Root name="filedAt" invalid={Boolean(dateErrors.filedAt)}>
           <Field.Label>Petition filed on</Field.Label>
           <DateInput
             value={matter.filedAt ?? ''}
@@ -206,9 +206,9 @@ export function EventsPanel({ colleagues }: { colleagues: readonly FirmColleague
             }}
           />
           <Field.Description>The order for relief in a voluntary case.</Field.Description>
-          {dateErrors.filed_at ? <Field.Error match>{dateErrors.filed_at}</Field.Error> : null}
+          {dateErrors.filedAt ? <Field.Error match>{dateErrors.filedAt}</Field.Error> : null}
         </Field.Root>
-        <Field.Root name="meeting_341_at" invalid={Boolean(dateErrors.meeting_341_at)}>
+        <Field.Root name="meeting341At" invalid={Boolean(dateErrors.meeting341At)}>
           <Field.Label>§ 341 meeting first set for</Field.Label>
           <DateInput
             value={matter.meeting341At ?? ''}
@@ -221,8 +221,8 @@ export function EventsPanel({ colleagues }: { colleagues: readonly FirmColleague
           <Field.Description>
             The first date on the court’s notice — a continued meeting does not move it.
           </Field.Description>
-          {dateErrors.meeting_341_at ? (
-            <Field.Error match>{dateErrors.meeting_341_at}</Field.Error>
+          {dateErrors.meeting341At ? (
+            <Field.Error match>{dateErrors.meeting341At}</Field.Error>
           ) : null}
         </Field.Root>
       </View>

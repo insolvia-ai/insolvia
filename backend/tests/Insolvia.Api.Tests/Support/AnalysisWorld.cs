@@ -146,7 +146,7 @@ internal sealed class AnalysisWorld : IDisposable
         foreach (var node in data["debtors"]!.AsArray())
         {
             var item = node!.AsObject();
-            var draft = DebtorRules.Parse(item["body"]!.DeepClone().AsObject(), enforceProvenance: false);
+            var body = DebtorRules.ReadBody(item["body"]);
             Assert.True(Wire.TryParse<FilingRole>(Json.AsString(item["filing_role"]), out var role));
             TaxIdRef? taxId = null;
             if (item["tax_id"] is JsonObject tax)
@@ -155,7 +155,7 @@ internal sealed class AnalysisWorld : IDisposable
                 taxId = new TaxIdRef(kind, Json.AsString(tax["last_four"])!, Json.AsString(tax["ref"])!);
             }
 
-            debtors.Add(new Debtor(Json.AsString(item["id"])!, caseId, role, Stamp(item["created_at"]), Stamp(item["updated_at"]), draft.Body) { TaxId = taxId });
+            debtors.Add(new Debtor(Json.AsString(item["id"])!, caseId, role, Stamp(item["created_at"]), Stamp(item["updated_at"]), body) { TaxId = taxId });
         }
 
         await World.Cases.CreateAsync(stored, new CaseAssignment(caseId, CaseWorld.Alice, created, created, CaseWorld.Alice), debtors, HttpAssert.Ct);

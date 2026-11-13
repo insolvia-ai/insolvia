@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 using Insolvia.Domain.Cases;
 using Insolvia.Domain.Debtors;
@@ -7,8 +8,8 @@ using Insolvia.Domain.TaxIds;
 namespace Insolvia.Api.Cases;
 
 /// <summary>
-/// A debtor as staff read it: the stored body at the top level, beside the
-/// server's own fields. The tax id leaves as its kind and last four only.
+/// A debtor as staff read it: the server's own fields, and the stored body
+/// under <c>body</c>. The tax id leaves as its kind and last four only.
 /// </summary>
 /// <param name="Id">The debtor's id, stable across saves.</param>
 /// <param name="CaseId">The case.</param>
@@ -20,14 +21,13 @@ namespace Insolvia.Api.Cases;
 /// <param name="ClientId">The firm client this debtor was copied from; absent when unlinked.</param>
 /// <param name="DiffersFromClient">The body paths that no longer match the client record; absent unless the caller may see the client directory.</param>
 /// <param name="Provenance">Where each populated field came from, by body path.</param>
-[SnakeCase]
 public sealed record DebtorView(
     string Id,
     string CaseId,
     FilingRole FilingRole,
     string CreatedAt,
     string UpdatedAt,
-    [property: Flatten] DebtorBody Body,
+    DebtorBody Body,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] TaxIdView? TaxId,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ClientId,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<string>? DiffersFromClient,
@@ -57,7 +57,6 @@ public sealed record DebtorView(
 /// <summary>A stored tax id as it may leave the server: its kind and last four, never the number.</summary>
 /// <param name="Kind">SSN or ITIN.</param>
 /// <param name="LastFour">The last four digits.</param>
-[SnakeCase]
 public sealed record TaxIdView(TaxIdKind Kind, string LastFour)
 {
     /// <summary>The view of <paramref name="taxId"/>.</summary>
@@ -70,21 +69,6 @@ public sealed record TaxIdView(TaxIdKind Kind, string LastFour)
     }
 }
 
-/// <summary>
-/// A debtor as written (<c>PUT …/debtors/{filingRole}</c>): the whole body,
-/// each unanswered field absent. Parsed by <c>DebtorRules.Parse</c>, which
-/// owns validation; this record is its shape for the OpenAPI document.
-/// </summary>
-/// <param name="Body">The case data.</param>
-/// <param name="TaxId">The number being entered (<c>value</c>), or the last four being kept (<c>last_four</c>); absent to remove it.</param>
-/// <param name="Provenance">Where each populated field came from, by body path.</param>
-[SnakeCase]
-public sealed record DebtorRequest(
-    [property: Flatten] DebtorBody Body,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] TaxIdInput? TaxId,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyDictionary<string, ProvenanceEntry>? Provenance);
-
 /// <summary>Which firm client a debtor is (<c>PUT …/debtors/{filingRole}/client</c>).</summary>
 /// <param name="ClientId">The client, in the case's firm.</param>
-[SnakeCase]
-public sealed record DebtorLinkRequest(string ClientId);
+public sealed record DebtorLinkRequest([property: Required(ErrorMessage = "Choose a client.")] string? ClientId);

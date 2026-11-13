@@ -8,8 +8,10 @@ using Insolvia.Data.Tests;
 using Insolvia.Domain.Cases;
 using Insolvia.Domain.Clients;
 using Insolvia.Domain.Debtors;
+using Insolvia.Domain.Fields;
 using Insolvia.Domain.FirmClients;
 using Insolvia.Domain.Firms;
+using Insolvia.Domain.Provenance;
 using Insolvia.Migrator.Purge;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
@@ -74,10 +76,10 @@ public sealed class PurgeTests(PostgresFixture postgres)
     }
 
     private static Case NewCase(World world) =>
-        CaseRules.Create(CaseRules.ParseCreation(new JsonObject { ["chapter"] = 7, ["court"] = "flmb", ["division"] = "tampa" }, requireClients: false), world.FirmId, Opener).Case;
+        CaseRules.Create(new NewCase(7, "flmb", "tampa", []), world.FirmId, Opener).Case;
 
     private static DebtorDraft Draft(string given) =>
-        DebtorRules.Parse(new JsonObject { ["name"] = new JsonObject { ["given"] = given }, ["provenance"] = new JsonObject { ["name.given"] = new JsonObject { ["source"] = "staff_typed" } } });
+        new(new DebtorBody(new PersonName(Given: given)), Provenance: new Dictionary<string, ProvenanceEntry> { ["name.given"] = new(ProvenanceSource.StaffTyped) });
 
     /// <summary>A case written before clients: debtors with no client_id.</summary>
     private static async Task<string> PreClientCaseAsync(World world, int debtors = 1)

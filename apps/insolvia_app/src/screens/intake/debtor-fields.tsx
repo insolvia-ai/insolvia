@@ -4,7 +4,13 @@ import {
   TAX_ID_KINDS,
   VENUE_BASES,
 } from '@insolvia-ai/api-client';
-import type { Address, DebtorBody, OtherName, PersonName } from '@insolvia-ai/api-client';
+import type {
+  Address,
+  DebtorBody,
+  OtherName,
+  PersonName,
+  PutDebtorRequest,
+} from '@insolvia-ai/api-client';
 import { Button, DateInput, Field, Input, PasswordInput, Select } from '@insolvia-ai/design-system';
 import { StyleSheet, Text, View } from 'react-native';
 
@@ -19,7 +25,8 @@ import { newRowId } from './row-id';
  * Every field is optional, matching the API: intake is progressive and a
  * half-finished record must save. So nothing here is marked required and
  * nothing blocks a save — the only errors shown are the ones the server sent
- * back, keyed by the same dotted path the field writes to.
+ * back, keyed by the request path the field writes to (`body.name.given`,
+ * `taxId.value`).
  */
 
 const VENUE_OPTIONS = [
@@ -65,26 +72,30 @@ function narrow<T extends string>(allowed: readonly T[], value: string): T | und
 }
 
 export interface DebtorFieldsProps {
-  readonly body: DebtorBody;
-  readonly onChange: (next: DebtorBody) => void;
-  /** Server messages, keyed by the field path they belong to. */
+  /** The body and tax id being edited — the request less its provenance. */
+  readonly draft: PutDebtorRequest;
+  readonly onChange: (next: PutDebtorRequest) => void;
+  /** Server messages, keyed by the request path they belong to. */
   readonly errors: Readonly<Record<string, string>>;
 }
 
-export function DebtorFields({ body, onChange, errors }: DebtorFieldsProps) {
+export function DebtorFields({ draft, onChange, errors }: DebtorFieldsProps) {
   const theme = useTheme();
+  const body = draft.body ?? {};
+  const taxId = draft.taxId;
+  const setBody = (next: DebtorBody) => onChange({ ...draft, body: next });
 
   const setName = (part: keyof PersonName, value: string) =>
-    onChange({ ...body, name: { ...body.name, [part]: value } });
+    setBody({ ...body, name: { ...body.name, [part]: value } });
 
   const setAddress =
-    (which: 'residence_address' | 'mailing_address') => (part: keyof Address, value: string) =>
-      onChange({ ...body, [which]: { ...body[which], [part]: value } });
+    (which: 'residenceAddress' | 'mailingAddress') => (part: keyof Address, value: string) =>
+      setBody({ ...body, [which]: { ...body[which], [part]: value } });
 
   const setAlias = (id: string, part: keyof OtherName, value: string) =>
-    onChange({
+    setBody({
       ...body,
-      other_names_used: (body.other_names_used ?? []).map((alias) =>
+      otherNamesUsed: (body.otherNamesUsed ?? []).map((alias) =>
         alias.id === id ? { ...alias, [part]: value } : alias,
       ),
     });
@@ -128,7 +139,7 @@ export function DebtorFields({ body, onChange, errors }: DebtorFieldsProps) {
       </Section>
 
       <Section title="Other names used in the last 8 years">
-        {(body.other_names_used ?? []).length === 0 ? (
+        {(body.otherNamesUsed ?? []).length === 0 ? (
           <Text
             style={[styles.help, { color: theme.colors.muted, fontFamily: theme.typography.body }]}
           >
@@ -136,10 +147,10 @@ export function DebtorFields({ body, onChange, errors }: DebtorFieldsProps) {
             name.
           </Text>
         ) : null}
-        {(body.other_names_used ?? []).map((alias, index) => (
+        {(body.otherNamesUsed ?? []).map((alias, index) => (
           // Errors are looked up by INDEX, not by the row's id. They are
           // different namespaces and mixing them shows nothing: the API keys
-          // BODY errors positionally (`other_names_used[0].given`) and
+          // BODY errors positionally (`body.otherNamesUsed[0].given`) and
           // PROVENANCE errors by id. Keying these fields by id meant every
           // alias error rendered nowhere — the user saw only "Some answers
           // need attention" with no field flagged, and every autosave after
@@ -155,32 +166,32 @@ export function DebtorFields({ body, onChange, errors }: DebtorFieldsProps) {
             </Text>
             <TextField
               label="First name"
-              path={`other_names_used[${index}].given`}
+              path={`otherNamesUsed[${index}].given`}
               value={alias.given}
               onChangeText={(value) => setAlias(alias.id, 'given', value)}
               errors={errors}
             />
             <TextField
               label="Last name"
-              path={`other_names_used[${index}].surname`}
+              path={`otherNamesUsed[${index}].surname`}
               value={alias.surname}
               onChangeText={(value) => setAlias(alias.id, 'surname', value)}
               errors={errors}
             />
             <TextField
               label="Business name"
-              path={`other_names_used[${index}].business_name`}
-              value={alias.business_name}
-              onChangeText={(value) => setAlias(alias.id, 'business_name', value)}
+              path={`otherNamesUsed[${index}].businessName`}
+              value={alias.businessName}
+              onChangeText={(value) => setAlias(alias.id, 'businessName', value)}
               errors={errors}
             />
             <Button
               size="lg"
               intent="secondary"
               onPress={() =>
-                onChange({
+                setBody({
                   ...body,
-                  other_names_used: (body.other_names_used ?? []).filter(
+                  otherNamesUsed: (body.otherNamesUsed ?? []).filter(
                     (candidate) => candidate.id !== alias.id,
                   ),
                 })
@@ -196,9 +207,9 @@ export function DebtorFields({ body, onChange, errors }: DebtorFieldsProps) {
           onPress={() =>
             // The id is minted HERE, not by the server — see row-id.ts. Without
             // one the API cannot accept the row at all.
-            onChange({
+            setBody({
               ...body,
-              other_names_used: [...(body.other_names_used ?? []), { id: newRowId() }],
+              otherNamesUsed: [...(body.otherNamesUsed ?? []), { id: newRowId() }],
             })
           }
         >
@@ -224,52 +235,49 @@ export function DebtorFields({ body, onChange, errors }: DebtorFieldsProps) {
           Stored encrypted. Only the last four digits are shown after saving; the full number prints
           on the Statement About Your Social Security Numbers (B121).
         </Text>
-        <Field.Root invalid={Boolean(errors['tax_id.kind'])}>
+        <Field.Root invalid={Boolean(errors['taxId.kind'])}>
           <Field.Label>Kind of number</Field.Label>
           <Select
             options={TAX_ID_OPTIONS}
-            value={body.tax_id?.kind ?? null}
+            value={taxId?.kind ?? null}
             onValueChange={(next) => {
               const kind = narrow(TAX_ID_KINDS, next);
-              onChange({
-                ...body,
-                tax_id: kind === undefined ? undefined : { ...body.tax_id, kind },
-              });
+              onChange({ ...draft, taxId: kind === undefined ? undefined : { ...taxId, kind } });
             }}
             placeholder="Choose a kind"
           />
-          {errors['tax_id.kind'] ? <Field.Error match>{errors['tax_id.kind']}</Field.Error> : null}
+          {errors['taxId.kind'] ? <Field.Error match>{errors['taxId.kind']}</Field.Error> : null}
         </Field.Root>
-        <Field.Root invalid={Boolean(errors['tax_id.value'] ?? errors.tax_id)}>
+        <Field.Root invalid={Boolean(errors['taxId.value'] ?? errors.taxId)}>
           <Field.Label>Number</Field.Label>
           <PasswordInput
-            value={body.tax_id?.value ?? ''}
+            value={taxId?.value ?? ''}
             onValueChange={(value) =>
               onChange({
-                ...body,
+                ...draft,
                 // A kind is needed before a number can be sent; default to
                 // an SSN, the common case, and let the picker correct it.
-                tax_id: { kind: body.tax_id?.kind ?? 'ssn', ...body.tax_id, value },
+                taxId: { kind: taxId?.kind ?? 'ssn', ...taxId, value },
               })
             }
-            placeholder={body.tax_id?.last_four ? `On file, ending ${body.tax_id.last_four}` : ''}
+            placeholder={taxId?.lastFour ? `On file, ending ${taxId.lastFour}` : ''}
             showLabel="Show number"
             hideLabel="Hide number"
           />
           <Field.Description>
-            {body.tax_id?.last_four
-              ? `A number ending in ${body.tax_id.last_four} is on file. Type a new one to replace it.`
+            {taxId?.lastFour
+              ? `A number ending in ${taxId.lastFour} is on file. Type a new one to replace it.`
               : 'Nine digits, with or without dashes.'}
           </Field.Description>
-          {(errors['tax_id.value'] ?? errors.tax_id) ? (
-            <Field.Error match>{errors['tax_id.value'] ?? errors.tax_id}</Field.Error>
+          {(errors['taxId.value'] ?? errors.taxId) ? (
+            <Field.Error match>{errors['taxId.value'] ?? errors.taxId}</Field.Error>
           ) : null}
         </Field.Root>
-        {body.tax_id?.last_four ? (
+        {taxId?.lastFour ? (
           <Button
             size="lg"
             intent="secondary"
-            onPress={() => onChange({ ...body, tax_id: undefined })}
+            onPress={() => onChange({ ...draft, taxId: undefined })}
           >
             Remove the stored number
           </Button>
@@ -278,9 +286,9 @@ export function DebtorFields({ body, onChange, errors }: DebtorFieldsProps) {
 
       <Section title="Where the debtor lives">
         <AddressFields
-          which="residence_address"
-          address={body.residence_address}
-          onChange={setAddress('residence_address')}
+          which="residenceAddress"
+          address={body.residenceAddress}
+          onChange={setAddress('residenceAddress')}
           errors={errors}
         />
       </Section>
@@ -292,9 +300,9 @@ export function DebtorFields({ body, onChange, errors }: DebtorFieldsProps) {
           Only if it is different from the address above.
         </Text>
         <AddressFields
-          which="mailing_address"
-          address={body.mailing_address}
-          onChange={setAddress('mailing_address')}
+          which="mailingAddress"
+          address={body.mailingAddress}
+          onChange={setAddress('mailingAddress')}
           errors={errors}
         />
       </Section>
@@ -304,40 +312,42 @@ export function DebtorFields({ body, onChange, errors }: DebtorFieldsProps) {
           label="Phone"
           path="phone"
           value={body.phone}
-          onChangeText={(value) => onChange({ ...body, phone: value })}
+          onChangeText={(value) => setBody({ ...body, phone: value })}
           errors={errors}
         />
         <TextField
           label="Mobile"
           path="mobile"
           value={body.mobile}
-          onChangeText={(value) => onChange({ ...body, mobile: value })}
+          onChangeText={(value) => setBody({ ...body, mobile: value })}
           errors={errors}
         />
         <TextField
           label="Email"
           path="email"
           value={body.email}
-          onChangeText={(value) => onChange({ ...body, email: value })}
+          onChangeText={(value) => setBody({ ...body, email: value })}
           errors={errors}
         />
       </Section>
 
       <Section title="Why this district">
-        <Field.Root invalid={Boolean(errors['venue.basis'])}>
+        <Field.Root invalid={Boolean(errors['body.venue.basis'])}>
           <Field.Label>Reason for filing here</Field.Label>
           <Select
             options={VENUE_OPTIONS}
             value={body.venue?.basis ?? null}
             onValueChange={(next) =>
-              onChange({
+              setBody({
                 ...body,
                 venue: { ...body.venue, basis: narrow(VENUE_BASES, next) },
               })
             }
             placeholder="Choose a reason"
           />
-          {errors['venue.basis'] ? <Field.Error match>{errors['venue.basis']}</Field.Error> : null}
+          {errors['body.venue.basis'] ? (
+            <Field.Error match>{errors['body.venue.basis']}</Field.Error>
+          ) : null}
         </Field.Root>
         {body.venue?.basis === 'other' ? (
           <TextField
@@ -345,7 +355,7 @@ export function DebtorFields({ body, onChange, errors }: DebtorFieldsProps) {
             path="venue.explanation"
             value={body.venue?.explanation}
             onChangeText={(value) =>
-              onChange({ ...body, venue: { ...body.venue, explanation: value } })
+              setBody({ ...body, venue: { ...body.venue, explanation: value } })
             }
             errors={errors}
           />
@@ -353,57 +363,57 @@ export function DebtorFields({ body, onChange, errors }: DebtorFieldsProps) {
       </Section>
 
       <Section title="Credit counseling">
-        <Field.Root invalid={Boolean(errors['credit_counseling.status'])}>
+        <Field.Root invalid={Boolean(errors['body.creditCounseling.status'])}>
           <Field.Label>Briefing status</Field.Label>
           <Select
             options={COUNSELING_OPTIONS}
-            value={body.credit_counseling?.status ?? null}
+            value={body.creditCounseling?.status ?? null}
             onValueChange={(next) =>
-              onChange({
+              setBody({
                 ...body,
-                credit_counseling: {
-                  ...body.credit_counseling,
+                creditCounseling: {
+                  ...body.creditCounseling,
                   status: narrow(COUNSELING_STATUSES, next),
                 },
               })
             }
             placeholder="Choose a status"
           />
-          {errors['credit_counseling.status'] ? (
-            <Field.Error match>{errors['credit_counseling.status']}</Field.Error>
+          {errors['body.creditCounseling.status'] ? (
+            <Field.Error match>{errors['body.creditCounseling.status']}</Field.Error>
           ) : null}
         </Field.Root>
         {/* Only the "not required" branch has grounds to give, and the form
             only prints them there. */}
-        {body.credit_counseling?.status === 'not_required' ? (
-          <Field.Root invalid={Boolean(errors['credit_counseling.exemption_reason'])}>
+        {body.creditCounseling?.status === 'not_required' ? (
+          <Field.Root invalid={Boolean(errors['body.creditCounseling.exemptionReason'])}>
             <Field.Label>Why not</Field.Label>
             <Select
               options={EXEMPTION_OPTIONS}
-              value={body.credit_counseling?.exemption_reason ?? null}
+              value={body.creditCounseling?.exemptionReason ?? null}
               onValueChange={(next) =>
-                onChange({
+                setBody({
                   ...body,
-                  credit_counseling: {
-                    ...body.credit_counseling,
-                    exemption_reason: narrow(COUNSELING_EXEMPTIONS, next),
+                  creditCounseling: {
+                    ...body.creditCounseling,
+                    exemptionReason: narrow(COUNSELING_EXEMPTIONS, next),
                   },
                 })
               }
               placeholder="Choose a reason"
             />
-            {errors['credit_counseling.exemption_reason'] ? (
-              <Field.Error match>{errors['credit_counseling.exemption_reason']}</Field.Error>
+            {errors['body.creditCounseling.exemptionReason'] ? (
+              <Field.Error match>{errors['body.creditCounseling.exemptionReason']}</Field.Error>
             ) : null}
           </Field.Root>
         ) : null}
       </Section>
 
       <Section title="Signature">
-        <Field.Root invalid={Boolean(errors.signed_at)}>
+        <Field.Root invalid={Boolean(errors['body.signedAt'])}>
           <Field.Label>Date signed</Field.Label>
           <DateInput
-            value={body.signed_at ?? ''}
+            value={body.signedAt ?? ''}
             // `incomplete` is IGNORED, and that is what the second argument
             // (design system 0.6.0) exists for. A half-typed date reports `''`,
             // and writing that through would have the debounced autosave clear
@@ -411,11 +421,13 @@ export function DebtorFields({ body, onChange, errors }: DebtorFieldsProps) {
             // 2020-01-15 and it is gone, the box still reading 2020-01-1.
             onValueChange={(next, status) => {
               if (status === 'incomplete') return;
-              onChange({ ...body, signed_at: next });
+              setBody({ ...body, signedAt: next });
             }}
           />
           <Field.Description>The date on the petition, not today&apos;s date.</Field.Description>
-          {errors.signed_at ? <Field.Error match>{errors.signed_at}</Field.Error> : null}
+          {errors['body.signedAt'] ? (
+            <Field.Error match>{errors['body.signedAt']}</Field.Error>
+          ) : null}
         </Field.Root>
       </Section>
     </View>
@@ -447,7 +459,7 @@ function AddressFields({
   onChange,
   errors,
 }: {
-  which: 'residence_address' | 'mailing_address';
+  which: 'residenceAddress' | 'mailingAddress';
   address: Address | undefined;
   onChange: (part: keyof Address, value: string) => void;
   errors: Readonly<Record<string, string>>;
@@ -488,7 +500,7 @@ function TextField({
   onChangeText: (value: string) => void;
   errors: Readonly<Record<string, string>>;
 }) {
-  const message = errors[path];
+  const message = errors[`body.${path}`];
   return (
     <Field.Root invalid={Boolean(message)}>
       <Field.Label>{label}</Field.Label>

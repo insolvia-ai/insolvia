@@ -354,7 +354,7 @@ export function MeansTest({ caseId }: MeansTestProps) {
 
   const ready = trace.kind === 'ready' ? trace.value : null;
   const hasColumnB =
-    debtors.some((debtor) => debtor.filing_role !== 'debtor_1') ||
+    debtors.some((debtor) => debtor.filingRole !== 'debtor_1') ||
     (ready?.cmi.columns.some((column) => column.column === 'B') ?? false) ||
     (body.incomeOverrides?.some((row) => row.column === 'B') ?? false);
   const columns: readonly IncomeColumn[] = hasColumnB ? ['A', 'B'] : ['A'];

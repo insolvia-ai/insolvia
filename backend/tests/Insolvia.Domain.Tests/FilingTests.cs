@@ -149,8 +149,8 @@ public sealed class FilingTests
             LifecycleProvenance.Manual));
 
     [Theory]
-    [InlineData("", "2099-01-15", "case_number")]
-    [InlineData("6:26-bk-1", "15/01/2099", "filed_at")]
+    [InlineData("", "2099-01-15", "caseNumber")]
+    [InlineData("6:26-bk-1", "15/01/2099", "filedAt")]
     public void A_filing_needs_its_number_and_a_petition_date(string number, string date, string field) =>
         Assert.Contains(field, Assert.Throws<FieldValidationException>(() => CaseLifecycle.FileCase(MakeCase(), [], number, date, Attorney, FilingId, LifecycleProvenance.Manual)).Fields.Keys);
 

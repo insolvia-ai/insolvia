@@ -92,7 +92,7 @@ internal sealed class CaseWorld : IDisposable
     public async Task<JsonObject> OpenCaseAsync(string subject = Alice, int chapter = 7, string court = "flmb", string division = "tampa")
     {
         var clientId = await AddClientAsync(subject);
-        var answer = await World.Post("/v1/cases", $$"""{"chapter": {{chapter}}, "court": "{{court}}", "division": "{{division}}", "client_ids": ["{{clientId}}"]}""", subject);
+        var answer = await World.Post("/v1/cases", $$"""{"chapter": {{chapter}}, "court": "{{court}}", "division": "{{division}}", "clientIds": ["{{clientId}}"]}""", subject);
         Assert.True(answer.Status == 201, answer.Body);
         return answer.Object;
     }
@@ -103,7 +103,7 @@ internal sealed class CaseWorld : IDisposable
     /// <summary>A case moved to filed through the PATCH (the docket facts a filing needs).</summary>
     public async Task FileAsync(string caseId, string filedAt = "2026-03-02", string subject = Alice)
     {
-        var answer = await Patch($"/v1/cases/{caseId}", $$"""{"status": "filed", "filed_at": "{{filedAt}}", "case_number": "8:26-bk-01234"}""", subject);
+        var answer = await Patch($"/v1/cases/{caseId}", $$"""{"status": "filed", "filedAt": "{{filedAt}}", "caseNumber": "8:26-bk-01234"}""", subject);
         Assert.True(answer.Status == 200, answer.Body);
     }
 

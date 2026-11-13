@@ -22,12 +22,12 @@ internal static class CaseFixtures
             ids.Add(id);
         }
 
-        return new JsonObject { ["chapter"] = 7, ["court"] = "flmb", ["division"] = "tampa", ["client_ids"] = ids };
+        return new JsonObject { ["chapter"] = 7, ["court"] = "flmb", ["division"] = "tampa", ["clientIds"] = ids };
     }
 
     /// <summary>A freshly opened case and its creator's assignment.</summary>
     public static (Case Case, CaseAssignment Assignment) NewCase(string firmId = Ids.Firm, string createdBy = Ids.Alice, TimeProvider? clock = null) =>
-        CaseRules.Create(CaseRules.ParseCreation(Opening()), firmId, createdBy, clock);
+        CaseRules.Create(Body.Read<Cases.NewCase>(Opening()), firmId, createdBy, clock);
 
     /// <summary>A firm user's resolved accessor.</summary>
     public static Accessor Accessor(string subject = Ids.Alice, bool isAdmin = false, bool accessAllCases = false, string firmId = Ids.Firm) =>

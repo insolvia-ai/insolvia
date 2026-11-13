@@ -1,5 +1,3 @@
-using System.Globalization;
-using System.Text.Json.Nodes;
 using Insolvia.Api.Auth;
 using Insolvia.Api.Cases;
 using Insolvia.Api.Hosting;
@@ -13,6 +11,7 @@ using Insolvia.Domain.Firms;
 using Insolvia.Domain.Ports;
 using Insolvia.Domain.TaxIds;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Mvc;
 
 namespace Insolvia.Api.Routes;
 
@@ -32,8 +31,8 @@ namespace Insolvia.Api.Routes;
 /// <para><b>A conversion</b> (<c>POST …/conversions {toChapter, effectiveOn}</c>,
 /// #509) goes through <see cref="CaseLifecycle.Convert"/>, which owns the
 /// checks — filed only (409), a real chapter that changes (400 on
-/// <c>to_chapter</c>), a date no earlier than the petition or the previous
-/// court event (400 on <c>effective_on</c>) — and records nothing else: a
+/// <c>toChapter</c>), a date no earlier than the petition or the previous
+/// court event (400 on <c>effectiveOn</c>) — and records nothing else: a
 /// conversion into 11 or 12 is a court fact and is recorded. It answers 201
 /// with the case as written and the event.</para>
 /// <para><b>Not here</b>: <c>POST …/confirmations</c>. #509 requires its
@@ -52,8 +51,8 @@ public sealed class CaseLifecycleRoutes : IEndpointModule
         ArgumentNullException.ThrowIfNull(routes);
         routes.MapGet("/v1/cases/{caseId}/status-history", StatusHistoryAsync).RequireAuth().Requires(Feature.Cases, PermissionLevel.ViewOnly);
         routes.MapGet("/v1/cases/{caseId}/lifecycle", LifecycleAsync).RequireAuth().Requires(Feature.Cases, PermissionLevel.ViewOnly);
-        routes.MapPost("/v1/cases/{caseId}/conversions", ConvertAsync).RequestBody<ConversionRequest>().RequireAuth().Requires(Feature.Cases, PermissionLevel.AddEdit);
-        routes.MapPut("/v1/cases/{caseId}/archived", ArchiveAsync).RequestBody<CaseArchiveRequest>().RequireAuth().Requires(Feature.Cases, PermissionLevel.AddEdit);
+        routes.MapPost("/v1/cases/{caseId}/conversions", ConvertAsync).WithMetadata(new RequestSizeLimitAttribute(MaxRequestBytes)).RequireAuth().Requires(Feature.Cases, PermissionLevel.AddEdit);
+        routes.MapPut("/v1/cases/{caseId}/archived", ArchiveAsync).WithMetadata(new RequestSizeLimitAttribute(MaxRequestBytes)).RequireAuth().Requires(Feature.Cases, PermissionLevel.AddEdit);
         routes.MapDelete("/v1/cases/{caseId}", DeleteAsync).RequireAuth().Requires(Feature.Cases, PermissionLevel.AddEdit);
         routes.MapPost("/v1/cases/{caseId}/copy", CopyAsync).RequireAuth().Requires(Feature.Cases, PermissionLevel.AddEdit).Requires(Feature.Clients, PermissionLevel.ViewOnly);
     }
@@ -82,14 +81,14 @@ public sealed class CaseLifecycleRoutes : IEndpointModule
     /// <summary>Record the court's conversion of a filed case to another chapter.</summary>
     /// <remarks>
     /// Filed cases only (409). The new chapter must differ from the current one
-    /// (400 on <c>to_chapter</c>), and the date may not precede the petition or
-    /// the previous court event (400 on <c>effective_on</c>). The case's
+    /// (400 on <c>toChapter</c>), and the date may not precede the petition or
+    /// the previous court event (400 on <c>effectiveOn</c>). The case's
     /// deadlines are not regenerated.
     /// </remarks>
-    internal static async Task<Created<ConversionView>> ConvertAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
+    internal static async Task<Created<ConversionView>> ConvertAsync(HttpContext context, string caseId, ConversionRequest request, CancellationToken cancellationToken)
     {
         var store = context.Cases();
-        var (toChapter, effectiveOn) = ParseConversion(await context.BodyAsync(MaxRequestBytes));
+        var (toChapter, effectiveOn) = (request.ToChapter, request.EffectiveOn!.Value);
         var accessor = await context.CurrentAccessorAsync();
 
         var existing = await store.GetAsync(caseId, accessor, cancellationToken);
@@ -113,10 +112,10 @@ public sealed class CaseLifecycleRoutes : IEndpointModule
 
     /// <summary>Archive or restore a case.</summary>
     /// <remarks>Idempotent, in any status; archiving an archived case keeps its first stamp.</remarks>
-    internal static async Task<CaseView> ArchiveAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
+    internal static async Task<CaseView> ArchiveAsync(HttpContext context, string caseId, CaseArchiveRequest request, CancellationToken cancellationToken)
     {
         var store = context.Cases();
-        var archived = CaseRules.ParseArchive(await context.BodyAsync(MaxRequestBytes));
+        var archived = request.Archived!.Value;
         var accessor = await context.CurrentAccessorAsync();
 
         var existing = await store.GetAsync(caseId, accessor, cancellationToken);
@@ -214,7 +213,7 @@ public sealed class CaseLifecycleRoutes : IEndpointModule
                     kept = debtor with
                     {
                         TaxId = null,
-                        Provenance = debtor.Provenance.Where(pair => pair.Key != "tax_id").ToValueDictionary(),
+                        Provenance = debtor.Provenance.Where(pair => pair.Key != "taxId").ToValueDictionary(),
                     };
                 }
                 else
@@ -291,45 +290,5 @@ public sealed class CaseLifecycleRoutes : IEndpointModule
                 throw new ConflictException(refusal);
             }
         }
-    }
-
-    // ADR 0027's wire: {toChapter, effectiveOn}. Field errors carry the
-    // snake_case names the writer uses (to_chapter, effective_on), so one
-    // key names one fault whichever check found it.
-    private static (int ToChapter, DateOnly EffectiveOn) ParseConversion(JsonObject payload)
-    {
-        var errors = new Dictionary<string, string>(StringComparer.Ordinal);
-        int? toChapter = null;
-        if (!Json.TryGetWholeNumber(payload["toChapter"], out var chapter))
-        {
-            errors["to_chapter"] = "Chapter must be a number.";
-        }
-        else if (!CaseRules.Chapters.Contains((int)Math.Clamp(chapter, int.MinValue, int.MaxValue)))
-        {
-            errors["to_chapter"] = "Chapter must be one of " + string.Join(", ", CaseRules.Chapters) + ".";
-        }
-        else
-        {
-            toChapter = (int)chapter;
-        }
-
-        DateOnly? effectiveOn = null;
-        var raw = Json.AsString(payload["effectiveOn"]);
-        var stripped = raw is null ? string.Empty : TextRules.Strip(raw);
-        if (DateOnly.TryParseExact(stripped, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed) && WireFormat.Date(parsed) == stripped)
-        {
-            effectiveOn = parsed;
-        }
-        else
-        {
-            errors["effective_on"] = "Must be a date in YYYY-MM-DD form.";
-        }
-
-        if (errors.Count > 0 || toChapter is null || effectiveOn is null)
-        {
-            throw new FieldValidationException(errors);
-        }
-
-        return (toChapter.Value, effectiveOn.Value);
     }
 }

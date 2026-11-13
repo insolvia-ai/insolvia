@@ -440,7 +440,7 @@ public sealed class SeedCaseTests : IDisposable
     public async Task A_debtor_without_a_client_refuses_the_whole_load()
     {
         // v1 to v3 are pre-client: their rows are what the purge deletes.
-        _world.Edit(CasesJson, body => ((JsonObject)body["cases"]![0]!["debtors"]!["debtor_1"]!).Remove("client_id"));
+        _world.Edit(CasesJson, body => ((JsonObject)body["cases"]![0]!["debtors"]!["debtor_1"]!).Remove("clientId"));
 
         Assert.Equal(2, await _world.LoadAsync());
         Assert.Empty(_world.Cases.Cases);
@@ -450,7 +450,7 @@ public sealed class SeedCaseTests : IDisposable
     [Fact]
     public async Task A_client_ref_to_no_fixture_client_is_refused()
     {
-        _world.Edit(CasesJson, body => body["cases"]![0]!["debtors"]!["debtor_1"]!["client_id"] = new JsonObject { ["$ref"] = "clients/nobody" });
+        _world.Edit(CasesJson, body => body["cases"]![0]!["debtors"]!["debtor_1"]!["clientId"] = new JsonObject { ["$ref"] = "clients/nobody" });
 
         Assert.Equal(2, await _world.LoadAsync());
         Assert.Empty(_world.Cases.Cases);

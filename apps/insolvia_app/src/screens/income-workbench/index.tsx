@@ -91,12 +91,12 @@ function useCaseEntities<C extends CaseCollection>(
  * intake has supplied one — the same join order the case rail uses. */
 function debtorLabel(debtor: Debtor): string {
   const role =
-    debtor.filing_role === 'debtor_1'
+    debtor.filingRole === 'debtor_1'
       ? 'Debtor 1'
-      : debtor.filing_role === 'debtor_2'
+      : debtor.filingRole === 'debtor_2'
         ? 'Debtor 2'
         : 'Non-filing spouse';
-  const parts = [debtor.name?.given, debtor.name?.surname]
+  const parts = [debtor.body.name?.given, debtor.body.name?.surname]
     .map((part) => part?.trim())
     .filter((part): part is string => Boolean(part));
   return parts.length > 0 ? `${role} — ${parts.join(' ')}` : role;

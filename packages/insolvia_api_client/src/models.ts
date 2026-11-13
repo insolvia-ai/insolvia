@@ -362,7 +362,7 @@ export interface CourtDivision {
     readonly line2: string | null;
     readonly city: string;
     readonly state: string;
-    readonly postal_code: string;
+    readonly postalCode: string;
   } | null;
   /** The counties whose debtors file here, by FIPS-5 code. */
   readonly counties: readonly { readonly name: string; readonly fips: string }[];
@@ -768,7 +768,7 @@ export interface FirmClientDraft {
  * caller may see, and which debtor of it the client is.
  */
 export interface FirmClientCase {
-  readonly filing_role: FilingRole;
+  readonly filingRole: FilingRole;
   readonly case: Case;
 }
 
@@ -1449,10 +1449,10 @@ export interface Case {
 
 /**
  * The `POST /v1/cases` request body: `{"chapter", "court", "division",
- * "client_ids"}`, all required. `court` and `division` are codes from
- * {@link CourtRegistry} (issue #360); the server refuses a pair it does not
- * know with a 400 keyed `court` or `division`, and refuses a typed `district`
- * by name.
+ * "clientIds"}`, all required, sent as it stands. `court` and `division` are
+ * codes from {@link CourtRegistry} (issue #360); the server refuses a pair it
+ * does not know with a 400 keyed `court` or `division`. Every case opens at
+ * `intake`: there is no status to send (issue #355).
  */
 export interface CreateCaseRequest {
   /** The bankruptcy chapter. */
@@ -1464,25 +1464,12 @@ export interface CreateCaseRequest {
   /**
    * The {@link FirmClient} ids the case is opened for (ADR 0022): one, or two
    * filing jointly — the first becomes Debtor 1, the second Debtor 2, each a
-   * copy of the client with `client` provenance. Sent as `client_ids`. The
-   * server refuses (400, keyed `client_ids`) none, three, the same client
+   * copy of the client with `client` provenance. The server refuses (400,
+   * keyed `clientIds`) none, three, the same client
    * twice, or one that is unknown, another firm's, or archived; it answers
    * 403 to a caller without `clients` at `view_only`.
    */
   readonly clientIds: readonly string[];
-}
-
-/**
- * The `POST /v1/cases` request body — every field is required. Every case
- * opens at `intake`: there is no status to send (issue #355).
- */
-export function createCaseRequestToJson(request: CreateCaseRequest): Record<string, unknown> {
-  return {
-    chapter: request.chapter,
-    court: request.court,
-    division: request.division,
-    client_ids: [...request.clientIds],
-  };
 }
 
 /**
@@ -1538,36 +1525,35 @@ export interface ListCasesResult {
 
 /**
  * The `PATCH /v1/cases/{caseId}` request body: any subset of `{"chapter",
- * "court" + "division", "status", "prospect_stage", "exemption_set", the two
- * dates and the four docket facts}`. An omitted key means "leave unchanged" — the client
- * must not send keys the caller did not supply, so {@link updateCaseChangesToJson}
- * omits them rather than sending `null`.
+ * "court" + "division", "status", "exemptionSet", the two dates and the four
+ * docket facts}`, sent as it stands. An omitted key means "leave unchanged";
+ * `null` CLEARS one of the six that can be cleared. The server refuses a body
+ * naming none of them (400).
  */
 export interface UpdateCaseChanges {
   /** A new chapter, or omit to leave it unchanged. */
   readonly chapter?: CaseChapter | undefined;
   /**
-   * A new court and division, or omit both to leave them unchanged. THE PAIR
-   * TRAVELS TOGETHER: the server refuses one without the other, so this is
-   * one field rather than two that could be sent apart.
+   * A new court, with {@link division}: THE PAIR TRAVELS TOGETHER, and the
+   * server refuses one without the other (400 keyed to the missing one).
    */
-  readonly court?: { readonly court: string; readonly division: string } | undefined;
+  readonly court?: string | undefined;
+  /** A new division of {@link court}. */
+  readonly division?: string | undefined;
   /** A new status, or omit to leave it unchanged. */
   readonly status?: CaseStatus | undefined;
   /**
-   * The 106C line 1 election, or omit to leave it unchanged (issue #346).
-   * Sent as `exemption_set`. A 400 keyed `exemption_set` means the debtor's
-   * state has opted out of the federal list.
+   * The 106C line 1 election, or omit to leave it unchanged (issue #346). A
+   * 400 keyed `exemptionSet` means the debtor's state has opted out of the
+   * federal list.
    */
   readonly exemptionSet?: ExemptionSet | undefined;
   /**
-   * The petition date (`filed_at` on the wire), or `null` to CLEAR it — the
-   * one place this request sends a null on purpose, because a date entered
-   * by mistake has to be removable and removing it takes the generated
-   * deadlines with it. Omit to leave it unchanged.
+   * The petition date, or `null` to CLEAR it — a date entered by mistake has
+   * to be removable, and removing it takes the generated deadlines with it.
    */
   readonly filedAt?: string | null | undefined;
-  /** The first § 341 date (`meeting_341_at`), `null` to clear, omit to keep. */
+  /** The first § 341 date, `null` to clear, omit to keep. */
   readonly meeting341At?: string | null | undefined;
   /**
    * The post-filing docket facts (issue #355), each `null` to clear and
@@ -1576,56 +1562,12 @@ export interface UpdateCaseChanges {
    * missing one); once filed, neither may be cleared.
    */
   readonly caseNumber?: string | null | undefined;
-  /** The judge's name (`judge`), `null` to clear, omit to keep. */
+  /** The judge's name, `null` to clear, omit to keep. */
   readonly judge?: string | null | undefined;
-  /** The trustee's name (`trustee`), `null` to clear, omit to keep. */
+  /** The trustee's name, `null` to clear, omit to keep. */
   readonly trustee?: string | null | undefined;
-  /** The firm's file number (`office_file_number`), `null` to clear, omit to keep. */
+  /** The firm's file number, `null` to clear, omit to keep. */
   readonly officeFileNumber?: string | null | undefined;
-}
-
-/**
- * The `PATCH /v1/cases/{caseId}` request body, with absent optional fields
- * omitted from the JSON entirely — never sent as `null`, except the two
- * deadline anchors, where an explicit `null` means "clear".
- */
-export function updateCaseChangesToJson(changes: UpdateCaseChanges): Record<string, unknown> {
-  const json: Record<string, unknown> = {};
-  // Explicit `if`s, not a conditional spread: matches
-  // `waitlistSubmissionToJson`'s style, and this is the rule the contract
-  // test pins ("omitted keys mean leave unchanged").
-  if (changes.chapter !== undefined) {
-    json.chapter = changes.chapter;
-  }
-  if (changes.court !== undefined) {
-    json.court = changes.court.court;
-    json.division = changes.court.division;
-  }
-  if (changes.status !== undefined) {
-    json.status = changes.status;
-  }
-  if (changes.exemptionSet !== undefined) {
-    json.exemption_set = changes.exemptionSet;
-  }
-  if (changes.filedAt !== undefined) {
-    json.filed_at = changes.filedAt;
-  }
-  if (changes.meeting341At !== undefined) {
-    json.meeting_341_at = changes.meeting341At;
-  }
-  if (changes.caseNumber !== undefined) {
-    json.case_number = changes.caseNumber;
-  }
-  if (changes.judge !== undefined) {
-    json.judge = changes.judge;
-  }
-  if (changes.trustee !== undefined) {
-    json.trustee = changes.trustee;
-  }
-  if (changes.officeFileNumber !== undefined) {
-    json.office_file_number = changes.officeFileNumber;
-  }
-  return json;
 }
 
 /**
@@ -2907,19 +2849,11 @@ export interface UploadPortalDocumentOptions {
 // `.../core/provenance.py` (the `provenance` map every case-scoped record
 // carries).
 //
-// THESE MODELS ARE snake_case WHERE EVERYTHING ABOVE IS camelCase, and that is
-// the wire being mirrored rather than drift in this file. `case_json` emits
-// `createdAt`; `debtor_json` emits `created_at`, `filing_role`,
-// `other_names_used`. This package's rule is that a model shows what actually
-// goes over the socket, so it follows the endpoint it mirrors instead of
-// smoothing the two spellings together — a client that translated would be the
-// only place in the system where a debtor field has two names.
-//
-// A debtor's `provenance` map is keyed by DOTTED PATHS INTO THIS RECORD —
-// `name.given`, `residence_address.postalCode`, `other_names_used[n1].surname`
-// — so a path follows whatever the body spells: snake_case here until the
-// debtor routes move to camelCase (ADR 0032), except the shared `Address`,
-// which is camelCase everywhere already. One spelling, and it is the server's.
+// camelCase (ADR 0032), and nested like every case record: the server's
+// identity beside a `body`. A debtor's `provenance` map is keyed by DOTTED
+// PATHS INTO THE BODY — `name.given`, `residenceAddress.postalCode`,
+// `otherNamesUsed[n1].surname` — plus the one path `taxId`. The provenance
+// ENTRIES keep their snake_case members (`confirmed_by`, `client_id`).
 // ---------------------------------------------------------------------------
 
 // The four enums below are declared as `as const` arrays with the union
@@ -2989,7 +2923,7 @@ export type TaxIdKind = (typeof TAX_ID_KINDS)[number];
 export interface TaxIdView {
   readonly kind: TaxIdKind;
   /** Exactly four digits. */
-  readonly last_four: string;
+  readonly lastFour: string;
 }
 
 /**
@@ -2997,21 +2931,21 @@ export interface TaxIdView {
  *
  * - `{ kind, value }`: a number being entered, nine digits with or without
  *   dashes. The API validates the shape (SSN vs ITIN rules) and seals it.
- * - `{ kind, last_four }`: the {@link TaxIdView} a read returned, echoed
+ * - `{ kind, lastFour }`: the {@link TaxIdView} a read returned, echoed
  *   back to mean "keep what is stored". A PUT replaces the whole record
  *   ({@link PutDebtorRequest}) and a client only ever holds the last four,
  *   so this is how a save that did not touch the number carries it across.
  *   The API refuses an echo that does not match what it holds.
  *
  * Both members present is refused; neither present is refused. Leaving
- * `tax_id` off the request altogether clears the stored number. A client
+ * `taxId` off the request altogether clears the stored number. A client
  * that holds both — a number on file and one being typed — sends the
  * typed one; {@link putDebtorRequestToJson} applies that rule.
  */
 export interface TaxIdEntry {
   readonly kind: TaxIdKind;
   readonly value?: string | undefined;
-  readonly last_four?: string | undefined;
+  readonly lastFour?: string | undefined;
 }
 
 /**
@@ -3142,7 +3076,7 @@ export interface PersonName {
  *
  * **{@link id} is required here even though the API will generate one**, and
  * that is not defensiveness — a generated id makes the request impossible to
- * satisfy. Provenance addresses this row as `other_names_used[<id>].surname`,
+ * satisfy. Provenance addresses this row as `otherNamesUsed[<id>].surname`,
  * so a client that omits the id cannot write provenance for the fields it is
  * sending, and the API rejects any populated field with no provenance. The id
  * must therefore be the client's, chosen before the request. It has to match
@@ -3154,7 +3088,7 @@ export interface OtherName {
   readonly given?: string | undefined;
   readonly middle?: string | undefined;
   readonly surname?: string | undefined;
-  readonly business_name?: string | undefined;
+  readonly businessName?: string | undefined;
 }
 
 /** A postal address. Every part is optional. */
@@ -3184,13 +3118,13 @@ export interface Venue {
 export interface CreditCounseling {
   readonly status?: CounselingStatus | undefined;
   /** Only meaningful when {@link status} is `not_required`. */
-  readonly exemption_reason?: CounselingExemption | undefined;
+  readonly exemptionReason?: CounselingExemption | undefined;
 }
 
 /**
- * A debtor's case data — everything except server-stamped identity and the
- * provenance map. Shared by {@link PutDebtorRequest} and {@link Debtor}
- * because the API sends back exactly what it accepts.
+ * A debtor's case data — everything except server-stamped identity, the tax
+ * id and the provenance map. The `body` of {@link PutDebtorRequest} and of
+ * {@link Debtor}, because the API sends back exactly what it accepts.
  *
  * **Every field is optional, by construction rather than by omission.** Intake
  * is progressive: a half-finished questionnaire has to persist, so the API
@@ -3201,153 +3135,105 @@ export interface CreditCounseling {
 export interface DebtorBody {
   readonly name?: PersonName | undefined;
   /** Aliases used in the last 8 years. Each row needs a client-chosen {@link OtherName.id}. */
-  readonly other_names_used?: readonly OtherName[] | undefined;
+  readonly otherNamesUsed?: readonly OtherName[] | undefined;
   /** Employer identification numbers. Each max 20 characters. */
-  readonly employer_ids?: readonly string[] | undefined;
-  readonly residence_address?: Address | undefined;
-  readonly mailing_address?: Address | undefined;
+  readonly employerIds?: readonly string[] | undefined;
+  readonly residenceAddress?: Address | undefined;
+  readonly mailingAddress?: Address | undefined;
   /** Max 40 characters. */
   readonly phone?: string | undefined;
   /** Max 40 characters. */
   readonly mobile?: string | undefined;
   readonly email?: string | undefined;
   readonly venue?: Venue | undefined;
-  readonly credit_counseling?: CreditCounseling | undefined;
+  readonly creditCounseling?: CreditCounseling | undefined;
   /**
    * The signature date, `YYYY-MM-DD` — a calendar fact, not an instant, so
    * no time and no zone (see docs/reference/case-data-model.md). The API
-   * parses it as a real date and rejects anything else, including a
-   * timestamp and the compact `20260805` form. `DateInput` in
+   * parses it as a real date and rejects anything else. `DateInput` in
    * `@insolvia-ai/design-system` emits exactly this.
    */
-  readonly signed_at?: string | undefined;
-  /**
-   * The SSN or ITIN (issue 13.12 / #382): a {@link TaxIdEntry} on the way
-   * in, a {@link TaxIdView} on the way out ({@link Debtor} narrows it). Its
-   * provenance is ONE entry at the path `tax_id` — the kind and the digits
-   * are one identifier entered in one act — which {@link staffTypedProvenance}
-   * handles as the one exception to its walk.
-   */
-  readonly tax_id?: TaxIdEntry | undefined;
+  readonly signedAt?: string | undefined;
 }
 
 /**
- * The `PUT /v1/cases/{caseId}/debtors/{filingRole}` request body: a
- * {@link DebtorBody} plus its {@link provenance}.
+ * The `PUT /v1/cases/{caseId}/debtors/{filingRole}` request body:
+ * `{body, taxId?, provenance}`.
  *
  * **Whole, not partial.** The endpoint is a PUT and replaces the record, so
- * anything left out is gone rather than left alone. That is a consequence of
- * the provenance rule rather than a preference: "every populated field carries
- * provenance" can only be checked against a complete record, and a partial
- * write would have to merge against the stored copy and re-derive the rule
- * afterwards. The questionnaire holds the whole record client-side anyway, so
- * autosave sends it.
+ * anything left out is gone rather than left alone: "every populated field
+ * carries provenance" can only be checked against a complete record. The
+ * questionnaire holds the whole record client-side anyway, so autosave sends it.
  *
- * **`tax_id` follows the same rule with one wrinkle.** The record is whole,
- * but the client never holds the whole number after a save — only its last
- * four — so a save that did not touch it echoes the {@link TaxIdView} it was
- * given and the API keeps the stored number ({@link TaxIdEntry}). Leaving it
- * out clears it, exactly as for any other field.
+ * **`taxId` follows the same rule with one wrinkle.** The client never holds
+ * the whole number after a save — only its last four — so a save that did not
+ * touch it echoes the {@link TaxIdView} it was given and the API keeps the
+ * stored number ({@link TaxIdEntry}). Leaving it out clears it. Its provenance
+ * is ONE entry at the path `taxId`.
  */
-export interface PutDebtorRequest extends DebtorBody {
+export interface PutDebtorRequest {
+  readonly body?: DebtorBody | undefined;
+  readonly taxId?: TaxIdEntry | undefined;
   /**
-   * Where each populated field came from. Omitted when empty, which is what an
-   * entirely blank record sends. Build it with {@link staffTypedProvenance}
-   * rather than by hand.
+   * Where each populated field came from. Build it with
+   * {@link staffTypedProvenance} or {@link revisedProvenance} rather than by hand.
    */
   readonly provenance?: ProvenanceMap | undefined;
 }
 
 /**
- * A debtor as both endpoints return it: identity, {@link provenance}, and
- * whatever of {@link DebtorBody} is populated.
- *
- * **Absent members are absent, not null.** On a progressive intake most of the
- * record is empty most of the time, and the API omits empty values — and empty
- * sub-objects and empty lists — entirely rather than sending a body of nulls.
- * This model mirrors that: a missing `name` means nothing in the name has been
- * filled in yet, and the key is genuinely not there.
+ * A debtor as both endpoints return it: identity, its {@link body},
+ * {@link provenance}. **Absent members are absent, not null** — the API omits
+ * empty values, sub-objects and lists from the body entirely.
  */
-export interface Debtor extends DebtorBody {
+export interface Debtor {
   /** The server-generated debtor id, stable across saves. */
   readonly id: string;
-  /** The last-four view — never the number. See {@link TaxIdView}. */
-  readonly tax_id?: TaxIdView | undefined;
   /** The case this debtor belongs to. */
-  readonly case_id: string;
+  readonly caseId: string;
   /** Which debtor of the case this is. */
-  readonly filing_role: FilingRole;
+  readonly filingRole: FilingRole;
   /** The server's UTC creation timestamp, kept verbatim as the wire string. */
-  readonly created_at: string;
+  readonly createdAt: string;
   /** The server's UTC last-update timestamp, kept verbatim as the wire string. */
-  readonly updated_at: string;
+  readonly updatedAt: string;
+  /** Whatever of the case data is populated. */
+  readonly body: DebtorBody;
+  /** The last-four view — never the number. See {@link TaxIdView}. */
+  readonly taxId?: TaxIdView | undefined;
   /**
-   * The {@link FirmClient} this debtor is (ADR 0022) — present on every
-   * Debtor 1 and Debtor 2 opened since cases are opened for clients, and on a
-   * non-filing spouse who is a client. **Server-owned**: {@link putDebtor}
-   * never sends it and the server keeps it; re-linking is
+   * The {@link FirmClient} this debtor is (ADR 0022). **Server-owned**:
+   * {@link putDebtor} never sends it and the server keeps it; re-linking is
    * `linkDebtorClient`.
    */
-  readonly client_id?: string | undefined;
+  readonly clientId?: string | undefined;
   /**
    * The copied field paths where this case's debtor and the linked client
-   * record now disagree (`name.given`, `residence_address.county`, …) —
+   * record now disagree (`name.given`, `residenceAddress.county`, …) —
    * computed on read, never stored. `[]` means identical. Absent when the
    * debtor names no client, or when the caller cannot see the firm's client
    * directory.
    */
-  readonly differs_from_client?: readonly string[] | undefined;
-  /**
-   * Where each populated field came from. **Always present**, unlike every
-   * other optional member here — the API emits it unconditionally, as `{}` on
-   * a record with nothing in it.
-   */
+  readonly differsFromClient?: readonly string[] | undefined;
+  /** Where each populated field came from. Always present — `{}` when empty. */
   readonly provenance: ProvenanceMap;
 }
 
 /**
- * The `PUT /v1/cases/{caseId}/debtors/{filingRole}` request body, with absent
- * members omitted from the JSON entirely — never sent as `null` or `{}`.
- *
- * The pruning is recursive and mirrors `_prune` in `core/debtors.py`: an
- * `undefined` member is dropped, and a sub-object or list that ends up empty
- * is dropped with it. That is not just tidiness — it makes the request body
- * and the response body the same shape, so a record sent and the record
- * returned compare equal instead of differing by a scatter of empty objects.
- *
- * An empty list and an absent list mean the same thing to this endpoint (the
- * PUT replaces the record either way), so dropping an empty one loses nothing.
- *
- * `provenance` entries are pruned by a different rule — see
- * {@link provenanceToJson}.
+ * The `PUT /v1/cases/{caseId}/debtors/{filingRole}` request body as JSON:
+ * the body pruned as {@link caseEntityRequestToJson} prunes one, the tax id as
+ * {@link taxIdToJson} sends it.
  */
 export function putDebtorRequestToJson(request: PutDebtorRequest): Record<string, unknown> {
   return assignDefined(
-    {},
-    {
-      name: personNameToJson(request.name),
-      other_names_used: otherNamesToJson(request.other_names_used),
-      employer_ids: stringListToJson(request.employer_ids),
-      // WITH county: a debtor copied from a client carries B101 line 5's
-      // County box, and a save that dropped it would erase it on every
-      // autosave — and then report it as differing from the client.
-      residence_address: clientAddressToJson(request.residence_address),
-      mailing_address: clientAddressToJson(request.mailing_address),
-      phone: request.phone,
-      mobile: request.mobile,
-      email: request.email,
-      venue: venueToJson(request.venue),
-      credit_counseling: creditCounselingToJson(request.credit_counseling),
-      signed_at: request.signed_at,
-      tax_id: taxIdToJson(request.tax_id),
-      provenance: provenanceToJson(request.provenance),
-    },
+    { body: pruneJsonValue(request.body) ?? {} },
+    { taxId: taxIdToJson(request.taxId), provenance: provenanceToJson(request.provenance) },
   );
 }
 
 /**
  * {@link TaxIdEntry} on the wire: the typed number wins over the on-file
- * echo when a caller holds both (a questionnaire that loaded `last_four` and
+ * echo when a caller holds both (a questionnaire that loaded `lastFour` and
  * then had a new number typed into it), and an entry with neither — a kind
  * chosen and nothing typed — is omitted rather than sent for the API to
  * refuse. Exported for {@link staffTypedProvenance}'s one exception, which
@@ -3360,8 +3246,8 @@ export function taxIdToJson(taxId: TaxIdEntry | undefined): Record<string, unkno
   if (taxId.value !== undefined && taxId.value !== '') {
     return { kind: taxId.kind, value: taxId.value };
   }
-  if (taxId.last_four !== undefined && taxId.last_four !== '') {
-    return { kind: taxId.kind, last_four: taxId.last_four };
+  if (taxId.lastFour !== undefined && taxId.lastFour !== '') {
+    return { kind: taxId.kind, lastFour: taxId.lastFour };
   }
   return undefined;
 }
@@ -3424,25 +3310,6 @@ function addressToJson(address: Address | undefined): Record<string, unknown> | 
   });
 }
 
-function venueToJson(venue: Venue | undefined): Record<string, unknown> | undefined {
-  if (venue === undefined) {
-    return undefined;
-  }
-  return definedMembersOrUndefined({ basis: venue.basis, explanation: venue.explanation });
-}
-
-function creditCounselingToJson(
-  counseling: CreditCounseling | undefined,
-): Record<string, unknown> | undefined {
-  if (counseling === undefined) {
-    return undefined;
-  }
-  return definedMembersOrUndefined({
-    status: counseling.status,
-    exemption_reason: counseling.exemption_reason,
-  });
-}
-
 /**
  * Alias rows, each keeping its `id` — the row's address, which provenance
  * paths already reference and which the server will not replace.
@@ -3460,14 +3327,10 @@ function otherNamesToJson(
         given: name.given,
         middle: name.middle,
         surname: name.surname,
-        business_name: name.business_name,
+        businessName: name.businessName,
       },
     ),
   );
-}
-
-function stringListToJson(values: readonly string[] | undefined): string[] | undefined {
-  return values === undefined || values.length === 0 ? undefined : [...values];
 }
 
 /**
@@ -3641,7 +3504,7 @@ export function revisedProvenance(
 function taxIdIdentity(sent: Record<string, unknown>): string {
   return typeof sent.value === 'string'
     ? `typed:${sent.value}`
-    : `${String(sent.kind)}:${String(sent.last_four)}`;
+    : `${String(sent.kind)}:${String(sent.lastFour)}`;
 }
 
 const PATH_SEGMENT_RE = /^([a-z][A-Za-z0-9_]*)(?:\[([A-Za-z0-9_-]+)\])?$/;
@@ -3666,46 +3529,30 @@ function valueAt(record: unknown, path: string): unknown {
   return current;
 }
 
-// Stamped by the server or already the record's address, so there is nothing
-// to record the origin of. The same six keys `debtor_body()` drops.
-const NOT_CASE_DATA: readonly string[] = [
-  'id',
-  'case_id',
-  'filing_role',
-  'created_at',
-  'updated_at',
-  'provenance',
-];
-
+/**
+ * The case data a provenance map describes: a collection body or a loose
+ * object as it stands, a debtor ({@link PutDebtorRequest} or {@link Debtor})
+ * as its `body` with its tax id beside it at `taxId`.
+ */
 function caseDataOf(
-  body: DebtorBodyLike,
+  record: DebtorBodyLike,
   taxIdAs: (sent: Record<string, unknown>) => unknown = () => 'present',
 ): unknown {
-  if (!isPlainObject(body)) {
-    return body;
+  if (!isPlainObject(record)) {
+    return record;
   }
-  const caseData = Object.fromEntries(
-    Object.entries(body).filter(([key]) => !NOT_CASE_DATA.includes(key)),
-  );
-  // THE ONE EXCEPTION TO THE WALK, mirrored from `parse_debtor` server-side:
-  // the tax id is ONE field for provenance — the path `tax_id`, never
-  // `tax_id.kind` and `tax_id.value` — because the kind and the digits are
-  // one identifier entered in one act, and the last-four echo a client sends
-  // to keep a stored number is not a fact of its own. Walking the object
-  // would mint two paths the API then refuses as unattributed. It counts as
-  // populated exactly when `taxIdToJson` would send it, so the map and the
-  // body cannot disagree.
-  if ('tax_id' in caseData) {
-    const sent = isPlainObject(caseData.tax_id)
-      ? taxIdToJson(caseData.tax_id as unknown as TaxIdEntry)
-      : undefined;
-    if (sent === undefined) {
-      delete caseData.tax_id;
-    } else {
-      caseData.tax_id = taxIdAs(sent);
-    }
+  if (!isPlainObject(record.body)) {
+    return Object.fromEntries(Object.entries(record).filter(([key]) => key !== 'provenance'));
   }
-  return caseData;
+  // THE ONE EXCEPTION TO THE WALK, mirrored from the server: the tax id is
+  // ONE field for provenance — the path `taxId`, never `taxId.kind` — because
+  // the kind and the digits are one identifier entered in one act. It counts
+  // as populated exactly when `taxIdToJson` would send it, so the map and the
+  // request cannot disagree.
+  const sent = isPlainObject(record.taxId)
+    ? taxIdToJson(record.taxId as unknown as TaxIdEntry)
+    : undefined;
+  return sent === undefined ? { ...record.body } : { ...record.body, taxId: taxIdAs(sent) };
 }
 
 /** A field path segment. Note the lower-case start: `SSN` and `LegalName` are not names. */
@@ -4966,12 +4813,14 @@ export function noteRequestToJson(request: NoteRequest): Record<string, unknown>
 }
 
 /**
- * The recursive half of {@link caseEntityRequestToJson}. `null` is treated as
- * absent alongside `undefined` — the server stores neither — and `false` and
- * `0` survive, because they are answers.
+ * The recursive half of {@link caseEntityRequestToJson} and
+ * {@link putDebtorRequestToJson}. `null` and `''` are treated as absent
+ * alongside `undefined` — a cleared input is no answer, and the server would
+ * otherwise demand provenance for it — while `false` and `0` survive,
+ * because they are answers.
  */
 function pruneJsonValue(value: unknown): unknown {
-  if (value === undefined || value === null) {
+  if (value === undefined || value === null || value === '') {
     return undefined;
   }
   if (Array.isArray(value)) {

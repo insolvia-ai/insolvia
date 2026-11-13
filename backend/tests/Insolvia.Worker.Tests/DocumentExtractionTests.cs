@@ -52,7 +52,7 @@ public sealed class DocumentExtractionTests
     private static async Task<(Case Case, DocumentExtractionDeps Deps, MemoryDocumentBlobStore Blobs, MemoryCandidateStore Candidates, MemoryAccessLog Log)> BuildAsync(ScriptedExtractionModel? model)
     {
         var cases = new MemoryCaseStore();
-        var (created, assignment) = CaseRules.Create(CaseRules.ParseCreation(Raw("""{"chapter": 7, "court": "flmb", "division": "tampa"}"""), requireClients: false), Firm, Alice);
+        var (created, assignment) = CaseRules.Create(new NewCase(7, "flmb", "tampa", []), Firm, Alice);
         await cases.CreateAsync(created, assignment, cancellationToken: Ct);
         var blobs = new MemoryDocumentBlobStore();
         var candidates = new MemoryCandidateStore();
