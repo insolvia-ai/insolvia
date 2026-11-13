@@ -153,7 +153,7 @@ public sealed class ApprovalAndResolutionTests : IAsyncLifetime
         Assert.Equal(409, blocked);
         Assert.Contains((AccessAction.FilingApprove, AccessOutcome.Denied, "filing_unresolved"), _world.Actions());
 
-        var (resolved, view) = await _world.CallAsync(HttpMethod.Post, $"/v1/cases/{_world.CaseId}/filings/{approval.FilingId}/resolution", """{"outcome": "not_filed", "docket_checked": true}""");
+        var (resolved, view) = await _world.CallAsync(HttpMethod.Post, $"/v1/cases/{_world.CaseId}/filings/{approval.FilingId}/resolution", """{"outcome": "not_filed", "docketChecked": true}""");
         Assert.True(resolved == 200, view?.ToJsonString());
         Assert.Equal("not_filed", view!["filing"]!["resolution"]!["outcome"]!.GetValue<string>());
         Assert.False(view["filing"]!["resolvable"]!.GetValue<bool>());
@@ -176,7 +176,7 @@ public sealed class ApprovalAndResolutionTests : IAsyncLifetime
         var (status, view) = await _world.CallAsync(
             HttpMethod.Post,
             $"/v1/cases/{_world.CaseId}/filings/{approval.FilingId}/resolution",
-            $$"""{"outcome": "filed", "docket_checked": true, "case_number": "8:26-bk-01234", "filed_at": "{{today}}"}""");
+            $$"""{"outcome": "filed", "docketChecked": true, "caseNumber": "8:26-bk-01234", "filedAt": "{{today}}"}""");
 
         Assert.True(status == 200, view?.ToJsonString());
         var filed = (await _world.CaseAsync())!;
@@ -193,7 +193,7 @@ public sealed class ApprovalAndResolutionTests : IAsyncLifetime
         var (approval, job) = await _world.ApproveAsync();
         Assert.Equal("outcome_unknown", (await _world.RunAsync(job)).Outcome);
 
-        var (status, body) = await _world.CallAsync(HttpMethod.Post, $"/v1/cases/{_world.CaseId}/filings/{approval.FilingId}/resolution", """{"outcome": "not_filed", "docket_checked": true}""");
+        var (status, body) = await _world.CallAsync(HttpMethod.Post, $"/v1/cases/{_world.CaseId}/filings/{approval.FilingId}/resolution", """{"outcome": "not_filed", "docketChecked": true}""");
 
         Assert.Equal((409, "ResolutionRefused", "attempt_may_be_live"), (status, body!["error"]!.GetValue<string>(), body["reason"]!.GetValue<string>()));
     }
@@ -208,6 +208,6 @@ public sealed class ApprovalAndResolutionTests : IAsyncLifetime
         var (status, body) = await _world.CallAsync(HttpMethod.Post, $"/v1/cases/{_world.CaseId}/filings/{approval.FilingId}/resolution", """{"outcome": "not_filed"}""");
 
         Assert.Equal(400, status);
-        Assert.NotNull(body!["fields"]!["docket_checked"]);
+        Assert.NotNull(body!["fields"]!["docketChecked"]);
     }
 }

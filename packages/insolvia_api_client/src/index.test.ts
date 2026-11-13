@@ -5213,14 +5213,14 @@ describe('the per-filing approval endpoints (ADR 0024, guardrail 1)', () => {
     expect(view.approval).toEqual(APPROVAL_JSON);
   });
 
-  test('names the login only when asked, snake_case', async () => {
+  test('names the login only when asked', async () => {
     const stub = stubFetch(() => jsonResponse({ basis: BASIS_JSON, approval: APPROVAL_JSON }, 201));
 
     await client(stub).approveFiling(CASE, { digest: DIGEST, credentialId: 'cred-1' });
 
     expect(JSON.parse(stub.lastRequest().body as string)).toEqual({
       digest: DIGEST,
-      credential_id: 'cred-1',
+      credentialId: 'cred-1',
     });
   });
 
@@ -5366,9 +5366,9 @@ describe('the per-filing approval endpoints (ADR 0024, guardrail 1)', () => {
     expect(stub.lastRequest().url).toBe(FILING_PATH);
     expect(JSON.parse(stub.lastRequest().body as string)).toEqual({
       outcome: 'filed',
-      docket_checked: true,
-      case_number: '6:99-bk-10000',
-      filed_at: '2099-01-15',
+      docketChecked: true,
+      caseNumber: '6:99-bk-10000',
+      filedAt: '2099-01-15',
     });
     expect(view.filing?.resolution).toEqual(resolution);
   });
@@ -5380,7 +5380,7 @@ describe('the per-filing approval endpoints (ADR 0024, guardrail 1)', () => {
 
     expect(JSON.parse(stub.lastRequest().body as string)).toEqual({
       outcome: 'not_filed',
-      docket_checked: true,
+      docketChecked: true,
     });
   });
 
@@ -5395,7 +5395,7 @@ describe('the per-filing approval endpoints (ADR 0024, guardrail 1)', () => {
     });
 
     expect(JSON.parse(stub.lastRequest().body as string)).toMatchObject({
-      confirmation_document_id: 'doc-1',
+      confirmationDocumentId: 'doc-1',
     });
   });
 
@@ -8723,35 +8723,35 @@ describe('the event, calendar and feed endpoints', () => {
   const EVENT_ID = 'e0e00000-0000-4000-8000-00000000e0e0';
   const HAND_MADE_JSON = {
     id: EVENT_ID,
-    case_id: CASE_ID,
+    caseId: CASE_ID,
     title: 'Hearing on the motion',
     start: '2026-03-02',
     end: '2026-03-02',
-    all_day: true,
+    allDay: true,
     location: 'Courtroom 4',
     attendees: [SUBJECT],
     generated: false,
     dismissed: false,
-    created_by: SUBJECT,
-    created_at: '2026-02-01T09:15:00.123456Z',
-    updated_at: '2026-02-01T09:15:00.123456Z',
+    createdBy: SUBJECT,
+    createdAt: '2026-02-01T09:15:00.123456Z',
+    updatedAt: '2026-02-01T09:15:00.123456Z',
   };
   const GENERATED_JSON = {
     id: 'd0d00000-0000-4000-8000-00000000d0d0',
-    case_id: CASE_ID,
+    caseId: CASE_ID,
     title: 'Schedules, statements and other documents due',
     description: 'Rule 1007(c)(1): ...',
     start: '2026-03-16',
     end: '2026-03-16',
-    all_day: true,
+    allDay: true,
     attendees: [],
     generated: true,
-    rule_id: 'frbp-1007c1-schedules',
-    rule_citation: 'Fed. R. Bankr. P. 1007(c)(1)',
+    ruleId: 'frbp-1007c1-schedules',
+    ruleCitation: 'Fed. R. Bankr. P. 1007(c)(1)',
     dismissed: true,
-    created_by: SUBJECT,
-    created_at: '2026-03-02T09:15:00.123456Z',
-    updated_at: '2026-03-03T09:15:00.123456Z',
+    createdBy: SUBJECT,
+    createdAt: '2026-03-02T09:15:00.123456Z',
+    updatedAt: '2026-03-03T09:15:00.123456Z',
   };
 
   function client(respond: () => Response) {
@@ -8777,16 +8777,16 @@ describe('the event, calendar and feed endpoints', () => {
     expect(stub.lastRequest().headers.get('authorization')).toBe(`Bearer ${ACCESS_TOKEN}`);
     expect(events).toHaveLength(2);
     expect(events[0]).toMatchObject({ id: EVENT_ID, generated: false, location: 'Courtroom 4' });
-    expect(events[0]?.rule_id).toBeUndefined();
+    expect(events[0]?.ruleId).toBeUndefined();
     expect(events[1]).toMatchObject({
       generated: true,
       dismissed: true,
-      rule_id: 'frbp-1007c1-schedules',
-      rule_citation: 'Fed. R. Bankr. P. 1007(c)(1)',
+      ruleId: 'frbp-1007c1-schedules',
+      ruleCitation: 'Fed. R. Bankr. P. 1007(c)(1)',
     });
   });
 
-  test('POSTs a draft with only the supplied keys, snake_case, and maps the 201', async () => {
+  test('POSTs a draft with only the supplied keys and maps the 201', async () => {
     const { stub, client: api } = client(() => jsonResponse(HAND_MADE_JSON, 201));
 
     const created = await api.addCaseEvent(CASE_ID, {
@@ -8812,14 +8812,14 @@ describe('the event, calendar and feed endpoints', () => {
     await put.client.updateCaseEvent(CASE_ID, EVENT_ID, {
       title: 'Moved',
       start: '2026-03-03T19:00:00Z',
-      all_day: false,
+      allDay: false,
     });
     expect(put.stub.lastRequest().method).toBe('PUT');
     expect(put.stub.lastRequest().url).toBe(`${BASE_URL}/v1/cases/${CASE_ID}/events/${EVENT_ID}`);
     expect(JSON.parse(put.stub.lastRequest().body)).toEqual({
       title: 'Moved',
       start: '2026-03-03T19:00:00Z',
-      all_day: false,
+      allDay: false,
     });
 
     const patch = client(() => jsonResponse({ ...GENERATED_JSON, dismissed: true }, 200));
@@ -8849,12 +8849,12 @@ describe('the event, calendar and feed endpoints', () => {
   });
 
   test('the firm-scoped routes hit /v1/firm/events with no firm id anywhere', async () => {
-    const firmEvent = { ...HAND_MADE_JSON, case_id: undefined, title: 'Office closed' };
-    delete (firmEvent as Record<string, unknown>).case_id;
+    const firmEvent = { ...HAND_MADE_JSON, caseId: undefined, title: 'Office closed' };
+    delete (firmEvent as Record<string, unknown>).caseId;
     const list = client(() => jsonResponse({ events: [firmEvent] }, 200));
     const events = await list.client.listFirmEvents();
     expect(list.stub.lastRequest().url).toBe(`${BASE_URL}/v1/firm/events`);
-    expect(events[0]?.case_id).toBeUndefined();
+    expect(events[0]?.caseId).toBeUndefined();
 
     const add = client(() => jsonResponse(firmEvent, 201));
     await add.client.addFirmEvent({ title: 'Office closed', start: '2026-07-03' });
@@ -8889,7 +8889,7 @@ describe('the event, calendar and feed endpoints', () => {
       `${BASE_URL}/v1/calendar?from=2026-03-01&to=2026-03-31&attendee=me&case_id=${CASE_ID}`,
     );
     expect(window.from).toBe('2026-03-01');
-    expect(window.events[0]?.rule_id).toBe('frbp-1007c1-schedules');
+    expect(window.events[0]?.ruleId).toBe('frbp-1007c1-schedules');
 
     const bare = client(() =>
       jsonResponse({ from: '2026-03-01', to: '2026-03-31', events: [] }, 200),

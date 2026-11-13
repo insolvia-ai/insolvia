@@ -40,19 +40,8 @@ public sealed class DocumentRequestTests
     }
 
     [Fact]
-    public void A_request_is_parsed_like_a_checklist_entry()
-    {
-        Assert.Equal(new ChecklistItem("Lease", DocumentKind.Other), DocumentRequestRules.ParseCreation(Body.Of("""{"title": "Lease", "kind": "other"}""")));
-        var error = Assert.Throws<FieldValidationException>(() => DocumentRequestRules.ParseCreation(Body.Of("""{"kind": "nope"}""")));
-        Assert.Equal(["kind", "title"], error.Fields.Keys.Order(StringComparer.Ordinal));
-    }
-
-    [Fact]
     public void Received_cannot_be_set_by_hand()
     {
-        Assert.Throws<FieldValidationException>(() => DocumentRequestRules.ParseUpdate(Body.Of("""{"status": "received"}""")));
-        Assert.Throws<FieldValidationException>(() => DocumentRequestRules.ParseUpdate(Body.Of("""{"status": "done"}""")));
-        Assert.Equal(DocumentRequestStatus.Waived, DocumentRequestRules.ParseUpdate(Body.Of("""{"status": "waived"}""")));
         var error = Assert.Throws<ArgumentException>(() => DocumentRequestRules.SetStatus(Request(), DocumentRequestStatus.Received));
         Assert.Contains("not settable", error.Message, StringComparison.Ordinal);
     }

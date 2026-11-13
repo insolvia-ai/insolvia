@@ -8,11 +8,6 @@ using Insolvia.Domain.Provenance;
 
 namespace Insolvia.Domain.Candidates;
 
-/// <summary>One validated review request.</summary>
-/// <param name="Accept">Accept (true) or reject.</param>
-/// <param name="CorrectedPayload">The human's corrected record — an accept only.</param>
-public sealed record ReviewDecision(bool Accept, JsonObject? CorrectedPayload = null);
-
 /// <summary>
 /// Extraction review — the human confirmation that turns candidates into case
 /// data (from services/api core/extraction_review.py; issue #89 / 8.9). NOTHING
@@ -44,7 +39,6 @@ public static partial class ExtractionReview
         ["pay_period_records"] = "employmentId",
     };
 
-    private static readonly string[] ReviewActions = ["accept", "reject"];
 
     /// <summary>The provenance source each origin channel confirms into.</summary>
     public static string SourceFor(OriginChannel channel) => channel switch
@@ -54,31 +48,6 @@ public static partial class ExtractionReview
         OriginChannel.Client => ProvenanceSource.ClientAnswered.ToWire(),
         _ => throw new ValidationException($"candidates from channel '{channel.ToWire()}' are not reviewable"),
     };
-
-    /// <summary>Validate POST …/review; unknown keys are ignored. Corrections ride on an accept only.</summary>
-    public static ReviewDecision ParseReview(JsonObject payload)
-    {
-        ArgumentNullException.ThrowIfNull(payload);
-        var action = Json.AsString(payload["action"]);
-        if (action is null || !ReviewActions.Contains(action, StringComparer.Ordinal))
-        {
-            throw Field("action", "Action must be one of " + string.Join(", ", ReviewActions) + ".");
-        }
-
-        JsonObject? corrected = null;
-        if (payload.TryGetPropertyValue("correctedPayload", out var raw) && raw is not null)
-        {
-            if (action != "accept")
-            {
-                throw Field("correctedPayload", "Corrections ride on an accept.");
-            }
-
-            corrected = raw as JsonObject ?? throw Field("correctedPayload", "correctedPayload must be an object.");
-            corrected = (JsonObject)corrected.DeepClone();
-        }
-
-        return new ReviewDecision(action == "accept", corrected);
-    }
 
     /// <summary>The <c>?status=</c> filter, or a 400.</summary>
     public static CandidateStatus? ParseStatusFilter(string? value)

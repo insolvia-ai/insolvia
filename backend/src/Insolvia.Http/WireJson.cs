@@ -35,7 +35,7 @@ public static class WireJson
     // The case collections' bodies, the case, debtor and firm requests, converted to typed requests (ADR 0032).
     private static readonly HashSet<string> CamelNamespaces = new(StringComparer.Ordinal)
     {
-        "Insolvia.Domain.Assets", "Insolvia.Domain.Cases", "Insolvia.Domain.Claims", "Insolvia.Domain.Codebtors", "Insolvia.Domain.ContractLeases",
+        "Insolvia.Domain.Assets", "Insolvia.Domain.Cases", "Insolvia.Domain.CaseTasks", "Insolvia.Domain.Claims", "Insolvia.Domain.Codebtors", "Insolvia.Domain.ContractLeases",
         "Insolvia.Domain.Creditors", "Insolvia.Domain.Debtors", "Insolvia.Domain.Exemptions", "Insolvia.Domain.Expenses", "Insolvia.Domain.FilingCredentials",
         "Insolvia.Domain.FirmClients", "Insolvia.Domain.Firms", "Insolvia.Domain.Income", "Insolvia.Domain.LibraryCreditors", "Insolvia.Domain.MeansTest",
         "Insolvia.Domain.Notes", "Insolvia.Domain.Petitions", "Insolvia.Domain.Plans", "Insolvia.Domain.Sofa", "Insolvia.Domain.TaxIds",

@@ -245,7 +245,7 @@ function ResolutionForm({
       )}
       {chosen === 'filed' ? (
         <>
-          <Field.Root name="case_number" invalid={Boolean(errors.case_number)}>
+          <Field.Root name="caseNumber" invalid={Boolean(errors.caseNumber)}>
             <Field.Label>Case number</Field.Label>
             <Input
               value={caseNumber}
@@ -255,9 +255,9 @@ function ResolutionForm({
               autoCapitalize="none"
             />
             <Field.Description>As the docket prints it, office first.</Field.Description>
-            {errors.case_number ? <Field.Error match>{errors.case_number}</Field.Error> : null}
+            {errors.caseNumber ? <Field.Error match>{errors.caseNumber}</Field.Error> : null}
           </Field.Root>
-          <Field.Root name="filed_at" invalid={Boolean(errors.filed_at)}>
+          <Field.Root name="filedAt" invalid={Boolean(errors.filedAt)}>
             <Field.Label>Petition date</Field.Label>
             <DateInput
               value={filedAt}
@@ -267,12 +267,12 @@ function ResolutionForm({
                 setFiledAt(next);
               }}
             />
-            {errors.filed_at ? <Field.Error match>{errors.filed_at}</Field.Error> : null}
+            {errors.filedAt ? <Field.Error match>{errors.filedAt}</Field.Error> : null}
           </Field.Root>
           {notices.length > 0 ? (
             <Field.Root
-              name="confirmation_document_id"
-              invalid={Boolean(errors.confirmation_document_id)}
+              name="confirmationDocumentId"
+              invalid={Boolean(errors.confirmationDocumentId)}
             >
               <Field.Label>The court’s notice (optional)</Field.Label>
               <Select
@@ -286,8 +286,8 @@ function ResolutionForm({
               <Field.Description>
                 A court notice uploaded to this case’s documents.
               </Field.Description>
-              {errors.confirmation_document_id ? (
-                <Field.Error match>{errors.confirmation_document_id}</Field.Error>
+              {errors.confirmationDocumentId ? (
+                <Field.Error match>{errors.confirmationDocumentId}</Field.Error>
               ) : null}
             </Field.Root>
           ) : null}
@@ -305,8 +305,8 @@ function ResolutionForm({
           I checked the court’s own docket for this debtor.
         </Text>
       </View>
-      {errors.docket_checked ? (
-        <Text style={[styles.body, danger]}>{errors.docket_checked}</Text>
+      {errors.docketChecked ? (
+        <Text style={[styles.body, danger]}>{errors.docketChecked}</Text>
       ) : null}
       <View style={styles.actions}>
         <Button

@@ -58,7 +58,7 @@ export function toDraft(form: EventFormState): CalendarEventDraft {
       title: form.title,
       start: form.startDate,
       end: undefinedIfBlank(form.endDate),
-      all_day: true,
+      allDay: true,
       location: undefinedIfBlank(form.location),
       description: undefinedIfBlank(form.description),
       attendees: form.attendees.length === 0 ? undefined : form.attendees,
@@ -69,7 +69,7 @@ export function toDraft(form: EventFormState): CalendarEventDraft {
     title: form.title,
     start: form.startDate === '' ? '' : localInstant(form.startDate, form.startTime),
     end: form.startDate === '' ? undefined : localInstant(endDate, form.endTime),
-    all_day: false,
+    allDay: false,
     location: undefinedIfBlank(form.location),
     description: undefinedIfBlank(form.description),
     attendees: form.attendees.length === 0 ? undefined : form.attendees,
@@ -82,14 +82,14 @@ export function toDraft(form: EventFormState): CalendarEventDraft {
  */
 export function fromEvent(event: {
   readonly title: string;
-  readonly all_day: boolean;
+  readonly allDay: boolean;
   readonly start: string;
   readonly end: string;
   readonly location?: string | undefined;
   readonly description?: string | undefined;
   readonly attendees: readonly string[];
 }): EventFormState {
-  if (event.all_day) {
+  if (event.allDay) {
     return {
       ...EMPTY_EVENT,
       title: event.title,

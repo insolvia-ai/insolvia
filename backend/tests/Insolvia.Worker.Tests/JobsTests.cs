@@ -21,40 +21,6 @@ public sealed class JobsTests
 
     private static JsonObject Body(string json) => JsonNode.Parse(json)!.AsObject();
 
-    // ── Acceptance validation ───────────────────────────────────────
-
-    [Fact]
-    public void A_registered_kind_is_accepted() =>
-        Assert.Equal(("echo", (string?)null, (JsonObject?)null), JobRules.ParseAcceptance(Body("""{"kind": "echo"}""")));
-
-    [Theory]
-    [InlineData("{}")]
-    [InlineData("""{"kind": "assemble_packet_from_the_future"}""")]
-    [InlineData("""{"kind": 7}""")]
-    [InlineData("""{"kind": null}""")]
-    [InlineData("""{"kind": "document_extraction"}""")]
-    [InlineData("""{"kind": "document_extraction", "documentId": "  "}""")]
-    [InlineData("""{"kind": "document_extraction", "documentId": 7}""")]
-    [InlineData("""{"kind": "echo", "documentId": "doc-1"}""")]
-    [InlineData("""{"kind": "echo", "options": {"draftWatermark": true}}""")]
-    [InlineData("""{"kind": "packet_assembly", "options": "not-an-object"}""")]
-    public void Anything_but_a_registered_kind_is_rejected(string payload) =>
-        Assert.Throws<FieldValidationException>(() => JobRules.ParseAcceptance(Body(payload)));
-
-    [Fact]
-    public void An_options_scoped_kind_accepts_and_returns_its_options()
-    {
-        var (kind, document, options) = JobRules.ParseAcceptance(Body("""{"kind": "packet_assembly", "options": {"draftWatermark": true}}"""));
-        Assert.Equal("packet_assembly", kind);
-        Assert.Null(document);
-        Assert.True(JsonNode.DeepEquals(Body("""{"draftWatermark": true}"""), options));
-        Assert.Null(JobRules.ParseAcceptance(Body("""{"kind": "packet_assembly"}""")).Options);
-    }
-
-    [Fact]
-    public void A_document_scoped_kind_requires_and_returns_its_document() =>
-        Assert.Equal("doc-1", JobRules.ParseAcceptance(Body("""{"kind": "document_extraction", "documentId": "doc-1"}""")).DocumentId);
-
     [Fact]
     public void Every_pure_worker_is_an_acceptable_kind()
     {

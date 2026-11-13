@@ -1,4 +1,7 @@
+using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
+using Insolvia.Domain;
+using Insolvia.Domain.Cases;
 using Insolvia.Domain.Filings;
 
 namespace Insolvia.Api.Filing;
@@ -128,18 +131,68 @@ public sealed record ResolutionView(
 
 /// <summary>
 /// The attorney's resolution of a hand-back
-/// (<c>POST /v1/cases/{caseId}/filings/{filingId}/resolution</c>). Parsed by
-/// <c>FilingOutcomes.Parse</c>, which owns validation.
+/// (<c>POST /v1/cases/{caseId}/filings/{filingId}/resolution</c>). An unknown member is refused.
 /// </summary>
 /// <param name="Outcome"><c>filed</c> or <c>not_filed</c>.</param>
 /// <param name="DocketChecked">Must be true: the attorney checked the court's docket.</param>
 /// <param name="CaseNumber">The case number on the docket; filed only.</param>
 /// <param name="FiledAt">The petition date, <c>yyyy-MM-dd</c>; filed only.</param>
 /// <param name="ConfirmationDocumentId">An uploaded confirmation document; filed only.</param>
-[SnakeCase]
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record FilingResolutionRequest(
-    ResolutionOutcome Outcome,
-    bool DocketChecked,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? CaseNumber,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? FiledAt,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ConfirmationDocumentId);
+    [property: Required(ErrorMessage = "Outcome must be filed or not_filed.")] ResolutionOutcome? Outcome,
+    bool DocketChecked = false,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? CaseNumber = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] DateOnly? FiledAt = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull), MinLength(1, ErrorMessage = "Must be a document id.")] string? ConfirmationDocumentId = null)
+    : IValidatableObject
+{
+    /// <summary>The resolution as the filing rules take it.</summary>
+    /// <returns>The resolution.</returns>
+    public ResolutionRequest ToResolution() => new(Outcome!.Value, CaseNumber, FiledAt, ConfirmationDocumentId);
+
+    /// <summary>The docket was checked; a filed outcome names its number and date, a not-filed one neither.</summary>
+    /// <param name="validationContext">Unused.</param>
+    /// <returns>The failures.</returns>
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        if (!DocketChecked)
+        {
+            yield return new ValidationResult("Confirm you checked the court's own docket for this debtor.", [nameof(DocketChecked)]);
+        }
+
+        if (Outcome == ResolutionOutcome.Filed)
+        {
+            if (string.IsNullOrWhiteSpace(CaseNumber))
+            {
+                yield return new ValidationResult("Enter the case number the court's docket shows.", [nameof(CaseNumber)]);
+            }
+            else if (TextRules.Length(CaseNumber) > 40 || CaseNumbers.Parse(CaseNumber, requireOffice: true) is null)
+            {
+                yield return new ValidationResult("Enter the case number as the docket prints it, e.g. 6:26-bk-10000.", [nameof(CaseNumber)]);
+            }
+
+            if (FiledAt is null)
+            {
+                yield return new ValidationResult("Enter the petition date in YYYY-MM-DD form.", [nameof(FiledAt)]);
+            }
+
+            yield break;
+        }
+
+        if (CaseNumber is not null)
+        {
+            yield return new ValidationResult("A filing that is not on the docket has no case number.", [nameof(CaseNumber)]);
+        }
+
+        if (FiledAt is not null)
+        {
+            yield return new ValidationResult("A filing that is not on the docket has no filing details.", [nameof(FiledAt)]);
+        }
+
+        if (ConfirmationDocumentId is not null)
+        {
+            yield return new ValidationResult("A filing that is not on the docket has no filing details.", [nameof(ConfirmationDocumentId)]);
+        }
+    }
+}

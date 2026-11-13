@@ -18,12 +18,12 @@ const EVENT: Spec = {
   ...(CALENDAR_EVENT as Record<string, Spec>),
   attendees: ['string'],
   generated: 'boolean',
-  'rule_id?': 'string',
-  'rule_citation?': 'string',
+  'ruleId?': 'string',
+  'ruleCitation?': 'string',
   dismissed: 'boolean',
-  created_by: 'string',
-  created_at: 'string',
-  updated_at: 'string',
+  createdBy: 'string',
+  createdAt: 'string',
+  updatedAt: 'string',
 };
 
 describe('the calendar', () => {
@@ -39,7 +39,7 @@ describe('the calendar', () => {
       attendees: [seeded.firmAdmin.subject],
     });
     admin.wire(201, EVENT);
-    expect(hearing.case_id).toBe(caseId);
+    expect(hearing.caseId).toBe(caseId);
     const moved = await admin.api.updateCaseEvent(caseId, hearing.id, {
       title: 'Meeting of creditors (continued)',
       start: '2026-11-27T15:00:00Z',
@@ -57,15 +57,15 @@ describe('the calendar', () => {
     const offsite = await admin.api.addFirmEvent({
       title: 'Firm offsite',
       start: '2026-11-25',
-      all_day: true,
+      allDay: true,
     });
     admin.wire(201, EVENT);
-    expect(offsite.case_id).toBeUndefined();
-    expect(admin.last().body).not.toHaveProperty('case_id');
+    expect(offsite.caseId).toBeUndefined();
+    expect(admin.last().body).not.toHaveProperty('caseId');
     await admin.api.updateFirmEvent(offsite.id, {
       title: 'Firm offsite',
       start: '2026-11-26',
-      all_day: true,
+      allDay: true,
       description: 'Moved a day.',
     });
     admin.wire(200, EVENT);
@@ -81,7 +81,7 @@ describe('the calendar', () => {
       expect.arrayContaining([hearing.id, offsite.id]),
     );
     const scoped = await admin.api.getCalendar({ from: '2026-11-01', to: '2026-12-01', caseId });
-    expect(scoped.events.every((e) => e.case_id === caseId)).toBe(true);
+    expect(scoped.events.every((e) => e.caseId === caseId)).toBe(true);
 
     await expectApiError(
       admin.api.addFirmEvent({ title: '', start: 'not-a-date' }),

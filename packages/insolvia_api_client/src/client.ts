@@ -20,18 +20,12 @@ import {
   PORTAL_INPUT_TYPES,
   QUESTIONNAIRE_SECTION_IDS,
   SIGNATURE_PAGES_MODES,
-  calendarEventDraftToJson,
   calendarWindowQuery,
   caseEntityRequestToJson,
-  createDocumentRequestToJson,
-  createTaskRequestToJson,
   formPreviewQuery,
   listCasesQuery,
   listMyTasksQuery,
-  noteRequestToJson,
-  outputOptionsRequestToJson,
   putDebtorRequestToJson,
-  updateTaskRequestToJson,
   waitlistSubmissionToJson,
 } from './models.ts';
 import type {
@@ -200,7 +194,7 @@ import type {
 } from './models.ts';
 // Document request checklists (ADR 0023 PR 5) — their own import, so the
 // section reads as one unit.
-import { DOCUMENT_CHANNELS, DOCUMENT_REQUEST_STATUSES, newChecklistItemToJson } from './models.ts';
+import { DOCUMENT_CHANNELS, DOCUMENT_REQUEST_STATUSES } from './models.ts';
 import type {
   ApplyChecklistResult,
   CaseDocumentRequests,
@@ -553,9 +547,7 @@ export class InsolviaApiClient {
       body: JSON.stringify({
         kind,
         ...(documentId === undefined ? {} : { documentId }),
-        ...(outputOptions === undefined
-          ? {}
-          : { options: outputOptionsRequestToJson(outputOptions) }),
+        ...(outputOptions === undefined ? {} : { options: outputOptions }),
       }),
     });
     const decoded = await decodeExpected(response, 202);
@@ -686,7 +678,7 @@ export class InsolviaApiClient {
     const response = await this.#fetch(this.#documentsUrl(caseId), {
       method: 'POST',
       headers: { ...headers, 'Content-Type': 'application/json' },
-      body: JSON.stringify(createDocumentRequestToJson(request)),
+      body: JSON.stringify(request),
     });
     const decoded = await decodeExpected(response, 201);
     return {
@@ -892,7 +884,7 @@ export class InsolviaApiClient {
   async saveFirmDocumentChecklist(
     request: SaveDocumentChecklistRequest,
   ): Promise<FirmDocumentChecklist> {
-    return this.#checklistCall('PUT', { items: request.items.map(newChecklistItemToJson) });
+    return this.#checklistCall('PUT', { items: request.items });
   }
 
   /** `DELETE /v1/firm/document-checklist` — back to the shipped default. Idempotent. */
@@ -938,7 +930,7 @@ export class InsolviaApiClient {
     const response = await this.#fetch(this.#documentRequestsUrl(caseId), {
       method: 'POST',
       headers: { ...headers, 'Content-Type': 'application/json' },
-      body: JSON.stringify(newChecklistItemToJson(item)),
+      body: JSON.stringify(item),
     });
     return documentRequestFromJson(await decodeExpected(response, 201));
   }
@@ -1366,7 +1358,7 @@ export class InsolviaApiClient {
       {
         method: 'POST',
         headers: { ...headers, 'Content-Type': 'application/json' },
-        body: JSON.stringify(noteRequestToJson(note)),
+        body: JSON.stringify(note),
       },
     );
     const decoded = await decodeExpected(response, 201);
@@ -1409,7 +1401,7 @@ export class InsolviaApiClient {
       {
         method: 'PUT',
         headers: { ...headers, 'Content-Type': 'application/json' },
-        body: JSON.stringify(noteRequestToJson(note)),
+        body: JSON.stringify(note),
       },
     );
     const decoded = await decodeExpected(response, 200);
@@ -1738,7 +1730,7 @@ export class InsolviaApiClient {
     const headers = await this.#protectedHeaders();
     const body: Record<string, string> = { digest: approval.digest };
     if (approval.credentialId !== undefined) {
-      body.credential_id = approval.credentialId;
+      body.credentialId = approval.credentialId;
     }
     const response = await this.#fetch(
       `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/filing-approval`,
@@ -1769,7 +1761,7 @@ export class InsolviaApiClient {
   /**
    * `POST /v1/cases/{caseId}/filings/{filingId}/resolution` (ADR 0024 PR 8)
    * — record what the court's docket shows for a handed-back or
-   * unknown-outcome filing. ALWAYS sends `docket_checked: true`: call it
+   * unknown-outcome filing. ALWAYS sends `docketChecked: true`: call it
    * only once the attorney has confirmed they checked the court's own
    * docket. `filed` files the case with the number and petition date given;
    * `not_filed` frees it for a new approval. A 403 means the caller is not
@@ -1787,13 +1779,13 @@ export class InsolviaApiClient {
     const headers = await this.#protectedHeaders();
     const body: Record<string, string | boolean> = {
       outcome: resolution.outcome,
-      docket_checked: true,
+      docketChecked: true,
     };
     if (resolution.outcome === 'filed') {
-      body.case_number = resolution.caseNumber;
-      body.filed_at = resolution.filedAt;
+      body.caseNumber = resolution.caseNumber;
+      body.filedAt = resolution.filedAt;
       if (resolution.confirmationDocumentId !== undefined) {
-        body.confirmation_document_id = resolution.confirmationDocumentId;
+        body.confirmationDocumentId = resolution.confirmationDocumentId;
       }
     }
     const response = await this.#fetch(
@@ -2664,7 +2656,7 @@ export class InsolviaApiClient {
     const response = await this.#fetch(this.#eventsUrl(caseId), {
       method: 'POST',
       headers: { ...headers, 'Content-Type': 'application/json' },
-      body: JSON.stringify(calendarEventDraftToJson(draft)),
+      body: JSON.stringify(draft),
     });
     return calendarEventFromJson(await decodeExpected(response, 201));
   }
@@ -2678,7 +2670,7 @@ export class InsolviaApiClient {
     const response = await this.#fetch(this.#eventsUrl(caseId, eventId), {
       method: 'PUT',
       headers: { ...headers, 'Content-Type': 'application/json' },
-      body: JSON.stringify(calendarEventDraftToJson(draft)),
+      body: JSON.stringify(draft),
     });
     return calendarEventFromJson(await decodeExpected(response, 200));
   }
@@ -2992,7 +2984,7 @@ export class InsolviaApiClient {
     const response = await this.#fetch(this.#tasksUrl(caseId), {
       method: 'POST',
       headers: { ...headers, 'Content-Type': 'application/json' },
-      body: JSON.stringify(createTaskRequestToJson(request)),
+      body: JSON.stringify(request),
     });
     const decoded = await decodeExpected(response, 201);
     return taskFromJson(decoded);
@@ -3034,7 +3026,7 @@ export class InsolviaApiClient {
     const response = await this.#fetch(this.#taskUrl(caseId, taskId), {
       method: 'PATCH',
       headers: { ...headers, 'Content-Type': 'application/json' },
-      body: JSON.stringify(updateTaskRequestToJson(request)),
+      body: JSON.stringify(request),
     });
     const decoded = await decodeExpected(response, 200);
     return taskFromJson(decoded);
@@ -3507,21 +3499,21 @@ function caseFromJson(response: DecodedResponse): Case {
 function calendarEventFromJson(response: DecodedResponse): CalendarEvent {
   return {
     id: requireString(response, 'id'),
-    case_id: optionalString(response, 'case_id'),
+    caseId: optionalString(response, 'caseId'),
     title: requireString(response, 'title'),
     description: optionalString(response, 'description'),
     start: requireString(response, 'start'),
     end: requireString(response, 'end'),
-    all_day: requireBoolean(response, 'all_day'),
+    allDay: requireBoolean(response, 'allDay'),
     location: optionalString(response, 'location'),
     attendees: requireStringArray(response, 'attendees'),
     generated: requireBoolean(response, 'generated'),
-    rule_id: optionalString(response, 'rule_id'),
-    rule_citation: optionalString(response, 'rule_citation'),
+    ruleId: optionalString(response, 'ruleId'),
+    ruleCitation: optionalString(response, 'ruleCitation'),
     dismissed: requireBoolean(response, 'dismissed'),
-    created_by: requireString(response, 'created_by'),
-    created_at: requireString(response, 'created_at'),
-    updated_at: requireString(response, 'updated_at'),
+    createdBy: requireString(response, 'createdBy'),
+    createdAt: requireString(response, 'createdAt'),
+    updatedAt: requireString(response, 'updatedAt'),
   };
 }
 

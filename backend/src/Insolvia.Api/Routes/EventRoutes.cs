@@ -11,6 +11,7 @@ using Insolvia.Domain.Events;
 using Insolvia.Domain.Firms;
 using Insolvia.Domain.Ports;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Mvc;
 
 namespace Insolvia.Api.Routes;
 
@@ -28,6 +29,7 @@ namespace Insolvia.Api.Routes;
 public sealed class EventRoutes : IEndpointModule
 {
     private const int MaxRequestBytes = 32 * 1024;
+    private static readonly RequestSizeLimitAttribute SizeLimit = new(MaxRequestBytes);
     private const string Logger = "insolvia_api.api.routes.events";
     private const string EventNotFound = "event not found";
 
@@ -36,16 +38,16 @@ public sealed class EventRoutes : IEndpointModule
     {
         ArgumentNullException.ThrowIfNull(routes);
         routes.MapGet("/v1/cases/{caseId}/events", ListCaseAsync).RequireAuth().Requires(Feature.Events, PermissionLevel.ViewOnly);
-        routes.MapPost("/v1/cases/{caseId}/events", CreateCaseAsync).RequestBody<EventRequest>().RequireAuth().Requires(Feature.Events, PermissionLevel.AddEdit);
+        routes.MapPost("/v1/cases/{caseId}/events", CreateCaseAsync).WithMetadata(SizeLimit).RequireAuth().Requires(Feature.Events, PermissionLevel.AddEdit);
         routes.MapGet("/v1/cases/{caseId}/events/{eventId}", GetCaseAsync).RequireAuth().Requires(Feature.Events, PermissionLevel.ViewOnly);
-        routes.MapPut("/v1/cases/{caseId}/events/{eventId}", PutCaseAsync).RequestBody<EventRequest>().RequireAuth().Requires(Feature.Events, PermissionLevel.AddEdit);
-        routes.MapPatch("/v1/cases/{caseId}/events/{eventId}", DismissCaseAsync).RequestBody<EventDismissal>().RequireAuth().Requires(Feature.Events, PermissionLevel.AddEdit);
+        routes.MapPut("/v1/cases/{caseId}/events/{eventId}", PutCaseAsync).WithMetadata(SizeLimit).RequireAuth().Requires(Feature.Events, PermissionLevel.AddEdit);
+        routes.MapPatch("/v1/cases/{caseId}/events/{eventId}", DismissCaseAsync).WithMetadata(SizeLimit).RequireAuth().Requires(Feature.Events, PermissionLevel.AddEdit);
         routes.MapDelete("/v1/cases/{caseId}/events/{eventId}", DeleteCaseAsync).RequireAuth().Requires(Feature.Events, PermissionLevel.AddEdit);
         routes.MapGet("/v1/firm/events", ListFirmAsync).RequireAuth().Requires(Feature.Events, PermissionLevel.ViewOnly);
-        routes.MapPost("/v1/firm/events", CreateFirmAsync).RequestBody<EventRequest>().RequireAuth().Requires(Feature.Events, PermissionLevel.AddEdit);
+        routes.MapPost("/v1/firm/events", CreateFirmAsync).WithMetadata(SizeLimit).RequireAuth().Requires(Feature.Events, PermissionLevel.AddEdit);
         routes.MapGet("/v1/firm/events/{eventId}", GetFirmAsync).RequireAuth().Requires(Feature.Events, PermissionLevel.ViewOnly);
-        routes.MapPut("/v1/firm/events/{eventId}", PutFirmAsync).RequestBody<EventRequest>().RequireAuth().Requires(Feature.Events, PermissionLevel.AddEdit);
-        routes.MapPatch("/v1/firm/events/{eventId}", DismissFirmAsync).RequestBody<EventDismissal>().RequireAuth().Requires(Feature.Events, PermissionLevel.AddEdit);
+        routes.MapPut("/v1/firm/events/{eventId}", PutFirmAsync).WithMetadata(SizeLimit).RequireAuth().Requires(Feature.Events, PermissionLevel.AddEdit);
+        routes.MapPatch("/v1/firm/events/{eventId}", DismissFirmAsync).WithMetadata(SizeLimit).RequireAuth().Requires(Feature.Events, PermissionLevel.AddEdit);
         routes.MapDelete("/v1/firm/events/{eventId}", DeleteFirmAsync).RequireAuth().Requires(Feature.Events, PermissionLevel.AddEdit);
     }
 
@@ -60,9 +62,8 @@ public sealed class EventRoutes : IEndpointModule
 
     /// <summary>Add an event to a case's calendar.</summary>
     /// <remarks>Attendees must be members of the caller's firm.</remarks>
-    internal static async Task<Created<EventView>> CreateCaseAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
+    internal static async Task<Created<EventView>> CreateCaseAsync(HttpContext context, string caseId, EventRequest draft, CancellationToken cancellationToken)
     {
-        var draft = CalendarRules.Parse(await context.BodyAsync(MaxRequestBytes));
         var target = await context.ReachableCaseAsync(caseId, AccessAction.CaseUpdate, cancellationToken);
         return await CreateAsync(context, draft, new EventScope(target.FirmId, target.Id), "case event created", cancellationToken);
     }
@@ -76,19 +77,17 @@ public sealed class EventRoutes : IEndpointModule
 
     /// <summary>Replace a case event, whole.</summary>
     /// <remarks>A generated deadline cannot be edited (400) — dismiss it instead.</remarks>
-    internal static async Task<EventView> PutCaseAsync(HttpContext context, string caseId, string eventId, CancellationToken cancellationToken)
+    internal static async Task<EventView> PutCaseAsync(HttpContext context, string caseId, string eventId, EventRequest draft, CancellationToken cancellationToken)
     {
-        var draft = CalendarRules.Parse(await context.BodyAsync(MaxRequestBytes));
         var target = await context.ReachableCaseAsync(caseId, AccessAction.CaseUpdate, cancellationToken);
         return await PutAsync(context, draft, new EventScope(target.FirmId, target.Id), eventId, "case event updated", cancellationToken);
     }
 
     /// <summary>Dismiss or restore a case event.</summary>
-    internal static async Task<EventView> DismissCaseAsync(HttpContext context, string caseId, string eventId, CancellationToken cancellationToken)
+    internal static async Task<EventView> DismissCaseAsync(HttpContext context, string caseId, string eventId, EventDismissal request, CancellationToken cancellationToken)
     {
-        var dismissed = CalendarRules.ParseDismissal(await context.BodyAsync(MaxRequestBytes));
         var target = await context.ReachableCaseAsync(caseId, AccessAction.CaseUpdate, cancellationToken);
-        return await DismissAsync(context, dismissed, new EventScope(target.FirmId, target.Id), eventId, "case event dismissal changed", cancellationToken);
+        return await DismissAsync(context, request.Dismissed!.Value, new EventScope(target.FirmId, target.Id), eventId, "case event dismissal changed", cancellationToken);
     }
 
     /// <summary>Delete a case event.</summary>
@@ -115,10 +114,9 @@ public sealed class EventRoutes : IEndpointModule
 
     /// <summary>Add an event to the firm's own calendar.</summary>
     /// <remarks>Attendees must be members of the caller's firm.</remarks>
-    internal static async Task<Created<EventView>> CreateFirmAsync(HttpContext context, CancellationToken cancellationToken)
+    internal static async Task<Created<EventView>> CreateFirmAsync(HttpContext context, EventRequest draft, CancellationToken cancellationToken)
     {
         var accessor = await context.CurrentAccessorAsync();
-        var draft = CalendarRules.Parse(await context.BodyAsync(MaxRequestBytes));
         return await CreateAsync(context, draft, new EventScope(accessor.FirmId), "firm event created", cancellationToken);
     }
 
@@ -127,19 +125,17 @@ public sealed class EventRoutes : IEndpointModule
         EventView.Of(await EventOr404Async(context, new EventScope((await context.CurrentAccessorAsync()).FirmId), eventId, cancellationToken));
 
     /// <summary>Replace one of the firm's own events, whole.</summary>
-    internal static async Task<EventView> PutFirmAsync(HttpContext context, string eventId, CancellationToken cancellationToken)
+    internal static async Task<EventView> PutFirmAsync(HttpContext context, string eventId, EventRequest draft, CancellationToken cancellationToken)
     {
         var accessor = await context.CurrentAccessorAsync();
-        var draft = CalendarRules.Parse(await context.BodyAsync(MaxRequestBytes));
         return await PutAsync(context, draft, new EventScope(accessor.FirmId), eventId, "firm event updated", cancellationToken);
     }
 
     /// <summary>Dismiss or restore one of the firm's own events.</summary>
-    internal static async Task<EventView> DismissFirmAsync(HttpContext context, string eventId, CancellationToken cancellationToken)
+    internal static async Task<EventView> DismissFirmAsync(HttpContext context, string eventId, EventDismissal request, CancellationToken cancellationToken)
     {
         var accessor = await context.CurrentAccessorAsync();
-        var dismissed = CalendarRules.ParseDismissal(await context.BodyAsync(MaxRequestBytes));
-        return await DismissAsync(context, dismissed, new EventScope(accessor.FirmId), eventId, "firm event dismissal changed", cancellationToken);
+        return await DismissAsync(context, request.Dismissed!.Value, new EventScope(accessor.FirmId), eventId, "firm event dismissal changed", cancellationToken);
     }
 
     /// <summary>Delete one of the firm's own events.</summary>
@@ -157,7 +153,7 @@ public sealed class EventRoutes : IEndpointModule
         return new EventList([.. events.Select(EventView.Of)]);
     }
 
-    private static async Task<Created<EventView>> CreateAsync(HttpContext context, EventDraft draft, EventScope scope, string message, CancellationToken cancellationToken)
+    private static async Task<Created<EventView>> CreateAsync(HttpContext context, EventRequest draft, EventScope scope, string message, CancellationToken cancellationToken)
     {
         var accessor = await context.CurrentAccessorAsync();
         await CheckAttendeesAsync(context, accessor, draft, cancellationToken);
@@ -167,7 +163,7 @@ public sealed class EventRoutes : IEndpointModule
         return TypedResults.Created((string?)null, EventView.Of(created));
     }
 
-    private static async Task<EventView> PutAsync(HttpContext context, EventDraft draft, EventScope scope, string eventId, string message, CancellationToken cancellationToken)
+    private static async Task<EventView> PutAsync(HttpContext context, EventRequest draft, EventScope scope, string eventId, string message, CancellationToken cancellationToken)
     {
         await CheckAttendeesAsync(context, await context.CurrentAccessorAsync(), draft, cancellationToken);
         var updated = CalendarRules.Replace(await EventOr404Async(context, scope, eventId, cancellationToken), draft, context.Clock());
@@ -207,17 +203,18 @@ public sealed class EventRoutes : IEndpointModule
         await context.Port<ICalendarEventStore>().GetAsync(scope, eventId, cancellationToken) ?? throw new NotFoundException(EventNotFound);
 
     // Every attendee a member of the caller's firm (any status), named by index.
-    private static async Task CheckAttendeesAsync(HttpContext context, Accessor accessor, EventDraft draft, CancellationToken cancellationToken)
+    private static async Task CheckAttendeesAsync(HttpContext context, Accessor accessor, EventRequest draft, CancellationToken cancellationToken)
     {
-        if (draft.Attendees.Count == 0)
+        var attendees = draft.Attendees ?? [];
+        if (attendees.Count == 0)
         {
             return;
         }
 
         var members = (await context.FirmStore().ListUsersAsync(accessor.FirmId, cancellationToken)).Select(user => user.Subject).ToHashSet(StringComparer.Ordinal);
-        for (var index = 0; index < draft.Attendees.Count; index++)
+        for (var index = 0; index < attendees.Count; index++)
         {
-            if (!members.Contains(draft.Attendees[index]))
+            if (!members.Contains(attendees[index]))
             {
                 throw new ValidationException($"attendees[{index}] is not a member of your firm");
             }

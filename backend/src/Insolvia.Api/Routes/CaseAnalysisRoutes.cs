@@ -1,13 +1,11 @@
-using System.Text.Json.Nodes;
+using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 using Insolvia.Api.Analysis;
 using Insolvia.Api.Auth;
 using Insolvia.Api.Cases;
 using Insolvia.Api.Hosting;
-using Insolvia.Domain;
 using Insolvia.Domain.AccessLog;
 using Insolvia.Domain.Assets;
-using Insolvia.Domain.CaseEntities;
 using Insolvia.Domain.Cases;
 using Insolvia.Domain.Claims;
 using Insolvia.Domain.Creditors;
@@ -23,6 +21,7 @@ using Insolvia.Domain.Fields;
 using Insolvia.Domain.Firms;
 using Insolvia.Domain.Plans;
 using Insolvia.Domain.Ports;
+using Microsoft.AspNetCore.Mvc;
 
 namespace Insolvia.Api.Routes;
 
@@ -48,7 +47,6 @@ public sealed class CaseAnalysisRoutes : IEndpointModule
     // plan.py: a plan is a nested document; enough to compare a handful of
     // alternatives side by side, each running the whole waterfall.
     private const int MaxPlanRequestBytes = 256 * 1024;
-    private const int MaxScenarios = 5;
     private const string MatrixLogger = "insolvia_api.api.routes.creditor_matrix";
 
     /// <inheritdoc />
@@ -61,7 +59,7 @@ public sealed class CaseAnalysisRoutes : IEndpointModule
         routes.MapGet("/v1/cases/{caseId}/liens", LiensAsync).RequireAuth().Requires(Feature.Intake, PermissionLevel.ViewOnly);
         routes.MapGet("/v1/cases/{caseId}/standards", StandardsAsync).RequireAuth().Requires(Feature.Cases, PermissionLevel.ViewOnly);
         routes.MapGet("/v1/cases/{caseId}/plan-calculation", PlanCalculationAsync).RequireAuth().Requires(Feature.Cases, PermissionLevel.ViewOnly);
-        routes.MapPost("/v1/cases/{caseId}/plan-calculation", PlanScenariosAsync).RequestBody<PlanScenariosRequest>().RequireAuth().Requires(Feature.Cases, PermissionLevel.ViewOnly);
+        routes.MapPost("/v1/cases/{caseId}/plan-calculation", PlanScenariosAsync).WithMetadata(new RequestSizeLimitAttribute(MaxPlanRequestBytes)).RequireAuth().Requires(Feature.Cases, PermissionLevel.ViewOnly);
     }
 
     /// <summary>The § 707(b) means test as of the expected filing date.</summary>
@@ -143,15 +141,11 @@ public sealed class CaseAnalysisRoutes : IEndpointModule
 
     /// <summary>Calculate unsaved plan alternatives against the case; nothing is written.</summary>
     /// <remarks>At most five scenarios; each malformed one is named by its path (<c>scenarios[0].plan.termMonths</c>).</remarks>
-    internal static async Task<PlanScenarioList> PlanScenariosAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
+    internal static async Task<PlanScenarioList> PlanScenariosAsync(HttpContext context, string caseId, PlanScenariosRequest request, CancellationToken cancellationToken)
     {
-        // Reachability first, so a 400 is never an oracle for a case id the
-        // caller cannot see; the body before the records, so a malformed
-        // request costs no collection reads.
         var target = await context.ReachableCaseAsync(caseId, AccessAction.CaseRead, cancellationToken);
-        var scenarios = Scenarios(await context.BodyAsync(MaxPlanRequestBytes));
         var (inputs, _) = await PlanInputsAsync(context, target, cancellationToken);
-        return new PlanScenarioList([.. scenarios.Select(scenario => new PlanScenario(scenario.Label, PlanCalculationView.Of(Chapter13Plan.Calculate(inputs, scenario.Plan))))]);
+        return new PlanScenarioList([.. request.Scenarios!.Select(scenario => new PlanScenario(scenario.Label, PlanCalculationView.Of(Chapter13Plan.Calculate(inputs, scenario.Plan))))]);
     }
 
     // plan.py's `_inputs`: the whole file read once, the stored plans beside it.
@@ -160,58 +154,6 @@ public sealed class CaseAnalysisRoutes : IEndpointModule
         var stored = await CaseFileReader.ReadAsync(target, context.Port<IDebtorStore>(), context.Port<ICaseEntityStore>(), cancellationToken);
         var inputs = Chapter13Plan.BuildPlanInputs(stored.CaseFile, stored.ExemptionCase, context.Today());
         return (inputs, stored.CaseFile.Plans);
-    }
-
-    // plan.py's `_scenarios`: every malformed scenario named by its path.
-    private static List<(string? Label, PlanBody Plan)> Scenarios(JsonObject payload)
-    {
-        if (payload["scenarios"] is not JsonArray { Count: > 0 } raw)
-        {
-            throw new FieldValidationException(new Dictionary<string, string> { ["scenarios"] = "Must be a non-empty list." });
-        }
-
-        if (raw.Count > MaxScenarios)
-        {
-            throw new FieldValidationException(new Dictionary<string, string> { ["scenarios"] = $"At most {MaxScenarios} scenarios at a time." });
-        }
-
-        var errors = new Dictionary<string, string>(StringComparer.Ordinal);
-        var parsed = new List<(string? Label, PlanBody Plan)>();
-        for (var index = 0; index < raw.Count; index++)
-        {
-            var path = $"scenarios[{index}]";
-            if (raw[index] is not JsonObject scenario)
-            {
-                errors[path] = "Must be an object.";
-                continue;
-            }
-
-            var label = FieldParsers.Text(scenario["label"], $"{path}.label", errors);
-            if (scenario["plan"] is not JsonObject plan)
-            {
-                errors[$"{path}.plan"] = "Must be an object.";
-                continue;
-            }
-
-            try
-            {
-                parsed.Add((label, (PlanBody)BodyJson.Read(plan, typeof(PlanBody))));
-            }
-            catch (FieldValidationException error)
-            {
-                foreach (var (field, message) in error.Fields)
-                {
-                    errors[$"{path}.plan.{field}"] = message;
-                }
-            }
-        }
-
-        if (errors.Count > 0)
-        {
-            throw new FieldValidationException(errors);
-        }
-
-        return parsed;
     }
 }
 
@@ -226,11 +168,12 @@ public sealed record PlanScenario(string? Label, PlanCalculationView Calculation
 
 /// <summary>Unsaved plan alternatives to calculate (<c>POST …/plan-calculation</c>): one to five.</summary>
 /// <param name="Scenarios">The alternatives.</param>
-public sealed record PlanScenariosRequest(IReadOnlyList<PlanScenarioRequest> Scenarios);
+public sealed record PlanScenariosRequest(
+    [property: Required(ErrorMessage = "Must be a non-empty list."), MinLength(1, ErrorMessage = "Must be a non-empty list."), MaxLength(5, ErrorMessage = "At most 5 scenarios at a time.")] IReadOnlyList<PlanScenarioRequest>? Scenarios);
 
 /// <summary>One unsaved plan alternative.</summary>
 /// <param name="Label">A label to tell it apart by.</param>
 /// <param name="Plan">The plan, as a plan record's body is written.</param>
 public sealed record PlanScenarioRequest(
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Label,
-    PlanBody Plan);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull), Text] string? Label,
+    [property: Required(ErrorMessage = "Must be an object.")] PlanBody Plan);

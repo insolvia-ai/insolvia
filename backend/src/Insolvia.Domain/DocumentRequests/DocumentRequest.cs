@@ -1,4 +1,3 @@
-using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using Insolvia.Domain.Documents;
 
@@ -42,50 +41,6 @@ public static class DocumentRequestRules
 {
     /// <summary>The statuses staff may set by hand.</summary>
     public static readonly IReadOnlyList<DocumentRequestStatus> SettableStatuses = [DocumentRequestStatus.Requested, DocumentRequestStatus.Waived];
-
-    /// <summary>
-    /// Validate POST /v1/cases/&lt;case_id&gt;/document-requests — one ad-hoc
-    /// request, the same three fields as a checklist entry, errors keyed bare.
-    /// </summary>
-    public static ChecklistItem ParseCreation(JsonObject payload)
-    {
-        ArgumentNullException.ThrowIfNull(payload);
-        var errors = new Dictionary<string, string>(StringComparer.Ordinal);
-        var item = DocumentChecklists.ParseItem(payload, "request", errors);
-        if (item is null || errors.Count > 0)
-        {
-            throw new FieldValidationException(errors.ToDictionary(
-                pair => pair.Key.StartsWith("request.", StringComparison.Ordinal) ? pair.Key["request.".Length..] : pair.Key,
-                pair => pair.Value,
-                StringComparer.Ordinal));
-        }
-
-        return item;
-    }
-
-    /// <summary>Validate PATCH …/document-requests/&lt;id&gt;: <c>{"status": "requested" | "waived"}</c>.</summary>
-    public static DocumentRequestStatus ParseUpdate(JsonObject payload)
-    {
-        ArgumentNullException.ThrowIfNull(payload);
-        var raw = Json.AsString(payload["status"]);
-        if (raw == DocumentRequestStatus.Received.ToWire())
-        {
-            throw new FieldValidationException(new Dictionary<string, string>
-            {
-                ["status"] = "A request is received when a document is uploaded against it, not by setting it.",
-            });
-        }
-
-        if (!Wire.TryParse<DocumentRequestStatus>(raw, out var status) || !SettableStatuses.Contains(status))
-        {
-            throw new FieldValidationException(new Dictionary<string, string>
-            {
-                ["status"] = "Must be one of " + string.Join(", ", SettableStatuses.Select(s => s.ToWire())) + ".",
-            });
-        }
-
-        return status;
-    }
 
     /// <summary>A fresh request for <paramref name="item"/>.</summary>
     public static DocumentRequest Create(ChecklistItem item, string caseId, string createdBy, TimeProvider? clock = null)

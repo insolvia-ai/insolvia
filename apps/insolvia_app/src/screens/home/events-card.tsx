@@ -133,9 +133,9 @@ export function EventsCard({ membership }: { membership: FirmMembership }) {
       ) : (
         <View role="list" style={styles.list}>
           {events.map((event) => {
-            const linked = event.case_id !== undefined;
+            const linked = event.caseId !== undefined;
             const time = formatTime(event) ?? 'All day';
-            const meta = [time, event.rule_citation].filter(
+            const meta = [time, event.ruleCitation].filter(
               (part): part is string => part !== null && part !== undefined,
             );
             return (
@@ -146,7 +146,7 @@ export function EventsCard({ membership }: { membership: FirmMembership }) {
                 aria-label={linked ? `${event.title} — open the case` : event.title}
                 disabled={!linked}
                 onPress={() => {
-                  if (event.case_id !== undefined) router.push(`/cases/${event.case_id}`);
+                  if (event.caseId !== undefined) router.push(`/cases/${event.caseId}`);
                 }}
                 style={[styles.row, { borderColor: theme.colors.line }]}
               >

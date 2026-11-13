@@ -11,6 +11,7 @@ using Insolvia.Domain.Forms;
 using Insolvia.Domain.Jobs;
 using Insolvia.Domain.Ports;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Mvc;
 
 namespace Insolvia.Api.Routes;
 
@@ -29,7 +30,7 @@ public sealed class JobRoutes : IEndpointModule
     public void Map(IEndpointRouteBuilder routes)
     {
         ArgumentNullException.ThrowIfNull(routes);
-        routes.MapPost("/v1/cases/{caseId}/jobs", AcceptAsync).RequestBody<JobRequest>().RequireAuth().Requires(Feature.Cases, PermissionLevel.AddEdit);
+        routes.MapPost("/v1/cases/{caseId}/jobs", AcceptAsync).WithMetadata(new RequestSizeLimitAttribute(MaxRequestBytes)).RequireAuth().Requires(Feature.Cases, PermissionLevel.AddEdit);
         routes.MapGet("/v1/cases/{caseId}/jobs/{jobId}", GetAsync).RequireAuth().Requires(Feature.Cases, PermissionLevel.ViewOnly);
     }
 
@@ -64,7 +65,7 @@ public sealed class JobRoutes : IEndpointModule
     /// cannot tell whether its first request landed gets the same job back.
     /// 503 <c>PipelineUnavailable</c> when this deployment has no pipeline.
     /// </remarks>
-    internal static async Task<Results<Accepted<JobView>, JsonHttpResult<ErrorBody>>> AcceptAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
+    internal static async Task<Results<Accepted<JobView>, JsonHttpResult<ErrorBody>>> AcceptAsync(HttpContext context, string caseId, JobRequest request, CancellationToken cancellationToken)
     {
         if (context.RequestServices.GetService<IJobSender>() is null)
         {
@@ -74,7 +75,7 @@ public sealed class JobRoutes : IEndpointModule
         }
 
         var jobs = context.Port<IJobStore>();
-        var (kind, documentId, rawOptions) = JobRules.ParseAcceptance(await context.BodyAsync(MaxRequestBytes));
+        var (kind, documentId) = (request.Kind!, request.DocumentId);
         var accessor = await context.CurrentAccessorAsync();
         var found = await context.Cases().GetAsync(caseId, accessor, cancellationToken) ?? throw new NotFoundException(CaseRouteSupport.CaseNotFound);
 
@@ -95,7 +96,7 @@ public sealed class JobRoutes : IEndpointModule
             // Validated AND canonicalised here: the stored job always carries
             // the full shape. `forms` is checked against the whole registry;
             // whether THIS case files it is the worker's gate.
-            var parsed = FormOverlay.ParseOutputOptions(rawOptions, allowForms: true);
+            var parsed = (request.Options ?? new()).ToOptions();
             if (parsed.Forms is { } forms)
             {
                 var known = FormTemplates.SeriesIds().Select(series => series.StartsWith("form/", StringComparison.Ordinal) ? series[5..] : series).ToHashSet(StringComparer.Ordinal);

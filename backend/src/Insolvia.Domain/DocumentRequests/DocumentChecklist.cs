@@ -1,5 +1,4 @@
 using System.ComponentModel.DataAnnotations;
-using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using Insolvia.Domain.Documents;
 using Insolvia.Domain.Fields;
@@ -86,45 +85,6 @@ public static class DocumentChecklists
     {
         ArgumentNullException.ThrowIfNull(title);
         return TextRules.Casefold(string.Join(" ", TextRules.SplitWhitespace(title)));
-    }
-
-    /// <summary>
-    /// Validate one checklist-shaped entry: a required single-line title, a
-    /// known document kind, an optional description. Errors are keyed under
-    /// <paramref name="path"/> (the case half's ad-hoc request parser reuses this).
-    /// </summary>
-    public static ChecklistItem? ParseItem(JsonNode? entry, string path, IDictionary<string, string> errors)
-    {
-        ArgumentNullException.ThrowIfNull(errors);
-        if (entry is not JsonObject raw)
-        {
-            errors[path] = "Must be an object.";
-            return null;
-        }
-
-        var title = FieldParsers.Text(raw["title"], $"{path}.title", errors, MaxTitle);
-        if (title is null && !errors.ContainsKey($"{path}.title"))
-        {
-            errors[$"{path}.title"] = "A title is required.";
-        }
-
-        DocumentKind? kind = null;
-        if (Wire.TryParse<DocumentKind>(Json.AsString(raw["kind"]), out var parsedKind))
-        {
-            kind = parsedKind;
-        }
-        else
-        {
-            errors[$"{path}.kind"] = "Must be one of " + string.Join(", ", Wire.Names<DocumentKind>()) + ".";
-        }
-
-        var description = FieldParsers.Narrative(raw["description"], $"{path}.description", errors, MaxDescription);
-        if (title is null || kind is null || errors.ContainsKey($"{path}.description"))
-        {
-            return null;
-        }
-
-        return new ChecklistItem(title, kind.Value, description);
     }
 
     /// <summary>The checklist a save writes.</summary>

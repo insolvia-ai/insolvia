@@ -146,6 +146,12 @@ public static partial class DocumentRules
         return document with { Status = DocumentStatus.Stored, ByteSize = blob.ByteSize, Etag = blob.Etag };
     }
 
+    /// <summary>What is wrong with <paramref name="fileName"/> as a file name, or null: no path separators, controls or invisible characters, and not a directory.</summary>
+    public static string? FileNameProblem(string fileName) =>
+        FileNameForbidden().IsMatch(fileName) ? "Must not contain path separators, control characters, or invisible or direction-changing characters."
+        : fileName is "." or ".." ? "Must be a file name."
+        : null;
+
     /// <summary>Newest first, tie-broken by id (descending) — the ONE definition both stores sort by.</summary>
     public static IComparer<Document> ListOrder { get; } = Comparer<Document>.Create((left, right) =>
     {
@@ -221,15 +227,9 @@ public static partial class DocumentRules
             return null;
         }
 
-        if (FileNameForbidden().IsMatch(fileName))
+        if (FileNameProblem(fileName) is { } problem)
         {
-            errors["fileName"] = "Must not contain path separators, control characters, or invisible or direction-changing characters.";
-            return null;
-        }
-
-        if (fileName is "." or "..")
-        {
-            errors["fileName"] = "Must be a file name.";
+            errors["fileName"] = problem;
             return null;
         }
 

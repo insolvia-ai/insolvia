@@ -130,6 +130,21 @@ public sealed class JobRouteTests : IAsyncLifetime, IDisposable
         Assert.Contains("kind", answer.FieldErrors);
     }
 
+    [Theory]
+    [InlineData("{}")]
+    [InlineData("""{"kind": 7}""")]
+    [InlineData("""{"kind": null}""")]
+    [InlineData("""{"kind": "document_extraction"}""")]
+    [InlineData("""{"kind": "document_extraction", "documentId": ""}""")]
+    [InlineData("""{"kind": "document_extraction", "documentId": 7}""")]
+    [InlineData("""{"kind": "echo", "documentId": "doc-1"}""")]
+    [InlineData("""{"kind": "packet_assembly", "options": "not-an-object"}""")]
+    public async Task A_malformed_acceptance_is_rejected(string body)
+    {
+        var caseId = await _world.OpenCaseIdAsync();
+        Assert.Equal(400, (await _world.Post($"/v1/cases/{caseId}/jobs", body, Alice)).Status);
+    }
+
     [Fact]
     public async Task Accepting_an_extraction_names_its_document()
     {
@@ -201,7 +216,7 @@ public sealed class JobRouteTests : IAsyncLifetime, IDisposable
         var caseId = await _world.OpenCaseIdAsync();
         var answer = await AcceptPacket(caseId, """{"signaturePages": "sideways"}""");
         Assert.Equal(400, answer.Status);
-        Assert.Contains("signaturePages", answer.FieldErrors);
+        Assert.Contains("options.signaturePages", answer.FieldErrors);
     }
 
     [Fact]

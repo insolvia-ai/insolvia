@@ -145,12 +145,12 @@ export const TASK: Spec = {
 
 export const CALENDAR_EVENT: Spec = {
   id: 'string',
-  'case_id?': 'string',
+  'caseId?': 'string',
   title: 'string',
   'description?': 'string',
   start: 'string',
   end: 'string',
-  all_day: 'boolean',
+  allDay: 'boolean',
   'location?': 'string',
 };
 

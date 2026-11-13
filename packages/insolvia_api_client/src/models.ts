@@ -960,16 +960,6 @@ export interface CreateTaskRequest {
   readonly formSeries?: string;
 }
 
-/** The `POST /v1/cases/{caseId}/tasks` request body, absent fields omitted. */
-export function createTaskRequestToJson(request: CreateTaskRequest): Record<string, unknown> {
-  const body: Record<string, unknown> = { subject: request.subject };
-  if (request.description !== undefined) body.description = request.description;
-  if (request.dueDate !== undefined) body.dueDate = request.dueDate;
-  if (request.assigneeSubject !== undefined) body.assigneeSubject = request.assigneeSubject;
-  if (request.formSeries !== undefined) body.formSeries = request.formSeries;
-  return body;
-}
-
 /**
  * The `PATCH /v1/cases/{caseId}/tasks/{taskId}` request body — edit, reassign,
  * complete or reopen a task, all through this one shape.
@@ -978,8 +968,7 @@ export function createTaskRequestToJson(request: CreateTaskRequest): Record<stri
  * {@link assigneeSubject} and {@link formSeries}.** Leave the key OUT of the
  * object entirely to leave that field unchanged; set it to `null` to CLEAR
  * it (unassign a task, remove a due date); set it to a value to replace it.
- * `updateTaskRequestToJson` reads which keys are actually present with the
- * `in` operator, so build the object literally —
+ * The client sends the object as it is, so build it literally —
  * `{ dueDate: null }`, never `{ dueDate: undefined }`, which is
  * indistinguishable from omitting the key at the JSON layer and would be
  * silently read as "leave unchanged" by the wire format, not "clear".
@@ -996,23 +985,6 @@ export interface UpdateTaskRequest {
   readonly assigneeSubject?: string | null;
   readonly formSeries?: string | null;
   readonly done?: boolean;
-}
-
-/**
- * The `PATCH /v1/cases/{caseId}/tasks/{taskId}` body — reads which keys
- * `request` actually carries (present-with-`null` means "clear", absent
- * means "leave unchanged") rather than checking `!== undefined`, which
- * cannot tell those two apart. See {@link UpdateTaskRequest}.
- */
-export function updateTaskRequestToJson(request: UpdateTaskRequest): Record<string, unknown> {
-  const body: Record<string, unknown> = {};
-  if (request.subject !== undefined) body.subject = request.subject;
-  if ('description' in request) body.description = request.description;
-  if ('dueDate' in request) body.dueDate = request.dueDate;
-  if ('assigneeSubject' in request) body.assigneeSubject = request.assigneeSubject;
-  if ('formSeries' in request) body.formSeries = request.formSeries;
-  if (request.done !== undefined) body.done = request.done;
-  return body;
 }
 
 /**
@@ -1452,39 +1424,39 @@ export const FILING_WORKER_ACTOR = 'filing-worker';
 // Events, the calendar and the feed — mirrors
 // services/api/src/insolvia_api/core/events.py (`event_json`),
 // api/routes/events.py and api/routes/calendar.py (issue 14.6 / #358).
-// SNAKE_CASE on the wire, like every case-domain body.
+// camelCase on the wire (ADR 0032).
 // ---------------------------------------------------------------------------
 
 /**
- * One calendar event — a case's (`case_id` present) or the firm's own.
+ * One calendar event — a case's (`caseId` present) or the firm's own.
  *
- * `all_day` decides how `start`/`end` read: form dates (`YYYY-MM-DD`, `end`
+ * `allDay` decides how `start`/`end` read: form dates (`YYYY-MM-DD`, `end`
  * INCLUSIVE) when true, RFC 3339 UTC instants (`...Z`) when false.
  *
  * `generated` events were written by the deadline engine from the case's
- * filed and § 341 dates and name their rule (`rule_id`, `rule_citation`).
+ * filed and § 341 dates and name their rule (`ruleId`, `ruleCitation`).
  * They cannot be edited or deleted — only DISMISSED, which is what
  * {@link InsolviaApiClient.dismissCaseEvent} does — and a dismissal survives
  * regeneration.
  */
 export interface CalendarEvent {
   readonly id: string;
-  readonly case_id?: string | undefined;
+  readonly caseId?: string | undefined;
   readonly title: string;
   readonly description?: string | undefined;
   readonly start: string;
   readonly end: string;
-  readonly all_day: boolean;
+  readonly allDay: boolean;
   readonly location?: string | undefined;
   /** Firm-user subjects — resolve them through the directory. */
   readonly attendees: readonly string[];
   readonly generated: boolean;
-  readonly rule_id?: string | undefined;
-  readonly rule_citation?: string | undefined;
+  readonly ruleId?: string | undefined;
+  readonly ruleCitation?: string | undefined;
   readonly dismissed: boolean;
-  readonly created_by: string;
-  readonly created_at: string;
-  readonly updated_at: string;
+  readonly createdBy: string;
+  readonly createdAt: string;
+  readonly updatedAt: string;
 }
 
 /**
@@ -1492,30 +1464,17 @@ export interface CalendarEvent {
  * partial PATCH, for the same reason {@link LibraryCreditorDraft} is one.
  *
  * `start` alone is enough: a bare date makes an all-day event ending the
- * same day; an instant makes a timed one ending an hour later. `all_day`
+ * same day; an instant makes a timed one ending an hour later. `allDay`
  * only needs stating when `start`'s shape would guess wrong.
  */
 export interface CalendarEventDraft {
   readonly title: string;
   readonly start: string;
   readonly end?: string | undefined;
-  readonly all_day?: boolean | undefined;
+  readonly allDay?: boolean | undefined;
   readonly description?: string | undefined;
   readonly location?: string | undefined;
   readonly attendees?: readonly string[] | undefined;
-}
-
-export function calendarEventDraftToJson(draft: CalendarEventDraft): Record<string, unknown> {
-  return assignDefined(
-    { title: draft.title, start: draft.start },
-    {
-      end: draft.end,
-      all_day: draft.all_day,
-      description: draft.description,
-      location: draft.location,
-      attendees: draft.attendees === undefined ? undefined : [...draft.attendees],
-    },
-  );
 }
 
 /** `GET /v1/calendar`'s query: a window, and two optional narrowings. */
@@ -1665,30 +1624,6 @@ export interface OutputOptionsRequest {
  * not just a 400 from the server.
  */
 export type FormPreviewOptions = Omit<OutputOptionsRequest, 'forms'>;
-
-/** {@link OutputOptionsRequest}, as the `packet_assembly` job body's `options` member. */
-export function outputOptionsRequestToJson(options: OutputOptionsRequest): Record<string, unknown> {
-  const body: Record<string, unknown> = {};
-  if (options.draftWatermark !== undefined) {
-    body.draftWatermark = options.draftWatermark;
-  }
-  if (options.printDate !== undefined) {
-    body.printDate = options.printDate;
-  }
-  if (options.signaturePages !== undefined) {
-    body.signaturePages = options.signaturePages;
-  }
-  if (options.signElectronically !== undefined) {
-    body.signElectronically = options.signElectronically;
-  }
-  if (options.forms !== undefined) {
-    body.forms = [...options.forms];
-  }
-  if (options.amendedOnly !== undefined) {
-    body.amendedOnly = options.amendedOnly;
-  }
-  return body;
-}
 
 /**
  * {@link FormPreviewOptions} rendered as `URLSearchParams` — the preview
@@ -2446,19 +2381,6 @@ export interface CreateDocumentRequest {
   readonly requestId?: string;
 }
 
-/** The `POST /v1/cases/{caseId}/documents` request body; `requestId` omitted when absent. */
-export function createDocumentRequestToJson(
-  request: CreateDocumentRequest,
-): Record<string, unknown> {
-  return {
-    kind: request.kind,
-    fileName: request.fileName,
-    contentType: request.contentType,
-    byteSize: request.byteSize,
-    ...(request.requestId === undefined ? {} : { requestId: request.requestId }),
-  };
-}
-
 /**
  * The capability minted alongside a new document record: one HTTP request,
  * to one object, for a few minutes.
@@ -2601,15 +2523,6 @@ export interface NewChecklistItem {
 /** `PUT /v1/firm/document-checklist` — the WHOLE list (at most 40). */
 export interface SaveDocumentChecklistRequest {
   readonly items: readonly NewChecklistItem[];
-}
-
-/** The wire shape of one checklist entry or ad-hoc request. */
-export function newChecklistItemToJson(item: NewChecklistItem): Record<string, unknown> {
-  return {
-    title: item.title,
-    kind: item.kind,
-    ...(item.description === undefined ? {} : { description: item.description }),
-  };
 }
 
 /** One document asked of a case's client — the staff view. */
@@ -4592,21 +4505,6 @@ export interface Note {
   readonly createdAt: string;
   readonly updatedAt: string;
   readonly body: NoteBody;
-}
-
-/**
- * The request body for `POST`/`PUT .../notes[...]`, with absent members
- * omitted from the JSON entirely. There is no `provenance` member: a note
- * carries none.
- */
-export function noteRequestToJson(request: NoteRequest): Record<string, unknown> {
-  return assignDefined(
-    {},
-    {
-      text: request.text,
-      formSeries: request.formSeries,
-    },
-  );
 }
 
 /**

@@ -1,7 +1,6 @@
 using Insolvia.Api.Auth;
 using Insolvia.Api.Filing;
 using Insolvia.Api.Hosting;
-using Insolvia.Api.Http;
 using Insolvia.Api.Logging;
 using Insolvia.Domain;
 using Insolvia.Domain.AccessLog;
@@ -13,6 +12,7 @@ using Insolvia.Domain.Firms;
 using Insolvia.Domain.Forms;
 using Insolvia.Domain.Ports;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Mvc;
 
 namespace Insolvia.Api.Routes;
 
@@ -42,6 +42,7 @@ public sealed class FilingApprovalRoutes : IEndpointModule
 {
     // A digest and maybe a credential id.
     private const int MaxRequestBytes = 1024;
+    private static readonly RequestSizeLimitAttribute SizeLimit = new(MaxRequestBytes);
     private const string Logger = "insolvia_api.api.routes.filing_approval";
 
     /// <inheritdoc />
@@ -50,12 +51,12 @@ public sealed class FilingApprovalRoutes : IEndpointModule
         ArgumentNullException.ThrowIfNull(routes);
         routes.MapGet("/v1/cases/{caseId}/filing-approval", ReadAsync).RequireAuth()
             .Requires(Feature.Cases, PermissionLevel.ViewOnly).Requires(Feature.ElectronicFiling, PermissionLevel.ViewOnly);
-        routes.MapPost("/v1/cases/{caseId}/filing-approval", ApproveAsync).RequestBody<FilingApproveRequest>()
+        routes.MapPost("/v1/cases/{caseId}/filing-approval", ApproveAsync).WithMetadata(SizeLimit)
             .Produces<FilingSetNotReadyBody>(StatusCodes.Status409Conflict).Produces<ErrorBody>(StatusCodes.Status503ServiceUnavailable).RequireAuth()
             .Requires(Feature.Cases, PermissionLevel.ViewOnly).Requires(Feature.ElectronicFiling, PermissionLevel.AddEdit);
         routes.MapDelete("/v1/cases/{caseId}/filing-approval", CancelAsync).RequireAuth()
             .Requires(Feature.Cases, PermissionLevel.ViewOnly).Requires(Feature.ElectronicFiling, PermissionLevel.ViewOnly);
-        routes.MapPost("/v1/cases/{caseId}/filings/{filingId}/resolution", ResolveAsync).RequestBody<FilingResolutionRequest>()
+        routes.MapPost("/v1/cases/{caseId}/filings/{filingId}/resolution", ResolveAsync).WithMetadata(SizeLimit)
             .Produces<ResolutionRefusedBody>(StatusCodes.Status409Conflict).RequireAuth()
             .Requires(Feature.Cases, PermissionLevel.AddEdit).Requires(Feature.ElectronicFiling, PermissionLevel.AddEdit);
     }
@@ -109,7 +110,7 @@ public sealed class FilingApprovalRoutes : IEndpointModule
     /// <c>FilingSetNotReady</c> lists what blocks it; 503 when filing is not
     /// configured or the queue refused the job (the approval is then voided).
     /// </remarks>
-    internal static async Task<Results<Created<FilingApprovalState>, JsonHttpResult<FilingSetNotReadyBody>, JsonHttpResult<ErrorBody>>> ApproveAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
+    internal static async Task<Results<Created<FilingApprovalState>, JsonHttpResult<FilingSetNotReadyBody>, JsonHttpResult<ErrorBody>>> ApproveAsync(HttpContext context, string caseId, FilingApproveRequest request, CancellationToken cancellationToken)
     {
         var approvals = context.Port<IFilingApprovalStore>();
         var credentials = context.Port<IFilingCredentialStore>();
@@ -120,7 +121,6 @@ public sealed class FilingApprovalRoutes : IEndpointModule
             return FilingCredentialRoutes.NoStore(context, Unavailable("Filing is not configured in this environment."));
         }
 
-        var payload = await RequestBodies.ReadSilentAsync(context, MaxRequestBytes);
         var (@case, data, basis) = await BasisAsync(context, caseId, cancellationToken);
         var accessor = await context.CurrentAccessorAsync();
         var now = context.Clock().GetUtcNow();
@@ -141,7 +141,8 @@ public sealed class FilingApprovalRoutes : IEndpointModule
         try
         {
             approval = await FilingApprovals.ApproveAsync(
-                payload,
+                request.Digest!,
+                request.CredentialId,
                 data,
                 basis,
                 accessor.FirmId,
@@ -186,16 +187,15 @@ public sealed class FilingApprovalRoutes : IEndpointModule
 
     /// <summary>Resolve a handed-back filing.</summary>
     /// <remarks>Records what the court's docket shows — filed or not filed — for a filing the worker handed back or could not confirm. 409 <c>ResolutionRefused</c>, with its reason, when the filing cannot be resolved that way.</remarks>
-    internal static async Task<Results<Ok<FilingApprovalState>, JsonHttpResult<ResolutionRefusedBody>>> ResolveAsync(HttpContext context, string caseId, string filingId, CancellationToken cancellationToken)
+    internal static async Task<Results<Ok<FilingApprovalState>, JsonHttpResult<ResolutionRefusedBody>>> ResolveAsync(HttpContext context, string caseId, string filingId, FilingResolutionRequest body, CancellationToken cancellationToken)
     {
         var approvals = context.Port<IFilingApprovalStore>();
         var filings = context.Port<IFilingStore>();
         var packets = context.Port<IPacketStore>();
         var documents = context.Port<IDocumentStore>();
-        var body = await RequestBodies.ReadSilentAsync(context, MaxRequestBytes);
         var @case = await context.ReachableCaseAsync(caseId, AccessAction.CaseRead, cancellationToken);
         var filing = await filings.GetAsync(@case.Id, filingId, cancellationToken) ?? throw new NotFoundException("filing not found");
-        var request = FilingOutcomes.Parse(body);
+        var request = body.ToResolution();
         var accessor = await context.CurrentAccessorAsync();
         var now = context.Clock().GetUtcNow();
         try

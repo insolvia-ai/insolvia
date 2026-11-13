@@ -1,4 +1,3 @@
-using System.Text.Json.Nodes;
 using Insolvia.Domain.AccessLog;
 using Insolvia.Domain.Auth;
 using Insolvia.Domain.Cases;
@@ -162,8 +161,8 @@ public static class FilingApprovals
 
     /// <summary>
     /// Approve the filing set the caller was shown, and enqueue its one job.
-    /// <paramref name="basis"/> is the basis over the stores NOW; the payload
-    /// carries the digest the client rendered. Refuses, in order — each a
+    /// <paramref name="basis"/> is the basis over the stores NOW;
+    /// <paramref name="shownDigest"/> is the digest the client rendered. Refuses, in order — each a
     /// denied <c>filing.approve</c> row naming it: a stale sign-in (403
     /// ReauthenticationRequired); not an attorney (403); a blocker (409); a
     /// digest other than today's (409); no current authorization or no
@@ -171,7 +170,8 @@ public static class FilingApprovals
     /// a filing in flight or unresolved (409).
     /// </summary>
     public static async Task<FilingApproval> ApproveAsync(
-        JsonNode? payload,
+        string shownDigest,
+        string? credentialId,
         CaseData data,
         ApprovalBasis basis,
         string firmId,
@@ -217,7 +217,6 @@ public static class FilingApprovals
             throw new ApprovalNotPermittedException("Only the attorney whose court login files the case may approve it.");
         }
 
-        var (shownDigest, credentialId) = ParseApprove(payload);
         if (basis.Blockers.Count > 0)
         {
             await Refuse("not_ready").ConfigureAwait(false);
@@ -434,28 +433,6 @@ public static class FilingApprovals
             AccessEvents.Record(approval.AttorneyId, AccessAction.FilingConsume, caseId: caseId, filingId: approval.FilingId, clock: new At(now)),
             cancellationToken).ConfigureAwait(false);
         return FilingApprovalRecords.Consumed(approval, consumedAt);
-    }
-
-    private static (string Digest, string? CredentialId) ParseApprove(JsonNode? payload)
-    {
-        if (payload is not JsonObject body)
-        {
-            throw new ValidationException("request body must be a JSON object");
-        }
-
-        var digest = Json.AsString(body["digest"]);
-        if (digest is null || TextRules.Length(digest) != 64)
-        {
-            throw new ValidationException("digest is required: the digest of the filing set you were shown");
-        }
-
-        var credential = body["credential_id"];
-        if (credential is not null && Json.AsString(credential) is null)
-        {
-            throw new ValidationException("credential_id must be a string");
-        }
-
-        return (digest, Json.AsString(credential));
     }
 
     /// <summary>The caller's OWN court login that would file this case, and the authorization it stands on.</summary>

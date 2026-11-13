@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using Insolvia.Api.Analysis;
@@ -130,14 +131,44 @@ public sealed record ExtractedCandidate(string Id, string EntityType);
 /// <param name="Message">What the preparer is told.</param>
 public sealed record JobFailureView(string Category, string Message);
 
-/// <summary>A job to accept (<c>POST …/jobs</c>). Parsed by <c>JobRules.ParseAcceptance</c>, which owns validation.</summary>
+/// <summary>
+/// A job to accept (<c>POST …/jobs</c>). <c>documentId</c> exactly when the
+/// kind works on one document; <c>options</c> only for a kind that takes them.
+/// </summary>
 /// <param name="Kind"><c>echo</c>, <c>packet_assembly</c>, <c>petition_review</c> or <c>document_extraction</c>.</param>
 /// <param name="DocumentId">The document, for <c>document_extraction</c> only (required there).</param>
 /// <param name="Options">Output options, for <c>packet_assembly</c> only.</param>
 public sealed record JobRequest(
-    string Kind,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? DocumentId,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] OutputOptionsRequest? Options);
+    [property: Required(ErrorMessage = JobRequest.KindMessage), AllowedValues(JobRules.EchoKind, JobRules.PacketAssemblyKind, JobRules.PetitionReviewKind, JobRules.DocumentExtractionKind, ErrorMessage = JobRequest.KindMessage)] string? Kind,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? DocumentId = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] OutputOptionsRequest? Options = null)
+    : IValidatableObject
+{
+    private const string KindMessage = "Kind must be one of echo, packet_assembly, petition_review, document_extraction.";
+
+    /// <summary>The document and the options belong to the kinds that take them.</summary>
+    /// <param name="validationContext">Unused.</param>
+    /// <returns>The failures.</returns>
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        if (JobRules.DocumentScopedKinds.Contains(Kind!))
+        {
+            if (string.IsNullOrWhiteSpace(DocumentId))
+            {
+                yield return new ValidationResult("This kind works on one document; name it.", [nameof(DocumentId)]);
+            }
+        }
+        else if (DocumentId is not null)
+        {
+            yield return new ValidationResult("This kind does not take a documentId.", [nameof(DocumentId)]);
+        }
+
+        if (Options is not null && !JobRules.OptionsScopedKinds.Contains(Kind!))
+        {
+            yield return new ValidationResult("This kind does not take options.", [nameof(Options)]);
+        }
+    }
+}
 
 /// <summary>An assembled filing packet.</summary>
 /// <param name="Id">The packet's id.</param>
