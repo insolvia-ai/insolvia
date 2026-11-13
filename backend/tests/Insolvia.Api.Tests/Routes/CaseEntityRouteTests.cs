@@ -35,6 +35,18 @@ public sealed class CaseEntityRouteTests : IAsyncLifetime, IDisposable
     }
 
     [Fact]
+    public async Task An_invalid_body_is_checked_only_after_the_caller_is_authenticated()
+    {
+        var caseId = await _world.OpenCaseIdAsync();
+        var tooLong = Creditor.Replace("Example Bank", new string('x', 201), StringComparison.Ordinal);
+
+        Assert.Equal(401, (await _world.World.SendAsync(HttpMethod.Post, $"/v1/cases/{caseId}/creditors", json: tooLong)).Status);
+        var signedIn = await Add(caseId, tooLong);
+        Assert.Equal(400, signedIn.Status);
+        Assert.Contains("body.name", signedIn.FieldErrors);
+    }
+
+    [Fact]
     public async Task Another_firms_case_is_not_found_and_its_records_are_indistinguishable_from_missing()
     {
         var caseId = await _world.OpenCaseIdAsync();
