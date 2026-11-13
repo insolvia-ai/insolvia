@@ -122,7 +122,7 @@ public sealed class FirmSettingsRouteTests : IAsyncLifetime, IDisposable
         var answer = await _world.Put("/v1/firm/questionnaire", Save(("personal_information", """ "enabled": false """)), Ids.Alice);
 
         Assert.Equal(400, answer.Status);
-        Assert.Equal("""{"error":"ValidationError","fields":{"sections.personal_information.enabled":"Personal information is always on."}}""", answer.Body);
+        Assert.Equal("""{"error":"ValidationError","fields":{"sections[0].enabled":"Personal information is always on."}}""", answer.Body);
     }
 
     [Theory]
@@ -196,7 +196,7 @@ public sealed class FirmSettingsRouteTests : IAsyncLifetime, IDisposable
         var answer = await _world.Put("/v1/firm/document-checklist", """{"items": [{"title": "Lease", "kind": "spaceship"}]}""", Ids.Alice);
 
         Assert.Equal(400, answer.Status);
-        Assert.Contains(answer.FieldErrors, field => field.StartsWith("items.0.", StringComparison.Ordinal));
+        Assert.Contains(answer.FieldErrors, field => field.StartsWith("items[0].", StringComparison.Ordinal));
     }
 
     // test_portal_routes.py's questionnaire_save: every section enabled, then

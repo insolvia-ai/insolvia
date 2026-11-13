@@ -24,10 +24,10 @@ public sealed class ClientCopyTests
 
     private const string ClientBody = """
         {"name": {"given": "Jordan", "surname": "Example", "suffix": "Jr."},
-         "other_names_used": [{"id": "alias-1", "surname": "Sample"}],
-         "date_of_birth": "1980-02-29",
-         "residence_address": {"line1": "1 Example St", "city": "Springfield", "state": "IL", "postalCode": "62701", "county": "Sangamon"},
-         "phone": "555-0100", "email": "jordan@example.test", "lead_source": "Referral"}
+         "otherNamesUsed": [{"id": "alias-1", "surname": "Sample"}],
+         "dateOfBirth": "1980-02-29",
+         "residenceAddress": {"line1": "1 Example St", "city": "Springfield", "state": "IL", "postalCode": "62701", "county": "Sangamon"},
+         "phone": "555-0100", "email": "jordan@example.test", "leadSource": "Referral"}
         """;
 
     private static readonly ProvenanceEntry Typed = new(ProvenanceSource.StaffTyped);
@@ -38,7 +38,7 @@ public sealed class ClientCopyTests
     {
         var body = Body.Of(ClientBody);
         overrides?.Invoke(body);
-        return FirmClientRules.Create(FirmClientRules.Parse(body), firmId, Ids.Alice);
+        return FirmClientRules.Create(FirmClientTests.Parse(body), firmId, Ids.Alice);
     }
 
     private static (Case Case, CaseAssignment Assignment) ACase(string firmId = Ids.Firm, string createdBy = Ids.Alice, TimeProvider? clock = null) =>
@@ -165,7 +165,7 @@ public sealed class ClientCopyTests
     [Fact]
     public void An_alias_is_compared_by_its_id_not_its_position()
     {
-        var client = AClient(overrides: body => body["other_names_used"] = Body.Value("""[{"id": "alias-1", "surname": "Sample"}, {"id": "alias-2", "surname": "Other"}]"""));
+        var client = AClient(overrides: body => body["otherNamesUsed"] = Body.Value("""[{"id": "alias-1", "surname": "Sample"}, {"id": "alias-2", "surname": "Other"}]"""));
         var debtor = ACopy(client);
         Assert.Empty(ClientCopies.DiffersFromClient(debtor, client with { OtherNamesUsed = client.OtherNamesUsed.Reverse().ToValueCollection() }));
         Assert.Equal(["otherNamesUsed[alias-2].surname"], ClientCopies.DiffersFromClient(debtor, client with { OtherNamesUsed = client.OtherNamesUsed.Take(1).ToValueCollection() }));

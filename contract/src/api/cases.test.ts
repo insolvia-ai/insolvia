@@ -85,8 +85,8 @@ describe('the client directory', () => {
     const created = await admin.api.createFirmClient({
       name: { given: 'Dana', surname },
       email: `dana-${tag()}@insolvia.test`,
-      residence_address: { line1: '1 Elm St', city: 'Tampa', state: 'FL', postalCode: '33602' },
-      lead_source: 'referral',
+      residenceAddress: { line1: '1 Elm St', city: 'Tampa', state: 'FL', postalCode: '33602' },
+      leadSource: 'referral',
     });
     admin.wire(201, FIRM_CLIENT);
     expect(created.status).toBe('active');
@@ -105,11 +105,11 @@ describe('the client directory', () => {
 
     const staged = await admin.api.setFirmClientProspectStage(created.id, 'consultation_scheduled');
     admin.wire(200, FIRM_CLIENT);
-    expect(staged.prospect_stage).toBe('consultation_scheduled');
+    expect(staged.prospectStage).toBe('consultation_scheduled');
     const unstaged = await admin.api.setFirmClientProspectStage(created.id, null);
     admin.wire(200, FIRM_CLIENT);
-    expect(unstaged.prospect_stage).toBeUndefined();
-    expect(admin.last().body).not.toHaveProperty('prospect_stage');
+    expect(unstaged.prospectStage).toBeUndefined();
+    expect(admin.last().body).not.toHaveProperty('prospectStage');
 
     const listed = await admin.api.listFirmClients();
     admin.wire(200, { clients: [FIRM_CLIENT] });
@@ -131,7 +131,7 @@ describe('the client directory', () => {
     const before = await debtor1();
     const merged = await admin.api.mergeFirmClient(created.id, duplicate.id);
     admin.wire(200, { client: FIRM_CLIENT, merged: FIRM_CLIENT });
-    expect(merged.merged.merged_into).toBe(created.id);
+    expect(merged.merged.mergedInto).toBe(created.id);
     expect(merged.merged.status).toBe('archived');
     const after = await debtor1();
     expect(after?.clientId).toBe(created.id);
@@ -340,9 +340,9 @@ describe('a case, opened from a client', () => {
     expect(new Set(sources)).toEqual(new Set([caseId]));
     // …and the client the copy was opened for stays retained, with no stage.
     const retained = await admin.api.getFirmClient(client.id);
-    expect(typeof retained.first_retained_at).toBe('string');
-    expect(retained.first_retained_at! <= new Date().toISOString().slice(0, 10)).toBe(true);
-    expect(admin.last().body).not.toHaveProperty('prospect_stage');
+    expect(typeof retained.firstRetainedAt).toBe('string');
+    expect(retained.firstRetainedAt! <= new Date().toISOString().slice(0, 10)).toBe(true);
+    expect(admin.last().body).not.toHaveProperty('prospectStage');
 
     await admin.api.deleteCase(copy.id);
     admin.wire(204);

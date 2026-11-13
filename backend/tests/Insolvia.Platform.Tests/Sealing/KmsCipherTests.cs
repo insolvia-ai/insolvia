@@ -1,4 +1,3 @@
-using System.Text.Json.Nodes;
 using Amazon.KeyManagementService;
 using Amazon.KeyManagementService.Model;
 using Insolvia.Domain.AccessLog;
@@ -123,11 +122,8 @@ public sealed class KmsCipherTests
         var store = new MemoryFilingCredentialStore();
         var authorizations = new MemoryFilingAuthorizationStore();
         await FilingAuthorizationRules.SignAsync(
-            new JsonObject
-            {
-                ["text_version"] = FilingAuthorizationRules.TextVersion,
-                ["text_digest"] = FilingAuthorizationRules.TextDigest(FilingAuthorizationRules.AuthorizationText()),
-            },
+            FilingAuthorizationRules.TextVersion,
+            FilingAuthorizationRules.TextDigest(FilingAuthorizationRules.AuthorizationText()),
             Firm,
             Attorney,
             4_102_444_800,
@@ -135,7 +131,7 @@ public sealed class KmsCipherTests
             authorizations,
             log,
             cancellationToken: Ct);
-        var enrolment = FilingCredentialRules.ParseEnrolment(new JsonObject { ["login"] = "FAKE-ECF-USER", ["password"] = "FAKE-ECF-PASSWORD-not-a-real-one", ["totp_seed"] = "JBSWY3DPEHPK3PXP" });
+        var enrolment = new FilingEnrolmentRequest("FAKE-ECF-USER", "FAKE-ECF-PASSWORD-not-a-real-one", "JBSWY3DPEHPK3PXP").ToEnrolment();
         var credential = await FilingCredentialRules.EnrolAsync(enrolment, Firm, Attorney, new KmsFilingCredentialSealer(kms, VaultKey), store, log, authorizations, cancellationToken: Ct);
         timeline.Clear();
 

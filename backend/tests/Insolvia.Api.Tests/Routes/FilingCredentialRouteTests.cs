@@ -28,7 +28,7 @@ public sealed class FilingCredentialRouteTests : IDisposable
     private readonly FirmWorld _world = new();
 
     private static string Enrolment(string login = "FAKE-ECF-USER") =>
-        $$"""{"login": "{{login}}", "password": "{{Password}}", "totp_seed": "{{Seed}}", "courts": ["flmb"]}""";
+        $$"""{"login": "{{login}}", "password": "{{Password}}", "totpSeed": "{{Seed}}", "courts": ["flmb"]}""";
 
     private async Task<FirmWorld> SeedAsync()
     {
@@ -49,7 +49,7 @@ public sealed class FilingCredentialRouteTests : IDisposable
         var text = (await _world.Get("/v1/me/filing-authorization", subject)).Object["text"]!;
         var answer = await _world.Post(
             "/v1/me/filing-authorization",
-            $$"""{"text_version": "{{text["version"]}}", "text_digest": "{{text["digest"]}}"}""",
+            $$"""{"textVersion": "{{text["version"]}}", "textDigest": "{{text["digest"]}}"}""",
             subject);
         Assert.True(answer.Status == 201, answer.Body);
     }
@@ -80,7 +80,7 @@ public sealed class FilingCredentialRouteTests : IDisposable
         var answer = await _world.Post("/v1/me/filing-credentials", Enrolment(), Attorney);
 
         Assert.Equal(201, answer.Status);
-        Assert.Equal(["courts", "created_at", "id", "login", "status", "updated_at"], Answer.Keys(answer.Json));
+        Assert.Equal(["courts", "createdAt", "id", "login", "status", "updatedAt"], Answer.Keys(answer.Json));
         Assert.Equal("no-store", answer.Response.Headers.CacheControl!.ToString());
         Assert.DoesNotContain(Password, answer.Body, StringComparison.Ordinal);
         Assert.DoesNotContain(Seed, answer.Body, StringComparison.Ordinal);
@@ -109,8 +109,8 @@ public sealed class FilingCredentialRouteTests : IDisposable
         await SeedAsync();
         await SignAsync();
 
-        var bad = await _world.Post("/v1/me/filing-credentials", """{"login": "FAKE", "password": "x", "totp_seed": "short"}""", Attorney);
-        Assert.Equal(["totp_seed"], bad.FieldErrors);
+        var bad = await _world.Post("/v1/me/filing-credentials", """{"login": "FAKE", "password": "x", "totpSeed": "short"}""", Attorney);
+        Assert.Equal(["totpSeed"], bad.FieldErrors);
         await EnrolAsync();
         Assert.Equal(409, (await _world.Post("/v1/me/filing-credentials", Enrolment(), Attorney)).Status);
     }
@@ -155,7 +155,7 @@ public sealed class FilingCredentialRouteTests : IDisposable
         {
             var answer = await _world.SendAsync(new HttpMethod(method), path, Plain, method == "POST" ? "{}" : null);
             Assert.True(answer.Status == 403, $"{method} {path}: {answer.Status}");
-            Assert.Equal(401, (await _world.SendAsync(new HttpMethod(method), path)).Status);
+            Assert.Equal(401, (await _world.SendAsync(new HttpMethod(method), path, null, method == "POST" ? "{}" : null)).Status);
         }
 
         Assert.Equal(PermissionLevel.Hidden, Permissions.DefaultFor(FirmRole.Attorney)[Feature.ElectronicFiling]);
@@ -203,7 +203,7 @@ public sealed class FilingCredentialRouteTests : IDisposable
     {
         await SeedAsync();
         var text = (await _world.Get("/v1/me/filing-authorization", Attorney)).Object["text"]!;
-        var body = $$"""{"text_version": "{{text["version"]}}", "text_digest": "{{text["digest"]}}"}""";
+        var body = $$"""{"textVersion": "{{text["version"]}}", "textDigest": "{{text["digest"]}}"}""";
         long? authTime = signedInAgo is { } ago ? DateTimeOffset.UtcNow.ToUnixTimeSeconds() - ago : null;
 
         var answer = await Stale(HttpMethod.Post, "/v1/me/filing-authorization", body, authTime);
@@ -218,10 +218,10 @@ public sealed class FilingCredentialRouteTests : IDisposable
     {
         await SeedAsync();
 
-        Assert.Equal(409, (await _world.Post("/v1/me/filing-authorization", $$"""{"text_version": "{{FilingAuthorizationRules.TextVersion}}", "text_digest": "{{new string('0', 64)}}"}""", Attorney)).Status);
+        Assert.Equal(409, (await _world.Post("/v1/me/filing-authorization", $$"""{"textVersion": "{{FilingAuthorizationRules.TextVersion}}", "textDigest": "{{new string('0', 64)}}"}""", Attorney)).Status);
         await SignAsync();
         var text = (await _world.Get("/v1/me/filing-authorization", Attorney)).Object["text"]!;
-        Assert.Equal(409, (await _world.Post("/v1/me/filing-authorization", $$"""{"text_version": "{{text["version"]}}", "text_digest": "{{text["digest"]}}"}""", Attorney)).Status);
+        Assert.Equal(409, (await _world.Post("/v1/me/filing-authorization", $$"""{"textVersion": "{{text["version"]}}", "textDigest": "{{text["digest"]}}"}""", Attorney)).Status);
     }
 
     [Fact]
@@ -237,7 +237,7 @@ public sealed class FilingCredentialRouteTests : IDisposable
         var answer = await Stale(HttpMethod.Delete, "/v1/me/filing-authorization", null, DateTimeOffset.UtcNow.ToUnixTimeSeconds() - 7200);
 
         Assert.Equal(200, answer.Status);
-        Assert.Equal(2, answer.Object["credentials_revoked"]!.GetValue<int>());
+        Assert.Equal(2, answer.Object["credentialsRevoked"]!.GetValue<int>());
         Assert.Empty(await Store.ListForAttorneyAsync(Ids.FirmA, Attorney, HttpAssert.Ct));
         Assert.Equal(theirs, Assert.Single(await Store.ListForAttorneyAsync(Ids.FirmA, Colleague, HttpAssert.Ct)).CredentialId);
         Assert.Equal(404, (await _world.Delete("/v1/me/filing-authorization", Attorney)).Status);

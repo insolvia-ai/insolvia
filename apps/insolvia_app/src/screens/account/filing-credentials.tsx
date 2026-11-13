@@ -68,7 +68,7 @@ export function FilingCredentials({
     setNotice(null);
     try {
       const result = await call((client) =>
-        client.enrolFilingCredential({ login, password, totp_seed: seed }),
+        client.enrolFilingCredential({ login, password, totpSeed: seed }),
       );
       if (result.ok) {
         // The secret's last moment on this device: clear it now, not later.
@@ -140,7 +140,7 @@ export function FilingCredentials({
               </Text>
               <Text
                 style={[styles.caption, muted]}
-              >{`Enrolled ${credential.created_at.slice(0, 10)}`}</Text>
+              >{`Enrolled ${credential.createdAt.slice(0, 10)}`}</Text>
               {canChange ? (
                 <View style={styles.actions}>
                   <Button
@@ -179,7 +179,7 @@ export function FilingCredentials({
             <PasswordInput value={password} onValueChange={setPassword} />
             {fieldErrors.password ? <Field.Error match>{fieldErrors.password}</Field.Error> : null}
           </Field.Root>
-          <Field.Root name="totp_seed" invalid={Boolean(fieldErrors.totp_seed)}>
+          <Field.Root name="totpSeed" invalid={Boolean(fieldErrors.totpSeed)}>
             <Field.Label>Authenticator key</Field.Label>
             <PasswordInput
               value={seed}
@@ -192,9 +192,7 @@ export function FilingCredentials({
               The setup key PACER showed when you turned on multi-factor authentication — the text
               version of its QR code.
             </Field.Description>
-            {fieldErrors.totp_seed ? (
-              <Field.Error match>{fieldErrors.totp_seed}</Field.Error>
-            ) : null}
+            {fieldErrors.totpSeed ? <Field.Error match>{fieldErrors.totpSeed}</Field.Error> : null}
           </Field.Root>
           <View style={styles.actions}>
             <Button size="lg" onPress={() => void enrol()} disabled={busy}>

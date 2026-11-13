@@ -42,12 +42,12 @@ const ROW_CASES = 3;
  */
 function haystack(client: FirmClient): string {
   const { given, middle, surname } = client.name;
-  const aliases = (client.other_names_used ?? []).flatMap((other) => [
+  const aliases = (client.otherNamesUsed ?? []).flatMap((other) => [
     other.given,
     other.middle,
     other.surname,
   ]);
-  return [given, middle, surname, ...aliases, client.residence_address?.city]
+  return [given, middle, surname, ...aliases, client.residenceAddress?.city]
     .filter((part): part is string => typeof part === 'string' && part !== '')
     .join(' ')
     .toLowerCase();
@@ -66,7 +66,7 @@ function matches(client: FirmClient, query: string): boolean {
 
 /** A client the firm has not been retained by yet — the funnel's (#355). */
 function isProspect(client: FirmClient): boolean {
-  return client.first_retained_at === undefined && client.merged_into === undefined;
+  return client.firstRetainedAt === undefined && client.mergedInto === undefined;
 }
 
 /** Whether `client` belongs in the `show` view. */
@@ -78,7 +78,7 @@ function shown(client: FirmClient, show: Show): boolean {
 
 /** "Tampa, FL", or whichever half exists — where a person is, at a glance. */
 function place(client: FirmClient): string {
-  const { city, state } = client.residence_address ?? {};
+  const { city, state } = client.residenceAddress ?? {};
   return [city, state].filter((part) => part !== undefined && part !== '').join(', ');
 }
 
@@ -106,7 +106,7 @@ function place(client: FirmClient): string {
  * already in hand, with no request per keystroke.
  *
  * PROSPECTS ARE CLIENTS NOT YET RETAINED (issue #355 — the funnel is the
- * client's): an active client with no `first_retained_at`, which the server
+ * client's): an active client with no `firstRetainedAt`, which the server
  * stamps when their first case is opened. That fact is on the record itself,
  * so the filter needs no case read; the row's badge carries the funnel stage.
  *
@@ -320,13 +320,13 @@ export function ClientList({ membership }: { membership: FirmMembership }) {
                         size="sm"
                       >
                         {client.status !== 'active'
-                          ? client.merged_into !== undefined
+                          ? client.mergedInto !== undefined
                             ? 'Merged'
                             : 'Archived'
                           : isProspect(client)
-                            ? client.prospect_stage === undefined
+                            ? client.prospectStage === undefined
                               ? 'Prospect'
-                              : PROSPECT_STAGE_LABEL[client.prospect_stage]
+                              : PROSPECT_STAGE_LABEL[client.prospectStage]
                             : 'Active'}
                       </Badge>
                     </Table.Cell>

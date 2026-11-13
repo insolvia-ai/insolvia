@@ -128,7 +128,7 @@ async function withdrawLeftovers(admin: ContractClient): Promise<void> {
 describe('electronic filing — the staff surface', () => {
   const AUTHORIZATION: Spec = {
     text: { version: 'string', digest: 'string', text: 'string' },
-    current_version: 'string',
+    currentVersion: 'string',
     current: 'boolean',
     signature: 'object|null',
   };
@@ -137,8 +137,8 @@ describe('electronic filing — the staff surface', () => {
     login: 'string',
     courts: ['string'],
     status: 'string',
-    created_at: 'string',
-    updated_at: 'string',
+    createdAt: 'string',
+    updatedAt: 'string',
   };
 
   it('authorization → credential → approval refusals → withdrawal', async () => {
@@ -153,7 +153,7 @@ describe('electronic filing — the staff surface', () => {
     const enrolment = {
       login: 'contract-filer',
       password: 'synthetic-not-a-secret',
-      totp_seed: 'JBSWY3DPEHPK3PXP',
+      totpSeed: 'JBSWY3DPEHPK3PXP',
       courts: ['flmb'],
     };
     await expectApiError(admin.api.enrolFilingCredential(enrolment), 403, 'ForbiddenError');
@@ -168,9 +168,9 @@ describe('electronic filing — the staff surface', () => {
       ...(AUTHORIZATION as Record<string, Spec>),
       signature: {
         id: 'string',
-        text_version: 'string',
-        text_digest: 'string',
-        signed_at: 'string',
+        textVersion: 'string',
+        textDigest: 'string',
+        signedAt: 'string',
       },
     });
     expect(signed.current).toBe(true);
@@ -180,12 +180,12 @@ describe('electronic filing — the staff surface', () => {
     admin.wire(201, CREDENTIAL);
     // The vault never hands a secret back.
     expect(JSON.stringify(admin.last().body)).not.toContain(enrolment.password);
-    expect(JSON.stringify(admin.last().body)).not.toContain(enrolment.totp_seed);
+    expect(JSON.stringify(admin.last().body)).not.toContain(enrolment.totpSeed);
     const credentials = await admin.api.listFilingCredentials();
     admin.wire(200, { credentials: [CREDENTIAL] });
     expect(credentials.map((c) => c.id)).toContain(credential.id);
     await expectApiError(
-      admin.api.enrolFilingCredential({ ...enrolment, totp_seed: '' }),
+      admin.api.enrolFilingCredential({ ...enrolment, totpSeed: '' }),
       400,
       'ValidationError',
     );
@@ -239,7 +239,7 @@ describe('electronic filing — the staff surface', () => {
     // Withdrawing destroys every credential and refuses the next enrolment.
     const second = await admin.api.enrolFilingCredential(enrolment);
     const destroyed = await admin.api.withdrawFilingAuthorization();
-    admin.wire(200, { credentials_revoked: 'integer' });
+    admin.wire(200, { credentialsRevoked: 'integer' });
     expect(destroyed).toBe(1);
     expect((await admin.api.listFilingCredentials()).map((c) => c.id)).not.toContain(second.id);
     await expectApiError(admin.api.revokeFilingCredential(second.id), 404, 'NotFoundError');

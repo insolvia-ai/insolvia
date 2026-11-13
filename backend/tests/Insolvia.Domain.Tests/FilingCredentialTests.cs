@@ -36,15 +36,17 @@ public sealed class FilingCredentialTests
 
     // ── Parsing ─────────────────────────────────────────────────────
 
+    private static Enrolment Enrolment(JsonObject body) => Body.Read<FilingEnrolmentRequest>(body).ToEnrolment();
+
     [Fact]
     public void A_complete_enrolment_parses()
     {
         var seed = FreshSeed();
-        var enrolment = FilingCredentialRules.ParseEnrolment(new JsonObject
+        var enrolment = Enrolment(new JsonObject
         {
             ["login"] = Login,
             ["password"] = Password,
-            ["totp_seed"] = seed,
+            ["totpSeed"] = seed,
             ["courts"] = new JsonArray("txsb", "flmb", "txsb"),
         });
         Assert.Equal(Login, enrolment.Login);
@@ -57,33 +59,33 @@ public sealed class FilingCredentialTests
     {
         var seed = FreshSeed();
         var grouped = string.Join(" ", seed.Chunk(4).Select(chunk => new string(chunk))).ToLowerInvariant();
-        Assert.Equal(seed, FilingCredentialRules.ParseEnrolment(new JsonObject { ["login"] = Login, ["password"] = Password, ["totp_seed"] = grouped }).Secret.TotpSeed);
+        Assert.Equal(seed, Enrolment(new JsonObject { ["login"] = Login, ["password"] = Password, ["totpSeed"] = grouped }).Secret.TotpSeed);
     }
 
     public static TheoryData<string, string> Problems() => new()
     {
-        { $$"""{"password": "{{Password}}", "totp_seed": "{{Valid32}}"}""", "login" },
-        { $$"""{"login": "has space", "password": "{{Password}}", "totp_seed": "{{Valid32}}"}""", "login" },
-        { $$"""{"login": "{{Login}}", "totp_seed": "{{Valid32}}"}""", "password" },
-        { $$"""{"login": "{{Login}}", "password": "{{new string('x', 129)}}", "totp_seed": "{{Valid32}}"}""", "password" },
-        { $$"""{"login": "{{Login}}", "password": "tab\there", "totp_seed": "{{Valid32}}"}""", "password" },
-        { $$"""{"login": "{{Login}}", "password": "{{Password}}", "totp_seed": "ABC"}""", "totp_seed" },
-        { $$"""{"login": "{{Login}}", "password": "{{Password}}", "totp_seed": "{{new string('0', 32)}}"}""", "totp_seed" },
-        { $$"""{"login": "{{Login}}", "password": "{{Password}}"}""", "totp_seed" },
-        { $$"""{"login": "{{Login}}", "password": "{{Password}}", "totp_seed": "{{Valid32}}", "courts": ["zzzz"]}""", "courts" },
-        { $$"""{"login": "{{Login}}", "password": "{{Password}}", "totp_seed": "{{Valid32}}", "courts": "txsb"}""", "courts" },
+        { $$"""{"password": "{{Password}}", "totpSeed": "{{Valid32}}"}""", "login" },
+        { $$"""{"login": "has space", "password": "{{Password}}", "totpSeed": "{{Valid32}}"}""", "login" },
+        { $$"""{"login": "{{Login}}", "totpSeed": "{{Valid32}}"}""", "password" },
+        { $$"""{"login": "{{Login}}", "password": "{{new string('x', 129)}}", "totpSeed": "{{Valid32}}"}""", "password" },
+        { $$"""{"login": "{{Login}}", "password": "tab\there", "totpSeed": "{{Valid32}}"}""", "password" },
+        { $$"""{"login": "{{Login}}", "password": "{{Password}}", "totpSeed": "ABC"}""", "totpSeed" },
+        { $$"""{"login": "{{Login}}", "password": "{{Password}}", "totpSeed": "{{new string('0', 32)}}"}""", "totpSeed" },
+        { $$"""{"login": "{{Login}}", "password": "{{Password}}"}""", "totpSeed" },
+        { $$"""{"login": "{{Login}}", "password": "{{Password}}", "totpSeed": "{{Valid32}}", "courts": ["zzzz"]}""", "courts" },
+        { $$"""{"login": "{{Login}}", "password": "{{Password}}", "totpSeed": "{{Valid32}}", "courts": "txsb"}""", "courts" },
     };
 
     [Theory]
     [MemberData(nameof(Problems))]
     public void Each_problem_is_reported_on_its_field(string body, string field) =>
-        Assert.Contains(field, Assert.Throws<FieldValidationException>(() => FilingCredentialRules.ParseEnrolment(Body.Of(body))).Fields.Keys);
+        Assert.Contains(field, Assert.Throws<FieldValidationException>(() => Enrolment(Body.Of(body))).Fields.Keys);
 
     [Fact]
     public void A_refusal_never_echoes_what_was_submitted()
     {
         var secretish = "NOT-ECHOED-" + FreshSeed();
-        var error = Assert.Throws<FieldValidationException>(() => FilingCredentialRules.ParseEnrolment(new JsonObject { ["login"] = secretish + " x", ["password"] = "", ["totp_seed"] = secretish }));
+        var error = Assert.Throws<FieldValidationException>(() => Enrolment(new JsonObject { ["login"] = secretish + " x", ["password"] = "", ["totpSeed"] = secretish }));
         Assert.DoesNotContain(error.Fields.Values, message => message.Contains(secretish, StringComparison.Ordinal));
         Assert.DoesNotContain(secretish, error.Message, StringComparison.Ordinal);
     }
@@ -93,7 +95,7 @@ public sealed class FilingCredentialTests
     {
         var secret = new CredentialSecret(Password, FreshSeed());
         Assert.DoesNotContain(Password, secret.ToString(), StringComparison.Ordinal);
-        var enrolment = FilingCredentialRules.ParseEnrolment(new JsonObject { ["login"] = Login, ["password"] = Password, ["totp_seed"] = secret.TotpSeed });
+        var enrolment = Enrolment(new JsonObject { ["login"] = Login, ["password"] = Password, ["totpSeed"] = secret.TotpSeed });
         Assert.DoesNotContain(Password, enrolment.ToString(), StringComparison.Ordinal);
     }
 
@@ -398,11 +400,8 @@ public sealed class FilingCredentialTests
 
         public Task<FilingAuthorization> SignAsync(string attorney = Attorney) =>
             FilingAuthorizationRules.SignAsync(
-                new JsonObject
-                {
-                    ["text_version"] = FilingAuthorizationRules.TextVersion,
-                    ["text_digest"] = FilingAuthorizationRules.TextDigest(FilingAuthorizationRules.AuthorizationText()),
-                },
+                FilingAuthorizationRules.TextVersion,
+                FilingAuthorizationRules.TextDigest(FilingAuthorizationRules.AuthorizationText()),
                 Firm,
                 attorney,
                 SignedInAt,
@@ -416,7 +415,7 @@ public sealed class FilingCredentialTests
 
         public Task<FilingCredential> EnrolAsync(string seed, string login = Login, string attorney = Attorney) =>
             FilingCredentialRules.EnrolAsync(
-                FilingCredentialRules.ParseEnrolment(new JsonObject { ["login"] = login, ["password"] = Password, ["totp_seed"] = seed }),
+                Enrolment(new JsonObject { ["login"] = login, ["password"] = Password, ["totpSeed"] = seed }),
                 Firm,
                 attorney,
                 Cipher,

@@ -90,7 +90,7 @@ function otherNames(names: readonly OtherName[] | undefined): string | undefined
  * refuses editing, restoring, re-merging or opening a case for it.
  *
  * A PROSPECT HAS A FUNNEL STAGE (issue #355 — the funnel is the client's, a
- * case starts retained). While the client has no `first_retained_at` the
+ * case starts retained). While the client has no `firstRetainedAt` the
  * record says "Prospect" and offers the stage as a `Select`; choosing one is
  * `PUT …/prospect-stage`, and "Not in the funnel" sends `null`. Starting
  * their first case retains them: the server stamps the date and clears the
@@ -98,7 +98,7 @@ function otherNames(names: readonly OtherName[] | undefined): string | undefined
  * and the record reloads.
  *
  * THE TAX ID IS THE LAST FOUR, OR NOTHING. The full value is sealed on a case
- * (#382); a client screen shows only what `tax_id_last_four` says, and
+ * (#382); a client screen shows only what `taxIdLastFour` says, and
  * cannot set it.
  *
  * THE CASES ARE THE ONES YOU MAY SEE, AND ONLY THOSE. The list comes from
@@ -153,7 +153,7 @@ export function ClientRecord({
   }, [load, mayView]);
 
   // A merged client names its survivor by id; the record says who that is.
-  const mergedInto = record.kind === 'ready' ? record.client.merged_into : undefined;
+  const mergedInto = record.kind === 'ready' ? record.client.mergedInto : undefined;
   useEffect(() => {
     setSurvivorName(null);
     if (mergedInto === undefined) return;
@@ -229,8 +229,8 @@ export function ClientRecord({
 
   const client = record.client;
   const archived = client.status === 'archived';
-  const merged = client.merged_into !== undefined;
-  const prospect = client.first_retained_at === undefined && !merged;
+  const merged = client.mergedInto !== undefined;
+  const prospect = client.firstRetainedAt === undefined && !merged;
 
   const save = async (form: ClientFormState) => {
     setBusy(true);
@@ -304,23 +304,23 @@ export function ClientRecord({
   };
 
   const details: readonly (readonly [string, string | undefined])[] = [
-    ['Date of birth', client.date_of_birth],
+    ['Date of birth', client.dateOfBirth],
     ['Email', client.email],
     ['Phone', client.phone],
     ['Mobile', client.mobile],
-    ['Lives at', addressLines(client.residence_address)],
-    ['Mailing address', addressLines(client.mailing_address)],
-    ['Other names used', otherNames(client.other_names_used)],
+    ['Lives at', addressLines(client.residenceAddress)],
+    ['Mailing address', addressLines(client.mailingAddress)],
+    ['Other names used', otherNames(client.otherNamesUsed)],
     [
       'SSN or ITIN',
-      client.tax_id_last_four === undefined
+      client.taxIdLastFour === undefined
         ? 'Not on file — it is entered on a case'
-        : `Ending ${client.tax_id_last_four}`,
+        : `Ending ${client.taxIdLastFour}`,
     ],
-    ['Lead source', client.lead_source],
-    ['Referred by', client.referred_by],
-    ['First retained', client.first_retained_at],
-    ['Added', client.created_at.slice(0, 10)],
+    ['Lead source', client.leadSource],
+    ['Referred by', client.referredBy],
+    ['First retained', client.firstRetainedAt],
+    ['Added', client.createdAt.slice(0, 10)],
   ];
 
   const statusIsProblem =
@@ -348,7 +348,7 @@ export function ClientRecord({
 
       {prospect ? (
         <View style={styles.funnel}>
-          <Field.Root name="prospect_stage">
+          <Field.Root name="prospectStage">
             <Field.Label>Funnel stage</Field.Label>
             <Select
               options={[
@@ -358,10 +358,10 @@ export function ClientRecord({
                   label: PROSPECT_STAGE_LABEL[stage],
                 })),
               ]}
-              value={client.prospect_stage ?? NOT_IN_FUNNEL}
+              value={client.prospectStage ?? NOT_IN_FUNNEL}
               disabled={!mayEdit || busy}
               onValueChange={(next) => {
-                if (next === null || next === (client.prospect_stage ?? NOT_IN_FUNNEL)) return;
+                if (next === null || next === (client.prospectStage ?? NOT_IN_FUNNEL)) return;
                 void setStage(next === NOT_IN_FUNNEL ? null : (next as ProspectStage));
               }}
             />
@@ -424,11 +424,11 @@ export function ClientRecord({
           ) : null}
         </View>
       ) : null}
-      {client.merged_into !== undefined ? (
+      {client.mergedInto !== undefined ? (
         <Text style={[styles.body, muted]}>
           {'Merged into '}
           <Link
-            href={`/clients/${client.merged_into}`}
+            href={`/clients/${client.mergedInto}`}
             style={{ color: theme.colors.primary, fontFamily: theme.typography.body }}
           >
             {survivorName ?? 'the client they were merged into'}

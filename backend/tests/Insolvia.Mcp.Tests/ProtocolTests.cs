@@ -150,7 +150,7 @@ public sealed class ProtocolTests : IDisposable
         Assert.NotEqual(true, (bool?)listed.Result["isError"]);
         var record = Assert.Single(listed.Result["structuredContent"]!["records"]!.AsArray())!;
         Assert.Equal(client.Id, (string?)record["id"]);
-        Assert.Equal("6789", (string?)record["tax_id_last_four"]);
+        Assert.Equal("6789", (string?)record["taxIdLastFour"]);
         Assert.DoesNotContain(TaxIdRef, listed.Raw, StringComparison.Ordinal);
 
         var read = await _host.CallAsync("get_case_record", new JsonObject { ["caseId"] = found.Id, ["entityType"] = "clients", ["recordId"] = client.Id }, Auth());

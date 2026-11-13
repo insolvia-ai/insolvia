@@ -91,7 +91,7 @@ public static class ClientMerges
 
         if (survivor.Id == merged.Id)
         {
-            throw new FieldValidationException(new Dictionary<string, string> { ["merged_client_id"] = "A client cannot be merged into itself." });
+            throw new FieldValidationException(new Dictionary<string, string> { ["mergedClientId"] = "A client cannot be merged into itself." });
         }
 
         if (Refusal(survivor, merged) is { } reason)

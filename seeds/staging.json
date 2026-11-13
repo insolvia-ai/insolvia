@@ -102,7 +102,7 @@
   ],
   "cases": [
     {
-      "fixture": "v6",
+      "fixture": "v7",
       "case": "chapter-7-sample",
       "firm": "Insolvia E2E",
       "openedBy": "admin",
@@ -117,7 +117,7 @@
       ]
     },
     {
-      "fixture": "v6",
+      "fixture": "v7",
       "case": "chapter-13-sample",
       "firm": "Insolvia E2E",
       "openedBy": "admin"

@@ -22,8 +22,7 @@ public sealed record PersonName(
 /// Structured parts AND a raw fallback (the IEPD's free-text form, for a
 /// creditor block that will not parse). <see cref="County"/> is B101 line 5's box.
 /// <see cref="PostalCode"/> is <c>postalCode</c> under every serializer, the
-/// snake_case ones included: an address sits in a case collection's camelCase
-/// body and in a debtor's, a firm's and a client's snake_case one alike (ADR 0032).
+/// stored rows' snake_case one included (ADR 0032).
 /// </summary>
 public sealed record Address(
     [property: Text] string? Line1 = null,
@@ -166,97 +165,5 @@ public static class FieldParsers
         }
 
         return parsed;
-    }
-
-
-    /// <summary>A yes/no answer, or null when unanswered. <c>false</c> is an answer, not an absence.</summary>
-    public static bool? Boolean(JsonNode? value, string path, IDictionary<string, string> errors)
-    {
-        ArgumentNullException.ThrowIfNull(errors);
-        if (value is null)
-        {
-            return null;
-        }
-
-        var parsed = Json.AsBool(value);
-        if (parsed is null)
-        {
-            errors[path] = "Must be true or false.";
-        }
-
-        return parsed;
-    }
-
-
-    /// <summary>One of <paramref name="allowed"/>, or null when absent.</summary>
-    public static string? Choice(JsonNode? value, IReadOnlyList<string> allowed, string path, IDictionary<string, string> errors)
-    {
-        ArgumentNullException.ThrowIfNull(allowed);
-        ArgumentNullException.ThrowIfNull(errors);
-        if (value is null)
-        {
-            return null;
-        }
-
-        var raw = Json.AsString(value);
-        if (raw is null || !allowed.Contains(raw, StringComparer.Ordinal))
-        {
-            errors[path] = "Must be one of " + string.Join(", ", allowed) + ".";
-            return null;
-        }
-
-        return raw;
-    }
-
-    /// <summary>One member of <typeparamref name="TEnum"/> by its wire string, or null when absent.</summary>
-    public static TEnum? Choice<TEnum>(JsonNode? value, string path, IDictionary<string, string> errors)
-        where TEnum : struct, Enum
-    {
-        var raw = Choice(value, Wire.Names<TEnum>(), path, errors);
-        return raw is not null && Wire.TryParse<TEnum>(raw, out var member) ? member : null;
-    }
-
-
-    /// <summary>An object, or an empty one when absent; anything else is an error.</summary>
-    public static JsonObject Mapping(JsonNode? value, string path, IDictionary<string, string> errors)
-    {
-        ArgumentNullException.ThrowIfNull(errors);
-        if (value is null)
-        {
-            return [];
-        }
-
-        if (value is not JsonObject obj)
-        {
-            errors[path] = "Must be an object.";
-            return [];
-        }
-
-        return obj;
-    }
-
-    /// <summary>A <see cref="PersonName"/>; absent parts stay null.</summary>
-    public static PersonName ParseName(JsonNode? value, string path, IDictionary<string, string> errors)
-    {
-        var raw = Mapping(value, path, errors);
-        return new PersonName(
-            Given: Text(raw["given"], $"{path}.given", errors),
-            Middle: Text(raw["middle"], $"{path}.middle", errors),
-            Surname: Text(raw["surname"], $"{path}.surname", errors),
-            Suffix: Text(raw["suffix"], $"{path}.suffix", errors, limit: 20));
-    }
-
-    /// <summary>An <see cref="Address"/>; absent parts stay null.</summary>
-    public static Address ParseAddress(JsonNode? value, string path, IDictionary<string, string> errors)
-    {
-        var raw = Mapping(value, path, errors);
-        return new Address(
-            Line1: Text(raw["line1"], $"{path}.line1", errors),
-            Line2: Text(raw["line2"], $"{path}.line2", errors),
-            City: Text(raw["city"], $"{path}.city", errors),
-            State: Text(raw["state"], $"{path}.state", errors, limit: 40),
-            PostalCode: Text(raw["postalCode"], $"{path}.postalCode", errors, limit: 12),
-            County: Text(raw["county"], $"{path}.county", errors, limit: 64),
-            Raw: Text(raw["raw"], $"{path}.raw", errors, limit: 500));
     }
 }

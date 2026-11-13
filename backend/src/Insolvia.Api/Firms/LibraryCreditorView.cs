@@ -17,7 +17,6 @@ namespace Insolvia.Api.Firms;
 /// <param name="CreatedAt">Added, ISO 8601 UTC to the microsecond.</param>
 /// <param name="UpdatedAt">Last changed, ISO 8601 UTC to the microsecond.</param>
 /// <param name="Notes">The firm's notes; absent when none.</param>
-[SnakeCase]
 public sealed record LibraryCreditorView(
     string Id,
     string Name,
@@ -51,7 +50,6 @@ public sealed record LibraryCreditorView(
 /// <param name="Name">The party's name; absent when none.</param>
 /// <param name="Address">The party's address, its unanswered parts absent.</param>
 /// <param name="AccountLast4">The last four of the account number the party knows it by; absent when none.</param>
-[SnakeCase]
 public sealed record NoticePartyView(
     string Id,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Name,
@@ -71,22 +69,3 @@ public sealed record NoticePartyView(
 /// <summary>The firm's creditor library.</summary>
 /// <param name="Creditors">Every creditor in the library.</param>
 public sealed record LibraryCreditorList(IReadOnlyList<LibraryCreditorView> Creditors);
-
-/// <summary>
-/// A library creditor as written (<c>POST /v1/firm/creditors</c>,
-/// <c>PUT …/{creditorId}</c>): the whole record; a PUT clears what it omits.
-/// Parsed by <c>LibraryCreditorRules.Parse</c>, which owns validation; this
-/// record is its shape for the OpenAPI document.
-/// </summary>
-/// <param name="Name">The creditor's name; the one required field.</param>
-/// <param name="Address">The creditor's address.</param>
-/// <param name="AdditionalNoticeParties">Others to notify about a debt to this creditor.</param>
-/// <param name="Preferred">Whether to pin it to the top of the picker; false when absent.</param>
-/// <param name="Notes">The firm's notes.</param>
-[SnakeCase]
-public sealed record LibraryCreditorRequest(
-    string Name,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] Address? Address,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<NoticeParty>? AdditionalNoticeParties,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? Preferred,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Notes);

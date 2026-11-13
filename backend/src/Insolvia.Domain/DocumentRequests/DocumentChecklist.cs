@@ -1,4 +1,6 @@
+using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 using Insolvia.Domain.Documents;
 using Insolvia.Domain.Fields;
 
@@ -9,7 +11,10 @@ namespace Insolvia.Domain.DocumentRequests;
 /// it is filed under (the client never chooses one); <see cref="Description"/>
 /// is what the client reads under the title.
 /// </summary>
-public sealed record ChecklistItem(string Title, DocumentKind Kind, string? Description = null);
+public sealed record ChecklistItem(
+    [property: Required(ErrorMessage = "A title is required."), Text(DocumentChecklists.MaxTitle)] string Title,
+    [property: JsonRequired] DocumentKind Kind,
+    [property: Narrative(DocumentChecklists.MaxDescription)] string? Description = null);
 
 /// <summary>
 /// A firm's stored checklist — it exists only once the firm has saved one. An
@@ -84,53 +89,6 @@ public static class DocumentChecklists
     }
 
     /// <summary>
-    /// Validate PUT <c>/v1/firm/document-checklist</c>: <c>{"items": [...]}</c>,
-    /// the WHOLE list. Errors keyed <c>items.&lt;index&gt;.&lt;field&gt;</c>.
-    /// Two entries with the same title are refused — applying the checklist
-    /// dedupes by title, so the second could never be requested.
-    /// </summary>
-    public static ValueCollection<ChecklistItem> ParseUpdate(JsonObject payload)
-    {
-        ArgumentNullException.ThrowIfNull(payload);
-        if (payload["items"] is not JsonArray raw)
-        {
-            throw new FieldValidationException(new Dictionary<string, string> { ["items"] = "Must be a list of documents." });
-        }
-
-        if (raw.Count > MaxChecklistItems)
-        {
-            throw new FieldValidationException(new Dictionary<string, string> { ["items"] = $"A checklist has at most {MaxChecklistItems} documents." });
-        }
-
-        var errors = new Dictionary<string, string>(StringComparer.Ordinal);
-        var items = new List<ChecklistItem>();
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-        for (var index = 0; index < raw.Count; index++)
-        {
-            var item = ParseItem(raw[index], $"items.{index}", errors);
-            if (item is null)
-            {
-                continue;
-            }
-
-            if (!seen.Add(TitleKey(item.Title)))
-            {
-                errors[$"items.{index}.title"] = "Another document has this title.";
-                continue;
-            }
-
-            items.Add(item);
-        }
-
-        if (errors.Count > 0)
-        {
-            throw new FieldValidationException(errors);
-        }
-
-        return items.ToValueCollection();
-    }
-
-    /// <summary>
     /// Validate one checklist-shaped entry: a required single-line title, a
     /// known document kind, an optional description. Errors are keyed under
     /// <paramref name="path"/> (the case half's ad-hoc request parser reuses this).
@@ -174,5 +132,30 @@ public static class DocumentChecklists
     {
         ArgumentNullException.ThrowIfNull(items);
         return new DocumentChecklist(firmId, items.ToValueCollection(), Clock.Now(clock), updatedBy);
+    }
+}
+
+/// <summary>
+/// The firm's document checklist as saved (<c>PUT /v1/firm/document-checklist</c>):
+/// the WHOLE list. Two entries with the same title are refused — applying the
+/// checklist dedupes by title, so the second could never be requested.
+/// </summary>
+/// <param name="Items">The whole list, in order.</param>
+public sealed record ChecklistRequest(
+    [property: Required(ErrorMessage = "Must be a list of documents."), MaxLength(DocumentChecklists.MaxChecklistItems, ErrorMessage = "A checklist has at most 40 documents.")] IReadOnlyList<ChecklistItem>? Items) : IValidatableObject
+{
+    /// <summary>Each title once, compared as <see cref="DocumentChecklists.TitleKey"/> does.</summary>
+    /// <param name="validationContext">Unused.</param>
+    /// <returns>The failures.</returns>
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        for (var index = 0; index < Items!.Count; index++)
+        {
+            if (!seen.Add(DocumentChecklists.TitleKey(Items[index].Title)))
+            {
+                yield return new ValidationResult("Another document has this title.", [$"items[{index}].title"]);
+            }
+        }
     }
 }

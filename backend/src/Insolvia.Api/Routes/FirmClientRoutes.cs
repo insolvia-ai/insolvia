@@ -7,6 +7,7 @@ using Insolvia.Domain.FirmClients;
 using Insolvia.Domain.Firms;
 using Insolvia.Domain.Ports;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Mvc;
 
 namespace Insolvia.Api.Routes;
 
@@ -20,7 +21,7 @@ namespace Insolvia.Api.Routes;
 /// <para><b>Access-logged</b>: a client is PII with no case to be logged
 /// under, so single-record reads and every write append a <c>client.*</c>
 /// row keyed to the client (a refused one <c>denied</c>); the list is not logged.</para>
-/// <para><b>Server-owned fields</b> — status, <c>created_by</c>, the tax-id
+/// <para><b>Server-owned fields</b> — status, <c>createdBy</c>, the tax-id
 /// pointer, the stage — never come from the whole-record body.</para>
 /// <para>Not here: <c>GET …/{id}/cases</c>, which reads the case store's
 /// by-client index and so arrives with the case routes (18.15).</para>
@@ -38,12 +39,13 @@ public sealed class FirmClientRoutes : IEndpointModule
     {
         ArgumentNullException.ThrowIfNull(routes);
         routes.MapGet("/v1/firm/clients", ListAsync).RequireAuth().Requires(Feature.Clients, PermissionLevel.ViewOnly);
-        routes.MapPost("/v1/firm/clients", CreateAsync).RequestBody<ClientRequest>().RequireAuth().Requires(Feature.Clients, PermissionLevel.AddEdit);
+        var sizeLimit = new RequestSizeLimitAttribute(MaxRequestBytes);
+        routes.MapPost("/v1/firm/clients", CreateAsync).WithMetadata(sizeLimit).RequireAuth().Requires(Feature.Clients, PermissionLevel.AddEdit);
         routes.MapGet("/v1/firm/clients/{clientId}", GetAsync).RequireAuth().Requires(Feature.Clients, PermissionLevel.ViewOnly);
-        routes.MapPut("/v1/firm/clients/{clientId}", UpdateAsync).RequestBody<ClientRequest>().RequireAuth().Requires(Feature.Clients, PermissionLevel.AddEdit);
-        routes.MapPut("/v1/firm/clients/{clientId}/status", SetStatusAsync).RequestBody<ClientStatusRequest>().RequireAuth().Requires(Feature.Clients, PermissionLevel.AddEdit);
-        routes.MapPut("/v1/firm/clients/{clientId}/prospect-stage", SetProspectStageAsync).RequestBody<ProspectStageRequest>().RequireAuth().Requires(Feature.Clients, PermissionLevel.AddEdit);
-        routes.MapPost("/v1/firm/clients/{clientId}/merge", MergeAsync).RequestBody<ClientMergeRequest>().RequireAuth().Requires(Feature.Clients, PermissionLevel.AddEdit);
+        routes.MapPut("/v1/firm/clients/{clientId}", UpdateAsync).WithMetadata(sizeLimit).RequireAuth().Requires(Feature.Clients, PermissionLevel.AddEdit);
+        routes.MapPut("/v1/firm/clients/{clientId}/status", SetStatusAsync).WithMetadata(sizeLimit).RequireAuth().Requires(Feature.Clients, PermissionLevel.AddEdit);
+        routes.MapPut("/v1/firm/clients/{clientId}/prospect-stage", SetProspectStageAsync).WithMetadata(sizeLimit).RequireAuth().Requires(Feature.Clients, PermissionLevel.AddEdit);
+        routes.MapPost("/v1/firm/clients/{clientId}/merge", MergeAsync).WithMetadata(sizeLimit).RequireAuth().Requires(Feature.Clients, PermissionLevel.AddEdit);
     }
 
     /// <summary>List the firm's clients.</summary>
@@ -56,14 +58,12 @@ public sealed class FirmClientRoutes : IEndpointModule
     }
 
     /// <summary>Add a client.</summary>
-    /// <remarks>Logged as <c>client.create</c>. A tax id is refused here; it is entered on a case.</remarks>
-    internal static async Task<Created<ClientView>> CreateAsync(HttpContext context, CancellationToken cancellationToken)
+    /// <remarks>Logged as <c>client.create</c>. A tax id is not a member; it is entered on a case.</remarks>
+    internal static async Task<Created<ClientView>> CreateAsync(HttpContext context, FirmClientDraft draft, CancellationToken cancellationToken)
     {
         var (store, log) = Stores(context);
         var accessor = await context.CurrentAccessorAsync();
-        var clock = context.Clock();
-        var draft = FirmClientRules.Parse(await context.BodyAsync(MaxRequestBytes), clock: clock);
-        var client = FirmClientRules.Create(draft, accessor.FirmId, accessor.Subject, clock);
+        var client = FirmClientRules.Create(draft, accessor.FirmId, accessor.Subject, context.Clock());
         await store.CreateClientAsync(client, cancellationToken);
         await LogAsync(context, log, client.Id, AccessAction.ClientCreate, found: true, cancellationToken);
 
@@ -86,11 +86,10 @@ public sealed class FirmClientRoutes : IEndpointModule
 
     /// <summary>Save a client, whole.</summary>
     /// <remarks>Keeps the status, the tax id, the stamps and the stage. A merged client is a 409: edit the survivor.</remarks>
-    internal static async Task<ClientView> UpdateAsync(HttpContext context, string clientId, CancellationToken cancellationToken)
+    internal static async Task<ClientView> UpdateAsync(HttpContext context, string clientId, FirmClientDraft draft, CancellationToken cancellationToken)
     {
         var (store, log) = Stores(context);
         var clock = context.Clock();
-        var draft = FirmClientRules.Parse(await context.BodyAsync(MaxRequestBytes), clock: clock);
         var existing = await ExistingOr404Async(context, store, log, clientId, AccessAction.ClientUpdate, cancellationToken);
         RefuseMerged(existing);
         var response = await WriteAsync(context, store, log, FirmClientRules.Replace(existing, draft, clock), cancellationToken);
@@ -100,10 +99,10 @@ public sealed class FirmClientRoutes : IEndpointModule
 
     /// <summary>Archive or restore a client.</summary>
     /// <remarks>A status write, never a delete.</remarks>
-    internal static async Task<ClientView> SetStatusAsync(HttpContext context, string clientId, CancellationToken cancellationToken)
+    internal static async Task<ClientView> SetStatusAsync(HttpContext context, string clientId, ClientStatusRequest request, CancellationToken cancellationToken)
     {
         var (store, log) = Stores(context);
-        var status = FirmClientRules.ParseClientStatus(await context.BodyAsync(MaxRequestBytes));
+        var status = request.Status!.Value;
         var existing = await ExistingOr404Async(context, store, log, clientId, AccessAction.ClientUpdate, cancellationToken);
         RefuseMerged(existing);
         var response = await WriteAsync(context, store, log, FirmClientRules.SetStatus(existing, status, context.Clock()), cancellationToken);
@@ -116,10 +115,10 @@ public sealed class FirmClientRoutes : IEndpointModule
 
     /// <summary>Set a prospect's stage.</summary>
     /// <remarks>A stage places the prospect in the funnel; null takes them out. A retained client is a 409: the funnel is behind them (14.3 / #355).</remarks>
-    internal static async Task<ClientView> SetProspectStageAsync(HttpContext context, string clientId, CancellationToken cancellationToken)
+    internal static async Task<ClientView> SetProspectStageAsync(HttpContext context, string clientId, ProspectStageRequest request, CancellationToken cancellationToken)
     {
         var (store, log) = Stores(context);
-        var stage = FirmClientRules.ParseProspectStage(await context.BodyAsync(MaxRequestBytes));
+        var stage = request.ProspectStage;
         var firmId = (await context.CurrentAccessorAsync()).FirmId;
         var existing = await ExistingOr404Async(context, store, log, clientId, AccessAction.ClientUpdate, cancellationToken);
         RefuseMerged(existing);
@@ -149,11 +148,11 @@ public sealed class FirmClientRoutes : IEndpointModule
     /// Folds the named client into this one (ADR 0022 PR 7). Answers both clients and no count of the cases moved — a count would
     /// include cases the caller may not see.
     /// </remarks>
-    internal static async Task<ClientMergeView> MergeAsync(HttpContext context, string clientId, CancellationToken cancellationToken)
+    internal static async Task<ClientMergeView> MergeAsync(HttpContext context, string clientId, ClientMergeRequest request, CancellationToken cancellationToken)
     {
         var (store, log) = Stores(context);
         var accessor = await context.CurrentAccessorAsync();
-        var mergedId = FirmClientRules.ParseClientMerge(await context.BodyAsync(MaxRequestBytes));
+        var mergedId = request.MergedClientId!;
         var survivor = await store.GetClientAsync(accessor.FirmId, clientId, cancellationToken);
         if (survivor is null)
         {
@@ -165,7 +164,7 @@ public sealed class FirmClientRoutes : IEndpointModule
         if (merged is null)
         {
             await LogAsync(context, log, mergedId, AccessAction.ClientMerge, found: false, cancellationToken);
-            throw new FieldValidationException(new Dictionary<string, string> { ["merged_client_id"] = "No such client." });
+            throw new FieldValidationException(new Dictionary<string, string> { ["mergedClientId"] = "No such client." });
         }
 
         var debtors = context.RequestServices.GetService<IDebtorClientLinks>()

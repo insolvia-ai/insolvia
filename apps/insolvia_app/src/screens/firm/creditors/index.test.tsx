@@ -57,10 +57,10 @@ const LIBRARY_CREDITOR = {
   id: CREDITOR_ID,
   name: 'Acme Collections',
   address: { line1: '1 Main St', city: 'Springfield', state: 'IL', postalCode: '62701' },
-  additional_notice_parties: [],
+  additionalNoticeParties: [],
   preferred: false,
-  created_at: '2026-01-01T00:00:00.000Z',
-  updated_at: '2026-01-01T00:00:00.000Z',
+  createdAt: '2026-01-01T00:00:00.000Z',
+  updatedAt: '2026-01-01T00:00:00.000Z',
 };
 
 /** One stubbed API route: a method, a URL fragment, and its answer. */
@@ -206,6 +206,7 @@ describe('the creditor library screen', () => {
       expect(post).toBeDefined();
       expect(JSON.parse(String((post?.[1] as RequestInit).body))).toEqual({
         name: 'Acme Collections',
+        address: {},
         preferred: false,
       });
     });

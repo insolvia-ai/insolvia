@@ -44,8 +44,7 @@ public sealed class FirmRouteTests : IAsyncLifetime, IDisposable
         { """{"email": "not-an-email", "firstName": "A", "lastName": "B", "role": "staff"}""", "email" },
         { """{"email": "a@b.test", "lastName": "B", "role": "staff"}""", "firstName" },
         { """{"email": "a@b.test", "firstName": "A", "role": "staff"}""", "lastName" },
-        { """{"email": "a@b.test", "role": "staff"}""", "displayName" },
-        { """{"email": "a@b.test", "displayName": "Cher", "role": "staff"}""", "displayName" },
+        { """{"email": "a@b.test", "displayName": "Ada Lovelace", "role": "staff"}""", "firstName" },
         { """{"email": "a@b.test", "firstName": "A", "lastName": "B"}""", "role" },
         { """{"email": "a@b.test", "firstName": "A", "lastName": "B", "role": "partner"}""", "role" },
         { """{"email": "a@b.test", "firstName": "A", "lastName": "B", "role": "staff", "isAdmin": "true"}""", "isAdmin" },
@@ -155,7 +154,7 @@ public sealed class FirmRouteTests : IAsyncLifetime, IDisposable
     [Fact]
     public async Task A_signature_block_is_self_service_and_visible_to_the_firm()
     {
-        const string block = """{"address":{"city":"Tampa","line1":"1 Main St","state":"FL"},"bar_number":"0123456","bar_state":"FL","email":"alice@example.test","firm_name":"Example & Partners","phone":"813-555-0100"}""";
+        const string block = """{"address":{"city":"Tampa","line1":"1 Main St","state":"FL"},"barNumber":"0123456","barState":"FL","email":"alice@example.test","firmName":"Example & Partners","phone":"813-555-0100"}""";
         var me = await _world.Patch("/v1/me", "{\"signatureBlock\": " + block + "}", Ids.Alice);
         Assert.Equal(200, me.Status);
         Assert.Equal(block, SortedJson.Serialize(me.Object["firm"]!["signatureBlock"]));
@@ -166,9 +165,9 @@ public sealed class FirmRouteTests : IAsyncLifetime, IDisposable
         Assert.Null(people.Single(p => p!["subject"]!.GetValue<string>() == Ids.Bob)!["signatureBlock"]);
 
         // An administrator may set a colleague's too.
-        var adminSet = await _world.Patch($"/v1/firm/users/{Ids.Bob}", """{"signatureBlock": {"bar_number": "7654321", "bar_state": "FL"}}""", Ids.Alice);
+        var adminSet = await _world.Patch($"/v1/firm/users/{Ids.Bob}", """{"signatureBlock": {"barNumber": "7654321", "barState": "FL"}}""", Ids.Alice);
         Assert.Equal(200, adminSet.Status);
-        Assert.Equal("7654321", adminSet.Object["signatureBlock"]!["bar_number"]!.GetValue<string>());
+        Assert.Equal("7654321", adminSet.Object["signatureBlock"]!["barNumber"]!.GetValue<string>());
     }
 
     [Fact]

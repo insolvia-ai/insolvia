@@ -235,14 +235,14 @@ public sealed class CaseLifecycleRouteTests : IAsyncLifetime, IDisposable
         var clientId = await _world.AddClientAsync();
         foreach (var value in new[] { "possible", "consultation_scheduled", "awaiting_signed_agreement" })
         {
-            Assert.Equal(value, (await Stage(clientId, value)).Str("prospect_stage"));
+            Assert.Equal(value, (await Stage(clientId, value)).Str("prospectStage"));
         }
 
         await _world.Post("/v1/cases", $$"""{ {{Tampa}}, "clientIds": ["{{clientId}}"]}""");
 
         var retained = (await _world.Get($"/v1/firm/clients/{clientId}")).Object;
-        Assert.Equal(Insolvia.Http.WireFormat.Date(Clock.Today()), retained.Str("first_retained_at"));
-        Assert.False(retained.ContainsKey("prospect_stage"));
+        Assert.Equal(Insolvia.Http.WireFormat.Date(Clock.Today()), retained.Str("firstRetainedAt"));
+        Assert.False(retained.ContainsKey("prospectStage"));
         Assert.Null((await _world.Firms.GetClientAsync(Ids.FirmA, clientId, HttpAssert.Ct))!.ProspectStage);
         Assert.Contains(_world.Events, e => (e.Action, e.ClientId) == (AccessAction.ClientUpdate, clientId));
     }
@@ -259,10 +259,10 @@ public sealed class CaseLifecycleRouteTests : IAsyncLifetime, IDisposable
     [Fact]
     public async Task An_earlier_retained_date_is_never_overwritten()
     {
-        var clientId = await _world.AddClientAsync(extra: """ "name": {"given": "Jordan", "surname": "Example"}, "first_retained_at": "2020-01-02" """);
+        var clientId = await _world.AddClientAsync(extra: """ "name": {"given": "Jordan", "surname": "Example"}, "firstRetainedAt": "2020-01-02" """);
         await _world.Post("/v1/cases", $$"""{ {{Tampa}}, "clientIds": ["{{clientId}}"]}""");
 
-        Assert.Equal("2020-01-02", (await _world.Get($"/v1/firm/clients/{clientId}")).Str("first_retained_at"));
+        Assert.Equal("2020-01-02", (await _world.Get($"/v1/firm/clients/{clientId}")).Str("firstRetainedAt"));
     }
 
     [Fact]
@@ -275,7 +275,7 @@ public sealed class CaseLifecycleRouteTests : IAsyncLifetime, IDisposable
 
         Assert.Equal(201, (await _world.Post($"/v1/cases/{source}/copy", null)).Status);
 
-        Assert.Equal(Insolvia.Http.WireFormat.Date(Clock.Today()), (await _world.Get($"/v1/firm/clients/{clientId}")).Str("first_retained_at"));
+        Assert.Equal(Insolvia.Http.WireFormat.Date(Clock.Today()), (await _world.Get($"/v1/firm/clients/{clientId}")).Str("firstRetainedAt"));
     }
 
     // ── Archive ─────────────────────────────────────────────────────
@@ -464,7 +464,7 @@ public sealed class CaseLifecycleRouteTests : IAsyncLifetime, IDisposable
     }
 
     private Task<Answer> Stage(string clientId, string? value) =>
-        _world.Put($"/v1/firm/clients/{clientId}/prospect-stage", value is null ? """{"prospect_stage": null}""" : $$"""{"prospect_stage": "{{value}}"}""");
+        _world.Put($"/v1/firm/clients/{clientId}/prospect-stage", value is null ? """{"prospectStage": null}""" : $$"""{"prospectStage": "{{value}}"}""");
 
     private async Task<List<string?>> ListedAsync(string query = "")
     {

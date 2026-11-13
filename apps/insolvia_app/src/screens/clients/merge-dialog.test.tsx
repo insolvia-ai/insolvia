@@ -21,7 +21,7 @@ const KEEP = firmClient('00000000-0000-4000-8000-0000000c11a2', 'Jordan', 'Examp
 const GONE = firmClient('00000000-0000-4000-8000-0000000c11a3', 'Old', 'Record', {
   status: 'archived',
 });
-const MERGED = { ...DUPE, status: 'archived', merged_into: KEEP.id };
+const MERGED = { ...DUPE, status: 'archived', mergedInto: KEEP.id };
 
 /**
  * The directory, each record, their (empty) case lists, and the merge —
@@ -108,7 +108,7 @@ describe('merging a client', () => {
     expect(posts.map(([url]) => url)).toEqual([
       expect.stringContaining(`/v1/firm/clients/${KEEP.id}/merge`),
     ]);
-    expect(bodiesOf(fetchMock, 'POST', '/merge')).toEqual([{ merged_client_id: DUPE.id }]);
+    expect(bodiesOf(fetchMock, 'POST', '/merge')).toEqual([{ mergedClientId: DUPE.id }]);
   });
 
   it('shows a refusal in the server’s own words and stays put', async () => {

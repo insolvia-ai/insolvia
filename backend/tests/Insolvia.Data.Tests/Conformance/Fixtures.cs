@@ -45,6 +45,9 @@ internal static class Make
 {
     public static JsonObject Json(string json) => JsonNode.Parse(json)!.AsObject();
 
+    /// <summary>A request body read and validated as the route would.</summary>
+    public static T Read<T>(JsonObject body) => (T)Insolvia.Domain.CaseEntities.BodyJson.Read(body, typeof(T));
+
     public static Firm Firm(string firmId = Ids.Firm, string name = "Example & Partners") =>
         new(firmId, name, FirmStatus.Active, DateTimeOffset.UnixEpoch, DateTimeOffset.UnixEpoch);
 
@@ -69,13 +72,13 @@ internal static class Make
             DateTimeOffset.UnixEpoch);
 
     public static LibraryCreditor Creditor(string firmId = Ids.Firm, string name = "Acme Collections") =>
-        LibraryCreditorRules.Create(LibraryCreditorRules.Parse(Json($$"""{"name": "{{name}}", "preferred": true}""")), firmId);
+        LibraryCreditorRules.Create(Read<LibraryCreditorDraft>(Json($$"""{"name": "{{name}}", "preferred": true}""")), firmId);
 
     public static FirmClient Client(string firmId = Ids.Firm, string surname = "Example", string? retained = null)
     {
-        var retainedField = retained is null ? "" : $$""", "first_retained_at": "{{retained}}" """;
+        var retainedField = retained is null ? "" : $$""", "firstRetainedAt": "{{retained}}" """;
         return FirmClientRules.Create(
-            FirmClientRules.Parse(Json($$"""{"name": {"given": "Jordan", "surname": "{{surname}}"}{{retainedField}}}""")),
+            Read<FirmClientDraft>(Json($$"""{"name": {"given": "Jordan", "surname": "{{surname}}"}{{retainedField}}}""")),
             firmId,
             Ids.Alice);
     }

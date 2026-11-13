@@ -21,10 +21,10 @@ const ALIAS = { id: 'alias-1', given: 'Jordan', surname: 'Maiden' };
 const JORDAN = firmClient('00000000-0000-4000-8000-0000000c11a0', 'Jordan', 'Example', {
   email: 'jordan@example.test',
   phone: '555-0100',
-  residence_address: { line1: '1 Main St', city: 'Tampa', state: 'FL', county: 'Hillsborough' },
-  other_names_used: [ALIAS],
-  lead_source: 'Referral',
-  tax_id_last_four: '1234',
+  residenceAddress: { line1: '1 Main St', city: 'Tampa', state: 'FL', county: 'Hillsborough' },
+  otherNamesUsed: [ALIAS],
+  leadSource: 'Referral',
+  taxIdLastFour: '1234',
 });
 
 const JOINT = caseBody('00000000-0000-4000-8000-0000000000c1', { chapter: 13 });
@@ -48,10 +48,10 @@ function record(
       });
     }
     if (url.endsWith('/prospect-stage') && init?.method === 'PUT') {
-      const { prospect_stage } = JSON.parse(String(init.body)) as {
-        prospect_stage: string | null;
+      const { prospectStage } = JSON.parse(String(init.body)) as {
+        prospectStage: string | null;
       };
-      current = { ...(current ?? {}), prospect_stage: prospect_stage ?? undefined };
+      current = { ...(current ?? {}), prospectStage: prospectStage ?? undefined };
       return jsonResponse(200, current);
     }
     if (url.endsWith('/status') && init?.method === 'PUT') {
@@ -64,7 +64,7 @@ function record(
       if (init?.method === 'PUT') {
         const body = JSON.parse(String(init.body)) as Record<string, unknown>;
         if (overrides.put !== undefined) return overrides.put(body);
-        current = { ...JORDAN, ...body, tax_id_last_four: '1234' };
+        current = { ...JORDAN, ...body, taxIdLastFour: '1234' };
         return jsonResponse(200, current);
       }
       return jsonResponse(200, current);
@@ -170,8 +170,8 @@ describe('the client record', () => {
     const [body] = bodiesOf(fetchMock, 'PUT', `/v1/firm/clients/${JORDAN.id}`);
     expect(body).toEqual({
       name: { given: 'Jordan', surname: 'Example' },
-      other_names_used: [ALIAS],
-      residence_address: {
+      otherNamesUsed: [ALIAS],
+      residenceAddress: {
         line1: '1 Main St',
         city: 'Tampa',
         state: 'FL',
@@ -179,7 +179,7 @@ describe('the client record', () => {
       },
       phone: '555-0100',
       email: 'jordan.new@example.test',
-      // `lead_source` cleared: omitted from a whole-record PUT is cleared.
+      // `leadSource` cleared: omitted from a whole-record PUT is cleared.
     });
     // Never the status, and never a tax ID — neither is this form's to write.
     expect(body).not.toHaveProperty('status');
@@ -192,7 +192,7 @@ describe('the client record', () => {
         put: () =>
           jsonResponse(400, {
             error: 'ValidationError',
-            fields: { date_of_birth: 'A date of birth cannot be in the future.' },
+            fields: { dateOfBirth: 'A date of birth cannot be in the future.' },
           }),
       }),
     );
@@ -217,13 +217,13 @@ describe('the client record', () => {
 
     await waitFor(() => {
       expect(bodiesOf(fetchMock, 'PUT', '/prospect-stage')).toEqual([
-        { prospect_stage: 'consultation_scheduled' },
+        { prospectStage: 'consultation_scheduled' },
       ]);
     });
   });
 
   it('shows no funnel for a client already retained', async () => {
-    signedIn(record({ client: { ...JORDAN, first_retained_at: '2026-07-20' } }));
+    signedIn(record({ client: { ...JORDAN, firstRetainedAt: '2026-07-20' } }));
     await loaded();
     expect(screen.queryByRole('combobox', { name: 'Funnel stage' })).toBeNull();
     expect(screen.queryByText('Prospect')).toBeNull();

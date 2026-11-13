@@ -185,9 +185,9 @@ function FilingAuthorization({
 
   const signature = status.signature;
   const summary = status.current
-    ? `You signed version ${signature?.text_version ?? ''} on ${signature?.signed_at.slice(0, 10) ?? ''}. Insolvia may file under your court login only after you approve each filing.`
+    ? `You signed version ${signature?.textVersion ?? ''} on ${signature?.signedAt.slice(0, 10) ?? ''}. Insolvia may file under your court login only after you approve each filing.`
     : signature !== null
-      ? `The authorization has changed since you signed version ${signature.text_version}. Until you sign version ${status.current_version}, Insolvia will not store or use your court login.`
+      ? `The authorization has changed since you signed version ${signature.textVersion}. Until you sign version ${status.currentVersion}, Insolvia will not store or use your court login.`
       : 'You have not signed it. Insolvia will not store your court login until you do.';
 
   return (

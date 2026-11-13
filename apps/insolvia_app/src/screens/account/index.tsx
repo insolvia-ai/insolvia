@@ -334,26 +334,26 @@ function SignatureBlockForm({
         The lines B101 Part 7 prints for you that do not change from case to case. The petition
         screen’s “Use firm default” copies them onto a case for you to check and save.
       </Text>
-      <Field.Root name="bar_number" invalid={Boolean(error('bar_number'))}>
+      <Field.Root name="barNumber" invalid={Boolean(error('barNumber'))}>
         <Field.Label>Bar number</Field.Label>
-        <Input value={block.bar_number ?? ''} onValueChange={(v) => setPart('bar_number', v)} />
-        {error('bar_number') ? <Field.Error match>{error('bar_number')}</Field.Error> : null}
+        <Input value={block.barNumber ?? ''} onValueChange={(v) => setPart('barNumber', v)} />
+        {error('barNumber') ? <Field.Error match>{error('barNumber')}</Field.Error> : null}
       </Field.Root>
-      <Field.Root name="bar_state" invalid={Boolean(error('bar_state'))}>
+      <Field.Root name="barState" invalid={Boolean(error('barState'))}>
         <Field.Label>Bar state</Field.Label>
         <Input
-          value={block.bar_state ?? ''}
-          onValueChange={(v) => setPart('bar_state', v)}
+          value={block.barState ?? ''}
+          onValueChange={(v) => setPart('barState', v)}
           autoCapitalize="characters"
         />
         <Field.Description>Two letters, like FL.</Field.Description>
-        {error('bar_state') ? <Field.Error match>{error('bar_state')}</Field.Error> : null}
+        {error('barState') ? <Field.Error match>{error('barState')}</Field.Error> : null}
       </Field.Root>
-      <Field.Root name="firm_name" invalid={Boolean(error('firm_name'))}>
+      <Field.Root name="firmName" invalid={Boolean(error('firmName'))}>
         <Field.Label>Firm name on filings</Field.Label>
-        <Input value={block.firm_name ?? ''} onValueChange={(v) => setPart('firm_name', v)} />
+        <Input value={block.firmName ?? ''} onValueChange={(v) => setPart('firmName', v)} />
         <Field.Description>Leave blank to use the firm’s letterhead.</Field.Description>
-        {error('firm_name') ? <Field.Error match>{error('firm_name')}</Field.Error> : null}
+        {error('firmName') ? <Field.Error match>{error('firmName')}</Field.Error> : null}
       </Field.Root>
       {ADDRESS_PARTS.map(([part, label]) => (
         <Field.Root key={part} name={part} invalid={Boolean(error(`address.${part}`))}>

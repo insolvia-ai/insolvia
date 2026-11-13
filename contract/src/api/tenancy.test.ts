@@ -69,7 +69,7 @@ needsSeeded(OUTSIDER, 'second firm').describe('another firm', () => {
     const credential = await admin.api.enrolFilingCredential({
       login: `contract-filer-${tag()}`,
       password: 'synthetic-not-a-secret',
-      totp_seed: 'JBSWY3DPEHPK3PXP',
+      totpSeed: 'JBSWY3DPEHPK3PXP',
       courts: ['flmb'],
     });
     try {

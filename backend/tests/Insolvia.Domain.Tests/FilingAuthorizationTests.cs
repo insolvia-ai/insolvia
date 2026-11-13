@@ -1,5 +1,4 @@
 using System.Security.Cryptography;
-using System.Text.Json.Nodes;
 using Insolvia.Domain.AccessLog;
 using Insolvia.Domain.Auth;
 using Insolvia.Domain.FilingAuthorizations;
@@ -22,11 +21,8 @@ public sealed class FilingAuthorizationTests
 
     private static string Digest => FilingAuthorizationRules.TextDigest(FilingAuthorizationRules.AuthorizationText());
 
-    private static JsonObject SignatureBody(string? version = null, string? digest = null) =>
-        new() { ["text_version"] = version ?? FilingAuthorizationRules.TextVersion, ["text_digest"] = digest ?? Digest };
-
-    private Task<FilingAuthorization> SignAsync(JsonNode? payload = null, long? authenticatedAt = SignedInAt, long now = SignedInAt + 60, string attorney = Attorney) =>
-        FilingAuthorizationRules.SignAsync(payload ?? SignatureBody(), Firm, attorney, authenticatedAt, DateTimeOffset.FromUnixTimeSeconds(now), _store, _log, cancellationToken: Ct);
+    private Task<FilingAuthorization> SignAsync(string? version = null, string? digest = null, long? authenticatedAt = SignedInAt, long now = SignedInAt + 60, string attorney = Attorney) =>
+        FilingAuthorizationRules.SignAsync(version ?? FilingAuthorizationRules.TextVersion, digest ?? Digest, Firm, attorney, authenticatedAt, DateTimeOffset.FromUnixTimeSeconds(now), _store, _log, cancellationToken: Ct);
 
     // ── The text ────────────────────────────────────────────────────
 
@@ -105,16 +101,9 @@ public sealed class FilingAuthorizationTests
     [InlineData(null, "0000000000000000000000000000000000000000000000000000000000000000")]
     public async Task A_text_other_than_the_one_that_ships_cannot_be_signed(string? version, string? digest)
     {
-        await Assert.ThrowsAsync<ConflictException>(() => SignAsync(SignatureBody(version, digest)));
+        await Assert.ThrowsAsync<ConflictException>(() => SignAsync(version, digest));
         Assert.Null(await _store.GetCurrentAsync(Firm, Attorney, Ct));
     }
-
-    [Theory]
-    [InlineData("[]")]
-    [InlineData("""{"text_version": "2026-10-07-draft"}""")]
-    [InlineData("\"x\"")]
-    public async Task A_malformed_body_is_a_validation_error(string payload) =>
-        await Assert.ThrowsAsync<ValidationException>(() => SignAsync(Body.Value(payload)));
 
     [Fact]
     public async Task Signing_twice_is_a_conflict()

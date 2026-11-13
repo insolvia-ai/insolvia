@@ -150,8 +150,9 @@ public static class WireViews
     }
 
     /// <summary>
-    /// <c>firm_client_json</c>: <c>name</c> always, the editable fields pruned,
-    /// and <c>tax_id_last_four</c> as the ONLY tax-id member — never the ref.
+    /// A firm client as the API's <c>ClientView</c> writes it: <c>name</c>
+    /// always, the editable fields pruned, and <c>taxIdLastFour</c> as the
+    /// ONLY tax-id member — never the ref.
     /// </summary>
     /// <param name="client">The client.</param>
     /// <returns>The body.</returns>
@@ -162,28 +163,17 @@ public static class WireViews
         {
             ["id"] = client.Id,
             ["status"] = client.Status.ToWire(),
-            ["created_at"] = Micros(client.CreatedAt),
-            ["updated_at"] = Micros(client.UpdatedAt),
-            ["created_by"] = client.CreatedBy,
+            ["createdAt"] = Micros(client.CreatedAt),
+            ["updatedAt"] = Micros(client.UpdatedAt),
+            ["createdBy"] = client.CreatedBy,
             ["name"] = new JsonObject(),
         };
-        Spread(body, BodyJson.Prune(BodyJson.ToSnakeNode(new FirmClientDraft(
-            client.Name,
-            client.OtherNamesUsed,
-            client.DateOfBirth,
-            client.ResidenceAddress,
-            client.MailingAddress,
-            client.Phone,
-            client.Mobile,
-            client.Email,
-            client.LeadSource,
-            client.ReferredBy,
-            client.FirstRetainedAt))));
-        AddIfPresent(body, "tax_id_last_four", client.TaxIdLastFour);
-        AddIfPresent(body, "merged_into", client.MergedInto);
+        Spread(body, BodyJson.ToNode(FirmClientRules.DraftOf(client)));
+        AddIfPresent(body, "taxIdLastFour", client.TaxIdLastFour);
+        AddIfPresent(body, "mergedInto", client.MergedInto);
         if (client.Prospect && client.ProspectStage is { } stage)
         {
-            body["prospect_stage"] = stage.ToWire();
+            body["prospectStage"] = stage.ToWire();
         }
 
         return body;

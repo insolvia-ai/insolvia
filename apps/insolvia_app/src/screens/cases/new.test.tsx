@@ -36,9 +36,9 @@ function client(id: string, given: string, surname: string, status = 'active') {
     id,
     status,
     name: { given, surname },
-    created_at: '2026-09-27T09:00:00.000000Z',
-    updated_at: '2026-09-27T09:00:00.000000Z',
-    created_by: CASE.createdBy,
+    createdAt: '2026-09-27T09:00:00.000000Z',
+    updatedAt: '2026-09-27T09:00:00.000000Z',
+    createdBy: CASE.createdBy,
   };
 }
 const JORDAN = client('00000000-0000-4000-8000-0000000c11a0', 'Jordan', 'Example');

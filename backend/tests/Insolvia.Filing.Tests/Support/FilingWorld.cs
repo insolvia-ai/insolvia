@@ -259,13 +259,13 @@ internal sealed class FilingWorld : IAsyncDisposable
     {
         var (_, view) = await CallAsync(HttpMethod.Get, "/v1/me/filing-authorization");
         var text = view!["text"]!;
-        var (status, body) = await CallAsync(HttpMethod.Post, "/v1/me/filing-authorization", $$"""{"text_version": "{{text["version"]}}", "text_digest": "{{text["digest"]}}"}""");
+        var (status, body) = await CallAsync(HttpMethod.Post, "/v1/me/filing-authorization", $$"""{"textVersion": "{{text["version"]}}", "textDigest": "{{text["digest"]}}"}""");
         Assert.True(status == 201, body?.ToJsonString());
     }
 
     private async Task<string> EnrolAsync(string login, string password, string seed)
     {
-        var (status, body) = await CallAsync(HttpMethod.Post, "/v1/me/filing-credentials", new JsonObject { ["login"] = login, ["password"] = password, ["totp_seed"] = seed, ["courts"] = new JsonArray("flmb") }.ToJsonString());
+        var (status, body) = await CallAsync(HttpMethod.Post, "/v1/me/filing-credentials", new JsonObject { ["login"] = login, ["password"] = password, ["totpSeed"] = seed, ["courts"] = new JsonArray("flmb") }.ToJsonString());
         Assert.True(status == 201, body?.ToJsonString());
         return body!["id"]!.GetValue<string>();
     }

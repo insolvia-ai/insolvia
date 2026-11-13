@@ -467,7 +467,7 @@ public sealed class CaseRouteTests : IAsyncLifetime, IDisposable
     [Fact]
     public async Task A_case_opened_for_a_client_starts_with_that_client_as_debtor_1()
     {
-        var clientId = await _world.AddClientAsync(extra: """ "name": {"given": "Jordan", "surname": "Example"}, "phone": "555-0100", "lead_source": "Referral" """);
+        var clientId = await _world.AddClientAsync(extra: """ "name": {"given": "Jordan", "surname": "Example"}, "phone": "555-0100", "leadSource": "Referral" """);
         var caseId = (await _world.Post("/v1/cases", $$"""{ {{Tampa}}, "clientIds": ["{{clientId}}"]}""")).Str("id");
 
         var debtor = Assert.Single((await _world.Get($"/v1/cases/{caseId}/debtors")).Object["debtors"]!.AsArray())!.AsObject();

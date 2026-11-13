@@ -1,9 +1,9 @@
+using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using Insolvia.Domain.AccessLog;
-using Insolvia.Domain.Fields;
 using Insolvia.Domain.FilingAuthorizations;
 using Insolvia.Domain.Ports;
 using Insolvia.Domain.TaxIds;
@@ -122,69 +122,6 @@ public static partial class FilingCredentialRules
             ["attorney_id"] = attorneyId,
             ["credential_id"] = credentialId,
         }.ToValueDictionary();
-
-    /// <summary>
-    /// Validate <c>{login, password, totp_seed, courts?}</c>. Every problem lands
-    /// in one error, keyed by field, and no message echoes a submitted value.
-    /// </summary>
-    public static Enrolment ParseEnrolment(JsonNode? payload, Ports.ICourtRegistry? courts = null)
-    {
-        var registry = courts ?? Courts.CourtRegistry.Shipped;
-        var errors = new Dictionary<string, string>(StringComparer.Ordinal);
-        var raw = FieldParsers.Mapping(payload, "body", errors);
-
-        var login = Json.AsString(raw["login"]);
-        if (login is null || !Login().IsMatch(TextRules.Strip(login)))
-        {
-            errors["login"] = "Enter the PACER username — letters, digits and . _ @ - only, at most 64 characters.";
-        }
-
-        var password = Json.AsString(raw["password"]);
-        if (string.IsNullOrEmpty(password))
-        {
-            errors["password"] = "Enter the PACER password.";
-        }
-        else if (TextRules.Length(password) > MaxPassword)
-        {
-            errors["password"] = $"At most {MaxPassword} characters.";
-        }
-        else if (password.Any(ch => ch < 0x20 || ch == 0x7F))
-        {
-            errors["password"] = "The password contains a control character.";
-        }
-
-        var seedRaw = Json.AsString(raw["totp_seed"]);
-        var seed = seedRaw is null ? string.Empty : NormaliseSeed(seedRaw);
-        if (!Seed().IsMatch(seed) || !SeedDecodes(seed))
-        {
-            errors["totp_seed"] = "Enter the authenticator key PACER showed you — the base32 text (letters A to Z and digits 2 to 7), at least 16 characters.";
-        }
-
-        var courtsNode = raw.ContainsKey("courts") ? raw["courts"] : new JsonArray();
-        var chosen = new List<string>();
-        if (courtsNode is not JsonArray courtList || courtList.Any(court => Json.AsString(court) is null))
-        {
-            errors["courts"] = "Must be a list of court codes.";
-        }
-        else
-        {
-            var codes = courtList.Select(court => Json.AsString(court)!).ToList();
-            var unknown = codes.Where(code => !registry.HasDistrict(code)).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToList();
-            if (unknown.Count > 0)
-            {
-                errors["courts"] = "Unknown court: " + string.Join(", ", unknown) + ".";
-            }
-
-            chosen = [.. codes.Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal)];
-        }
-
-        if (errors.Count > 0)
-        {
-            throw new FieldValidationException(errors);
-        }
-
-        return new Enrolment(TextRules.Strip(login!), new CredentialSecret(password!, seed), chosen.ToValueCollection());
-    }
 
     /// <summary>
     /// Seal and store one credential for the signed-in attorney —
@@ -355,7 +292,10 @@ public static partial class FilingCredentialRules
             .ToJsonString(new JsonSerializerOptions { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping });
 
     /// <summary>Seeds are shown grouped and sometimes lower-case; canonical is upper-case base32, no spaces.</summary>
-    private static string NormaliseSeed(string value) => string.Concat(TextRules.SplitWhitespace(value)).ToUpperInvariant();
+    internal static string NormaliseSeed(string value) => string.Concat(TextRules.SplitWhitespace(value)).ToUpperInvariant();
+
+    /// <summary>Whether a normalised seed is base32 that decodes, at least 16 symbols.</summary>
+    internal static bool IsSeed(string seed) => Seed().IsMatch(seed) && SeedDecodes(seed);
 
     /// <summary>
     /// Whether <c>b32decode</c> accepts the seed once re-padded: the regex has
@@ -364,11 +304,52 @@ public static partial class FilingCredentialRules
     /// </summary>
     private static bool SeedDecodes(string seed) => (seed.TrimEnd('=').Length % 8) is not (1 or 3 or 6);
 
-    [GeneratedRegex(@"^[A-Za-z0-9._@-]{1,64}\z")]
-    private static partial Regex Login();
-
     [GeneratedRegex(@"^[A-Z2-7]{16,128}={0,6}\z")]
     private static partial Regex Seed();
+}
+
+/// <summary>
+/// A CM/ECF credential to enrol (<c>POST /v1/me/filing-credentials</c>). The
+/// password and key are sealed on arrival and never returned, and no message
+/// echoes a submitted value. Its text form is redacted, so it cannot reach a log line.
+/// </summary>
+/// <param name="Login">The PACER username: letters, digits and <c>. _ @ -</c>, at most 64 characters.</param>
+/// <param name="Password">The PACER password.</param>
+/// <param name="TotpSeed">The authenticator key PACER showed: base32, at least 16 characters, spaces and case ignored.</param>
+/// <param name="Courts">The court codes the attorney e-files in.</param>
+public sealed record FilingEnrolmentRequest(
+    [property: Required(ErrorMessage = FilingEnrolmentRequest.LoginMessage), RegularExpression(@"^[A-Za-z0-9._@-]{1,64}$", ErrorMessage = FilingEnrolmentRequest.LoginMessage)] string? Login,
+    [property: Required(AllowEmptyStrings = true, ErrorMessage = FilingEnrolmentRequest.PasswordMessage), MinLength(1, ErrorMessage = FilingEnrolmentRequest.PasswordMessage), MaxLength(FilingCredentialRules.MaxPassword, ErrorMessage = "At most 128 characters."), RegularExpression(@"^[^\x00-\x1F\x7F]*$", ErrorMessage = "The password contains a control character.")] string? Password,
+    string? TotpSeed,
+    IReadOnlyList<string>? Courts = null) : IValidatableObject
+{
+    private const string LoginMessage = "Enter the PACER username — letters, digits and . _ @ - only, at most 64 characters.";
+    private const string PasswordMessage = "Enter the PACER password.";
+
+    /// <summary>The enrolment to seal: the seed normalised, the courts deduplicated and sorted.</summary>
+    /// <returns>The enrolment.</returns>
+    public Enrolment ToEnrolment() =>
+        new(Login!, new CredentialSecret(Password!, FilingCredentialRules.NormaliseSeed(TotpSeed!)), (Courts ?? []).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToValueCollection());
+
+    /// <summary>The seed decodes; every court is in the registry.</summary>
+    /// <param name="validationContext">Unused.</param>
+    /// <returns>The failures.</returns>
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        if (TotpSeed is null || !FilingCredentialRules.IsSeed(FilingCredentialRules.NormaliseSeed(TotpSeed)))
+        {
+            yield return new ValidationResult("Enter the authenticator key PACER showed you — the base32 text (letters A to Z and digits 2 to 7), at least 16 characters.", [nameof(TotpSeed)]);
+        }
+
+        var unknown = (Courts ?? []).Where(code => !Insolvia.Domain.Courts.CourtRegistry.Shipped.HasDistrict(code)).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToList();
+        if (unknown.Count > 0)
+        {
+            yield return new ValidationResult("Unknown court: " + string.Join(", ", unknown) + ".", [nameof(Courts)]);
+        }
+    }
+
+    /// <inheritdoc />
+    public override string ToString() => $"FilingEnrolmentRequest {{ Login = {Login} }}";
 }
 
 /// <summary>A filing credential's state (Python's <c>CREDENTIAL_STATUSES</c>).</summary>

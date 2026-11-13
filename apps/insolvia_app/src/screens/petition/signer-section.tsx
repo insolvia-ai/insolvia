@@ -116,12 +116,12 @@ export function SignerSection({ caseId }: { caseId: string }) {
         ...(person.firstName ? { given: person.firstName } : {}),
         ...(person.lastName ? { surname: person.lastName } : {}),
       },
-      ...defined('firmName', block.firm_name ?? letterhead?.name),
+      ...defined('firmName', block.firmName ?? letterhead?.name),
       ...(address === undefined ? {} : { address }),
       ...defined('phone', block.phone ?? letterhead?.phone),
       ...defined('email', block.email ?? letterhead?.email),
-      ...defined('barNumber', block.bar_number),
-      ...defined('barState', block.bar_state),
+      ...defined('barNumber', block.barNumber),
+      ...defined('barState', block.barState),
     }));
     setErrors({});
     setStatus(

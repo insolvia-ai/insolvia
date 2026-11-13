@@ -220,9 +220,9 @@ describe('the petition screen', () => {
                   displayName: 'Alice Attorney',
                   role: 'attorney',
                   signatureBlock: {
-                    bar_number: '0123456',
-                    bar_state: 'FL',
-                    firm_name: 'Example & Partners',
+                    barNumber: '0123456',
+                    barState: 'FL',
+                    firmName: 'Example & Partners',
                     address: { line1: '1 Main St', city: 'Tampa', state: 'FL' },
                     phone: '813-555-0100',
                     email: 'alice@example.test',

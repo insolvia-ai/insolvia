@@ -133,7 +133,7 @@ describe('the firm’s people', () => {
     const edited = await admin.api.updateFirmUser(added.subject, {
       firstName: 'Paula',
       accessAllCases: true,
-      signatureBlock: { bar_number: '999', address: { city: 'Tampa', state: 'FL' } },
+      signatureBlock: { barNumber: '999', address: { city: 'Tampa', state: 'FL' } },
     });
     const body = admin.wire(200, FIRM_USER) as { signatureBlock: unknown };
     expect(edited.firstName).toBe('Paula');
@@ -262,11 +262,11 @@ describe('the creditor library', () => {
       id: 'string',
       name: 'string',
       address: ADDRESS,
-      additional_notice_parties: ['object'],
+      additionalNoticeParties: ['object'],
       preferred: 'boolean',
       'notes?': 'string',
-      created_at: 'string',
-      updated_at: 'string',
+      createdAt: 'string',
+      updatedAt: 'string',
     } as const;
 
     const name = `Example Lender ${tag()}`;

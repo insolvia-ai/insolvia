@@ -280,9 +280,8 @@ public static partial class WireOpenApi
             }
         }
 
-        // A record the framework reads a body into is never written, so its null stays: a PATCH clears with it.
-        var bound = context.ApplicationServices.GetRequiredService<EndpointDataSource>().Endpoints
-            .SelectMany(e => e.Metadata.OfType<IAcceptsMetadata>()).Any(m => m.RequestType == type.Type);
+        // A record the framework reads a body into, or one inside it, is never written, so its null stays: a PATCH clears with it.
+        var bound = BoundBodies(context.ApplicationServices).Contains(type.Type);
         foreach (var property in type.Properties.Where(p => p.ShouldSerialize is not null))
         {
             schema.Required.Remove(property.Name);
@@ -406,6 +405,33 @@ public static partial class WireOpenApi
         }
 
         return (HashSet<string>)names;
+    }
+
+    // Every record the framework reads a body into, and the *Request records inside
+    // one; a shared member type (an address, say) keeps the response's rule.
+    private static HashSet<Type> BoundBodies(IServiceProvider services)
+    {
+        var endpoints = services.GetRequiredService<EndpointDataSource>().Endpoints;
+        var found = new HashSet<Type>();
+        var pending = new Stack<Type>(endpoints.SelectMany(e => e.Metadata.OfType<IAcceptsMetadata>()).Select(m => m.RequestType).OfType<Type>());
+        while (pending.TryPop(out var type))
+        {
+            if (type.Namespace?.StartsWith("Insolvia.", StringComparison.Ordinal) != true || !found.Add(type))
+            {
+                continue;
+            }
+
+            foreach (var member in type.GetProperties().Select(p => p.PropertyType).SelectMany(t => t.IsGenericType ? t.GetGenericArguments() : [t]))
+            {
+                var inner = Nullable.GetUnderlyingType(member) ?? member;
+                if (inner.Name.EndsWith("Request", StringComparison.Ordinal))
+                {
+                    pending.Push(inner);
+                }
+            }
+        }
+
+        return found;
     }
 
     // Every type a route declares as its body (RequestBody<T>), and the host

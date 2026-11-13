@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 using Insolvia.Domain.Debtors;
 using Insolvia.Domain.Fields;
@@ -29,7 +30,6 @@ namespace Insolvia.Api.Firms;
 /// <param name="TaxIdLastFour">The last four digits of the tax id entered on one of their cases.</param>
 /// <param name="MergedInto">The client this one was merged into; once set, edit that one instead.</param>
 /// <param name="ProspectStage">Where a prospect is in the funnel; absent once retained.</param>
-[SnakeCase]
 public sealed record ClientView(
     string Id,
     FirmClientStatus Status,
@@ -91,49 +91,32 @@ public sealed record ClientList(IReadOnlyList<ClientView> Clients);
 /// <param name="Merged">The client folded away, now archived and pointing at the survivor.</param>
 public sealed record ClientMergeView(ClientView Client, ClientView Merged);
 
-/// <summary>
-/// A client as written (<c>POST /v1/firm/clients</c>, <c>PUT …/{clientId}</c>):
-/// the whole record, each unanswered field absent; a PUT clears what it
-/// omits. Server-owned fields an echoed read sends are ignored, but a tax id
-/// is refused — it is entered on a case. Parsed by <c>FirmClientRules.Parse</c>,
-/// which owns validation; this record is its shape for the OpenAPI document.
-/// </summary>
-/// <param name="Name">The client's name; a given name or a surname is required.</param>
-/// <param name="OtherNamesUsed">Names used in the last eight years.</param>
-/// <param name="DateOfBirth">Date of birth, YYYY-MM-DD, never in the future.</param>
-/// <param name="ResidenceAddress">Where the client lives.</param>
-/// <param name="MailingAddress">Where the client's mail goes.</param>
-/// <param name="Phone">A phone number.</param>
-/// <param name="Mobile">A mobile number.</param>
-/// <param name="Email">An email address.</param>
-/// <param name="LeadSource">How the firm heard of them.</param>
-/// <param name="ReferredBy">Who referred them.</param>
-/// <param name="FirstRetainedAt">When the firm was first retained, YYYY-MM-DD; absent for a prospect.</param>
-[SnakeCase]
-public sealed record ClientRequest(
-    PersonName Name,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<OtherName>? OtherNamesUsed,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? DateOfBirth,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] Address? ResidenceAddress,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] Address? MailingAddress,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Phone,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Mobile,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Email,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? LeadSource,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ReferredBy,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? FirstRetainedAt);
-
 /// <summary>Archive a client, or bring one back (<c>PUT …/{clientId}/status</c>).</summary>
 /// <param name="Status">The status to set.</param>
-[SnakeCase]
-public sealed record ClientStatusRequest(FirmClientStatus Status);
+public sealed record ClientStatusRequest(
+    [property: Required(ErrorMessage = "Must be one of active, archived.")] FirmClientStatus? Status);
 
 /// <summary>Place a prospect in the funnel, or take them out (<c>PUT …/{clientId}/prospect-stage</c>).</summary>
-/// <param name="ProspectStage">The stage, or null to leave the funnel; the key itself is required.</param>
-[SnakeCase]
-public sealed record ProspectStageRequest(ProspectStage? ProspectStage);
+public sealed record ProspectStageRequest : IValidatableObject
+{
+    private readonly bool _sent;
+
+    /// <summary>The stage, or null to leave the funnel; the key itself is required.</summary>
+    public ProspectStage? ProspectStage { get; init { field = value; _sent = true; } }
+
+    /// <summary>The key is required: an empty body is not "take them out".</summary>
+    /// <param name="validationContext">Unused.</param>
+    /// <returns>The failures.</returns>
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        if (!_sent)
+        {
+            yield return new ValidationResult("Choose a stage, or null.", [nameof(ProspectStage)]);
+        }
+    }
+}
 
 /// <summary>Fold another client into this one (<c>POST …/{clientId}/merge</c>).</summary>
-/// <param name="MergedClientId">The client to fold away, in the same firm.</param>
-[SnakeCase]
-public sealed record ClientMergeRequest(string MergedClientId);
+/// <param name="MergedClientId">The client to fold away, in the same firm — named for what happens to it, so the direction cannot be read backwards.</param>
+public sealed record ClientMergeRequest(
+    [property: Required(ErrorMessage = "Choose the client to merge into this one.")] string? MergedClientId);

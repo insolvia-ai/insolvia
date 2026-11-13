@@ -1,11 +1,11 @@
-using System.Text.Json.Serialization;
+using System.ComponentModel.DataAnnotations;
 using Insolvia.Api.Configuration;
 using Insolvia.Api.Hosting;
 using Insolvia.Api.Mail;
 using Insolvia.Api.Waitlist;
 using Insolvia.Data.Waitlist;
-using Insolvia.Domain;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Mvc;
 
 namespace Insolvia.Api.Routes;
 
@@ -25,15 +25,14 @@ public sealed class WaitlistRoutes : IEndpointModule
     public void Map(IEndpointRouteBuilder routes)
     {
         ArgumentNullException.ThrowIfNull(routes);
-        routes.MapPost("/v1/waitlist", SubmitAsync).RequestBody<WaitlistRequest>();
+        routes.MapPost("/v1/waitlist", SubmitAsync).WithMetadata(new RequestSizeLimitAttribute(MaxRequestBytes));
     }
 
     /// <summary>Join the waitlist.</summary>
     /// <remarks>Unauthenticated: the marketing site calls it server to server.</remarks>
-    internal static async Task<Created<WaitlistReceipt>> SubmitAsync(HttpContext context, CancellationToken cancellationToken)
+    internal static async Task<Created<WaitlistReceipt>> SubmitAsync(HttpContext context, WaitlistRequest request, CancellationToken cancellationToken)
     {
-        var submission = WaitlistSubmissions.Parse(await context.BodyAsync(MaxRequestBytes));
-        var record = WaitlistSubmissions.Create(submission, context.Clock());
+        var record = WaitlistSubmissions.Create(request.ToSubmission(), context.Clock());
         var store = context.RequestServices.GetService<IWaitlistStore>()
             ?? throw new InvalidOperationException("waitlist store is not composed");
         await store.AddAsync(record, cancellationToken);
@@ -67,7 +66,7 @@ public sealed class UnsubscribeRoutes : IEndpointModule
     public void Map(IEndpointRouteBuilder routes)
     {
         ArgumentNullException.ThrowIfNull(routes);
-        routes.MapPost("/v1/unsubscribe", SubmitAsync).RequestBody<UnsubscribeRequest>();
+        routes.MapPost("/v1/unsubscribe", SubmitAsync).WithMetadata(new RequestSizeLimitAttribute(MaxRequestBytes));
     }
 
     /// <summary>Stop email to the address an unsubscribe link was made for.</summary>
@@ -75,11 +74,9 @@ public sealed class UnsubscribeRoutes : IEndpointModule
     /// Unauthenticated: the token is the authentication. An invalid token is a
     /// 400; a valid one always answers the same 202, whatever the address's state.
     /// </remarks>
-    internal static async Task<Accepted<UnsubscribeReceipt>> SubmitAsync(HttpContext context, CancellationToken cancellationToken)
+    internal static async Task<Accepted<UnsubscribeReceipt>> SubmitAsync(HttpContext context, UnsubscribeRequest request, CancellationToken cancellationToken)
     {
-        var payload = await context.BodyAsync(MaxRequestBytes);
-        var token = Json.AsString(payload["token"]) ?? throw new ValidationException("token is required");
-
+        var token = request.Token!;
         var config = context.RequestServices.GetRequiredService<ApiConfig>();
         var address = UnsubscribeTokens.Verify(token, config.UnsubscribeSecret);
         var mailer = context.RequestServices.GetService<IMailer>()
@@ -93,23 +90,29 @@ public sealed class UnsubscribeRoutes : IEndpointModule
 }
 
 /// <summary>
-/// A waitlist sign-up (<c>POST /v1/waitlist</c>). Parsed by
-/// <c>WaitlistSubmissions.Parse</c>, which owns validation: values are
-/// trimmed, a non-string counts as missing, and unknown keys are ignored.
+/// A waitlist sign-up (<c>POST /v1/waitlist</c>): the marketing form's caps,
+/// and the DNS name limit for the host the marketing action sends. Unknown
+/// keys are ignored — the form's honeypot is checked in its action and never
+/// reaches this API.
 /// </summary>
-/// <param name="Name">The person's name (required, up to 200 characters).</param>
-/// <param name="Firm">Their firm's name (required, up to 200 characters).</param>
-/// <param name="Email">A work email (required, up to 320 characters).</param>
-/// <param name="CurrentSoftware">What they use today (up to 100 characters).</param>
-/// <param name="Message">Anything else (up to 2000 characters).</param>
-/// <param name="Host">The marketing host the form was sent from (up to 253 characters).</param>
+/// <param name="Name">The person's name.</param>
+/// <param name="Firm">Their firm's name.</param>
+/// <param name="Email">A work email.</param>
+/// <param name="CurrentSoftware">What they use today.</param>
+/// <param name="Message">Anything else.</param>
+/// <param name="Host">The marketing host the form was sent from.</param>
 public sealed record WaitlistRequest(
-    string Name,
-    string Firm,
-    string Email,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? CurrentSoftware,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Message,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Host);
+    [property: Required(ErrorMessage = "Please tell us your name."), MaxLength(200, ErrorMessage = "Please keep this under 200 characters.")] string? Name,
+    [property: Required(ErrorMessage = "Please tell us your firm's name."), MaxLength(200, ErrorMessage = "Please keep this under 200 characters.")] string? Firm,
+    [property: Required(ErrorMessage = "A work email is required."), MaxLength(320, ErrorMessage = "Please keep this under 320 characters."), RegularExpression(@"^[^@\s]+@[^@\s]+\.[^@\s]+$", ErrorMessage = "That doesn't look like a valid email address.")] string? Email,
+    [property: MaxLength(100, ErrorMessage = "Please keep this under 100 characters.")] string? CurrentSoftware = null,
+    [property: MaxLength(2000, ErrorMessage = "Please keep this under 2000 characters.")] string? Message = null,
+    [property: MaxLength(253, ErrorMessage = "Please keep this under 253 characters.")] string? Host = null)
+{
+    /// <summary>The submission to store; an absent optional field is stored empty.</summary>
+    /// <returns>The submission.</returns>
+    public WaitlistSubmission ToSubmission() => new(Name!, Firm!, Email!, CurrentSoftware ?? "", Message ?? "", Host ?? "");
+}
 
 /// <summary>A stored waitlist sign-up.</summary>
 /// <param name="Id">The sign-up's server-generated id.</param>
@@ -118,7 +121,7 @@ public sealed record WaitlistReceipt(string Id, string SubmittedAt);
 
 /// <summary>An unsubscribe click (<c>POST /v1/unsubscribe</c>).</summary>
 /// <param name="Token">The signed token from the email's unsubscribe link.</param>
-public sealed record UnsubscribeRequest(string Token);
+public sealed record UnsubscribeRequest([property: Required(ErrorMessage = "token is required")] string? Token);
 
 /// <summary>The one answer to a valid unsubscribe token.</summary>
 /// <param name="Status">Always <c>unsubscribed</c>.</param>

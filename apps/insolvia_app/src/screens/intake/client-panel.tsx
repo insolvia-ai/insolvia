@@ -57,20 +57,6 @@ const PART_LABELS: Readonly<Record<string, string>> = {
 
 const SEGMENT_RE = /^([a-z][A-Za-z0-9_]*)(?:\[([A-Za-z0-9_-]+)\])?$/;
 
-// The client record is still snake_case (ADR 0032 step 4): a debtor path's
-// first segment, as the client spells it.
-const CLIENT_ROOTS: Readonly<Record<string, string>> = {
-  otherNamesUsed: 'other_names_used',
-  residenceAddress: 'residence_address',
-  mailingAddress: 'mailing_address',
-};
-
-function clientPath(path: string): string {
-  const [root = '', ...rest] = path.split('.');
-  const name = SEGMENT_RE.exec(root)?.[1] ?? root;
-  return [root.replace(name, CLIENT_ROOTS[name] ?? name), ...rest].join('.');
-}
-
 /** A `differsFromClient` path in words — "Residence · city". */
 export function pathLabel(path: string): string {
   const names = path.split('.').map((segment) => SEGMENT_RE.exec(segment)?.[1] ?? segment);
@@ -171,7 +157,7 @@ export function LinkedClient({
               <Text key={path} style={[styles.line, muted]}>
                 <Text style={[styles.label, ink]}>{pathLabel(path)}</Text>
                 {`  This case: ${valueAt(debtor.body, path) ?? '(empty)'} · Client: ${
-                  client === null ? '…' : (valueAt(client, clientPath(path)) ?? '(empty)')
+                  client === null ? '…' : (valueAt(client, path) ?? '(empty)')
                 }`}
               </Text>
             ))}

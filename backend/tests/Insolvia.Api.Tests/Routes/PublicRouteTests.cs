@@ -37,24 +37,21 @@ public sealed class WaitlistTests : IDisposable
 
     // ── Validation ───────────────────────────────────────────────────
 
-    [Fact]
-    public void A_valid_submission_is_trimmed_and_parsed()
-    {
-        var padded = new JsonObject();
-        foreach (var (key, value) in Body(ValidBody))
-        {
-            padded[key] = $"  {value!.GetValue<string>()}  ";
-        }
+    private static WaitlistSubmission Parse(JsonObject body) =>
+        ((Insolvia.Api.Routes.WaitlistRequest)Insolvia.Domain.CaseEntities.BodyJson.Read(body, typeof(Insolvia.Api.Routes.WaitlistRequest))).ToSubmission();
 
+    [Fact]
+    public void A_valid_submission_is_read()
+    {
         Assert.Equal(
             new WaitlistSubmission("Ada Lovelace", "Lovelace & Byron LLP", "ada@lovelace-law.example", "Best Case", "Two attorneys, chapter 7 heavy.", "www.insolvia.ai"),
-            WaitlistSubmissions.Parse(padded));
+            Parse(Body(ValidBody)));
     }
 
     [Fact]
     public void Optional_fields_default_to_empty()
     {
-        var submission = WaitlistSubmissions.Parse(Body("""{"name": "Ada", "firm": "Lovelace LLP", "email": "ada@example.com"}"""));
+        var submission = Parse(Body("""{"name": "Ada", "firm": "Lovelace LLP", "email": "ada@example.com"}"""));
 
         Assert.Equal(("", "", ""), (submission.CurrentSoftware, submission.Message, submission.Host));
     }
@@ -62,7 +59,7 @@ public sealed class WaitlistTests : IDisposable
     [Fact]
     public void Missing_required_fields_are_reported_per_field()
     {
-        var error = Assert.Throws<FieldValidationException>(() => WaitlistSubmissions.Parse(new JsonObject()));
+        var error = Assert.Throws<FieldValidationException>(() => Parse(new JsonObject()));
 
         Assert.Equal(
             new Dictionary<string, string>
@@ -74,13 +71,13 @@ public sealed class WaitlistTests : IDisposable
             error.Fields);
     }
 
-    [Fact]
-    public void Non_string_values_count_as_missing()
-    {
-        var error = Assert.Throws<FieldValidationException>(() => WaitlistSubmissions.Parse(Body("""{"name": 42, "firm": null, "email": ["a@b.c"]}""")));
-
-        Assert.Equal(["email", "firm", "name"], error.Fields.Keys.Order(StringComparer.Ordinal));
-    }
+    [Theory]
+    [InlineData("""{"name": 42, "firm": "LLP", "email": "a@b.co"}""", "name")]
+    [InlineData("""{"name": "Ada", "firm": null, "email": "a@b.co"}""", "firm")]
+    [InlineData("""{"name": "Ada", "firm": "LLP", "email": ["a@b.c"]}""", "email")]
+    [InlineData("""{"name": "   ", "firm": "LLP", "email": "a@b.co"}""", "name")]
+    public void A_missing_blank_or_non_string_value_is_refused_on_its_field(string payload, string field) =>
+        Assert.Equal([field], Assert.Throws<FieldValidationException>(() => Parse(Body(payload))).Fields.Keys);
 
     [Theory]
     [MemberData(nameof(MalformedEmails))]
@@ -89,7 +86,7 @@ public sealed class WaitlistTests : IDisposable
         var body = Body("""{"name": "Ada", "firm": "LLP"}""");
         body["email"] = email;
 
-        var error = Assert.Throws<FieldValidationException>(() => WaitlistSubmissions.Parse(body));
+        var error = Assert.Throws<FieldValidationException>(() => Parse(body));
 
         Assert.Equal(new Dictionary<string, string> { ["email"] = "That doesn't look like a valid email address." }, error.Fields);
     }
@@ -101,7 +98,7 @@ public sealed class WaitlistTests : IDisposable
         var body = Body(ValidBody);
         body[field] = field == "email" ? "a@" + new string('x', cap) + ".com" : new string('x', cap + 1);
 
-        var error = Assert.Throws<FieldValidationException>(() => WaitlistSubmissions.Parse(body));
+        var error = Assert.Throws<FieldValidationException>(() => Parse(body));
 
         Assert.Equal(new Dictionary<string, string> { [field] = $"Please keep this under {cap} characters." }, error.Fields);
     }
@@ -114,13 +111,13 @@ public sealed class WaitlistTests : IDisposable
         body["website"] = "http://spam.example";
         body["extra"] = 1;
 
-        Assert.Equal("Ada Lovelace", WaitlistSubmissions.Parse(body).Name);
+        Assert.Equal("Ada Lovelace", Parse(body).Name);
     }
 
     [Fact]
     public void A_record_is_a_uuid4_stamped_to_the_millisecond()
     {
-        var record = WaitlistSubmissions.Create(WaitlistSubmissions.Parse(Body(ValidBody)));
+        var record = WaitlistSubmissions.Create(Parse(Body(ValidBody)));
 
         Assert.Equal(4, Guid.Parse(record.Id).Version);
         Assert.Equal(0, record.SubmittedAt.Ticks % TimeSpan.TicksPerMillisecond);
@@ -181,12 +178,8 @@ public sealed class WaitlistTests : IDisposable
     }
 
     [Fact]
-    public async Task A_body_over_64_kib_is_refused()
-    {
-        var answer = await _world.Post("/v1/waitlist", "{\"message\": \"" + new string('x', 70_000) + "\"}");
-
-        Assert.Equal(HttpAssert.ErrorBody("ValidationError", "request body exceeds 64 KiB"), answer.Body);
-    }
+    public void The_route_declares_a_64_kib_body_cap() =>
+        Assert.Equal(64 * 1024, MeRouteTests.BodyCap(_world.Host.Services, "/v1/waitlist", "POST"));
 
     [Fact]
     public async Task The_log_line_carries_the_id_and_no_submitted_value()

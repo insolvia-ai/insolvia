@@ -1,10 +1,11 @@
+using System.ComponentModel.DataAnnotations;
 using Insolvia.Domain.FilingAuthorizations;
 
 namespace Insolvia.Api.Filing;
 
 /// <summary>The authorization text an attorney is asked to sign, with what they must post back.</summary>
-/// <param name="Version">The text's version; post it back as <c>text_version</c>.</param>
-/// <param name="Digest">SHA-256 of the text; post it back as <c>text_digest</c>.</param>
+/// <param name="Version">The text's version; post it back as <c>textVersion</c>.</param>
+/// <param name="Digest">SHA-256 of the text; post it back as <c>textDigest</c>.</param>
 /// <param name="Text">The text itself.</param>
 public sealed record AuthorizationTextView(string Version, string Digest, string Text)
 {
@@ -25,7 +26,6 @@ public sealed record AuthorizationTextView(string Version, string Digest, string
 /// <param name="CurrentVersion">The version a signature must be over to be current.</param>
 /// <param name="Current">Whether the caller's signature is over the current version.</param>
 /// <param name="Signature">The signature on record; null when the caller never signed or withdrew.</param>
-[SnakeCase]
 public sealed record FilingAuthorizationView(
     AuthorizationTextView Text,
     string CurrentVersion,
@@ -51,20 +51,18 @@ public sealed record FilingAuthorizationView(
 /// <param name="TextVersion">The version signed.</param>
 /// <param name="TextDigest">SHA-256 of that version's text.</param>
 /// <param name="SignedAt">When, ISO 8601 UTC with microseconds.</param>
-[SnakeCase]
 public sealed record AuthorizationSignatureView(string Id, string TextVersion, string TextDigest, string SignedAt);
 
 /// <summary>
 /// A signature (<c>POST /v1/me/filing-authorization</c>): the version and
-/// digest of the text as shown, which must be the current one. Parsed by
-/// <c>FilingAuthorizationRules.SignAsync</c>.
+/// digest of the text as shown, which must be the current one (a 409 otherwise).
 /// </summary>
 /// <param name="TextVersion">The version shown.</param>
 /// <param name="TextDigest">Its digest.</param>
-[SnakeCase]
-public sealed record AuthorizationSignRequest(string TextVersion, string TextDigest);
+public sealed record AuthorizationSignRequest(
+    [property: Required(ErrorMessage = "The version shown is required.")] string? TextVersion,
+    [property: Required(ErrorMessage = "The digest shown is required.")] string? TextDigest);
 
 /// <summary>What withdrawing the authorization destroyed.</summary>
 /// <param name="CredentialsRevoked">How many credentials were destroyed with it.</param>
-[SnakeCase]
 public sealed record AuthorizationWithdrawn(int CredentialsRevoked);

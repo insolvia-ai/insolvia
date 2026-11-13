@@ -17,16 +17,16 @@ jest.mock('@/config/environment', () => ({
 }));
 
 const JORDAN = firmClient('00000000-0000-4000-8000-0000000c11a0', 'Jordan', 'Example', {
-  residence_address: { city: 'Tampa', state: 'FL' },
-  first_retained_at: '2026-07-20',
+  residenceAddress: { city: 'Tampa', state: 'FL' },
+  firstRetainedAt: '2026-07-20',
 });
 const RILEY = firmClient('00000000-0000-4000-8000-0000000c11a1', 'Riley', 'Example', {
-  first_retained_at: '2026-07-20',
+  firstRetainedAt: '2026-07-20',
 });
 // A prospect (issue #355): never retained, in the funnel.
 const SAM = firmClient('00000000-0000-4000-8000-0000000c11a2', 'Sam', 'Sample', {
-  residence_address: { city: 'Orlando', state: 'FL' },
-  prospect_stage: 'consultation_scheduled',
+  residenceAddress: { city: 'Orlando', state: 'FL' },
+  prospectStage: 'consultation_scheduled',
 });
 const CASEY = firmClient('00000000-0000-4000-8000-0000000c11a3', 'Casey', 'Gone', {
   status: 'archived',

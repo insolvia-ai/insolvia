@@ -223,7 +223,7 @@ describe('mcp: the eight tools', () => {
       entityType: 'clients',
     });
     expectShape(clients.structuredContent, {
-      records: [{ id: 'string', name: 'object', 'tax_id_last_four?': 'string' }],
+      records: [{ id: 'string', name: 'object', 'taxIdLastFour?': 'string' }],
     });
     await mcp.refuse(
       'get_case_record',
