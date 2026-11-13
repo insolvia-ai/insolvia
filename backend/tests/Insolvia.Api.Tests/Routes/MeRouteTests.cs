@@ -257,15 +257,15 @@ public sealed class MeRouteTests : IDisposable
     }
 
     [Fact]
-    public async Task The_route_declares_a_four_kib_body_cap() =>
-        Assert.Equal(4 * 1024, BodyCap(_world.Host.Services, "/v1/me", "PATCH"));
+    public async Task A_body_over_four_kib_is_refused_before_it_is_parsed()
+    {
+        await ProvisionedAsync();
 
-    /// <summary>The byte cap a route declares; the server that hosts it enforces it.</summary>
-    internal static long? BodyCap(IServiceProvider services, string pattern, string method) =>
-        services.GetRequiredService<Microsoft.AspNetCore.Routing.EndpointDataSource>().Endpoints
-            .OfType<Microsoft.AspNetCore.Routing.RouteEndpoint>()
-            .Single(endpoint => endpoint.RoutePattern.RawText == pattern && endpoint.Metadata.GetMetadata<Microsoft.AspNetCore.Routing.IHttpMethodMetadata>()!.HttpMethods.Contains(method))
-            .Metadata.GetMetadata<Microsoft.AspNetCore.Http.Metadata.IRequestSizeLimitMetadata>()!.MaxRequestBodySize;
+        var answer = await _world.Patch("/v1/me", "{\"firstName\": \"" + new string('x', 5000) + "\"}", Ids.Alice);
+
+        Assert.Equal(400, answer.Status);
+        Assert.Equal(HttpAssert.ErrorBody("ValidationError", "request body exceeds 4 KiB"), answer.Body);
+    }
 
     [Fact]
     public async Task A_rename_logs_that_it_happened_and_nothing_about_whom()

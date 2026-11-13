@@ -386,6 +386,7 @@ public static class ApiComposition
         app.UseHeadAsGet();
         app.UseRouting();
         app.UseMethodFallback();
+        app.UseRequestSizeLimits();
 
         app.MapHealth();
         app.MapOpenApi();

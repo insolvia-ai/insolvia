@@ -178,8 +178,12 @@ public sealed class WaitlistTests : IDisposable
     }
 
     [Fact]
-    public void The_route_declares_a_64_kib_body_cap() =>
-        Assert.Equal(64 * 1024, MeRouteTests.BodyCap(_world.Host.Services, "/v1/waitlist", "POST"));
+    public async Task A_body_over_64_kib_is_refused()
+    {
+        var answer = await _world.Post("/v1/waitlist", "{\"message\": \"" + new string('x', 70_000) + "\"}");
+
+        Assert.Equal(HttpAssert.ErrorBody("ValidationError", "request body exceeds 64 KiB"), answer.Body);
+    }
 
     [Fact]
     public async Task The_log_line_carries_the_id_and_no_submitted_value()
