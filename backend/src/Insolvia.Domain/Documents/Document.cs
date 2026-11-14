@@ -71,12 +71,10 @@ public static partial class DocumentRules
         Clock.NowMillis(clock).AddSeconds(seconds);
 
     /// <summary>
-    /// Validate POST /v1/cases/&lt;case_id&gt;/documents; unknown keys are ignored.
-    /// <paramref name="kind"/>, when given, is the kind the SERVER decided (a
-    /// client upload takes its request's kind), and the payload's is ignored.
-    /// Every check runs BEFORE an upload URL exists.
+    /// Validate an upload's metadata outside a request (the seed loader);
+    /// unknown keys are ignored.
     /// </summary>
-    public static DocumentDraft ParseUpload(JsonObject payload, DocumentKind? kind = null)
+    public static DocumentDraft ParseUpload(JsonObject payload)
     {
         ArgumentNullException.ThrowIfNull(payload);
         var errors = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -85,7 +83,7 @@ public static partial class DocumentRules
             errors["provenance"] = "A document record carries no provenance. Provenance describes values extracted FROM a document, not the document itself.";
         }
 
-        var parsedKind = kind ?? ParseKind(payload["kind"], errors);
+        var parsedKind = ParseKind(payload["kind"], errors);
         var fileName = ParseFileName(payload["fileName"], errors);
         var contentType = ParseContentType(payload["contentType"], errors);
         var byteSize = ParseByteSize(payload["byteSize"], errors);

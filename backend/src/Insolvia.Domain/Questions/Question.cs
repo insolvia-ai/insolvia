@@ -379,16 +379,15 @@ public static class QuestionRules
     }
 
     /// <summary>
-    /// Validate <c>POST /v1/portal/answers</c>: <c>{questionId, filingRole?, value}</c>.
+    /// Check <c>POST /v1/portal/answers</c> against the questionnaire.
     /// <paramref name="sections"/> is the firm's resolved config (a switched-off
     /// section's questions are not answerable); <paramref name="roles"/> the binding's.
     /// </summary>
-    public static AnswerRequest ParseAnswer(JsonObject body, IReadOnlyList<ResolvedSection> sections, IReadOnlyList<ClientRole> roles)
+    public static AnswerRequest ParseAnswer(string questionId, ClientRole? filingRole, JsonNode? value, IReadOnlyList<ResolvedSection> sections, IReadOnlyList<ClientRole> roles)
     {
-        ArgumentNullException.ThrowIfNull(body);
-        var entry = EnabledQuestion(body["questionId"], sections);
-        var role = FilingRoleOf(body["filingRole"], roles);
-        return new AnswerRequest(entry, role, BuildPayload(entry, body["value"]));
+        var entry = EnabledQuestion(questionId, sections);
+        var role = FilingRoleOf(filingRole, roles);
+        return new AnswerRequest(entry, role, BuildPayload(entry, value));
     }
 
     /// <summary>The candidate's locator for an answer — a question kind, snake_case members.</summary>
@@ -564,12 +563,11 @@ public static class QuestionRules
         return $"value.{path}";
     }
 
-    private static Question EnabledQuestion(JsonNode? questionId, IReadOnlyList<ResolvedSection> sections)
+    private static Question EnabledQuestion(string questionId, IReadOnlyList<ResolvedSection> sections)
     {
         ArgumentNullException.ThrowIfNull(sections);
         var enabled = sections.Where(resolved => resolved.Enabled).Select(resolved => resolved.Section.Id).ToHashSet(StringComparer.Ordinal);
-        var id = Json.AsString(questionId);
-        var entry = id is null ? null : Find(id);
+        var entry = Find(questionId);
         if (entry is null || entry.Retired || !enabled.Contains(entry.Section))
         {
             throw new FieldValidationException(new Dictionary<string, string> { ["questionId"] = "Not a question in your questionnaire." });
@@ -582,22 +580,14 @@ public static class QuestionRules
     /// Which debtor an answer is for: a client holding one role answers for it,
     /// named or not; a client holding both must say which.
     /// </summary>
-    private static ClientRole FilingRoleOf(JsonNode? value, IReadOnlyList<ClientRole> roles)
+    private static ClientRole FilingRoleOf(ClientRole? value, IReadOnlyList<ClientRole> roles)
     {
         ArgumentNullException.ThrowIfNull(roles);
-        if (value is null)
+        if (value is not { } role)
         {
             return roles.Count == 1
                 ? roles[0]
                 : throw new FieldValidationException(new Dictionary<string, string> { ["filingRole"] = "Say which of you this answer is for." });
-        }
-
-        if (!Wire.TryParse<ClientRole>(Json.AsString(value), out var role))
-        {
-            throw new FieldValidationException(new Dictionary<string, string>
-            {
-                ["filingRole"] = "Must be one of " + string.Join(", ", Wire.Names<ClientRole>()) + ".",
-            });
         }
 
         return roles.Contains(role)

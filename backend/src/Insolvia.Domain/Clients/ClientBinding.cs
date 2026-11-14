@@ -1,5 +1,6 @@
-using System.Text.Json.Nodes;
+using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
+using Insolvia.Domain.Fields;
 using Insolvia.Domain.Firms;
 
 namespace Insolvia.Domain.Clients;
@@ -62,6 +63,42 @@ public sealed record ClientBinding(
 /// <summary>A validated invitation body.</summary>
 public sealed record InvitationDraft(string Email, string DisplayName, ValueCollection<ClientRole> Roles);
 
+/// <summary>
+/// An invitation (<c>POST /v1/cases/{caseId}/portal/invitation</c>), and a
+/// fixture case's client. Any other key is refused: a caller sending
+/// <c>caseId</c> or <c>subject</c> believes it controls something it does not.
+/// </summary>
+/// <param name="Email">The client's address; stored lower-cased.</param>
+/// <param name="DisplayName">The name to greet them by.</param>
+/// <param name="Roles">The debtors the login answers for, once each; absent for <c>debtor_1</c> alone.</param>
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record PortalInvitationRequest(
+    [property: Required(ErrorMessage = "An email address is required."), MaxLength(FirmRules.MaxEmail, ErrorMessage = "Please keep this under 320 characters."), RegularExpression(FirmRules.EmailPattern, ErrorMessage = FirmRules.EmailMessage)] string? Email,
+    [property: Required(ErrorMessage = FirmRules.NameRequired), Text(ClientBindings.MaxDisplayName), RegularExpression(FirmRules.NotBlank, ErrorMessage = FirmRules.NameRequired)] string? DisplayName,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull), MinLength(1, ErrorMessage = "Choose at least one debtor this person answers for.")] IReadOnlyList<ClientRole>? Roles = null)
+    : IValidatableObject
+{
+    /// <summary>The draft a binding is created from: the address lower-cased, the roles in canonical order.</summary>
+    /// <returns>The draft.</returns>
+    // Defaults to the first debtor alone — safe on a joint case too: a held
+    // debtor_1 is a narrowing or a 409, never a silent second holder.
+    public InvitationDraft ToDraft() => new(
+        TextRules.Lower(Email!),
+        DisplayName!,
+        Roles is null ? [ClientRole.Debtor1] : Wire.Members<ClientRole>().Where(Roles.Contains).ToValueCollection());
+
+    /// <summary>Each role once.</summary>
+    /// <param name="validationContext">Unused.</param>
+    /// <returns>The failures.</returns>
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        if (Roles is not null && Roles.Distinct().Count() != Roles.Count)
+        {
+            yield return new ValidationResult("Must be debtor_1, debtor_2, or both, once each.", [nameof(Roles)]);
+        }
+    }
+}
+
 /// <summary>Parsing and the transitions of a portal binding (from <c>clients.py</c>).</summary>
 public static class ClientBindings
 {
@@ -71,33 +108,8 @@ public static class ClientBindings
     /// </summary>
     public const string AccessChanged = "that client's access changed while this was written; reload and try again";
 
-    private static readonly HashSet<string> InvitationFields = new(StringComparer.Ordinal) { "email", "displayName", "roles" };
-
-    /// <summary>
-    /// <c>POST /v1/cases/&lt;id&gt;/portal/invitation</c>'s body. Unknown keys
-    /// are REFUSED: a caller sending <c>caseId</c> or <c>subject</c> believes
-    /// it controls something it does not.
-    /// </summary>
-    public static InvitationDraft ParseInvitation(JsonObject payload)
-    {
-        ArgumentNullException.ThrowIfNull(payload);
-        var unknown = payload.Select(pair => pair.Key).Where(key => !InvitationFields.Contains(key)).Order(StringComparer.Ordinal).ToList();
-        if (unknown.Count > 0)
-        {
-            throw new ValidationException("unsupported fields: " + string.Join(", ", unknown));
-        }
-
-        var errors = new Dictionary<string, string>(StringComparer.Ordinal);
-        var email = FirmParser.ParseEmail(payload["email"], errors);
-        var displayName = ParseDisplayName(payload["displayName"], errors);
-        var roles = ParseRoles(payload["roles"], errors);
-        if (errors.Count > 0 || email is null || displayName is null || roles is null)
-        {
-            throw new FieldValidationException(errors);
-        }
-
-        return new InvitationDraft(email, displayName, roles);
-    }
+    /// <summary>The cap on the name a firm greets a client by.</summary>
+    public const int MaxDisplayName = 200;
 
     /// <summary>A new binding, <see cref="BindingStatus.Invited"/>.</summary>
     public static ClientBinding CreateBinding(InvitationDraft draft, string firmId, string caseId, string subject, string invitedBy, TimeProvider? clock = null)
@@ -170,61 +182,5 @@ public static class ClientBindings
         }
 
         return narrowed.ToValueCollection();
-    }
-
-    private static string? ParseDisplayName(JsonNode? value, Dictionary<string, string> errors)
-    {
-        var raw = Json.AsString(value);
-        if (raw is null || TextRules.Strip(raw).Length == 0)
-        {
-            errors["displayName"] = "A name is required.";
-            return null;
-        }
-
-        var name = TextRules.Strip(raw);
-        if (TextRules.Length(name) > FirmParser.MaxDisplayName)
-        {
-            errors["displayName"] = $"Please keep this under {FirmParser.MaxDisplayName} characters.";
-            return null;
-        }
-
-        return name;
-    }
-
-    // Defaults to the first debtor alone — safe on a joint case too: a held
-    // debtor_1 is a narrowing or a 409, never a silent second holder.
-    private static ValueCollection<ClientRole>? ParseRoles(JsonNode? value, Dictionary<string, string> errors)
-    {
-        if (value is null)
-        {
-            return [ClientRole.Debtor1];
-        }
-
-        if (value is not JsonArray list || list.Count == 0)
-        {
-            errors["roles"] = "Choose at least one debtor this person answers for.";
-            return null;
-        }
-
-        if (list.Any(role => Json.AsString(role) == "non_filing_spouse"))
-        {
-            errors["roles"] = "A non-filing spouse has no portal login; their details are asked of a debtor.";
-            return null;
-        }
-
-        var parsed = new List<ClientRole>();
-        foreach (var raw in list)
-        {
-            if (!Wire.TryParse<ClientRole>(Json.AsString(raw), out var role) || parsed.Contains(role))
-            {
-                errors["roles"] = "Must be debtor_1, debtor_2, or both, once each.";
-                return null;
-            }
-
-            parsed.Add(role);
-        }
-
-        // Canonical order, so two invitations naming the same roles store the same value.
-        return Wire.Members<ClientRole>().Where(parsed.Contains).ToValueCollection();
     }
 }

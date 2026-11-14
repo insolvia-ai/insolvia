@@ -11,6 +11,7 @@ using Insolvia.Domain.Clients;
 using Insolvia.Domain.Firms;
 using Insolvia.Domain.Ports;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Mvc;
 
 namespace Insolvia.Api.Routes;
 
@@ -47,7 +48,7 @@ public sealed class PortalInvitationRoutes : IEndpointModule
     {
         ArgumentNullException.ThrowIfNull(routes);
         routes.MapGet("/v1/cases/{caseId}/portal/clients", ListAsync).RequireAuth().Requires(Feature.ClientPortal, PermissionLevel.ViewOnly);
-        routes.MapPost("/v1/cases/{caseId}/portal/invitation", InviteAsync).RequestBody<PortalInvitationRequest>().RequireAuth().Requires(Feature.ClientPortal, PermissionLevel.AddEdit);
+        routes.MapPost("/v1/cases/{caseId}/portal/invitation", InviteAsync).WithMetadata(new RequestSizeLimitAttribute(MaxRequestBytes)).RequireAuth().Requires(Feature.ClientPortal, PermissionLevel.AddEdit);
         routes.MapPost("/v1/cases/{caseId}/portal/clients/{subject}/resend", ResendAsync).RequireAuth().Requires(Feature.ClientPortal, PermissionLevel.AddEdit);
         routes.MapDelete("/v1/cases/{caseId}/portal/clients/{subject}", RevokeAsync).RequireAuth().Requires(Feature.ClientPortal, PermissionLevel.AddEdit);
     }
@@ -69,11 +70,11 @@ public sealed class PortalInvitationRoutes : IEndpointModule
     /// choice of one login for both spouses. An address that already has an
     /// account not among the firm's clients is a 409.
     /// </remarks>
-    internal static async Task<Created<ClientBindingView>> InviteAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
+    internal static async Task<Created<ClientBindingView>> InviteAsync(HttpContext context, string caseId, PortalInvitationRequest request, CancellationToken cancellationToken)
     {
         var accessor = await context.CurrentAccessorAsync();
         await VisibleCaseAsync(context, accessor, caseId, AccessAction.ClientInvite, cancellationToken);
-        var draft = ClientBindings.ParseInvitation(await context.BodyAsync(MaxRequestBytes));
+        var draft = request.ToDraft();
         var bindings = context.Port<IClientBindingStore>();
         var clock = context.Clock();
 

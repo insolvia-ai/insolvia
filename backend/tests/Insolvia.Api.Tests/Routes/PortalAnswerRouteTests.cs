@@ -170,10 +170,12 @@ public sealed class PortalAnswerRouteTests : IAsyncLifetime, IDisposable
         Assert.Equal(id, Assert.Single(await Candidates.ListForCaseAsync(_caseId, HttpAssert.Ct)).Id);
     }
 
-    [Fact]
-    public async Task A_client_cannot_answer_for_the_other_debtor()
+    [Theory]
+    [InlineData("debtor_2")]
+    [InlineData("non_filing_spouse")]
+    public async Task A_client_cannot_answer_for_the_other_debtor(string role)
     {
-        var answer = await Answer("""{"questionId": "personal_information.legal_name", "filingRole": "debtor_2", "value": {"given": "P", "surname": "E"}}""");
+        var answer = await Answer($$$"""{"questionId": "personal_information.legal_name", "filingRole": "{{{role}}}", "value": {"given": "P", "surname": "E"}}""");
 
         Assert.Equal(400, answer.Status);
         Assert.True(answer.Object["fields"]!.AsObject().ContainsKey("filingRole"));

@@ -310,7 +310,7 @@ public sealed partial class PortalRouteTests : IAsyncLifetime, IDisposable
         var answer = await _world.Post($"/v1/cases/{await _world.OpenCaseIdAsync()}/portal/invitation", """{"email": "pat@example.test", "displayName": "Pat", "caseId": "other"}""");
 
         Assert.Equal(400, answer.Status);
-        Assert.Equal("unsupported fields: caseId", answer.Object.Str("message"));
+        Assert.True(answer.Object["fields"]!.AsObject().ContainsKey("caseId"), answer.Body);
     }
 
     // ── Resend and revoke ───────────────────────────────────────────

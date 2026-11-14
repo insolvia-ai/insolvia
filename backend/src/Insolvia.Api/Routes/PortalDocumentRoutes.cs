@@ -9,6 +9,7 @@ using Insolvia.Domain.DocumentRequests;
 using Insolvia.Domain.Documents;
 using Insolvia.Domain.Ports;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Mvc;
 
 namespace Insolvia.Api.Routes;
 
@@ -43,7 +44,7 @@ public sealed class PortalDocumentRoutes : IEndpointModule
     {
         ArgumentNullException.ThrowIfNull(routes);
         routes.MapGet("/v1/portal/document-requests", RequestsAsync).RequireClient();
-        routes.MapPost("/v1/portal/documents", CreateAsync).RequestBody<PortalUploadRequest>().RequireClient();
+        routes.MapPost("/v1/portal/documents", CreateAsync).WithMetadata(new RequestSizeLimitAttribute(MaxRequestBytes)).RequireClient();
         routes.MapPost("/v1/portal/documents/{documentId}/complete", CompleteAsync).RequireClient();
     }
 
@@ -60,21 +61,12 @@ public sealed class PortalDocumentRoutes : IEndpointModule
 
     /// <summary>Start a document upload.</summary>
     /// <remarks>Authorises one upload against one of the firm's open document requests, and answers the document and a presigned PUT for its bytes; then call <c>…/complete</c>.</remarks>
-    internal static async Task<Created<PortalUploadTicket>> CreateAsync(HttpContext context, CancellationToken cancellationToken)
+    internal static async Task<Created<PortalUploadTicket>> CreateAsync(HttpContext context, PortalUploadRequest request, CancellationToken cancellationToken)
     {
         var client = context.CurrentClient();
-
-        // Body before the case — the staff route's order and reason.
-        var body = await context.BodyAsync(MaxRequestBytes);
-        if (Json.AsString(body["requestId"]) is not { Length: > 0 } requestId)
-        {
-            throw new FieldValidationException(new Dictionary<string, string> { ["requestId"] = "Choose the document this upload is for." });
-        }
-
         var caseId = await BoundCaseAsync(context, client, AccessAction.DocumentCreate, cancellationToken);
-        var answered = await DocumentRoutes.OpenRequestOr400Async(context, caseId, requestId, cancellationToken);
-        var draft = DocumentRules.ParseUpload(body, answered.Kind);
-        var document = DocumentRules.Create(draft, caseId, client.Subject, DocumentChannel.Client, answered.Id, context.Clock());
+        var answered = await DocumentRoutes.OpenRequestOr400Async(context, caseId, request.RequestId!, cancellationToken);
+        var document = DocumentRules.Create(request.Draft(answered.Kind), caseId, client.Subject, DocumentChannel.Client, answered.Id, context.Clock());
         await context.Port<IDocumentStore>().CreateAsync(document, cancellationToken);
         var upload = await DocumentRoutes.UploadAsync(context, document, cancellationToken);
         context.Log(Logger, "client document created", ("document_id", document.Id), ("request_id", answered.Id));

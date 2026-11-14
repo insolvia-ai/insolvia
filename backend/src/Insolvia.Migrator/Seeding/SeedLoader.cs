@@ -622,7 +622,7 @@ public sealed class SeedLoader
 
     /// <summary>
     /// Converge a fixture case's PORTAL clients (ADR 0023) — through the same
-    /// parser, planner and store the invitation route uses, except that no
+    /// record, planner and store the invitation route uses, except that no
     /// invitation is mailed: the password is set here. A binding that exists
     /// is left alone, revoked or not.
     /// </summary>
@@ -642,7 +642,7 @@ public sealed class SeedLoader
                 }
             }
 
-            var draft = ClientBindings.ParseInvitation(invitation);
+            var draft = ((PortalInvitationRequest)BodyJson.Read(invitation, typeof(PortalInvitationRequest))).ToDraft();
             string subject;
             try
             {
