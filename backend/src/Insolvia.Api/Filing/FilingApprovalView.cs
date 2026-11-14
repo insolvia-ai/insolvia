@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 using Insolvia.Domain.Filings;
 using Insolvia.Domain.Forms;
@@ -206,14 +207,16 @@ public sealed record BasisPacketView(string Id, string CreatedAt, string Sha256,
 
 /// <summary>
 /// An attorney's approval (<c>POST /v1/cases/{caseId}/filing-approval</c>):
-/// the digest of the basis as shown. Parsed by <c>FilingApprovals.ApproveAsync</c>.
+/// the digest of the basis as shown.
 /// </summary>
 /// <param name="Digest">The basis digest shown; a mismatch is refused.</param>
 /// <param name="CredentialId">The CM/ECF credential to file with; absent for the caller's only one.</param>
-[SnakeCase]
 public sealed record FilingApproveRequest(
-    string Digest,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? CredentialId);
+    [property: Required(ErrorMessage = FilingApproveRequest.DigestMessage), StringLength(64, MinimumLength = 64, ErrorMessage = FilingApproveRequest.DigestMessage)] string? Digest,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? CredentialId = null)
+{
+    private const string DigestMessage = "The digest of the filing set you were shown is required.";
+}
 
 /// <summary>A refused approval: the filing set is not ready.</summary>
 /// <param name="Error">Always <c>FilingSetNotReady</c>.</param>

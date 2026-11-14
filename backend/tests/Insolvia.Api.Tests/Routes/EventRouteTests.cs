@@ -80,10 +80,10 @@ public sealed class EventRouteTests : IAsyncLifetime, IDisposable
         var created = await Add(caseId);
 
         Assert.Equal(201, created.Status);
-        Assert.Equal(("Hearing on the motion", caseId, "2026-03-02", "2026-03-02"), (created.Str("title"), created.Str("case_id"), created.Str("start"), created.Str("end")));
-        Assert.True(created.Object["all_day"]!.GetValue<bool>());
+        Assert.Equal(("Hearing on the motion", caseId, "2026-03-02", "2026-03-02"), (created.Str("title"), created.Str("caseId"), created.Str("start"), created.Str("end")));
+        Assert.True(created.Object["allDay"]!.GetValue<bool>());
         Assert.False(created.Object["generated"]!.GetValue<bool>());
-        Assert.Equal(["all_day", "attendees", "case_id", "created_at", "created_by", "dismissed", "end", "generated", "id", "location", "start", "title", "updated_at"], Answer.Keys(created.Json));
+        Assert.Equal(["allDay", "attendees", "caseId", "createdAt", "createdBy", "dismissed", "end", "generated", "id", "location", "start", "title", "updatedAt"], Answer.Keys(created.Json));
         Assert.Equal([created.Str("id")], (await _world.Get($"/v1/cases/{caseId}/events")).Object["events"]!.AsArray().Select(e => e!.AsObject().Str("id")));
     }
 
@@ -120,7 +120,7 @@ public sealed class EventRouteTests : IAsyncLifetime, IDisposable
         var url = $"/v1/cases/{caseId}/events/{(await Add(caseId)).Str("id")}";
 
         Assert.True((await _world.Patch(url, """{"dismissed": true}""")).Object["dismissed"]!.GetValue<bool>());
-        Assert.Equal(["dismissed"], (await _world.Patch(url, """{"dismissed": false, "title": "x"}""")).FieldErrors);
+        Assert.Equal(["title"], (await _world.Patch(url, """{"dismissed": false, "title": "x"}""")).FieldErrors);
         Assert.True((await _world.Get(url)).Object["dismissed"]!.GetValue<bool>());
     }
 
@@ -131,7 +131,7 @@ public sealed class EventRouteTests : IAsyncLifetime, IDisposable
         var eventId = created.Str("id");
 
         Assert.Equal(201, created.Status);
-        Assert.False(created.Object.ContainsKey("case_id"));
+        Assert.False(created.Object.ContainsKey("caseId"));
         Assert.Equal([eventId], (await _world.Get("/v1/firm/events", Dana)).Object["events"]!.AsArray().Select(e => e!.AsObject().Str("id")));
         Assert.Equal("""{"events":[]}""", (await _world.Get("/v1/firm/events", Carol)).Body);
         Assert.Equal(404, (await _world.Get($"/v1/firm/events/{eventId}", Carol)).Status);
@@ -160,7 +160,7 @@ public sealed class EventRouteTests : IAsyncLifetime, IDisposable
         Assert.Equal("2026-03-02", body.Str("filedAt"));
         var rules = await GeneratedAsync(caseId);
         var schedules = rules["frbp-1007c1-schedules"];
-        Assert.Equal(("2026-03-16", "Fed. R. Bankr. P. 1007(c)(1)", $"[\"{Alice}\"]"), (schedules.Str("start"), schedules.Str("rule_citation"), schedules["attendees"]!.ToJsonString()));
+        Assert.Equal(("2026-03-16", "Fed. R. Bankr. P. 1007(c)(1)", $"[\"{Alice}\"]"), (schedules.Str("start"), schedules.Str("ruleCitation"), schedules["attendees"]!.ToJsonString()));
         Assert.Contains("frbp-2003a1a-341-window", rules.Keys);
         Assert.DoesNotContain("frbp-4004a-discharge-objection", rules.Keys);
     }
@@ -347,7 +347,7 @@ public sealed class EventRouteTests : IAsyncLifetime, IDisposable
         (await _world.Get($"/v1/cases/{caseId}/events")).Object["events"]!.AsArray()
             .Select(e => e!.AsObject())
             .Where(e => e["generated"]!.GetValue<bool>())
-            .ToDictionary(e => e.Str("rule_id")!, StringComparer.Ordinal);
+            .ToDictionary(e => e.Str("ruleId")!, StringComparer.Ordinal);
 
     private Task<Answer> Add(string caseId, string body = Hearing, string subject = Alice) =>
         _world.Post($"/v1/cases/{caseId}/events", body, subject);
@@ -366,7 +366,7 @@ public sealed class CalendarRulesTests
     [Fact]
     public void A_title_and_a_start_are_required()
     {
-        var error = Assert.Throws<Insolvia.Domain.FieldValidationException>(() => CalendarRules.Parse(new System.Text.Json.Nodes.JsonObject()));
+        var error = Assert.Throws<Insolvia.Domain.FieldValidationException>(() => Parse("{}"));
 
         Assert.Equal(["start", "title"], error.Fields.Keys.Order(StringComparer.Ordinal));
     }
@@ -374,26 +374,26 @@ public sealed class CalendarRulesTests
     [Fact]
     public void A_bare_date_start_means_all_day_and_end_defaults_to_start()
     {
-        var draft = Parse("""{"title": "Hearing", "start": "2026-03-02"}""");
+        var (start, end, allDay) = Parse("""{"title": "Hearing", "start": "2026-03-02"}""").Span();
 
-        Assert.Equal((true, "2026-03-02", "2026-03-02"), (draft.AllDay, draft.Start, draft.End));
+        Assert.Equal((true, "2026-03-02", "2026-03-02"), (allDay, start, end));
     }
 
     [Fact]
     public void A_timed_event_is_normalised_to_utc_truncated_to_the_second_and_ends_an_hour_later()
     {
-        var draft = Parse("""{"title": "Call", "start": "2026-03-02T10:00:00.750-05:00"}""");
+        var (start, end, allDay) = Parse("""{"title": "Call", "start": "2026-03-02T10:00:00.750-05:00"}""").Span();
 
-        Assert.Equal((false, "2026-03-02T15:00:00Z", "2026-03-02T16:00:00Z"), (draft.AllDay, draft.Start, draft.End));
+        Assert.Equal((false, "2026-03-02T15:00:00Z", "2026-03-02T16:00:00Z"), (allDay, start, end));
     }
 
     [Theory]
-    [InlineData("""{"title": "Call", "start": "2026-03-02T15:00:00", "all_day": false}""", "start")]
-    [InlineData("""{"title": "Call", "start": "next tuesday", "all_day": false}""", "start")]
+    [InlineData("""{"title": "Call", "start": "2026-03-02T15:00:00", "allDay": false}""", "start")]
+    [InlineData("""{"title": "Call", "start": "next tuesday", "allDay": false}""", "start")]
     [InlineData("""{"title": "Call", "start": "2026-03-02", "end": "2026-03-01"}""", "end")]
     [InlineData("""{"title": "Long", "start": "2026-01-01", "end": "2026-03-05"}""", "end")]
     [InlineData("""{"title": "Long", "start": "2026-01-01T00:00:00Z", "end": "2026-03-05T00:00:00Z"}""", "end")]
-    [InlineData("""{"title": "x", "start": "2026-01-01", "all_day": "yes"}""", "all_day")]
+    [InlineData("""{"title": "x", "start": "2026-01-01", "allDay": "yes"}""", "allDay")]
     [InlineData("""{"title": "x", "start": "2026-01-01", "attendees": ["not-a-subject"]}""", "attendees[0]")]
     [InlineData("""{"title": "x", "start": "2026-01-01", "attendees": ["00000000-0000-4000-8000-00000000a11c", "00000000-0000-4000-8000-00000000a11c"]}""", "attendees[1]")]
     [InlineData("""{"title": "x", "start": "2026-01-01", "attendees": "00000000-0000-4000-8000-00000000a11c"}""", "attendees")]
@@ -407,7 +407,7 @@ public sealed class CalendarRulesTests
     [Fact]
     public void A_span_of_exactly_the_cap_is_allowed()
     {
-        Assert.Equal("2026-03-04", Parse("""{"title": "Long", "start": "2026-01-01", "end": "2026-03-04"}""").End);
+        Assert.Equal("2026-03-04", Parse("""{"title": "Long", "start": "2026-01-01", "end": "2026-03-04"}""").Span().End);
     }
 
     [Theory]
@@ -415,9 +415,9 @@ public sealed class CalendarRulesTests
     [InlineData("""{"dismissed": false}""", false)]
     public void A_dismissal_body_is_the_one_flag_alone(string body, bool expected)
     {
-        Assert.Equal(expected, CalendarRules.ParseDismissal(System.Text.Json.Nodes.JsonNode.Parse(body)!.AsObject()));
-        Assert.Throws<Insolvia.Domain.FieldValidationException>(() => CalendarRules.ParseDismissal(System.Text.Json.Nodes.JsonNode.Parse("""{"dismissed": true, "title": "x"}""")!.AsObject()));
-        Assert.Throws<Insolvia.Domain.FieldValidationException>(() => CalendarRules.ParseDismissal(System.Text.Json.Nodes.JsonNode.Parse("""{"dismissed": "yes"}""")!.AsObject()));
+        Assert.Equal(expected, Read<EventDismissal>(body).Dismissed);
+        Assert.Throws<Insolvia.Domain.FieldValidationException>(() => Read<EventDismissal>("""{"dismissed": true, "title": "x"}"""));
+        Assert.Throws<Insolvia.Domain.FieldValidationException>(() => Read<EventDismissal>("""{"dismissed": "yes"}"""));
     }
 
     [Fact]
@@ -516,5 +516,7 @@ public sealed class CalendarRulesTests
     private static IReadOnlyList<Insolvia.Domain.Engines.Deadlines.GeneratedDeadline> Generate(Insolvia.Domain.Cases.Case target) =>
         Insolvia.Domain.Engines.Deadlines.DeadlineEngine.Generate(target, Insolvia.Domain.Engines.Deadlines.DeadlineRules.Resolve(target.FiledAt!.Value), Insolvia.Domain.Engines.Deadlines.LegalHolidays.Resolve(target.FiledAt!.Value));
 
-    private static EventDraft Parse(string body) => CalendarRules.Parse(System.Text.Json.Nodes.JsonNode.Parse(body)!.AsObject());
+    private static EventRequest Parse(string body) => Read<EventRequest>(body);
+
+    private static T Read<T>(string body) => (T)Insolvia.Domain.CaseEntities.BodyJson.Read(System.Text.Json.Nodes.JsonNode.Parse(body), typeof(T));
 }

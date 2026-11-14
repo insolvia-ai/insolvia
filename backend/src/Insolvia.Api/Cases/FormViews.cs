@@ -1,4 +1,7 @@
+using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
+using Insolvia.Domain;
 using Insolvia.Domain.Forms;
 
 namespace Insolvia.Api.Cases;
@@ -56,13 +59,55 @@ public sealed record OutputOptionsView(
 /// <param name="SignElectronically"><c>/s/ Name</c> on every debtor signature line.</param>
 /// <param name="AmendedOnly">Only the forms and records marked amended.</param>
 /// <param name="Forms">Only these forms, by short key (<c>b101</c>).</param>
-public sealed record OutputOptionsRequest(
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? DraftWatermark,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? PrintDate,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? SignaturePages,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? SignElectronically,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? AmendedOnly,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<string>? Forms);
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed partial record OutputOptionsRequest(
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? DraftWatermark = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? PrintDate = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull), AllowedValues(null, "all", "only", "omit", ErrorMessage = "must be one of all, only, omit.")] string? SignaturePages = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? SignElectronically = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? AmendedOnly = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<string>? Forms = null)
+    : IValidatableObject
+{
+    /// <summary>The options, unsent ones at their defaults.</summary>
+    /// <returns>The options.</returns>
+    public OutputOptions ToOptions() => new()
+    {
+        DraftWatermark = DraftWatermark ?? false,
+        PrintDate = PrintDate ?? false,
+        SignaturePages = SignaturePages switch { "only" => SignaturePagesMode.Only, "omit" => SignaturePagesMode.Omit, _ => SignaturePagesMode.All },
+        SignElectronically = SignElectronically ?? false,
+        AmendedOnly = AmendedOnly ?? false,
+        Forms = Forms?.ToValueCollection(),
+    };
+
+    /// <summary>A forms subset is distinct short keys, and never beside <c>amendedOnly</c>.</summary>
+    /// <param name="validationContext">Unused.</param>
+    /// <returns>The failures.</returns>
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        if (Forms is null)
+        {
+            yield break;
+        }
+
+        if (Forms.Count == 0 || Forms.Any(form => form is null || !FormKey().IsMatch(form)))
+        {
+            yield return new ValidationResult("must be a non-empty list of lower-case form keys (e.g. \"b101\").", [nameof(Forms)]);
+        }
+        else if (Forms.Distinct(StringComparer.Ordinal).Count() != Forms.Count)
+        {
+            yield return new ValidationResult("names the same form more than once.", [nameof(Forms)]);
+        }
+        else if (AmendedOnly == true)
+        {
+            yield return new ValidationResult("cannot be combined with an explicit forms subset.", [nameof(AmendedOnly)]);
+        }
+    }
+
+    [GeneratedRegex("^[a-z0-9]+$")]
+    private static partial Regex FormKey();
+}
 
 /// <summary>One form the case files, with its status.</summary>
 /// <param name="Series">The form series, e.g. <c>form/b101</c>.</param>

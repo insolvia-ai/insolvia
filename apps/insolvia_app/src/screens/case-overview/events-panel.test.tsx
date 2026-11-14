@@ -54,36 +54,36 @@ function me(events: string) {
 
 const DEADLINE = {
   id: DEADLINE_ID,
-  case_id: CASE_ID,
+  caseId: CASE_ID,
   title: 'Schedules, statements and other documents due',
   description: 'Rule 1007(c)(1): …',
   start: '2026-03-16',
   end: '2026-03-16',
-  all_day: true,
+  allDay: true,
   attendees: [ALICE],
   generated: true,
-  rule_id: 'frbp-1007c1-schedules',
-  rule_citation: 'Fed. R. Bankr. P. 1007(c)(1)',
+  ruleId: 'frbp-1007c1-schedules',
+  ruleCitation: 'Fed. R. Bankr. P. 1007(c)(1)',
   dismissed: false,
-  created_by: ALICE,
-  created_at: '2026-03-02T10:00:00.000000Z',
-  updated_at: '2026-03-02T10:00:00.000000Z',
+  createdBy: ALICE,
+  createdAt: '2026-03-02T10:00:00.000000Z',
+  updatedAt: '2026-03-02T10:00:00.000000Z',
 };
 
 const HEARING = {
   id: HEARING_ID,
-  case_id: CASE_ID,
+  caseId: CASE_ID,
   title: 'Hearing on the motion',
   start: '2026-04-02',
   end: '2026-04-02',
-  all_day: true,
+  allDay: true,
   location: 'Courtroom 4',
   attendees: [],
   generated: false,
   dismissed: false,
-  created_by: ALICE,
-  created_at: '2026-03-02T10:00:00.000000Z',
-  updated_at: '2026-03-02T10:00:00.000000Z',
+  createdBy: ALICE,
+  createdAt: '2026-03-02T10:00:00.000000Z',
+  updatedAt: '2026-03-02T10:00:00.000000Z',
 };
 
 /** One stubbed route: method, URL fragment, answer. */
@@ -277,7 +277,7 @@ describe('the events panel', () => {
     const post = fetchMock.mock.calls.find(isAdd);
     expect(JSON.parse(String(post?.[1]?.body))).toMatchObject({
       title: 'Hearing on the motion',
-      all_day: true,
+      allDay: true,
     });
   });
 });

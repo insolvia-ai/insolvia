@@ -160,56 +160,6 @@ public static class JobRules
     });
 
     /// <summary>
-    /// Validate POST /v1/cases/{id}/jobs; unknown keys are ignored. <c>kind</c>
-    /// always; <c>documentId</c> exactly when the kind is document-scoped;
-    /// <c>options</c> (an object, structurally — its fields are the route's
-    /// business) exactly when the kind is options-scoped.
-    /// </summary>
-    public static (string Kind, string? DocumentId, JsonObject? Options) ParseAcceptance(JsonObject payload)
-    {
-        ArgumentNullException.ThrowIfNull(payload);
-        var kind = Json.AsString(payload["kind"]);
-        if (kind is null || !Kinds.Contains(kind, StringComparer.Ordinal))
-        {
-            throw Field("kind", "Kind must be one of " + string.Join(", ", Kinds) + ".");
-        }
-
-        string? documentId = null;
-        var hasDocument = payload.TryGetPropertyValue("documentId", out var rawDocument) && rawDocument is not null;
-        if (DocumentScopedKinds.Contains(kind))
-        {
-            var text = Json.AsString(rawDocument);
-            if (text is null || TextRules.Strip(text).Length == 0)
-            {
-                throw Field("documentId", "This kind works on one document; name it.");
-            }
-
-            documentId = TextRules.Strip(text);
-        }
-        else if (hasDocument)
-        {
-            throw Field("documentId", "This kind does not take a documentId.");
-        }
-
-        JsonObject? options = null;
-        var hasOptions = payload.TryGetPropertyValue("options", out var rawOptions) && rawOptions is not null;
-        if (OptionsScopedKinds.Contains(kind))
-        {
-            if (hasOptions)
-            {
-                options = rawOptions as JsonObject ?? throw Field("options", "options must be a JSON object.");
-                options = (JsonObject)options.DeepClone();
-            }
-        }
-        else if (hasOptions)
-        {
-            throw Field("options", "This kind does not take options.");
-        }
-
-        return (kind, documentId, options);
-    }
-
-    /// <summary>
     /// A freshly accepted job. The scoping fields come from the route — the
     /// document only after it was resolved against the case, the options only
     /// after they were validated and canonicalised — never the request body.
@@ -387,7 +337,4 @@ public static class JobRules
 
         return ParseMessage(node);
     }
-
-    private static FieldValidationException Field(string field, string message) =>
-        new(new Dictionary<string, string>(StringComparer.Ordinal) { [field] = message });
 }

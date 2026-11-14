@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using Insolvia.Domain.Candidates;
@@ -157,10 +158,31 @@ public sealed record CandidateReview(
 
 /// <summary>
 /// One review decision (<c>POST …/candidates/{candidateId}/review</c>).
-/// Parsed by <c>ExtractionReview.ParseReview</c>, which owns validation.
 /// </summary>
 /// <param name="Action"><c>accept</c> or <c>reject</c>.</param>
-/// <param name="CorrectedPayload">On accept only, the corrected record body to write instead of the proposal.</param>
+/// <param name="CorrectedPayload">
+/// On accept only, the corrected record body to write instead of the proposal.
+/// Its type is the candidate's collection's, so it is read as that body when the candidate is.
+/// </param>
 public sealed record CandidateReviewRequest(
-    string Action,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] JsonObject? CorrectedPayload);
+    [property: Required(ErrorMessage = CandidateReviewRequest.ActionMessage), AllowedValues("accept", "reject", ErrorMessage = CandidateReviewRequest.ActionMessage)] string? Action,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] JsonObject? CorrectedPayload = null)
+    : IValidatableObject
+{
+    private const string ActionMessage = "Action must be one of accept, reject.";
+
+    /// <summary>Whether the candidate is accepted.</summary>
+    [JsonIgnore]
+    public bool Accept => Action == "accept";
+
+    /// <summary>Corrections ride on an accept.</summary>
+    /// <param name="validationContext">Unused.</param>
+    /// <returns>The failures.</returns>
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        if (CorrectedPayload is not null && !Accept)
+        {
+            yield return new ValidationResult("Corrections ride on an accept.", [nameof(CorrectedPayload)]);
+        }
+    }
+}

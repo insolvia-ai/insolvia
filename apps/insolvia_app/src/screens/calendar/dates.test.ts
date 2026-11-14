@@ -19,13 +19,13 @@ function event(over: Partial<CalendarEvent>): CalendarEvent {
     title: 'x',
     start: '2026-03-02',
     end: '2026-03-02',
-    all_day: true,
+    allDay: true,
     attendees: [],
     generated: false,
     dismissed: false,
-    created_by: 's',
-    created_at: '2026-01-01T00:00:00Z',
-    updated_at: '2026-01-01T00:00:00Z',
+    createdBy: 's',
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
     ...over,
   };
 }
@@ -93,7 +93,7 @@ describe('the calendar’s date arithmetic', () => {
     const span = event({ id: 'span', start: '2026-03-02', end: '2026-03-04' });
     const timed = event({
       id: 'timed',
-      all_day: false,
+      allDay: false,
       start: '2026-03-03T15:00:00Z',
       end: '2026-03-03T16:00:00Z',
     });

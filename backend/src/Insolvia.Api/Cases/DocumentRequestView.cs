@@ -1,7 +1,8 @@
-using System.Text.Json.Serialization;
+using System.ComponentModel.DataAnnotations;
 using Insolvia.Domain.Cases;
 using Insolvia.Domain.DocumentRequests;
 using Insolvia.Domain.Documents;
+using Insolvia.Domain.Fields;
 
 namespace Insolvia.Api.Cases;
 
@@ -46,6 +47,20 @@ public sealed record DocumentRequestView(
             CaseRules.Iso(request.UpdatedAt),
             request.ReceivedAt is { } received ? CaseRules.Iso(received) : null);
     }
+}
+
+/// <summary>The body of a new document request: a checklist entry.</summary>
+/// <param name="Title">What is asked for.</param>
+/// <param name="Kind">The kind an upload against it is filed under.</param>
+/// <param name="Description">What the client reads under the title.</param>
+public sealed record DocumentRequestCreation(
+    [property: Required(ErrorMessage = "A title is required."), Text(DocumentChecklists.MaxTitle)] string? Title,
+    [property: Required] DocumentKind? Kind,
+    [property: Narrative(DocumentChecklists.MaxDescription)] string? Description = null)
+{
+    /// <summary>The entry this body asks for.</summary>
+    /// <returns>The checklist item.</returns>
+    public ChecklistItem ToItem() => new(Title!, Kind!.Value, Description);
 }
 
 /// <summary>A case's document requests and its progress, read from the same list so they agree.</summary>
@@ -97,24 +112,23 @@ public sealed record PortalRequestView(
 }
 
 /// <summary>
-/// One ad-hoc document request (<c>POST …/document-requests</c>). Parsed by
-/// <c>DocumentRequestRules.ParseCreation</c>, which owns validation; this
-/// record is its shape for the OpenAPI document.
-/// </summary>
-/// <param name="Title">What is asked for, one line.</param>
-/// <param name="Kind">The kind an upload against it is filed under.</param>
-/// <param name="Description">What the client reads under the title; absent when none.</param>
-public sealed record DocumentRequestCreation(
-    string Title,
-    DocumentKind Kind,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Description);
-
-/// <summary>
 /// A document request's new status (<c>PATCH …/document-requests/{requestId}</c>).
 /// Only <c>requested</c> and <c>waived</c> may be set; <c>received</c> follows an upload.
 /// </summary>
 /// <param name="Status">The status to set.</param>
-public sealed record DocumentRequestStatusChange(DocumentRequestStatus Status);
+public sealed record DocumentRequestStatusChange([property: Required(ErrorMessage = "A status is required.")] DocumentRequestStatus? Status) : IValidatableObject
+{
+    /// <summary>Received is the upload's to say.</summary>
+    /// <param name="validationContext">Unused.</param>
+    /// <returns>The failures.</returns>
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        if (Status == DocumentRequestStatus.Received)
+        {
+            yield return new ValidationResult("A request is received when a document is uploaded against it, not by setting it.", [nameof(Status)]);
+        }
+    }
+}
 
 /// <summary>The document requests a client's firm made of them, and the case's progress.</summary>
 /// <param name="Requests">The requests, oldest first, each with the client's own uploads against it.</param>

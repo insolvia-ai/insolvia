@@ -301,15 +301,6 @@ public sealed class DocumentChecklistTests
     }
 
     [Fact]
-    public void A_request_is_parsed_like_a_checklist_entry()
-    {
-        var errors = new Dictionary<string, string>();
-        Assert.Equal(new ChecklistItem("Lease", DocumentKind.Other), DocumentChecklists.ParseItem(Body.Of("""{"title": "Lease", "kind": "other"}"""), "request", errors));
-        Assert.Null(DocumentChecklists.ParseItem(Body.Of("""{"kind": "nope"}"""), "request", errors));
-        Assert.Equal(["request.kind", "request.title"], errors.Keys.Order(StringComparer.Ordinal));
-    }
-
-    [Fact]
     public void Every_document_kind_keeps_its_python_wire_value() =>
         Assert.Equal(["credit_report", "pay_stub", "bank_statement", "tax_return", "identification", "court_notice", "other"], Wire.Names<DocumentKind>());
 }

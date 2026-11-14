@@ -164,7 +164,7 @@ export function EventsPanel({ colleagues }: { colleagues: readonly FirmColleague
 
   const when = (event: CalendarEvent): string => {
     const time = formatTime(event);
-    if (event.all_day) {
+    if (event.allDay) {
       return event.start === event.end
         ? formatLong(event.start)
         : `${formatLong(event.start)} – ${formatLong(event.end)}`;
@@ -273,7 +273,7 @@ export function EventsPanel({ colleagues }: { colleagues: readonly FirmColleague
                       {event.title}
                     </Text>
                     <Text style={[styles.rowMeta, muted]}>
-                      {[when(event), event.rule_citation, event.location]
+                      {[when(event), event.ruleCitation, event.location]
                         .filter((part): part is string => part !== undefined)
                         .join(' · ')}
                       {event.dismissed ? ' · dismissed' : ''}

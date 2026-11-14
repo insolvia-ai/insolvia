@@ -1,4 +1,3 @@
-using System.Text.Json.Nodes;
 using Insolvia.Api.Auth;
 using Insolvia.Api.Cases;
 using Insolvia.Api.Hosting;
@@ -10,6 +9,7 @@ using Insolvia.Domain.Firms;
 using Insolvia.Domain.Jobs;
 using Insolvia.Domain.Ports;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Mvc;
 
 namespace Insolvia.Api.Routes;
 
@@ -37,7 +37,7 @@ public sealed class DocumentRoutes : IEndpointModule
     public void Map(IEndpointRouteBuilder routes)
     {
         ArgumentNullException.ThrowIfNull(routes);
-        routes.MapPost("/v1/cases/{caseId}/documents", CreateAsync).RequestBody<DocumentUploadRequest>().RequireAuth().Requires(Feature.Documents, PermissionLevel.AddEdit);
+        routes.MapPost("/v1/cases/{caseId}/documents", CreateAsync).WithMetadata(new RequestSizeLimitAttribute(MaxRequestBytes)).RequireAuth().Requires(Feature.Documents, PermissionLevel.AddEdit);
         routes.MapPost("/v1/cases/{caseId}/documents/{documentId}/complete", CompleteAsync).RequireAuth().Requires(Feature.Documents, PermissionLevel.AddEdit);
         routes.MapGet("/v1/cases/{caseId}/documents", ListAsync).RequireAuth().Requires(Feature.Documents, PermissionLevel.ViewOnly);
         routes.MapGet("/v1/cases/{caseId}/documents/{documentId}/url", UrlAsync).RequireAuth().Requires(Feature.Documents, PermissionLevel.ViewOnly);
@@ -136,19 +136,17 @@ public sealed class DocumentRoutes : IEndpointModule
     /// 15 minutes. Call <c>…/complete</c> once the bytes have landed. With a
     /// <c>requestId</c>, the request must be this case's and still want documents.
     /// </remarks>
-    internal static async Task<Created<DocumentUploadTicket>> CreateAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
+    internal static async Task<Created<DocumentUploadTicket>> CreateAsync(HttpContext context, string caseId, DocumentUploadRequest request, CancellationToken cancellationToken)
     {
         var accessor = await context.CurrentAccessorAsync();
-        var body = await context.BodyAsync(MaxRequestBytes);
-        var draft = DocumentRules.ParseUpload(body);
-        var requestId = ParseRequestId(body);
+        var requestId = request.RequestId;
         await context.ReachableCaseAsync(caseId, AccessAction.DocumentCreate, cancellationToken);
         if (requestId is not null)
         {
             await OpenRequestOr400Async(context, caseId, requestId, cancellationToken);
         }
 
-        var document = DocumentRules.Create(draft, caseId, accessor.Subject, requestId: requestId, clock: context.Clock());
+        var document = DocumentRules.Create(request.Draft(), caseId, accessor.Subject, requestId: requestId, clock: context.Clock());
         await context.Port<IDocumentStore>().CreateAsync(document, cancellationToken);
         var upload = await UploadAsync(context, document, cancellationToken);
         context.Log(Logger, "document created", ("case_id", caseId), ("document_id", document.Id), ("kind", document.Kind.ToWire()));
@@ -219,18 +217,6 @@ public sealed class DocumentRoutes : IEndpointModule
 
     private static async Task<Document> DocumentOr404Async(HttpContext context, string caseId, string documentId, CancellationToken cancellationToken) =>
         await context.Port<IDocumentStore>().GetAsync(caseId, documentId, cancellationToken) ?? throw new NotFoundException(DocumentNotFound);
-
-    private static string? ParseRequestId(JsonObject body)
-    {
-        if (!body.TryGetPropertyValue("requestId", out var value) || value is null)
-        {
-            return null;
-        }
-
-        return Json.AsString(value) is { Length: > 0 } id
-            ? id
-            : throw new FieldValidationException(new Dictionary<string, string> { ["requestId"] = "Must be a document request id." });
-    }
 }
 
 /// <summary>
@@ -250,9 +236,10 @@ public sealed class DocumentRequestRoutes : IEndpointModule
     {
         ArgumentNullException.ThrowIfNull(routes);
         routes.MapGet("/v1/cases/{caseId}/document-requests", ListAsync).RequireAuth().Requires(Feature.Documents, PermissionLevel.ViewOnly);
-        routes.MapPost("/v1/cases/{caseId}/document-requests", CreateAsync).RequestBody<DocumentRequestCreation>().RequireAuth().Requires(Feature.Documents, PermissionLevel.AddEdit);
+        var sizeLimit = new RequestSizeLimitAttribute(MaxRequestBytes);
+        routes.MapPost("/v1/cases/{caseId}/document-requests", CreateAsync).WithMetadata(sizeLimit).RequireAuth().Requires(Feature.Documents, PermissionLevel.AddEdit);
         routes.MapPost("/v1/cases/{caseId}/document-requests/from-checklist", ApplyChecklistAsync).RequireAuth().Requires(Feature.Documents, PermissionLevel.AddEdit);
-        routes.MapPatch("/v1/cases/{caseId}/document-requests/{requestId}", UpdateAsync).RequestBody<DocumentRequestStatusChange>().RequireAuth().Requires(Feature.Documents, PermissionLevel.AddEdit);
+        routes.MapPatch("/v1/cases/{caseId}/document-requests/{requestId}", UpdateAsync).WithMetadata(sizeLimit).RequireAuth().Requires(Feature.Documents, PermissionLevel.AddEdit);
         routes.MapDelete("/v1/cases/{caseId}/document-requests/{requestId}", DeleteAsync).RequireAuth().Requires(Feature.Documents, PermissionLevel.AddEdit);
     }
 
@@ -265,12 +252,11 @@ public sealed class DocumentRequestRoutes : IEndpointModule
     }
 
     /// <summary>Ask the client for one document.</summary>
-    internal static async Task<Created<DocumentRequestView>> CreateAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
+    internal static async Task<Created<DocumentRequestView>> CreateAsync(HttpContext context, string caseId, DocumentRequestCreation request, CancellationToken cancellationToken)
     {
         var accessor = await context.CurrentAccessorAsync();
-        var item = DocumentRequestRules.ParseCreation(await context.BodyAsync(MaxRequestBytes));
         await context.ReachableCaseAsync(caseId, AccessAction.CaseUpdate, cancellationToken);
-        var made = DocumentRequestRules.Create(item, caseId, accessor.Subject, context.Clock());
+        var made = DocumentRequestRules.Create(request.ToItem(), caseId, accessor.Subject, context.Clock());
         await context.Port<IDocumentRequestStore>().CreateAsync(made, cancellationToken);
         context.Log(Logger, "document request created", ("case_id", caseId), ("id", made.Id));
         return TypedResults.Created((string?)null, DocumentRequestView.Of(made));
@@ -297,10 +283,10 @@ public sealed class DocumentRequestRoutes : IEndpointModule
 
     /// <summary>Set a document request's status.</summary>
     /// <remarks>Reopen it (<c>requested</c>) or waive it (<c>waived</c>); <c>received</c> follows an upload.</remarks>
-    internal static async Task<DocumentRequestView> UpdateAsync(HttpContext context, string caseId, string requestId, CancellationToken cancellationToken)
+    internal static async Task<DocumentRequestView> UpdateAsync(HttpContext context, string caseId, string requestId, DocumentRequestStatusChange change, CancellationToken cancellationToken)
     {
         var store = context.Port<IDocumentRequestStore>();
-        var status = DocumentRequestRules.ParseUpdate(await context.BodyAsync(MaxRequestBytes));
+        var status = change.Status!.Value;
         await context.ReachableCaseAsync(caseId, AccessAction.CaseUpdate, cancellationToken);
         var stored = await store.GetAsync(caseId, requestId, cancellationToken) ?? throw new NotFoundException(RequestNotFound);
         var written = await store.UpdateAsync(DocumentRequestRules.SetStatus(stored, status, context.Clock()), cancellationToken) ?? throw new NotFoundException(RequestNotFound);

@@ -160,7 +160,7 @@ export function localDayOf(instant: string): string {
 
 /** The first and last day an event touches, as the reader sees them. */
 export function eventSpan(event: CalendarEvent): { first: string; last: string } {
-  if (event.all_day) return { first: event.start, last: event.end };
+  if (event.allDay) return { first: event.start, last: event.end };
   return { first: localDayOf(event.start), last: localDayOf(event.end) };
 }
 
@@ -174,7 +174,7 @@ export function eventsOn(events: readonly CalendarEvent[], day: string): readonl
   return events
     .filter((event) => eventTouches(event, day))
     .sort((a, b) => {
-      if (a.all_day !== b.all_day) return a.all_day ? -1 : 1;
+      if (a.allDay !== b.allDay) return a.allDay ? -1 : 1;
       return a.start < b.start ? -1 : a.start > b.start ? 1 : 0;
     });
 }
@@ -216,7 +216,7 @@ export function formatMonth(date: string): string {
 
 /** A timed event's local clock time, "3:00 PM"; nothing for an all-day one. */
 export function formatTime(event: CalendarEvent): string | null {
-  if (event.all_day) return null;
+  if (event.allDay) return null;
   const parsed = new Date(event.start);
   if (Number.isNaN(parsed.getTime())) return null;
   return new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' }).format(parsed);

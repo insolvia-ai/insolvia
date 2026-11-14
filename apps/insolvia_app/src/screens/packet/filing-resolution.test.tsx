@@ -196,7 +196,7 @@ describe('resolving a handed-back filing', () => {
     expect(post?.[0]).toContain(`/v1/cases/${CASE_ID}/filings/f1/resolution`);
     expect(JSON.parse(post?.[1]?.body as string)).toEqual({
       outcome: 'not_filed',
-      docket_checked: true,
+      docketChecked: true,
     });
     // Freed: the approval is offered again (behind a fresh sign-in).
     expect(screen.getByRole('button', { name: 'Sign in again to approve' })).toBeTruthy();

@@ -5,7 +5,7 @@ using Insolvia.Domain.Events;
 namespace Insolvia.Api.Cases;
 
 /// <summary>
-/// A calendar event, a case's or the firm's own. <c>all_day</c> decides how
+/// A calendar event, a case's or the firm's own. <c>allDay</c> decides how
 /// <c>start</c> and <c>end</c> read.
 /// </summary>
 /// <param name="Id">The event's id.</param>
@@ -23,8 +23,7 @@ namespace Insolvia.Api.Cases;
 /// <param name="Description">Free text; absent when none.</param>
 /// <param name="Location">Where; absent when none.</param>
 /// <param name="RuleId">The deadline rule that generated it; absent for a hand-made event.</param>
-/// <param name="RuleCitation">The rule's citation, with <c>rule_id</c>.</param>
-[SnakeCase]
+/// <param name="RuleCitation">The rule's citation, with <c>ruleId</c>.</param>
 public sealed record EventView(
     string Id,
     string Title,
@@ -83,30 +82,3 @@ public sealed record CalendarWindow(string From, string To, IReadOnlyList<EventV
 /// <param name="Token">The token, for <c>?token=</c>.</param>
 /// <param name="FeedPath">The feed's path with the token in place, for a calendar client to subscribe to.</param>
 public sealed record CalendarFeedToken(string Token, string FeedPath);
-
-/// <summary>
-/// An event as written (<c>POST</c> or <c>PUT</c> on <c>…/events</c>), whole.
-/// Parsed by <c>CalendarRules.Parse</c>, which owns validation; this record
-/// is its shape for the OpenAPI document.
-/// </summary>
-/// <param name="Title">The title — required.</param>
-/// <param name="Start">All-day: <c>YYYY-MM-DD</c>. Otherwise an RFC 3339 instant.</param>
-/// <param name="End">As <c>start</c>; absent means the start day (all-day) or an hour after the start.</param>
-/// <param name="AllDay">Whether the span is whole days; absent means "a bare date in <c>start</c> is all-day".</param>
-/// <param name="Description">Free text.</param>
-/// <param name="Location">Where.</param>
-/// <param name="Attendees">Firm users, by subject; each must be a member of the caller's firm.</param>
-[SnakeCase]
-public sealed record EventRequest(
-    string Title,
-    string Start,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? End,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? AllDay,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Description,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Location,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<string>? Attendees);
-
-/// <summary>Dismiss or restore an event (<c>PATCH …/events/{eventId}</c>); the member must be alone.</summary>
-/// <param name="Dismissed">Whether it is dismissed.</param>
-[SnakeCase]
-public sealed record EventDismissal(bool Dismissed);

@@ -9,6 +9,7 @@ using Insolvia.Domain.Debtors;
 using Insolvia.Domain.Expenses;
 using Insolvia.Domain.Firms;
 using Insolvia.Domain.Ports;
+using Microsoft.AspNetCore.Mvc;
 
 namespace Insolvia.Api.Routes;
 
@@ -33,7 +34,7 @@ public sealed class ExtractionReviewRoutes : IEndpointModule
         ArgumentNullException.ThrowIfNull(routes);
         routes.MapGet("/v1/cases/{caseId}/extraction/candidates", ListAsync).RequireAuth().Requires(Feature.ExtractionReview, PermissionLevel.ViewOnly)
             .QueryParameter("status", "Only the candidates in this review status.");
-        routes.MapPost("/v1/cases/{caseId}/extraction/candidates/{candidateId}/review", ReviewAsync).RequestBody<CandidateReviewRequest>().RequireAuth().Requires(Feature.ExtractionReview, PermissionLevel.AddEdit);
+        routes.MapPost("/v1/cases/{caseId}/extraction/candidates/{candidateId}/review", ReviewAsync).WithMetadata(new RequestSizeLimitAttribute(MaxRequestBytes)).RequireAuth().Requires(Feature.ExtractionReview, PermissionLevel.AddEdit);
     }
 
     /// <summary>A case's review queue, creation order, every stream.</summary>
@@ -58,11 +59,10 @@ public sealed class ExtractionReviewRoutes : IEndpointModule
     /// the candidate alone; an acceptance also the record it wrote — a case
     /// record, or for a client's answer about a debtor, that debtor.
     /// </remarks>
-    internal static async Task<CandidateReview> ReviewAsync(HttpContext context, string caseId, string candidateId, CancellationToken cancellationToken)
+    internal static async Task<CandidateReview> ReviewAsync(HttpContext context, string caseId, string candidateId, CandidateReviewRequest decision, CancellationToken cancellationToken)
     {
         var candidates = context.Port<ICandidateStore>();
         var accessor = await context.CurrentAccessorAsync();
-        var decision = ExtractionReview.ParseReview(await context.BodyAsync(MaxRequestBytes));
         await context.ReachableCaseAsync(caseId, AccessAction.ExtractionReview, cancellationToken);
 
         var candidate = await candidates.GetAsync(caseId, candidateId, cancellationToken) ?? throw new NotFoundException("candidate not found");

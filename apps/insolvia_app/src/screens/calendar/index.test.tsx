@@ -58,19 +58,19 @@ function thisMonth(day: string): string {
 
 const DEADLINE = {
   id: '00000000-0000-4000-8000-00000000d0d0',
-  case_id: CASE_ID,
+  caseId: CASE_ID,
   title: 'Proofs of claim due (non-governmental creditors)',
   start: thisMonth('16'),
   end: thisMonth('16'),
-  all_day: true,
+  allDay: true,
   attendees: [ALICE],
   generated: true,
-  rule_id: 'frbp-3002c-proof-of-claim',
-  rule_citation: 'Fed. R. Bankr. P. 3002(c)',
+  ruleId: 'frbp-3002c-proof-of-claim',
+  ruleCitation: 'Fed. R. Bankr. P. 3002(c)',
   dismissed: false,
-  created_by: ALICE,
-  created_at: '2026-03-02T10:00:00.000000Z',
-  updated_at: '2026-03-02T10:00:00.000000Z',
+  createdBy: ALICE,
+  createdAt: '2026-03-02T10:00:00.000000Z',
+  updatedAt: '2026-03-02T10:00:00.000000Z',
 };
 
 const OFFICE = {
@@ -78,13 +78,13 @@ const OFFICE = {
   title: 'Office closed',
   start: thisMonth('20'),
   end: thisMonth('20'),
-  all_day: true,
+  allDay: true,
   attendees: [],
   generated: false,
   dismissed: false,
-  created_by: ALICE,
-  created_at: '2026-03-02T10:00:00.000000Z',
-  updated_at: '2026-03-02T10:00:00.000000Z',
+  createdBy: ALICE,
+  createdAt: '2026-03-02T10:00:00.000000Z',
+  updatedAt: '2026-03-02T10:00:00.000000Z',
 };
 
 /**

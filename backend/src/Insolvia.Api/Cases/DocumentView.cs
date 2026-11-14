@@ -1,5 +1,7 @@
+using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 using Insolvia.Domain.Documents;
+using Insolvia.Domain.Fields;
 
 namespace Insolvia.Api.Cases;
 
@@ -101,20 +103,37 @@ public sealed record UploadHeaders(
     [property: JsonPropertyName("x-amz-tagging")] string Tagging);
 
 /// <summary>
-/// A new upload (<c>POST …/documents</c>). Parsed by <c>DocumentRules.ParseUpload</c>,
-/// which owns validation; this record is its shape for the OpenAPI document.
+/// A new upload (<c>POST …/documents</c>). Every check runs before an upload
+/// URL exists.
 /// </summary>
 /// <param name="Kind">What the document is.</param>
-/// <param name="FileName">The file name, at most 255 characters.</param>
+/// <param name="FileName">The file name, at most 255 characters, no path separators or invisible characters.</param>
 /// <param name="ContentType">The content type the upload will carry.</param>
 /// <param name="ByteSize">The size in bytes, at most 50 MB.</param>
 /// <param name="RequestId">The document request it answers, in this case and still open; absent when none.</param>
 public sealed record DocumentUploadRequest(
-    DocumentKind Kind,
-    string FileName,
-    DocumentContentType ContentType,
-    long ByteSize,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? RequestId);
+    [property: Required(ErrorMessage = "A kind is required.")] DocumentKind? Kind,
+    [property: Required(ErrorMessage = "A file name is required."), Text(DocumentRules.MaxFileName)] string? FileName,
+    [property: Required(ErrorMessage = "A content type is required.")] DocumentContentType? ContentType,
+    [property: Required(ErrorMessage = "A size in bytes is required."), Range(1, DocumentRules.MaxByteSize, ErrorMessage = "A document must be at least one byte and 50 MB or smaller.")] long? ByteSize,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull), MinLength(1, ErrorMessage = "Must be a document request id.")] string? RequestId = null)
+    : IValidatableObject
+{
+    /// <summary>The upload as the document rules take it.</summary>
+    /// <returns>The draft.</returns>
+    public DocumentDraft Draft() => new(Kind!.Value, FileName!, ContentType!.Value, ByteSize!.Value);
+
+    /// <summary>A file name, never a path.</summary>
+    /// <param name="validationContext">Unused.</param>
+    /// <returns>The failures.</returns>
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        if (DocumentRules.FileNameProblem(FileName!) is { } problem)
+        {
+            yield return new ValidationResult(problem, [nameof(FileName)]);
+        }
+    }
+}
 
 /// <summary>A client's new upload: the document, and where to PUT its bytes.</summary>
 /// <param name="Document">The document, as the client sees it.</param>

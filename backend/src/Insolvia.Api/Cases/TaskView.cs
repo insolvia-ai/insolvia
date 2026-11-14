@@ -60,38 +60,3 @@ public sealed record TaskView(
 /// <summary>Tasks, in the order the route states.</summary>
 /// <param name="Tasks">The tasks.</param>
 public sealed record TaskList(IReadOnlyList<TaskView> Tasks);
-
-/// <summary>
-/// A new task (<c>POST …/tasks</c>). Parsed by <c>CaseTaskRules.ParseCreation</c>,
-/// which owns validation; this record is its shape for the OpenAPI document.
-/// </summary>
-/// <param name="Subject">The title — required.</param>
-/// <param name="Description">The detail.</param>
-/// <param name="DueDate">When it is due.</param>
-/// <param name="AssigneeSubject">An active user of the caller's firm.</param>
-/// <param name="FormSeries">The short form key to anchor it to (<c>b106d</c>).</param>
-public sealed record TaskCreation(
-    string Subject,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Description,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] DateOnly? DueDate,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? AssigneeSubject,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? FormSeries);
-
-/// <summary>
-/// A change to a task (<c>PATCH …/tasks/{taskId}</c>): a member left out is
-/// unchanged; <c>null</c> clears a clearable one. At least one member must be
-/// given. Parsed by <c>CaseTaskRules.ParseUpdate</c>.
-/// </summary>
-/// <param name="Subject">A new title; cannot be cleared.</param>
-/// <param name="Description">A new detail, or null to clear it.</param>
-/// <param name="DueDate">A new due date, or null to clear it.</param>
-/// <param name="AssigneeSubject">A new assignee (an active user of the caller's firm), or null to unassign.</param>
-/// <param name="FormSeries">A new form anchor, or null to clear it.</param>
-/// <param name="Done">Mark it done or not done.</param>
-public sealed record TaskChange(
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Subject,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Description,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] DateOnly? DueDate,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? AssigneeSubject,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? FormSeries,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? Done);

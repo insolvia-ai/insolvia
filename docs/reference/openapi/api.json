@@ -2079,46 +2079,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": ["kind", "fileName", "contentType", "byteSize"],
-                "type": "object",
-                "properties": {
-                  "kind": {
-                    "enum": [
-                      "credit_report",
-                      "pay_stub",
-                      "bank_statement",
-                      "tax_return",
-                      "identification",
-                      "court_notice",
-                      "other"
-                    ],
-                    "description": "What a document is (Python\u0027s \u0060documents.KINDS\u0060). Here first because a\nfirm\u0027s document checklist files each entry under one; the rest of\n\u0060documents.py\u0060 is the case half\u0027s (18.7) and lands beside it."
-                  },
-                  "fileName": {
-                    "type": "string",
-                    "description": "The file name, at most 255 characters."
-                  },
-                  "contentType": {
-                    "enum": [
-                      "application/pdf",
-                      "image/jpeg",
-                      "image/png",
-                      "image/heic",
-                      "image/tiff"
-                    ],
-                    "description": "The file types an upload may be (Python\u0027s \u0060CONTENT_TYPES\u0060)."
-                  },
-                  "byteSize": {
-                    "type": "integer",
-                    "description": "The size in bytes, at most 50 MB.",
-                    "format": "int64"
-                  },
-                  "requestId": {
-                    "type": ["null", "string"],
-                    "description": "The document request it answers, in this case and still open; absent when none."
-                  }
-                },
-                "description": "A new upload (\u0060POST \u2026/documents\u0060). Parsed by \u0060DocumentRules.ParseUpload\u0060,\nwhich owns validation; this record is its shape for the OpenAPI document."
+                "$ref": "#/components/schemas/DocumentUploadRequest"
               }
             }
           },
@@ -2366,31 +2327,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": ["title", "kind"],
-                "type": "object",
-                "properties": {
-                  "title": {
-                    "type": "string",
-                    "description": "What is asked for, one line."
-                  },
-                  "kind": {
-                    "enum": [
-                      "credit_report",
-                      "pay_stub",
-                      "bank_statement",
-                      "tax_return",
-                      "identification",
-                      "court_notice",
-                      "other"
-                    ],
-                    "description": "What a document is (Python\u0027s \u0060documents.KINDS\u0060). Here first because a\nfirm\u0027s document checklist files each entry under one; the rest of\n\u0060documents.py\u0060 is the case half\u0027s (18.7) and lands beside it."
-                  },
-                  "description": {
-                    "type": ["null", "string"],
-                    "description": "What the client reads under the title; absent when none."
-                  }
-                },
-                "description": "One ad-hoc document request (\u0060POST \u2026/document-requests\u0060). Parsed by\n\u0060DocumentRequestRules.ParseCreation\u0060, which owns validation; this\nrecord is its shape for the OpenAPI document."
+                "$ref": "#/components/schemas/DocumentRequestCreation"
               }
             }
           },
@@ -2484,15 +2421,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": ["status"],
-                "type": "object",
-                "properties": {
-                  "status": {
-                    "enum": ["requested", "received", "waived"],
-                    "description": "Where a document request stands (Python\u0027s \u0060STATUSES\u0060)."
-                  }
-                },
-                "description": "A document request\u0027s new status (\u0060PATCH \u2026/document-requests/{requestId}\u0060).\nOnly \u0060requested\u0060 and \u0060waived\u0060 may be set; \u0060received\u0060 follows an upload."
+                "$ref": "#/components/schemas/DocumentRequestStatusChange"
               }
             }
           },
@@ -2576,32 +2505,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": ["subject"],
-                "type": "object",
-                "properties": {
-                  "subject": {
-                    "type": "string",
-                    "description": "The title \u2014 required."
-                  },
-                  "description": {
-                    "type": ["null", "string"],
-                    "description": "The detail."
-                  },
-                  "dueDate": {
-                    "type": ["null", "string"],
-                    "description": "When it is due.",
-                    "format": "date"
-                  },
-                  "assigneeSubject": {
-                    "type": ["null", "string"],
-                    "description": "An active user of the caller\u0027s firm."
-                  },
-                  "formSeries": {
-                    "type": ["null", "string"],
-                    "description": "The short form key to anchor it to (\u0060b106d\u0060)."
-                  }
-                },
-                "description": "A new task (\u0060POST \u2026/tasks\u0060). Parsed by \u0060CaseTaskRules.ParseCreation\u0060,\nwhich owns validation; this record is its shape for the OpenAPI document."
+                "$ref": "#/components/schemas/CaseTaskDraft"
               }
             }
           },
@@ -2735,35 +2639,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "subject": {
-                    "type": ["null", "string"],
-                    "description": "A new title; cannot be cleared."
-                  },
-                  "description": {
-                    "type": ["null", "string"],
-                    "description": "A new detail, or null to clear it."
-                  },
-                  "dueDate": {
-                    "type": ["null", "string"],
-                    "description": "A new due date, or null to clear it.",
-                    "format": "date"
-                  },
-                  "assigneeSubject": {
-                    "type": ["null", "string"],
-                    "description": "A new assignee (an active user of the caller\u0027s firm), or null to unassign."
-                  },
-                  "formSeries": {
-                    "type": ["null", "string"],
-                    "description": "A new form anchor, or null to clear it."
-                  },
-                  "done": {
-                    "type": ["null", "boolean"],
-                    "description": "Mark it done or not done."
-                  }
-                },
-                "description": "A change to a task (\u0060PATCH \u2026/tasks/{taskId}\u0060): a member left out is\nunchanged; \u0060null\u0060 clears a clearable one. At least one member must be\ngiven. Parsed by \u0060CaseTaskRules.ParseUpdate\u0060."
+                "$ref": "#/components/schemas/CaseTaskChanges"
               }
             }
           },
@@ -2920,42 +2796,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": ["title", "start"],
-                "type": "object",
-                "properties": {
-                  "title": {
-                    "type": "string",
-                    "description": "The title \u2014 required."
-                  },
-                  "start": {
-                    "type": "string",
-                    "description": "All-day: \u0060YYYY-MM-DD\u0060. Otherwise an RFC 3339 instant."
-                  },
-                  "end": {
-                    "type": ["null", "string"],
-                    "description": "As \u0060start\u0060; absent means the start day (all-day) or an hour after the start."
-                  },
-                  "all_day": {
-                    "type": ["null", "boolean"],
-                    "description": "Whether the span is whole days; absent means \u0022a bare date in \u0060start\u0060 is all-day\u0022."
-                  },
-                  "description": {
-                    "type": ["null", "string"],
-                    "description": "Free text."
-                  },
-                  "location": {
-                    "type": ["null", "string"],
-                    "description": "Where."
-                  },
-                  "attendees": {
-                    "type": ["null", "array"],
-                    "items": {
-                      "type": "string"
-                    },
-                    "description": "Firm users, by subject; each must be a member of the caller\u0027s firm."
-                  }
-                },
-                "description": "An event as written (\u0060POST\u0060 or \u0060PUT\u0060 on \u0060\u2026/events\u0060), whole.\nParsed by \u0060CalendarRules.Parse\u0060, which owns validation; this record\nis its shape for the OpenAPI document."
+                "$ref": "#/components/schemas/EventRequest"
               }
             }
           },
@@ -3054,42 +2895,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": ["title", "start"],
-                "type": "object",
-                "properties": {
-                  "title": {
-                    "type": "string",
-                    "description": "The title \u2014 required."
-                  },
-                  "start": {
-                    "type": "string",
-                    "description": "All-day: \u0060YYYY-MM-DD\u0060. Otherwise an RFC 3339 instant."
-                  },
-                  "end": {
-                    "type": ["null", "string"],
-                    "description": "As \u0060start\u0060; absent means the start day (all-day) or an hour after the start."
-                  },
-                  "all_day": {
-                    "type": ["null", "boolean"],
-                    "description": "Whether the span is whole days; absent means \u0022a bare date in \u0060start\u0060 is all-day\u0022."
-                  },
-                  "description": {
-                    "type": ["null", "string"],
-                    "description": "Free text."
-                  },
-                  "location": {
-                    "type": ["null", "string"],
-                    "description": "Where."
-                  },
-                  "attendees": {
-                    "type": ["null", "array"],
-                    "items": {
-                      "type": "string"
-                    },
-                    "description": "Firm users, by subject; each must be a member of the caller\u0027s firm."
-                  }
-                },
-                "description": "An event as written (\u0060POST\u0060 or \u0060PUT\u0060 on \u0060\u2026/events\u0060), whole.\nParsed by \u0060CalendarRules.Parse\u0060, which owns validation; this record\nis its shape for the OpenAPI document."
+                "$ref": "#/components/schemas/EventRequest"
               }
             }
           },
@@ -3142,15 +2948,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": ["dismissed"],
-                "type": "object",
-                "properties": {
-                  "dismissed": {
-                    "type": "boolean",
-                    "description": "Whether it is dismissed."
-                  }
-                },
-                "description": "Dismiss or restore an event (\u0060PATCH \u2026/events/{eventId}\u0060); the member must be alone."
+                "$ref": "#/components/schemas/EventDismissal"
               }
             }
           },
@@ -3251,42 +3049,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": ["title", "start"],
-                "type": "object",
-                "properties": {
-                  "title": {
-                    "type": "string",
-                    "description": "The title \u2014 required."
-                  },
-                  "start": {
-                    "type": "string",
-                    "description": "All-day: \u0060YYYY-MM-DD\u0060. Otherwise an RFC 3339 instant."
-                  },
-                  "end": {
-                    "type": ["null", "string"],
-                    "description": "As \u0060start\u0060; absent means the start day (all-day) or an hour after the start."
-                  },
-                  "all_day": {
-                    "type": ["null", "boolean"],
-                    "description": "Whether the span is whole days; absent means \u0022a bare date in \u0060start\u0060 is all-day\u0022."
-                  },
-                  "description": {
-                    "type": ["null", "string"],
-                    "description": "Free text."
-                  },
-                  "location": {
-                    "type": ["null", "string"],
-                    "description": "Where."
-                  },
-                  "attendees": {
-                    "type": ["null", "array"],
-                    "items": {
-                      "type": "string"
-                    },
-                    "description": "Firm users, by subject; each must be a member of the caller\u0027s firm."
-                  }
-                },
-                "description": "An event as written (\u0060POST\u0060 or \u0060PUT\u0060 on \u0060\u2026/events\u0060), whole.\nParsed by \u0060CalendarRules.Parse\u0060, which owns validation; this record\nis its shape for the OpenAPI document."
+                "$ref": "#/components/schemas/EventRequest"
               }
             }
           },
@@ -3368,42 +3131,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": ["title", "start"],
-                "type": "object",
-                "properties": {
-                  "title": {
-                    "type": "string",
-                    "description": "The title \u2014 required."
-                  },
-                  "start": {
-                    "type": "string",
-                    "description": "All-day: \u0060YYYY-MM-DD\u0060. Otherwise an RFC 3339 instant."
-                  },
-                  "end": {
-                    "type": ["null", "string"],
-                    "description": "As \u0060start\u0060; absent means the start day (all-day) or an hour after the start."
-                  },
-                  "all_day": {
-                    "type": ["null", "boolean"],
-                    "description": "Whether the span is whole days; absent means \u0022a bare date in \u0060start\u0060 is all-day\u0022."
-                  },
-                  "description": {
-                    "type": ["null", "string"],
-                    "description": "Free text."
-                  },
-                  "location": {
-                    "type": ["null", "string"],
-                    "description": "Where."
-                  },
-                  "attendees": {
-                    "type": ["null", "array"],
-                    "items": {
-                      "type": "string"
-                    },
-                    "description": "Firm users, by subject; each must be a member of the caller\u0027s firm."
-                  }
-                },
-                "description": "An event as written (\u0060POST\u0060 or \u0060PUT\u0060 on \u0060\u2026/events\u0060), whole.\nParsed by \u0060CalendarRules.Parse\u0060, which owns validation; this record\nis its shape for the OpenAPI document."
+                "$ref": "#/components/schemas/EventRequest"
               }
             }
           },
@@ -3448,15 +3176,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": ["dismissed"],
-                "type": "object",
-                "properties": {
-                  "dismissed": {
-                    "type": "boolean",
-                    "description": "Whether it is dismissed."
-                  }
-                },
-                "description": "Dismiss or restore an event (\u0060PATCH \u2026/events/{eventId}\u0060); the member must be alone."
+                "$ref": "#/components/schemas/EventDismissal"
               }
             }
           },
@@ -3904,158 +3624,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": ["scenarios"],
-                "type": "object",
-                "properties": {
-                  "scenarios": {
-                    "type": "array",
-                    "items": {
-                      "required": ["plan"],
-                      "type": "object",
-                      "properties": {
-                        "label": {
-                          "type": ["null", "string"],
-                          "description": "A label to tell it apart by."
-                        },
-                        "plan": {
-                          "type": "object",
-                          "properties": {
-                            "termMonths": {
-                              "type": ["null", "integer"],
-                              "format": "int32"
-                            },
-                            "paymentSource": {
-                              "enum": ["fixed", "schedule_j_excess", "disposable_income", null]
-                            },
-                            "monthlyPayment": {
-                              "type": "number"
-                            },
-                            "trusteePercentage": {
-                              "type": "number"
-                            },
-                            "attorneyFees": {
-                              "type": "number"
-                            },
-                            "attorneyFeeMonthly": {
-                              "type": "number"
-                            },
-                            "priorityPercentage": {
-                              "type": "number"
-                            },
-                            "priorityInterestRate": {
-                              "type": "number"
-                            },
-                            "unsecuredTreatment": {
-                              "enum": ["pot", "percentage", "amount", null]
-                            },
-                            "unsecuredPercentage": {
-                              "type": "number"
-                            },
-                            "unsecuredAmount": {
-                              "type": "number"
-                            },
-                            "unsecuredInterestRate": {
-                              "type": "number"
-                            },
-                            "chapter7OtherCosts": {
-                              "type": "number"
-                            },
-                            "chapter7OtherCostsDescription": {
-                              "type": ["null", "string"]
-                            },
-                            "presentValueRate": {
-                              "type": "number"
-                            },
-                            "stepPayments": {
-                              "type": "array",
-                              "items": {
-                                "type": "object",
-                                "properties": {
-                                  "id": {
-                                    "type": "string"
-                                  },
-                                  "startMonth": {
-                                    "type": ["null", "integer"],
-                                    "format": "int32"
-                                  },
-                                  "monthlyPayment": {
-                                    "type": "number"
-                                  }
-                                },
-                                "description": "From int? StepPayment.StartMonth on (1-based, inclusive) the monthly payment is decimal? StepPayment.MonthlyPayment."
-                              },
-                              "description": "The step schedule."
-                            },
-                            "lumpSums": {
-                              "type": "array",
-                              "items": {
-                                "type": "object",
-                                "properties": {
-                                  "id": {
-                                    "type": "string"
-                                  },
-                                  "month": {
-                                    "type": ["null", "integer"],
-                                    "format": "int32"
-                                  },
-                                  "amount": {
-                                    "type": "number"
-                                  },
-                                  "description": {
-                                    "type": ["null", "string"]
-                                  }
-                                },
-                                "description": "A one-time payment into the plan in int? LumpSum.Month."
-                              },
-                              "description": "The one-time payments."
-                            },
-                            "securedTreatments": {
-                              "type": "array",
-                              "items": {
-                                "type": "object",
-                                "properties": {
-                                  "id": {
-                                    "type": "string"
-                                  },
-                                  "claimId": {
-                                    "type": ["null", "string"]
-                                  },
-                                  "treatment": {
-                                    "enum": ["cure_and_maintain", "cramdown", "surrender", null]
-                                  },
-                                  "arrearage": {
-                                    "type": "number"
-                                  },
-                                  "arrearageInterestRate": {
-                                    "type": "number"
-                                  },
-                                  "maintenancePayment": {
-                                    "type": "number"
-                                  },
-                                  "cramdownValue": {
-                                    "type": "number"
-                                  },
-                                  "interestRate": {
-                                    "type": "number"
-                                  },
-                                  "monthlyPayment": {
-                                    "type": "number"
-                                  }
-                                },
-                                "description": "How the plan treats one secured claim: cure-and-maintain (arrearage cured,\noptional conduit maintenance), cramdown (paid to the collateral\u0027s value)\nor surrender (nothing through the plan). decimal? SecuredTreatment.MonthlyPayment\nfixes the equal monthly payment; absent, the calculator amortises."
-                              },
-                              "description": "The secured claims\u0027 treatments."
-                            }
-                          },
-                          "description": "The plan\u0027s proposal."
-                        }
-                      },
-                      "description": "One unsaved plan alternative."
-                    },
-                    "description": "The alternatives."
-                  }
-                },
-                "description": "Unsaved plan alternatives to calculate (\u0060POST \u2026/plan-calculation\u0060): one to five."
+                "$ref": "#/components/schemas/PlanScenariosRequest"
               }
             }
           },
@@ -9585,52 +9154,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": ["kind"],
-                "type": "object",
-                "properties": {
-                  "kind": {
-                    "type": "string",
-                    "description": "\u0060echo\u0060, \u0060packet_assembly\u0060, \u0060petition_review\u0060 or \u0060document_extraction\u0060."
-                  },
-                  "documentId": {
-                    "type": ["null", "string"],
-                    "description": "The document, for \u0060document_extraction\u0060 only (required there)."
-                  },
-                  "options": {
-                    "type": ["null", "object"],
-                    "properties": {
-                      "draftWatermark": {
-                        "type": ["null", "boolean"],
-                        "description": "A \u0022DRAFT\u0022 watermark on every page."
-                      },
-                      "printDate": {
-                        "type": ["null", "boolean"],
-                        "description": "A date and time stamp in the top margin."
-                      },
-                      "signaturePages": {
-                        "type": ["null", "string"],
-                        "description": "\u0060all\u0060, \u0060only\u0060 or \u0060omit\u0060."
-                      },
-                      "signElectronically": {
-                        "type": ["null", "boolean"],
-                        "description": "\u0060/s/ Name\u0060 on every debtor signature line."
-                      },
-                      "amendedOnly": {
-                        "type": ["null", "boolean"],
-                        "description": "Only the forms and records marked amended."
-                      },
-                      "forms": {
-                        "type": ["null", "array"],
-                        "items": {
-                          "type": "string"
-                        },
-                        "description": "Only these forms, by short key (\u0060b101\u0060)."
-                      }
-                    },
-                    "description": "Output options as sent; every one optional, an unknown one a 400."
-                  }
-                },
-                "description": "A job to accept (\u0060POST \u2026/jobs\u0060). Parsed by \u0060JobRules.ParseAcceptance\u0060, which owns validation."
+                "$ref": "#/components/schemas/JobRequest"
               }
             }
           },
@@ -9899,18 +9423,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": ["action"],
-                "type": "object",
-                "properties": {
-                  "action": {
-                    "type": "string",
-                    "description": "\u0060accept\u0060 or \u0060reject\u0060."
-                  },
-                  "correctedPayload": {
-                    "type": ["null", "object"]
-                  }
-                },
-                "description": "One review decision (\u0060POST \u2026/candidates/{candidateId}/review\u0060).\nParsed by \u0060ExtractionReview.ParseReview\u0060, which owns validation."
+                "$ref": "#/components/schemas/CandidateReviewRequest"
               }
             }
           },
@@ -10179,19 +9692,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": ["digest"],
-                "type": "object",
-                "properties": {
-                  "digest": {
-                    "type": "string",
-                    "description": "The basis digest shown; a mismatch is refused."
-                  },
-                  "credential_id": {
-                    "type": ["null", "string"],
-                    "description": "The CM/ECF credential to file with; absent for the caller\u0027s only one."
-                  }
-                },
-                "description": "An attorney\u0027s approval (\u0060POST /v1/cases/{caseId}/filing-approval\u0060):\nthe digest of the basis as shown. Parsed by \u0060FilingApprovals.ApproveAsync\u0060."
+                "$ref": "#/components/schemas/FilingApproveRequest"
               }
             }
           },
@@ -10303,31 +9804,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": ["outcome", "docket_checked"],
-                "type": "object",
-                "properties": {
-                  "outcome": {
-                    "enum": ["filed", "not_filed"],
-                    "description": "What the court\u0027s docket shows, as the attorney resolved it (Python\u0027s \u0060ResolutionOutcome\u0060)."
-                  },
-                  "docket_checked": {
-                    "type": "boolean",
-                    "description": "Must be true: the attorney checked the court\u0027s docket."
-                  },
-                  "case_number": {
-                    "type": ["null", "string"],
-                    "description": "The case number on the docket; filed only."
-                  },
-                  "filed_at": {
-                    "type": ["null", "string"],
-                    "description": "The petition date, \u0060yyyy-MM-dd\u0060; filed only."
-                  },
-                  "confirmation_document_id": {
-                    "type": ["null", "string"],
-                    "description": "An uploaded confirmation document; filed only."
-                  }
-                },
-                "description": "The attorney\u0027s resolution of a hand-back\n(\u0060POST /v1/cases/{caseId}/filings/{filingId}/resolution\u0060). Parsed by\n\u0060FilingOutcomes.Parse\u0060, which owns validation."
+                "$ref": "#/components/schemas/FilingResolutionRequest"
               }
             }
           },
@@ -11196,6 +10673,28 @@
           }
         },
         "description": "A reviewed candidate and, when it was accepted, the record its acceptance wrote."
+      },
+      "CandidateReviewRequest": {
+        "required": ["action"],
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": ["null", "string"],
+            "description": "\u0060accept\u0060 or \u0060reject\u0060."
+          },
+          "correctedPayload": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "On accept only, the corrected record body to write instead of the proposal.\nIts type is the candidate\u0027s collection\u0027s, so it is read as that body when the candidate is.",
+                "$ref": "#/components/schemas/JsonObject"
+              }
+            ]
+          }
+        },
+        "description": "One review decision (\u0060POST \u2026/candidates/{candidateId}/review\u0060)."
       },
       "CandidateStatus": {
         "enum": ["pending", "accepted", "corrected", "rejected", "withdrawn"],
@@ -13305,6 +12804,68 @@
         },
         "description": "What a case is worth, what it owes, and whether it could be filed."
       },
+      "CaseTaskChanges": {
+        "type": "object",
+        "properties": {
+          "subject": {
+            "type": ["null", "string"],
+            "description": "A new title."
+          },
+          "description": {
+            "type": ["null", "string"],
+            "description": "A new description, or null to clear."
+          },
+          "dueDate": {
+            "type": ["null", "string"],
+            "description": "A new due date, or null to clear.",
+            "format": "date"
+          },
+          "assigneeSubject": {
+            "pattern": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
+            "type": ["null", "string"],
+            "description": "A new assignee, or null to unassign."
+          },
+          "formSeries": {
+            "pattern": "(?i)[a-z][a-z0-9]{1,31}",
+            "type": ["null", "string"],
+            "description": "A new form anchor, or null to clear."
+          },
+          "done": {
+            "type": ["null", "boolean"],
+            "description": "Completion \u2014 a state transition \u0060completedAt\u0060 follows."
+          }
+        },
+        "description": "Changing a task (\u0060PATCH \u2026/tasks/{taskId}\u0060): only the keys sent change,\nand a body with none is a 400. A nullable member sent as null clears it\n(bool CaseTaskChanges.Names(string member) tells that apart from a key not sent);\nstring? CaseTaskChanges.Subject can be replaced, never cleared."
+      },
+      "CaseTaskDraft": {
+        "type": "object",
+        "properties": {
+          "subject": {
+            "type": ["null", "string"],
+            "description": "The title \u2014 required."
+          },
+          "description": {
+            "type": ["null", "string"],
+            "description": "The detail."
+          },
+          "dueDate": {
+            "type": ["null", "string"],
+            "description": "When it is due.",
+            "format": "date"
+          },
+          "assigneeSubject": {
+            "pattern": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
+            "type": ["null", "string"],
+            "description": "An active user of the caller\u0027s firm."
+          },
+          "formSeries": {
+            "pattern": "(?i)[a-z][a-z0-9]{1,31}",
+            "type": ["null", "string"],
+            "description": "The short form key to anchor it to (\u0060b106d\u0060)."
+          }
+        },
+        "description": "A new task (\u0060POST /v1/cases/{caseId}/tasks\u0060). Only string? CaseTaskDraft.Subject\nis required; \u0060done\u0060 is never accepted here \u2014 every task starts not-done."
+      },
       "CaseTotalsView": {
         "required": [
           "realEstate",
@@ -15076,6 +14637,32 @@
         },
         "description": "A case\u0027s documents."
       },
+      "DocumentRequestCreation": {
+        "required": ["title", "kind"],
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": ["null", "string"],
+            "description": "What is asked for."
+          },
+          "kind": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The kind an upload against it is filed under.",
+                "$ref": "#/components/schemas/DocumentKind"
+              }
+            ]
+          },
+          "description": {
+            "type": ["null", "string"],
+            "description": "What the client reads under the title."
+          }
+        },
+        "description": "The body of a new document request: a checklist entry."
+      },
       "DocumentRequestList": {
         "required": ["requests", "progress"],
         "type": "object",
@@ -15119,6 +14706,24 @@
       "DocumentRequestStatus": {
         "enum": ["requested", "received", "waived"],
         "description": "Where a document request stands (Python\u0027s \u0060STATUSES\u0060)."
+      },
+      "DocumentRequestStatusChange": {
+        "required": ["status"],
+        "type": "object",
+        "properties": {
+          "status": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The status to set.",
+                "$ref": "#/components/schemas/DocumentRequestStatus"
+              }
+            ]
+          }
+        },
+        "description": "A document request\u0027s new status (\u0060PATCH \u2026/document-requests/{requestId}\u0060).\nOnly \u0060requested\u0060 and \u0060waived\u0060 may be set; \u0060received\u0060 follows an upload."
       },
       "DocumentRequestView": {
         "required": [
@@ -15195,6 +14800,51 @@
       "DocumentStatus": {
         "enum": ["pending", "stored"],
         "description": "Whether the bytes are known to have arrived (Python\u0027s \u0060STATUSES\u0060)."
+      },
+      "DocumentUploadRequest": {
+        "required": ["kind", "fileName", "contentType", "byteSize"],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "What the document is.",
+                "$ref": "#/components/schemas/DocumentKind"
+              }
+            ]
+          },
+          "fileName": {
+            "type": ["null", "string"],
+            "description": "The file name, at most 255 characters, no path separators or invisible characters."
+          },
+          "contentType": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The content type the upload will carry.",
+                "$ref": "#/components/schemas/DocumentContentType"
+              }
+            ]
+          },
+          "byteSize": {
+            "maximum": 52428800,
+            "minimum": 1,
+            "type": ["null", "integer"],
+            "description": "The size in bytes, at most 50 MB.",
+            "format": "int64"
+          },
+          "requestId": {
+            "minLength": 1,
+            "type": ["null", "string"],
+            "description": "The document request it answers, in this case and still open; absent when none."
+          }
+        },
+        "description": "A new upload (\u0060POST \u2026/documents\u0060). Every check runs before an upload\nURL exists."
       },
       "DocumentUploadTicket": {
         "required": ["document", "upload"],
@@ -16685,6 +16335,18 @@
           null
         ]
       },
+      "EventDismissal": {
+        "required": ["dismissed"],
+        "type": "object",
+        "properties": {
+          "dismissed": {
+            "type": ["null", "boolean"],
+            "description": "Whether it is dismissed."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Dismiss or restore an event (\u0060PATCH \u2026/events/{eventId}\u0060). The member must be alone: a client that meant PUT finds out rather than losing its edits."
+      },
       "EventList": {
         "required": ["events"],
         "type": "object",
@@ -16699,19 +16361,58 @@
         },
         "description": "Calendar events."
       },
+      "EventRequest": {
+        "required": ["title", "start"],
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": ["null", "string"],
+            "description": "The title \u2014 required."
+          },
+          "start": {
+            "type": ["null", "string"],
+            "description": "All-day: \u0060YYYY-MM-DD\u0060. Otherwise an RFC 3339 instant with an offset (or Z)."
+          },
+          "end": {
+            "type": ["null", "string"],
+            "description": "As \u0060start\u0060; absent means the start day (all-day) or an hour after the start."
+          },
+          "allDay": {
+            "type": ["null", "boolean"],
+            "description": "Whether the span is whole days; absent means \u0022a bare date in \u0060start\u0060 is all-day\u0022."
+          },
+          "description": {
+            "type": ["null", "string"],
+            "description": "Free text."
+          },
+          "location": {
+            "type": ["null", "string"],
+            "description": "Where."
+          },
+          "attendees": {
+            "maxItems": 50,
+            "type": ["null", "array"],
+            "items": {
+              "type": "string"
+            },
+            "description": "Firm users, by subject; each must be a member of the caller\u0027s firm."
+          }
+        },
+        "description": "An event as written (\u0060POST\u0060 or \u0060PUT\u0060 on \u0060\u2026/events\u0060), whole.\n\u0060end\u0060 defaults to \u0060start\u0060 (all-day) or an hour later (timed);\n\u0060allDay\u0060 defaults to whether \u0060start\u0060 is a bare date. A span over\nint CalendarEvents.MaxEventSpanDays days is refused."
+      },
       "EventView": {
         "required": [
           "id",
           "title",
           "start",
           "end",
-          "all_day",
+          "allDay",
           "attendees",
           "generated",
           "dismissed",
-          "created_by",
-          "created_at",
-          "updated_at"
+          "createdBy",
+          "createdAt",
+          "updatedAt"
         ],
         "type": "object",
         "properties": {
@@ -16731,7 +16432,7 @@
             "type": "string",
             "description": "As \u0060start\u0060; an all-day end is inclusive."
           },
-          "all_day": {
+          "allDay": {
             "type": "boolean",
             "description": "Whether the span is whole days."
           },
@@ -16750,19 +16451,19 @@
             "type": "boolean",
             "description": "Whether someone dismissed it; survives regeneration."
           },
-          "created_by": {
+          "createdBy": {
             "type": "string",
             "description": "Who made it: a subject, or the deadline engine\u0027s actor."
           },
-          "created_at": {
+          "createdAt": {
             "type": "string",
             "description": "When it was made, ISO 8601 UTC."
           },
-          "updated_at": {
+          "updatedAt": {
             "type": "string",
             "description": "When it was last written, ISO 8601 UTC."
           },
-          "case_id": {
+          "caseId": {
             "type": "string",
             "description": "The case; absent for a firm event."
           },
@@ -16774,16 +16475,16 @@
             "type": "string",
             "description": "Where; absent when none."
           },
-          "rule_id": {
+          "ruleId": {
             "type": "string",
             "description": "The deadline rule that generated it; absent for a hand-made event."
           },
-          "rule_citation": {
+          "ruleCitation": {
             "type": "string",
-            "description": "The rule\u0027s citation, with \u0060rule_id\u0060."
+            "description": "The rule\u0027s citation, with \u0060ruleId\u0060."
           }
         },
-        "description": "A calendar event, a case\u0027s or the firm\u0027s own. \u0060all_day\u0060 decides how\n\u0060start\u0060 and \u0060end\u0060 read."
+        "description": "A calendar event, a case\u0027s or the firm\u0027s own. \u0060allDay\u0060 decides how\n\u0060start\u0060 and \u0060end\u0060 read."
       },
       "ExemptionAnalysisView": {
         "required": [
@@ -17381,6 +17082,23 @@
         },
         "description": "What a client sees of an attorney\u0027s approval to file."
       },
+      "FilingApproveRequest": {
+        "required": ["digest"],
+        "type": "object",
+        "properties": {
+          "digest": {
+            "maxLength": 64,
+            "minLength": 64,
+            "type": ["null", "string"],
+            "description": "The basis digest shown; a mismatch is refused."
+          },
+          "credentialId": {
+            "type": ["null", "string"],
+            "description": "The CM/ECF credential to file with; absent for the caller\u0027s only one."
+          }
+        },
+        "description": "An attorney\u0027s approval (\u0060POST /v1/cases/{caseId}/filing-approval\u0060):\nthe digest of the basis as shown."
+      },
       "FilingAuthorizationView": {
         "required": ["text", "currentVersion", "current", "signature"],
         "type": "object",
@@ -17693,6 +17411,44 @@
       },
       "FilingProfessionalRole": {
         "enum": ["attorney", "bankruptcy_petition_preparer", null]
+      },
+      "FilingResolutionRequest": {
+        "required": ["outcome"],
+        "type": "object",
+        "properties": {
+          "outcome": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "\u0060filed\u0060 or \u0060not_filed\u0060.",
+                "$ref": "#/components/schemas/ResolutionOutcome"
+              }
+            ]
+          },
+          "docketChecked": {
+            "type": "boolean",
+            "description": "Must be true: the attorney checked the court\u0027s docket.",
+            "default": false
+          },
+          "caseNumber": {
+            "type": ["null", "string"],
+            "description": "The case number on the docket; filed only."
+          },
+          "filedAt": {
+            "type": ["null", "string"],
+            "description": "The petition date, \u0060yyyy-MM-dd\u0060; filed only.",
+            "format": "date"
+          },
+          "confirmationDocumentId": {
+            "minLength": 1,
+            "type": ["null", "string"],
+            "description": "An uploaded confirmation document; filed only."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The attorney\u0027s resolution of a hand-back\n(\u0060POST /v1/cases/{caseId}/filings/{filingId}/resolution\u0060). An unknown member is refused."
       },
       "FilingRole": {
         "enum": ["debtor_1", "debtor_2", "non_filing_spouse"],
@@ -18540,6 +18296,32 @@
           }
         },
         "description": "Why a job failed."
+      },
+      "JobRequest": {
+        "required": ["kind"],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": ["null", "string"],
+            "description": "\u0060echo\u0060, \u0060packet_assembly\u0060, \u0060petition_review\u0060 or \u0060document_extraction\u0060."
+          },
+          "documentId": {
+            "type": ["null", "string"],
+            "description": "The document, for \u0060document_extraction\u0060 only (required there)."
+          },
+          "options": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "Output options, for \u0060packet_assembly\u0060 only.",
+                "$ref": "#/components/schemas/OutputOptionsRequest"
+              }
+            ]
+          }
+        },
+        "description": "A job to accept (\u0060POST \u2026/jobs\u0060). \u0060documentId\u0060 exactly when the\nkind works on one document; \u0060options\u0060 only for a kind that takes them."
       },
       "JobStatus": {
         "enum": ["queued", "running", "succeeded", "failed"],
@@ -20171,6 +19953,40 @@
         },
         "description": "One line-33d row: a secured debt beyond the home and the two claimed vehicles."
       },
+      "OutputOptionsRequest": {
+        "type": "object",
+        "properties": {
+          "draftWatermark": {
+            "type": ["null", "boolean"],
+            "description": "A \u0022DRAFT\u0022 watermark on every page."
+          },
+          "printDate": {
+            "type": ["null", "boolean"],
+            "description": "A date and time stamp in the top margin."
+          },
+          "signaturePages": {
+            "type": ["null", "string"],
+            "description": "\u0060all\u0060, \u0060only\u0060 or \u0060omit\u0060."
+          },
+          "signElectronically": {
+            "type": ["null", "boolean"],
+            "description": "\u0060/s/ Name\u0060 on every debtor signature line."
+          },
+          "amendedOnly": {
+            "type": ["null", "boolean"],
+            "description": "Only the forms and records marked amended."
+          },
+          "forms": {
+            "type": ["null", "array"],
+            "items": {
+              "type": "string"
+            },
+            "description": "Only these forms, by short key (\u0060b101\u0060)."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Output options as sent; every one optional, an unknown one a 400."
+      },
       "OutputOptionsView": {
         "required": [
           "draftWatermark",
@@ -21471,6 +21287,37 @@
           }
         },
         "description": "The unsaved plan alternatives, each calculated against the same case, in request order."
+      },
+      "PlanScenarioRequest": {
+        "required": ["plan"],
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": ["null", "string"],
+            "description": "A label to tell it apart by."
+          },
+          "plan": {
+            "description": "The plan, as a plan record\u0027s body is written.",
+            "$ref": "#/components/schemas/PlanBody"
+          }
+        },
+        "description": "One unsaved plan alternative."
+      },
+      "PlanScenariosRequest": {
+        "required": ["scenarios"],
+        "type": "object",
+        "properties": {
+          "scenarios": {
+            "maxItems": 5,
+            "minItems": 1,
+            "type": ["null", "array"],
+            "items": {
+              "$ref": "#/components/schemas/PlanScenarioRequest"
+            },
+            "description": "The alternatives."
+          }
+        },
+        "description": "Unsaved plan alternatives to calculate (\u0060POST \u2026/plan-calculation\u0060): one to five."
       },
       "PlanScheduledPayment": {
         "required": ["month", "payment"],

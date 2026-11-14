@@ -168,7 +168,7 @@ export function CalendarScreen({ membership }: { membership: FirmMembership }) {
   };
 
   const open = (event: CalendarEvent) => {
-    if (event.case_id !== undefined) router.push(`/cases/${event.case_id}`);
+    if (event.caseId !== undefined) router.push(`/cases/${event.caseId}`);
   };
 
   const stacked = width < railBreakpoint;
@@ -344,11 +344,11 @@ function EventRow({
   const time = formatTime(event);
   const meta = [
     time,
-    event.case_id === undefined ? 'Office' : caseLabel(event.case_id),
-    event.rule_citation,
+    event.caseId === undefined ? 'Office' : caseLabel(event.caseId),
+    event.ruleCitation,
     event.location,
   ].filter((part): part is string => part !== null && part !== undefined);
-  const linked = event.case_id !== undefined;
+  const linked = event.caseId !== undefined;
   return (
     <Pressable
       accessibilityRole={linked ? 'link' : 'text'}
@@ -439,9 +439,9 @@ function MonthView({
                 {todays.slice(0, CELL_EVENTS).map((event) => (
                   <Pressable
                     key={event.id}
-                    accessibilityRole={event.case_id === undefined ? 'text' : 'link'}
-                    aria-label={`${event.title}${event.case_id === undefined ? '' : ` — ${caseLabel(event.case_id)}`}`}
-                    disabled={event.case_id === undefined}
+                    accessibilityRole={event.caseId === undefined ? 'text' : 'link'}
+                    aria-label={`${event.title}${event.caseId === undefined ? '' : ` — ${caseLabel(event.caseId)}`}`}
+                    disabled={event.caseId === undefined}
                     onPress={() => onOpen(event)}
                   >
                     <Text

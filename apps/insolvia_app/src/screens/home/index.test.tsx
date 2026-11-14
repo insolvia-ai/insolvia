@@ -191,13 +191,13 @@ describe('the dashboard', () => {
               title: (body as { title?: string }).title ?? '',
               start: '2026-09-01',
               end: '2026-09-01',
-              all_day: true,
+              allDay: true,
               attendees: [],
               generated: false,
               dismissed: false,
-              created_by: ALICE,
-              created_at: '2026-09-01T00:00:00.000000Z',
-              updated_at: '2026-09-01T00:00:00.000000Z',
+              createdBy: ALICE,
+              createdAt: '2026-09-01T00:00:00.000000Z',
+              updatedAt: '2026-09-01T00:00:00.000000Z',
             }),
         );
       }

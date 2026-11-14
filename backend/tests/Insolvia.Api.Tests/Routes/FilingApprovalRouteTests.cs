@@ -124,7 +124,7 @@ public sealed class FilingApprovalRouteTests : IDisposable
         var caseId = await SeedAsync();
 
         Assert.Equal(409, (await World.Delete(Path(caseId), Attorney)).Status);
-        Assert.Equal(404, (await World.Post($"/v1/cases/{caseId}/filings/{Guid.NewGuid()}/resolution", """{"outcome": "not_filed", "docket_checked": true}""", Attorney)).Status);
+        Assert.Equal(404, (await World.Post($"/v1/cases/{caseId}/filings/{Guid.NewGuid()}/resolution", """{"outcome": "not_filed", "docketChecked": true}""", Attorney)).Status);
     }
 
     public void Dispose() => _world?.Dispose();

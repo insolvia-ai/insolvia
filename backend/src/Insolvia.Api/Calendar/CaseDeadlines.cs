@@ -39,21 +39,22 @@ public static class CaseDeadlines
         foreach (var deadline in generated)
         {
             var rule = deadline.Rule;
-            var draft = new EventDraft(deadline.Title, deadline.Description(), CalendarEvents.FormatDay(deadline.Start), CalendarEvents.FormatDay(deadline.End), AllDay: true, Location: null, attendees.ToValueCollection());
+            var (title, description) = (deadline.Title, deadline.Description());
+            var (start, end) = (CalendarEvents.FormatDay(deadline.Start), CalendarEvents.FormatDay(deadline.End));
             if (!stored.Remove(rule.RuleId, out var current))
             {
-                create.Add(CalendarRules.Create(draft, new EventScope(target.FirmId, target.Id), actor, clock) with { RuleId = rule.RuleId, RuleCitation = rule.Citation });
+                create.Add(CalendarRules.Create(new EventRequest(title, start, end, AllDay: true, description, Attendees: attendees), new EventScope(target.FirmId, target.Id), actor, clock) with { RuleId = rule.RuleId, RuleCitation = rule.Citation });
                 continue;
             }
 
-            if (current.Start != draft.Start || current.End != draft.End || current.Title != draft.Title || current.Description != draft.Description || current.RuleCitation != rule.Citation)
+            if (current.Start != start || current.End != end || current.Title != title || current.Description != description || current.RuleCitation != rule.Citation)
             {
                 put.Add(current with
                 {
-                    Title = draft.Title,
-                    Description = draft.Description,
-                    Start = draft.Start,
-                    End = draft.End,
+                    Title = title,
+                    Description = description,
+                    Start = start,
+                    End = end,
                     AllDay = true,
                     RuleCitation = rule.Citation,
                     UpdatedAt = Clock.Now(clock),

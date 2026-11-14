@@ -23,15 +23,15 @@ public sealed class CaseTaskTests
     }
 
     private static CaseTask Make(Action<JsonObject>? overrides = null, TimeProvider? clock = null) =>
-        CaseTaskRules.Create(CaseTaskRules.ParseCreation(Payload(overrides)), CaseId, Ids.Alice, clock);
+        CaseTaskRules.Create(Body.Read<CaseTaskDraft>(Payload(overrides)), CaseId, Ids.Alice, clock);
 
     private static CaseTask Apply(CaseTask task, string json, TimeProvider? clock = null) =>
-        CaseTaskRules.ApplyChanges(task, CaseTaskRules.ParseUpdate(Body.Of(json)), clock);
+        CaseTaskRules.ApplyChanges(task, Body.Read<CaseTaskChanges>(Body.Of(json)), clock);
 
     [Fact]
     public void Only_subject_is_required()
     {
-        var draft = CaseTaskRules.ParseCreation(Body.Of("""{"subject": "Follow up with client"}"""));
+        var draft = Body.Read<CaseTaskDraft>(Body.Of("""{"subject": "Follow up with client"}"""));
         Assert.Equal("Follow up with client", draft.Subject);
         Assert.Null(draft.Description);
         Assert.Null(draft.DueDate);
@@ -54,25 +54,29 @@ public sealed class CaseTaskTests
     {
         // LONG is one character past the cap — Python's "x" * (MAX_SUBJECT + 1).
         var node = value == "LONG" ? JsonValue.Create(new string('x', CaseTaskRules.MaxSubject + 1)) : Body.Value(value);
-        var error = Assert.Throws<FieldValidationException>(() => CaseTaskRules.ParseCreation(Payload(p => p[field] = node)));
+        var error = Assert.Throws<FieldValidationException>(() => Body.Read<CaseTaskDraft>(Payload(p => p[field] = node)));
         Assert.Contains(field, error.Fields.Keys);
     }
 
     [Fact]
     public void The_subject_cap_is_exactly_the_maximum() =>
-        Assert.Equal(CaseTaskRules.MaxSubject, CaseTaskRules.ParseCreation(new JsonObject { ["subject"] = new string('x', CaseTaskRules.MaxSubject) }).Subject.Length);
+        Assert.Equal(CaseTaskRules.MaxSubject, Body.Read<CaseTaskDraft>(new JsonObject { ["subject"] = new string('x', CaseTaskRules.MaxSubject) }).Subject!.Length);
 
     [Fact]
-    public void A_blank_optional_field_collapses_to_none_rather_than_erroring()
+    public void A_null_optional_field_is_none()
     {
-        var draft = CaseTaskRules.ParseCreation(Payload(p =>
+        var draft = Body.Read<CaseTaskDraft>(Payload(p =>
         {
-            p["description"] = "   ";
+            p["description"] = null;
             p["formSeries"] = null;
         }));
         Assert.Null(draft.Description);
         Assert.Null(draft.FormSeries);
     }
+
+    [Fact]
+    public void A_form_key_is_stored_lowercase() =>
+        Assert.Equal("b106d", Make(p => p["formSeries"] = "B106D").FormSeries);
 
     [Fact]
     public void Creation_never_accepts_done()
@@ -94,8 +98,8 @@ public sealed class CaseTaskTests
     }
 
     [Fact]
-    public void Update_requires_at_least_one_field() =>
-        Assert.Throws<ValidationException>(() => CaseTaskRules.ParseUpdate([]));
+    public void An_empty_update_names_no_field() =>
+        Assert.True(Body.Read<CaseTaskChanges>([]).IsEmpty);
 
     [Fact]
     public void Update_leaves_absent_fields_unchanged()
@@ -126,7 +130,7 @@ public sealed class CaseTaskTests
 
     [Fact]
     public void Subject_cannot_be_cleared() =>
-        Assert.Contains("subject", Assert.Throws<FieldValidationException>(() => CaseTaskRules.ParseUpdate(Body.Of("""{"subject": null}"""))).Fields.Keys);
+        Assert.Contains("subject", Assert.Throws<FieldValidationException>(() => Body.Read<CaseTaskChanges>(Body.Of("""{"subject": null}"""))).Fields.Keys);
 
     [Fact]
     public void Reassign_changes_only_the_assignee()
@@ -175,7 +179,7 @@ public sealed class CaseTaskTests
 
     [Fact]
     public void Done_must_be_a_boolean() =>
-        Assert.Contains("done", Assert.Throws<FieldValidationException>(() => CaseTaskRules.ParseUpdate(Body.Of("""{"done": "yes"}"""))).Fields.Keys);
+        Assert.Contains("done", Assert.Throws<FieldValidationException>(() => Body.Read<CaseTaskChanges>(Body.Of("""{"done": "yes"}"""))).Fields.Keys);
 
     [Fact]
     public void A_task_past_its_due_date_is_overdue() =>

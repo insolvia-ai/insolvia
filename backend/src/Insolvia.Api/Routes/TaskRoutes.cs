@@ -9,6 +9,7 @@ using Insolvia.Domain.CaseTasks;
 using Insolvia.Domain.Firms;
 using Insolvia.Domain.Ports;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Mvc;
 
 namespace Insolvia.Api.Routes;
 
@@ -30,10 +31,11 @@ public sealed class TaskRoutes : IEndpointModule
     public void Map(IEndpointRouteBuilder routes)
     {
         ArgumentNullException.ThrowIfNull(routes);
-        routes.MapPost("/v1/cases/{caseId}/tasks", CreateAsync).RequestBody<TaskCreation>().RequireAuth().Requires(Feature.Tasks, PermissionLevel.AddEdit);
+        var sizeLimit = new RequestSizeLimitAttribute(MaxRequestBytes);
+        routes.MapPost("/v1/cases/{caseId}/tasks", CreateAsync).WithMetadata(sizeLimit).RequireAuth().Requires(Feature.Tasks, PermissionLevel.AddEdit);
         routes.MapGet("/v1/cases/{caseId}/tasks", ListAsync).RequireAuth().Requires(Feature.Tasks, PermissionLevel.ViewOnly);
         routes.MapGet("/v1/cases/{caseId}/tasks/{taskId}", GetAsync).RequireAuth().Requires(Feature.Tasks, PermissionLevel.ViewOnly);
-        routes.MapPatch("/v1/cases/{caseId}/tasks/{taskId}", UpdateAsync).RequestBody<TaskChange>().RequireAuth().Requires(Feature.Tasks, PermissionLevel.AddEdit);
+        routes.MapPatch("/v1/cases/{caseId}/tasks/{taskId}", UpdateAsync).WithMetadata(sizeLimit).RequireAuth().Requires(Feature.Tasks, PermissionLevel.AddEdit);
         routes.MapDelete("/v1/cases/{caseId}/tasks/{taskId}", DeleteAsync).RequireAuth().Requires(Feature.Tasks, PermissionLevel.AddEdit);
         routes.MapGet("/v1/me/tasks", ListMineAsync).RequireAuth().Requires(Feature.Tasks, PermissionLevel.ViewOnly)
             .QueryParameter("scope", "`mine` (the default) for the caller's tasks, or `firm` for everyone's.");
@@ -41,10 +43,9 @@ public sealed class TaskRoutes : IEndpointModule
 
     /// <summary>Create a task on a case.</summary>
     /// <remarks>An assignee must be an active user of the caller's firm.</remarks>
-    internal static async Task<Created<TaskView>> CreateAsync(HttpContext context, string caseId, CancellationToken cancellationToken)
+    internal static async Task<Created<TaskView>> CreateAsync(HttpContext context, string caseId, CaseTaskDraft draft, CancellationToken cancellationToken)
     {
         var accessor = await context.CurrentAccessorAsync();
-        var draft = CaseTaskRules.ParseCreation(await context.BodyAsync(MaxRequestBytes));
         await context.ReachableCaseAsync(caseId, AccessAction.CaseUpdate, cancellationToken);
         await ValidateAssigneeAsync(context, accessor, draft.AssigneeSubject, cancellationToken);
         var task = CaseTaskRules.Create(draft, caseId, accessor.Subject, context.Clock());
@@ -72,17 +73,18 @@ public sealed class TaskRoutes : IEndpointModule
 
     /// <summary>Change a task.</summary>
     /// <remarks>Only the members given change. A new assignee must be an active user of the caller's firm.</remarks>
-    internal static async Task<TaskView> UpdateAsync(HttpContext context, string caseId, string taskId, CancellationToken cancellationToken)
+    internal static async Task<TaskView> UpdateAsync(HttpContext context, string caseId, string taskId, CaseTaskChanges changes, CancellationToken cancellationToken)
     {
         var accessor = await context.CurrentAccessorAsync();
         var store = context.Port<ICaseTaskStore>();
-        var changes = CaseTaskRules.ParseUpdate(await context.BodyAsync(MaxRequestBytes));
+        if (changes.IsEmpty)
+        {
+            throw new ValidationException("no supported fields to update");
+        }
+
         await context.ReachableCaseAsync(caseId, AccessAction.CaseUpdate, cancellationToken);
         var stored = await store.GetAsync(caseId, taskId, cancellationToken) ?? throw new NotFoundException(TaskNotFound);
-        if (changes.AssigneeSubject is { IsSet: true, Value: { } assignee })
-        {
-            await ValidateAssigneeAsync(context, accessor, assignee, cancellationToken);
-        }
+        await ValidateAssigneeAsync(context, accessor, changes.AssigneeSubject, cancellationToken);
 
         var written = await store.UpdateAsync(CaseTaskRules.ApplyChanges(stored, changes, context.Clock()), cancellationToken) ?? throw new NotFoundException(TaskNotFound);
         context.Log(Logger, "task updated", ("case_id", caseId), ("id", taskId));

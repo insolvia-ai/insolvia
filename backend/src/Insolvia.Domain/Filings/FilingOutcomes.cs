@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Text.Json.Nodes;
 using Insolvia.Domain.AccessLog;
 using Insolvia.Domain.Cases;
 using Insolvia.Domain.Documents;
@@ -7,7 +6,7 @@ using Insolvia.Domain.Ports;
 
 namespace Insolvia.Domain.Filings;
 
-/// <summary>A parsed resolution body.</summary>
+/// <summary>An attorney's resolution of a handed-back filing.</summary>
 /// <param name="Outcome">What the docket shows.</param>
 /// <param name="CaseNumber">The court's number, for <c>filed</c>.</param>
 /// <param name="FiledAt">The petition date, for <c>filed</c>.</param>
@@ -84,106 +83,9 @@ public sealed class NotTheFilingAttorneyException : ForbiddenException
 /// </remarks>
 public static class FilingOutcomes
 {
-    /// <summary>The body's keys.</summary>
-    public static readonly IReadOnlySet<string> AllowedKeys = new HashSet<string>(StringComparer.Ordinal)
-    {
-        "outcome", "docket_checked", "case_number", "filed_at", "confirmation_document_id",
-    };
-
     // The petition date may be a day either side of the clock's: the court's
     // local date and UTC differ by up to one.
     private static readonly TimeSpan DateSlack = TimeSpan.FromDays(1);
-
-    /// <summary>
-    /// <c>POST …/filings/&lt;id&gt;/resolution</c>'s body: <c>{outcome,
-    /// docket_checked, case_number?, filed_at?, confirmation_document_id?}</c>.
-    /// </summary>
-    public static ResolutionRequest Parse(JsonNode? payload)
-    {
-        if (payload is not JsonObject body)
-        {
-            throw new ValidationException("request body must be a JSON object");
-        }
-
-        var unknown = body.Select(pair => pair.Key).Where(key => !AllowedKeys.Contains(key)).Order(StringComparer.Ordinal).ToList();
-        if (unknown.Count > 0)
-        {
-            throw new ValidationException("unsupported fields: " + string.Join(", ", unknown));
-        }
-
-        var errors = new Dictionary<string, string>(StringComparer.Ordinal);
-        var outcomeText = Json.AsString(body["outcome"]);
-        ResolutionOutcome? outcome = outcomeText switch
-        {
-            "filed" => ResolutionOutcome.Filed,
-            "not_filed" => ResolutionOutcome.NotFiled,
-            _ => null,
-        };
-        if (outcome is null)
-        {
-            errors["outcome"] = "Outcome must be filed or not_filed.";
-        }
-
-        if (!(body["docket_checked"] is JsonValue checkedValue && checkedValue.TryGetValue<bool>(out var docketChecked) && docketChecked))
-        {
-            errors["docket_checked"] = "Confirm you checked the court's own docket for this debtor.";
-        }
-
-        string? caseNumber = null;
-        DateOnly? filedAt = null;
-        string? documentId = null;
-        if (outcome == ResolutionOutcome.Filed)
-        {
-            var rawNumber = Json.AsString(body["case_number"]);
-            if (rawNumber is null || TextRules.Strip(rawNumber).Length == 0)
-            {
-                errors["case_number"] = "Enter the case number the court's docket shows.";
-            }
-            else if (TextRules.Length(rawNumber) > 40 || CaseNumbers.Parse(rawNumber, requireOffice: true) is null)
-            {
-                errors["case_number"] = "Enter the case number as the docket prints it, e.g. 6:26-bk-10000.";
-            }
-            else
-            {
-                caseNumber = TextRules.Strip(rawNumber);
-            }
-
-            filedAt = FormDate(body["filed_at"]);
-            if (filedAt is null)
-            {
-                errors["filed_at"] = "Enter the petition date in YYYY-MM-DD form.";
-            }
-
-            if (body.ContainsKey("confirmation_document_id") && body["confirmation_document_id"] is { } rawDocument)
-            {
-                if (Json.AsString(rawDocument) is { Length: > 0 } id)
-                {
-                    documentId = id;
-                }
-                else
-                {
-                    errors["confirmation_document_id"] = "Must be a document id.";
-                }
-            }
-        }
-        else if (outcome == ResolutionOutcome.NotFiled)
-        {
-            foreach (var key in new[] { "case_number", "filed_at", "confirmation_document_id" })
-            {
-                if (body[key] is not null)
-                {
-                    errors[key] = "A filing that is not on the docket has no " + (key == "case_number" ? "case number." : "filing details.");
-                }
-            }
-        }
-
-        if (errors.Count > 0)
-        {
-            throw new FieldValidationException(errors);
-        }
-
-        return new ResolutionRequest(outcome!.Value, caseNumber, filedAt, documentId);
-    }
 
     /// <summary>
     /// Record the attorney's resolution of <paramref name="filing"/>, and file
@@ -328,21 +230,6 @@ public static class FilingOutcomes
             AccessEvents.Record(principal, AccessAction.FilingResolve, caseId: @case.Id, purpose: request.Outcome.ToWire(), filingId: filing.FilingId),
             cancellationToken).ConfigureAwait(false);
         return resolved;
-    }
-
-    private static DateOnly? FormDate(JsonNode? value)
-    {
-        var text = Json.AsString(value);
-        if (text is null)
-        {
-            return null;
-        }
-
-        var stripped = TextRules.Strip(text);
-        return DateOnly.TryParseExact(stripped, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed)
-            && parsed.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) == stripped
-            ? parsed
-            : null;
     }
 
     /// <summary>A clock that reads one instant — the caller's "now", passed down.</summary>

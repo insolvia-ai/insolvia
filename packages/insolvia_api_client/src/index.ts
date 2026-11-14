@@ -50,25 +50,19 @@ export {
   DOCUMENT_STATUSES,
   MAX_DOCUMENT_BYTE_SIZE,
   SIGNATURE_PAGES_MODES,
-  calendarEventDraftToJson,
   calendarWindowQuery,
   caseEntityRequestToJson,
-  createDocumentRequestToJson,
-  createTaskRequestToJson,
   formPreviewQuery,
   isDocumentContentType,
   isDocumentKind,
   libraryProvenance,
   listCasesQuery,
   listMyTasksQuery,
-  noteRequestToJson,
-  outputOptionsRequestToJson,
   putDebtorRequestToJson,
   revisedProvenance,
   staffTypedProvenance,
   submittedAtUtc,
   permits,
-  updateTaskRequestToJson,
   waitlistSubmissionToJson,
 } from './models.ts';
 // The four debtor enums are exported as VALUES, not only as types: each one is
@@ -408,7 +402,7 @@ export type {
 
 // Document request checklists (ADR 0023 PR 5 / #364) — one block, so the
 // section reads as a unit.
-export { DOCUMENT_CHANNELS, DOCUMENT_REQUEST_STATUSES, newChecklistItemToJson } from './models.ts';
+export { DOCUMENT_CHANNELS, DOCUMENT_REQUEST_STATUSES } from './models.ts';
 export type {
   ApplyChecklistResult,
   CaseDocumentRequests,
