@@ -216,7 +216,7 @@ public sealed class PurgeTests(PostgresFixture postgres)
         var kept = await ClientCaseAsync(world);
         foreach (var (caseId, subject) in new[] { (doomed, "00000000-0000-4000-8000-0000000000c1"), (kept, "00000000-0000-4000-8000-0000000000c2") })
         {
-            var draft = ClientBindings.ParseInvitation(new JsonObject { ["email"] = $"{subject[^2..]}@insolvia.test", ["displayName"] = "Sample", ["roles"] = new JsonArray("debtor_1") });
+            var draft = new PortalInvitationRequest($"{subject[^2..]}@insolvia.test", "Sample", [ClientRole.Debtor1]).ToDraft();
             await world.Bindings.BindAsync(ClientBindings.CreateBinding(draft, world.FirmId, caseId, subject, Opener), [], Ct);
         }
 

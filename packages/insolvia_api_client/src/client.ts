@@ -1024,12 +1024,7 @@ export class InsolviaApiClient {
     const response = await this.#fetch(`${this.#baseUrl}/v1/portal/documents`, {
       method: 'POST',
       headers: { ...headers, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        requestId: request.requestId,
-        fileName: request.fileName,
-        contentType: request.contentType,
-        byteSize: request.byteSize,
-      }),
+      body: JSON.stringify(request),
     });
     const decoded = await decodeExpected(response, 201);
     return {
@@ -2110,17 +2105,12 @@ export class InsolviaApiClient {
     request: InvitePortalClientRequest,
   ): Promise<PortalClient> {
     const headers = await this.#protectedHeaders();
-    const body: Record<string, unknown> = {
-      email: request.email,
-      displayName: request.displayName,
-    };
-    if (request.roles !== undefined) body.roles = [...request.roles];
     const response = await this.#fetch(
       `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/portal/invitation`,
       {
         method: 'POST',
         headers: { ...headers, 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify(request),
       },
     );
     const decoded = await decodeExpected(response, 201);
@@ -2246,11 +2236,7 @@ export class InsolviaApiClient {
     const response = await this.#fetch(`${this.#baseUrl}/v1/portal/answers`, {
       method: 'POST',
       headers: { ...headers, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        questionId: request.questionId,
-        ...(request.filingRole === undefined ? {} : { filingRole: request.filingRole }),
-        value: request.value,
-      }),
+      body: JSON.stringify(request),
     });
     return portalAnswerFromJson(await decodeExpected(response, 201));
   }

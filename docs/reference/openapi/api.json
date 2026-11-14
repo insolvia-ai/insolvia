@@ -8660,27 +8660,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": ["email", "displayName"],
-                "type": "object",
-                "properties": {
-                  "email": {
-                    "type": "string",
-                    "description": "The client\u0027s address."
-                  },
-                  "displayName": {
-                    "type": "string",
-                    "description": "The name to greet them by."
-                  },
-                  "roles": {
-                    "type": ["null", "array"],
-                    "items": {
-                      "enum": ["debtor_1", "debtor_2"],
-                      "description": "The filing roles a portal binding may answer for. \u0060non_filing_spouse\u0060\nis a filing role and deliberately NOT here: ADR 0023 gives a non-filing\nspouse no login in v1."
-                    },
-                    "description": "The debtors the login answers for; absent for \u0060debtor_1\u0060 alone."
-                  }
-                },
-                "description": "An invitation (\u0060POST /v1/cases/{caseId}/portal/invitation\u0060). Parsed\nby \u0060ClientBindings.ParseInvitation\u0060, which refuses any other key."
+                "$ref": "#/components/schemas/PortalInvitationRequest"
               }
             }
           },
@@ -8882,21 +8862,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": ["questionId", "value"],
-                "type": "object",
-                "properties": {
-                  "questionId": {
-                    "type": "string",
-                    "description": "The question, in a section the firm shows."
-                  },
-                  "filingRole": {
-                    "enum": ["debtor_1", "debtor_2", null]
-                  },
-                  "value": {
-                    "type": "object"
-                  }
-                },
-                "description": "A new answer (\u0060POST /v1/portal/answers\u0060). Parsed by\n\u0060QuestionRules.ParseAnswer\u0060, which owns validation."
+                "$ref": "#/components/schemas/PortalAnswerRequest"
               }
             }
           },
@@ -8943,14 +8909,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": ["value"],
-                "type": "object",
-                "properties": {
-                  "value": {
-                    "type": "object"
-                  }
-                },
-                "description": "A pending answer\u0027s new value (\u0060PUT /v1/portal/answers/{answerId}\u0060)."
+                "$ref": "#/components/schemas/PortalAnswerRevision"
               }
             }
           },
@@ -9049,28 +9008,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": ["requestId", "fileName", "contentType", "byteSize"],
-                "type": "object",
-                "properties": {
-                  "requestId": {
-                    "type": "string",
-                    "description": "The open document request this upload answers."
-                  },
-                  "fileName": {
-                    "type": "string",
-                    "description": "The file\u0027s name."
-                  },
-                  "contentType": {
-                    "type": "string",
-                    "description": "The file\u0027s media type."
-                  },
-                  "byteSize": {
-                    "type": "integer",
-                    "description": "The file\u0027s size in bytes.",
-                    "format": "int64"
-                  }
-                },
-                "description": "A client\u0027s upload against one of the firm\u0027s document requests\n(\u0060POST /v1/portal/documents\u0060). The document\u0027s kind is the request\u0027s.\nParsed by \u0060DocumentRules.ParseUpload\u0060, which owns validation."
+                "$ref": "#/components/schemas/PortalUploadRequest"
               }
             }
           },
@@ -21394,6 +21332,57 @@
         },
         "description": "The client\u0027s own answers, every status, in sections the firm still shows."
       },
+      "PortalAnswerRequest": {
+        "required": ["questionId", "value"],
+        "type": "object",
+        "properties": {
+          "questionId": {
+            "type": ["null", "string"],
+            "description": "The question, in a section the firm shows."
+          },
+          "value": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The value, by input key.",
+                "$ref": "#/components/schemas/JsonObject"
+              }
+            ]
+          },
+          "filingRole": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The debtor it is about; absent when the login answers for one.",
+                "$ref": "#/components/schemas/ClientRole"
+              }
+            ]
+          }
+        },
+        "description": "A new answer (\u0060POST /v1/portal/answers\u0060). Which questions are\nanswerable, and what a value must hold, are the firm\u0027s questionnaire\u0027s and\nthe question\u0027s (\u0060QuestionRules.ParseAnswer\u0060)."
+      },
+      "PortalAnswerRevision": {
+        "required": ["value"],
+        "type": "object",
+        "properties": {
+          "value": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The value, by input key.",
+                "$ref": "#/components/schemas/JsonObject"
+              }
+            ]
+          }
+        },
+        "description": "A pending answer\u0027s new value (\u0060PUT /v1/portal/answers/{answerId}\u0060)."
+      },
       "PortalAnswerView": {
         "required": [
           "id",
@@ -21523,6 +21512,32 @@
           }
         },
         "description": "One box on the portal screen."
+      },
+      "PortalInvitationRequest": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "maxLength": 320,
+            "pattern": "^[^@\\s]\u002B@[^@\\s]\u002B\\.[^@\\s]\u002B$",
+            "type": ["null", "string"],
+            "description": "The client\u0027s address; stored lower-cased."
+          },
+          "displayName": {
+            "pattern": ".*\\S.*",
+            "type": ["null", "string"],
+            "description": "The name to greet them by."
+          },
+          "roles": {
+            "minItems": 1,
+            "type": ["null", "array"],
+            "items": {
+              "$ref": "#/components/schemas/ClientRole"
+            },
+            "description": "The debtors the login answers for, once each; absent for \u0060debtor_1\u0060 alone."
+          }
+        },
+        "additionalProperties": false,
+        "description": "An invitation (\u0060POST /v1/cases/{caseId}/portal/invitation\u0060), and a\nfixture case\u0027s client. Any other key is refused: a caller sending\n\u0060caseId\u0060 or \u0060subject\u0060 believes it controls something it does not."
       },
       "PortalMeView": {
         "required": ["subject", "displayName", "roles", "firm", "case"],
@@ -21690,6 +21705,40 @@
           }
         },
         "description": "A client\u0027s upload, completed."
+      },
+      "PortalUploadRequest": {
+        "required": ["requestId", "fileName", "contentType", "byteSize"],
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "minLength": 1,
+            "type": ["null", "string"],
+            "description": "The open document request this upload answers."
+          },
+          "fileName": {
+            "type": ["null", "string"],
+            "description": "The file name, at most 255 characters, no path separators or invisible characters."
+          },
+          "contentType": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The content type the upload will carry.",
+                "$ref": "#/components/schemas/DocumentContentType"
+              }
+            ]
+          },
+          "byteSize": {
+            "maximum": 52428800,
+            "minimum": 1,
+            "type": ["null", "integer"],
+            "description": "The size in bytes, at most 50 MB.",
+            "format": "int64"
+          }
+        },
+        "description": "A client\u0027s upload against one of the firm\u0027s document requests\n(\u0060POST /v1/portal/documents\u0060). The document\u0027s kind is the request\u0027s.\nEvery check runs before an upload URL exists."
       },
       "PortalUploadTicket": {
         "required": ["document", "upload"],

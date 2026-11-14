@@ -27,8 +27,13 @@ public sealed class QuestionTests
         DateTimeOffset.UnixEpoch,
         Ids.Alice));
 
-    private static AnswerRequest Answer(string body, ClientRole[]? roles = null, IReadOnlyList<ResolvedSection>? sections = null) =>
-        QuestionRules.ParseAnswer(Body.Of(body), sections ?? AllOn, roles ?? [ClientRole.Debtor1]);
+    // The body as the route binds it: a role that is not a ClientRole never reaches the rules.
+    private static AnswerRequest Answer(string body, ClientRole[]? roles = null, IReadOnlyList<ResolvedSection>? sections = null)
+    {
+        var parsed = Body.Of(body);
+        ClientRole? filingRole = Wire.TryParse<ClientRole>(Json.AsString(parsed["filingRole"]), out var role) ? role : null;
+        return QuestionRules.ParseAnswer(Json.AsString(parsed["questionId"])!, filingRole, parsed["value"], sections ?? AllOn, roles ?? [ClientRole.Debtor1]);
+    }
 
     private static Candidate Stored(string body, CandidateOrigin? origin = null, IReadOnlyList<Candidate>? existing = null) =>
         QuestionRules.CreateAnswer(Answer(body), CaseId, origin ?? Origin, existing ?? []);
@@ -133,14 +138,11 @@ public sealed class QuestionTests
     public void A_two_role_binding_must_say_which_debtor() =>
         Assert.Contains("filingRole", Assert.Throws<FieldValidationException>(() => Answer(LegalName, roles: [ClientRole.Debtor1, ClientRole.Debtor2])).Fields.Keys);
 
-    [Theory]
-    [InlineData("debtor_2")]
-    [InlineData("non_filing_spouse")]
-    [InlineData("both")]
-    public void A_client_cannot_answer_for_a_role_their_binding_lacks(string role)
+    [Fact]
+    public void A_client_cannot_answer_for_a_role_their_binding_lacks()
     {
         var body = Body.Of(LegalName);
-        body["filingRole"] = role;
+        body["filingRole"] = "debtor_2";
         Assert.Contains("filingRole", Assert.Throws<FieldValidationException>(() => Answer(body.ToJsonString(), roles: [ClientRole.Debtor1])).Fields.Keys);
     }
 

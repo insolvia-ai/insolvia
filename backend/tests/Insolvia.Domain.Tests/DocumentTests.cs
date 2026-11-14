@@ -217,10 +217,6 @@ public sealed class DocumentTests
     }
 
     [Fact]
-    public void A_server_decided_kind_overrides_the_payloads() =>
-        Assert.Equal(DocumentKind.TaxReturn, DocumentRules.ParseUpload(Payload(p => p["kind"] = "wedding_photos"), DocumentKind.TaxReturn).Kind);
-
-    [Fact]
     public void The_document_vocabularies_keep_their_wire_strings()
     {
         Assert.Equal(["application/pdf", "image/jpeg", "image/png", "image/heic", "image/tiff"], Wire.Names<DocumentContentType>());

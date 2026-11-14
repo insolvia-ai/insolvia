@@ -10,6 +10,7 @@ using Insolvia.Domain.Ports;
 using Insolvia.Domain.Questionnaires;
 using Insolvia.Domain.Questions;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Mvc;
 
 namespace Insolvia.Api.Routes;
 
@@ -49,8 +50,8 @@ public sealed class PortalRoutes : IEndpointModule
         routes.MapGet("/v1/portal/me", MeAsync).RequireClient();
         routes.MapGet("/v1/portal/questionnaire", QuestionnaireAsync).RequireClient();
         routes.MapGet("/v1/portal/answers", ListAnswersAsync).RequireClient();
-        routes.MapPost("/v1/portal/answers", CreateAnswerAsync).RequestBody<PortalAnswerRequest>().RequireClient();
-        routes.MapPut("/v1/portal/answers/{answerId}", UpdateAnswerAsync).RequestBody<PortalAnswerRevision>().RequireClient();
+        routes.MapPost("/v1/portal/answers", CreateAnswerAsync).WithMetadata(new RequestSizeLimitAttribute(MaxAnswerBytes)).RequireClient();
+        routes.MapPut("/v1/portal/answers/{answerId}", UpdateAnswerAsync).WithMetadata(new RequestSizeLimitAttribute(MaxAnswerBytes)).RequireClient();
         routes.MapDelete("/v1/portal/answers/{answerId}", WithdrawAnswerAsync).RequireClient();
     }
 
@@ -116,13 +117,12 @@ public sealed class PortalRoutes : IEndpointModule
     /// <summary>Answer a question.</summary>
     /// <remarks>The answer waits, pending, in the firm's review queue; nothing reaches the case until a person accepts it. Its origin is the verified token's — never anything the body says.</remarks>
     // Channel client, the portal app client, the subject.
-    internal static async Task<Created<PortalAnswerView>> CreateAnswerAsync(HttpContext context, CancellationToken cancellationToken)
+    internal static async Task<Created<PortalAnswerView>> CreateAnswerAsync(HttpContext context, PortalAnswerRequest request, CancellationToken cancellationToken)
     {
         var client = context.CurrentClient();
         var principal = context.CurrentClientPrincipal();
         var candidates = context.Port<ICandidateStore>();
-        var body = await context.BodyAsync(MaxAnswerBytes);
-        var parsed = QuestionRules.ParseAnswer(body, await SectionsAsync(context, client, cancellationToken), client.Roles);
+        var parsed = QuestionRules.ParseAnswer(request.QuestionId!, request.FilingRole, request.Value!, await SectionsAsync(context, client, cancellationToken), client.Roles);
         var candidate = QuestionRules.CreateAnswer(
             parsed,
             client.CaseId,
@@ -143,16 +143,15 @@ public sealed class PortalRoutes : IEndpointModule
     /// </remarks>
     // The CAS on pending means an edit that races a reviewer loses rather
     // than rewriting what they accepted.
-    internal static async Task<PortalAnswerView> UpdateAnswerAsync(HttpContext context, string answerId, CancellationToken cancellationToken)
+    internal static async Task<PortalAnswerView> UpdateAnswerAsync(HttpContext context, string answerId, PortalAnswerRevision request, CancellationToken cancellationToken)
     {
         var client = context.CurrentClient();
         var candidates = context.Port<ICandidateStore>();
-        var body = await context.BodyAsync(MaxAnswerBytes);
         var (candidate, answer) = QuestionRules.OwnAnswerOr404(
             await candidates.GetAsync(client.CaseId, answerId, cancellationToken),
             client.Subject,
             await SectionsAsync(context, client, cancellationToken));
-        var revised = QuestionRules.ReviseAnswer(candidate, answer, body["value"], context.Clock());
+        var revised = QuestionRules.ReviseAnswer(candidate, answer, request.Value, context.Clock());
         if (await candidates.UpdateAsync(revised, CandidateStatus.Pending, cancellationToken) is null)
         {
             throw new ConflictException(Reviewed);

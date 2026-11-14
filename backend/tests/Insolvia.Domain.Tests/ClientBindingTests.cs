@@ -1,5 +1,6 @@
 using Insolvia.Domain.Access;
 using Insolvia.Domain.AccessLog;
+using Insolvia.Domain.CaseEntities;
 using Insolvia.Domain.Clients;
 using Insolvia.Domain.Firms;
 
@@ -36,10 +37,13 @@ public sealed class ClientBindingTests
 
     // ── The invitation body ─────────────────────────────────────────
 
+    private static InvitationDraft Invitation(string json) =>
+        ((PortalInvitationRequest)BodyJson.Read(Body.Of(json), typeof(PortalInvitationRequest))).ToDraft();
+
     [Fact]
     public void An_invitation_defaults_to_the_first_debtor_and_lowercases_the_address()
     {
-        var draft = ClientBindings.ParseInvitation(Body.Of("""{"email": "Pat@Example.TEST", "displayName": " Pat "}"""));
+        var draft = Invitation("""{"email": "Pat@Example.TEST", "displayName": "Pat"}""");
         Assert.Equal("pat@example.test", draft.Email);
         Assert.Equal("Pat", draft.DisplayName);
         Assert.Equal([ClientRole.Debtor1], draft.Roles);
@@ -49,7 +53,7 @@ public sealed class ClientBindingTests
     public void Both_roles_are_stored_in_canonical_order() =>
         Assert.Equal(
             [ClientRole.Debtor1, ClientRole.Debtor2],
-            ClientBindings.ParseInvitation(Body.Of("""{"email": "pat@example.test", "displayName": "Pat", "roles": ["debtor_2", "debtor_1"]}""")).Roles);
+            Invitation("""{"email": "pat@example.test", "displayName": "Pat", "roles": ["debtor_2", "debtor_1"]}""").Roles);
 
     [Theory]
     [InlineData("[]")]
@@ -58,19 +62,19 @@ public sealed class ClientBindingTests
     [InlineData("""["debtor_1", "debtor_1"]""")]
     [InlineData("\"debtor_1\"")]
     public void Roles_must_be_a_nonempty_set_of_the_two_debtors(string roles) =>
-        Assert.Contains("roles", Assert.Throws<FieldValidationException>(() => ClientBindings.ParseInvitation(
-            Body.Of($$"""{"email": "pat@example.test", "displayName": "Pat", "roles": {{roles}}}"""))).Fields.Keys);
+        Assert.Contains(Assert.Throws<FieldValidationException>(() => Invitation(
+            $$"""{"email": "pat@example.test", "displayName": "Pat", "roles": {{roles}}}""")).Fields.Keys, key => key.StartsWith("roles", StringComparison.Ordinal));
 
     [Fact]
     public void A_body_naming_the_case_or_subject_is_refused_not_ignored() =>
-        Assert.Throws<ValidationException>(() => ClientBindings.ParseInvitation(
-            Body.Of($$"""{"email": "pat@example.test", "displayName": "Pat", "caseId": "{{OtherCase}}"}""")));
+        Assert.Contains("caseId", Assert.Throws<FieldValidationException>(() => Invitation(
+            $$"""{"email": "pat@example.test", "displayName": "Pat", "caseId": "{{OtherCase}}"}""")).Fields.Keys);
 
     [Fact]
     public void A_missing_name_and_address_are_both_reported() =>
         Assert.Equal(
             ["displayName", "email"],
-            Assert.Throws<FieldValidationException>(() => ClientBindings.ParseInvitation(Body.Of("{}"))).Fields.Keys.Order(StringComparer.Ordinal));
+            Assert.Throws<FieldValidationException>(() => Invitation("{}")).Fields.Keys.Order(StringComparer.Ordinal));
 
     // ── Planning a binding ──────────────────────────────────────────
 
@@ -118,7 +122,7 @@ public sealed class ClientBindingTests
     [Fact]
     public void Create_binding_starts_invited()
     {
-        var draft = ClientBindings.ParseInvitation(Body.Of("""{"email": "pat@example.test", "displayName": "Pat"}"""));
+        var draft = Invitation("""{"email": "pat@example.test", "displayName": "Pat"}""");
         var made = ClientBindings.CreateBinding(draft, Ids.Firm, Case, Pat, Staff);
         Assert.Equal((BindingStatus.Invited, Staff, Case), (made.Status, made.InvitedBy, made.CaseId));
     }

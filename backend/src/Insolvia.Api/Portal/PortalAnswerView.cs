@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using Insolvia.Domain.Candidates;
@@ -53,17 +54,18 @@ public sealed record PortalAnswerView(
 public sealed record PortalAnswerList(IReadOnlyList<PortalAnswerView> Answers);
 
 /// <summary>
-/// A new answer (<c>POST /v1/portal/answers</c>). Parsed by
-/// <c>QuestionRules.ParseAnswer</c>, which owns validation.
+/// A new answer (<c>POST /v1/portal/answers</c>). Which questions are
+/// answerable, and what a value must hold, are the firm's questionnaire's and
+/// the question's (<c>QuestionRules.ParseAnswer</c>).
 /// </summary>
 /// <param name="QuestionId">The question, in a section the firm shows.</param>
 /// <param name="FilingRole">The debtor it is about; absent when the login answers for one.</param>
 /// <param name="Value">The value, by input key.</param>
 public sealed record PortalAnswerRequest(
-    string QuestionId,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ClientRole? FilingRole,
-    JsonObject Value);
+    [property: Required(ErrorMessage = "Not a question in your questionnaire.")] string? QuestionId,
+    [property: Required(ErrorMessage = "Must be an object.")] JsonObject? Value,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ClientRole? FilingRole = null);
 
 /// <summary>A pending answer's new value (<c>PUT /v1/portal/answers/{answerId}</c>).</summary>
 /// <param name="Value">The value, by input key.</param>
-public sealed record PortalAnswerRevision(JsonObject Value);
+public sealed record PortalAnswerRevision([property: Required(ErrorMessage = "Must be an object.")] JsonObject? Value);

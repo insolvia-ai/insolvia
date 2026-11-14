@@ -1,4 +1,3 @@
-using System.Text.Json.Serialization;
 using Insolvia.Domain.Clients;
 
 namespace Insolvia.Api.Portal;
@@ -46,15 +45,3 @@ public sealed record ClientBindingView(
 /// <summary>Everyone ever invited to a case's portal, revoked included, oldest first.</summary>
 /// <param name="Clients">The invitations.</param>
 public sealed record ClientBindingList(IReadOnlyList<ClientBindingView> Clients);
-
-/// <summary>
-/// An invitation (<c>POST /v1/cases/{caseId}/portal/invitation</c>). Parsed
-/// by <c>ClientBindings.ParseInvitation</c>, which refuses any other key.
-/// </summary>
-/// <param name="Email">The client's address.</param>
-/// <param name="DisplayName">The name to greet them by.</param>
-/// <param name="Roles">The debtors the login answers for; absent for <c>debtor_1</c> alone.</param>
-public sealed record PortalInvitationRequest(
-    string Email,
-    string DisplayName,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<ClientRole>? Roles);

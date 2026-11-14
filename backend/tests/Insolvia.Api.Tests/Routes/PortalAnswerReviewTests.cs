@@ -44,7 +44,8 @@ public sealed class PortalAnswerReviewTests : IAsyncLifetime, IDisposable
     private async Task<string> AnswerAsync(string json)
     {
         var candidates = _world.Service<ICandidateStore>();
-        var request = QuestionRules.ParseAnswer(JsonNode.Parse(json)!.AsObject(), Questionnaire.ClientSections(null), [ClientRole.Debtor1]);
+        var body = JsonNode.Parse(json)!.AsObject();
+        var request = QuestionRules.ParseAnswer((string)body["questionId"]!, null, body["value"], Questionnaire.ClientSections(null), [ClientRole.Debtor1]);
         var candidate = QuestionRules.CreateAnswer(request, _caseId, new CandidateOrigin(OriginChannel.Client, PortalClientId, Pat), await candidates.ListForCaseAsync(_caseId, HttpAssert.Ct));
         await candidates.CreateAsync(candidate, HttpAssert.Ct);
         return candidate.Id;
