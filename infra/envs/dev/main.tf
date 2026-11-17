@@ -13,8 +13,6 @@
 #
 # Scope is deliberately tiny — only what local development actually consumes
 # today (see docs/reference/terraform.md):
-#   • the waitlist DynamoDB table — local dev's actual database (there is no
-#     local emulator; the compose stack's API talks straight to this table);
 #   • the case store via modules/case_store — the same module staging and prod
 #     instantiate, so local development exercises the real encrypted path
 #     rather than an approximation of it;
@@ -57,35 +55,6 @@ locals {
   }
 }
 
-# ── Waitlist storage ────────────────────────────────────────────
-# Same schema as modules/api_service's table (generic PK/SK string keys,
-# on-demand billing) so the service's DynamoDB adapter behaves identically
-# against it. Two deliberate differences from the deployed table:
-#   • PITR is OFF — this is throwaway dev data a developer wipes with
-#     dev-aws-reset.sh; paying for recovery of it would be noise.
-#   • No IAM grant — the developer's own credentials are the principal, so
-#     there is no execution role to scope PutItem to.
-
-resource "aws_dynamodb_table" "waitlist" {
-  name         = "insolvia-${local.environment}-waitlist"
-  billing_mode = "PAY_PER_REQUEST"
-  hash_key     = "PK"
-  range_key    = "SK"
-
-  attribute {
-    name = "PK"
-    type = "S"
-  }
-
-  attribute {
-    name = "SK"
-    type = "S"
-  }
-
-  server_side_encryption { enabled = true }
-  tags = local.common_tags
-}
-
 # ── Case store (issue 8.2) ──────────────────────────────────────
 # The SAME module staging and prod use, not a hand-rolled copy — which is the
 # whole point. The table's keys, its owner index and its customer-managed key
@@ -93,9 +62,8 @@ resource "aws_dynamodb_table" "waitlist" {
 # query behind GET /v1/cases, and any KMS permission mistake all surface on a
 # laptop instead of on staging.
 #
-# Three deliberate differences from the deployed instances, all for the same
-# reason the waitlist table above diverges — this is throwaway data on a
-# machine, not a case file:
+# Three deliberate differences from the deployed instances, all for one
+# reason — this is throwaway data on a machine, not a case file:
 #   • PITR off — a developer wipes this with dev-aws-reset.sh.
 #   • Deletion protection off — dev-aws-destroy.sh has to be able to remove it.
 #   • The minimum 7-day key deletion window, so a destroy does not leave a
@@ -137,24 +105,6 @@ module "job_pipeline" {
   api_role_name      = null
   alarms_topic_arn   = null
   tags               = local.common_tags
-}
-
-# ── Firms ───────────────────────────────────────────────────────
-# The same module staging and prod instantiate, on the same case key, so local
-# development resolves a caller through the real sparse index rather than a
-# stub. api_role_name is null for the same reason the case store's is: there is
-# no Lambda here.
-module "firm_store" {
-  source = "../../modules/firm_store"
-
-  project                = "insolvia"
-  environment            = local.environment
-  aws_region             = var.aws_region
-  kms_key_arn            = module.case_store.kms_key_arn
-  api_role_name          = null
-  point_in_time_recovery = false
-  deletion_protection    = false
-  tags                   = local.common_tags
 }
 
 # ── Filing credentials (ADR 0024, guardrail 3) ──────────────────
@@ -258,8 +208,7 @@ module "filing_worker" {
 
 
 # ── Admin audit table (#213) ────────────────────────────────────
-# Hand-rolled like the waitlist table above, and for the same reason: dev has
-# no Lambda, so modules/admin_service (which owns the deployed table alongside
+# Hand-rolled because dev has no Lambda, so modules/admin_service (which owns the deployed table alongside
 # an image Lambda and an HTTP API) does not fit here. Schema matches
 # services/admin's core/audit.py item shape. PITR off, protection off —
 # throwaway rows a developer wipes; the DEPLOYED table is the durable record.

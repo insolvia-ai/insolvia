@@ -1,6 +1,6 @@
 # The dev-aws scripts consume these: machine_id is the ownership check every
-# script performs before touching anything, waitlist_table_name is written
-# into services/api/.env, and the auth_* outputs are printed for upcoming
+# script performs before touching anything, the table and bucket names are
+# written into services/api/.env, and the auth_* outputs are printed for upcoming
 # local auth work.
 
 output "machine_id" {
@@ -11,11 +11,6 @@ output "machine_id" {
 output "environment" {
   description = "This machine's environment name (dev-<machine_short_id>)."
   value       = local.environment
-}
-
-output "waitlist_table_name" {
-  description = "This machine's waitlist DynamoDB table (WAITLIST_TABLE_NAME for the local API)."
-  value       = aws_dynamodb_table.waitlist.name
 }
 
 output "case_table_name" {
@@ -71,11 +66,6 @@ output "auth_domain" {
 output "auth_issuer_url" {
   description = "OIDC issuer for tokens from this machine's pool."
   value       = module.auth.issuer_url
-}
-
-output "firm_table_name" {
-  description = "Firms, firm users and their permissions (FIRM_TABLE_NAME for the API)."
-  value       = module.firm_store.table_name
 }
 
 output "case_document_bucket" {

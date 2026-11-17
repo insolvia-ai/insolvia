@@ -9,8 +9,7 @@
 #     the role's grant on it is PutItem alone — an audit log its own subject
 #     can rewrite is not evidence (the same posture as the case access log).
 #   - Its cross-service grants arrive FROM OTHER MODULES' seams, not here:
-#     modules/firm_store's admin_role_name (table CRUD + the Scan the API
-#     role deliberately lacks) and modules/auth's admin_invite_role_name
+#     modules/auth's admin_invite_role_name
 #     (AdminCreateUser on the firm pool — create and RESEND are one action).
 #     This module only exposes the role for them to attach to.
 #   - No unqualified Lambda permission: this module was born on the alias, so
@@ -131,7 +130,6 @@ resource "aws_lambda_function" "admin" {
   environment {
     variables = {
       INSOLVIA_ENV           = var.insolvia_env
-      FIRM_TABLE_NAME        = var.firm_table_name
       FIRM_USER_POOL_ID      = var.firm_user_pool_id
       ADMIN_AUDIT_TABLE_NAME = aws_dynamodb_table.audit.name
       GOOGLE_CLIENT_ID       = var.google_client_id
@@ -280,7 +278,6 @@ resource "aws_route53_record" "admin" {
 resource "aws_ssm_parameter" "config" {
   for_each = {
     "insolvia-env"           = var.insolvia_env
-    "firm-table-name"        = var.firm_table_name
     "firm-user-pool-id"      = var.firm_user_pool_id
     "admin-audit-table-name" = aws_dynamodb_table.audit.name
     "google-client-id"       = var.google_client_id

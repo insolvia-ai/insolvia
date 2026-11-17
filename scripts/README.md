@@ -15,11 +15,11 @@ Two layers — a shared base plus thin per-package scripts:
 | `scripts/dev-up.sh` | Whole system | Brings the API, mailer, app and marketing site up together in one terminal by delegating to each area's own `dev-up.sh` (the mailer's from a sibling insolvia-services checkout — skipped, with the API recording mail in memory, when there is none); prefixed logs, and one Ctrl-C that runs every `dev-down.sh`. Takes no arguments — to run one part, run that part's own script |
 | `scripts/dev-down.sh` | Whole system | Stops everything `dev-up.sh` starts — containers included — for when Ctrl-C never got the chance: a closed terminal, a killed process, or a stack started from **another checkout** (ports and compose project names are machine-global, so one machine runs one stack). Delegates to each area's `dev-down.sh`; idempotent, and also what `dev-up.sh`'s own Ctrl-C trap runs |
 | `scripts/github-packages-auth.sh` | Shared base (npm consumers) | Ensures a `read:packages` token is available as `NODE_AUTH_TOKEN` so `npm ci` can install `@insolvia-ai/design-system` from GitHub Packages. Reuses the current `gh` token when it already can; only starts `gh auth refresh` (a browser login) when there is a terminal to finish it in |
-| `scripts/dev-aws-setup.sh` | Per-machine AWS layer | Provisions this machine's isolated dev resources (`infra/envs/dev`: waitlist table, case store, …) — sign-in is the one shared dev pool, insolvia-services' (style included), read through SSM (ADR 0026) — and wires `services/api/.env` **and `apps/insolvia_app/.env`** at them; `--check` verifies |
+| `scripts/dev-aws-setup.sh` | Per-machine AWS layer | Provisions this machine's isolated dev resources (`infra/envs/dev`: case store, queues, …) — sign-in is the one shared dev pool, insolvia-services' (style included), read through SSM (ADR 0026) — and wires `services/api/.env` **and `apps/insolvia_app/.env`** at them; `--check` verifies |
 | `scripts/dev-test-unit.sh` | Unit tier (whole repo) | Runs every **unit** suite — pytest per Python unit (preceded by the same `ruff check .` / `ruff format --check .` its `*-pr.yml` job runs, with the venv's ruff checked against the CI pin — the only local ruff gate there is), Jest/Vitest per JS one, the forms checker, the plain-bash test of `.github/scripts/release-diff-base.sh` (the rule that picks which staging legs a release deploys) — or only the suites a set of files can break (`--list` shows the mapping). **What the pre-push hook runs** (`.pre-commit-config.yaml`); with no arguments it is the "did I break anything anywhere" question before a PR. Unit means unit: nothing it runs needs AWS, a server, a secret or the network. An affected area whose venv is missing FAILS naming its setup script rather than skipping — a hook that skips passes on exactly the machine that was never set up |
 | `scripts/dev-fixture.sh` | Seed fixtures (shared bucket) | `publish v1` copies a committed fixture version ([`seeds/fixtures/v1/`](../seeds/fixtures/v1/)) into the account's shared fixture bucket, idempotently by digest; `capture v2 <case-id> <handle>` writes a NEW version out of **this machine's** dev stack (and refuses any other source — that is what keeps every fixture synthetic). Curating a fixture is a human act, so neither runs in CI: the seed role reads the bucket and never writes it |
-| `scripts/dev-aws-seed.sh` | Per-machine AWS layer | Makes this machine signable-in **and** seeded, in one run. First ensures the dev account exists in the shared development Cognito pool (one for every machine, ADR 0026 — use the same password everywhere) — there is **no sign-up screen** on any pool (`allow_admin_create_user_only`), so this is the only way to get one; the password comes from `~/.config/insolvia/dev.env`, `DEV_USER_PASSWORD`, or a no-echo prompt that offers to write that file. Then loads [`seeds/dev.json`](../seeds/dev.json) into this machine's dev tables — a firm with your dev account as its **admin**, and the fixture case it names (rows into the case table; the sample documents copied server-side from the shared fixture bucket into this machine's own document bucket). Without the firm a signed-in developer resolves to no firm and every route behind `current_accessor()` answers **403** (`no_active_firm_user`), because the first firm cannot come from the API (`POST /v1/firm/users` is itself behind `FIRM_ADMINISTRATION`). **Edit the fixture to change what is seeded; this script only says where.** The same loader puts `seeds/staging.json` into staging from `.github/actions/seed-staging` (shared by the API's integration job and the app's e2e job), so the two environments differ in fixture and tables, never in the code path that built the rows — which is why the account step lives in this wrapper, not the loader. `--check` verifies both halves |
-| `scripts/dev-aws-reset.sh` | Per-machine AWS layer | Wipes this machine's dev **data** — waitlist, case, access-log and firm tables (delete + recreate) plus the pool's users — resources survive; `--dry-run`, `--skip-cognito`. Leaves you needing `dev-aws-seed.sh` again, which recreates the account and the firm in one run |
+| `scripts/dev-aws-seed.sh` | Per-machine AWS layer | Makes this machine signable-in **and** seeded, in one run. First ensures the dev account exists in the shared development Cognito pool (one for every machine, ADR 0026 — use the same password everywhere) — there is **no sign-up screen** on any pool (`allow_admin_create_user_only`), so this is the only way to get one; the password comes from `~/.config/insolvia/dev.env`, `DEV_USER_PASSWORD`, or a no-echo prompt that offers to write that file. Then loads [`seeds/dev.json`](../seeds/dev.json) into this machine's dev stores — a firm (into the local Postgres, through `DATABASE_URL`) with your dev account as its **admin**, and the fixture case it names (rows into the case table; the sample documents copied server-side from the shared fixture bucket into this machine's own document bucket). Without the firm a signed-in developer resolves to no firm and every route behind `current_accessor()` answers **403** (`no_active_firm_user`), because the first firm cannot come from the API (`POST /v1/firm/users` is itself behind `FIRM_ADMINISTRATION`). **Edit the fixture to change what is seeded; this script only says where.** The same loader puts `seeds/staging.json` into staging from `.github/actions/seed-staging` (shared by the API's integration job and the app's e2e job), so the two environments differ in fixture and tables, never in the code path that built the rows — which is why the account step lives in this wrapper, not the loader. `--check` verifies both halves |
+| `scripts/dev-aws-reset.sh` | Per-machine AWS layer | Wipes this machine's dev **data** — case and access-log tables (delete + recreate) plus the pool's users; the firm stores and waitlist are the local Postgres, wiped with `docker compose -f services/api/docker-compose.yml down -v` — resources survive; `--dry-run`, `--skip-cognito`. Leaves you needing `dev-aws-seed.sh` again, which recreates the account and the firm in one run |
 | `scripts/dev-aws-destroy.sh` | Per-machine AWS layer | `terraform destroy` of this machine's dev resources + unwinds both `.env` files; the machine id is retained |
 | `scripts/dev-aws-destroy-orphan.sh` | Per-machine AWS layer | `terraform destroy` of a **previous** machine-id's leftovers — `<short-id>` from the orphaned resource names; finds that id's own state key in the bucket, destroys everything the state tracks, then deletes the state object |
 | `scripts/dev-aws-common.sh` | Per-machine AWS layer (sourced) | Machine-UUID identity, per-machine state key, the `aws configure export-credentials` helper shared by the four scripts above, and the refreshed container credentials the API's and admin service's `dev-up.sh` hand their compose stacks (see **Credentials** below) |
@@ -313,8 +313,8 @@ Two things worth knowing:
   `~/.config/insolvia/dev.env` (chmod 600, outside the repo tree — this repo
   is public and an in-tree `.env` has been committed here once already); with
   the file in place, later runs and `e2e/scripts/dev-test.sh` need no prompt
-  and no export. `dev-aws-reset.sh` deletes the pool's users and recreates
-  the firm table — so re-run the seed script after every reset.
+  and no export. `dev-aws-reset.sh` deletes the pool's users, and wiping the
+  local Postgres drops the firm — so re-run the seed script after either.
 - **It needs `dev-aws-setup.sh` to have run.** There is no DynamoDB emulator
   and no fake Cognito: the API talks to this machine's real per-developer
   tables and the app signs in against its real pool. Preflight says so by name
@@ -352,15 +352,17 @@ A lost or regenerated `~/.config/insolvia/machine-id` orphans that old id's
 environment: `dev-aws-destroy.sh` only ever inits the *current* id's state
 key, so the old resources and state object survive every teardown.
 `dev-aws-destroy-orphan.sh` takes the 12-char short id visible in the leftover
-resource names (e.g. `insolvia-dev-<short-id>-waitlist`), locates that id's
+resource names (e.g. `insolvia-dev-<short-id>-cases`), locates that id's
 own state object in the bucket, destroys everything the state tracks, and
 removes the state object. It refuses the current machine's id, and without
 `--yes` the embedded `terraform destroy` shows its plan and asks first.
 
-The in-memory waitlist store still exists in code — it is what unit tests and
-the bare `development_server` use when `WAITLIST_TABLE_NAME` is unset — but it
-is a test seam, not the dev path: `dev-up.sh` refuses to start until setup has
-written `services/api/.env`.
+The in-memory stores still exist in code — they are what unit tests and the
+bare `development_server` use when `CASE_TABLE_NAME` is unset — but they are
+a test seam, not the dev path: `dev-up.sh` refuses to start until setup has
+written `services/api/.env`. The firm stores and the waitlist have no
+in-memory fallback in a running service: they are the local Postgres
+(ADR 0030), and `DATABASE_URL` is required.
 
 How it works:
 
@@ -401,7 +403,7 @@ How it works:
   - `services/api/.env` — docker compose reads it for `${VAR:-default}`
     substitution in `services/api/docker-compose.yml`; `dev-up.sh` reads
     `AWS_PROFILE` from it to export credentials and requires
-    `WAITLIST_TABLE_NAME`. `AUTH_ISSUER_URL`/`AUTH_CLIENT_ID` point token
+    `CASE_TABLE_NAME`. `AUTH_ISSUER_URL`/`AUTH_CLIENT_ID` point token
     verification at this machine's pool — the API fails **closed**, so without
     them every protected route answers 401.
   - `apps/insolvia_app/.env` — Expo loads it automatically and inlines the

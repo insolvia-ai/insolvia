@@ -48,19 +48,13 @@ output_machine_id="$(jq -r '.machine_id.value' <<<"$outputs")"
 
 # Paranoid ownership checks: every name must carry THIS machine's short id
 # and match what infra/envs/dev provisions, or the reset refuses to run.
-table="$(jq -r '.waitlist_table_name.value' <<<"$outputs")"
 case_table="$(jq -r '.case_table_name.value' <<<"$outputs")"
 access_log_table="$(jq -r '.case_access_log_table_name.value' <<<"$outputs")"
-firm_table="$(jq -r '.firm_table_name.value' <<<"$outputs")"
 pool_id="$(jq -r '.auth_user_pool_id.value' <<<"$outputs")"
-[[ "$table" == "$WAITLIST_TABLE_NAME_EXPECTED" ]] ||
-  die "Refusing reset: unexpected DynamoDB table '$table' (expected '$WAITLIST_TABLE_NAME_EXPECTED')."
 [[ "$case_table" == "$CASE_TABLE_NAME_EXPECTED" ]] ||
   die "Refusing reset: unexpected case table '$case_table' (expected '$CASE_TABLE_NAME_EXPECTED')."
 [[ "$access_log_table" == "$CASE_ACCESS_LOG_TABLE_NAME_EXPECTED" ]] ||
   die "Refusing reset: unexpected access-log table '$access_log_table' (expected '$CASE_ACCESS_LOG_TABLE_NAME_EXPECTED')."
-[[ "$firm_table" == "$FIRM_TABLE_NAME_EXPECTED" ]] ||
-  die "Refusing reset: unexpected firm table '$firm_table' (expected '$FIRM_TABLE_NAME_EXPECTED')."
 pool_name="$(aws_dev cognito-idp describe-user-pool --user-pool-id "$pool_id" --query 'UserPool.Name' --output text)"
 [[ "$pool_name" == "$USER_POOL_NAME_EXPECTED" ]] ||
   die "Refusing reset: Cognito pool is named '$pool_name', not '$USER_POOL_NAME_EXPECTED'."
@@ -68,10 +62,8 @@ pool_name="$(aws_dev cognito-idp describe-user-pool --user-pool-id "$pool_id" --
 printf '\nThis will clear development data owned by:\n'
 printf '  AWS account: %s\n' "$AWS_ACCOUNT_ID"
 printf '  Machine ID:  %s\n' "$MACHINE_ID"
-printf '  Table:       %s (delete + recreate)\n' "$table"
 printf '  Case table:  %s (delete + recreate)\n' "$case_table"
 printf '  Access log:  %s (delete + recreate)\n' "$access_log_table"
-printf '  Firm table:  %s (delete + recreate)\n' "$firm_table"
 printf '  Cognito:     %s — the shared pool; its users are NOT deleted\n\n' "$pool_id"
 
 if [[ "$DRY_RUN" -eq 1 ]]; then
@@ -96,10 +88,6 @@ if command -v docker >/dev/null 2>&1 &&
   docker compose -f "$compose_file" stop api >/dev/null
 fi
 
-log "Deleting $table..."
-aws_dev dynamodb delete-table --table-name "$table" >/dev/null
-aws_dev dynamodb wait table-not-exists --table-name "$table"
-
 # The case store goes the same way. Its customer-managed key is deliberately
 # NOT touched: the key is Terraform-owned and survives a reset, so recreating
 # the table below re-grants against the same key rather than churning a new
@@ -115,14 +103,11 @@ log "Deleting $access_log_table..."
 aws_dev dynamodb delete-table --table-name "$access_log_table" >/dev/null
 aws_dev dynamodb wait table-not-exists --table-name "$access_log_table"
 
-# The firms go too, and this table is the one with a foot in both halves of the
-# reset: its firm rows own the cases deleted just above, so a surviving firm
-# would be an empty shell. The accounts survive (shared pool, above), and
-# re-running `dev-aws-seed.sh` gives them their firm back in one command.
-log "Deleting $firm_table..."
-aws_dev dynamodb delete-table --table-name "$firm_table" >/dev/null
-aws_dev dynamodb wait table-not-exists --table-name "$firm_table"
-
+# The firms, the portal bindings and the waitlist are not here: they live in
+# this machine's Docker Postgres (ADR 0030). Wipe that with
+#   docker compose -f services/api/docker-compose.yml down -v
+# and re-run `dev-aws-seed.sh` to give the shared pool's accounts their firm
+# back.
 log "Recreating the empty DynamoDB tables through Terraform..."
 terraform -chdir="$TF_DIR" apply -input=false -auto-approve "${TF_VARS[@]}"
 

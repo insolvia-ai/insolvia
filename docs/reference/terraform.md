@@ -17,7 +17,7 @@ infra/
 ├── modules/
 │   ├── web_hosting/          # reusable: S3 (private+OAC) + CloudFront + Route53 alias
 │   ├── api_service/          # reusable: Docker Lambda + alias + HTTP API + custom domain
-│   │                         #   + waitlist DynamoDB + SSM config namespace + alarms
+│   │                         #   + SSM config namespace + alarms
 │   ├── auth/                 # the CONSUMER half of auth (ADR 0026): the contract
 │   │                         #   reader below + its roles' AdminCreateUser grants
 │   ├── auth_contract/        # reads insolvia-services' SSM contract
@@ -49,8 +49,8 @@ infra/
     │                         # api_service -> api.insolvia.ai
     │                         # auth        -> insolvia-prod-users
     │                         # marketing_site -> www.insolvia.ai (+ apex 301)
-    └── dev/                  # PER DEVELOPER MACHINE (see below) — waitlist
-                              # table + case store + auth pool, env suffix
+    └── dev/                  # PER DEVELOPER MACHINE (see below) — case
+                              # store + auth pool, env suffix
                               # dev-<short-id>; audit trail opt-in
 ```
 
@@ -59,9 +59,9 @@ infra/
 | ci-trust *(insolvia-services)* | `insolvia/ci-trust/terraform.tfstate` | GitHub OIDC provider + `insolvia-shared-deploy-role` deploy role + its policy, and the staging seed role — **human-applied only**, never by CI. The deploy role trusts both repositories; the seed role trusts this one only |
 | account-access *(insolvia-services)* | `insolvia/account-access/terraform.tfstate` | The human IAM users, their groups and attached policies — **human-applied only**, and CI *cannot* apply it at all |
 | shared *(insolvia-services)* | `insolvia/shared/terraform.tfstate` | zone, wildcard cert, SES identity + mail DNS, **the container repositories** (`insolvia-shared-api`, `insolvia-shared-marketing`, `insolvia-shared-jobs`, … — one per image, including every service of this repo's, shared by every env), and **the seed-fixture bucket** (`insolvia-shared-dev-fixtures-us-east-1` — the bytes behind `seeds/fixtures/`, read by every dev stack and by staging's seed step; CI applies it and never writes it) |
-| staging | `insolvia/staging/terraform.tfstate` | staging S3 + CloudFront + DNS record; staging API stack (Lambda, HTTP API, `insolvia-staging-waitlist`, alarms); staging auth (`insolvia-staging-users`) |
-| prod | `insolvia/prod/terraform.tfstate` | prod S3 + CloudFront + DNS record; prod API stack (Lambda, HTTP API, `insolvia-prod-waitlist`, alarms); prod auth (`insolvia-prod-users`); the marketing stack (see below) |
-| dev | `insolvia/dev/<account-id>/<machine-id>/terraform.tfstate` — one per developer machine | that machine's `insolvia-dev-<short-id>-waitlist` and `insolvia-dev-<short-id>-cases` tables and `insolvia-dev-<short-id>-users` pool; the audit trail only with `-var=enable_audit_trail=true` |
+| staging | `insolvia/staging/terraform.tfstate` | staging S3 + CloudFront + DNS record; staging API stack (Lambda, HTTP API, alarms); staging auth (`insolvia-staging-users`) |
+| prod | `insolvia/prod/terraform.tfstate` | prod S3 + CloudFront + DNS record; prod API stack (Lambda, HTTP API, alarms); prod auth (`insolvia-prod-users`); the marketing stack (see below) |
+| dev | `insolvia/dev/<account-id>/<machine-id>/terraform.tfstate` — one per developer machine | that machine's `insolvia-dev-<short-id>-cases` tables and `insolvia-dev-<short-id>-users` pool; the audit trail only with `-var=enable_audit_trail=true` |
 
 ## Cross-layer references (data sources, not outputs)
 
@@ -122,12 +122,12 @@ One instance per environment (issue #63): `staging-api.insolvia.ai` and
   API's own region — unlike CloudFront's unconditional us-east-1 — so the
   same shared wildcard-cert lookup serves both, only because everything is
   us-east-1.
-- **DynamoDB** `insolvia-<env>-waitlist` — `PK`/`SK` string keys,
-  PAY_PER_REQUEST, PITR. Lives here rather than with the marketing site per
-  `docs/adr/0001`. The Lambda's role gets
-  **PutItem only** (append-only by design), on its own env's table only.
+- **No waitlist table.** The waitlist, the firm stores and the portal
+  bindings moved to Postgres (ADR 0030, #621); their tables are migration
+  `0001` in `insolvia_core.adapters.postgres`, and the database itself is
+  #625's.
 - **SSM namespace** `/insolvia/<env>/api/<key>` (#70) — Terraform writes the
-  values the service reads (`insolvia-env`, `waitlist-table-name`); the deploy
+  values the service reads (`insolvia-env`); the deploy
   workflow resolves the namespace into the Lambda environment. Future secrets
   join as SecureStrings with `ignore_changes = [value]`, so Terraform creates
   the slot but never owns the value.
@@ -521,9 +521,6 @@ declares no `key`), so two developers can never collide on names or state.
 
 What it owns is deliberately only what local dev consumes today:
 
-- **DynamoDB** `insolvia-dev-<short-id>-waitlist` — same PK/SK schema as
-  `api_service`'s table so the API's adapter behaves identically, but PITR is
-  **off** (throwaway data; `dev-aws-reset.sh` wipes it by design).
 - **Case store** via the same `modules/case_store` as staging/prod —
   `insolvia-dev-<short-id>-cases` and its access-log table under this
   machine's own customer-managed key, so the tenancy indexes and the encrypted read path behave here exactly as

@@ -6,7 +6,6 @@ from insolvia_core.adapters.aws.case_entity_store import DynamoDbCaseEntityStore
 from insolvia_core.adapters.aws.case_store import DynamoDbCaseStore
 from insolvia_core.adapters.aws.debtor_store import DynamoDbDebtorStore
 from insolvia_core.adapters.aws.document_store import DynamoDbDocumentStore
-from insolvia_core.adapters.aws.firm_store import DynamoDbFirmStore
 from insolvia_core.adapters.aws.jwks_provider import CognitoJwksProvider
 from insolvia_core.adapters.memory.access_log import MemoryAccessLog
 from insolvia_core.adapters.memory.candidate_store import MemoryCandidateStore
@@ -14,7 +13,7 @@ from insolvia_core.adapters.memory.case_entity_store import MemoryCaseEntityStor
 from insolvia_core.adapters.memory.case_store import MemoryCaseStore
 from insolvia_core.adapters.memory.debtor_store import MemoryDebtorStore
 from insolvia_core.adapters.memory.document_store import MemoryDocumentStore
-from insolvia_core.adapters.memory.firm_store import MemoryFirmStore
+from insolvia_core.adapters.postgres.firm_store import PostgresFirmStore
 from insolvia_core.ports import (
     AccessLog,
     CandidateStore,
@@ -22,7 +21,6 @@ from insolvia_core.ports import (
     CaseStore,
     DebtorStore,
     DocumentStore,
-    FirmStore,
     JwksProvider,
 )
 
@@ -50,19 +48,17 @@ debtor_store: DebtorStore
 document_store: DocumentStore
 candidate_store: CandidateStore
 access_log: AccessLog
-firm_store: FirmStore
-if (
-    config.case_table_name
-    and config.case_access_log_table_name
-    and config.firm_table_name
-):
+# The firm store is this machine's Docker Postgres (ADR 0030); load_config()
+# refused to start without DATABASE_URL.
+assert config.database_url is not None
+firm_store = PostgresFirmStore(config.database_url)
+if config.case_table_name and config.case_access_log_table_name:
     case_store = DynamoDbCaseStore(config.case_table_name)
     case_entity_store = DynamoDbCaseEntityStore(config.case_table_name)
     debtor_store = DynamoDbDebtorStore(config.case_table_name)
     document_store = DynamoDbDocumentStore(config.case_table_name)
     candidate_store = DynamoDbCandidateStore(config.case_table_name)
     access_log = DynamoDbAccessLog(config.case_access_log_table_name)
-    firm_store = DynamoDbFirmStore(config.firm_table_name)
 else:
     debtor_store = MemoryDebtorStore()
     # Shared with the case store: a case's debtors live in its partition.
@@ -71,10 +67,6 @@ else:
     document_store = MemoryDocumentStore()
     candidate_store = MemoryCandidateStore()
     access_log = MemoryAccessLog()
-    # Empty at every start: a signed-in developer with no firm is exactly the
-    # "authenticated but not provisioned" case whoami exists to report, and
-    # inventing a firm here would hide it until staging.
-    firm_store = MemoryFirmStore()
 
 # Auth against this machine's own Cognito pool when AUTH_ISSUER_URL and
 # AUTH_CLIENT_IDS are set. Unset, the provider is simply absent and every

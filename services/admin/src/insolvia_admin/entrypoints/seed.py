@@ -182,17 +182,20 @@ from typing import Any, Final, Protocol
 
 from insolvia_core.adapters.aws.case_entity_store import DynamoDbCaseEntityStore
 from insolvia_core.adapters.aws.case_store import DynamoDbCaseStore
-from insolvia_core.adapters.aws.client_binding_store import DynamoDbClientBindingStore
 from insolvia_core.adapters.aws.debtor_store import DynamoDbDebtorStore
 from insolvia_core.adapters.aws.document_blobs import S3DocumentBlobStore
 from insolvia_core.adapters.aws.document_store import DynamoDbDocumentStore
-from insolvia_core.adapters.aws.firm_store import DynamoDbFirmStore
 from insolvia_core.adapters.aws.tax_id_cipher import KmsTaxIdCipher, case_key_alias
 from insolvia_core.adapters.aws.tax_id_store import DynamoDbTaxIdStore
+from insolvia_core.adapters.postgres.client_binding_store import (
+    PostgresClientBindingStore,
+)
+from insolvia_core.adapters.postgres.firm_store import PostgresFirmStore
 from insolvia_core.case_collections import COLLECTIONS
 from insolvia_core.case_entities import create_entity, entity_json, parse_entity
 from insolvia_core.cases import assign_case, create_case, parse_case_creation
 from insolvia_core.clients import create_binding, parse_invitation, plan_binding
+from insolvia_core.database import database_url
 from insolvia_core.debtors import Debtor, create_debtor, debtor_json, parse_debtor
 from insolvia_core.documents import (
     STATUS_STORED,
@@ -435,7 +438,13 @@ class Dependencies:
     """The seams tests replace. Factories, because neither a table name nor a
     pool id is legitimate until the guards below have accepted it."""
 
-    firm_store: Callable[[str], FirmStore] = DynamoDbFirmStore
+    # The firm side is Postgres (ADR 0030, #621): the target's name still
+    # guards the load and derives the ids, while the rows go to DATABASE_URL.
+    # shortcut: the name and the database are two inputs that must agree;
+    # the seeder that writes Postgres throughout (#624) makes them one.
+    firm_store: Callable[[str], FirmStore] = lambda _target: PostgresFirmStore(
+        _database()
+    )
     accounts: Callable[[str], Accounts] = CognitoAccounts
     case_store: Callable[[str], CaseStore] = DynamoDbCaseStore
     debtor_store: Callable[[str], DebtorStore] = DynamoDbDebtorStore
@@ -452,10 +461,16 @@ class Dependencies:
     tax_id_cipher: Callable[[str], TaxIdCipher] = lambda table: KmsTaxIdCipher(
         case_key_alias(table)
     )
-    # (firm table, case table): a binding spans both (insolvia_core.clients).
+    # (firm target, case table): the bindings live beside the firm, in Postgres.
     client_binding_store: Callable[[str, str], ClientBindingStore] = (
-        DynamoDbClientBindingStore
+        lambda _firm, _cases: PostgresClientBindingStore(_database())
     )
+
+
+def _database() -> str:
+    url = database_url(os.environ, required=True)
+    assert url is not None
+    return url
 
 
 def _require_seedable_table(table: str, *, kind: str) -> None:

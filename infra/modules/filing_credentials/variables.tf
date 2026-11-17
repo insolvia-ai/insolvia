@@ -12,7 +12,7 @@ variable "environment" {
 variable "table_kms_key_arn" {
   description = <<-EOT
     The key the credential TABLE is encrypted under at rest — the case key
-    (modules/case_store), exactly as modules/firm_store takes it. This is NOT
+    (modules/case_store), as the case table's own. This is NOT
     the key the password and TOTP seed are sealed under: that is this
     module's own `aws_kms_key.vault`. main.tf says why the two are separate.
   EOT

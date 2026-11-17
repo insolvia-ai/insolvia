@@ -4,20 +4,16 @@ maintainer's decision of 2026-10-01): a client is a prospect until retained,
 stamps `first_retained_at` and clears the stage in one conditional write.
 
 Route-level behaviour is services/api's test_client_funnel_routes.py; this
-file pins the domain rule and both store adapters.
+file pins the domain rule and both stores.
 """
 
 from __future__ import annotations
 
 from dataclasses import replace
-from typing import Any
 
 import pytest
-from botocore.exceptions import ClientError
-from insolvia_core.adapters.aws import firm_store as aws_firm_store
-from insolvia_core.adapters.aws.dynamo import to_attributes
-from insolvia_core.adapters.aws.firm_store import DynamoDbFirmStore
 from insolvia_core.adapters.memory.firm_store import MemoryFirmStore
+from insolvia_core.adapters.postgres.firm_store import PostgresFirmStore
 from insolvia_core.errors import FieldValidationError
 from insolvia_core.firm_clients import (
     PROSPECT_STAGES,
@@ -29,6 +25,7 @@ from insolvia_core.firm_clients import (
     parse_firm_client,
     parse_prospect_stage,
 )
+from insolvia_core.firms import Firm
 
 FIRM_ID = "00000000-0000-4000-8000-00000000f18a"
 ALICE = "00000000-0000-4000-8000-00000000a11c"
@@ -75,12 +72,27 @@ def test_the_whole_record_put_cannot_set_a_stage():
     assert not hasattr(draft, "prospect_stage")
 
 
-# ── The memory store ───────────────────────────────────────────────
+# ── Both stores (memory and Postgres) ───────────────────────────────────────────────
 
 
-@pytest.fixture
-def memory() -> MemoryFirmStore:
-    return MemoryFirmStore()
+@pytest.fixture(params=["memory", "postgres"])
+def memory(request):
+    """Each FirmStore (the name is historical), holding the test firm."""
+    if request.param == "memory":
+        store = MemoryFirmStore()
+    else:
+        request.getfixturevalue("postgres")
+        store = PostgresFirmStore(request.getfixturevalue("postgres_url"))
+    store.create_firm(
+        Firm(
+            id=FIRM_ID,
+            name="Example & Partners",
+            status="active",
+            created_at="2026-01-01T00:00:00.000Z",
+            updated_at="2026-01-01T00:00:00.000Z",
+        )
+    )
+    return store
 
 
 def test_a_prospects_stage_is_set_and_cleared(memory):
@@ -131,65 +143,3 @@ def test_a_whole_record_save_leaves_the_stage_as_stored(memory):
     stored = memory.get_client(FIRM_ID, client.id)
     assert stored is not None
     assert stored.prospect_stage == "possible"
-
-
-# ── The DynamoDB store, over a recording transport ─────────────────
-
-
-class FakeDynamoDb:
-    def __init__(self, response: Any) -> None:
-        self.calls: list[dict[str, Any]] = []
-        self.response = response
-
-    def update_item(self, **kwargs: Any) -> Any:
-        self.calls.append(kwargs)
-        if isinstance(self.response, Exception):
-            raise self.response
-        return self.response
-
-
-def dynamo(monkeypatch, response: Any) -> tuple[DynamoDbFirmStore, FakeDynamoDb]:
-    fake = FakeDynamoDb(response)
-    monkeypatch.setattr(aws_firm_store.boto3, "client", lambda _service: fake)
-    return DynamoDbFirmStore("insolvia-test-firms"), fake
-
-
-def test_setting_a_stage_is_conditioned_on_the_client_still_being_a_prospect(
-    monkeypatch,
-):
-    client = replace(a_client(), prospect_stage="possible")
-    store, fake = dynamo(
-        monkeypatch, {"Attributes": to_attributes(firm_client_item(client))}
-    )
-
-    written = store.set_client_prospect_stage(FIRM_ID, client.id, "possible")
-
-    assert written == client
-    (call,) = fake.calls
-    assert "attribute_not_exists(#body.#retained)" in call["ConditionExpression"]
-    assert call["ExpressionAttributeNames"]["#retained"] == "first_retained_at"
-    assert call["ExpressionAttributeValues"][":stage"] == {"S": "possible"}
-
-
-def test_a_refused_stage_write_is_none(monkeypatch):
-    refused = ClientError(
-        {"Error": {"Code": "ConditionalCheckFailedException", "Message": "no"}},
-        "UpdateItem",
-    )
-    store, _ = dynamo(monkeypatch, refused)
-    assert store.set_client_prospect_stage(FIRM_ID, "c", "possible") is None
-
-
-def test_the_retained_write_stamps_if_absent_and_removes_the_stage_together(
-    monkeypatch,
-):
-    client = a_client(first_retained_at="2026-10-01")
-    store, fake = dynamo(
-        monkeypatch, {"Attributes": to_attributes(firm_client_item(client))}
-    )
-
-    store.mark_client_retained(FIRM_ID, client.id, retained_on="2026-10-01")
-
-    (call,) = fake.calls
-    assert "if_not_exists(#body.#retained, :date)" in call["UpdateExpression"]
-    assert "REMOVE #stage" in call["UpdateExpression"]

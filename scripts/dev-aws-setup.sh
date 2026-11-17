@@ -55,23 +55,17 @@ if [[ "$CHECK_ONLY" -eq 1 ]]; then
     die "Terraform state is missing. Run ./scripts/dev-aws-setup.sh --profile $AWS_PROFILE_VALUE."
   [[ "$(jq -r '.outputs.machine_id.value // empty' <<<"$state_json")" == "$MACHINE_ID" ]] ||
     die "Terraform state does not match this machine ID."
-  table="$(jq -r '.outputs.waitlist_table_name.value // empty' <<<"$state_json")"
   case_table="$(jq -r '.outputs.case_table_name.value // empty' <<<"$state_json")"
   access_log_table="$(jq -r '.outputs.case_access_log_table_name.value // empty' <<<"$state_json")"
-  firm_table="$(jq -r '.outputs.firm_table_name.value // empty' <<<"$state_json")"
   pool_id="$(jq -r '.outputs.auth_user_pool_id.value // empty' <<<"$state_json")"
   document_bucket="$(jq -r '.outputs.case_document_bucket.value // empty' <<<"$state_json")"
   job_queue_url="$(jq -r '.outputs.job_queue_url.value // empty' <<<"$state_json")"
   filing_queue_url="$(jq -r '.outputs.filing_queue_url.value // empty' <<<"$state_json")"
-  [[ -n "$table" && -n "$case_table" && -n "$access_log_table" && -n "$firm_table" && -n "$document_bucket" && -n "$pool_id" && -n "$job_queue_url" && -n "$filing_queue_url" ]] || die "Terraform state is missing required development outputs."
-  aws_dev dynamodb describe-table --table-name "$table" >/dev/null ||
-    die "Development DynamoDB table '$table' is unavailable."
+  [[ -n "$case_table" && -n "$access_log_table" && -n "$document_bucket" && -n "$pool_id" && -n "$job_queue_url" && -n "$filing_queue_url" ]] || die "Terraform state is missing required development outputs."
   aws_dev dynamodb describe-table --table-name "$case_table" >/dev/null ||
     die "Development case table '$case_table' is unavailable."
   aws_dev dynamodb describe-table --table-name "$access_log_table" >/dev/null ||
     die "Development case access-log table '$access_log_table' is unavailable."
-  aws_dev dynamodb describe-table --table-name "$firm_table" >/dev/null ||
-    die "Development firm table '$firm_table' is unavailable."
   aws_dev s3api head-bucket --bucket "$document_bucket" >/dev/null ||
     die "Development case document bucket '$document_bucket' is unavailable."
   aws_dev cognito-idp describe-user-pool --user-pool-id "$pool_id" >/dev/null ||
@@ -80,10 +74,9 @@ if [[ "$CHECK_ONLY" -eq 1 ]]; then
     die "Development job queue '$job_queue_url' is unavailable."
   aws_dev sqs get-queue-attributes --queue-url "$filing_queue_url" --attribute-names QueueArn >/dev/null ||
     die "Development filing queue '$filing_queue_url' is unavailable."
-  if [[ ! -f "$API_DIR/.env" ]] || ! grep -q "^WAITLIST_TABLE_NAME=$table\$" "$API_DIR/.env" ||
+  if [[ ! -f "$API_DIR/.env" ]] ||
     ! grep -q "^CASE_TABLE_NAME=$case_table\$" "$API_DIR/.env" ||
     ! grep -q "^CASE_ACCESS_LOG_TABLE_NAME=$access_log_table\$" "$API_DIR/.env" ||
-    ! grep -q "^FIRM_TABLE_NAME=$firm_table\$" "$API_DIR/.env" ||
     ! grep -q "^CASE_DOCUMENT_BUCKET=$document_bucket\$" "$API_DIR/.env" ||
     ! grep -q "^JOB_QUEUE_URL=$job_queue_url\$" "$API_DIR/.env" ||
     ! grep -q "^FILING_QUEUE_URL=$filing_queue_url\$" "$API_DIR/.env" ||
@@ -92,7 +85,6 @@ if [[ "$CHECK_ONLY" -eq 1 ]]; then
   fi
   if [[ ! -f "$REPO_ROOT/services/mcp/.env" ]] ||
     ! grep -q "^CASE_TABLE_NAME=$case_table\$" "$REPO_ROOT/services/mcp/.env" ||
-    ! grep -q "^FIRM_TABLE_NAME=$firm_table\$" "$REPO_ROOT/services/mcp/.env" ||
     ! grep -q "^AUTH_CLIENT_IDS=" "$REPO_ROOT/services/mcp/.env"; then
     die "services/mcp/.env is missing or stale. Run setup without --check."
   fi
@@ -118,10 +110,8 @@ apply_args=(apply -input=false "${TF_VARS[@]}")
 terraform -chdir="$TF_DIR" "${apply_args[@]}"
 
 outputs="$(terraform_output_json)"
-table="$(jq -r '.waitlist_table_name.value' <<<"$outputs")"
 case_table="$(jq -r '.case_table_name.value' <<<"$outputs")"
 access_log_table="$(jq -r '.case_access_log_table_name.value' <<<"$outputs")"
-firm_table="$(jq -r '.firm_table_name.value' <<<"$outputs")"
 document_bucket="$(jq -r '.case_document_bucket.value' <<<"$outputs")"
 pool_id="$(jq -r '.auth_user_pool_id.value' <<<"$outputs")"
 web_client_id="$(jq -r '.auth_web_client_id.value' <<<"$outputs")"
@@ -140,9 +130,9 @@ filing_worker_role_arn="$(jq -r '.filing_worker_role_arn.value' <<<"$outputs")"
 # compose auto-reads services/api/.env for VARIABLE SUBSTITUTION — not
 # container env — and the compose file's `environment:` block is written as
 # ${VAR:-default} substitutions for exactly the keys below. So:
-#   • WAITLIST_TABLE_NAME here points the stack at this machine's table
-#     (dev-up.sh refuses to start without it).
 #   • CASE_TABLE_NAME points it at this machine's case store (issue 8.2),
+#     and dev-up.sh refuses to start without it. (The firm stores and the
+#     waitlist are the local Postgres, ADR 0030 — nothing to wire here.)
 #     encrypted under this machine's own customer-managed key. Local work on
 #     anything storing case data needs it, and having it here means a KMS or
 #     IAM mistake fails on a laptop rather than after a deploy.
@@ -160,10 +150,8 @@ filing_worker_role_arn="$(jq -r '.filing_worker_role_arn.value' <<<"$outputs")"
 #     appear in every sign-in redirect.
 
 api_env="$API_DIR/.env"
-upsert_env "$api_env" WAITLIST_TABLE_NAME "$table"
 upsert_env "$api_env" CASE_TABLE_NAME "$case_table"
 upsert_env "$api_env" CASE_ACCESS_LOG_TABLE_NAME "$access_log_table"
-upsert_env "$api_env" FIRM_TABLE_NAME "$firm_table"
 upsert_env "$api_env" CASE_DOCUMENT_BUCKET "$document_bucket"
 # The pipeline's local seam (ADR 0018): the local API enqueues accepted jobs
 # onto this machine's real queue, and `python -m
@@ -187,14 +175,12 @@ upsert_env "$api_env" AUTH_PORTAL_CLIENT_ID "$portal_client_id"
 upsert_env "$api_env" AUTH_USER_POOL_ID "$pool_id"
 
 # ── Wire services/admin at the same resources (#213) ───────────
-# Same compose-substitution mechanism as the API's file above. FIRM_TABLE_NAME
-# is the SAME table the API reads — the admin service is the second principal
-# with access to it (ADR 0011); locally both run as the developer's own IAM
-# user. FIRM_USER_POOL_ID is the pool provisioning mints first-administrator
+# Same compose-substitution mechanism as the API's file above. The firm store
+# is the local Postgres the API reads (ADR 0030) — the admin service is the
+# second principal with access to it (ADR 0011). FIRM_USER_POOL_ID is the pool provisioning mints first-administrator
 # accounts in (the one the API verifies against — one dev pool serves both
 # jobs). GOOGLE_CLIENT_ID is the dev Workspace OAuth client, a public value.
 admin_env="$REPO_ROOT/services/admin/.env"
-upsert_env "$admin_env" FIRM_TABLE_NAME "$firm_table"
 upsert_env "$admin_env" FIRM_USER_POOL_ID "$pool_id"
 upsert_env "$admin_env" ADMIN_AUDIT_TABLE_NAME "$admin_audit_table"
 upsert_env "$admin_env" GOOGLE_CLIENT_ID "$google_admin_client_id"
@@ -211,7 +197,6 @@ upsert_env "$admin_env" AWS_DEFAULT_REGION "$AWS_REGION_VALUE"
 mcp_env="$REPO_ROOT/services/mcp/.env"
 upsert_env "$mcp_env" CASE_TABLE_NAME "$case_table"
 upsert_env "$mcp_env" CASE_ACCESS_LOG_TABLE_NAME "$access_log_table"
-upsert_env "$mcp_env" FIRM_TABLE_NAME "$firm_table"
 upsert_env "$mcp_env" AUTH_ISSUER_URL "$issuer_url"
 upsert_env "$mcp_env" AUTH_CLIENT_IDS "$mcp_auth_client_ids"
 upsert_env "$mcp_env" INSOLVIA_ENV "local"

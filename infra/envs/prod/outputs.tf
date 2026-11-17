@@ -37,11 +37,6 @@ output "api_http_api_id" {
   value       = module.api_service.http_api_id
 }
 
-output "api_waitlist_table_name" {
-  description = "Production waitlist DynamoDB table."
-  value       = module.api_service.waitlist_table_name
-}
-
 output "api_alarms_topic_arn" {
   description = "SNS topic for production API alarms — subscribe by hand (Terraform manages no subscriptions)."
   value       = module.api_service.alarms_topic_arn

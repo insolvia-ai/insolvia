@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 #
 # Run the API locally: `docker compose up --build` on services/api's compose
-# stack, pointed at this machine's REAL per-developer AWS waitlist table
-# (there is no local DynamoDB emulator).
+# stack: the Postgres (firm stores, migrated on start) and this machine's
+# REAL per-developer AWS case table (there is no local DynamoDB emulator).
 # Then: curl http://127.0.0.1:8080/health
 #
 # REQUIRES the per-machine AWS layer: ./scripts/dev-aws-setup.sh provisions
 # the table (infra/envs/dev) and writes services/api/.env with
-# WAITLIST_TABLE_NAME + AWS_PROFILE. The container never sees that profile
+# CASE_TABLE_NAME + AWS_PROFILE. The container never sees that profile
 # or a snapshot of keys: this script writes short-lived credentials from it
 # to a 0600 file under ~/.cache/insolvia/aws-container/api (never the repo),
 # keeps rewriting it from the host for as long as compose runs, and the
@@ -34,8 +34,8 @@ if ! command -v docker >/dev/null 2>&1; then
 fi
 
 env_file="$API_DIR/.env"
-if [[ ! -f "$env_file" ]] || ! grep -q '^WAITLIST_TABLE_NAME=' "$env_file"; then
-  die "services/api/.env is missing or lacks WAITLIST_TABLE_NAME — local dev runs against this machine's real AWS table. Run ./scripts/dev-aws-setup.sh first."
+if [[ ! -f "$env_file" ]] || ! grep -q '^CASE_TABLE_NAME=' "$env_file"; then
+  die "services/api/.env is missing or lacks CASE_TABLE_NAME — local dev runs against this machine's real AWS case table. Run ./scripts/dev-aws-setup.sh first."
 fi
 
 profile_from_env="$(sed -n 's/^AWS_PROFILE=//p' "$env_file" | tail -n 1)"

@@ -38,7 +38,7 @@ output "alarms_topic_arn" {
   value       = aws_sns_topic.alarms.arn
 }
 
-# The seam modules/case_store and modules/firm_store attach this service's
+# The seam modules/case_store attaches this service's
 # data grants onto (mcp_role_name) — the third application principal, after
 # the API (ADR 0001) and the admin service (ADR 0011).
 output "lambda_role_name" {

@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from asgiref.wsgi import WsgiToAsgi
-from insolvia_core.adapters.aws.firm_store import DynamoDbFirmStore
 from insolvia_core.adapters.aws.jwks_provider import CognitoJwksProvider
 from insolvia_core.adapters.aws.user_directory import CognitoUserDirectory
+from insolvia_core.adapters.postgres.firm_store import PostgresFirmStore
 from insolvia_core.auth import GOOGLE_ISSUERS, google_jwks_url
 from mangum import Mangum
 
@@ -19,13 +19,12 @@ config = load_config()
 
 # EVERYTHING is hard-required here, unlike the tenant API's mailer seam:
 # this service has no degraded mode worth shipping. A deployment that cannot
-# verify staff tokens, reach the firm table, mint pool accounts, or write its
+# verify staff tokens, reach the firm database, mint pool accounts, or write its
 # audit row is not an admin service with a feature missing — it is one that
 # either refuses every request (confusing) or performs unaudited mutations
 # (forbidden by #178's whole premise). Refusing to boot is discovered by the
 # deploy; the alternatives are discovered by an operator mid-provision.
 for name, value in (
-    ("FIRM_TABLE_NAME", config.firm_table_name),
     ("FIRM_USER_POOL_ID", config.firm_user_pool_id),
     ("ADMIN_AUDIT_TABLE_NAME", config.admin_audit_table_name),
     ("GOOGLE_CLIENT_ID", config.google_client_id),
@@ -33,7 +32,8 @@ for name, value in (
     if not value:
         raise RuntimeError(f"{name} must be set for the admin Lambda entrypoint")
 
-assert config.firm_table_name is not None
+# load_config() already refused to start without DATABASE_URL (ADR 0030).
+assert config.database_url is not None
 assert config.firm_user_pool_id is not None
 assert config.admin_audit_table_name is not None
 
@@ -49,7 +49,7 @@ app = create_app(
     AdminDependencies(
         config=config,
         jwks_provider=jwks_provider,
-        firm_store=DynamoDbFirmStore(config.firm_table_name),
+        firm_store=PostgresFirmStore(config.database_url),
         user_directory=CognitoUserDirectory(config.firm_user_pool_id),
         audit_log=DynamoDbAuditLog(config.admin_audit_table_name),
     )

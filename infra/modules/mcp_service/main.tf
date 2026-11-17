@@ -8,9 +8,9 @@
 # topic.
 #
 # NO DATA STORES OF ITS OWN, deliberately. This service is a second surface
-# over the SAME case, access-log and firm tables the API composes; its
-# execution role's grants attach from modules/case_store and
-# modules/firm_store (mcp_role_name), matching what ADR 0011 did for the
+# over the SAME case and access-log tables the API composes (and the firm
+# store, which is Postgres since ADR 0030); its execution role's grants
+# attach from modules/case_store (mcp_role_name), matching what ADR 0011 did for the
 # admin service — two execution roles with data-store access instead of one,
 # each scoped to what its service exports.
 #
@@ -68,7 +68,7 @@ resource "aws_iam_role_policy_attachment" "mcp_basic" {
 
 # NO inline data policy here, deliberately: every data grant this role holds
 # attaches from the module that owns the store (modules/case_store's
-# mcp_case_access, modules/firm_store's mcp_firm_access), so what this
+# mcp_case_access), so what this
 # service may reach is readable next to what the other principals may — one
 # file per store, every principal's grant side by side.
 

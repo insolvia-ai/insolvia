@@ -1,8 +1,7 @@
 # The Insolvia backend API (services/api): a Flask+Mangum Docker Lambda behind
 # an API Gateway HTTP API, one instance per environment (#62, #63). Owns the
 # whole per-env API stack: Lambda + execution role, HTTP API +
-# custom domain + DNS, the waitlist DynamoDB table
-# (per docs/adr/0001), the /insolvia/<env>/api SSM config
+# custom domain + DNS, the /insolvia/<env>/api SSM config
 # namespace (#70), and the CloudWatch alarms + SNS topic (#69).
 #
 # The house pattern for a Mangum service: HTTP API with a $default route to the
@@ -104,39 +103,6 @@ removed {
   }
 }
 
-# ── Waitlist storage ────────────────────────────────────────────
-# The API owns the waitlist table: docs/adr/0001 makes the API the only
-# application principal with data-store access (an SSR Lambda holding a
-# DynamoDB grant was reviewed and rejected). Named insolvia-<env>-waitlist —
-# deliberately NOT insolvia-marketing-waitlist-*: the table belongs to the
-# API, not to any one client of it.
-#
-# Schema matches insolvia_api.core.waitlist.record_item exactly: constant
-# "WAITLIST" partition, "<submittedAt>#<id>" sort key, so rows read back
-# time-ordered with a single Query. Separate tables per environment is a #63
-# requirement: staging must never be able to read (or pollute) prod.
-
-resource "aws_dynamodb_table" "waitlist" {
-  name         = "${var.project}-${var.environment}-waitlist"
-  billing_mode = "PAY_PER_REQUEST"
-  hash_key     = "PK"
-  range_key    = "SK"
-
-  attribute {
-    name = "PK"
-    type = "S"
-  }
-
-  attribute {
-    name = "SK"
-    type = "S"
-  }
-
-  point_in_time_recovery { enabled = true }
-  server_side_encryption { enabled = true }
-  tags = var.tags
-}
-
 # ── Lambda execution role ───────────────────────────────────────
 
 data "aws_iam_policy_document" "lambda_trust" {
@@ -161,33 +127,10 @@ resource "aws_iam_role_policy_attachment" "api_basic" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-# PutItem ONLY, on this environment's table only. The waitlist is append-only
-# by design: the service records signups and nothing else, so the role gets no
-# read, update, or delete — a compromised API cannot enumerate the list, and
-# staging can never reach the prod table because each environment's role names
-# exactly its own table ARN (#63).
-#
-# When the service starts reading runtime secrets from SSM (#65/#70), grant
-# ssm:GetParameter here on the specific parameters it reads — per-parameter,
-# like the mailer's kill-switch grant, not the whole ${local.ssm_prefix} tree.
-resource "aws_iam_role_policy" "api" {
-  # `-data` is the GRANT this policy carries, per the naming skill's IAM policy
-  # pattern ([project]-[env]-[component]-[grant]). "-policy" said only that a
-  # policy is a policy.
-  name = "${local.name}-data"
-  role = aws_iam_role.api.id
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect   = "Allow"
-        Action   = ["dynamodb:PutItem"]
-        Resource = aws_dynamodb_table.waitlist.arn
-      },
-    ]
-  })
-}
-
+# No data grant here: the waitlist moved to Postgres (ADR 0030, #621), and the
+# case and filing stores attach their own grants to this role from their
+# modules. When the service starts reading runtime secrets from SSM (#65/#70),
+# grant ssm:GetParameter in a policy here on the specific parameters it reads.
 # ── Lambda function ─────────────────────────────────────────────
 
 resource "aws_lambda_function" "api" {
@@ -212,8 +155,7 @@ resource "aws_lambda_function" "api" {
 
   environment {
     variables = {
-      INSOLVIA_ENV        = var.insolvia_env
-      WAITLIST_TABLE_NAME = aws_dynamodb_table.waitlist.name
+      INSOLVIA_ENV = var.insolvia_env
     }
   }
 
@@ -228,7 +170,7 @@ resource "aws_lambda_function" "api" {
   lifecycle { ignore_changes = [image_uri, environment] }
 
   tags       = var.tags
-  depends_on = [aws_iam_role_policy_attachment.api_basic, aws_iam_role_policy.api]
+  depends_on = [aws_iam_role_policy_attachment.api_basic]
 }
 
 resource "aws_cloudwatch_log_group" "lambda" {
@@ -419,7 +361,6 @@ resource "aws_route53_record" "api" {
 #                           infra env name is "prod" but the app-level value
 #                           is "production" — this parameter is where that
 #                           mapping is authoritatively recorded)
-#   waitlist-table-name  -> WAITLIST_TABLE_NAME
 #   unsubscribe-secret   -> UNSUBSCRIBE_SECRET (SecureString, below)
 #
 # Future secrets (#65/#70 consumers) slot in as SecureString siblings with
@@ -428,8 +369,7 @@ resource "aws_route53_record" "api" {
 
 resource "aws_ssm_parameter" "config" {
   for_each = {
-    "insolvia-env"        = var.insolvia_env
-    "waitlist-table-name" = aws_dynamodb_table.waitlist.name
+    "insolvia-env" = var.insolvia_env
   }
 
   name  = "${local.ssm_prefix}/${each.key}"

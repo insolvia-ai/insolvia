@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from insolvia_core.adapters.aws.firm_store import DynamoDbFirmStore
 from insolvia_core.adapters.aws.jwks_provider import CognitoJwksProvider
 from insolvia_core.adapters.aws.user_directory import CognitoUserDirectory
-from insolvia_core.adapters.memory.firm_store import MemoryFirmStore
 from insolvia_core.adapters.memory.user_directory import MemoryUserDirectory
+from insolvia_core.adapters.postgres.firm_store import PostgresFirmStore
 from insolvia_core.auth import GOOGLE_ISSUERS, google_jwks_url
-from insolvia_core.ports import FirmStore, JwksProvider, UserDirectory
+from insolvia_core.ports import JwksProvider, UserDirectory
 
 from insolvia_admin.adapters.aws.audit_log import DynamoDbAuditLog
 from insolvia_admin.adapters.memory.audit_log import MemoryAuditLog
@@ -22,20 +21,19 @@ if config.environment != "local":
 
 configure_logging()
 
-# Adapter composition, mirroring the tenant API's dev server: with this
-# machine's real dev resources named (scripts/dev-aws-setup.sh writes
-# services/admin/.env), the AWS adapters run against them; unset, the bare
-# server falls back to in-memory. The firm store and audit table move as a
-# GROUP — a real firm suspended with the audit row landing in a dict that
-# dies with the process would be an unaudited mutation of real data, which is
-# the one state this service must never occupy.
-firm_store: FirmStore
+# Adapter composition, mirroring the tenant API's dev server. The firm store
+# is this machine's Docker Postgres (ADR 0030; load_config() refused to start
+# without DATABASE_URL) — the same database the local API reads. The audit
+# table is still DynamoDB until it moves (#623): this machine's real table
+# when ADMIN_AUDIT_TABLE_NAME is set, in-memory otherwise. Local data is
+# throwaway, so an in-memory audit row beside a local firm is acceptable here
+# and nowhere else; api_lambda.py requires both.
+assert config.database_url is not None
+firm_store = PostgresFirmStore(config.database_url)
 audit_log: AuditLog
-if config.firm_table_name and config.admin_audit_table_name:
-    firm_store = DynamoDbFirmStore(config.firm_table_name)
+if config.admin_audit_table_name:
     audit_log = DynamoDbAuditLog(config.admin_audit_table_name)
 else:
-    firm_store = MemoryFirmStore()
     audit_log = MemoryAuditLog()
 
 # Its own condition, like the API dev server's: provisioning is the one

@@ -47,11 +47,6 @@ variable "image_tag" {
   default     = "latest"
 }
 
-variable "firm_table_name" {
-  description = "The environment's firm table (modules/firm_store) — the same table the tenant API reads; ADR 0011 records the shared access. The CRUD+Scan grant is attached by that module's admin_role_name seam, not here."
-  type        = string
-}
-
 variable "firm_user_pool_id" {
   description = "The FIRM Cognito pool (insolvia-<env>-users) provisioning mints first-administrator accounts in. The AdminCreateUser grant is attached by modules/auth's admin_invite_role_name seam, not here."
   type        = string

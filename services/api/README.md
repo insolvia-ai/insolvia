@@ -47,9 +47,10 @@ rather than empty) — see `core/waitlist.py::record_item`.
 
 Local dev runs against **this machine's real AWS dev table** — there is no
 local DynamoDB emulator. The per-machine layer
-(`infra/envs/dev`: an isolated waitlist table and case store per developer
-machine; sign-in uses the one shared dev pool from insolvia-services) is the dev
-database:
+(`infra/envs/dev`: an isolated case store per developer machine; sign-in
+uses the one shared dev pool from insolvia-services) is the dev case
+database. The firm stores, portal bindings and waitlist are the compose
+stack's Postgres (ADR 0030), migrated on start:
 
 ```sh
 ./scripts/dev-setup.sh                      # venv + per-machine AWS resources
@@ -66,10 +67,9 @@ a `credential_process` config, so a run longer than one credential lifetime
 `~/.aws` mount: **Credentials in a container** in `scripts/README.md` at the
 repo root.
 
-The bare dev server still runs with zero AWS — with `WAITLIST_TABLE_NAME`
-unset it falls back to the in-memory store (each submission is logged so
-local marketing dev can see it). That fallback is the unit-test seam, not the
-dev path:
+The bare dev server needs the local Postgres (`DATABASE_URL`) and nothing
+else — with `CASE_TABLE_NAME` unset the case stores fall back to in-memory.
+That fallback is the unit-test seam, not the dev path:
 
 ```sh
 python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
@@ -94,8 +94,7 @@ deploy. `tests/__init__.py` is the map of the tiers.
 | Variable | Meaning |
 |---|---|
 | `INSOLVIA_ENV` | `local` (default) \| `staging` \| `production`; also selects the CORS allowlist (`core/config.py`) |
-| `WAITLIST_TABLE_NAME` | DynamoDB table for `POST /v1/waitlist`; required by the Lambda entrypoint. Locally it names this machine's real dev table (written to `.env` by `dev-aws-setup.sh`); unset → in-memory store (test seam) |
-| `FIRM_TABLE_NAME` | DynamoDB table holding firms, their people, and what each may do (`infra/modules/firm_store`). **Read on every authenticated request** — resolving the caller's firm is what makes a case reachable — so the Lambda entrypoint refuses to boot without it. Same local/in-memory shape as the others |
+| `DATABASE_URL` | The Postgres database (ADR 0030): the firm stores, the portal bindings and the waitlist. Required — a running service refuses to start without it. Locally the compose stack's Postgres, `postgresql://insolvia:insolvia@127.0.0.1:5432/insolvia` |
 | `AUTH_ISSUER_URL` | Cognito OIDC issuer — `https://cognito-idp.<region>.amazonaws.com/<pool-id>`. Its `/.well-known/jwks.json` supplies the signing keys. Required by the Lambda entrypoint |
 | `AUTH_USER_POOL_ID` | The pool this environment **calls** (`AdminCreateUser`, when a firm admin adds a colleague) — as against `AUTH_ISSUER_URL`, which it **verifies against**. Both end in the same id and neither is derived from the other: parsing an id out of a URL would make that URL's format load-bearing in a way Cognito never promised. Required by the Lambda entrypoint |
 | `AUTH_CLIENT_ID` | The web app client id every access token must name (`client_id` claim). Required by the Lambda entrypoint |

@@ -49,11 +49,10 @@ terraform -chdir="$TF_DIR" "${destroy_args[@]}"
 
 # Unwind the setup script's wiring — a services/api/.env still naming the
 # destroyed table would send dev-up.sh at a table that no longer exists.
-# Removing WAITLIST_TABLE_NAME makes dev-up.sh fail fast with "run
+# Removing CASE_TABLE_NAME makes dev-up.sh fail fast with "run
 # dev-aws-setup.sh first" instead, and removing AWS_PROFILE stops it
 # exporting credentials.
 api_env="$API_DIR/.env"
-remove_env "$api_env" WAITLIST_TABLE_NAME
 remove_env "$api_env" CASE_TABLE_NAME
 remove_env "$api_env" CASE_ACCESS_LOG_TABLE_NAME
 remove_env "$api_env" FIRM_TABLE_NAME
