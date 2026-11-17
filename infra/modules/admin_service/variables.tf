@@ -47,6 +47,11 @@ variable "image_tag" {
   default     = "latest"
 }
 
+variable "firm_table_name" {
+  description = "The environment's firm table (modules/firm_store) — the same table the tenant API reads; ADR 0011 records the shared access. The CRUD+Scan grant is attached by that module's admin_role_name seam, not here."
+  type        = string
+}
+
 variable "firm_user_pool_id" {
   description = "The FIRM Cognito pool (insolvia-<env>-users) provisioning mints first-administrator accounts in. The AdminCreateUser grant is attached by modules/auth's admin_invite_role_name seam, not here."
   type        = string
@@ -60,25 +65,17 @@ variable "google_client_id" {
   type        = string
 }
 
+# True everywhere this module runs in a deployed environment: the audit table
+# IS the durable provisioning record (#178). Dev instances may disarm it so
+# dev-aws-destroy.sh can remove the table.
+variable "audit_deletion_protection" {
+  description = "Whether the admin audit table refuses deletion."
+  type        = bool
+  default     = true
+}
+
 variable "tags" {
   description = "Common tags applied to all resources."
   type        = map(string)
   default     = {}
-}
-
-# ── The VPC and the database (ADR 0028, plan 18.22) ─────────────
-
-variable "vpc_subnet_ids" {
-  description = "Private subnets the Lambda runs in — module.network.private_subnet_ids."
-  type        = list(string)
-}
-
-variable "vpc_security_group_ids" {
-  description = "Security groups for the Lambda — [module.network.lambda_security_group_id], the one modules/aurora admits 5432 from."
-  type        = list(string)
-}
-
-variable "db_cluster_resource_id" {
-  description = "The Aurora cluster's resource id (module.aurora.cluster_resource_id) — what this host's rds-db:connect grant names."
-  type        = string
 }

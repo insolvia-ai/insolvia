@@ -19,16 +19,11 @@ output "worker_function_name" {
 }
 
 output "worker_role_name" {
-  description = "Worker Lambda execution role name — what modules/case_store's worker_role_name takes to attach the tax-id key grant. null in dev."
+  description = "Worker Lambda execution role name — what modules/case_store's worker_role_name takes to attach the table grant. null in dev."
   value       = local.worker_count == 0 ? null : aws_iam_role.worker[0].name
 }
 
 output "ecr_repository_url" {
   description = "Passed straight through, like api_service's — the repository the deploy workflow pushes worker images to. null in dev."
   value       = var.ecr_repository_url
-}
-
-output "worker_ssm_parameter_prefix" {
-  description = "The worker's config namespace (/insolvia/<env>/worker) — the env root writes its cross-module values here, the deploy step derives it."
-  value       = local.ssm_prefix
 }

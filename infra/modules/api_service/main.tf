@@ -1,9 +1,8 @@
-# The Insolvia backend API: since the switch (ADR 0028, plan 18.22) the .NET
-# host backend/src/Insolvia.Api (ASP.NET Core on Lambda, image-packaged, in
-# the VPC's private subnets) behind an API Gateway HTTP API, one instance per
-# environment (#62, #63). It was services/api's Flask+Mangum image before. Owns the
+# The Insolvia backend API (services/api): a Flask+Mangum Docker Lambda behind
+# an API Gateway HTTP API, one instance per environment (#62, #63). Owns the
 # whole per-env API stack: Lambda + execution role, HTTP API +
-# custom domain + DNS, the /insolvia/<env>/api SSM config
+# custom domain + DNS, the waitlist DynamoDB table
+# (per docs/adr/0001), the /insolvia/<env>/api SSM config
 # namespace (#70), and the CloudWatch alarms + SNS topic (#69).
 #
 # The house pattern for a Mangum service: HTTP API with a $default route to the
@@ -22,8 +21,8 @@
 # just "seed an image, then apply", once per environment:
 #
 #   1. release insolvia-services' infra/envs/shared (creates insolvia-shared-api)
-#   2. build backend/ (`docker build --platform linux/amd64 --provenance=false
-#      --target lambda backend`; scripts/bootstrap-ecr-images.sh does it),
+#   2. build services/api
+#      (`docker build --platform linux/amd64 --provenance=false --target lambda`),
 #      tag it <repo-url>:<env> — this environment's moving marker tag, which is
 #      what `var.image_tag` seeds the Lambda from; there is no `:latest`,
 #      because under a shared repository it would mean "whatever any
@@ -44,12 +43,6 @@ locals {
   # SECOND segment, per the insolvia-aws-naming skill; `api` is the component
   # because that is the surface this serves (api.insolvia.ai).
   name = "${var.project}-${var.environment}-api"
-
-  # The Postgres role this host logs in as (ADR 0028 § Data: one role per
-  # service). Published as INSOLVIA_DB_USERNAME below and named in
-  # module.vpc_access's rds-db:connect grant — one literal, so the two
-  # cannot disagree.
-  db_username = "api"
 
   # The per-environment API config namespace (#70): /<project>/<env>/..., with
   # an /api segment so later services can claim sibling namespaces.
@@ -111,6 +104,39 @@ removed {
   }
 }
 
+# ── Waitlist storage ────────────────────────────────────────────
+# The API owns the waitlist table: docs/adr/0001 makes the API the only
+# application principal with data-store access (an SSR Lambda holding a
+# DynamoDB grant was reviewed and rejected). Named insolvia-<env>-waitlist —
+# deliberately NOT insolvia-marketing-waitlist-*: the table belongs to the
+# API, not to any one client of it.
+#
+# Schema matches insolvia_api.core.waitlist.record_item exactly: constant
+# "WAITLIST" partition, "<submittedAt>#<id>" sort key, so rows read back
+# time-ordered with a single Query. Separate tables per environment is a #63
+# requirement: staging must never be able to read (or pollute) prod.
+
+resource "aws_dynamodb_table" "waitlist" {
+  name         = "${var.project}-${var.environment}-waitlist"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "PK"
+  range_key    = "SK"
+
+  attribute {
+    name = "PK"
+    type = "S"
+  }
+
+  attribute {
+    name = "SK"
+    type = "S"
+  }
+
+  point_in_time_recovery { enabled = true }
+  server_side_encryption { enabled = true }
+  tags = var.tags
+}
+
 # ── Lambda execution role ───────────────────────────────────────
 
 data "aws_iam_policy_document" "lambda_trust" {
@@ -135,22 +161,31 @@ resource "aws_iam_role_policy_attachment" "api_basic" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-# NO DynamoDB grant (ADR 0028). The waitlist is the waitlist_entries Postgres
-# table, INSERT-only for the `api` role (backend/src/Insolvia.Migrator/
-# Grants.cs), so a compromised API still cannot enumerate the list. The
-# DynamoDB waitlist table this module held was deleted in plan 18.23.
+# PutItem ONLY, on this environment's table only. The waitlist is append-only
+# by design: the service records signups and nothing else, so the role gets no
+# read, update, or delete — a compromised API cannot enumerate the list, and
+# staging can never reach the prod table because each environment's role names
+# exactly its own table ARN (#63).
 #
-# What the role holds instead: the VPC's network interfaces and
-# rds-db:connect as `api` (module.vpc_access, one owner for every backend
-# host), plus the grants the stores' modules attach by role name (KMS for the
-# tax-id and vault envelopes, S3, SQS, Cognito).
-module "vpc_access" {
-  source = "../vpc_lambda_access"
-
-  name                   = local.name
-  role_name              = aws_iam_role.api.name
-  db_username            = local.db_username
-  db_cluster_resource_id = var.db_cluster_resource_id
+# When the service starts reading runtime secrets from SSM (#65/#70), grant
+# ssm:GetParameter here on the specific parameters it reads — per-parameter,
+# like the mailer's kill-switch grant, not the whole ${local.ssm_prefix} tree.
+resource "aws_iam_role_policy" "api" {
+  # `-data` is the GRANT this policy carries, per the naming skill's IAM policy
+  # pattern ([project]-[env]-[component]-[grant]). "-policy" said only that a
+  # policy is a policy.
+  name = "${local.name}-data"
+  role = aws_iam_role.api.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["dynamodb:PutItem"]
+        Resource = aws_dynamodb_table.waitlist.arn
+      },
+    ]
+  })
 }
 
 # ── Lambda function ─────────────────────────────────────────────
@@ -165,20 +200,9 @@ resource "aws_lambda_function" "api" {
   # a promotion-invariant violation in the one code path nobody watches.
   # `staging` / `prod` are moving tags CI repoints at each deploy, so this seed
   # means "the last image THIS environment ran".
-  image_uri = "${var.ecr_repository_url}:${var.image_tag}"
-  timeout   = 30
-  # 1024, not the Python image's 512: Lambda allots CPU in proportion to
-  # memory, and a .NET cold start (JIT + ASP.NET Core composition) is
-  # CPU-bound — ADR 0028 § Runtime shape holds it to a 3 s p95.
-  memory_size = 1024
-
-  # The private subnets of modules/network (ADR 0028 § Network). Aurora admits
-  # 5432 from this security group only; Cognito's JWKS, the mailer and every
-  # AWS API but S3 (a gateway endpoint) leave through the NAT instance.
-  vpc_config {
-    subnet_ids         = var.vpc_subnet_ids
-    security_group_ids = var.vpc_security_group_ids
-  }
+  image_uri   = "${var.ecr_repository_url}:${var.image_tag}"
+  timeout     = 30
+  memory_size = 512
 
   # Publish a numbered version on every Terraform-driven change, so the alias
   # below always has a real version to point at (an alias cannot target
@@ -188,7 +212,8 @@ resource "aws_lambda_function" "api" {
 
   environment {
     variables = {
-      INSOLVIA_ENV = var.insolvia_env
+      INSOLVIA_ENV        = var.insolvia_env
+      WAITLIST_TABLE_NAME = aws_dynamodb_table.waitlist.name
     }
   }
 
@@ -202,10 +227,8 @@ resource "aws_lambda_function" "api" {
   # the very first apply.
   lifecycle { ignore_changes = [image_uri, environment] }
 
-  tags = var.tags
-  # module.vpc_access first: Lambda refuses vpc_config until the role can
-  # create network interfaces.
-  depends_on = [aws_iam_role_policy_attachment.api_basic, module.vpc_access]
+  tags       = var.tags
+  depends_on = [aws_iam_role_policy_attachment.api_basic, aws_iam_role_policy.api]
 }
 
 resource "aws_cloudwatch_log_group" "lambda" {
@@ -396,12 +419,8 @@ resource "aws_route53_record" "api" {
 #                           infra env name is "prod" but the app-level value
 #                           is "production" — this parameter is where that
 #                           mapping is authoritatively recorded)
-#   insolvia-db-username -> INSOLVIA_DB_USERNAME (the Postgres role; the rest
-#                           of the database contract is /insolvia/<env>/db/*,
-#                           which the deploy step derives beside this
-#                           namespace as INSOLVIA_DB_*)
+#   waitlist-table-name  -> WAITLIST_TABLE_NAME
 #   unsubscribe-secret   -> UNSUBSCRIBE_SECRET (SecureString, below)
-#   insolvia-cursor-key  -> INSOLVIA_CURSOR_KEY (SecureString, below)
 #
 # Future secrets (#65/#70 consumers) slot in as SecureString siblings with
 # `lifecycle { ignore_changes = [value] }` — Terraform creates the slot, a human
@@ -409,8 +428,8 @@ resource "aws_route53_record" "api" {
 
 resource "aws_ssm_parameter" "config" {
   for_each = {
-    "insolvia-env"         = var.insolvia_env
-    "insolvia-db-username" = local.db_username
+    "insolvia-env"        = var.insolvia_env
+    "waitlist-table-name" = aws_dynamodb_table.waitlist.name
   }
 
   name  = "${local.ssm_prefix}/${each.key}"
@@ -449,29 +468,6 @@ resource "aws_ssm_parameter" "unsubscribe_secret" {
   name  = "${local.ssm_prefix}/unsubscribe-secret"
   type  = "SecureString"
   value = random_password.unsubscribe_secret.result
-  tags  = var.tags
-
-  lifecycle {
-    ignore_changes = [value]
-  }
-}
-
-# ── Pagination cursor key (ADR 0028, plan 18.9) ─────────────────
-# The HMAC key keyset cursors are bound with (backend/src/Insolvia.Data/
-# Pagination/CursorCodec.cs; base64). Unset, the codec falls back to a
-# constant written in this public repository: cursors stay bound to their
-# query but become forgeable. Generated, for the unsubscribe key's reason
-# (present beats remembered). Rotating it only invalidates outstanding
-# cursors — a client lists again from the first page — and ignore_changes
-# lets a hand rotation stand.
-resource "random_bytes" "cursor_key" {
-  length = 32
-}
-
-resource "aws_ssm_parameter" "cursor_key" {
-  name  = "${local.ssm_prefix}/insolvia-cursor-key"
-  type  = "SecureString"
-  value = random_bytes.cursor_key.base64
   tags  = var.tags
 
   lifecycle {

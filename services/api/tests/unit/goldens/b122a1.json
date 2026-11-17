@@ -1,0 +1,189 @@
+{
+ "fields": {
+  "12B": {
+   "value": "1,284.56"
+  },
+  "13A": {
+   "value": "FL"
+  },
+  "13B": {
+   "value": "4"
+  },
+  "13C": {
+   "value": "1,214.56"
+  },
+  "14a": {
+   "value": "/12b less or equal to 13",
+   "widget_states": [
+    "/12b less or equal to 13",
+    "/Off"
+   ]
+  },
+  "Bankruptcy District Information": {
+   "value": "Middle District of Florida"
+  },
+  "Case number1": {
+   "value": "S3.0 caption.case_number"
+  },
+  "CheckBox1": {
+   "value": "/Does not apply",
+   "widget_states": [
+    "/Off",
+    "/Off",
+    "/Does not apply"
+   ]
+  },
+  "CheckBox2": {
+   "value": "/On",
+   "widget_states": [
+    "/On"
+   ]
+  },
+  "CheckBox3": {
+   "value": "/Married but not filing",
+   "widget_states": [
+    "/Off",
+    "/Off",
+    "/Married but not filing"
+   ]
+  },
+  "CheckBox3A": {
+   "value": "/separately",
+   "widget_states": [
+    "/Off",
+    "/separately"
+   ]
+  },
+  "Debto1.Quest10A": {
+   "value": "1,214.56"
+  },
+  "Debto1.Quest10B": {
+   "value": "1,224.56"
+  },
+  "Debto1.Quest10C": {
+   "value": "1,234.56"
+  },
+  "Debto1.Quest11": {
+   "value": "1,264.56"
+  },
+  "Debto1.Quest2.0": {
+   "value": "1,284.56"
+  },
+  "Debto1.Quest3": {
+   "value": "1,294.56"
+  },
+  "Debto1.Quest4": {
+   "value": "1,204.56"
+  },
+  "Debto1.Quest5A": {
+   "value": "1,214.56"
+  },
+  "Debto1.Quest5B": {
+   "value": "1,224.56"
+  },
+  "Debto1.Quest5C": {
+   "value": "1,234.56"
+  },
+  "Debto1.Quest6A": {
+   "value": "1,244.56"
+  },
+  "Debto1.Quest6B": {
+   "value": "1,254.56"
+  },
+  "Debto1.Quest6C": {
+   "value": "1,264.56"
+  },
+  "Debto1.Quest7": {
+   "value": "1,274.56"
+  },
+  "Debto1.Quest8.0": {
+   "value": "1,284.56"
+  },
+  "Debto1.Quest8A": {
+   "value": "1,294.56"
+  },
+  "Debto1.Quest9": {
+   "value": "1,204.56"
+  },
+  "Debto2.Quest10A": {
+   "value": "1,224.56"
+  },
+  "Debto2.Quest10B": {
+   "value": "1,234.56"
+  },
+  "Debto2.Quest10C": {
+   "value": "1,244.56"
+  },
+  "Debto2.Quest11": {
+   "value": "1,274.56"
+  },
+  "Debto2.Quest2.0": {
+   "value": "1,294.56"
+  },
+  "Debto2.Quest2.2": {
+   "value": "1,214.56"
+  },
+  "Debto2.Quest3": {
+   "value": "1,204.56"
+  },
+  "Debto2.Quest5A": {
+   "value": "1,224.56"
+  },
+  "Debto2.Quest5B": {
+   "value": "1,234.56"
+  },
+  "Debto2.Quest5C": {
+   "value": "1,244.56"
+  },
+  "Debto2.Quest6A": {
+   "value": "1,254.56"
+  },
+  "Debto2.Quest6B": {
+   "value": "1,264.56"
+  },
+  "Debto2.Quest6C": {
+   "value": "1,274.56"
+  },
+  "Debto2.Quest7": {
+   "value": "1,284.56"
+  },
+  "Debto2.Quest8.0": {
+   "value": "1,294.56"
+  },
+  "Debto2.Quest8A": {
+   "value": "1,204.56"
+  },
+  "Debto2.Quest9": {
+   "value": "1,214.56"
+  },
+  "Debtor1.Date signed": {
+   "value": "01/08/2026"
+  },
+  "Debtor1.Name": {
+   "value": "S0.0 caption.debtor1_name"
+  },
+  "Debtor1.sig": {
+   "value": "Ada Q Lovelace 1"
+  },
+  "Debtor2.Date signed": {
+   "value": "01/09/2026"
+  },
+  "Debtor2.Name": {
+   "value": "S1.0 caption.debtor2_name"
+  },
+  "Debtor2.sig": {
+   "value": "Ada Q Lovelace 1"
+  },
+  "Quest11": {
+   "value": "1,274.56"
+  },
+  "terrorism If necessary list other sources on a separate page and put the total below 1": {
+   "value": "S24.0 other_income_source_1"
+  },
+  "terrorism If necessary list other sources on a separate page and put the total below 2": {
+   "value": "S25.0 other_income_source_2"
+  }
+ },
+ "release": "form/b122a1@2019-12-01",
+ "sha256": "7d12a80d6e59964f262c5a0dbb042201fd9e74609d2a2fa3edccdb67face1a89"
+}

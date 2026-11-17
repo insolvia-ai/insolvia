@@ -1,8 +1,5 @@
 # ── The filing worker (ADR 0024 PR 7) ──────────────────────────
-# The filing worker as an image Lambda consuming the filing queue — since the
-# switch (ADR 0028, plan 18.22) backend/src/Insolvia.Filing in the VPC's
-# private subnets, logging in to Aurora as the `filing` Postgres role (the
-# vault's SELECT is that role's alone); services/filing before — the kill
+# services/filing as an image Lambda consuming the filing queue, the kill
 # switch it reads before every submission, and EVERY grant its role holds on
 # the case data — in one module, so "what can the filing worker touch" is one
 # file to read and one test (tests/filing_worker.tftest.hcl) pins it whole.
@@ -11,18 +8,13 @@
 # name it, so it is created there, ahead of the service) and arrives here by
 # name and ARN. What it holds, all told:
 #
-#   from modules/filing_credentials   the vault: Decrypt under the vault
-#                                     purpose (PR 4)
+#   from modules/filing_credentials   the vault: GetItem on the credential
+#                                     table, Decrypt under the vault purpose,
+#                                     the access-log append (PR 4)
 #   from modules/filing_queue         consume on the filing queue (PR 6)
-#   from THIS module                  the documents bucket, the tax-id open
-#                                     (Case Upload, PR 9), the kill switch,
-#                                     its own logs, the VPC's network
-#                                     interfaces and rds-db:connect as
-#                                     `filing` (modules/vpc_lambda_access)
-#
-# No DynamoDB verb anywhere since ADR 0028: the case partition the worker
-# reads and the filing records it writes are Aurora rows, reached as the
-# `filing` Postgres role.
+#   from THIS module                  the case table, the documents bucket,
+#                                     the tax-id open (Case Upload, PR 9),
+#                                     the kill switch, its own logs
 #
 # The narrowest role in the account (ADR 0024, Risks): a compromise of it
 # defeats the approval check, so each statement below says what it is for.
@@ -35,7 +27,7 @@
 #
 # ── Bootstrap order (the first apply in a fresh account) ────────
 # Like every image Lambda here: insolvia-services' infra/envs/shared applies
-# first (creates insolvia-shared-filing-dotnet), run `scripts/bootstrap-ecr-images.sh <env> filing`,
+# first (creates insolvia-shared-filing), run `scripts/bootstrap-ecr-images.sh <env> filing`,
 # then apply the env. Later deploys are filing-<env>.yml pushing an image and
 # calling update-function-code; Terraform ignores the image drift.
 
@@ -47,11 +39,6 @@ locals {
   # `-worker`, the kill switch an SSM parameter in the service's namespace.
   name          = "${var.project}-${var.environment}-filing"
   function_name = "${local.name}-worker"
-
-  # The Postgres role this host logs in as — modules/api_service's
-  # db_username note. The Lambda's environment below is Terraform's own here
-  # (names only, no secret), so the literal is used directly.
-  db_username = "filing"
 
   worker_count = var.ecr_repository_url == null ? 0 : 1
   alarm_count  = var.ecr_repository_url != null && var.alarms_topic_arn != null ? 1 : 0
@@ -74,6 +61,72 @@ locals {
   worker_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
+      {
+        # READ the case partition: the approval it consumes, and the record
+        # the approval's digest is recomputed over (the case, its debtors,
+        # every case collection, its packets) — twice per run, at consume and
+        # immediately before the final submit. GetItem and Query on the table
+        # alone: no index (every read starts from the case id), no Scan, no
+        # BatchGetItem (nothing the worker calls batches).
+        Sid      = "FilingCaseRead"
+        Effect   = "Allow"
+        Action   = ["dynamodb:GetItem", "dynamodb:Query"]
+        Resource = var.case_table_arn
+        Condition = {
+          Bool = { "aws:SecureTransport" = "true" }
+        }
+      },
+      {
+        # WRITE five kinds of item in the case partition, every one
+        # conditional: the approval's consume (UpdateItem — pending →
+        # consumed, or voided when the digest no longer matches), the
+        # FILING#<id> record (PutItem — claimed once, then each transition
+        # conditional on its state and attempt), the receipt's DOCUMENT#
+        # item (PutItem), and — ADR 0024 PR 8, in ONE transaction with the
+        # record's move to `filed` — the case's META (UpdateItem of `status`,
+        # `filedAt`, `caseNumber`, `caseNumberKey` and `updatedAt` only,
+        # conditional on the status the worker read) and its STATUS#
+        # history row (PutItem, conditional on not existing).
+        #
+        # PR 8 adds NO action: IAM authorizes each item of a
+        # TransactWriteItems as the PutItem / UpdateItem it is — there is no
+        # separate transaction action to grant (DynamoDB's "Using IAM with
+        # transactions"; `dynamodb:EnclosingOperation` is the only
+        # transaction-specific key). Which also means the grant never stopped
+        # this role from writing a transaction, whatever an earlier version of
+        # this comment said.
+        #
+        # Honest about the limit, as modules/case_store's MCP grant is: IAM
+        # cannot fence a write to a SORT-KEY namespace (dynamodb:LeadingKeys
+        # is partition keys only) or to one item's attributes when the same
+        # statement must Put whole items, so "those five only, those
+        # attributes only" is a property of the code — services/filing writes
+        # nothing but through insolvia_core.adapters.aws.filing_store and the
+        # API's approval and document stores, and the case update's attribute
+        # list is pinned by packages/insolvia_core tests/unit/test_filings.py.
+        # What the omissions buy: no DeleteItem, no BatchWriteItem — the
+        # worker cannot delete a row.
+        Sid      = "FilingRecordWrite"
+        Effect   = "Allow"
+        Action   = ["dynamodb:PutItem", "dynamodb:UpdateItem"]
+        Resource = var.case_table_arn
+        Condition = {
+          Bool = { "aws:SecureTransport" = "true" }
+        }
+      },
+      {
+        # The case table's at-rest key, through DynamoDB only — the same
+        # per-caller table-key need modules/case_store's api_key_actions
+        # note explains. Never a direct Decrypt — the one direct Decrypt this
+        # role holds is TaxIdOpen, next.
+        Sid      = "CaseKeyThroughDynamoDb"
+        Effect   = "Allow"
+        Action   = ["kms:Decrypt", "kms:GenerateDataKey", "kms:DescribeKey"]
+        Resource = var.case_kms_key_arn
+        Condition = {
+          StringEquals = { "kms:ViaService" = "dynamodb.${local.region}.amazonaws.com" }
+        }
+      },
       {
         # OPEN a debtor's sealed tax id, for the Case Upload file (ADR 0024
         # PR 9): Debtor.txt carries the full SSN, and the worker builds it in
@@ -166,17 +219,6 @@ resource "aws_iam_role_policy_attachment" "worker_logs" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-# The VPC's network interfaces and rds-db:connect as `filing`.
-module "vpc_access" {
-  source = "../vpc_lambda_access"
-  count  = local.worker_count
-
-  name                   = local.function_name
-  role_name              = var.worker_role_name
-  db_username            = local.db_username
-  db_cluster_resource_id = var.db_cluster_resource_id
-}
-
 resource "aws_lambda_function" "worker" {
   count = local.worker_count
 
@@ -192,47 +234,24 @@ resource "aws_lambda_function" "worker" {
   timeout     = var.timeout_seconds
   memory_size = var.memory_mb
 
-  # The private subnets: Aurora, S3 through its gateway endpoint, KMS and SSM
-  # through the NAT — and the courts, through the NAT's stable address
-  # (modules/network's nat_public_ip, what a court would allow-list).
-  vpc_config {
-    subnet_ids         = coalesce(var.vpc_subnet_ids, [])
-    security_group_ids = coalesce(var.vpc_security_group_ids, [])
-  }
-
-  # What backend/src/Insolvia.Filing reads (FilingConfig, FilingComposition,
-  # Insolvia.Data's DatabaseSettings). AWS_REGION is Lambda's own reserved
-  # variable and cannot be set here; the runtime provides it.
   environment {
     variables = {
-      INSOLVIA_ENV                  = var.insolvia_env
-      CASE_DOCUMENT_BUCKET          = var.case_document_bucket_name
-      FILING_KILL_SWITCH_PARAMETER  = local.kill_switch_name
-      INSOLVIA_DB_ENDPOINT          = coalesce(var.db_endpoint, "unset")
-      INSOLVIA_DB_PORT              = tostring(var.db_port)
-      INSOLVIA_DB_DATABASE_NAME     = coalesce(var.db_database_name, "unset")
-      INSOLVIA_DB_USERNAME          = local.db_username
-      INSOLVIA_KMS_CASE_KEY_ALIAS   = coalesce(var.case_kms_key_alias, "unset")
-      INSOLVIA_KMS_FILING_KEY_ALIAS = coalesce(var.filing_kms_key_alias, "unset")
+      INSOLVIA_ENV                 = var.insolvia_env
+      CASE_TABLE_NAME              = var.case_table_name
+      CASE_ACCESS_LOG_TABLE_NAME   = var.case_access_log_table_name
+      CASE_DOCUMENT_BUCKET         = var.case_document_bucket_name
+      FILING_KILL_SWITCH_PARAMETER = local.kill_switch_name
     }
   }
 
   # The deploy workflow owns the image (filing-<env>.yml); Terraform owns the
   # environment, which holds names only — no secret ever rides here.
-  lifecycle {
-    ignore_changes = [image_uri]
-
-    precondition {
-      condition     = var.vpc_subnet_ids != null && var.vpc_security_group_ids != null && var.db_cluster_resource_id != null && var.db_endpoint != null && var.db_database_name != null && var.case_kms_key_alias != null && var.filing_kms_key_alias != null
-      error_message = "A deployed filing worker runs in the VPC against Aurora: pass the vpc_*, db_* and *_kms_key_alias inputs (module.network, module.aurora, the key aliases)."
-    }
-  }
+  lifecycle { ignore_changes = [image_uri] }
 
   tags = var.tags
   depends_on = [
     aws_iam_role_policy_attachment.worker_logs,
     aws_iam_role_policy.worker,
-    module.vpc_access,
   ]
 }
 

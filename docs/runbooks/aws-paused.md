@@ -1,8 +1,8 @@
 # AWS is paused
 
 On 2026-11-05 every Insolvia environment in AWS was torn down to bring the bill
-to near zero until there is a full MVP. Development is local:
-`./scripts/dev-up.sh` runs the whole system. **There is no staging or production
+to near zero until there is a full MVP.
+**There is no staging or production
 right now.**
 
 ## What still exists in account 521762924626
@@ -24,13 +24,12 @@ Support Center, also remains; it has cost nothing.
 
 ## Local development
 
-`scripts/dev-aws-setup.sh` no longer applies `infra/envs/dev`. It reads the pool
-from SSM and writes `backend/.env` and `apps/insolvia_app/.env`. It and
-`scripts/dev-aws-seed.sh` still need an AWS session, for the pool only. The
-compose stack uses local Postgres, blobs and queues.
-
-Do **not** run `scripts/dev-aws-destroy.sh`: it would strip the sign-in values
-from the env files. Re-run `scripts/dev-aws-setup.sh` if that happens.
+The backend is Python again (main restored to its state before ADR 0028). That
+backend has **no local stand-in for DynamoDB**: `scripts/dev-up.sh` talks to a
+per-developer stack that `scripts/dev-aws-setup.sh` applies into
+`infra/envs/dev`. While AWS is paused that stack does not exist, so the API
+cannot run locally until someone decides to apply `infra/envs/dev` (it costs
+money) or adds a local DynamoDB. Unit tests that use moto still run offline.
 
 ## Do not run while paused
 

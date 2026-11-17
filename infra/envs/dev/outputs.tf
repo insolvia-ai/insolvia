@@ -1,6 +1,7 @@
 # The dev-aws scripts consume these: machine_id is the ownership check every
-# script performs before touching anything, and dev-aws-setup.sh writes the
-# auth_*, queue and bucket outputs into backend/.env and apps/insolvia_app/.env.
+# script performs before touching anything, waitlist_table_name is written
+# into services/api/.env, and the auth_* outputs are printed for upcoming
+# local auth work.
 
 output "machine_id" {
   description = "Machine UUID this state belongs to — the scripts refuse to act when it does not match the local machine-id file."
@@ -12,9 +13,29 @@ output "environment" {
   value       = local.environment
 }
 
+output "waitlist_table_name" {
+  description = "This machine's waitlist DynamoDB table (WAITLIST_TABLE_NAME for the local API)."
+  value       = aws_dynamodb_table.waitlist.name
+}
+
+output "case_table_name" {
+  description = "This machine's case DynamoDB table (CASE_TABLE_NAME for the local API)."
+  value       = module.case_store.table_name
+}
+
+output "case_access_log_table_name" {
+  description = "This machine's case access-log table (CASE_ACCESS_LOG_TABLE_NAME for the local API)."
+  value       = module.case_store.access_log_table_name
+}
+
 output "case_kms_key_alias" {
-  description = "Alias of this machine's case-data key — INSOLVIA_KMS_CASE_KEY_ALIAS for a local host that seals tax ids against AWS."
+  description = "Alias of this machine's case-data key. Printed for orientation; nothing consumes it — DynamoDB resolves the key from the table."
   value       = module.case_store.kms_key_alias
+}
+
+output "filing_credentials_table_name" {
+  description = "This machine's filing-credential vault table. Nothing needs it configured — the API derives it from CASE_TABLE_NAME — printed for the dev proof."
+  value       = module.filing_credentials.table_name
 }
 
 output "filing_credentials_key_alias" {
@@ -52,6 +73,11 @@ output "auth_issuer_url" {
   value       = module.auth.issuer_url
 }
 
+output "firm_table_name" {
+  description = "Firms, firm users and their permissions (FIRM_TABLE_NAME for the API)."
+  value       = module.firm_store.table_name
+}
+
 output "case_document_bucket" {
   description = "Bucket holding the source documents of a case (CASE_DOCUMENT_BUCKET for the API)."
   value       = module.case_documents.bucket_name
@@ -67,14 +93,19 @@ output "filing_queue_url" {
   value       = module.filing_queue.queue_url
 }
 
+output "admin_audit_table_name" {
+  description = "This machine's append-only admin audit table (#213)."
+  value       = aws_dynamodb_table.admin_audit.name
+}
+
 output "google_admin_client_id" {
-  description = "The dev Google OAuth client id (public), for backend/.env (the admin service) and the portal dev server."
+  description = "The dev Google OAuth client id (public), for services/admin/.env and the portal dev server."
   value       = var.google_admin_client_id
 }
 
 # The MCP service's token allowlist (#261): every harness app client on this
 # machine's pool, comma-joined the way the deployed SSM parameter is —
-# dev-aws-setup.sh writes it into backend/.env as AUTH_CLIENT_IDS.
+# dev-aws-setup.sh writes it into services/mcp/.env as AUTH_CLIENT_IDS.
 output "mcp_auth_client_ids" {
   description = "Comma-joined MCP harness app client ids (AUTH_CLIENT_IDS for the local MCP server)."
   value       = join(",", module.auth.mcp_client_ids)

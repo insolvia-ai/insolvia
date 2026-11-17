@@ -1,0 +1,508 @@
+{
+ "fields": {
+  "1": {
+   "value": "S16.0 home_debt_creditor_name"
+  },
+  "2": {
+   "value": "S16.1 home_debt_creditor_name"
+  },
+  "33d": {
+   "value": "S60.0 other_secured_creditor"
+  },
+  "33e": {
+   "value": "S60.1 other_secured_creditor"
+  },
+  "33f": {
+   "value": "S60.2 other_secured_creditor"
+  },
+  "43a": {
+   "value": "S84.0 special_circumstances_description"
+  },
+  "43b": {
+   "value": "S84.1 special_circumstances_description"
+  },
+  "43c": {
+   "value": "S84.2 special_circumstances_description"
+  },
+  "60": {
+   "value": "1,234.56"
+  },
+  "7a Outofpocket health care allowance per person": {
+   "value": "1,274.56"
+  },
+  "7d Outofpocket health care allowance per person": {
+   "value": "1,204.56"
+  },
+  "Bankruptcy District Information": {
+   "value": "Middle District of Florida"
+  },
+  "Case number": {
+   "value": "S3.0 caption.case_number"
+  },
+  "Check if this is an amended filing": {
+   "value": "/On",
+   "widget_states": [
+    "/On"
+   ]
+  },
+  "Date": {
+   "value": "01/20/2026"
+  },
+  "Date_2": {
+   "value": "01/21/2026"
+  },
+  "Debtor 1": {
+   "value": "S0.0 caption.debtor1_name"
+  },
+  "Debtor 2": {
+   "value": "S1.0 caption.debtor2_name"
+  },
+  "Describe 1": {
+   "value": "S24.0 vehicle_1_description"
+  },
+  "Describe 1_2": {
+   "value": "S30.0 vehicle_2_description"
+  },
+  "Describe 2": {
+   "value": "S24.1 vehicle_1_description"
+  },
+  "Describe 2_2": {
+   "value": "S30.1 vehicle_2_description"
+  },
+  "Explain why 1": {
+   "value": "S21.0 housing_adjustment_explanation"
+  },
+  "Explain why 2": {
+   "value": "S21.1 housing_adjustment_explanation"
+  },
+  "Text1.0": {
+   "value": "S97.0 change_line"
+  },
+  "Text1.1": {
+   "value": "S97.1 change_line"
+  },
+  "Text1.2": {
+   "value": "S97.2 change_line"
+  },
+  "Text1.3": {
+   "value": "S97.3 change_line"
+  },
+  "X": {
+   "value": "9"
+  },
+  "X_2": {
+   "value": "3"
+  },
+  "check11": {
+   "value": "/14",
+   "widget_states": [
+    "/14",
+    "/Off",
+    "/Off"
+   ]
+  },
+  "check25": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check33d": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check33e": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "check33f": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check34": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "check35": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check46": {
+   "value": "/c-2",
+   "widget_states": [
+    "/Off",
+    "/c-2"
+   ]
+  },
+  "check46a": {
+   "value": "/increase",
+   "widget_states": [
+    "/increase",
+    "/Off"
+   ]
+  },
+  "check46b": {
+   "value": "/c-2",
+   "widget_states": [
+    "/Off",
+    "/c-2"
+   ]
+  },
+  "check46c": {
+   "value": "/increase",
+   "widget_states": [
+    "/increase",
+    "/Off"
+   ]
+  },
+  "check46d": {
+   "value": "/c-2",
+   "widget_states": [
+    "/Off",
+    "/c-2"
+   ]
+  },
+  "check46e": {
+   "value": "/increase",
+   "widget_states": [
+    "/increase",
+    "/Off"
+   ]
+  },
+  "check46f": {
+   "value": "/c-1",
+   "widget_states": [
+    "/c-1",
+    "/Off"
+   ]
+  },
+  "check46g": {
+   "value": "/increase",
+   "widget_states": [
+    "/increase",
+    "/Off"
+   ]
+  },
+  "undefined": {
+   "value": "6"
+  },
+  "undefined_10": {
+   "value": "1,294.56"
+  },
+  "undefined_100": {
+   "value": "01/16/2026"
+  },
+  "undefined_101": {
+   "value": "1,204.56"
+  },
+  "undefined_102": {
+   "value": "S98.1 change_reason"
+  },
+  "undefined_103": {
+   "value": "01/17/2026"
+  },
+  "undefined_104": {
+   "value": "1,214.56"
+  },
+  "undefined_105": {
+   "value": "S98.2 change_reason"
+  },
+  "undefined_106": {
+   "value": "01/18/2026"
+  },
+  "undefined_107": {
+   "value": "1,224.56"
+  },
+  "undefined_108": {
+   "value": "S98.3 change_reason"
+  },
+  "undefined_109": {
+   "value": "01/19/2026"
+  },
+  "undefined_11": {
+   "value": "1,284.56"
+  },
+  "undefined_110": {
+   "value": "1,234.56"
+  },
+  "undefined_111": {
+   "value": "Ada Q Lovelace 1"
+  },
+  "undefined_112": {
+   "value": "Ada Q Lovelace 1"
+  },
+  "undefined_12": {
+   "value": "1,254.56"
+  },
+  "undefined_13": {
+   "value": "1,244.56"
+  },
+  "undefined_14": {
+   "value": "1,294.56"
+  },
+  "undefined_16": {
+   "value": "1,204.56"
+  },
+  "undefined_17": {
+   "value": "1,234.56"
+  },
+  "undefined_18": {
+   "value": "1,254.56"
+  },
+  "undefined_19": {
+   "value": "S26.0 vehicle_1_creditor_name"
+  },
+  "undefined_19-1": {
+   "value": "S26.1 vehicle_1_creditor_name"
+  },
+  "undefined_2": {
+   "value": "1,264.56"
+  },
+  "undefined_20": {
+   "value": "1,274.56"
+  },
+  "undefined_20-1": {
+   "value": "1,284.56"
+  },
+  "undefined_20-2": {
+   "value": "1,284.56"
+  },
+  "undefined_21": {
+   "value": "1,294.56"
+  },
+  "undefined_23": {
+   "value": "1,214.56"
+  },
+  "undefined_24": {
+   "value": "S32.0 vehicle_2_creditor_name"
+  },
+  "undefined_24-1": {
+   "value": "S32.1 vehicle_2_creditor_name"
+  },
+  "undefined_25": {
+   "value": "1,234.56"
+  },
+  "undefined_25-1": {
+   "value": "1,244.56"
+  },
+  "undefined_25-2": {
+   "value": "1,244.56"
+  },
+  "undefined_26": {
+   "value": "1,254.56"
+  },
+  "undefined_28": {
+   "value": "1,264.56"
+  },
+  "undefined_29": {
+   "value": "1,274.56"
+  },
+  "undefined_3": {
+   "value": "1,294.56"
+  },
+  "undefined_30": {
+   "value": "1,284.56"
+  },
+  "undefined_31": {
+   "value": "1,294.56"
+  },
+  "undefined_32": {
+   "value": "1,204.56"
+  },
+  "undefined_33": {
+   "value": "1,214.56"
+  },
+  "undefined_34": {
+   "value": "1,224.56"
+  },
+  "undefined_35": {
+   "value": "1,234.56"
+  },
+  "undefined_36": {
+   "value": "1,244.56"
+  },
+  "undefined_37": {
+   "value": "1,254.56"
+  },
+  "undefined_38": {
+   "value": "1,264.56"
+  },
+  "undefined_39": {
+   "value": "1,274.56"
+  },
+  "undefined_4": {
+   "value": "1,224.56"
+  },
+  "undefined_40": {
+   "value": "1,284.56"
+  },
+  "undefined_41": {
+   "value": "1,294.56"
+  },
+  "undefined_42": {
+   "value": "1,204.56"
+  },
+  "undefined_44": {
+   "value": "1,224.56"
+  },
+  "undefined_45": {
+   "value": "1,234.56"
+  },
+  "undefined_46": {
+   "value": "1,244.56"
+  },
+  "undefined_47": {
+   "value": "1,254.56"
+  },
+  "undefined_48": {
+   "value": "1,264.56"
+  },
+  "undefined_49": {
+   "value": "1,274.56"
+  },
+  "undefined_5": {
+   "value": "1,234.56"
+  },
+  "undefined_53": {
+   "value": "S61.0 other_secured_property"
+  },
+  "undefined_54": {
+   "value": "1,254.56"
+  },
+  "undefined_55": {
+   "value": "S61.1 other_secured_property"
+  },
+  "undefined_56": {
+   "value": "1,264.56"
+  },
+  "undefined_57": {
+   "value": "S61.2 other_secured_property"
+  },
+  "undefined_58": {
+   "value": "1,274.56"
+  },
+  "undefined_59": {
+   "value": "1,264.56"
+  },
+  "undefined_60": {
+   "value": "1,284.56"
+  },
+  "undefined_61": {
+   "value": "1,294.56"
+  },
+  "undefined_63": {
+   "value": "S68.0 cure_creditor"
+  },
+  "undefined_64": {
+   "value": "S69.0 cure_property"
+  },
+  "undefined_65": {
+   "value": "1,204.56"
+  },
+  "undefined_66": {
+   "value": "1,214.56"
+  },
+  "undefined_67": {
+   "value": "S68.1 cure_creditor"
+  },
+  "undefined_68": {
+   "value": "S69.1 cure_property"
+  },
+  "undefined_69": {
+   "value": "1,214.56"
+  },
+  "undefined_7": {
+   "value": "1,274.56"
+  },
+  "undefined_70": {
+   "value": "1,224.56"
+  },
+  "undefined_71": {
+   "value": "S68.2 cure_creditor"
+  },
+  "undefined_72": {
+   "value": "S69.2 cure_property"
+  },
+  "undefined_73": {
+   "value": "1,224.56"
+  },
+  "undefined_74": {
+   "value": "1,224.56"
+  },
+  "undefined_76": {
+   "value": "1,244.56"
+  },
+  "undefined_77": {
+   "value": "1,254.56"
+  },
+  "undefined_78": {
+   "value": "1,264.56"
+  },
+  "undefined_79": {
+   "value": "1,284.56"
+  },
+  "undefined_8": {
+   "value": "1,284.56"
+  },
+  "undefined_81": {
+   "value": "1,294.56"
+  },
+  "undefined_85": {
+   "value": "1,204.56"
+  },
+  "undefined_87": {
+   "value": "1,224.56"
+  },
+  "undefined_88": {
+   "value": "1,234.56"
+  },
+  "undefined_9": {
+   "value": "S16.2 home_debt_creditor_name"
+  },
+  "undefined_90": {
+   "value": "1,254.56"
+  },
+  "undefined_91": {
+   "value": "1,264.56"
+  },
+  "undefined_92": {
+   "value": "1,274.56"
+  },
+  "undefined_93": {
+   "value": "1,264.56"
+  },
+  "undefined_95": {
+   "value": "1,274.56"
+  },
+  "undefined_96": {
+   "value": "1,214.56"
+  },
+  "undefined_98": {
+   "value": "1,284.56"
+  },
+  "undefined_99": {
+   "value": "S98.0 change_reason"
+  },
+  "x": {
+   "value": "S77.0 ch13_multiplier"
+  }
+ },
+ "release": "form/b122c2@2025-04-01",
+ "sha256": "657b90f36bf612006759bc078bbeb903950e35b090ca768bbec04f332f013440"
+}

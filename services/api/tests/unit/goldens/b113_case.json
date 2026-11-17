@@ -1,0 +1,486 @@
+{
+ "fields": {
+  "2.1.amount.1": {
+   "value": "500.00"
+  },
+  "2.1.amount.2": {
+   "value": null
+  },
+  "2.1.months.1": {
+   "value": "60"
+  },
+  "2.1.months.2": {
+   "value": null
+  },
+  "2.1.per.1": {
+   "value": "month"
+  },
+  "2.1.per.2": {
+   "value": null
+  },
+  "2.2.direct": {
+   "value": null
+  },
+  "2.2.other": {
+   "value": null
+  },
+  "2.2.other_specify": {
+   "value": null
+  },
+  "2.2.payroll_deduction": {
+   "value": null
+  },
+  "2.3.other": {
+   "value": null
+  },
+  "2.3.other.1": {
+   "value": null
+  },
+  "2.3.other.2": {
+   "value": null
+  },
+  "2.3.retain": {
+   "value": null
+  },
+  "2.3.turn_over": {
+   "value": null
+  },
+  "2.4.additional": {
+   "value": null
+  },
+  "2.4.description.1": {
+   "value": null
+  },
+  "2.4.description.2": {
+   "value": null
+  },
+  "2.4.none": {
+   "value": "X"
+  },
+  "2.5.total": {
+   "value": "30,000.00"
+  },
+  "3.1.arrearage.1": {
+   "value": null
+  },
+  "3.1.arrearage.2": {
+   "value": null
+  },
+  "3.1.collateral.1.1": {
+   "value": "12 Byron Court,"
+  },
+  "3.1.collateral.1.2": {
+   "value": "Tampa, FL 33601"
+  },
+  "3.1.collateral.2.1": {
+   "value": null
+  },
+  "3.1.collateral.2.2": {
+   "value": null
+  },
+  "3.1.creditor.1.1": {
+   "value": "Gulf Coast Home Loans"
+  },
+  "3.1.creditor.1.2": {
+   "value": null
+  },
+  "3.1.creditor.2.1": {
+   "value": null
+  },
+  "3.1.creditor.2.2": {
+   "value": null
+  },
+  "3.1.disbursed_debtor.1": {
+   "value": "X"
+  },
+  "3.1.disbursed_debtor.2": {
+   "value": null
+  },
+  "3.1.disbursed_trustee.1": {
+   "value": null
+  },
+  "3.1.disbursed_trustee.2": {
+   "value": null
+  },
+  "3.1.installment.1": {
+   "value": null
+  },
+  "3.1.installment.2": {
+   "value": null
+  },
+  "3.1.maintain": {
+   "value": "X"
+  },
+  "3.1.monthly.1": {
+   "value": null
+  },
+  "3.1.monthly.2": {
+   "value": null
+  },
+  "3.1.none": {
+   "value": null
+  },
+  "3.1.rate.1": {
+   "value": null
+  },
+  "3.1.rate.2": {
+   "value": null
+  },
+  "3.1.total.1": {
+   "value": "0.00"
+  },
+  "3.1.total.2": {
+   "value": null
+  },
+  "3.2.claim_amount.1": {
+   "value": "7,400.00"
+  },
+  "3.2.claim_amount.2": {
+   "value": null
+  },
+  "3.2.collateral.1.1": {
+   "value": "2016 Honda"
+  },
+  "3.2.collateral.1.2": {
+   "value": "Civic LX"
+  },
+  "3.2.collateral.2.1": {
+   "value": null
+  },
+  "3.2.collateral.2.2": {
+   "value": null
+  },
+  "3.2.collateral_value.1": {
+   "value": "9,000.00"
+  },
+  "3.2.collateral_value.2": {
+   "value": null
+  },
+  "3.2.creditor.1.1": {
+   "value": "Drive Away Financial"
+  },
+  "3.2.creditor.1.2": {
+   "value": "LLC"
+  },
+  "3.2.creditor.2.1": {
+   "value": null
+  },
+  "3.2.creditor.2.2": {
+   "value": null
+  },
+  "3.2.monthly.1": {
+   "value": "146.53"
+  },
+  "3.2.monthly.2": {
+   "value": null
+  },
+  "3.2.none": {
+   "value": null
+  },
+  "3.2.rate.1": {
+   "value": "7"
+  },
+  "3.2.rate.2": {
+   "value": null
+  },
+  "3.2.request": {
+   "value": "X"
+  },
+  "3.2.secured.1": {
+   "value": "7,400.00"
+  },
+  "3.2.secured.2": {
+   "value": null
+  },
+  "3.2.senior.1": {
+   "value": "0.00"
+  },
+  "3.2.senior.2": {
+   "value": null
+  },
+  "3.2.total.1": {
+   "value": "8,791.73"
+  },
+  "3.2.total.2": {
+   "value": null
+  },
+  "3.3.none": {
+   "value": "X"
+  },
+  "3.4.none": {
+   "value": "X"
+  },
+  "3.5.collateral.1": {
+   "value": null
+  },
+  "3.5.collateral.2": {
+   "value": null
+  },
+  "3.5.creditor.1": {
+   "value": null
+  },
+  "3.5.creditor.2": {
+   "value": null
+  },
+  "3.5.none": {
+   "value": "X"
+  },
+  "3.5.surrender": {
+   "value": null
+  },
+  "4.2.percentage": {
+   "value": "10"
+  },
+  "4.2.total": {
+   "value": "3,000.00"
+  },
+  "4.3.attorney_fees": {
+   "value": "3,500.00"
+  },
+  "4.4.estimate": {
+   "value": "X"
+  },
+  "4.4.none": {
+   "value": null
+  },
+  "4.4.total": {
+   "value": "3,200.00"
+  },
+  "4.5.none": {
+   "value": "X"
+  },
+  "5.1.liquidation": {
+   "value": "9,145.00"
+  },
+  "5.1.percentage": {
+   "value": null
+  },
+  "5.1.percentage_estimate": {
+   "value": null
+  },
+  "5.1.percentage_value": {
+   "value": null
+  },
+  "5.1.remaining": {
+   "value": "X"
+  },
+  "5.1.sum": {
+   "value": null
+  },
+  "5.1.sum_amount": {
+   "value": null
+  },
+  "5.2.none": {
+   "value": "X"
+  },
+  "5.3.none": {
+   "value": "X"
+  },
+  "6.1.assumed": {
+   "value": "X"
+  },
+  "6.1.creditor.1.1": {
+   "value": "Sunshine Auto Leasing LLC"
+  },
+  "6.1.creditor.1.2": {
+   "value": null
+  },
+  "6.1.creditor.2.1": {
+   "value": null
+  },
+  "6.1.creditor.2.2": {
+   "value": null
+  },
+  "6.1.description.1.1": {
+   "value": "Lease of a 2024 Toyota"
+  },
+  "6.1.description.1.2": {
+   "value": "RAV4, 22 months"
+  },
+  "6.1.description.1.3": {
+   "value": "remaining; debtor's interest:"
+  },
+  "6.1.description.1.4": {
+   "value": "lessee"
+  },
+  "6.1.description.2.1": {
+   "value": null
+  },
+  "6.1.description.2.2": {
+   "value": null
+  },
+  "6.1.description.2.3": {
+   "value": null
+  },
+  "6.1.description.2.4": {
+   "value": null
+  },
+  "6.1.disbursed_debtor.1": {
+   "value": "X"
+  },
+  "6.1.disbursed_debtor.2": {
+   "value": null
+  },
+  "6.1.disbursed_trustee.1": {
+   "value": null
+  },
+  "6.1.disbursed_trustee.2": {
+   "value": null
+  },
+  "6.1.none": {
+   "value": null
+  },
+  "7.1.confirmation": {
+   "value": null
+  },
+  "7.1.discharge": {
+   "value": null
+  },
+  "7.1.other": {
+   "value": null
+  },
+  "7.1.other_specify": {
+   "value": null
+  },
+  "8.1.none": {
+   "value": "X"
+  },
+  "amended_plan": {
+   "value": null
+  },
+  "amended_sections.1": {
+   "value": null
+  },
+  "amended_sections.2": {
+   "value": null
+  },
+  "case_number": {
+   "value": null
+  },
+  "debtor1.name": {
+   "value": "Ada Quinn Lovelace"
+  },
+  "debtor2.name": {
+   "value": "Ben Lovelace Jr."
+  },
+  "district.1": {
+   "value": "Middle"
+  },
+  "district.2": {
+   "value": "Florida"
+  },
+  "exhibit.a": {
+   "value": "0.00"
+  },
+  "exhibit.b": {
+   "value": "8,791.73"
+  },
+  "exhibit.c": {
+   "value": "0.00"
+  },
+  "exhibit.d": {
+   "value": "0.00"
+  },
+  "exhibit.e": {
+   "value": "9,700.00"
+  },
+  "exhibit.f": {
+   "value": "11,508.27"
+  },
+  "exhibit.g": {
+   "value": "0.00"
+  },
+  "exhibit.h": {
+   "value": "0.00"
+  },
+  "exhibit.i": {
+   "value": "0.00"
+  },
+  "exhibit.j": {
+   "value": "0.00"
+  },
+  "exhibit.total": {
+   "value": "30,000.00"
+  },
+  "header.case_number.p2": {
+   "value": null
+  },
+  "header.case_number.p3": {
+   "value": null
+  },
+  "header.case_number.p4": {
+   "value": null
+  },
+  "header.case_number.p5": {
+   "value": null
+  },
+  "header.case_number.p6": {
+   "value": null
+  },
+  "header.case_number.p7": {
+   "value": null
+  },
+  "header.case_number.p8": {
+   "value": null
+  },
+  "header.debtor.p2": {
+   "value": "Ada Quinn Lovelace"
+  },
+  "header.debtor.p3": {
+   "value": "Ada Quinn Lovelace"
+  },
+  "header.debtor.p4": {
+   "value": "Ada Quinn Lovelace"
+  },
+  "header.debtor.p5": {
+   "value": "Ada Quinn Lovelace"
+  },
+  "header.debtor.p6": {
+   "value": "Ada Quinn Lovelace"
+  },
+  "header.debtor.p7": {
+   "value": "Ada Quinn Lovelace"
+  },
+  "header.debtor.p8": {
+   "value": "Ada Quinn Lovelace"
+  },
+  "part1.1.1.included": {
+   "value": "X"
+  },
+  "part1.1.1.not_included": {
+   "value": null
+  },
+  "part1.1.2.included": {
+   "value": null
+  },
+  "part1.1.2.not_included": {
+   "value": "X"
+  },
+  "part1.1.3.included": {
+   "value": null
+  },
+  "part1.1.3.not_included": {
+   "value": "X"
+  },
+  "sign.attorney": {
+   "value": null
+  },
+  "sign.attorney_date": {
+   "value": "08/31/2026"
+  },
+  "sign.debtor1": {
+   "value": null
+  },
+  "sign.debtor1_date": {
+   "value": "08/30/2026"
+  },
+  "sign.debtor2": {
+   "value": null
+  },
+  "sign.debtor2_date": {
+   "value": "08/30/2026"
+  }
+ },
+ "release": "form/b113@2017-12-01",
+ "sha256": "b99f19b6e9a2ff5c44881ae0e1c490aef5e210d36473d081c1af820154ef7b4e"
+}

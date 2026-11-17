@@ -16,12 +16,8 @@ insolvia/
 │   │       └── theme.ts               StyleSheet helpers over the tokens
 │   └── insolvia_marketing/            React Router v7 + Vite, SSR
 ├── packages/
-│   ├── insolvia_api_client/           @insolvia-ai/api-client
-│   └── insolvia_admin_client/         @insolvia-ai/admin-client — the admin portal's client (unpublished)
-├── backend/                           the .NET 10 backend on Aurora PostgreSQL (ADR 0028)
-├── contract/                          the backend's HTTP contract suite (Jest; offline, or deployed and signed in)
-├── e2e/                               Playwright: flows and smoke against deployed envs; the admin portal's flow offline
-├── seeds/                             who exists per environment, and the versioned fixture cases
+│   └── insolvia_api_client/           @insolvia-ai/api-client
+├── services/                          api · admin · mcp · filing (Python on Lambda)
 ├── infra/                             Terraform — staging / prod / dev
 ├── tool/                              brand generators (themes, favicon)
 └── docs/                              business plan + runbooks
@@ -38,7 +34,7 @@ repository, the CI deploy role, the human IAM users) or the mailer: those are
 which this repo depends on the way it depends on the design system — by name,
 never by path ([ADR 0025](../adr/0025-shared-infra-and-mailer-move-to-insolvia-services.md)).
 
-The front end is TypeScript and the backend C#. The app follows the layout Expo itself publishes —
+Everything is TypeScript. The app follows the layout Expo itself publishes —
 `src/app/` is routes-only, screen bodies live in `src/screens/` — see
 [ADR 0005](../adr/0005-expo-app-layout.md) for why, and
 [`apps/insolvia_app/CLAUDE.md`](../../apps/insolvia_app/CLAUDE.md) for the rules.
@@ -79,7 +75,7 @@ behind all of it, including the measurements that ruled out a component library.
 | Node | ≥ 24 (`engines.node`), installed by `scripts/dev-setup.sh` |
 | App | **Expo SDK 57**, pinned exact · Metro · Expo Router (`web.output: "single"`) |
 | Marketing | React Router v7 framework mode · Vite |
-| Services | **.NET 10** (ASP.NET Core minimal APIs) on image Lambdas in a VPC, on **Aurora Serverless v2 PostgreSQL 17** — [ADR 0028](../adr/0028-backend-moves-to-dotnet-and-postgres.md). The Python 3.12 services they replaced were deleted in 18.23 |
+| Services | Python 3.12 on Lambda |
 | Lint/format | ESLint 9 + Prettier, fanned out per workspace member |
 
 **Expo's free tier only — and CI enforces it.** No EAS Build, Submit, Update or
@@ -163,29 +159,9 @@ real (prod ships when the release run's gate is approved).
 
 | Stage | Jobs | Gate |
 |---|---|---|
-| Staging | `infra-staging.yml` (`mode: apply`) → `migrator-staging.yml` (build, then **invoke the migrator Lambda**: migrate, seed) → changed services, ordered by `needs`; the api leg ends in the **contract suite's deployed target** and the app leg in the **e2e suite** (both projects), each after re-converging the seed | none — staging *is* `main` |
+| Staging | `infra-staging.yml` (`mode: apply`) → changed services, ordered by `needs`; the api leg ends in the **integration tier** and the app leg in the **e2e suite** (both projects), each after seeding staging | none — staging *is* `main` |
 | Evidence | `record` (sha image tags + commit status), `supersede` | none |
-| Production | `promote` → `infra-prod.yml` (`mode: apply`) → `migrator-prod.yml` (promote by digest, invoke: migrate only) → every service, same order; the app leg ends in the **smoke** project against production, a detector | `promote` carries the `insolvia-production` environment |
-
-**The database is migrated before any alias shifts** (ADR 0028 § Runtime
-shape). Aurora sits in private subnets no GitHub runner can reach, so the
-schema, the per-service Postgres roles and their grants are applied by a
-one-shot Lambda inside the VPC (`infra/modules/migrator`, the image of
-`backend/src/Insolvia.Migrator`), which CI invokes and checks for a
-`FunctionError`. It is the first leg after infra in both stages, so every
-backend leg after it starts against a current schema; a migration that will
-not apply fails the release before any service moves. The staging migrator
-also seeds (`seeds/README.md`); production's is never seeded and its role
-holds nothing the seed would need.
-
-**Every backend Lambda's environment comes from one derivation**,
-`.github/scripts/lambda-environment.sh`: the host's SSM namespace
-(`/insolvia/<env>/<api|worker|admin-api|mcp|migrator>/*`, last segment
-upper-snake-cased) plus the database contract `/insolvia/<env>/db/*` as
-`INSOLVIA_DB_*`. It refuses an empty namespace, the wrong `INSOLVIA_ENV`,
-and any Lambda-reserved name (`AWS_REGION` is the runtime's own). The filing
-worker is the exception — Terraform owns its environment outright — because
-it holds names only.
+| Production | `promote` → `infra-prod.yml` (`mode: apply`) → every service, same order; the app leg ends in the **smoke** project against production, a detector | `promote` carries the `insolvia-production` environment |
 
 Shared infra and the mailer are **not** legs of this pipeline — they release
 from insolvia-services' own `release.yml`. Both env roots here still resolve
@@ -247,23 +223,18 @@ catches syntax and type errors but can never show what a change would *do*.
 
 ### What each stage asserts
 
-Each level of testing has one owner and a fixed set of environments —
-[ADR 0029](../adr/0029-one-testing-shape.md) owns the table (amending
-[ADR 0021](../adr/0021-test-tiers-and-seed-fixtures.md)'s tiers) and the
-`insolvia-testing` skill owns how to write one. In pipeline terms: every
-`*-pr.yml` check and the pre-push hook run the **unit**, **data** and
-**in-process route** levels, and `Contract (.NET)` runs `contract/`'s
-**offline** target (the .NET hosts on a throwaway Postgres, tokens signed by
-the run's own keys). `contract/`'s **deployed** target (the live API, admin
-and MCP over HTTP through each surface's real client, signed in as a seeded
-person) and the e2e **flows** and **smoke** projects run inside the staging
-stage after the deploys they test, seeded by `.github/actions/seed-staging`
-(the migrator Lambda's `seed` command), and their failure withholds the
-`insolvia/staging-release` status; the e2e **smoke** project alone runs
-against production, last, with no credentials. Seed data converges on every
-staging deploy from `seeds/staging.json` plus the versioned fixtures in
-`seeds/fixtures/`, whose bytes live in the shared bucket insolvia-services'
-`infra/envs/shared` owns.
+Four test tiers, each aimed at the environments that can answer it —
+[ADR 0021](../adr/0021-test-tiers-and-seed-fixtures.md) owns the table and the
+`insolvia-testing` skill owns how to write one. In pipeline terms: the **unit**
+tier is every `*-pr.yml` check and the pre-push hook; the **integration** tier
+(`services/api/tests/integration`, the live API over HTTP signed in as a seeded
+person) and the **e2e** suite (`e2e/`, both projects) run inside the staging
+stage after the deploys they test, seeded by `.github/actions/seed-staging`,
+and their failure withholds the `insolvia/staging-release` status; the e2e
+**smoke** project alone runs against production, last, with no credentials.
+Seed data converges on every staging deploy from `seeds/staging.json` plus the
+versioned fixtures in `seeds/fixtures/`, whose bytes live in the shared bucket
+insolvia-services' `infra/envs/shared` owns.
 
 ### Production promotes; it does not rebuild
 
@@ -338,7 +309,7 @@ first.
 
 **Enforced today:** a PR is required (no direct pushes); linear history; no
 force-push; no branch deletion; squash or rebase merges only; review threads must
-be resolved, and pushes dismiss stale reviews. **Plus the required status
+be resolved, and pushes dismiss stale reviews. **Plus the thirteen required status
 checks below** — red CI cannot merge.
 
 **Not enforced today** (despite `.github/CODEOWNERS` existing):
@@ -350,37 +321,30 @@ last paragraph of this section.
 ### Required status checks
 
 Red CI blocks a merge to `main`. The `protect-main` ruleset requires these
-job `name:` values (matrix legs get a `(leg)` suffix) — every `*-pr.yml` gate,
-so a new PR gate is not finished until it is on this list. **18.23 deleted the
-five Python checks' workflows** (`API service`, `Admin service`,
-`MCP service`, `Filing worker`, `Core package`), and they are off the ruleset
-(ADR 0028 § Consequences). ADR 0029's moves (Jest everywhere, the forms check
-as xUnit, `integration/` into `contract/`) renamed no check.
+**thirteen** job `name:` values (matrix legs get a `(leg)` suffix) — every
+`*-pr.yml` job, so a new PR gate is not finished until it is on this list:
 
 | Check name | Workflow |
 |---|---|
-| `App` | `app-pr.yml` — also the guard against tracked Python (ADR 0029 rule 4) |
+| `App` | `app-pr.yml` |
 | `Admin portal` | `admin-pr.yml` |
+| `Admin service` | `admin-pr.yml` |
 | `API client` | `api-client-pr.yml` |
-| `Backend (.NET)` | `backend-pr.yml` — the backend that deploys (ADR 0028) |
+| `API service` | `api-pr.yml` |
 | `Cognito branding` | `branding-pr.yml` — the brand drift gate (ADR 0020); the name outlived Cognito, see the workflow's header |
-| `Contract (.NET)` | `contract-dotnet-pr.yml` — `contract/`'s offline target and its coverage gates (ADR 0029 rule 2) |
-| `Form specs` | `forms-pr.yml` — the xUnit spec tests in `Insolvia.Forms.Tests` |
+| `Core package` | `core-pr.yml` |
+| `Filing worker` | `filing-pr.yml` |
+| `Form specs` | `forms-pr.yml` |
 | `Marketing site` | `marketing-pr.yml` |
+| `MCP service` | `mcp-pr.yml` |
 | `Terraform validate (staging)` | `shared-infra-plan.yml` |
 | `Terraform validate (prod)` | `shared-infra-plan.yml` |
 
-`Admin portal`, the since-deleted `Admin service` and `Cognito branding` were
-missing from the ruleset until 2026-10-13 although their workflows already said they were
+`Admin portal`, `Admin service` and `Cognito branding` were missing from the
+ruleset until 2026-10-13 although their workflows already said they were
 required — `scripts/update-ruleset.sh show` is the check, not this table.
 
-Two PR jobs run on every PR and are **not** required, by decision:
-`Admin client` (`admin-pr.yml` — the portal's client package on its own; the
-`Admin portal` job, which builds the portal against it, is the gate) and
-`Admin portal flow (offline)` (`admin-flow-pr.yml` — a Playwright flow, and
-e2e flows stay out of the required set; see the workflow's header).
-
-`Terraform validate (dev)` runs alongside the two `Terraform validate` checks above but is deliberately
+`Terraform validate (dev)` runs alongside the two above but is deliberately
 **not** required — dev is never applied by CI, so it exists for coverage rather
 than as a gate. The reasoning is in `shared-infra-plan.yml`'s matrix comment.
 `Mailer service` and `Terraform validate (shared)` left this list when the

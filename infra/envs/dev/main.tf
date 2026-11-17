@@ -12,19 +12,20 @@
 # `terraform validate -backend=false` here, like every other env).
 #
 # Scope is deliberately tiny — only what local development actually consumes
-# today (see docs/reference/terraform.md). THE DATABASE IS NOT HERE: it is
-# Postgres in Docker (backend/docker-compose.yml, ADR 0028), so the waitlist
-# and admin-audit tables this root used to hold for the Python stack are gone
-# (18.23). What remains:
-#   • the case key via modules/case_store — the customer-managed key the
-#     document bucket is encrypted under and tax ids are sealed with (its
-#     DynamoDB tables, and the firm store's, went in plan 18.23);
-#   • the filing-credential vault key via modules/filing_credentials
-#     (ADR 0024) — the key and the filing worker's role, so the key policy
+# today (see docs/reference/terraform.md):
+#   • the waitlist DynamoDB table — local dev's actual database (there is no
+#     local emulator; the compose stack's API talks straight to this table);
+#   • the case store via modules/case_store — the same module staging and prod
+#     instantiate, so local development exercises the real encrypted path
+#     rather than an approximation of it;
+#   • the filing-credential vault via modules/filing_credentials (ADR 0024)
+#     — its key, its table and the filing worker's role, so the key policy
 #     that keeps Decrypt to the worker is exercised here, not first met on
 #     staging;
-#   • the job and filing queues, and the case-document bucket — what a
-#     `dotnet run` of the worker or a host reads through backend/.env;
+#   • the filing queue via modules/filing_queue (ADR 0024 PR 6) — the queue
+#     an attorney's approval puts a filing job on, so the dev proof
+#     (services/api/scripts/dev-filing-approval-proof.sh) enqueues on a real
+#     per-machine queue;
 #   • the SHARED development Cognito pool's identifiers, READ from
 #     insolvia-services' SSM contract via modules/auth_contract — the pool is
 #     that repo's and every machine's (ADR 0026), not this machine's;
@@ -32,14 +33,14 @@
 #     off by default because a per-developer trail is cost with no evidentiary
 #     value — but standable-up, so modules/audit_trail can be exercised on a
 #     laptop rather than first met on staging.
-# No ECR/Lambda/API Gateway: local dev runs the backend via compose or
-# `dotnet run`, not Lambda, and the app runs on the Expo dev server.
+# No ECR/Lambda/API Gateway/S3: local dev runs the API via compose or the
+# plain dev server, not Lambda, and the app runs on the Expo dev server.
 
 locals {
   # dev-<machine_short_id> is this machine's environment name, and it slots
   # into the ENV segment of the repo-wide insolvia-<env>-<component>
-  # convention (the insolvia-aws-naming skill) — so this machine's case key
-  # is alias/insolvia-dev-<short-id>-cases. The machine id being inside the env
+  # convention (the insolvia-aws-naming skill) — so this machine's case table
+  # is insolvia-dev-<short-id>-cases. The machine id being inside the env
   # segment rather than trailing the whole name is what keeps two developers
   # from colliding on any name, including the globally-unique ones.
   environment = "dev-${var.machine_short_id}"
@@ -56,15 +57,49 @@ locals {
   }
 }
 
-# ── Case key (issue 8.2) ────────────────────────────────────────
+# ── Waitlist storage ────────────────────────────────────────────
+# Same schema as modules/api_service's table (generic PK/SK string keys,
+# on-demand billing) so the service's DynamoDB adapter behaves identically
+# against it. Two deliberate differences from the deployed table:
+#   • PITR is OFF — this is throwaway dev data a developer wipes with
+#     dev-aws-reset.sh; paying for recovery of it would be noise.
+#   • No IAM grant — the developer's own credentials are the principal, so
+#     there is no execution role to scope PutItem to.
+
+resource "aws_dynamodb_table" "waitlist" {
+  name         = "insolvia-${local.environment}-waitlist"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "PK"
+  range_key    = "SK"
+
+  attribute {
+    name = "PK"
+    type = "S"
+  }
+
+  attribute {
+    name = "SK"
+    type = "S"
+  }
+
+  server_side_encryption { enabled = true }
+  tags = local.common_tags
+}
+
+# ── Case store (issue 8.2) ──────────────────────────────────────
 # The SAME module staging and prod use, not a hand-rolled copy — which is the
-# whole point: the customer-managed key behaves here exactly as it does
-# deployed, so a KMS permission mistake surfaces on a laptop instead of on
-# staging.
+# whole point. The table's keys, its owner index and its customer-managed key
+# behave here exactly as they do deployed, so the DynamoDB adapter, the GSI
+# query behind GET /v1/cases, and any KMS permission mistake all surface on a
+# laptop instead of on staging.
 #
-# One deliberate difference from the deployed instances: the minimum 7-day key
-# deletion window, so a destroy does not leave a 30-day pending key (and a
-# monthly charge) behind on every teardown.
+# Three deliberate differences from the deployed instances, all for the same
+# reason the waitlist table above diverges — this is throwaway data on a
+# machine, not a case file:
+#   • PITR off — a developer wipes this with dev-aws-reset.sh.
+#   • Deletion protection off — dev-aws-destroy.sh has to be able to remove it.
+#   • The minimum 7-day key deletion window, so a destroy does not leave a
+#     30-day pending key (and a monthly charge) behind on every teardown.
 #
 # api_role_name is null: there is no Lambda here. The developer's own IAM user
 # is the principal, and it reaches the key through the key policy's root
@@ -75,19 +110,19 @@ module "case_store" {
   project                     = "insolvia"
   environment                 = local.environment
   api_role_name               = null
+  point_in_time_recovery      = false
+  deletion_protection         = false
   key_deletion_window_in_days = 7
   tags                        = local.common_tags
 }
-
-# No VPC and no Aurora here, deliberately: local development uses Postgres in Docker (backend/docker-compose.yml, ADR 0028 § Local, dev, staging, prod).
 
 # ── Job pipeline (ADR 0018), queue half only ────────────────────
 # The same module staging and prod instantiate, with the WORKER half absent:
 # ecr_repository_url is null (there is no Lambda in dev, same as everywhere
 # above), so the module creates the queue and its DLQ and nothing else. That
-# is deliberately not a stub — a local host enqueues onto this real queue
-# (JOB_QUEUE_URL in backend/.env), and the worker's local poller
-# (`dotnet run --project backend/src/Insolvia.Worker`) consumes it under the
+# is deliberately not a stub — the local API enqueues onto this real queue
+# (JOB_QUEUE_URL in services/api/.env), and
+# `python -m insolvia_api.entrypoints.worker_poller` consumes it under the
 # developer's own credentials, so the full accept → deliver → run → status
 # loop runs on a laptop; only the managed SQS→Lambda delivery hop itself is
 # cloud-only (ADR 0018 writes that down). api_role_name is null for the
@@ -104,6 +139,24 @@ module "job_pipeline" {
   tags               = local.common_tags
 }
 
+# ── Firms ───────────────────────────────────────────────────────
+# The same module staging and prod instantiate, on the same case key, so local
+# development resolves a caller through the real sparse index rather than a
+# stub. api_role_name is null for the same reason the case store's is: there is
+# no Lambda here.
+module "firm_store" {
+  source = "../../modules/firm_store"
+
+  project                = "insolvia"
+  environment            = local.environment
+  aws_region             = var.aws_region
+  kms_key_arn            = module.case_store.kms_key_arn
+  api_role_name          = null
+  point_in_time_recovery = false
+  deletion_protection    = false
+  tags                   = local.common_tags
+}
+
 # ── Filing credentials (ADR 0024, guardrail 3) ──────────────────
 # The same module staging and prod instantiate — the real dedicated key, its
 # real key policy and the real filing worker's role — so the sealed
@@ -116,15 +169,19 @@ module "job_pipeline" {
 #     delegation. The key policy's deny refuses THAT principal Decrypt too —
 #     an admin — which is the dev proof that only the worker can open.
 #   • worker_assumable_by names the developer, so "the worker's role opens"
-#     can be proved by assuming the real role. The module refuses this
-#     outside dev-*.
+#     is proved by assuming the real role (services/api/scripts/
+#     dev-filing-vault-proof.sh). The module refuses this outside dev-*.
 module "filing_credentials" {
   source = "../../modules/filing_credentials"
 
   project                     = "insolvia"
   environment                 = local.environment
+  table_kms_key_arn           = module.case_store.kms_key_arn
+  access_log_table_arn        = module.case_store.access_log_table_arn
   api_role_name               = null
   worker_assumable_by         = [var.aws_principal_arn]
+  point_in_time_recovery      = false
+  deletion_protection         = false
   key_deletion_window_in_days = 7
   tags                        = local.common_tags
 }
@@ -133,7 +190,7 @@ module "filing_credentials" {
 # Where an approval puts a filing job — the real queue, per machine, as
 # job_pipeline's is. No API role here (the developer sends, playing the API
 # as for the vault); the consume grant lands on this machine's filing worker
-# role.
+# role, which services/filing's local poller assumes.
 module "filing_queue" {
   source = "../../modules/filing_queue"
 
@@ -173,30 +230,58 @@ module "case_documents" {
 
 # ── The filing worker (ADR 0024 PR 7) ───────────────────────────
 # The same module staging and prod instantiate, with no Lambda
-# (ecr_repository_url = null): its grants on the tax-id key, the documents
+# (ecr_repository_url = null): its grants on the case table, the documents
 # bucket and the kill switch attach to this machine's filing worker role all
-# the same, so a laptop run under that role (filing_worker_role_arn) is held
+# the same, because services/filing's local poller ASSUMES that role
+# (FILING_WORKER_ROLE_ARN in services/filing/.env) — so a laptop run is held
 # to exactly what the deployed worker holds. The kill switch parameter exists
-# for parity; the .NET filing worker's local poller
-# (`dotnet run --project backend/src/Insolvia.Filing`) reads
-# FILING_SUBMISSIONS_ENABLED instead.
+# for parity; locally the worker reads FILING_SUBMISSIONS_ENABLED instead.
 module "filing_worker" {
   source = "../../modules/filing_worker"
 
-  project                   = "insolvia"
-  environment               = local.environment
-  ecr_repository_url        = null
-  worker_role_name          = module.filing_credentials.worker_role_name
-  worker_role_arn           = module.filing_credentials.worker_role_arn
-  queue_arn                 = module.filing_queue.queue_arn
-  dlq_name                  = module.filing_queue.dlq_name
-  case_kms_key_arn          = module.case_store.kms_key_arn
-  case_document_bucket_arn  = module.case_documents.bucket_arn
-  case_document_bucket_name = module.case_documents.bucket_name
-  alarms_topic_arn          = null
-  tags                      = local.common_tags
+  project                    = "insolvia"
+  environment                = local.environment
+  ecr_repository_url         = null
+  worker_role_name           = module.filing_credentials.worker_role_name
+  worker_role_arn            = module.filing_credentials.worker_role_arn
+  queue_arn                  = module.filing_queue.queue_arn
+  dlq_name                   = module.filing_queue.dlq_name
+  case_table_arn             = module.case_store.table_arn
+  case_table_name            = module.case_store.table_name
+  case_access_log_table_name = module.case_store.access_log_table_name
+  case_kms_key_arn           = module.case_store.kms_key_arn
+  case_document_bucket_arn   = module.case_documents.bucket_arn
+  case_document_bucket_name  = module.case_documents.bucket_name
+  alarms_topic_arn           = null
+  tags                       = local.common_tags
 }
 
+
+# ── Admin audit table (#213) ────────────────────────────────────
+# Hand-rolled like the waitlist table above, and for the same reason: dev has
+# no Lambda, so modules/admin_service (which owns the deployed table alongside
+# an image Lambda and an HTTP API) does not fit here. Schema matches
+# services/admin's core/audit.py item shape. PITR off, protection off —
+# throwaway rows a developer wipes; the DEPLOYED table is the durable record.
+resource "aws_dynamodb_table" "admin_audit" {
+  name         = "insolvia-${local.environment}-admin-api-audit"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "PK"
+  range_key    = "SK"
+
+  attribute {
+    name = "PK"
+    type = "S"
+  }
+
+  attribute {
+    name = "SK"
+    type = "S"
+  }
+
+  server_side_encryption { enabled = true }
+  tags = local.common_tags
+}
 
 # ── Auth ────────────────────────────────────────────────────────
 # READ-ONLY. This machine signs in against the ONE shared development pool
@@ -235,8 +320,9 @@ module "auth" {
 # here — there is none in dev — but they keep the namespace identical across
 # every environment, so "where does AUTH_ISSUER_URL come from" has one answer
 # rather than two. For the local API, the values are also available directly
-# as this env's auth_issuer_url / auth_web_client_id outputs, which
-# dev-aws-setup.sh writes into backend/.env.
+# as this env's auth_issuer_url / auth_web_client_id outputs; export them into
+# services/api/.env to run the compose stack or the dev server against this
+# machine's pool.
 
 resource "aws_ssm_parameter" "auth_issuer_url" {
   name  = "/insolvia/${local.environment}/api/auth-issuer-url"
@@ -265,9 +351,30 @@ resource "aws_ssm_parameter" "auth_portal_client_id" {
   tags  = local.common_tags
 }
 
+# Same reasoning as the auth parameters above: nothing reads it here, but
+# keeping the namespace identical across every environment means "where does
+# CASE_TABLE_NAME come from" has one answer rather than two. The value a
+# developer actually consumes is the case_table_name output, which
+# dev-aws-setup.sh writes into services/api/.env.
+resource "aws_ssm_parameter" "case_table_name" {
+  name  = "/insolvia/${local.environment}/api/case-table-name"
+  type  = "String"
+  value = module.case_store.table_name
+  tags  = local.common_tags
+}
+
+# The access log's table name, same namespace and same reasoning as
+# case-table-name above — the API derives it as CASE_ACCESS_LOG_TABLE_NAME.
+resource "aws_ssm_parameter" "case_access_log_table_name" {
+  name  = "/insolvia/${local.environment}/api/case-access-log-table-name"
+  type  = "String"
+  value = module.case_store.access_log_table_name
+  tags  = local.common_tags
+}
+
 # The job queue's URL, same namespace-parity reasoning as everything above.
 # The value a developer actually consumes is the job_queue_url output, which
-# dev-aws-setup.sh writes into backend/.env as JOB_QUEUE_URL.
+# dev-aws-setup.sh writes into services/api/.env as JOB_QUEUE_URL.
 resource "aws_ssm_parameter" "job_queue_url" {
   name  = "/insolvia/${local.environment}/api/job-queue-url"
   type  = "String"
@@ -277,7 +384,7 @@ resource "aws_ssm_parameter" "job_queue_url" {
 
 # The filing queue's URL, same namespace-parity reasoning. A developer
 # consumes the filing_queue_url output, which dev-aws-setup.sh writes into
-# backend/.env as FILING_QUEUE_URL.
+# services/api/.env as FILING_QUEUE_URL.
 resource "aws_ssm_parameter" "filing_queue_url" {
   name  = "/insolvia/${local.environment}/api/filing-queue-url"
   type  = "String"
@@ -299,6 +406,7 @@ module "audit_trail" {
 
   project                     = "insolvia"
   environment                 = local.environment
+  data_resource_arns          = [module.case_store.table_arn, module.filing_credentials.table_arn]
   include_management_events   = true
   retention_days              = 90
   key_deletion_window_in_days = 7

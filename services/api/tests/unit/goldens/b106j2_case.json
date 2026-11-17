@@ -1,0 +1,253 @@
+{
+ "fields": {
+  "10": {
+   "value": null
+  },
+  "11": {
+   "value": null
+  },
+  "12": {
+   "value": null
+  },
+  "13": {
+   "value": null
+  },
+  "14": {
+   "value": null
+  },
+  "15a": {
+   "value": null
+  },
+  "15b": {
+   "value": null
+  },
+  "15c": {
+   "value": null
+  },
+  "15d": {
+   "value": null
+  },
+  "16": {
+   "value": null
+  },
+  "17a": {
+   "value": null
+  },
+  "17b": {
+   "value": null
+  },
+  "17c": {
+   "value": null
+  },
+  "17d": {
+   "value": null
+  },
+  "18": {
+   "value": null
+  },
+  "19": {
+   "value": null
+  },
+  "20a": {
+   "value": null
+  },
+  "20b": {
+   "value": null
+  },
+  "20c": {
+   "value": null
+  },
+  "20d": {
+   "value": null
+  },
+  "20e": {
+   "value": null
+  },
+  "21": {
+   "value": null
+  },
+  "22": {
+   "value": null
+  },
+  "4": {
+   "value": null
+  },
+  "4a": {
+   "value": null
+  },
+  "4b": {
+   "value": null
+  },
+  "4c": {
+   "value": null
+  },
+  "4d": {
+   "value": null
+  },
+  "5": {
+   "value": null
+  },
+  "6a": {
+   "value": null
+  },
+  "6b": {
+   "value": null
+  },
+  "6c": {
+   "value": null
+  },
+  "6d": {
+   "value": null
+  },
+  "7": {
+   "value": null
+  },
+  "8": {
+   "value": null
+  },
+  "9": {
+   "value": null
+  },
+  "Bankruptcy District Information": {
+   "value": "Middle District of Florida"
+  },
+  "Case number": {
+   "value": null
+  },
+  "Check 1": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off"
+   ]
+  },
+  "Debtor 1": {
+   "value": "Ada Quinn Lovelace"
+  },
+  "Debtor 2": {
+   "value": "Ben Lovelace Jr."
+  },
+  "Dependant Relation 2a": {
+   "value": null
+  },
+  "Dependant Relation 2b": {
+   "value": null
+  },
+  "Dependant Relation 2c": {
+   "value": null
+  },
+  "Dependant Relation 2d": {
+   "value": null
+  },
+  "Dependant Relation 2e": {
+   "value": null
+  },
+  "Dependant age 2a": {
+   "value": null
+  },
+  "Dependant age 2b": {
+   "value": null
+  },
+  "Dependant age 2c": {
+   "value": null
+  },
+  "Dependant age 2d": {
+   "value": null
+  },
+  "Dependant age 2e": {
+   "value": null
+  },
+  "Other 15d": {
+   "value": null
+  },
+  "Other 16": {
+   "value": null
+  },
+  "Other 17c": {
+   "value": null
+  },
+  "Other 17d": {
+   "value": null
+  },
+  "Other 19": {
+   "value": null
+  },
+  "Other 21": {
+   "value": null
+  },
+  "Other 24": {
+   "value": null
+  },
+  "Other 6d": {
+   "value": null
+  },
+  "Supplemental income date": {
+   "value": null
+  },
+  "check1a": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check2": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off"
+   ]
+  },
+  "check24": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off"
+   ]
+  },
+  "check2a": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off"
+   ]
+  },
+  "check2b": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off"
+   ]
+  },
+  "check2c": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off"
+   ]
+  },
+  "check2d": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off"
+   ]
+  },
+  "check2e": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off"
+   ]
+  },
+  "check3": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off"
+   ]
+  }
+ },
+ "release": "form/b106j2@2015-12-01",
+ "sha256": "3f9aacd02386b4b7302e992c94287a1304fa005bee03b5d7fa74d608ae66b790"
+}

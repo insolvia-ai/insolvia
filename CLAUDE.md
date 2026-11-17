@@ -1,14 +1,10 @@
+> **AWS is paused (2026-11-05).** There is no staging or production. Deploy workflows are disabled; do not re-enable them or apply Terraform. The Python backend needs the per-developer AWS stack to run locally, which is paused too. See [docs/runbooks/aws-paused.md](docs/runbooks/aws-paused.md).
+
 # Insolvia — agent guide
 
-> **AWS is paused (2026-11-05).** There is no staging or production, and development is local. Deploy workflows are disabled; do not re-enable them or apply Terraform. See [docs/runbooks/aws-paused.md](docs/runbooks/aws-paused.md).
-
-Bankruptcy case-prep & e-filing: one monorepo on AWS. The app is
+Bankruptcy case-prep & e-filing: one **TypeScript** monorepo on AWS. The app is
 **React Native on Expo** (`apps/insolvia_app`), the marketing site is React
-Router v7 + Vite (`apps/insolvia_marketing`), the backend is **.NET 10 on
-Lambda with Aurora PostgreSQL** (`backend/`,
-[ADR 0028](docs/adr/0028-backend-moves-to-dotnet-and-postgres.md)). The
-Python backend it replaced is gone (plan 18.23); ADRs that name it are
-history.
+Router v7 + Vite (`apps/insolvia_marketing`), the services are Python on Lambda.
 
 **Web is the only target that ships.** No desktop builds; nothing committed under
 `ios/`/`android/` — `expo prebuild` generates those on demand. **Expo free tier
@@ -19,8 +15,8 @@ fails the build on an `eas.json`. Decision **D9** in
 before proposing NativeWind, Tailwind-in-the-app, or a UI library.
 
 **Two repositories.** This one is the product: the apps, the marketing site,
-and the app's own backend (`backend/`: API, worker, admin, MCP, filing worker,
-migrator) with its staging/prod/dev Terraform. The account-wide AWS layer — Route53 zone,
+and the app's own backend (`api`, `admin`, `mcp`, `filing`, `insolvia_core`)
+with its staging/prod/dev Terraform. The account-wide AWS layer — Route53 zone,
 wildcard cert, SES identity, every service's ECR repository, the CI deploy
 role, the human IAM users — the **mailer** service and **auth** (the Cognito
 user pools and their app clients, dev pools included) live in
@@ -53,15 +49,14 @@ not here.
 
 ```
 apps/       insolvia_app (Expo / React Native, web) · insolvia_admin (staff portal, Vite SPA) · insolvia_marketing (React SSR)
-packages/   insolvia_api_client (the app's typed client for the API) · insolvia_admin_client (the admin portal's client for the admin service; unpublished, the portal takes it by file:)
-backend/    .NET 10 + Postgres: Api · Worker · Admin · Mcp · Filing · Migrator hosts over Core · Engines · Forms · Data · Aws (ADR 0028; the mailer is in insolvia-services)
-forms/      official-form field specs (B101, B106*, B107) — data, checked by xUnit (`forms/scripts/dev-test.sh`), no build
+packages/   insolvia_api_client · insolvia_core (Python — shared by the services, not an npm member)
+services/   api · admin · mcp · filing    (Python on Lambda; the mailer is in insolvia-services)
+forms/      official-form field specs (B101, B106*, B107) — data + checker, no build
 seeds/      who exists per environment (dev.json, staging.json) · fixtures/<version>/ — what a seeded case contains
-e2e/        Playwright: flows (signed in; dev, staging) · smoke (no credentials; also prod) · the admin portal's flow (offline, over contract/'s stack)
-contract/   the backend's HTTP contract suite (Jest, by base URL, through the shipped api-client) — offline against the .NET hosts on a throwaway Postgres (every PR), or deployed: signed in through the real pool, against staging after each deploy or a laptop's dev stack
+e2e/        Playwright against deployed environments: flows (signed in; dev, staging) · smoke (no credentials; also prod)
 infra/      Terraform: staging · prod · dev (shared, ci-trust, account-access are in insolvia-services)
 brand/      colors.json · fonts.json · radii.json — Insolvia's palette, typefaces and corners, the ONE place each is written down
-tool/       brand-palette.ts · render-brand-theme.ts · render-brand-marks.ts (colours the marks) · cut-brand-marks.ts (cuts them)
+tool/       brand-palette.ts · render-brand-theme.ts · render-brand-marks.ts
 docs/       plan.md · reference/ · runbooks/ · adr/ · business/
 ```
 
@@ -110,17 +105,16 @@ before you touch anything:
 | adding/removing a **human** IAM user or changing their groups | [insolvia-services' `infra/envs/account-access/`](https://github.com/insolvia-ai/insolvia-services/blob/main/infra/envs/account-access/main.tf) — human-applied; CI holds no IAM user/group permissions at all |
 | rotating an IAM user's **MFA device** | [insolvia-services' `docs/runbooks/iam-mfa-rotation.md`](https://github.com/insolvia-ai/insolvia-services/blob/main/docs/runbooks/iam-mfa-rotation.md) — a console procedure, deliberately **not** Terraform (the TOTP seed would land in state) |
 | adding a new package/app/service | `insolvia-new-package` skill |
-| **opening a PR / writing or editing its description** | `pr` skill (mattpocock, installed per-user — see the skills table) — Summary / Evidence / Merge Danger. Repo-specific facts still apply: title `<area>: <phrase>`, `Closes #N` vs `Refs #N`, and say what the change does on local, staging and prod |
-| **writing or changing any test**, or asked to "improve coverage" | `insolvia-testing` skill — four frameworks (xUnit, Jest, Playwright, `terraform test`), one owner per level: **which level owns an assertion** (unit · data · route tests own refusals, `contract/` the happy path and tenancy · Playwright flows · smoke) and which environment runs it · [ADR 0029](docs/adr/0029-one-testing-shape.md), amending [ADR 0008](docs/adr/0008-testing-shape-follows-the-code-it-tests.md) and [ADR 0021](docs/adr/0021-test-tiers-and-seed-fixtures.md) |
-| **changing any backend route's behaviour or response**, or adding an `InsolviaApiClient` method | [`contract/CLAUDE.md`](contract/CLAUDE.md) — `contract/scripts/dev-test.sh` runs the wire-level suite offline; its coverage gate fails on a client method nothing calls |
-| **seeding an environment**, adding a test user or a fixture case, or wondering why a signed-in test user 403s | [`seeds/README.md`](seeds/README.md) — `seeds/<env>.json` is who exists, `seeds/fixtures/<version>/` is what a case contains; `scripts/dev-aws-seed.sh` (dev), `.github/actions/seed-staging` (staging), `scripts/dev-fixture.sh` (publish a version). Prod is refused by the loader |
+| **opening a PR / writing or editing its description** | `pr` skill (mattpocock) — Summary / Evidence / Merge Danger. Repo-specific facts still apply: title `<area>: <phrase>`, `Closes #N` vs `Refs #N`, and say what the change does on local, staging and prod |
+| **writing or changing any test**, or asked to "improve coverage" | `insolvia-testing` skill — the shape differs by area on purpose · [ADR 0008](docs/adr/0008-testing-shape-follows-the-code-it-tests.md); **which tier** (unit / integration / e2e flows / e2e smoke) and which environment runs it · [ADR 0021](docs/adr/0021-test-tiers-and-seed-fixtures.md) |
+| **seeding an environment**, adding a test user or a fixture case, or wondering why a signed-in test user 403s | [`seeds/README.md`](seeds/README.md) — `seeds/<env>.json` is who exists, `seeds/fixtures/<version>/` is what a case contains; `scripts/dev-aws-seed.sh` (dev), `.github/actions/seed-staging` (staging), `scripts/dev-fixture.sh` (publish / capture a version). Prod is refused by the loader |
 | **building or changing any UI** in the app, admin portal, or marketing — picking a component, calling it, wondering whether the package already has one | `design-system-catalogue` skill **first**, before writing the screen. The package ships 43 components; the habit to break is hand-rolling one it already owns |
 | a component **renders unstyled**, resolves to the wrong leaf, or `react-native` turns up in the marketing bundle | `design-system-platforms` skill — the `.web`/`.native` split, and why this app renders `.native` on web too |
 | **tuning how a screen feels** — press feedback, a menu or sheet's motion, tracking and leading at a given size, reduced motion, what a nav label should say | `apple-design` skill, after `design-system-catalogue` has picked the component — the principles behind the choice, with the three places its defaults lose to this repo's decisions noted in the skills table below |
 | **re-branding**: changing a brand colour or font the design system owns | `design-system-theming` skill — the override seams, and why `primaryHover` follows the base colour on web but is pre-computed on native |
 | wiring the packages into a **new** consumer (401/404 on the `@insolvia-ai` scope, Tailwind seeing `node_modules`, dark mode) | `design-system-setup` skill — both consumers here are already wired; this is for when one breaks |
 | **changing a shared component (Button, Field, …) or a design token** | **Not in this repo** — [`insolvia-ai/design-system`](https://github.com/insolvia-ai/design-system). Change it there, publish, then bump the dependency here · [ADR 0010](docs/adr/0010-design-system-moves-to-its-own-repository.md) · [ADR 0006](docs/adr/0006-owned-cross-platform-design-system.md) |
-| **touching the backend** — the firm or case domain, token verification, the stores, migrations, grants, an engine, the PDF engine, a host | [`backend/CLAUDE.md`](backend/CLAUDE.md) — the layering (`Insolvia.Core` is the domain; `Insolvia.Data` the Postgres stores, migrations and the migrator's grants), the retry-safety rule for writes · [ADR 0028](docs/adr/0028-backend-moves-to-dotnet-and-postgres.md) · [ADR 0016](docs/adr/0016-mcp-server-is-its-own-service.md) |
+| **touching the firm or case domain, token verification, or their stores** — item shapes, permissions, `FirmStore`, the case stores, JWKS | [`packages/insolvia_core/CLAUDE.md`](packages/insolvia_core/CLAUDE.md) — shared by the Python services; the item shapes have one owner · [ADR 0012](docs/adr/0012-shared-python-domain-package.md) · [ADR 0016](docs/adr/0016-mcp-server-is-its-own-service.md) |
 | **taking a new design-system / tokens version** (bumping the dependency) | `insolvia-design-system-bump` skill — bump every consumer's manifest and lockfile (app, admin portal, marketing), and regenerate the Cognito branding |
 | changing the app-local components (`apps/insolvia_app/src/components/`) | [`apps/insolvia_app/CLAUDE.md`](apps/insolvia_app/CLAUDE.md) · [ADR 0005](docs/adr/0005-expo-app-layout.md) — no version bump, not published; shared Button/Field come from the package, row above |
 | **changing a corner radius** | [`brand/radii.json`](brand/radii.json) — the third brand file. It deliberately REVERSES the base theme's "square IS the new design": on the warm-neutral palette a 0-radius card reads as a wireframe, because no colour is separating it from the page |
@@ -136,7 +130,7 @@ before you touch anything:
 | **touching the official-form field specs** — form fields, revisions, the forms engine's input | [`forms/CLAUDE.md`](forms/CLAUDE.md) — the AcroForm dumps are ground truth; `forms/scripts/dev-test.sh` gates every edit |
 | touching Terraform state / naming / deploy order | [`docs/reference/terraform.md`](docs/reference/terraform.md) |
 | doing one-time AWS/GitHub bootstrap | [insolvia-services' `docs/runbooks/aws-bootstrap.md`](https://github.com/insolvia-ai/insolvia-services/blob/main/docs/runbooks/aws-bootstrap.md) |
-| working on mail / SES — the mailer is in insolvia-services; this repo only calls it (the API's mailer client, `backend/src/Insolvia.Aws/Mailer`) | [`docs/reference/email.md`](https://github.com/insolvia-ai/insolvia-services/blob/main/docs/reference/email.md) · [`docs/runbooks/ses-production-access.md`](https://github.com/insolvia-ai/insolvia-services/blob/main/docs/runbooks/ses-production-access.md) — both in insolvia-services |
+| working on mail / SES — the mailer is in insolvia-services; this repo only calls it (`services/api`'s mailer client) | [`docs/reference/email.md`](https://github.com/insolvia-ai/insolvia-services/blob/main/docs/reference/email.md) · [`docs/runbooks/ses-production-access.md`](https://github.com/insolvia-ai/insolvia-services/blob/main/docs/runbooks/ses-production-access.md) — both in insolvia-services |
 | **adding, moving, or rewriting anything in `docs/`** | [`docs/CLAUDE.md`](docs/CLAUDE.md) — four kinds, one per directory; and what belongs in a skill instead |
 | looking for any other runbook | [`docs/README.md`](docs/README.md) |
 
@@ -165,11 +159,11 @@ one offline command, and it does **not** rewrite `skills-lock.json`:
 ./scripts/dev-skills.sh --link
 ```
 
-The same hook also links the per-machine `.env` files (`backend/.env`,
-`apps/insolvia_app/.env`) from the primary checkout, because they are
-gitignored and a worktree starts without them — the symptom is an app that
-says "Sign-in is not configured" and an API that answers every signed-in
-route with 401, not an error. By hand: `./scripts/dev-env-files.sh
+The same hook also links the four per-machine `.env` files
+(`services/{api,admin,mcp}/.env`, `apps/insolvia_app/.env`) from the primary
+checkout, because they are gitignored and a worktree starts without them —
+the symptom is an app that says "Sign-in is not configured" and an API stack
+that refuses to start, not an error. By hand: `./scripts/dev-env-files.sh
 --link`. [`scripts/README.md`](scripts/README.md) owns the detail.
 
 They were vendored once, and 131 files of other people's documentation sat in
@@ -210,7 +204,7 @@ invites the next agent to overrule it.
 | `apple-design` | **Use**, translated | Ours, hand-written, and **tracked** at `.claude/skills/apple-design/` rather than installed — it is in no lock. Apple's fluid-interface, materials and typography rules, written for the web platform. Three of its defaults lose to decisions here: it says "system font first" (the brand faces in `brand/fonts.json` win, so read its tracking/leading rules *for* Open Sans, and for Cormorant in the wordmark alone); its code is CSS, Pointer Events and Motion, which the app cannot run — translate to `Pressable` state, `Animated`/`lineHeight`/`letterSpacing` in a `StyleSheet`; and it wants `backdrop-filter` chrome that content scrolls under, where `AppShell` keeps the header outside the scroller on purpose. |
 | `expo-router` | **Use** | We use Expo Router with `web.output: "single"`; this is the routing reference. |
 | `expo-project-structure` | **Use**, with two exceptions | It *is* our layout ([ADR 0005](docs/adr/0005-expo-app-layout.md)) — minus `eas.json` and minus `src/server`/`app/api`. See below. |
-| `expo-data-fetching` | **Use** | Fetching against the backend's API; the caching and error-handling guidance is stack-neutral and correct. |
+| `expo-data-fetching` | **Use** | Fetching against `services/api`; the caching and error-handling guidance is stack-neutral and correct. |
 | `expo-upgrade` | **Use** | The SDK is pinned exact, so an upgrade is a deliberate task and this is the procedure for it. |
 | `eas-hosting` | **Do not use** | It deploys to Expo-managed Cloudflare Workers — exactly what `infra/modules/web_hosting` already does for free, under Terraform, in our own account. Adopting it would fork the deploy path. |
 | `eas-app-stores` | **Do not use** | `eas build`/`eas submit` are paid, need an Expo account in CI, and need paid Apple/Google accounts. We ship no store builds. |
@@ -220,12 +214,11 @@ invites the next agent to overrule it.
 | `eas-update-insights` | **Do not use** | Reports on EAS Update, which we do not publish. Also `allowed-tools: Bash(eas *)`. |
 | `gluestack-ui-v5` | **Uninstalled** — do not reinstall | It described a component library this codebase deliberately does not have, and its first principle was *"gluestack components over React Native primitives"* — the exact inversion of our decision. It is gone from `skills-lock.json`, so dev-setup no longer installs it. [ADR 0004](docs/adr/0004-react-native-replaces-flutter.md) keeps the measurements that rejected the library, including two accessibility defects it caused. |
 | `expo-tailwind-setup` | **Uninstalled** — do not reinstall | Expo removed it upstream ([expo/skills#151](https://github.com/expo/skills/pull/151)), so it is gone from `skills-lock.json` too. The row stays because the reasons still hold: **there is no Tailwind in the app at all** (it stays on the web side: the design system's `.web` leaves and marketing). It also pinned `react-native-css@0.0.0-nightly.5ce6396`, whose own npm metadata reads *"Outdated SDK 54 era nightly… cannot resolve on Expo SDK 55 or newer"* — we are on SDK 57. |
-| `mattpocock/skills` (38) | **Use**, case by case, with the four below — **installed per-user, not by this repo** | Not in `skills-lock.json` since 2026-11-08: the maintainer installs them into `~/.claude/skills/` with `npx skills add mattpocock/skills -g --agent claude-code`, so `dev-setup.sh` neither installs nor prunes them, and a cloud session or another machine has them only if installed there. Matt Pocock's engineering skills (`tdd`, `diagnosing-bugs`, `grill-me`, `to-spec`, `domain-modeling`, `writing-for-agents`, …) and his General group. Most are user-invoked only (`disable-model-invocation`). The tracker-based ones (`triage`, `to-tickets`, `code-review`, `implement`, …) read their config from `docs/agents/` (written by `/setup-matt-pocock-skills`; see **Agent skills** below). |
-| `code-review` (mattpocock) | **Use** — it is the review step `/implement` and `/implement-spec` call | A two-axis Standards + Spec review that reads the tracker setup above. It shares its name with Claude Code's built-in `/code-review`, which cannot be fixed from here: an installed skill cannot be renamed, and editing it under `~/.claude/skills/` is overwritten on the next install. Kept despite the clash because `/implement` calls it by name, and without it that step would reach a review that knows nothing of the ticket. If a typed `/code-review` lands on the wrong one, say which you want in words. |
+| `mattpocock/skills` (all 38) | **Use**, case by case, with the four below | Matt Pocock's engineering skills (`tdd`, `diagnosing-bugs`, `grill-me`, `to-spec`, `domain-modeling`, `writing-for-agents`, …) and his General group. Most are user-invoked only (`disable-model-invocation`). The tracker-based ones (`triage`, `to-tickets`, `code-review`, `implement`, …) read their config from `docs/agents/` (written by `/setup-matt-pocock-skills`; see **Agent skills** below). |
+| `code-review` (mattpocock) | **Use** — it is the review step `/implement` and `/implement-spec` call | A two-axis Standards + Spec review that reads the tracker setup above. It shares its name with Claude Code's built-in `/code-review`, which cannot be fixed from here: an installed skill cannot be renamed, and editing it under `.agents/skills/` is overwritten on the next install. Kept despite the clash because `/implement` calls it by name, and without it that step would reach a review that knows nothing of the ticket. If a typed `/code-review` lands on the wrong one, say which you want in words. |
 | `pr` (mattpocock) | **Use** — it owns PR bodies here | Replaced `insolvia-pr-description` on 2026-10-13 by the maintainer's choice. Its Summary / Evidence / Merge Danger shape is the template; the catalog row above lists the repo facts it doesn't know. |
 | `setup-pre-commit` (mattpocock) | **Do not use** | Adds Husky + lint-staged + Prettier at the root. Hooks here are per-area and installed by each `scripts/dev-setup.sh`; this would add a second hook system. |
 | `git-guardrails-claude-code` (mattpocock) | **Do not use** | Blocks every `git push` — which is how every change here ships (branch → PR). The `main` ruleset on GitHub already guards what matters: `main`. |
-| The .NET set for `backend/` — `dotnet/skills` (Microsoft): `csharp-expert`, `csharp-refactoring`, `optimizing-ef-core-queries`, `dotnet-webapi`, `analyzing-dotnet-performance`, `msbuild-antipatterns`, `directory-build-organization`, `run-tests`, `test-anti-patterns`, `detect-static-dependencies`, `migrate-static-to-wrapper`, and the `dotnet-test` companions those four hand off to (`platform-detection`, `filter-syntax`, `assertion-quality`, `test-gap-analysis`, `test-analysis-extensions`, `generate-testability-wrappers`, `testability-obstacle`) plus `test-value-evidence`, `grade-tests`, `find-untested-sources`; `Aaronontheweb/dotnet-skills`: `modern-csharp-coding-standards`, `csharp-concurrency-patterns`, `api-design`, `type-design-performance`, `efcore-patterns`, `database-performance`, `dependency-injection-patterns`, `microsoft-extensions-configuration`, `serialization`, `testcontainers-integration-tests`, `package-management`, `dotnet-project-structure` | **Use**, under [`backend/CLAUDE.md`](backend/CLAUDE.md) | Generic .NET practice; `backend/CLAUDE.md` and the byte-for-byte wire contract win every disagreement. The ones that lose here: **`dotnet-webapi`'s** ProblemDetails, `TypedResults`, OpenAPI, `Location` headers and global JSON options all change response bytes — `FlaskJson` and `ErrorMappingMiddleware` reproduce Flask on purpose. **`serialization`** prefers Protobuf/MessagePack — the wire is Flask-compatible JSON. **`modern-csharp-coding-standards`'** Result types, strong-typed ids and `Guid.CreateVersion7` would break Python parity in the engines and in id ordering. **`package-management`'s** "never edit the XML" — `Directory.Packages.props` is hand-edited here; the lock diff is the gate. **`testcontainers-integration-tests`'** per-class containers and Respawn — one container per assembly, a fresh database per test. **`efcore-patterns`'** "cap every read" — the listings are whole for parity. **`microsoft-extensions-configuration`'s** `IOptions` — the config records keep Python's flat env names and fail at boot. The MSTest-only parts of `run-tests`/`test-anti-patterns` don't apply (xUnit v3). **`find-untested-sources`** is the one that ships code: its C# script pulls `Microsoft.CodeAnalysis.CSharp` from NuGet on first run (the Python one needs `tree-sitter-language-pack`); both only read files. Its source-to-test pairing is a hint, not a rule — a route here is tested through `WebApplicationFactory`, not a file named after it. Left out of the plugin on purpose: `code-testing` and `scaffold-dotnet-test-project` (they overlap `insolvia-testing` and `insolvia-new-package`), `coverage-analysis`/`crap-score` (no coverage threshold, ADR 0008), and the MSTest/MTP-only ones. |
 | everything else | **Case by case** | Not evaluated. Check the frontmatter first: **"EAS service (paid)" or an `allowed-tools: Bash(eas *)` line means it is out of scope**, whatever the task looks like. |
 
 **All six `eas-*` skills are out of scope for one reason:** we are on Expo's free
@@ -241,16 +234,15 @@ own description.)
 [ADR 0004](docs/adr/0004-react-native-replaces-flutter.md):
 
 - **No `eas.json`.** Free tier; and see the guard above.
-- **No `src/server/` and no `+api.ts` routes.** The API is .NET on Lambda in
-  `backend/src/Insolvia.Api` — one trust boundary, one place that touches the data stores
+- **No `src/server/` and no `+api.ts` routes.** The API is Python on Lambda in
+  `services/api` — one trust boundary, one place that touches the data stores
   ([ADR 0001](docs/adr/0001-client-stays-dumb-trust-boundary.md)). Shipping
   Expo Router API routes would also need EAS Hosting.
 
 ## Agent skills
 
 Config the mattpocock engineering skills read. `docs/agents/` owns it; edit
-those files directly. The skills themselves are installed per-user, not from
-`skills-lock.json` — see their row in the skills table.
+those files directly.
 
 ### Issue tracker
 

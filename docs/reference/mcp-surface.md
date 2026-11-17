@@ -12,12 +12,7 @@ downstream of them:
 
 - **One trust boundary** ([ADR 0001](../adr/0001-client-stays-dumb-trust-boundary.md)):
   an MCP client is a client. It never touches a data store; the server brokers
-  every read and write, exactly as the API does for the app.
-
-> **Module names below are the Python originals** (`insolvia_core.auth`,
-> `insolvia_core.errors`, …), ported one for one into `backend/src/Insolvia.Core`
-> and the MCP host `backend/src/Insolvia.Mcp` (ADR 0028) and deleted in 18.23.
-> The surface they describe is unchanged — `contract/src/mcp` pins it.
+  every read and write, exactly as `services/api` does for the app.
 - **A case belongs to a firm** ([ADR 0009](../adr/0009-a-case-belongs-to-a-firm.md)):
   an MCP session resolves to a Cognito `sub` with firm permissions, looked up
   in our store on every call, never cached, failing closed. The firm is never
@@ -48,10 +43,9 @@ Protocol facts below were verified against the MCP specification, revision
 - **Tools only.** No MCP resources, prompts, or subscriptions in v1. Tool
   support is the one capability every harness has; resource support is uneven.
   Revisit after 12.5 if a harness turns out to want documents as resources.
-- **Every successful tool result carries `structuredContent`** conforming to
-  its `outputSchema`, plus the serialized JSON as a text block (the spec's
-  backwards-compatibility SHOULD). A refusal carries the text block alone
-  (§ Error vocabulary). Read-only tools carry `readOnlyHint: true` annotations; nothing on
+- **Every tool returns `structuredContent`** conforming to its `outputSchema`,
+  plus the serialized JSON as a text block (the spec's backwards-compatibility
+  SHOULD). Read-only tools carry `readOnlyHint: true` annotations; nothing on
   this surface is destructive, so no tool carries `destructiveHint`.
 
 ## Identity and authorization — the seam 12.2 implements
@@ -84,7 +78,7 @@ starts from them rather than rediscovering them:
    contract parameter. Whether the harnesses
    we claim can work with a pre-registered client is a 12.5 question.
 2. **Cognito access tokens carry `client_id` and `scope`, not an RFC 8707
-   `aud`.** Audience binding is approximated the way the API already
+   `aud`.** Audience binding is approximated the way `services/api` already
    does it: verify issuer + signature + `token_use` and match `client_id`
    against an allowlist of *MCP* client ids — disjoint from the app's client
    id, so an app token is not an MCP token and vice versa. State this gap in
@@ -337,7 +331,7 @@ Three layers, matching where the spec puts each failure:
 |---|---|---|
 | HTTP | transport auth | 401 invalid/expired token (+ `WWW-Authenticate` with `resource_metadata`); 403 `insufficient_scope` (OAuth scope, not firm permissions) |
 | JSON-RPC protocol errors | the call was malformed | unknown tool (−32602), unparseable arguments, unsupported protocol version, header mismatch (−32020) |
-| Tool execution errors | the domain said no | `isError: true`, the text block = the envelope below as JSON, no `structuredContent` |
+| Tool execution errors | the domain said no | `isError: true`, content = the message, `structuredContent.error` below |
 
 Domain failures reuse `insolvia_core.errors` — the tool layer maps exception
 classes to machine-readable codes exactly as the API layer maps them to
@@ -345,15 +339,8 @@ statuses, so the reasoning each class's docstring carries (anti-oracle 404,
 honest 403, retryable 409) governs both surfaces:
 
 ```
-text block on error: { "error": { code, message, fields? } }
+structuredContent on error: { error: { code, message, fields? } }
 ```
-
-The envelope is never `structuredContent`: the spec says structured content
-MUST conform to the tool's `outputSchema`, with no exception for errors, and
-no output schema declares it. A client that validates — the TypeScript SDK's
-`callTool` once it has listed the tools — turned every refusal into a −32602
-while the server put it there. Pinned by
-`ProtocolTests.A_refusal_is_content_only_so_it_passes_an_output_schema_check`.
 
 | `insolvia_core.errors` | code | Semantics carried over |
 |---|---|---|

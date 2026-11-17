@@ -1,33 +1,18 @@
 name: MCP · Deploy · Staging
 
-# Steady-state deploy for the MCP service (ADR 0016; the .NET host
-# backend/src/Insolvia.Mcp since the switch, ADR 0028): push a fresh image
-# (backend/Dockerfile's `mcp-lambda` target), point the Lambda at it,
-# re-derive its environment from the /insolvia/staging/mcp SSM namespace and
-# the database contract, smoke-test the endpoint. Same shape as
-# api-staging.yml minus the worker half; the migrator leg ran before it.
+# Steady-state deploy for the MCP service (services/mcp, ADR 0016): push a
+# fresh image, point the Lambda at it, re-derive its environment from the
+# /insolvia/staging/mcp SSM namespace, smoke-test the endpoint. Same shape as
+# api-staging.yml minus the worker half.
 #
 # The FIRST deploy in a fresh environment cannot run through this workflow: an
 # Image-package Lambda refuses to be created before its image exists, so the
 # infra apply deadlocks. Bootstrap once by hand, per
 # infra/modules/mcp_service/main.tf:
-#   1. insolvia-services releases infra/envs/shared   (creates insolvia-shared-mcp-dotnet)
+#   1. insolvia-services releases infra/envs/shared   (creates insolvia-shared-mcp)
 #   2. scripts/bootstrap-ecr-images.sh staging mcp
 #   3. terraform apply   (full)
 # After that, every deploy is this workflow.
-#
-# ── Job order: deploy → contract ─────────────────────────────────────────────
-#
-# `contract` runs contract/'s MCP specs on the DEPLOYED target against the
-# server now serving (ADR 0029 rule 2; api-staging.yml's `integration` job is
-# the model and owns the shared reasoning), through the official TypeScript
-# SDK — the client an agent's harness runs — and SIGNED IN: the seeded firm
-# admin signs in by SRP through the MCP Inspector's app client, which is on
-# the server's allowlist (AUTH_CLIENT_IDS) and permits SRP (verified for
-# #583). So it proves a real pool token verifies against the deployed
-# allowlist, the role may make every read the tools make and write
-# candidates, and the agent's proposal reaches the API's review queue. Its
-# failure fails this workflow, and so the release's production stage.
 
 on:
   # Reusable: release.yml calls this as one leg of a staging release, and it
@@ -49,15 +34,6 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     environment: insolvia-staging
-    # Frozen for the contract job, so it never reads state that moved on.
-    outputs:
-      domain: ${{ steps.tf.outputs.domain }}
-      api_domain: ${{ steps.tf.outputs.api_domain }}
-      migrator_function: ${{ steps.tf.outputs.migrator_function }}
-      auth_pool_id: ${{ steps.tf.outputs.auth_pool_id }}
-      auth_client_id: ${{ steps.tf.outputs.auth_client_id }}
-      auth_portal_client_id: ${{ steps.tf.outputs.auth_portal_client_id }}
-      auth_mcp_client_id: ${{ steps.tf.outputs.auth_mcp_client_id }}
     steps:
       - uses: actions/checkout@v5
 
@@ -82,16 +58,6 @@ jobs:
             echo "function=$(terraform -chdir=infra/envs/staging output -raw mcp_lambda_function_name)"
             echo "domain=$(terraform -chdir=infra/envs/staging output -raw mcp_domain)"
             echo "alias=$(terraform -chdir=infra/envs/staging output -raw mcp_lambda_alias_name)"
-            # The contract job's inputs (public values), as api-staging.yml
-            # reads them, plus the MCP Inspector's client from the auth
-            # contract insolvia-services publishes (/insolvia/staging/auth/*,
-            # ADR 0026) — the client the seeded admin signs in through.
-            echo "api_domain=$(terraform -chdir=infra/envs/staging output -raw api_domain)"
-            echo "migrator_function=$(terraform -chdir=infra/envs/staging output -raw migrator_function_name)"
-            echo "auth_pool_id=$(terraform -chdir=infra/envs/staging output -raw auth_user_pool_id)"
-            echo "auth_client_id=$(terraform -chdir=infra/envs/staging output -raw auth_web_client_id)"
-            echo "auth_portal_client_id=$(terraform -chdir=infra/envs/staging output -raw auth_portal_client_id)"
-            echo "auth_mcp_client_id=$(aws ssm get-parameter --name /insolvia/staging/auth/mcp-client-ids --query Parameter.Value --output text | jq -er .inspector)"
           } >> "$GITHUB_OUTPUT"
 
       - name: Log in to ECR
@@ -108,12 +74,12 @@ jobs:
           # `sha-<sha>` is the immutable build identity a production promotion
           # resolves to a digest; `staging` is the moving marker tag a
           # from-scratch apply seeds the Lambda from — api-staging.yml's
-          # comment owns the full argument. Context is backend/: every .NET
-          # host builds from its one Dockerfile.
-          docker build --target mcp-lambda \
+          # comment owns the full argument. Context is the repo root: the
+          # image installs packages/insolvia_core by relative path.
+          docker build --target lambda -f services/mcp/Dockerfile \
             -t "$REPO:sha-${{ github.sha }}" \
             -t "$REPO:staging" \
-            backend
+            .
           docker push "$REPO:sha-${{ github.sha }}"
           docker push "$REPO:staging"
 
@@ -134,15 +100,26 @@ jobs:
           FUNCTION: ${{ steps.tf.outputs.function }}
         run: |
           # /insolvia/staging/mcp/<kebab-key> -> KEBAB_KEY:
-          #   insolvia-env         -> INSOLVIA_ENV
-          #   insolvia-db-username -> INSOLVIA_DB_USERNAME (= mcp)
-          #   insolvia-cursor-key  -> INSOLVIA_CURSOR_KEY
-          #   auth-issuer-url      -> AUTH_ISSUER_URL
-          #   auth-client-ids      -> AUTH_CLIENT_IDS
-          # plus /insolvia/staging/db/* as INSOLVIA_DB_*
-          # (.github/scripts/lambda-environment.sh). Terraform ignores
-          # `environment` drift on the Lambda — this step owns it.
-          environment="$(.github/scripts/lambda-environment.sh staging mcp --db --expect-env staging)"
+          #   insolvia-env               -> INSOLVIA_ENV
+          #   case-table-name            -> CASE_TABLE_NAME
+          #   case-access-log-table-name -> CASE_ACCESS_LOG_TABLE_NAME
+          #   firm-table-name            -> FIRM_TABLE_NAME
+          #   auth-issuer-url            -> AUTH_ISSUER_URL
+          #   auth-client-ids            -> AUTH_CLIENT_IDS
+          # Terraform ignores `environment` drift on the Lambda — this step
+          # owns it.
+          environment="$(
+            aws ssm get-parameters-by-path \
+              --path /insolvia/staging/mcp \
+              --with-decryption \
+              --query 'Parameters[].{Name:Name,Value:Value}' \
+              --output json \
+            | jq -c 'map({key: (.Name | split("/") | last | ascii_upcase | gsub("-"; "_")), value: .Value})
+                     | {Variables: from_entries}'
+          )"
+          # Refuse to ship nonsense: an empty or half-applied namespace would
+          # otherwise silently wipe every variable the service reads.
+          echo "$environment" | jq -e '.Variables.INSOLVIA_ENV == "staging"' > /dev/null
           echo "$environment" | jq -e '.Variables.AUTH_CLIENT_IDS | length > 0' > /dev/null
           aws lambda update-function-configuration \
             --function-name "$FUNCTION" \
@@ -190,54 +167,3 @@ jobs:
             echo "::error::Expected an unauthenticated tools/list to answer 401, got $status."
             exit 1
           fi
-
-  # ── Contract: the deployed MCP server, signed in through the SDK ───────
-  #
-  # `environment: insolvia-staging` is load-bearing, as in api-staging.yml:
-  # E2E_TEST_USER_PASSWORD is an environment secret, and the seed step
-  # invokes the migrator with AWS_ROLE_ARN. The suite itself holds no AWS
-  # credentials — SRP is unsigned Cognito calls, the rest HTTPS. Writes go to
-  # a scratch case the suite deletes when the file ends.
-  contract:
-    needs: deploy
-    runs-on: ubuntu-latest
-    environment: insolvia-staging
-    permissions:
-      id-token: write
-      contents: read
-      packages: read
-    steps:
-      - uses: actions/checkout@v5
-
-      - uses: ./.github/actions/seed-staging
-        with:
-          role-arn: ${{ secrets.AWS_ROLE_ARN }}
-          migrator-function: ${{ needs.deploy.outputs.migrator_function }}
-
-      # The root workspace's lockfile: contract/ pins @modelcontextprotocol/sdk
-      # there, and installs the design-system packages from GitHub Packages.
-      - uses: actions/setup-node@v5
-        with:
-          node-version: '24'
-          cache: npm
-
-      - name: Install
-        run: npm ci
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      # src/mcp only; it reaches the API too (a scratch case, the review
-      # queue), so the API's inputs are here as well. The offline-only specs
-      # are listed as skipped, by name.
-      - name: Contract suite against staging MCP (deployed target)
-        env:
-          CONTRACT_TARGET: deployed
-          CONTRACT_ENVIRONMENT: staging
-          CONTRACT_API_URL: https://${{ needs.deploy.outputs.api_domain }}
-          CONTRACT_MCP_URL: https://${{ needs.deploy.outputs.domain }}/mcp
-          CONTRACT_AUTH_POOL_ID: ${{ needs.deploy.outputs.auth_pool_id }}
-          CONTRACT_AUTH_CLIENT_ID: ${{ needs.deploy.outputs.auth_client_id }}
-          CONTRACT_AUTH_PORTAL_CLIENT_ID: ${{ needs.deploy.outputs.auth_portal_client_id }}
-          CONTRACT_AUTH_MCP_CLIENT_ID: ${{ needs.deploy.outputs.auth_mcp_client_id }}
-          E2E_TEST_USER_PASSWORD: ${{ secrets.E2E_TEST_USER_PASSWORD }}
-        run: npm run contract --workspace @insolvia-ai/contract -- src/mcp

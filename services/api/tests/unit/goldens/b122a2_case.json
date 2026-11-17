@@ -1,0 +1,497 @@
+{
+ "fields": {
+  "1_2": {
+   "value": null
+  },
+  "2_2": {
+   "value": null
+  },
+  "Bankruptcy District Information": {
+   "value": "Middle District of Florida"
+  },
+  "Case number1": {
+   "value": null
+  },
+  "CheckBox1": {
+   "value": "/No Abuse",
+   "widget_states": [
+    "/No Abuse",
+    "/Off"
+   ]
+  },
+  "CheckBox10": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off"
+   ]
+  },
+  "CheckBox11": {
+   "value": "/Yes",
+   "widget_states": [
+    "/Off",
+    "/Yes"
+   ]
+  },
+  "CheckBox12": {
+   "value": "/Yes",
+   "widget_states": [
+    "/Off",
+    "/Yes"
+   ]
+  },
+  "CheckBox13": {
+   "value": "/Yes",
+   "widget_states": [
+    "/Off",
+    "/Yes"
+   ]
+  },
+  "CheckBox14": {
+   "value": "/1",
+   "widget_states": [
+    "/1",
+    "/Off",
+    "/Off"
+   ]
+  },
+  "CheckBox15": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off"
+   ]
+  },
+  "CheckBox16": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off"
+   ]
+  },
+  "CheckBox2": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "CheckBox3": {
+   "value": "/Yes",
+   "widget_states": [
+    "/Off",
+    "/Yes"
+   ]
+  },
+  "CheckBox4": {
+   "value": "/Yes",
+   "widget_states": [
+    "/Off",
+    "/Yes"
+   ]
+  },
+  "CheckBox5": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off"
+   ]
+  },
+  "CheckBox6": {
+   "value": "/1",
+   "widget_states": [
+    "/Off",
+    "/1",
+    "/Off"
+   ]
+  },
+  "CheckBox7": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off"
+   ]
+  },
+  "CheckBox8": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off"
+   ]
+  },
+  "CheckBox9": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off"
+   ]
+  },
+  "Debtor1.Date signed": {
+   "value": "08/30/2026"
+  },
+  "Debtor1.Name": {
+   "value": "Ada Quinn Lovelace"
+  },
+  "Debtor1.sig": {
+   "value": null
+  },
+  "Debtor2.Date signed": {
+   "value": "08/30/2026"
+  },
+  "Debtor2.Name": {
+   "value": "Ben Lovelace Jr."
+  },
+  "Debtor2.sig": {
+   "value": null
+  },
+  "Describe Vehicle 1 1": {
+   "value": null
+  },
+  "Describe Vehicle 1 2": {
+   "value": null
+  },
+  "Describe Vehicle 2 1": {
+   "value": null
+  },
+  "Describe Vehicle 2 2": {
+   "value": null
+  },
+  "Explain 1": {
+   "value": null
+  },
+  "Explain 2": {
+   "value": null
+  },
+  "Quest1": {
+   "value": "8,700.00"
+  },
+  "Quest10": {
+   "value": "0.00"
+  },
+  "Quest12": {
+   "value": "320.00"
+  },
+  "Quest13A": {
+   "value": "703.00"
+  },
+  "Quest13B Creditor for vehicle 1-1": {
+   "value": null
+  },
+  "Quest13B Creditor for vehicle 1-2": {
+   "value": null
+  },
+  "Quest13B Total amount for vehicle 1": {
+   "value": "415.00"
+  },
+  "Quest13B amount for vehicle 1-1": {
+   "value": null
+  },
+  "Quest13B amount for vehicle 1-2": {
+   "value": null
+  },
+  "Quest13C": {
+   "value": "288.00"
+  },
+  "Quest13D": {
+   "value": null
+  },
+  "Quest13E.Creditor1": {
+   "value": null
+  },
+  "Quest13E.Creditor2": {
+   "value": null
+  },
+  "Quest13E.Monthly1": {
+   "value": null
+  },
+  "Quest13E.Monthly2": {
+   "value": null
+  },
+  "Quest13E.TotalMonthly": {
+   "value": null
+  },
+  "Quest13F": {
+   "value": null
+  },
+  "Quest14": {
+   "value": "0.00"
+  },
+  "Quest15": {
+   "value": "0.00"
+  },
+  "Quest3": {
+   "value": "0.00"
+  },
+  "Quest3A": {
+   "value": null
+  },
+  "Quest3A1": {
+   "value": null
+  },
+  "Quest3B": {
+   "value": null
+  },
+  "Quest3B1": {
+   "value": null
+  },
+  "Quest3C": {
+   "value": null
+  },
+  "Quest3C1": {
+   "value": null
+  },
+  "Quest4": {
+   "value": "8,700.00"
+  },
+  "Quest5": {
+   "value": "3"
+  },
+  "Quest6": {
+   "value": "1,857.00"
+  },
+  "Quest7A": {
+   "value": "90.00"
+  },
+  "Quest7B": {
+   "value": "3"
+  },
+  "Quest7C": {
+   "value": "270.00"
+  },
+  "Quest7D": {
+   "value": "163.00"
+  },
+  "Quest7E": {
+   "value": "0"
+  },
+  "Quest7F": {
+   "value": "0.00"
+  },
+  "Quest7G": {
+   "value": "270.00"
+  },
+  "Quest8": {
+   "value": "733.00"
+  },
+  "Quest9": {
+   "value": "1,833.00"
+  },
+  "Quest9B creditor amount1": {
+   "value": null
+  },
+  "Quest9B creditor amount2": {
+   "value": null
+  },
+  "Quest9B creditor amount3": {
+   "value": null
+  },
+  "Quest9B creditor name1": {
+   "value": null
+  },
+  "Quest9B creditor name2": {
+   "value": null
+  },
+  "Quest9B creditor name3": {
+   "value": null
+  },
+  "Quest9B total amount": {
+   "value": "1,480.00"
+  },
+  "Quest9C": {
+   "value": "353.00"
+  },
+  "secures the debt": {
+   "value": null
+  },
+  "undefined_100": {
+   "value": "2,143.33"
+  },
+  "undefined_101": {
+   "value": null
+  },
+  "undefined_102": {
+   "value": null
+  },
+  "undefined_103": {
+   "value": null
+  },
+  "undefined_104": {
+   "value": "9,089.33"
+  },
+  "undefined_107": {
+   "value": "-389.33"
+  },
+  "undefined_108": {
+   "value": "-23,359.80"
+  },
+  "undefined_110": {
+   "value": null
+  },
+  "undefined_111": {
+   "value": null
+  },
+  "undefined_113": {
+   "value": null
+  },
+  "undefined_114": {
+   "value": null
+  },
+  "undefined_115": {
+   "value": null
+  },
+  "undefined_116": {
+   "value": null
+  },
+  "undefined_117": {
+   "value": null
+  },
+  "undefined_118": {
+   "value": null
+  },
+  "undefined_119": {
+   "value": null
+  },
+  "undefined_120": {
+   "value": null
+  },
+  "undefined_48": {
+   "value": "1,620.00"
+  },
+  "undefined_49": {
+   "value": "85.00"
+  },
+  "undefined_50": {
+   "value": "35.00"
+  },
+  "undefined_51": {
+   "value": "0.00"
+  },
+  "undefined_52": {
+   "value": "0.00"
+  },
+  "undefined_53": {
+   "value": "450.00"
+  },
+  "undefined_54": {
+   "value": "0.00"
+  },
+  "undefined_55": {
+   "value": "45.00"
+  },
+  "undefined_56": {
+   "value": "6,056.00"
+  },
+  "undefined_57": {
+   "value": null
+  },
+  "undefined_58": {
+   "value": null
+  },
+  "undefined_59": {
+   "value": null
+  },
+  "undefined_61": {
+   "value": "0.00"
+  },
+  "undefined_62": {
+   "value": "0.00"
+  },
+  "undefined_63": {
+   "value": "0.00"
+  },
+  "undefined_64": {
+   "value": "150.00"
+  },
+  "undefined_65": {
+   "value": "60.00"
+  },
+  "undefined_66": {
+   "value": "100.00"
+  },
+  "undefined_67": {
+   "value": "890.00"
+  },
+  "undefined_71": {
+   "value": "Suncoast Equipment Finance"
+  },
+  "undefined_72": {
+   "value": "Utility trailer"
+  },
+  "undefined_73": {
+   "value": "95.00"
+  },
+  "undefined_74": {
+   "value": null
+  },
+  "undefined_75": {
+   "value": null
+  },
+  "undefined_76": {
+   "value": null
+  },
+  "undefined_77": {
+   "value": null
+  },
+  "undefined_78": {
+   "value": null
+  },
+  "undefined_79": {
+   "value": null
+  },
+  "undefined_80": {
+   "value": "1,990.00"
+  },
+  "undefined_81": {
+   "value": null
+  },
+  "undefined_82": {
+   "value": null
+  },
+  "undefined_83": {
+   "value": null
+  },
+  "undefined_84": {
+   "value": null
+  },
+  "undefined_85": {
+   "value": null
+  },
+  "undefined_86": {
+   "value": null
+  },
+  "undefined_87": {
+   "value": null
+  },
+  "undefined_88": {
+   "value": null
+  },
+  "undefined_89": {
+   "value": null
+  },
+  "undefined_90": {
+   "value": null
+  },
+  "undefined_91": {
+   "value": null
+  },
+  "undefined_92": {
+   "value": "35.00"
+  },
+  "undefined_93": {
+   "value": "3,200.00"
+  },
+  "undefined_93-1": {
+   "value": "53.33"
+  },
+  "undefined_97": {
+   "value": null
+  },
+  "undefined_98": {
+   "value": "65.00"
+  },
+  "x": {
+   "value": "0.1"
+  }
+ },
+ "release": "form/b122a2@2025-04-01",
+ "sha256": "bf2b742589b3e46c7dde596eaadf159ef3af03ea8b785585ecff0a7cdd730927"
+}

@@ -1,5 +1,0 @@
-{
-  "extends": "../tsconfig.base.json",
-  "compilerOptions": { "resolveJsonModule": true },
-  "include": ["src/**/*.ts", "scripts/**/*.ts", "jest.config.js"]
-}

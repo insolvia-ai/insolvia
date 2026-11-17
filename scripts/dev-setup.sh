@@ -3,9 +3,9 @@
 # Shared developer / CI toolchain bootstrap for the Insolvia monorepo.
 #
 # Installs the cross-cutting tools every package needs (Terraform, tflint, AWS
-# CLI, jq, Node.js, Watchman, the .NET SDK, pre-commit) with Homebrew on BOTH macOS and
+# CLI, jq, Node.js, Watchman, Python 3.12) with Homebrew on BOTH macOS and
 # Linux. Package-specific setup lives in per-package scripts, e.g.
-# apps/insolvia_app/scripts/dev-setup.sh (the Expo app).
+# services/api/scripts/dev-setup.sh (venv + pip).
 #
 # Homebrew details:
 #   - macOS (developer machines): brew runs as the normal user.
@@ -27,12 +27,8 @@
 #     bundler) uses it to watch the source tree; without it Metro falls back to
 #     Node's own recursive fs watching, which is slower and hits the macOS
 #     open-file limit on a tree this size.
-#   - Python:   not installed on its own. Nothing of ours is Python (ADR 0029
-#     rule 4; app-pr.yml guards it). The one Python program here is
-#     pre-commit, a third-party tool, and Homebrew's formula brings the
-#     interpreter it runs on.
-#   - .NET SDK: 10.0, as backend/global.json pins it (the .NET backend, ADR
-#     0028). Checked against that file below, not here.
+#   - Python:   3.12, matching services/api (pyproject `requires-python` and the
+#     public.ecr.aws/lambda/python:3.12 base image).
 #
 # NOT INSTALLED, deliberately: Xcode (+ its command line tools) and CocoaPods.
 # The app is a web SPA today — `expo start --web` / `expo export --platform web`
@@ -152,27 +148,12 @@ brew_ensure aws       awscli
 brew_ensure jq        jq
 brew_ensure node      node
 brew_ensure watchman  watchman
-brew_ensure dotnet    dotnet
+brew_ensure python3.12 python@3.12
 
 # Node version floor (the OS may already ship a newer/older node than brew's).
 if have node; then
   major="$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)"
   [[ "$major" -ge "$NODE_MAJOR_MIN" ]] || warn "node $(node --version) is below required v${NODE_MAJOR_MIN} (engines.node in the npm packages)"
-fi
-
-# .NET SDK (ADR 0028). backend/global.json owns the pin: 10.0.302 or any
-# later 10.0 feature band (rollForward latestFeature). `dotnet --version` run
-# inside backend/ applies exactly that rule, so it is the check. Any SDK on
-# the machine counts — Homebrew's formula, Microsoft's .pkg, or dotnet-install.sh
-# — because the muxer picks a matching one from whichever are installed. The
-# formula tracks the newest major, so on the day it moves past 10 this warns,
-# and the fix is the exact pin from Microsoft's installer.
-if have dotnet; then
-  if dotnet_sdk="$(cd "$SCRIPT_DIR/../backend" && dotnet --version 2>/dev/null)"; then
-    ok ".NET SDK $dotnet_sdk satisfies backend/global.json"
-  else
-    warn "no installed .NET SDK satisfies backend/global.json (have: $(dotnet --list-sdks 2>/dev/null | awk '{print $1}' | tr '\n' ' ')). Install it with: curl -fsSL https://dot.net/v1/dotnet-install.sh | bash -s -- --jsonfile backend/global.json"
-  fi
 fi
 
 # --- agent skills ----------------------------------------------------------
@@ -253,9 +234,8 @@ else
   warn "root npm ci did not complete — the pre-commit hook cannot run until it does. Run: eval \"\$(./scripts/github-packages-auth.sh --export)\" && npm ci"
 fi
 
-# Docker is a daemon/GUI concern — check only, never auto-install. The local
-# backend (backend/docker-compose.yml), its images and its Testcontainers data
-# tier need it.
+# Docker is a daemon/GUI concern — check only, never auto-install. services/api
+# local dev (docker compose) and its Lambda image build need it.
 if have docker; then skip docker "$(command -v docker)"; else
   if [[ "$PLATFORM" == "macos" ]]; then
     warn "docker not found — install Docker Desktop: https://www.docker.com/products/docker-desktop/"
@@ -265,6 +245,7 @@ if have docker; then skip docker "$(command -v docker)"; else
 fi
 
 log "shared toolchain ready. For complete per-package setup run its script, e.g.:"
+log "    ./services/api/scripts/dev-setup.sh           # venv + pip"
 log "    ./apps/insolvia_app/scripts/dev-setup.sh        # the Expo app"
 log "    ./apps/insolvia_marketing/scripts/dev-setup.sh  # packages auth + npm ci"
 [[ "$PLATFORM" == "linux" && "$CHECK_ONLY" -ne 1 ]] && log "Tools are on PATH via /etc/profile.d/homebrew.sh (new shells) or: eval \"\$($LINUXBREW_PREFIX/bin/brew shellenv)\""

@@ -7,7 +7,7 @@
     "Private and unpublished: the app resolves it as a workspace member by",
     "symlink, so there is nothing to publish and no version-bump gate.",
     "",
-    "No OpenAPI codegen. The tests ARE the contract pin against the API;",
+    "No OpenAPI codegen. The tests ARE the contract pin against services/api;",
     "see CLAUDE.md."
   ],
   "exports": {
@@ -16,6 +16,6 @@
   "scripts": {
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json",
-    "test": "jest"
+    "test": "vitest run"
   }
 }

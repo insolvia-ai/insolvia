@@ -28,19 +28,13 @@ does not apply. Human docs: [`README.md`](README.md).
   one variable, `VITE_INSOLVIA_ENV`.
 - **The dev server is PINNED to :3100** (`strictPort`): Google's JavaScript
   origins are exact-match and the app owns :3000. Local loop:
-  `./backend/scripts/dev-up.sh` (the admin service on :8090) +
+  `./services/admin/scripts/dev-up.sh` (service on :8090) +
   `./apps/insolvia_admin/scripts/dev-up.sh` here + your real Workspace
   account — or both at once via the root `./scripts/dev-up.sh`.
 - **`RequireStaff` is a courtesy, never a control** — the admin service
   verifies every request; the guard renders the sign-in screen in place (no
   redirect leaves the page, so there is no return-to to remember).
-- **The admin client is not here**: it is `packages/insolvia_admin_client`
-  (`@insolvia-ai/admin-client`), taken as `file:../../packages/insolvia_admin_client`
-  so `contract/` can prove the same code against the real service (ADR 0029
-  rule 2). Change it there; its `CLAUDE.md` owns the rules, and its contract
-  pins live beside it.
-- Tests are Jest (`jest.config.js`; jsdom plus Node's `fetch` and
-  `TextDecoder`, `jest.environment.js`): the screens, and the sign-in
-  assertions that are checkable nowhere else (this environment's
+- Tests are Vitest: contract pins against literal admin-service JSON, and
+  the sign-in assertions that are checkable nowhere else (this environment's
   client id, the `hd` hint, no `auto_select`). Follow the `insolvia-testing`
   skill.

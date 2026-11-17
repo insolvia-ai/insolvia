@@ -37,6 +37,11 @@ output "api_http_api_id" {
   value       = module.api_service.http_api_id
 }
 
+output "api_waitlist_table_name" {
+  description = "Staging waitlist DynamoDB table."
+  value       = module.api_service.waitlist_table_name
+}
+
 output "api_alarms_topic_arn" {
   description = "SNS topic for staging API alarms — subscribe by hand (Terraform manages no subscriptions)."
   value       = module.api_service.alarms_topic_arn
@@ -65,6 +70,18 @@ output "filing_queue_url" {
 output "auth_user_pool_id" {
   description = "Staging Cognito user pool ID."
   value       = module.auth.user_pool_id
+}
+
+# Also published to SSM (main.tf) for the API to read at runtime. This output
+# exists for a different reader: app-staging.yml's seed step, which loads
+# seeds/staging.json before the E2E suite runs and needs the table name in the
+# workflow, not in a Lambda's environment. Reading SSM from the workflow would
+# work too and was rejected — it needs an extra IAM grant on the seed role to
+# fetch a value Terraform already knows and every other value in that job
+# already comes from `terraform output`.
+output "firm_table_name" {
+  description = "Firms, firm users and their permissions (FIRM_TABLE_NAME for the API)."
+  value       = module.firm_store.table_name
 }
 
 output "auth_user_pool_arn" {
@@ -125,8 +142,8 @@ output "marketing_url" {
 }
 
 output "admin_ecr_repository_url" {
-  description = "Shared insolvia-shared-admin-api-dotnet repository the deploy workflow pushes to."
-  value       = data.aws_ecr_repository.service["admin-api-dotnet"].repository_url
+  description = "Shared insolvia-admin repository the deploy workflow pushes to."
+  value       = data.aws_ecr_repository.service["admin-api"].repository_url
 }
 
 output "admin_lambda_function_name" {
@@ -142,6 +159,11 @@ output "admin_lambda_alias_name" {
 output "admin_api_url" {
   description = "Staging admin service base URL."
   value       = module.admin_service.url
+}
+
+output "admin_audit_table_name" {
+  description = "Append-only admin audit table (#178's provisioning record)."
+  value       = module.admin_service.audit_table_name
 }
 
 output "admin_alarms_topic_arn" {
@@ -202,10 +224,16 @@ output "mcp_client_ids" {
 }
 
 # ── The seed step's inputs ──────────────────────────────────────
-# Values the workflow reads with `terraform output` rather than from SSM: they
-# are Terraform's already, and an SSM read from the workflow would need one
-# more grant. The document bucket is ALSO published to SSM (main.tf) for the
-# API; this output is the workflow's copy.
+# Read by .github/actions/seed-staging from the workflow, for the reason
+# firm_table_name above gives: the values are Terraform's already, and an SSM
+# read from the workflow would need one more grant on the seed role. The
+# case table and document bucket are ALSO published to SSM (main.tf) for the
+# API; these outputs are the workflow's copy.
+output "case_table_name" {
+  description = "Cases, debtors, collection items and document records (CASE_TABLE_NAME for the API)."
+  value       = module.case_store.table_name
+}
+
 output "case_document_bucket" {
   description = "The case-documents bucket (CASE_DOCUMENT_BUCKET for the API)."
   value       = module.case_documents.bucket_name
@@ -229,15 +257,4 @@ output "filing_worker_function_name" {
 output "filing_kill_switch_parameter" {
   description = "The filing kill switch: \"true\" lets the worker submit. Created off; flipped by hand only."
   value       = module.filing_worker.kill_switch_parameter
-}
-
-# ── The migrator (ADR 0028) ─────────────────────────────────────
-output "migrator_function_name" {
-  description = "The migrator Lambda the deploy workflows invoke before every alias shift (migrate; seed on staging)."
-  value       = module.migrator.function_name
-}
-
-output "migrator_ecr_repository_url" {
-  description = "ECR repository holding the migrator image (insolvia-shared-migrator-dotnet)."
-  value       = module.migrator.ecr_repository_url
 }

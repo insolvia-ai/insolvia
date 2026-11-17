@@ -1,0 +1,235 @@
+{
+ "fields": {
+  "10a": {
+   "value": null
+  },
+  "10b": {
+   "value": null
+  },
+  "13a": {
+   "value": null
+  },
+  "13b": {
+   "value": null
+  },
+  "13c": {
+   "value": null
+  },
+  "16 Calculate the median family income that applies to you Follow these steps": {
+   "value": "FL"
+  },
+  "Bankruptcy District Information": {
+   "value": "Middle District of Florida"
+  },
+  "Case number": {
+   "value": null
+  },
+  "Check if this is an amended filing": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "Date": {
+   "value": "08/30/2026"
+  },
+  "Date_2": {
+   "value": "08/30/2026"
+  },
+  "Debtor 1": {
+   "value": "Ada Quinn Lovelace"
+  },
+  "Debtor 2": {
+   "value": "Ben Lovelace Jr."
+  },
+  "Fill in the number of people in your household": {
+   "value": "3"
+  },
+  "check": {
+   "value": "/2",
+   "widget_states": [
+    "/Off",
+    "/2"
+   ]
+  },
+  "check1": {
+   "value": "/married",
+   "widget_states": [
+    "/Off",
+    "/married"
+   ]
+  },
+  "check13": {
+   "value": "/2",
+   "widget_states": [
+    "/Off",
+    "/2",
+    "/Off"
+   ]
+  },
+  "check17": {
+   "value": "/17b",
+   "widget_states": [
+    "/Off",
+    "/17b"
+   ]
+  },
+  "check2": {
+   "value": "/4",
+   "widget_states": [
+    "/Off",
+    "/4"
+   ]
+  },
+  "check21": {
+   "value": "/no",
+   "widget_states": [
+    "/Off",
+    "/no"
+   ]
+  },
+  "fill_7": {
+   "value": "0.00"
+  },
+  "undefined": {
+   "value": "7,400.00"
+  },
+  "undefined_10.0": {
+   "value": "0.00"
+  },
+  "undefined_10.1": {
+   "value": "0.00"
+  },
+  "undefined_11": {
+   "value": "0.00"
+  },
+  "undefined_12": {
+   "value": "0.00"
+  },
+  "undefined_13": {
+   "value": "0.00"
+  },
+  "undefined_16": {
+   "value": "0.00"
+  },
+  "undefined_17": {
+   "value": "0.00"
+  },
+  "undefined_18": {
+   "value": "0.00"
+  },
+  "undefined_19": {
+   "value": "1,300.00"
+  },
+  "undefined_2": {
+   "value": "0.00"
+  },
+  "undefined_20": {
+   "value": null
+  },
+  "undefined_21": {
+   "value": "150.00"
+  },
+  "undefined_22": {
+   "value": "0.00"
+  },
+  "undefined_23": {
+   "value": "0.00"
+  },
+  "undefined_24": {
+   "value": "0.00"
+  },
+  "undefined_25": {
+   "value": "0.00"
+  },
+  "undefined_26": {
+   "value": null
+  },
+  "undefined_27": {
+   "value": null
+  },
+  "undefined_28": {
+   "value": null
+  },
+  "undefined_29": {
+   "value": null
+  },
+  "undefined_3": {
+   "value": "0.00"
+  },
+  "undefined_30": {
+   "value": "7,400.00"
+  },
+  "undefined_31": {
+   "value": "1,300.00"
+  },
+  "undefined_32": {
+   "value": "8,700.00"
+  },
+  "undefined_34": {
+   "value": null
+  },
+  "undefined_35": {
+   "value": null
+  },
+  "undefined_36": {
+   "value": null
+  },
+  "undefined_37": {
+   "value": "0.00"
+  },
+  "undefined_38": {
+   "value": "8,700.00"
+  },
+  "undefined_4.0": {
+   "value": "0.00"
+  },
+  "undefined_4.1": {
+   "value": "0.00"
+  },
+  "undefined_40": {
+   "value": "104,400.00"
+  },
+  "undefined_41": {
+   "value": "97,540.00"
+  },
+  "undefined_43": {
+   "value": "8,700.00"
+  },
+  "undefined_45": {
+   "value": "104,400.00"
+  },
+  "undefined_47": {
+   "value": null
+  },
+  "undefined_48": {
+   "value": null
+  },
+  "undefined_5.0": {
+   "value": "0.00"
+  },
+  "undefined_5.1": {
+   "value": "0.00"
+  },
+  "undefined_6.0": {
+   "value": "0.00"
+  },
+  "undefined_6.1": {
+   "value": "0.00"
+  },
+  "undefined_8.0": {
+   "value": "0.00"
+  },
+  "undefined_8.1": {
+   "value": "0.00"
+  },
+  "undefined_9.0": {
+   "value": "0.00"
+  },
+  "undefined_9.1": {
+   "value": "0.00"
+  }
+ },
+ "release": "form/b122c1@2019-10-01",
+ "sha256": "fa7081709e0ae45ebb964629b30987a048cf2858456ed05fdf61c47be7332239"
+}

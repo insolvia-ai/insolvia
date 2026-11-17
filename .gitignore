@@ -53,26 +53,34 @@ terraform.rc
 # Lambda zips built by archive_file at plan time.
 infra/modules/*/.build/
 
-# Per-machine local wiring written by scripts/dev-aws-setup.sh (the shared dev
-# pool's ids, the Google client id — no secrets, but machine-specific and never
-# committed). There is deliberately no `.example` alongside these: every value
-# names a resource that exists outside this repo, so a copied template would
-# name nothing. Run `./scripts/dev-aws-setup.sh` and it writes both files.
-/backend/.env
+# Per-machine local wiring written by scripts/dev-aws-setup.sh (table name,
+# profile name, this machine's own Cognito pool ids — no secrets, but
+# machine-specific and never committed). There is deliberately no `.example`
+# alongside these: every value is an identifier for a resource `infra/envs/dev`
+# creates per machine, so a copied template would name nothing. Run
+# `./scripts/dev-aws-setup.sh` and it writes both files.
+/services/api/.env
+/services/admin/.env
+/services/mcp/.env
+/services/filing/.env
 /apps/insolvia_app/.env
 
 # ── Python ──────────────────────────────────────────────────────
 __pycache__/
 *.py[cod]
+.pytest_cache/
 .ruff_cache/
 .venv/
 venv/
 *.egg-info/
-# Where the retired Python brand-mark cutter kept its venv (the cutter is
-# tool/cut-brand-marks.ts now). Still ignored so a checkout that ran it does
-# not show the leftover; delete it freely. Anchored: one known path, not a
-# licence for any `.cache` anywhere.
+# The disposable toolchain scripts/render-brand-marks.sh builds to cut the
+# wordmark and icon out of the display face. Anchored: it is one known path,
+# not a licence for any `.cache` anywhere.
 /.cache/
+# setuptools drops this when a consumer pip-installs the shared package from
+# its local path (ADR 0012). Anchored, matching the Node rule below: a bare
+# `build/` would silently swallow any future build directory anywhere.
+/packages/insolvia_core/build/
 
 # ── Node (the npm workspace + the version-gated React packages) ─
 # package-lock.json IS committed (reproducible npm installs in CI).
@@ -110,38 +118,43 @@ storybook-static/
 .claude/skills/design-system-*
 .claude/skills/expo-*
 .claude/skills/eas-*
-# The .NET skills for backend/ — dotnet/skills (Microsoft) and
-# Aaronontheweb/dotnet-skills — have no common prefix either; one line each.
-.claude/skills/analyzing-dotnet-performance
-.claude/skills/api-design
-.claude/skills/assertion-quality
-.claude/skills/csharp-concurrency-patterns
-.claude/skills/csharp-expert
-.claude/skills/csharp-refactoring
-.claude/skills/database-performance
-.claude/skills/dependency-injection-patterns
-.claude/skills/detect-static-dependencies
-.claude/skills/directory-build-organization
-.claude/skills/dotnet-project-structure
-.claude/skills/dotnet-webapi
-.claude/skills/efcore-patterns
-.claude/skills/filter-syntax
-.claude/skills/find-untested-sources
-.claude/skills/generate-testability-wrappers
-.claude/skills/grade-tests
-.claude/skills/microsoft-extensions-configuration
-.claude/skills/migrate-static-to-wrapper
-.claude/skills/modern-csharp-coding-standards
-.claude/skills/msbuild-antipatterns
-.claude/skills/optimizing-ef-core-queries
-.claude/skills/package-management
-.claude/skills/platform-detection
-.claude/skills/run-tests
-.claude/skills/serialization
-.claude/skills/test-analysis-extensions
-.claude/skills/test-anti-patterns
-.claude/skills/test-gap-analysis
-.claude/skills/test-value-evidence
-.claude/skills/testability-obstacle
-.claude/skills/testcontainers-integration-tests
-.claude/skills/type-design-performance
+# mattpocock/skills has no common prefix, so each of its symlinks is listed by
+# name. Adding a skill from it means adding its line here too.
+.claude/skills/ask-matt
+.claude/skills/chief-of-staff
+.claude/skills/claude-handoff
+.claude/skills/code-review
+.claude/skills/codebase-design
+.claude/skills/diagnosing-bugs
+.claude/skills/domain-modeling
+.claude/skills/git-guardrails-claude-code
+.claude/skills/grill-me
+.claude/skills/grill-with-docs
+.claude/skills/grilling
+.claude/skills/handoff
+.claude/skills/implement
+.claude/skills/implement-spec
+.claude/skills/improve-codebase-architecture
+.claude/skills/loop-me
+.claude/skills/migrate-to-shoehorn
+.claude/skills/pr
+.claude/skills/prototype
+.claude/skills/research
+.claude/skills/retro
+.claude/skills/scaffold-exercises
+.claude/skills/setup-matt-pocock-skills
+.claude/skills/setup-pre-commit
+.claude/skills/setup-ts-deep-modules
+.claude/skills/tdd
+.claude/skills/teach
+.claude/skills/to-questionnaire
+.claude/skills/to-spec
+.claude/skills/to-tickets
+.claude/skills/triage
+.claude/skills/wait-what
+.claude/skills/wayfinder
+.claude/skills/wizard
+.claude/skills/writing-beats
+.claude/skills/writing-for-agents
+.claude/skills/writing-fragments
+.claude/skills/writing-shape

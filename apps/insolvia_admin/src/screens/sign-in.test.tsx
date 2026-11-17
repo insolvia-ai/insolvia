@@ -6,19 +6,19 @@
  * than leaving a silent dead card.
  */
 
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { CredentialResponse, GoogleIdentityApi } from '../session/google-identity';
 import { loadGoogleIdentity } from '../session/google-identity';
 import { SessionProvider, useSession } from '../session/session';
 import { SignInScreen } from './sign-in';
 
-jest.mock('../session/google-identity', () => ({
-  loadGoogleIdentity: jest.fn(),
+vi.mock('../session/google-identity', () => ({
+  loadGoogleIdentity: vi.fn(),
 }));
 
-const loadMock = jest.mocked(loadGoogleIdentity);
+const loadMock = vi.mocked(loadGoogleIdentity);
 
 function fakeJwt(claims: Record<string, unknown>): string {
   const encode = (value: unknown) =>
@@ -29,10 +29,10 @@ function fakeJwt(claims: Record<string, unknown>): string {
 function fakeIdentity() {
   let credentialCallback: ((response: CredentialResponse) => void) | null = null;
   const api: GoogleIdentityApi = {
-    initialize: jest.fn<GoogleIdentityApi['initialize']>((config) => {
+    initialize: vi.fn((config) => {
       credentialCallback = config.callback;
     }),
-    renderButton: jest.fn((parent: HTMLElement) => {
+    renderButton: vi.fn((parent: HTMLElement) => {
       const marker = document.createElement('div');
       marker.textContent = 'Google button';
       parent.appendChild(marker);
@@ -54,12 +54,12 @@ function SignedInProbe() {
 }
 
 beforeEach(() => {
-  jest.clearAllMocks();
+  vi.clearAllMocks();
 });
 
-// Explicit, not left to testing-library's automatic cleanup, which registers
-// only when the runner injects `afterEach` as a global — two renders would
-// share one DOM and the second test finds the first test's alert.
+// Without vitest `globals`, testing-library cannot register its automatic
+// cleanup — two renders would share one DOM and the second test finds the
+// first test's alert.
 afterEach(cleanup);
 
 describe('the sign-in screen', () => {
@@ -82,7 +82,7 @@ describe('the sign-in screen', () => {
     );
     // auto_select is deliberately never set: silent re-sign-in is a
     // decision, not a default, for a high-privilege internal tool.
-    const config = jest.mocked(identity.api.initialize).mock.calls[0]?.[0];
+    const config = vi.mocked(identity.api.initialize).mock.calls[0]?.[0];
     expect(config).not.toHaveProperty('auto_select');
   });
 
@@ -97,12 +97,9 @@ describe('the sign-in screen', () => {
     );
     await screen.findByText('Google button');
 
-    // Google calls the callback outside React; act() flushes what it sets.
-    act(() => {
-      identity.signInAs({
-        email: 'operator@insolvia.ai',
-        exp: Math.floor(Date.now() / 1000) + 3600,
-      });
+    identity.signInAs({
+      email: 'operator@insolvia.ai',
+      exp: Math.floor(Date.now() / 1000) + 3600,
     });
 
     expect(await screen.findByText('signed in as operator@insolvia.ai')).toBeInTheDocument();
@@ -119,9 +116,7 @@ describe('the sign-in screen', () => {
     );
     await screen.findByText('Google button');
 
-    act(() => {
-      identity.signInAs({ email: 'operator@insolvia.ai' }); // no exp
-    });
+    identity.signInAs({ email: 'operator@insolvia.ai' }); // no exp
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/could not be completed/i);
   });

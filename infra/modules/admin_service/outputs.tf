@@ -8,8 +8,9 @@ output "lambda_alias_name" {
   value       = aws_lambda_alias.live.name
 }
 
-# The role modules/auth (admin_invite_role_name) attaches its grant to — the
-# seam lives there so the grant sits beside the resource it opens.
+# The role modules/firm_store (admin_role_name) and modules/auth
+# (admin_invite_role_name) attach their grants to — the seams live there so
+# each grant sits beside the resource it opens.
 output "lambda_role_name" {
   description = "Admin Lambda execution role name."
   value       = aws_iam_role.admin.name
@@ -33,6 +34,11 @@ output "url" {
 output "http_api_id" {
   description = "API Gateway HTTP API id (CloudWatch dimension, CLI operations)."
   value       = aws_apigatewayv2_api.admin.id
+}
+
+output "audit_table_name" {
+  description = "Append-only admin audit table (#178's provisioning record)."
+  value       = aws_dynamodb_table.audit.name
 }
 
 output "ssm_parameter_prefix" {

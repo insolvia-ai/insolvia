@@ -1,0 +1,1922 @@
+{
+ "fields": {
+  "Accountant Name 27a": {
+   "value": null
+  },
+  "Accountant Name 27b": {
+   "value": null
+  },
+  "Accountant Name 27c": {
+   "value": null
+  },
+  "Address2 13a": {
+   "value": null
+  },
+  "Address2 13b": {
+   "value": null
+  },
+  "Address2 14": {
+   "value": null
+  },
+  "Address2 16a": {
+   "value": null
+  },
+  "Address2 16b": {
+   "value": null
+  },
+  "Address2 17": {
+   "value": null
+  },
+  "Address2 18a": {
+   "value": null
+  },
+  "Address2 18b": {
+   "value": null
+  },
+  "Address2 20a": {
+   "value": null
+  },
+  "Address2 20b": {
+   "value": null
+  },
+  "Address2 21": {
+   "value": null
+  },
+  "Address2 22a": {
+   "value": null
+  },
+  "Address2 23a": {
+   "value": null
+  },
+  "Address2 23b": {
+   "value": null
+  },
+  "Address2 24a": {
+   "value": null
+  },
+  "Address2 24b": {
+   "value": null
+  },
+  "Address2 25a": {
+   "value": null
+  },
+  "Address2 25b": {
+   "value": null
+  },
+  "Address2 27a": {
+   "value": null
+  },
+  "Address2 27b": {
+   "value": null
+  },
+  "Address2 27c": {
+   "value": null
+  },
+  "Address2 28": {
+   "value": null
+  },
+  "Amount 11": {
+   "value": null
+  },
+  "Amount1 13a": {
+   "value": "650.00"
+  },
+  "Amount1 13b": {
+   "value": null
+  },
+  "Amount1 14": {
+   "value": "700.00"
+  },
+  "Amount1 15": {
+   "value": "1,400.00"
+  },
+  "Amount1 16a": {
+   "value": "1,500.00"
+  },
+  "Amount1 16b": {
+   "value": null
+  },
+  "Amount1 17": {
+   "value": null
+  },
+  "Amount2 13a": {
+   "value": null
+  },
+  "Amount2 13b": {
+   "value": null
+  },
+  "Amount2 14": {
+   "value": null
+  },
+  "Amount2 16a": {
+   "value": null
+  },
+  "Amount2 16b": {
+   "value": null
+  },
+  "Amount2 17": {
+   "value": null
+  },
+  "Balance 20a": {
+   "value": "25.00"
+  },
+  "Balance 20b": {
+   "value": null
+  },
+  "Bankruptcy District Information": {
+   "value": "Middle District of Florida"
+  },
+  "Business Name 27a": {
+   "value": "Ada's Analytical Engines"
+  },
+  "Business Name 27b": {
+   "value": null
+  },
+  "Business Name 27c": {
+   "value": null
+  },
+  "Case nature 26": {
+   "value": null
+  },
+  "Case nature 9a": {
+   "value": "Credit card collection"
+  },
+  "Case nature 9b": {
+   "value": null
+  },
+  "Case number": {
+   "value": null
+  },
+  "Case number 26": {
+   "value": null
+  },
+  "Case number 9a": {
+   "value": "26-CC-1184"
+  },
+  "Case number 9b": {
+   "value": null
+  },
+  "Case title1 26": {
+   "value": null
+  },
+  "Case title1 9a": {
+   "value": "Meridian Bank Card Services v. Lovelace"
+  },
+  "Case title1 9b": {
+   "value": null
+  },
+  "Case title2 26": {
+   "value": null
+  },
+  "Case title2 9a": {
+   "value": null
+  },
+  "Case title2 9b": {
+   "value": null
+  },
+  "Charitys Name 14": {
+   "value": "Tampa Bay Food Bank"
+  },
+  "Check if this is an": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "City 13a": {
+   "value": "Atlanta"
+  },
+  "City 13b": {
+   "value": null
+  },
+  "City 14": {
+   "value": "Tampa"
+  },
+  "City 16a": {
+   "value": "Tampa"
+  },
+  "City 16b": {
+   "value": null
+  },
+  "City 17": {
+   "value": null
+  },
+  "City 18a": {
+   "value": "Tampa"
+  },
+  "City 18b": {
+   "value": null
+  },
+  "City 1b Debtor1": {
+   "value": "Tampa"
+  },
+  "City 1b Debtor2": {
+   "value": "Decatur"
+  },
+  "City 1c Debtor1": {
+   "value": null
+  },
+  "City 1c Debtor2": {
+   "value": null
+  },
+  "City 20a": {
+   "value": "Tampa"
+  },
+  "City 20b": {
+   "value": null
+  },
+  "City 21a": {
+   "value": null
+  },
+  "City 21b": {
+   "value": null
+  },
+  "City 22a": {
+   "value": "Tampa"
+  },
+  "City 22b": {
+   "value": null
+  },
+  "City 23a": {
+   "value": "Tampa"
+  },
+  "City 23b": {
+   "value": null
+  },
+  "City 24a": {
+   "value": null
+  },
+  "City 24b": {
+   "value": null
+  },
+  "City 25a": {
+   "value": null
+  },
+  "City 25b": {
+   "value": null
+  },
+  "City 27a": {
+   "value": "Tampa"
+  },
+  "City 27b": {
+   "value": null
+  },
+  "City 27c": {
+   "value": null
+  },
+  "City 28": {
+   "value": "Tampa"
+  },
+  "Court City 26": {
+   "value": null
+  },
+  "Court City 9a": {
+   "value": "Tampa"
+  },
+  "Court City 9b": {
+   "value": null
+  },
+  "Court Name 26": {
+   "value": null
+  },
+  "Court Name 9a": {
+   "value": "Hillsborough County Court"
+  },
+  "Court Name 9b": {
+   "value": null
+  },
+  "Court State 26": {
+   "value": null
+  },
+  "Court State 9a": {
+   "value": "FL"
+  },
+  "Court State 9b": {
+   "value": null
+  },
+  "Court ZIP Code 26": {
+   "value": null
+  },
+  "Court ZIP Code 9a": {
+   "value": "33602"
+  },
+  "Court ZIP Code 9b": {
+   "value": null
+  },
+  "Court address 26": {
+   "value": null
+  },
+  "Court address 9a": {
+   "value": "800 E Twiggs Street"
+  },
+  "Court address 9b": {
+   "value": null
+  },
+  "Creditor Date 11": {
+   "value": null
+  },
+  "Creditor Date3 10a": {
+   "value": null
+  },
+  "Creditor Date3 10b": {
+   "value": null
+  },
+  "Creditors City 1": {
+   "value": "Tampa"
+  },
+  "Creditors City 10a": {
+   "value": null
+  },
+  "Creditors City 10b": {
+   "value": null
+  },
+  "Creditors City 11": {
+   "value": null
+  },
+  "Creditors City 2": {
+   "value": null
+  },
+  "Creditors City 3": {
+   "value": null
+  },
+  "Creditors Name 1": {
+   "value": "Gulf Coast Home Loans"
+  },
+  "Creditors Name 10a": {
+   "value": null
+  },
+  "Creditors Name 10b": {
+   "value": null
+  },
+  "Creditors Name 11": {
+   "value": null
+  },
+  "Creditors Name 2": {
+   "value": null
+  },
+  "Creditors Name 3": {
+   "value": null
+  },
+  "Creditors State 1": {
+   "value": "FL"
+  },
+  "Creditors State 10a": {
+   "value": null
+  },
+  "Creditors State 10b": {
+   "value": null
+  },
+  "Creditors State 11": {
+   "value": null
+  },
+  "Creditors State 2": {
+   "value": null
+  },
+  "Creditors State 3": {
+   "value": null
+  },
+  "Creditors ZIP Code 1": {
+   "value": "33602"
+  },
+  "Creditors ZIP Code 10a": {
+   "value": null
+  },
+  "Creditors ZIP Code 10b": {
+   "value": null
+  },
+  "Creditors ZIP Code 11": {
+   "value": null
+  },
+  "Creditors ZIP Code 2": {
+   "value": null
+  },
+  "Creditors ZIP Code 3": {
+   "value": null
+  },
+  "Creditors address 10a": {
+   "value": null
+  },
+  "Creditors address 10b": {
+   "value": null
+  },
+  "Creditors address 11": {
+   "value": null
+  },
+  "Creditors address a 1": {
+   "value": "100 Lender Way"
+  },
+  "Creditors address a 2": {
+   "value": null
+  },
+  "Creditors address a 3": {
+   "value": null
+  },
+  "Creditors address b 1": {
+   "value": null
+  },
+  "Creditors address b 2": {
+   "value": null
+  },
+  "Creditors address b 3": {
+   "value": null
+  },
+  "Creditors address2 10a": {
+   "value": null
+  },
+  "Creditors address2 10b": {
+   "value": null
+  },
+  "Creditors address2 11": {
+   "value": null
+  },
+  "Creditors amount owe 1": {
+   "value": "195,000.00"
+  },
+  "Creditors amount owe 2": {
+   "value": null
+  },
+  "Creditors amount owe 3": {
+   "value": null
+  },
+  "Creditors amount paid 1": {
+   "value": "4,440.00"
+  },
+  "Creditors amount paid 2": {
+   "value": null
+  },
+  "Creditors amount paid 3": {
+   "value": null
+  },
+  "Creditors payment Date 1a": {
+   "value": "05/01/2026"
+  },
+  "Creditors payment Date 1b": {
+   "value": "06/01/2026"
+  },
+  "Creditors payment Date 1c": {
+   "value": "07/01/2026"
+  },
+  "Creditors payment Date 2a": {
+   "value": null
+  },
+  "Creditors payment Date 2b": {
+   "value": null
+  },
+  "Creditors payment Date 2c": {
+   "value": null
+  },
+  "Creditors payment Date 3a": {
+   "value": null
+  },
+  "Creditors payment Date 3b": {
+   "value": null
+  },
+  "Creditors payment Date 3c": {
+   "value": null
+  },
+  "Date 24": {
+   "value": null
+  },
+  "Date 25": {
+   "value": null
+  },
+  "Date 28": {
+   "value": "06/01/2025"
+  },
+  "Date closed 20a": {
+   "value": "01/15/2026"
+  },
+  "Date closed 20b": {
+   "value": null
+  },
+  "Date from 1b Debtor1": {
+   "value": "01/01/2023"
+  },
+  "Date from 1b Debtor2": {
+   "value": "11/01/2024"
+  },
+  "Date from 1c Debtor1": {
+   "value": null
+  },
+  "Date from 1c Debtor2": {
+   "value": null
+  },
+  "Date from 27a": {
+   "value": "01/01/2019"
+  },
+  "Date from 27b": {
+   "value": null
+  },
+  "Date from 27c": {
+   "value": null
+  },
+  "Date signed Debtor 1": {
+   "value": "08/30/2026"
+  },
+  "Date signed Debtor 2": {
+   "value": "08/30/2026"
+  },
+  "Date to 1b Debtor1": {
+   "value": "06/30/2024"
+  },
+  "Date to 1b Debtor2": {
+   "value": "07/01/2026"
+  },
+  "Date to 1c Debtor1": {
+   "value": null
+  },
+  "Date to 1c Debtor2": {
+   "value": null
+  },
+  "Date to 27a": {
+   "value": null
+  },
+  "Date to 27b": {
+   "value": null
+  },
+  "Date1 13a": {
+   "value": "10/12/2025"
+  },
+  "Date1 13b": {
+   "value": null
+  },
+  "Date1 14": {
+   "value": "11/30/2025"
+  },
+  "Date1 15": {
+   "value": "09/28/2025"
+  },
+  "Date1 16a": {
+   "value": "07/15/2026"
+  },
+  "Date1 16b": {
+   "value": null
+  },
+  "Date1 17": {
+   "value": null
+  },
+  "Date1 18a": {
+   "value": "03/15/2025"
+  },
+  "Date1 18b": {
+   "value": null
+  },
+  "Date2 13a": {
+   "value": null
+  },
+  "Date2 13b": {
+   "value": null
+  },
+  "Date2 14": {
+   "value": null
+  },
+  "Date2 16a": {
+   "value": null
+  },
+  "Date2 16b": {
+   "value": null
+  },
+  "Date2 17": {
+   "value": null
+  },
+  "Debtor 1": {
+   "value": "Ada Quinn Lovelace"
+  },
+  "Debtor 2": {
+   "value": "Ben Lovelace Jr."
+  },
+  "Debtor1.Employer Identification Number27a": {
+   "value": "123456789"
+  },
+  "Debtor1.Employer Identification Number27b": {
+   "value": null
+  },
+  "Debtor1.Employer Identification Number27c": {
+   "value": null
+  },
+  "Describe 13a": {
+   "value": "Wedding gift"
+  },
+  "Describe 13b": {
+   "value": null
+  },
+  "Describe 14": {
+   "value": "Cash donations"
+  },
+  "Describe 16a": {
+   "value": "Attorney fees for this bankruptcy case"
+  },
+  "Describe 16b": {
+   "value": null
+  },
+  "Describe 17": {
+   "value": null
+  },
+  "Describe 19": {
+   "value": null
+  },
+  "Describe 21": {
+   "value": null
+  },
+  "Describe 22": {
+   "value": "Business records and spare parts"
+  },
+  "Describe 23": {
+   "value": "Loaned test equipment"
+  },
+  "Describe 24": {
+   "value": null
+  },
+  "Describe 25": {
+   "value": null
+  },
+  "Describe action 11": {
+   "value": null
+  },
+  "Describe nature 27a": {
+   "value": "Repair and resale of analytical engines"
+  },
+  "Describe nature 27b": {
+   "value": null
+  },
+  "Describe nature 27c": {
+   "value": null
+  },
+  "Describe property 10a": {
+   "value": null
+  },
+  "Describe property 10b": {
+   "value": null
+  },
+  "Describe1 15": {
+   "value": "Hurricane damage to the back fence"
+  },
+  "Describe1 18a": {
+   "value": "Sold a spare engine lathe valued at about $800"
+  },
+  "Describe1 18b": {
+   "value": null
+  },
+  "Describe2 15": {
+   "value": "Not covered; below the deductible"
+  },
+  "Describe2 18a": {
+   "value": "$500 cash"
+  },
+  "Describe2 18b": {
+   "value": null
+  },
+  "Email 16a": {
+   "value": "alex@example.com"
+  },
+  "Email 16b": {
+   "value": null
+  },
+  "Government unit 24b": {
+   "value": null
+  },
+  "Government unit 25b": {
+   "value": null
+  },
+  "Income 4a Debtor 1": {
+   "value": "41,600.00"
+  },
+  "Income 4a Debtor 2": {
+   "value": "24,000.00"
+  },
+  "Income 4b Debtor 1": {
+   "value": "65,200.00"
+  },
+  "Income 4b Debtor 2": {
+   "value": "35,000.00"
+  },
+  "Income 4c Debtor 1": {
+   "value": "58,300.00"
+  },
+  "Income 4c Debtor 2": {
+   "value": null
+  },
+  "Income 5a Debtor 1": {
+   "value": "3,100.00"
+  },
+  "Income 5a Debtor 2": {
+   "value": null
+  },
+  "Income 5b Debtor 1": {
+   "value": null
+  },
+  "Income 5b Debtor 2": {
+   "value": null
+  },
+  "Income 5c Debtor 1": {
+   "value": null
+  },
+  "Income 5c Debtor 2": {
+   "value": null
+  },
+  "Income 5d Debtor 1": {
+   "value": null
+  },
+  "Income 5d Debtor 2": {
+   "value": null
+  },
+  "Income 5e Debtor 1": {
+   "value": null
+  },
+  "Income 5e Debtor 2": {
+   "value": null
+  },
+  "Income 5f Debtor 1": {
+   "value": null
+  },
+  "Income 5f Debtor 2": {
+   "value": null
+  },
+  "Income 5g Debtor 1": {
+   "value": null
+  },
+  "Income 5g Debtor 2": {
+   "value": null
+  },
+  "Income 5h Debtor 1": {
+   "value": null
+  },
+  "Income 5h Debtor 2": {
+   "value": null
+  },
+  "Income 5i Debtor 1": {
+   "value": null
+  },
+  "Income 5i Debtor 2": {
+   "value": null
+  },
+  "Income source 5a Debtor 1": {
+   "value": "Unemployment compensation"
+  },
+  "Income source 5a Debtor 2": {
+   "value": null
+  },
+  "Income source 5b Debtor 1": {
+   "value": null
+  },
+  "Income source 5b Debtor 2": {
+   "value": null
+  },
+  "Income source 5c Debtor 1": {
+   "value": null
+  },
+  "Income source 5c Debtor 2": {
+   "value": null
+  },
+  "Income source 5d Debtor 1": {
+   "value": null
+  },
+  "Income source 5d Debtor 2": {
+   "value": null
+  },
+  "Income source 5e Debtor 1": {
+   "value": null
+  },
+  "Income source 5e Debtor 2": {
+   "value": null
+  },
+  "Income source 5f Debtor 1": {
+   "value": null
+  },
+  "Income source 5f Debtor 2": {
+   "value": null
+  },
+  "Income source 5g Debtor 1": {
+   "value": null
+  },
+  "Income source 5g Debtor 2": {
+   "value": null
+  },
+  "Income source 5h Debtor 1": {
+   "value": null
+  },
+  "Income source 5h Debtor 2": {
+   "value": null
+  },
+  "Income source 5i Debtor 1": {
+   "value": null
+  },
+  "Income source 5i Debtor 2": {
+   "value": null
+  },
+  "Insider Name 7a": {
+   "value": "Margaret Lovelace"
+  },
+  "Insider Name 7b": {
+   "value": null
+  },
+  "Insider Name 8a": {
+   "value": null
+  },
+  "Insider Name 8b": {
+   "value": null
+  },
+  "Insider reason of pay 7a": {
+   "value": null
+  },
+  "Insider reason of pay 7b": {
+   "value": "Repayment of a family loan"
+  },
+  "Insider reason of pay 8a": {
+   "value": null
+  },
+  "Insider reason of pay 8b": {
+   "value": null
+  },
+  "Insiders City 7a": {
+   "value": "Tampa"
+  },
+  "Insiders City 7b": {
+   "value": null
+  },
+  "Insiders City 8a": {
+   "value": null
+  },
+  "Insiders City 8b": {
+   "value": null
+  },
+  "Insiders State 7a": {
+   "value": "FL"
+  },
+  "Insiders State 7b": {
+   "value": null
+  },
+  "Insiders State 8a": {
+   "value": null
+  },
+  "Insiders State 8b": {
+   "value": null
+  },
+  "Insiders ZIP Code 7a": {
+   "value": "33603"
+  },
+  "Insiders ZIP Code 7b": {
+   "value": null
+  },
+  "Insiders ZIP Code 8a": {
+   "value": null
+  },
+  "Insiders address 7a": {
+   "value": "9 Garden Lane"
+  },
+  "Insiders address 7b": {
+   "value": null
+  },
+  "Insiders address 8a": {
+   "value": null
+  },
+  "Insiders address 8b": {
+   "value": null
+  },
+  "Insiders amount owe 7a": {
+   "value": "0.00"
+  },
+  "Insiders amount owe 7b": {
+   "value": null
+  },
+  "Insiders amount owe 8a": {
+   "value": null
+  },
+  "Insiders amount owe 8b": {
+   "value": null
+  },
+  "Insiders amount paid 7a": {
+   "value": "1,200.00"
+  },
+  "Insiders amount paid 7b": {
+   "value": null
+  },
+  "Insiders amount paid 8a": {
+   "value": null
+  },
+  "Insiders amount paid 8b": {
+   "value": null
+  },
+  "Insiders payment Date1 7a": {
+   "value": "12/20/2025"
+  },
+  "Insiders payment Date1 7b": {
+   "value": null
+  },
+  "Insiders payment Date1 8a": {
+   "value": null
+  },
+  "Insiders payment Date1 8b": {
+   "value": null
+  },
+  "Insiders payment Date2 7a": {
+   "value": null
+  },
+  "Insiders payment Date2 7b": {
+   "value": null
+  },
+  "Insiders payment Date2 8a": {
+   "value": null
+  },
+  "Insiders payment Date2 8b": {
+   "value": null
+  },
+  "Insiders payment Date3 7a": {
+   "value": null
+  },
+  "Insiders payment Date3 7b": {
+   "value": null
+  },
+  "Insiders payment Date3 8a": {
+   "value": null
+  },
+  "Insiders payment Date3 8b": {
+   "value": null
+  },
+  "Insiderss address2 7a": {
+   "value": null
+  },
+  "Insiderss address2 7b": {
+   "value": null
+  },
+  "Insiderss address2 8a": {
+   "value": null
+  },
+  "Insiderss address2 8b": {
+   "value": null
+  },
+  "Name 28": {
+   "value": "Suncoast Credit Union"
+  },
+  "Name of financial institution 20a": {
+   "value": "First Gulf Bank"
+  },
+  "Name of financial institution 20b": {
+   "value": null
+  },
+  "Name of financial institution 21a": {
+   "value": null
+  },
+  "Name of financial institution 22a": {
+   "value": "StorSafe Tampa LLC"
+  },
+  "Name of owner 23a": {
+   "value": "Menabrea Machines Inc"
+  },
+  "Name of person agreed to pay": {
+   "value": null
+  },
+  "Name of site 24a": {
+   "value": null
+  },
+  "Name of site 25a": {
+   "value": null
+  },
+  "Name of trust1 19": {
+   "value": null
+  },
+  "Name of trust2 19": {
+   "value": null
+  },
+  "Name of who else had access 21b": {
+   "value": null
+  },
+  "Name of who else had access 22b": {
+   "value": "Ada Lovelace"
+  },
+  "Name to who you gave gift 13a": {
+   "value": "Clara Byron"
+  },
+  "Name to who you gave gift 13b": {
+   "value": null
+  },
+  "Name to who you received transfer 18a": {
+   "value": "Charles Menabrea"
+  },
+  "Name to who you received transfer 18b": {
+   "value": null
+  },
+  "Name to who you was paid 16a": {
+   "value": "Counsel & Counsel PA"
+  },
+  "Name to who you was paid 16b": {
+   "value": null
+  },
+  "Name to who you was paid 17": {
+   "value": null
+  },
+  "Other 1": {
+   "value": null
+  },
+  "Other 2": {
+   "value": null
+  },
+  "Other 20a": {
+   "value": null
+  },
+  "Other 20b": {
+   "value": null
+  },
+  "Other 3": {
+   "value": null
+  },
+  "Person who paid 16a": {
+   "value": null
+  },
+  "Person who paid 16b": {
+   "value": null
+  },
+  "Property value 10a": {
+   "value": null
+  },
+  "Property value 10b": {
+   "value": null
+  },
+  "Relation 13a": {
+   "value": "Niece"
+  },
+  "Relation 13b": {
+   "value": null
+  },
+  "Relation 18a": {
+   "value": "Friend"
+  },
+  "Relation 18b": {
+   "value": null
+  },
+  "Signature of Debtor 1": {
+   "value": null
+  },
+  "Signature of Debtor 2": {
+   "value": null
+  },
+  "State 13a": {
+   "value": "GA"
+  },
+  "State 13b": {
+   "value": null
+  },
+  "State 14": {
+   "value": "FL"
+  },
+  "State 16a": {
+   "value": "FL"
+  },
+  "State 16b": {
+   "value": null
+  },
+  "State 17": {
+   "value": null
+  },
+  "State 18a": {
+   "value": "FL"
+  },
+  "State 18b": {
+   "value": null
+  },
+  "State 1b Debtor1": {
+   "value": "FL"
+  },
+  "State 1b Debtor2": {
+   "value": "GA"
+  },
+  "State 1c Debtor1": {
+   "value": null
+  },
+  "State 1c Debtor2": {
+   "value": null
+  },
+  "State 20a": {
+   "value": "FL"
+  },
+  "State 20b": {
+   "value": null
+  },
+  "State 21a": {
+   "value": null
+  },
+  "State 21b": {
+   "value": null
+  },
+  "State 22a": {
+   "value": "FL"
+  },
+  "State 22b": {
+   "value": null
+  },
+  "State 23a": {
+   "value": "FL"
+  },
+  "State 23b": {
+   "value": null
+  },
+  "State 24a": {
+   "value": null
+  },
+  "State 24b": {
+   "value": null
+  },
+  "State 25a": {
+   "value": null
+  },
+  "State 25b": {
+   "value": null
+  },
+  "State 27a": {
+   "value": "FL"
+  },
+  "State 27b": {
+   "value": null
+  },
+  "State 27c": {
+   "value": null
+  },
+  "State 28": {
+   "value": "FL"
+  },
+  "Street address 1b Debtor 1": {
+   "value": "3 Difference Court"
+  },
+  "Street address 1b Debtor 2": {
+   "value": "8 Peachtree Lane"
+  },
+  "Street address 1c Debtor 1": {
+   "value": null
+  },
+  "Street address 1c Debtor 2": {
+   "value": null
+  },
+  "Street address 2b Debtor 1": {
+   "value": null
+  },
+  "Street address 2b Debtor 2": {
+   "value": null
+  },
+  "Street address 2c Debtor 1": {
+   "value": null
+  },
+  "Street address 2c Debtor 2": {
+   "value": null
+  },
+  "Value 23b": {
+   "value": "900.00"
+  },
+  "Year from 4b Debtor1": {
+   "value": "2025"
+  },
+  "Year from 4c Debtor1": {
+   "value": "2024"
+  },
+  "ZIP Code 13a": {
+   "value": "30301"
+  },
+  "ZIP Code 13b": {
+   "value": null
+  },
+  "ZIP Code 14": {
+   "value": "33610"
+  },
+  "ZIP Code 16a": {
+   "value": "33604"
+  },
+  "ZIP Code 16b": {
+   "value": null
+  },
+  "ZIP Code 17": {
+   "value": null
+  },
+  "ZIP Code 18a": {
+   "value": "33605"
+  },
+  "ZIP Code 18b": {
+   "value": null
+  },
+  "ZIP Code 1b Debtor 1": {
+   "value": "33604"
+  },
+  "ZIP Code 1b Debtor 2": {
+   "value": "30030"
+  },
+  "ZIP Code 1c Debtor 1": {
+   "value": null
+  },
+  "ZIP Code 1c Debtor 2": {
+   "value": null
+  },
+  "ZIP Code 20a": {
+   "value": "33601"
+  },
+  "ZIP Code 21a": {
+   "value": null
+  },
+  "ZIP Code 22a": {
+   "value": "33605"
+  },
+  "ZIP Code 23a": {
+   "value": "33605"
+  },
+  "ZIP Code 23b": {
+   "value": null
+  },
+  "ZIP Code 24a": {
+   "value": null
+  },
+  "ZIP Code 24b": {
+   "value": null
+  },
+  "ZIP Code 25a": {
+   "value": null
+  },
+  "ZIP Code 25b": {
+   "value": null
+  },
+  "ZIP Code 27a": {
+   "value": "33603"
+  },
+  "ZIP Code 27b": {
+   "value": null
+  },
+  "ZIP Code 27c": {
+   "value": null
+  },
+  "ZIP Code 28": {
+   "value": "33607"
+  },
+  "account number 11": {
+   "value": null
+  },
+  "account number 20a": {
+   "value": "2210"
+  },
+  "account number 20b": {
+   "value": null
+  },
+  "address 13a": {
+   "value": "15 Loom Lane"
+  },
+  "address 13b": {
+   "value": null
+  },
+  "address 14": {
+   "value": "5 Harvest Road"
+  },
+  "address 16a": {
+   "value": "1 Example Way"
+  },
+  "address 16b": {
+   "value": null
+  },
+  "address 17": {
+   "value": null
+  },
+  "address 18a": {
+   "value": "41 Engine Row"
+  },
+  "address 18b": {
+   "value": null
+  },
+  "address 20a": {
+   "value": "12 Bay Street"
+  },
+  "address 20b": {
+   "value": null
+  },
+  "address 21a": {
+   "value": null
+  },
+  "address 21b": {
+   "value": null
+  },
+  "address 22a": {
+   "value": "77 Keeper Street"
+  },
+  "address 22b": {
+   "value": null
+  },
+  "address 23a": {
+   "value": "200 Engine Row"
+  },
+  "address 23b": {
+   "value": "Workshop shelf at 12 Byron Court"
+  },
+  "address 24a": {
+   "value": null
+  },
+  "address 25a": {
+   "value": null
+  },
+  "address 27a": {
+   "value": "88 Difference Drive"
+  },
+  "address 27b": {
+   "value": null
+  },
+  "address 27c": {
+   "value": null
+  },
+  "address 28": {
+   "value": "6801 Croom Road"
+  },
+  "check Checking 20a": {
+   "value": "/yes",
+   "widget_states": [
+    "/yes"
+   ]
+  },
+  "check Checking 20b": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "check CorpOwner 27": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "check Executive 27": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "check LLC 27": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "check Money market 20a": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "check Money market 20b": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "check Partner 27": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "check Savings 20a": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "check Savings 20b": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "check Sole Proprietor 27": {
+   "value": "/yes",
+   "widget_states": [
+    "/yes"
+   ]
+  },
+  "check brokerage 20a": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "check brokerage 20b": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "check car 1": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "check car 2": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "check car 3": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "check credit card 1": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "check credit card 2": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "check credit card 3": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "check loan 1": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "check loan 2": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "check loan 3": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "check mortgage 1": {
+   "value": "/no",
+   "widget_states": [
+    "/no"
+   ]
+  },
+  "check mortgage 2": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "check mortgage 3": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "check other 1": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "check other 2": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "check other 20a": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "check other 20b": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "check other 3": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "check vendors 1": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "check vendors 2": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "check vendors 3": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "check1": {
+   "value": "/married",
+   "widget_states": [
+    "/married",
+    "/Off"
+   ]
+  },
+  "check10": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check10a1": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "check10a2": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "check10a3": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "check10a4": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "check10b1": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "check10b2": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "check10b3": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "check10b4": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "check11": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check12": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check13": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "check14": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "check15": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "check16": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "check17": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check18": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "check19": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check1b": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "check1b2": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "check1c": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "check1c2": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "check2": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "check20": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "check21": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check21a": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off"
+   ]
+  },
+  "check22": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "check22a": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "check23": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "check24": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check25": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check26": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off",
+    "/Off",
+    "/Off",
+    "/Off"
+   ]
+  },
+  "check27a": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "check28": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "check29": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off"
+   ]
+  },
+  "check3": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off",
+    "/Off"
+   ]
+  },
+  "check30": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check4": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "check4a Debtor 1": {
+   "value": "/no",
+   "widget_states": [
+    "/no"
+   ]
+  },
+  "check4a Debtor 2": {
+   "value": "/no",
+   "widget_states": [
+    "/no"
+   ]
+  },
+  "check4b Debtor 1": {
+   "value": "/no",
+   "widget_states": [
+    "/no"
+   ]
+  },
+  "check4b Debtor 2": {
+   "value": "/no",
+   "widget_states": [
+    "/no"
+   ]
+  },
+  "check4c Debtor 1": {
+   "value": "/no",
+   "widget_states": [
+    "/no"
+   ]
+  },
+  "check4c Debtor 2": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "check4d Debtor 1": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "check4d Debtor 2": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "check4e Debtor 1": {
+   "value": "/no",
+   "widget_states": [
+    "/no"
+   ]
+  },
+  "check4e Debtor 2": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "check4f Debtor 1": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "check4f Debtor 2": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "check5": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "check6": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "check6a": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off"
+   ]
+  },
+  "check6b": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "check7": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "check8": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check9": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "check9a": {
+   "value": "/pending",
+   "widget_states": [
+    "/pending",
+    "/Off",
+    "/Off"
+   ]
+  },
+  "check9b": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off",
+    "/Off"
+   ]
+  }
+ },
+ "release": "form/b107@2025-04-01",
+ "sha256": "ef45efa5236905df62551c71c58fcf23625cb14d1162ff79b771f83fe5f86b8a"
+}

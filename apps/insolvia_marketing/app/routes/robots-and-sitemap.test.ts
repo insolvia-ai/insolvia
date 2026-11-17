@@ -1,6 +1,4 @@
-import { afterEach, describe, expect, it } from "@jest/globals";
-
-import { restoreEnv, stubEnv } from "../../test/env";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { loader as robotsLoader } from "./[robots.txt]";
 import { loader as sitemapLoader } from "./[sitemap.xml]";
@@ -112,11 +110,11 @@ describe("sitemap.xml", () => {
  */
 describe("placeholder mode", () => {
   afterEach(() => {
-    restoreEnv();
+    vi.unstubAllEnvs();
   });
 
   it("disallows crawling even on the production host", async () => {
-    stubEnv("INSOLVIA_SITE_MODE", "placeholder");
+    vi.stubEnv("INSOLVIA_SITE_MODE", "placeholder");
 
     const body = await callLoader(robotsLoader, PRODUCTION_HOST).text();
 
@@ -125,7 +123,7 @@ describe("placeholder mode", () => {
   });
 
   it("advertises no sitemap entries", async () => {
-    stubEnv("INSOLVIA_SITE_MODE", "placeholder");
+    vi.stubEnv("INSOLVIA_SITE_MODE", "placeholder");
 
     const body = await callLoader(sitemapLoader, PRODUCTION_HOST).text();
 
@@ -136,7 +134,7 @@ describe("placeholder mode", () => {
   it("leaves the production contract intact when off", async () => {
     // The regression that matters: placeholder mode must not leak into the
     // normal path, or launching would silently keep the site out of the index.
-    stubEnv("INSOLVIA_SITE_MODE", "full");
+    vi.stubEnv("INSOLVIA_SITE_MODE", "full");
 
     const robots = await callLoader(robotsLoader, PRODUCTION_HOST).text();
     const sitemap = await callLoader(sitemapLoader, PRODUCTION_HOST).text();

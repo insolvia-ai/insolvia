@@ -1,0 +1,235 @@
+{
+ "fields": {
+  "10a": {
+   "value": "S24.0 other_income_source_1"
+  },
+  "10b": {
+   "value": "S25.0 other_income_source_2"
+  },
+  "13a": {
+   "value": "S29.0 marital_adjustment_purpose"
+  },
+  "13b": {
+   "value": "S29.1 marital_adjustment_purpose"
+  },
+  "13c": {
+   "value": "S29.2 marital_adjustment_purpose"
+  },
+  "16 Calculate the median family income that applies to you Follow these steps": {
+   "value": "FL"
+  },
+  "Bankruptcy District Information": {
+   "value": "Middle District of Florida"
+  },
+  "Case number": {
+   "value": "S3.0 caption.case_number"
+  },
+  "Check if this is an amended filing": {
+   "value": "/On",
+   "widget_states": [
+    "/On"
+   ]
+  },
+  "Date": {
+   "value": "01/17/2026"
+  },
+  "Date_2": {
+   "value": "01/18/2026"
+  },
+  "Debtor 1": {
+   "value": "S0.0 caption.debtor1_name"
+  },
+  "Debtor 2": {
+   "value": "S1.0 caption.debtor2_name"
+  },
+  "Fill in the number of people in your household": {
+   "value": "9"
+  },
+  "check": {
+   "value": "/2",
+   "widget_states": [
+    "/Off",
+    "/2"
+   ]
+  },
+  "check1": {
+   "value": "/single",
+   "widget_states": [
+    "/single",
+    "/Off"
+   ]
+  },
+  "check13": {
+   "value": "/1",
+   "widget_states": [
+    "/1",
+    "/Off",
+    "/Off"
+   ]
+  },
+  "check17": {
+   "value": "/17b",
+   "widget_states": [
+    "/Off",
+    "/17b"
+   ]
+  },
+  "check2": {
+   "value": "/3",
+   "widget_states": [
+    "/3",
+    "/Off"
+   ]
+  },
+  "check21": {
+   "value": "/no",
+   "widget_states": [
+    "/Off",
+    "/no"
+   ]
+  },
+  "fill_7": {
+   "value": "1,284.56"
+  },
+  "undefined": {
+   "value": "1,284.56"
+  },
+  "undefined_10.0": {
+   "value": "1,264.56"
+  },
+  "undefined_10.1": {
+   "value": "1,274.56"
+  },
+  "undefined_11": {
+   "value": "1,294.56"
+  },
+  "undefined_12": {
+   "value": "1,204.56"
+  },
+  "undefined_13": {
+   "value": "1,214.56"
+  },
+  "undefined_16": {
+   "value": "1,274.56"
+  },
+  "undefined_17": {
+   "value": "1,284.56"
+  },
+  "undefined_18": {
+   "value": "1,284.56"
+  },
+  "undefined_19": {
+   "value": "1,294.56"
+  },
+  "undefined_2": {
+   "value": "1,294.56"
+  },
+  "undefined_20": {
+   "value": "1,294.56"
+  },
+  "undefined_21": {
+   "value": "1,204.56"
+  },
+  "undefined_22": {
+   "value": "1,204.56"
+  },
+  "undefined_23": {
+   "value": "1,214.56"
+  },
+  "undefined_24": {
+   "value": "1,214.56"
+  },
+  "undefined_25": {
+   "value": "1,224.56"
+  },
+  "undefined_26": {
+   "value": "1,224.56"
+  },
+  "undefined_27": {
+   "value": "1,234.56"
+  },
+  "undefined_28": {
+   "value": "1,234.56"
+  },
+  "undefined_29": {
+   "value": "1,244.56"
+  },
+  "undefined_3": {
+   "value": "1,204.56"
+  },
+  "undefined_30": {
+   "value": "1,264.56"
+  },
+  "undefined_31": {
+   "value": "1,274.56"
+  },
+  "undefined_32": {
+   "value": "1,274.56"
+  },
+  "undefined_34": {
+   "value": "1,204.56"
+  },
+  "undefined_35": {
+   "value": "1,214.56"
+  },
+  "undefined_36": {
+   "value": "1,224.56"
+  },
+  "undefined_37": {
+   "value": "1,214.56"
+  },
+  "undefined_38": {
+   "value": "1,224.56"
+  },
+  "undefined_4.0": {
+   "value": "1,214.56"
+  },
+  "undefined_4.1": {
+   "value": "1,224.56"
+  },
+  "undefined_40": {
+   "value": "1,234.56"
+  },
+  "undefined_41": {
+   "value": "1,264.56"
+  },
+  "undefined_43": {
+   "value": "1,294.56"
+  },
+  "undefined_45": {
+   "value": "1,204.56"
+  },
+  "undefined_47": {
+   "value": "Ada Q Lovelace 1"
+  },
+  "undefined_48": {
+   "value": "Ada Q Lovelace 1"
+  },
+  "undefined_5.0": {
+   "value": "1,224.56"
+  },
+  "undefined_5.1": {
+   "value": "1,234.56"
+  },
+  "undefined_6.0": {
+   "value": "1,234.56"
+  },
+  "undefined_6.1": {
+   "value": "1,244.56"
+  },
+  "undefined_8.0": {
+   "value": "1,244.56"
+  },
+  "undefined_8.1": {
+   "value": "1,254.56"
+  },
+  "undefined_9.0": {
+   "value": "1,254.56"
+  },
+  "undefined_9.1": {
+   "value": "1,264.56"
+  }
+ },
+ "release": "form/b122c1@2019-10-01",
+ "sha256": "085762f7774e3b63817895ebae7cc114f2aaca1dd2cbab7463f0c280402de88c"
+}

@@ -10,7 +10,7 @@
 # The dev build targets `local`, whose apiBaseUrl is http://127.0.0.1:8090 —
 # start the admin service first for anything beyond the sign-in screen:
 #
-#   ./backend/scripts/dev-up.sh   (the admin service on 8090, beside the API)
+#   ./services/admin/scripts/dev-up.sh
 #
 set -euo pipefail
 

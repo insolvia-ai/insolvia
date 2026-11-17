@@ -22,11 +22,11 @@ bootstrap is its
   DynamoDB lock table), AWS provider `~> 6.37` — **6.37 is a deliberate floor,
   not a stale `~> 6.0`**. Two things set it, and the floor is the later:
   `aws_cognito_managed_login_branding` first shipped in 6.12.0 (it lives in
-  insolvia-services now, which keeps the same pin), and the DynamoDB case
-  table's `global_secondary_index.key_schema` needed 6.37.0 (6.32.1 fixed a
-  perpetual diff on a range-keyed index, 6.37.0 a removal that deleted
-  **every** index). That table is gone (18.23); the floor stays, because
-  lowering it buys nothing and every root moves together. Bump the floor whenever
+  insolvia-services now, which keeps the same pin), and
+  `modules/case_store`'s `global_secondary_index.key_schema` first shipped in
+  6.29.0 — but *working* `key_schema` is 6.37.0, because 6.32.1 fixed a
+  perpetual diff on an index that has a range key (ours does) and 6.37.0 fixed
+  a removal that deletes **every** index on the table. Bump the floor whenever
   a root starts depending on a newer resource or a data-loss fix. All three
   roots here carry the same pin, and so do insolvia-services' roots — keep
   them moving together. **Region `us-east-1` everywhere** (CloudFront ACM
@@ -70,22 +70,6 @@ bootstrap is its
   stores. **A new service's repository is a PR there, released there, before
   the PR here that deploys it** — the env root's `data "aws_ecr_repository"`
   hard-fails until it exists.
-- **The backend runs in the VPC on Aurora** (ADR 0028, since 18.22). A
-  backend Lambda takes `vpc_subnet_ids = module.network.private_subnet_ids`,
-  `vpc_security_group_ids = [module.network.lambda_security_group_id]` and
-  `db_cluster_resource_id = module.aurora.cluster_resource_id`, and calls
-  `modules/vpc_lambda_access` for its role — the inline ENI policy and
-  `rds-db:connect` as ONE Postgres role (a `db_username` literal the module
-  also publishes as `insolvia-db-username`). **Never attach
-  `AWSLambdaVPCAccessExecutionRole`**: ci-trust's `ServiceRolePolicyAttachment`
-  admits only `AWSLambdaBasicExecutionRole`, and that condition is a control,
-  not an oversight. A new Postgres role is a migrator change first
-  (`backend/src/Insolvia.Migrator`'s `ServiceRoles` and `Grants.cs`), then its
-  name in `vpc_lambda_access`'s validation. The migrator Lambda
-  (`modules/migrator`) is the only reader of the RDS master secret; the deploy
-  role is denied it. There is no DynamoDB: the tables,
-  `modules/firm_store` and the DynamoDB gateway endpoint went in 18.23. `docs/reference/terraform.md` § "The backend on .NET and
-  Aurora" has the per-host table.
 - **Structure:** `modules/<concern>/{main,variables,outputs}.tf`,
   `envs/<env>/{main,variables,providers,backend,outputs}.tf`. State:
   `s3://insolvia-shared-terraform-state-us-east-1`, key

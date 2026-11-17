@@ -60,13 +60,13 @@ React Router v7 SSR marketing site for `www.insolvia.ai`. Human docs:
   prod for its own keywords. `app/lib/seo.test.ts` and
   `app/routes/robots-and-sitemap.test.ts` pin this — including that the check
   fails *closed* for an unanticipated host.
-- **Tests are Jest, colocated, `node` environment** (`npm test`, gated by the
+- **Tests are Vitest, colocated, `node` environment** (`npm test`, gated by the
   `Marketing site` job). They cover the SSR halves — the `.server.ts` libraries
   and route `loader`/`action` functions — which is where this app's behaviour
   lives; Lighthouse and the RNW guard only ever inspect the *built* output.
   There is no jsdom environment yet: add one when the first component test
   arrives, not before. Shape and conventions:
-  [ADR 0029](../../docs/adr/0029-one-testing-shape.md)
+  [ADR 0008](../../docs/adr/0008-testing-shape-follows-the-code-it-tests.md)
   and the `insolvia-testing` skill.
 - **A test under `app/routes/` is a ROUTE unless `routes.ts` excludes it.**
   `flatRoutes()` turns every file in that directory into a route module, and
@@ -78,9 +78,8 @@ React Router v7 SSR marketing site for `www.insolvia.ai`. Human docs:
   exactly this; don't remove it. **Typecheck, lint and `npm test` all pass in
   that broken state — only `npm run build` catches it, so run the build before
   pushing a change under `app/routes/`.**
-- **The waitlist field caps in `app/lib/waitlist.server.ts` mirror the API's
-  (`backend/src/Insolvia.Api/Waitlist/WaitlistSubmissions.cs`) and nothing
-  mechanical keeps them in step.**
+- **The waitlist field caps in `app/lib/waitlist.server.ts` mirror
+  `services/api` `core/waitlist.py` and nothing mechanical keeps them in step.**
   `waitlist.server.test.ts` table-drives every cap as the drift alarm — if you
   change a limit on either side, change it on both.
 - **Only prod owns the apex.** Staging passes `apex_domain = null`; the module

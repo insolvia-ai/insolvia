@@ -1,0 +1,381 @@
+{
+ "fields": {
+  "10": {
+   "value": null
+  },
+  "11": {
+   "value": null
+  },
+  "12": {
+   "value": null
+  },
+  "13": {
+   "value": null
+  },
+  "14": {
+   "value": null
+  },
+  "2.1": {
+   "value": "Fla. Const. art. X, \u00a7 4(a)(1)"
+  },
+  "2.2": {
+   "value": "Fla. Stat. \u00a7 222.25(1)"
+  },
+  "2.3": {
+   "value": "Fla. Const. art. X, \u00a7 4(a)(2)"
+  },
+  "3": {
+   "value": "Fla. Stat. \u00a7 222.21(2)"
+  },
+  "4": {
+   "value": null
+  },
+  "5": {
+   "value": null
+  },
+  "6": {
+   "value": null
+  },
+  "7": {
+   "value": null
+  },
+  "8": {
+   "value": null
+  },
+  "9": {
+   "value": null
+  },
+  "Bankruptcy District Information": {
+   "value": "Middle District of Florida"
+  },
+  "Case number": {
+   "value": null
+  },
+  "Check if this is an": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "Debtor 1": {
+   "value": "Ada Quinn Lovelace"
+  },
+  "Debtor 2": {
+   "value": "Ben Lovelace Jr."
+  },
+  "Line from": {
+   "value": null
+  },
+  "Line from_2": {
+   "value": null
+  },
+  "Line from_3": {
+   "value": null
+  },
+  "Line from_4": {
+   "value": null
+  },
+  "Schedule AB": {
+   "value": null
+  },
+  "Schedule AB_10": {
+   "value": null
+  },
+  "Schedule AB_11": {
+   "value": null
+  },
+  "Schedule AB_2": {
+   "value": null
+  },
+  "Schedule AB_3": {
+   "value": null
+  },
+  "Schedule AB_4": {
+   "value": null
+  },
+  "Schedule AB_5": {
+   "value": null
+  },
+  "Schedule AB_6": {
+   "value": null
+  },
+  "Schedule AB_7": {
+   "value": null
+  },
+  "Schedule AB_8": {
+   "value": null
+  },
+  "Schedule AB_9": {
+   "value": null
+  },
+  "check 1": {
+   "value": "/state and federal",
+   "widget_states": [
+    "/state and federal",
+    "/Off"
+   ]
+  },
+  "check 10": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off"
+   ]
+  },
+  "check 11": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off"
+   ]
+  },
+  "check 12": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off"
+   ]
+  },
+  "check 13": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off"
+   ]
+  },
+  "check 14": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off"
+   ]
+  },
+  "check 15": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off"
+   ]
+  },
+  "check 2.1": {
+   "value": "/fair market",
+   "widget_states": [
+    "/Off",
+    "/fair market"
+   ]
+  },
+  "check 2.2": {
+   "value": "/On",
+   "widget_states": [
+    "/On",
+    "/Off"
+   ]
+  },
+  "check 2.3": {
+   "value": "/On",
+   "widget_states": [
+    "/On",
+    "/Off"
+   ]
+  },
+  "check 3": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "check 3-1": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check 4": {
+   "value": "/fair market",
+   "widget_states": [
+    "/Off",
+    "/fair market"
+   ]
+  },
+  "check 5": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off"
+   ]
+  },
+  "check 6": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off"
+   ]
+  },
+  "check 7": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off"
+   ]
+  },
+  "check 8": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off"
+   ]
+  },
+  "check 9": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off"
+   ]
+  },
+  "description": {
+   "value": "12 Byron Court, Tampa, FL 33601"
+  },
+  "description_10": {
+   "value": null
+  },
+  "description_11": {
+   "value": null
+  },
+  "description_12": {
+   "value": null
+  },
+  "description_13": {
+   "value": null
+  },
+  "description_14": {
+   "value": null
+  },
+  "description_15": {
+   "value": null
+  },
+  "description_2": {
+   "value": "2016 Honda Civic LX"
+  },
+  "description_3": {
+   "value": "Used furniture and kitchen appliances"
+  },
+  "description_4": {
+   "value": "401(k) retirement account"
+  },
+  "description_5": {
+   "value": null
+  },
+  "description_6": {
+   "value": null
+  },
+  "description_7": {
+   "value": null
+  },
+  "description_8": {
+   "value": null
+  },
+  "description_9": {
+   "value": null
+  },
+  "page": {
+   "value": null
+  },
+  "page 2": {
+   "value": "2"
+  },
+  "undefined": {
+   "value": "240,000.00"
+  },
+  "undefined_11": {
+   "value": "48,000.00"
+  },
+  "undefined_12": {
+   "value": null
+  },
+  "undefined_13": {
+   "value": null
+  },
+  "undefined_2": {
+   "value": null
+  },
+  "undefined_26": {
+   "value": null
+  },
+  "undefined_27": {
+   "value": null
+  },
+  "undefined_28": {
+   "value": null
+  },
+  "undefined_29": {
+   "value": null
+  },
+  "undefined_30": {
+   "value": null
+  },
+  "undefined_31": {
+   "value": null
+  },
+  "undefined_32": {
+   "value": null
+  },
+  "undefined_34": {
+   "value": null
+  },
+  "undefined_35": {
+   "value": null
+  },
+  "undefined_36": {
+   "value": null
+  },
+  "undefined_37": {
+   "value": null
+  },
+  "undefined_38": {
+   "value": null
+  },
+  "undefined_39": {
+   "value": null
+  },
+  "undefined_40": {
+   "value": null
+  },
+  "undefined_41": {
+   "value": null
+  },
+  "undefined_42": {
+   "value": null
+  },
+  "undefined_43": {
+   "value": null
+  },
+  "undefined_44": {
+   "value": null
+  },
+  "undefined_45": {
+   "value": null
+  },
+  "undefined_47": {
+   "value": null
+  },
+  "undefined_48": {
+   "value": null
+  },
+  "undefined_6": {
+   "value": "9,000.00"
+  },
+  "undefined_7": {
+   "value": "5,000.00"
+  },
+  "undefined_8": {
+   "value": "2,200.00"
+  },
+  "undefined_9": {
+   "value": "1,000.00"
+  }
+ },
+ "release": "form/b106c@2025-04-01",
+ "sha256": "fe351150a4c91b647c6bd43b172f5fa069259c1a8dcb76116daa50b1f236b1df"
+}

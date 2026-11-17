@@ -37,6 +37,11 @@ output "api_http_api_id" {
   value       = module.api_service.http_api_id
 }
 
+output "api_waitlist_table_name" {
+  description = "Production waitlist DynamoDB table."
+  value       = module.api_service.waitlist_table_name
+}
+
 output "api_alarms_topic_arn" {
   description = "SNS topic for production API alarms — subscribe by hand (Terraform manages no subscriptions)."
   value       = module.api_service.alarms_topic_arn
@@ -125,8 +130,8 @@ output "marketing_url" {
 }
 
 output "admin_ecr_repository_url" {
-  description = "Shared insolvia-shared-admin-api-dotnet repository the deploy workflow pushes to."
-  value       = data.aws_ecr_repository.service["admin-api-dotnet"].repository_url
+  description = "Shared insolvia-admin repository the deploy workflow pushes to."
+  value       = data.aws_ecr_repository.service["admin-api"].repository_url
 }
 
 output "admin_lambda_function_name" {
@@ -142,6 +147,11 @@ output "admin_lambda_alias_name" {
 output "admin_api_url" {
   description = "Production admin service base URL."
   value       = module.admin_service.url
+}
+
+output "admin_audit_table_name" {
+  description = "Append-only admin audit table (#178's provisioning record)."
+  value       = module.admin_service.audit_table_name
 }
 
 output "admin_alarms_topic_arn" {
@@ -214,15 +224,4 @@ output "filing_worker_function_name" {
 output "filing_kill_switch_parameter" {
   description = "The filing kill switch: \"true\" lets the worker submit. Created off; flipped by hand only."
   value       = module.filing_worker.kill_switch_parameter
-}
-
-# ── The migrator (ADR 0028) ─────────────────────────────────────
-output "migrator_function_name" {
-  description = "The migrator Lambda the deploy workflows invoke before every alias shift (migrate; seed on staging)."
-  value       = module.migrator.function_name
-}
-
-output "migrator_ecr_repository_url" {
-  description = "ECR repository holding the migrator image (insolvia-shared-migrator-dotnet)."
-  value       = module.migrator.ecr_repository_url
 }

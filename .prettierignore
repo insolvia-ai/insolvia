@@ -4,24 +4,11 @@ node_modules/
 dist/
 build/
 
-# Python environments (the brand-mark cutter builds one; a checkout that ran
-# the retired Python contract or integration stacks still has a .venv there) —
-# gitignored by the global `.venv/` rule. Their site-packages ship JS and JSON
-# nobody here wrote.
-.venv/
-
 # Expo-generated, gitignored, and self-labelled "should not be edited". Prettier
 # does not read .gitignore, so without these the format check trips on a file no
 # human wrote and cannot fix by hand.
 .expo/
 **/expo-env.d.ts
-
-# NuGet's lock files (backend/, ADR 0028) are written by `dotnet restore` in its
-# own layout; reformatting them would be undone by the next restore. Build
-# output under backend/ is gitignored there, which Prettier does not read.
-backend/**/packages.lock.json
-backend/**/bin/
-backend/**/obj/
 
 # Markdown is hand-authored and hand-wrapped throughout this repo, with compact
 # `|---|---|` tables and `*emphasis*`. Prettier rewrites both on sight, which

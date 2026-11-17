@@ -1,0 +1,486 @@
+{
+ "fields": {
+  "2.1.amount.1": {
+   "value": "1,244.56"
+  },
+  "2.1.amount.2": {
+   "value": "1,254.56"
+  },
+  "2.1.months.1": {
+   "value": "8"
+  },
+  "2.1.months.2": {
+   "value": "9"
+  },
+  "2.1.per.1": {
+   "value": "S15.0 "
+  },
+  "2.1.per.2": {
+   "value": "S15.1 "
+  },
+  "2.2.direct": {
+   "value": "X"
+  },
+  "2.2.other": {
+   "value": "X"
+  },
+  "2.2.other_specify": {
+   "value": "S20.0 line_2_2_other_spec"
+  },
+  "2.2.payroll_deduction": {
+   "value": "X"
+  },
+  "2.3.other": {
+   "value": "X"
+  },
+  "2.3.other.1": {
+   "value": "S24.0 line_2_3_other_treatment"
+  },
+  "2.3.other.2": {
+   "value": "S24.1 line_2_3_other_treatment"
+  },
+  "2.3.retain": {
+   "value": "X"
+  },
+  "2.3.turn_over": {
+   "value": "X"
+  },
+  "2.4.additional": {
+   "value": "X"
+  },
+  "2.4.description.1": {
+   "value": "S27.0 line_2_4_description"
+  },
+  "2.4.description.2": {
+   "value": "S27.1 line_2_4_description"
+  },
+  "2.4.none": {
+   "value": "X"
+  },
+  "2.5.total": {
+   "value": "1,284.56"
+  },
+  "3.1.arrearage.1": {
+   "value": "1,244.56"
+  },
+  "3.1.arrearage.2": {
+   "value": "1,254.56"
+  },
+  "3.1.collateral.1.1": {
+   "value": "S32.0 line_3"
+  },
+  "3.1.collateral.1.2": {
+   "value": "S32.1 line_3"
+  },
+  "3.1.collateral.2.1": {
+   "value": "S32.2 line_3"
+  },
+  "3.1.collateral.2.2": {
+   "value": "S32.3 line_3"
+  },
+  "3.1.creditor.1.1": {
+   "value": "S31.0 line_3_1_creditor"
+  },
+  "3.1.creditor.1.2": {
+   "value": "S31.1 line_3_1_creditor"
+  },
+  "3.1.creditor.2.1": {
+   "value": "S31.2 line_3_1_creditor"
+  },
+  "3.1.creditor.2.2": {
+   "value": "S31.3 line_3_1_creditor"
+  },
+  "3.1.disbursed_debtor.1": {
+   "value": "X"
+  },
+  "3.1.disbursed_debtor.2": {
+   "value": "X"
+  },
+  "3.1.disbursed_trustee.1": {
+   "value": "X"
+  },
+  "3.1.disbursed_trustee.2": {
+   "value": "X"
+  },
+  "3.1.installment.1": {
+   "value": "1,234.56"
+  },
+  "3.1.installment.2": {
+   "value": "1,244.56"
+  },
+  "3.1.maintain": {
+   "value": "X"
+  },
+  "3.1.monthly.1": {
+   "value": "1,264.56"
+  },
+  "3.1.monthly.2": {
+   "value": "1,274.56"
+  },
+  "3.1.none": {
+   "value": "X"
+  },
+  "3.1.rate.1": {
+   "value": "S35.0"
+  },
+  "3.1.rate.2": {
+   "value": "S35.1"
+  },
+  "3.1.total.1": {
+   "value": "1,274.56"
+  },
+  "3.1.total.2": {
+   "value": "1,284.56"
+  },
+  "3.2.claim_amount.1": {
+   "value": "1,234.56"
+  },
+  "3.2.claim_amount.2": {
+   "value": "1,244.56"
+  },
+  "3.2.collateral.1.1": {
+   "value": "S44.0 line_"
+  },
+  "3.2.collateral.1.2": {
+   "value": "S44.1 line_"
+  },
+  "3.2.collateral.2.1": {
+   "value": "S44.2 line_"
+  },
+  "3.2.collateral.2.2": {
+   "value": "S44.3 line_"
+  },
+  "3.2.collateral_value.1": {
+   "value": "1,254.5"
+  },
+  "3.2.collateral_value.2": {
+   "value": "1,264.5"
+  },
+  "3.2.creditor.1.1": {
+   "value": "S42.0 line_3_2_c"
+  },
+  "3.2.creditor.1.2": {
+   "value": "S42.1 line_3_2_c"
+  },
+  "3.2.creditor.2.1": {
+   "value": "S42.2 line_3_2_c"
+  },
+  "3.2.creditor.2.2": {
+   "value": "S42.3 line_3_2_c"
+  },
+  "3.2.monthly.1": {
+   "value": "1,294.56"
+  },
+  "3.2.monthly.2": {
+   "value": "1,204.56"
+  },
+  "3.2.none": {
+   "value": "X"
+  },
+  "3.2.rate.1": {
+   "value": "S4"
+  },
+  "3.2.rate.2": {
+   "value": "S4"
+  },
+  "3.2.request": {
+   "value": "X"
+  },
+  "3.2.secured.1": {
+   "value": "1,274.56"
+  },
+  "3.2.secured.2": {
+   "value": "1,284.56"
+  },
+  "3.2.senior.1": {
+   "value": "1,264.56"
+  },
+  "3.2.senior.2": {
+   "value": "1,274.56"
+  },
+  "3.2.total.1": {
+   "value": "1,204.56"
+  },
+  "3.2.total.2": {
+   "value": "1,214.56"
+  },
+  "3.3.none": {
+   "value": "X"
+  },
+  "3.4.none": {
+   "value": "X"
+  },
+  "3.5.collateral.1": {
+   "value": "S56.0 line_3_5_collateral"
+  },
+  "3.5.collateral.2": {
+   "value": "S56.1 line_3_5_collateral"
+  },
+  "3.5.creditor.1": {
+   "value": "S55.0 line_3_5_creditor"
+  },
+  "3.5.creditor.2": {
+   "value": "S55.1 line_3_5_creditor"
+  },
+  "3.5.none": {
+   "value": "X"
+  },
+  "3.5.surrender": {
+   "value": "X"
+  },
+  "4.2.percentage": {
+   "value": "S57.0 l"
+  },
+  "4.2.total": {
+   "value": "1,284.56"
+  },
+  "4.3.attorney_fees": {
+   "value": "1,294.56"
+  },
+  "4.4.estimate": {
+   "value": "X"
+  },
+  "4.4.none": {
+   "value": "X"
+  },
+  "4.4.total": {
+   "value": "1,224.56"
+  },
+  "4.5.none": {
+   "value": "X"
+  },
+  "5.1.liquidation": {
+   "value": "1,204.56"
+  },
+  "5.1.percentage": {
+   "value": "X"
+  },
+  "5.1.percentage_estimate": {
+   "value": "1,284.5"
+  },
+  "5.1.percentage_value": {
+   "value": "S67.0 "
+  },
+  "5.1.remaining": {
+   "value": "X"
+  },
+  "5.1.sum": {
+   "value": "X"
+  },
+  "5.1.sum_amount": {
+   "value": "1,254.56"
+  },
+  "5.2.none": {
+   "value": "X"
+  },
+  "5.3.none": {
+   "value": "X"
+  },
+  "6.1.assumed": {
+   "value": "X"
+  },
+  "6.1.creditor.1.1": {
+   "value": "S75.0 line_6_1_creditor"
+  },
+  "6.1.creditor.1.2": {
+   "value": "S75.1 line_6_1_creditor"
+  },
+  "6.1.creditor.2.1": {
+   "value": "S75.2 line_6_1_creditor"
+  },
+  "6.1.creditor.2.2": {
+   "value": "S75.3 line_6_1_creditor"
+  },
+  "6.1.description.1.1": {
+   "value": "S76.0 line_6_1_de"
+  },
+  "6.1.description.1.2": {
+   "value": "S76.1 line_6_1_de"
+  },
+  "6.1.description.1.3": {
+   "value": "S76.2 line_6_1_de"
+  },
+  "6.1.description.1.4": {
+   "value": "S76.3 line_6_1_de"
+  },
+  "6.1.description.2.1": {
+   "value": "S76.4 line_6_1_de"
+  },
+  "6.1.description.2.2": {
+   "value": "S76.5 line_6_1_de"
+  },
+  "6.1.description.2.3": {
+   "value": "S76.6 line_6_1_de"
+  },
+  "6.1.description.2.4": {
+   "value": "S76.7 line_6_1_de"
+  },
+  "6.1.disbursed_debtor.1": {
+   "value": "X"
+  },
+  "6.1.disbursed_debtor.2": {
+   "value": "X"
+  },
+  "6.1.disbursed_trustee.1": {
+   "value": "X"
+  },
+  "6.1.disbursed_trustee.2": {
+   "value": "X"
+  },
+  "6.1.none": {
+   "value": "X"
+  },
+  "7.1.confirmation": {
+   "value": "X"
+  },
+  "7.1.discharge": {
+   "value": "X"
+  },
+  "7.1.other": {
+   "value": "X"
+  },
+  "7.1.other_specify": {
+   "value": "S82.0 line_7_1_other_specify"
+  },
+  "8.1.none": {
+   "value": "X"
+  },
+  "amended_plan": {
+   "value": "X"
+  },
+  "amended_sections.1": {
+   "value": "S5.0 caption.amended_sect"
+  },
+  "amended_sections.2": {
+   "value": "S5.1 caption.amended_sect"
+  },
+  "case_number": {
+   "value": "S3.0 caption.case_number"
+  },
+  "debtor1.name": {
+   "value": "S0.0 caption.debtor1_name"
+  },
+  "debtor2.name": {
+   "value": "S1.0 caption.debtor2_name"
+  },
+  "district.1": {
+   "value": "S2.0 caption.distri"
+  },
+  "district.2": {
+   "value": "S2.1 captio"
+  },
+  "exhibit.a": {
+   "value": "1,204.56"
+  },
+  "exhibit.b": {
+   "value": "1,214.56"
+  },
+  "exhibit.c": {
+   "value": "1,224.56"
+  },
+  "exhibit.d": {
+   "value": "1,234.56"
+  },
+  "exhibit.e": {
+   "value": "1,244.56"
+  },
+  "exhibit.f": {
+   "value": "1,254.56"
+  },
+  "exhibit.g": {
+   "value": "1,264.56"
+  },
+  "exhibit.h": {
+   "value": "1,274.56"
+  },
+  "exhibit.i": {
+   "value": "1,284.56"
+  },
+  "exhibit.j": {
+   "value": "1,294.56"
+  },
+  "exhibit.total": {
+   "value": "1,204.56"
+  },
+  "header.case_number.p2": {
+   "value": "S7.0 header.case_nu"
+  },
+  "header.case_number.p3": {
+   "value": "S7.1 header.case_nu"
+  },
+  "header.case_number.p4": {
+   "value": "S7.2 header.case_nu"
+  },
+  "header.case_number.p5": {
+   "value": "S7.3 header.case_nu"
+  },
+  "header.case_number.p6": {
+   "value": "S7.4 header.case_nu"
+  },
+  "header.case_number.p7": {
+   "value": "S7.5 header.case_nu"
+  },
+  "header.case_number.p8": {
+   "value": "S7.6 header.case_nu"
+  },
+  "header.debtor.p2": {
+   "value": "S6.0 header.debtor_name"
+  },
+  "header.debtor.p3": {
+   "value": "S6.1 header.debtor_name"
+  },
+  "header.debtor.p4": {
+   "value": "S6.2 header.debtor_name"
+  },
+  "header.debtor.p5": {
+   "value": "S6.3 header.debtor_name"
+  },
+  "header.debtor.p6": {
+   "value": "S6.4 header.debtor_name"
+  },
+  "header.debtor.p7": {
+   "value": "S6.5 header.debtor_name"
+  },
+  "header.debtor.p8": {
+   "value": "S6.6 header.debtor_name"
+  },
+  "part1.1.1.included": {
+   "value": "X"
+  },
+  "part1.1.1.not_included": {
+   "value": "X"
+  },
+  "part1.1.2.included": {
+   "value": "X"
+  },
+  "part1.1.2.not_included": {
+   "value": "X"
+  },
+  "part1.1.3.included": {
+   "value": "X"
+  },
+  "part1.1.3.not_included": {
+   "value": "X"
+  },
+  "sign.attorney": {
+   "value": "Ada Q Lovelace 1"
+  },
+  "sign.attorney_date": {
+   "value": "01/06/2026"
+  },
+  "sign.debtor1": {
+   "value": "Ada Q Lovelace 1"
+  },
+  "sign.debtor1_date": {
+   "value": "01/03/2026"
+  },
+  "sign.debtor2": {
+   "value": "Ada Q Lovelace 1"
+  },
+  "sign.debtor2_date": {
+   "value": "01/04/2026"
+  }
+ },
+ "release": "form/b113@2017-12-01",
+ "sha256": "47d92595b95b424dfba8174cc36cf6fadc1cfc4a193101b6f2dcb4b2db859938"
+}
