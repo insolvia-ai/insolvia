@@ -11,6 +11,8 @@ boto3==1.40.66
 # insolvia_core's token module and tax-id envelope import these by name; the
 # pins stay aligned with every other Python service.
 PyJWT[crypto]==2.13.0
+# insolvia_core's Postgres adapters (ADR 0030); pinned exact like boto3.
+psycopg[binary]==3.3.9
 cryptography==50.0.1
 # The API's core — the filing set and the approval digest this worker must
 # compute byte-for-byte as the API does — renders and measures PDFs, and the

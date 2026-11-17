@@ -4,6 +4,7 @@ import os
 from collections.abc import Mapping
 from dataclasses import dataclass
 
+from insolvia_core.database import database_url
 from insolvia_core.errors import ValidationError
 
 SERVICE_NAME = "insolvia-api"
@@ -72,6 +73,8 @@ class AppConfig:
     """
 
     environment: str
+    # Postgres (ADR 0030). load_config refuses to start a service without it.
+    database_url: str | None = None
     waitlist_table_name: str | None = None
     case_table_name: str | None = None
     case_access_log_table_name: str | None = None
@@ -201,6 +204,7 @@ def load_config(environ: Mapping[str, str] | None = None) -> AppConfig:
         )
     return AppConfig(
         environment=environment,
+        database_url=database_url(source, required=environ is None),
         waitlist_table_name=source.get("WAITLIST_TABLE_NAME") or None,
         case_table_name=source.get("CASE_TABLE_NAME") or None,
         case_access_log_table_name=source.get("CASE_ACCESS_LOG_TABLE_NAME") or None,

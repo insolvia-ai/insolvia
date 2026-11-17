@@ -19,7 +19,19 @@ def test_unknown_environment_is_rejected():
 
 def test_defaults_to_process_environment(monkeypatch):
     monkeypatch.setenv("INSOLVIA_ENV", "production")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://127.0.0.1/unused")
     assert load_config().environment == "production"
+
+
+def test_the_process_environment_must_name_a_database(monkeypatch):
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    with pytest.raises(ValidationError, match="DATABASE_URL"):
+        load_config()
+
+
+def test_database_url_is_read():
+    config = load_config({"DATABASE_URL": "postgresql://127.0.0.1/insolvia"})
+    assert config.database_url == "postgresql://127.0.0.1/insolvia"
 
 
 def test_waitlist_table_name_defaults_to_none():

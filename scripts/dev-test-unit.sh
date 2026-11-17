@@ -17,7 +17,10 @@
 # anywhere" question before opening a PR.
 #
 # UNIT MEANS UNIT. Nothing here needs AWS, a running server, a password, or
-# the network: pytest over memory adapters, Jest and Vitest over mocks.
+# the network: pytest over memory adapters, Jest and Vitest over mocks. The
+# one exception is the local Docker Postgres store tests run against (ADR
+# 0030) — CI's jobs have it as a service container, so a Python suite starts
+# it here first (python_suite), and it stays up.
 # The integration tier is a different script with a different name
 # (services/api/scripts/dev-test-integration.sh) precisely so that a hook
 # can never accidentally reach for it.
@@ -122,6 +125,8 @@ python_suite() { # $1 area  $2 directory  $3 venv directory  $4 setup script
 
   ( cd "$REPO_ROOT/$2" && "$venv/bin/ruff" check . && "$venv/bin/ruff" format --check . ) ||
     die "$1: ruff failed as CI's Lint / Format check would. Fix: (cd $2 && $REPO_ROOT/$3/bin/ruff check --fix . && $REPO_ROOT/$3/bin/ruff format .)"
+  docker compose -f "$REPO_ROOT/services/api/docker-compose.yml" up -d --wait postgres >/dev/null ||
+    die "$1: could not start the local Postgres the store tests need — is Docker running?"
   ( cd "$REPO_ROOT/$2" && "$venv/bin/pytest" )
 }
 

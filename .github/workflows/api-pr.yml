@@ -16,6 +16,21 @@ jobs:
   api:
     name: API service
     runs-on: ubuntu-latest
+    # Store tests run against a real Postgres (ADR 0030); the fixture's
+    # default URL (insolvia_core/adapters/postgres/testing.py) points here.
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: insolvia
+          POSTGRES_PASSWORD: insolvia
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U insolvia"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
     defaults:
       run:
         working-directory: services/api

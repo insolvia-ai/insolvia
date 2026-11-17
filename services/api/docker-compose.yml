@@ -14,8 +14,45 @@
 # directory mounted read-only below. botocore re-runs the process before each
 # set expires, so the container outlives any one set. Without dev-up.sh the
 # directory is empty and the container simply has no AWS credentials.
+#
+# Postgres 17 (ADR 0030) runs here, in Docker, for every service on this
+# machine: `migrate` applies insolvia_core's numbered migrations to it before
+# the API starts, so `up` always means a migrated database. Its data lives in
+# the `postgres-data` volume and survives `down`; `down -v` empties it. The
+# credentials are local-only throwaways, published on 127.0.0.1 alone.
 services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: insolvia
+      POSTGRES_PASSWORD: insolvia
+      POSTGRES_DB: insolvia
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "insolvia", "-d", "insolvia"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  migrate:
+    build:
+      context: ../..
+      dockerfile: services/api/Dockerfile
+      target: development
+    command: ["python", "-m", "insolvia_core.adapters.postgres.migrations"]
+    environment:
+      DATABASE_URL: postgresql://insolvia:insolvia@postgres:5432/insolvia
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   api:
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
     build:
       # The repo root, not this directory: the image installs the shared
       # packages/insolvia_core by relative path (see the Dockerfile header).
@@ -24,6 +61,8 @@ services:
       target: development
     environment:
       INSOLVIA_ENV: ${INSOLVIA_ENV:-local}
+      # Required: unset, the service refuses to start (ADR 0030).
+      DATABASE_URL: postgresql://insolvia:insolvia@postgres:5432/insolvia
       WAITLIST_TABLE_NAME: ${WAITLIST_TABLE_NAME:-}
       # Case store (issue 8.2). Encrypted under this machine's own
       # customer-managed key, so a KMS permission mistake surfaces here
@@ -75,3 +114,6 @@ services:
       - ${HOME}/.cache/insolvia/aws-container/api:/run/insolvia-aws:ro
     ports:
       - "127.0.0.1:8080:8080"
+
+volumes:
+  postgres-data:

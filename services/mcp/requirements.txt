@@ -17,6 +17,8 @@ mangum==0.22.0
 boto3==1.40.66
 # JWT verification for Cognito access tokens, via insolvia_core.auth.
 PyJWT[crypto]==2.13.0
+# insolvia_core's Postgres adapters (ADR 0030); pinned exact like boto3.
+psycopg[binary]==3.3.9
 # Named directly because insolvia_core's tax-id envelope imports it by name
 # (issue 13.12 / #382) — this service never seals or opens one, but the
 # package it installs does, so the pin stays aligned with the API's.

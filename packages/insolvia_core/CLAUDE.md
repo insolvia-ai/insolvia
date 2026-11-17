@@ -28,7 +28,7 @@ local-path install. Human docs: [`README.md`](README.md).
 - **Layering, enforced by `tests/unit/test_architecture.py`:** the domain modules in
   the package root import nothing but each other and the stdlib (PyJWT is the
   one deliberate exception — the signature check *is* the domain rule, see
-  `auth.py`); `adapters/` owns boto3; nothing here ever imports a web framework
+  `auth.py`); `adapters/` owns boto3 and psycopg; nothing here ever imports a web framework
   or reaches back into a service (`insolvia_api`, `insolvia_admin`).
 - **No pins here.** `pyproject.toml` declares loose floors; each consumer's
   `requirements.txt` pins the exact versions its image resolves. Tool versions
@@ -43,3 +43,10 @@ local-path install. Human docs: [`README.md`](README.md).
   same PR that adds the dependency.
 - Tests: pytest, in `tests/unit/` (the only tier here — `tests/__init__.py`
   says why), same conventions as the services (`insolvia-testing` skill). Strict mypy is on for `src`.
+- **Postgres (ADR 0030) lives in `adapters/postgres/`:** `connect`, the
+  forward-only runner (`migrations.py`, files `migrations/NNNN_name.sql`,
+  never edited once merged), `queries.py` (`require_rows` for a refused
+  conditional write, `keyset_after`/`next_key` for cursors), and `testing.py`
+  — the pytest plugin every consumer's `tests/conftest.py` loads, giving a
+  test `postgres` (a connection to an empty, migrated database). Store tests
+  need the Docker Postgres up: `docker compose -f services/api/docker-compose.yml up -d --wait postgres`.

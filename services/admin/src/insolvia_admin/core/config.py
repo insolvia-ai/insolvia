@@ -4,6 +4,7 @@ import os
 from collections.abc import Mapping
 from dataclasses import dataclass
 
+from insolvia_core.database import database_url
 from insolvia_core.errors import ValidationError
 
 SERVICE_NAME = "insolvia-admin"
@@ -39,6 +40,8 @@ class AppConfig:
     """
 
     environment: str
+    # Postgres (ADR 0030). load_config refuses to start a service without it.
+    database_url: str | None = None
     firm_table_name: str | None = None
     firm_user_pool_id: str | None = None
     admin_audit_table_name: str | None = None
@@ -89,6 +92,7 @@ def load_config(environ: Mapping[str, str] | None = None) -> AppConfig:
 
     return AppConfig(
         environment=environment,
+        database_url=database_url(env, required=environ is None),
         firm_table_name=optional("FIRM_TABLE_NAME"),
         firm_user_pool_id=optional("FIRM_USER_POOL_ID"),
         admin_audit_table_name=optional("ADMIN_AUDIT_TABLE_NAME"),

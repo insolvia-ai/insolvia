@@ -36,6 +36,10 @@ from insolvia_mcp.api.dependencies import McpDependencies
 from insolvia_mcp.core.config import load_config
 from insolvia_mcp.core.tools import CaseTools
 
+# Store tests run against a real Postgres (ADR 0030): the `postgres` and
+# `postgres_url` fixtures. See insolvia_core/adapters/postgres/testing.py.
+pytest_plugins = ("insolvia_core.adapters.postgres.testing",)
+
 ISSUER = "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_EXAMPLE00"
 # Two allowlisted MCP clients — the surface's shape is one pre-registered
 # client per harness — plus the app's, which must never verify here.
