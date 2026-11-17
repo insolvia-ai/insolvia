@@ -1,3 +1,5 @@
+> **AWS is paused (2026-11-05).** There is no staging or production. Deploy workflows are disabled; do not re-enable them or apply Terraform. The Python backend needs the per-developer AWS stack to run locally, which is paused too. See [docs/runbooks/aws-paused.md](docs/runbooks/aws-paused.md).
+
 # Insolvia — agent guide
 
 Bankruptcy case-prep & e-filing: one **TypeScript** monorepo on AWS. The app is
