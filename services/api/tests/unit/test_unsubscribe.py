@@ -154,7 +154,6 @@ def config(secret: str | None = SECRET) -> AppConfig:
     base = load_config({})
     return AppConfig(
         environment=base.environment,
-        waitlist_table_name=base.waitlist_table_name,
         mailer_api_url=base.mailer_api_url,
         unsubscribe_secret=secret,
         marketing_origin=base.marketing_origin,

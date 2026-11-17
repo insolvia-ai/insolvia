@@ -4,7 +4,6 @@ from insolvia_core.adapters.aws.access_log import DynamoDbAccessLog
 from insolvia_core.adapters.aws.candidate_store import DynamoDbCandidateStore
 from insolvia_core.adapters.aws.case_entity_store import DynamoDbCaseEntityStore
 from insolvia_core.adapters.aws.case_store import DynamoDbCaseStore
-from insolvia_core.adapters.aws.client_binding_store import DynamoDbClientBindingStore
 from insolvia_core.adapters.aws.debtor_store import DynamoDbDebtorStore
 from insolvia_core.adapters.aws.document_blobs import S3DocumentBlobStore
 from insolvia_core.adapters.aws.document_request_store import (
@@ -19,7 +18,6 @@ from insolvia_core.adapters.aws.filing_credentials import (
     filing_credentials_table_name,
 )
 from insolvia_core.adapters.aws.filing_store import DynamoDbFilingStore
-from insolvia_core.adapters.aws.firm_store import DynamoDbFirmStore
 from insolvia_core.adapters.aws.jwks_provider import CognitoJwksProvider
 from insolvia_core.adapters.aws.task_store import DynamoDbTaskStore
 from insolvia_core.adapters.aws.tax_id_cipher import KmsTaxIdCipher, case_key_alias
@@ -29,9 +27,6 @@ from insolvia_core.adapters.memory.access_log import MemoryAccessLog
 from insolvia_core.adapters.memory.candidate_store import MemoryCandidateStore
 from insolvia_core.adapters.memory.case_entity_store import MemoryCaseEntityStore
 from insolvia_core.adapters.memory.case_store import MemoryCaseStore
-from insolvia_core.adapters.memory.client_binding_store import (
-    MemoryClientBindingStore,
-)
 from insolvia_core.adapters.memory.debtor_store import MemoryDebtorStore
 from insolvia_core.adapters.memory.document_blobs import MemoryDocumentBlobStore
 from insolvia_core.adapters.memory.document_request_store import (
@@ -44,17 +39,19 @@ from insolvia_core.adapters.memory.filing_credentials import (
     MemoryFilingCredentialStore,
 )
 from insolvia_core.adapters.memory.filing_store import MemoryFilingStore
-from insolvia_core.adapters.memory.firm_store import MemoryFirmStore
 from insolvia_core.adapters.memory.task_store import MemoryTaskStore
 from insolvia_core.adapters.memory.tax_id_cipher import LocalTaxIdCipher
 from insolvia_core.adapters.memory.tax_id_store import MemoryTaxIdStore
 from insolvia_core.adapters.memory.user_directory import MemoryUserDirectory
+from insolvia_core.adapters.postgres.client_binding_store import (
+    PostgresClientBindingStore,
+)
+from insolvia_core.adapters.postgres.firm_store import PostgresFirmStore
 from insolvia_core.ports import (
     AccessLog,
     CandidateStore,
     CaseEntityStore,
     CaseStore,
-    ClientBindingStore,
     DebtorStore,
     DocumentBlobStore,
     DocumentRequestStore,
@@ -63,7 +60,6 @@ from insolvia_core.ports import (
     FilingCredentialSealer,
     FilingCredentialStore,
     FilingStore,
-    FirmStore,
     JwksProvider,
     TaskStore,
     TaxIdCipher,
@@ -83,7 +79,6 @@ from insolvia_api.adapters.aws.job_queue import SqsJobQueue
 from insolvia_api.adapters.aws.job_store import DynamoDbJobStore
 from insolvia_api.adapters.aws.mailer_client import SigV4MailerClient
 from insolvia_api.adapters.aws.packet_store import DynamoDbPacketStore
-from insolvia_api.adapters.aws.waitlist_store import DynamoDbWaitlistStore
 from insolvia_api.adapters.memory.event_store import (
     MemoryCalendarTokenStore,
     MemoryEventStore,
@@ -96,7 +91,7 @@ from insolvia_api.adapters.memory.job_queue import MemoryJobQueue
 from insolvia_api.adapters.memory.job_store import MemoryJobStore
 from insolvia_api.adapters.memory.mailer_client import InMemoryMailerClient
 from insolvia_api.adapters.memory.packet_store import MemoryPacketStore
-from insolvia_api.adapters.memory.waitlist_store import MemoryWaitlistStore
+from insolvia_api.adapters.postgres.waitlist_store import PostgresWaitlistStore
 from insolvia_api.api.app_factory import create_app
 from insolvia_api.api.dependencies import ApiDependencies
 from insolvia_api.core.config import load_config
@@ -110,7 +105,6 @@ from insolvia_api.core.ports import (
     JobStore,
     Mailer,
     PacketStore,
-    WaitlistStore,
 )
 
 config = load_config()
@@ -119,16 +113,15 @@ if config.environment != "local":
 
 configure_logging()
 
-# Adapter composition, mirroring mailer's development server. With
-# WAITLIST_TABLE_NAME set (the compose stack / dev-aws layer — this machine's
-# real per-developer table) the real DynamoDB adapter runs; unset, the bare
-# dev server falls back to the in-memory store (echo=True logs each
-# submission so local marketing-site dev can see them arrive).
-waitlist_store: WaitlistStore
-if config.waitlist_table_name:
-    waitlist_store = DynamoDbWaitlistStore(config.waitlist_table_name)
-else:
-    waitlist_store = MemoryWaitlistStore(echo=True)
+# The Postgres stores (ADR 0030): this machine's Docker Postgres, migrated by
+# dev-up.sh. load_config() refused to start without DATABASE_URL, so there is
+# no in-memory fallback to drift to. The firm group, the portal bindings and
+# the waitlist live there; the case group still follows CASE_TABLE_NAME below
+# until it moves too (#622).
+assert config.database_url is not None
+waitlist_store = PostgresWaitlistStore(config.database_url)
+firm_store = PostgresFirmStore(config.database_url)
+client_binding_store = PostgresClientBindingStore(config.database_url)
 
 # The plain development server never sends real mail. Unset MAILER_API_URL
 # records sends in memory — mirroring the memory waitlist store. Set, it
@@ -166,25 +159,6 @@ else:
 # actually reason about.
 case_store: CaseStore
 access_log: AccessLog
-firm_store: FirmStore
-if (
-    config.case_table_name
-    and config.case_access_log_table_name
-    and config.firm_table_name
-):
-    case_store = DynamoDbCaseStore(
-        config.case_table_name, firm_table_name=config.firm_table_name
-    )
-    access_log = DynamoDbAccessLog(config.case_access_log_table_name)
-    firm_store = DynamoDbFirmStore(config.firm_table_name)
-else:
-    case_store = MemoryCaseStore()
-    access_log = MemoryAccessLog()
-    # Empty at every start, so the bare dev server has no firms and no users in
-    # it. That is the honest shape rather than a seeded one: a signed-in
-    # developer with no firm is exactly the "authenticated but not provisioned"
-    # case, and inventing a firm here would hide it until staging.
-    firm_store = MemoryFirmStore()
 document_store: DocumentStore
 document_blobs: DocumentBlobStore
 if (
@@ -192,9 +166,7 @@ if (
     and config.case_access_log_table_name
     and config.case_document_bucket
 ):
-    case_store = DynamoDbCaseStore(
-        config.case_table_name, firm_table_name=config.firm_table_name
-    )
+    case_store = DynamoDbCaseStore(config.case_table_name)
     access_log = DynamoDbAccessLog(config.case_access_log_table_name)
     document_store = DynamoDbDocumentStore(config.case_table_name)
     document_blobs = S3DocumentBlobStore(config.case_document_bucket)
@@ -215,15 +187,11 @@ filing_credential_store: FilingCredentialStore
 filing_credential_sealer: FilingCredentialSealer
 filing_authorization_store: FilingAuthorizationStore
 if config.case_table_name and config.case_access_log_table_name:
-    case_store = DynamoDbCaseStore(
-        config.case_table_name, firm_table_name=config.firm_table_name
-    )
+    case_store = DynamoDbCaseStore(config.case_table_name)
     access_log = DynamoDbAccessLog(config.case_access_log_table_name)
-    # The firm table is the client row a link conditions on (the merge
-    # race, insolvia_core.client_merge) — the deployed composition's.
-    debtor_store = DynamoDbDebtorStore(
-        config.case_table_name, firm_table_name=config.firm_table_name
-    )
+    # No firm table: the client rows moved to Postgres (#621), so a
+    # DynamoDB link refuses to run until the case stores follow (#622).
+    debtor_store = DynamoDbDebtorStore(config.case_table_name)
     # The same table again: the generic collections (issue #249) are child
     # items of their case's partition, so the dev table already holds them.
     case_entity_store = DynamoDbCaseEntityStore(config.case_table_name)
@@ -350,17 +318,6 @@ if config.case_table_name and config.case_access_log_table_name:
 else:
     event_store = MemoryEventStore()
     calendar_token_store = MemoryCalendarTokenStore()
-
-# The client portal's bindings (ADR 0023) span the firm table AND the case
-# table, so they ride this machine's real pair when BOTH are named and the
-# in-memory store otherwise — the same "the group moves together" rule.
-client_binding_store: ClientBindingStore
-if config.firm_table_name and config.case_table_name:
-    client_binding_store = DynamoDbClientBindingStore(
-        config.firm_table_name, config.case_table_name
-    )
-else:
-    client_binding_store = MemoryClientBindingStore()
 
 jwks_provider: JwksProvider | None = None
 if config.auth_issuer_url and config.auth_client_id:

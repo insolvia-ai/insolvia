@@ -208,7 +208,7 @@ def resolve_accessor() -> Accessor | None:
     deps = dependencies()
     if deps.firm_store is None:
         # A composition bug, not a caller error: api_lambda.py refuses to boot
-        # without FIRM_TABLE_NAME. It raises rather than returning None — a
+        # without DATABASE_URL. It raises rather than returning None — a
         # deployment that cannot resolve anyone must not look like every user
         # being unprovisioned, which is a 403 nobody would investigate.
         raise RuntimeError("firm store is not composed")

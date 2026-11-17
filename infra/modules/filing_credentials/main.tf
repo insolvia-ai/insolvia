@@ -28,7 +28,7 @@
 # and the deny in (1) would have to carve an exception for it. A key whose
 # policy reads "Decrypt: the worker, plus anyone via DynamoDB" is a weaker
 # sentence than "Decrypt: the worker". So the two jobs take two keys: the
-# table's at-rest wrapper is the case key, exactly as modules/firm_store's
+# table's at-rest wrapper is the case key, exactly as the case table's
 # is (ci-trust's DenyCaseDataDecryption already fences it from the
 # pipeline), and the SECRET inside each item is sealed under the vault key.
 # The non-secret attributes — the login name, the courts, the status — are

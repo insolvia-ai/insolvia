@@ -1044,7 +1044,8 @@ purpose: every existing row has it hidden until an admin grants it.
 
 **A client is not a debtor.** The firm's client directory
 (`insolvia_core.firm_clients`, `/v1/firm/clients`) is a firm-scoped person
-record in the firm table, beside the library creditors; a debtor is that
+record in the firm's `firm_clients` table (Postgres, ADR 0030), beside the
+library creditors; a debtor is that
 person's identity as copied into one case (see "Identity" above for the
 copy, `client_id` and the `by-client` index). Opening a case therefore needs
 `clients` at `view_only` as well as `cases` at `add_edit`, and a client's own

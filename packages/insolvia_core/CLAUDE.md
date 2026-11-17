@@ -50,3 +50,7 @@ local-path install. Human docs: [`README.md`](README.md).
   — the pytest plugin every consumer's `tests/conftest.py` loads, giving a
   test `postgres` (a connection to an empty, migrated database). Store tests
   need the Docker Postgres up: `docker compose -f services/api/docker-compose.yml up -d --wait postgres`.
+  The firm stores (`firm_store.py`, `client_binding_store.py`; migration
+  `0001`) are here since #621: each row's `item` jsonb is the domain's
+  `*_item` shape minus the DynamoDB keys. A store test runs the memory twin
+  and the Postgres adapter through one parametrized fixture.

@@ -75,10 +75,8 @@ class AppConfig:
     environment: str
     # Postgres (ADR 0030). load_config refuses to start a service without it.
     database_url: str | None = None
-    waitlist_table_name: str | None = None
     case_table_name: str | None = None
     case_access_log_table_name: str | None = None
-    firm_table_name: str | None = None
     auth_user_pool_id: str | None = None
     case_document_bucket: str | None = None
     job_queue_url: str | None = None
@@ -99,14 +97,13 @@ def load_config(environ: Mapping[str, str] | None = None) -> AppConfig:
     """Build the configuration from the environment.
 
     INSOLVIA_ENV (local|staging|production) defaults to "local", mirroring the
-    app's EXPO_PUBLIC_INSOLVIA_ENV. WAITLIST_TABLE_NAME names the DynamoDB
-    table behind POST /v1/waitlist — in local dev that is this machine's real
-    per-developer table (scripts/dev-aws-setup.sh); unset means the in-memory
-    store, which only unit tests and the bare development server use.
+    app's EXPO_PUBLIC_INSOLVIA_ENV. DATABASE_URL is the Postgres database
+    (ADR 0030) holding the firm stores, the portal bindings and the waitlist;
+    a running service refuses to start without it.
     CASE_TABLE_NAME names the DynamoDB table holding case data (issue 8.2),
-    encrypted under a customer-managed key. Same SSM derivation and the same
-    unset-means-in-memory shape as WAITLIST_TABLE_NAME, and in local dev it is
-    likewise this machine's real per-developer table rather than an emulator.
+    encrypted under a customer-managed key. Unset means the in-memory store,
+    which only unit tests and the bare development server use; in local dev
+    it is this machine's real per-developer table rather than an emulator.
     Nothing reads it yet — the case routes and their store land with 8.3; the
     value is wired now so local, staging and prod are configured identically
     before the code that needs it arrives.
@@ -114,13 +111,7 @@ def load_config(environ: Mapping[str, str] | None = None) -> AppConfig:
     signed-in user read or changed which case. The API's role holds PutItem on
     it and nothing else, so this service can write an entry and can never read,
     amend or delete one — see modules/case_store. Same unset-means-in-memory
-    shape as the two above.
-    FIRM_TABLE_NAME names the DynamoDB table holding firms, the people in them,
-    and what each of them may do (infra/modules/firm_store). Same SSM
-    derivation and the same unset-means-in-memory shape as the three above. It
-    is separate from CASE_TABLE_NAME even though both are encrypted under the
-    same key, because it is read on every authenticated request and carries a
-    different IAM grant — the module's header has the argument.
+    shape as CASE_TABLE_NAME.
     AUTH_USER_POOL_ID names the Cognito pool this environment authenticates
     against. It is NOT redundant with AUTH_ISSUER_URL, which ends in the same
     id: parsing an id out of a URL to make an AWS API call would make the
@@ -205,10 +196,8 @@ def load_config(environ: Mapping[str, str] | None = None) -> AppConfig:
     return AppConfig(
         environment=environment,
         database_url=database_url(source, required=environ is None),
-        waitlist_table_name=source.get("WAITLIST_TABLE_NAME") or None,
         case_table_name=source.get("CASE_TABLE_NAME") or None,
         case_access_log_table_name=source.get("CASE_ACCESS_LOG_TABLE_NAME") or None,
-        firm_table_name=source.get("FIRM_TABLE_NAME") or None,
         auth_user_pool_id=source.get("AUTH_USER_POOL_ID") or None,
         case_document_bucket=source.get("CASE_DOCUMENT_BUCKET") or None,
         job_queue_url=source.get("JOB_QUEUE_URL") or None,

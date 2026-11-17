@@ -89,9 +89,12 @@ case "$COMMAND" in
     outputs="$(terraform_output_json)"
     CASE_TABLE="$(jq -r '.case_table_name.value // empty' <<<"$outputs")"
     DOCUMENT_BUCKET="$(jq -r '.case_document_bucket.value // empty' <<<"$outputs")"
-    # The firm table too: a case's debtors are copies of firm clients
-    # (ADR 0022), and capture writes those clients into the version.
-    FIRM_TABLE="$(jq -r '.firm_table_name.value // empty' <<<"$outputs")"
+    # The firm side too: a case's debtors are copies of firm clients
+    # (ADR 0022), and capture writes those clients into the version. They
+    # live in this machine's Docker Postgres (ADR 0030); FIRM_TABLE is the
+    # target's name, which the capture guard checks.
+    FIRM_TABLE="$FIRM_TABLE_NAME_EXPECTED"
+    export DATABASE_URL="${DATABASE_URL:-postgresql://insolvia:insolvia@127.0.0.1:5432/insolvia}"
     [[ "$CASE_TABLE" == "$CASE_TABLE_NAME_EXPECTED" ]] ||
       die "Refusing: case table '$CASE_TABLE' is not '$CASE_TABLE_NAME_EXPECTED'."
     [[ "$FIRM_TABLE" == "$FIRM_TABLE_NAME_EXPECTED" ]] ||

@@ -12,16 +12,15 @@ from typing import Any
 import pytest
 from botocore.exceptions import ClientError
 from insolvia_core.adapters.aws import document_request_store as aws_requests
-from insolvia_core.adapters.aws import firm_store as aws_firm_store
 from insolvia_core.adapters.aws.document_request_store import (
     DynamoDbDocumentRequestStore,
 )
 from insolvia_core.adapters.aws.dynamo import to_attributes
-from insolvia_core.adapters.aws.firm_store import DynamoDbFirmStore
 from insolvia_core.adapters.memory.document_request_store import (
     MemoryDocumentRequestStore,
 )
 from insolvia_core.adapters.memory.firm_store import MemoryFirmStore
+from insolvia_core.adapters.postgres.firm_store import PostgresFirmStore
 from insolvia_core.document_requests import (
     DEFAULT_CHECKLIST,
     MAX_CHECKLIST_ITEMS,
@@ -401,8 +400,17 @@ def test_a_request_update_over_a_deleted_row_is_none(monkeypatch):
 # ── The firm store's checklist ─────────────────────────────────────
 
 
-def test_the_memory_firm_store_holds_one_checklist_per_firm():
-    store = MemoryFirmStore()
+@pytest.mark.parametrize("kind", ["memory", "postgres"])
+def test_the_firm_store_holds_one_checklist_per_firm(kind, request):
+    if kind == "memory":
+        store = MemoryFirmStore()
+    else:
+        postgres = request.getfixturevalue("postgres")
+        for firm_id in (FIRM_ID, OTHER_FIRM_ID):  # `firm_id` is a foreign key
+            postgres.execute(
+                "INSERT INTO firms (id, item) VALUES (%s, '{}')", (firm_id,)
+            )
+        store = PostgresFirmStore(request.getfixturevalue("postgres_url"))
     saved = build_checklist(DEFAULT_CHECKLIST[:1], firm_id=FIRM_ID, updated_by=ALICE)
 
     assert store.get_document_checklist(FIRM_ID) is None
@@ -410,18 +418,4 @@ def test_the_memory_firm_store_holds_one_checklist_per_firm():
     assert store.get_document_checklist(FIRM_ID) == saved
     assert store.get_document_checklist(OTHER_FIRM_ID) is None
     assert store.delete_document_checklist(FIRM_ID) is True
-    assert store.delete_document_checklist(FIRM_ID) is False
-
-
-def test_the_checklist_round_trips_through_the_firm_table(monkeypatch):
-    saved = build_checklist(DEFAULT_CHECKLIST, firm_id=FIRM_ID, updated_by=ALICE)
-    fake = FakeDynamoDb({"get_item": {"Item": to_attributes(checklist_item(saved))}})
-    monkeypatch.setattr(aws_firm_store.boto3, "client", lambda _service: fake)
-    store = DynamoDbFirmStore("insolvia-test-firms")
-
-    assert store.get_document_checklist(FIRM_ID) == saved
-    assert fake.calls[0][1]["Key"]["SK"] == {"S": "DOCUMENT_CHECKLIST"}
-    assert fake.calls[0][1]["ConsistentRead"] is True
-
-    fake.raises = conditional_check_failed()
     assert store.delete_document_checklist(FIRM_ID) is False

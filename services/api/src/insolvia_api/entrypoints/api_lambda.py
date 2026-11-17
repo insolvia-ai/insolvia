@@ -5,7 +5,6 @@ from insolvia_core.adapters.aws.access_log import DynamoDbAccessLog
 from insolvia_core.adapters.aws.candidate_store import DynamoDbCandidateStore
 from insolvia_core.adapters.aws.case_entity_store import DynamoDbCaseEntityStore
 from insolvia_core.adapters.aws.case_store import DynamoDbCaseStore
-from insolvia_core.adapters.aws.client_binding_store import DynamoDbClientBindingStore
 from insolvia_core.adapters.aws.debtor_store import DynamoDbDebtorStore
 from insolvia_core.adapters.aws.document_blobs import S3DocumentBlobStore
 from insolvia_core.adapters.aws.document_request_store import (
@@ -20,12 +19,15 @@ from insolvia_core.adapters.aws.filing_credentials import (
     filing_credentials_table_name,
 )
 from insolvia_core.adapters.aws.filing_store import DynamoDbFilingStore
-from insolvia_core.adapters.aws.firm_store import DynamoDbFirmStore
 from insolvia_core.adapters.aws.jwks_provider import CognitoJwksProvider
 from insolvia_core.adapters.aws.task_store import DynamoDbTaskStore
 from insolvia_core.adapters.aws.tax_id_cipher import KmsTaxIdCipher, case_key_alias
 from insolvia_core.adapters.aws.tax_id_store import DynamoDbTaxIdStore
 from insolvia_core.adapters.aws.user_directory import CognitoUserDirectory
+from insolvia_core.adapters.postgres.client_binding_store import (
+    PostgresClientBindingStore,
+)
+from insolvia_core.adapters.postgres.firm_store import PostgresFirmStore
 from mangum import Mangum
 
 from insolvia_api.adapters.aws.event_store import (
@@ -40,8 +42,8 @@ from insolvia_api.adapters.aws.job_queue import SqsJobQueue
 from insolvia_api.adapters.aws.job_store import DynamoDbJobStore
 from insolvia_api.adapters.aws.mailer_client import SigV4MailerClient
 from insolvia_api.adapters.aws.packet_store import DynamoDbPacketStore
-from insolvia_api.adapters.aws.waitlist_store import DynamoDbWaitlistStore
 from insolvia_api.adapters.memory.mailer_client import InMemoryMailerClient
+from insolvia_api.adapters.postgres.waitlist_store import PostgresWaitlistStore
 from insolvia_api.api.app_factory import create_app
 from insolvia_api.api.dependencies import ApiDependencies
 from insolvia_api.core.config import load_config
@@ -51,10 +53,11 @@ from insolvia_api.core.ports import FilingQueue, JobQueue, Mailer
 configure_logging()
 
 config = load_config()
-if not config.waitlist_table_name:
-    raise RuntimeError("WAITLIST_TABLE_NAME must be set for the Lambda entrypoint")
+# load_config() already refused to start without DATABASE_URL (ADR 0030):
+# the firm stores, the portal bindings and the waitlist live there.
+assert config.database_url is not None
 
-# Hard-required, exactly like WAITLIST_TABLE_NAME and unlike MAILER_API_URL
+# Hard-required, exactly like DATABASE_URL and unlike MAILER_API_URL
 # (issue #79). There is no sensible degraded mode for auth: booting without a
 # verifier would 401 every protected route, which looks like a client bug and
 # is discovered by users. Refusing to boot is discovered by the deploy.
@@ -75,14 +78,6 @@ if not config.case_table_name or not config.case_access_log_table_name:
         "CASE_TABLE_NAME and CASE_ACCESS_LOG_TABLE_NAME must be set "
         "for the Lambda entrypoint"
     )
-
-# Hard-required, and of everything on this list it is the one with no partial
-# failure at all. Without the firm table nothing can establish which firm a
-# signed-in person belongs to, so every authenticated route is unreachable —
-# not degraded, unreachable. infra/envs/<env>/main.tf publishes the name as
-# /insolvia/<env>/api/firm-table-name.
-if not config.firm_table_name:
-    raise RuntimeError("FIRM_TABLE_NAME must be set for the Lambda entrypoint")
 
 # NOT hard-required, unlike AUTH_CLIENT_ID: without it every /v1/portal/ route
 # fails CLOSED with a 401 (insolvia_core.auth.portal_settings_or_raise) and
@@ -145,35 +140,29 @@ if config.filing_queue_url:
 app = create_app(
     ApiDependencies(
         config=config,
-        waitlist_store=DynamoDbWaitlistStore(config.waitlist_table_name),
+        waitlist_store=PostgresWaitlistStore(config.database_url),
         mailer=mailer,
         # Constructed here, at cold start, so its key cache lives for the
         # container's lifetime rather than one request. Nothing is fetched
         # until the first token arrives — an unauthenticated request path
         # never touches the network.
         jwks_provider=CognitoJwksProvider(config.auth_issuer_url),
-        # With the FIRM table: opening a case conditions each debtor's link
-        # on its client's row, in the case's own transaction — the merge
-        # race (insolvia_core.client_merge). The debtor store's link, below,
-        # the same.
-        case_store=DynamoDbCaseStore(
-            config.case_table_name, firm_table_name=config.firm_table_name
-        ),
+        # No firm table any more: the client rows a case open and a debtor
+        # link condition on moved to Postgres (#621). Until the case stores
+        # follow (#622) a DynamoDB case open states no client condition and
+        # a DynamoDB link refuses to run. Not deployed while AWS is paused.
+        case_store=DynamoDbCaseStore(config.case_table_name),
         access_log=DynamoDbAccessLog(config.case_access_log_table_name),
-        # Its own table, not the case table — read on every authenticated
-        # request, with a grant of its own (infra/modules/firm_store).
-        firm_store=DynamoDbFirmStore(config.firm_table_name),
+        # Read on every authenticated request (ADR 0030: Postgres).
+        firm_store=PostgresFirmStore(config.database_url),
         user_directory=CognitoUserDirectory(config.auth_user_pool_id),
         # The document ROW lives in the case table — same table, same
         # partition, no second table — while the bytes live in the bucket.
         document_store=DynamoDbDocumentStore(config.case_table_name),
         document_blobs=S3DocumentBlobStore(config.case_document_bucket),
         # Same table as the case store, deliberately: a debtor is stored in
-        # its case's partition. The firm table is the client row `link`
-        # conditions on.
-        debtor_store=DynamoDbDebtorStore(
-            config.case_table_name, firm_table_name=config.firm_table_name
-        ),
+        # its case's partition.
+        debtor_store=DynamoDbDebtorStore(config.case_table_name),
         # The sealed tax ids (issue 13.12 / #382): items in the case table,
         # data keys under the case KEY — whose alias is derived from the
         # table's name (case_key_alias says why that is a derivation and not
@@ -225,11 +214,9 @@ app = create_app(
         # A case's document requests (ADR 0023 PR 5 / #364): the case table
         # again.
         document_request_store=DynamoDbDocumentRequestStore(config.case_table_name),
-        # The client portal's bindings (ADR 0023): one store over BOTH tables
-        # already named above — its writes are one transaction across them.
-        client_binding_store=DynamoDbClientBindingStore(
-            config.firm_table_name, config.case_table_name
-        ),
+        # The client portal's bindings (ADR 0023), in Postgres beside the
+        # firm they belong to.
+        client_binding_store=PostgresClientBindingStore(config.database_url),
     )
 )
 handler = Mangum(WsgiToAsgi(app), lifespan="off")  # type: ignore[no-untyped-call]

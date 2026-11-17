@@ -146,11 +146,11 @@ outputs="$(terraform_output_json)"
 
 # Belt and braces on "dev only", exactly as dev-aws-reset.sh does before it
 # deletes anything: every name must carry THIS machine's short id.
-FIRM_TABLE="$(jq -r '.firm_table_name.value // empty' <<<"$outputs")"
-[[ -n "$FIRM_TABLE" ]] ||
-  die "No firm_table_name in this machine's Terraform state. Run ./scripts/dev-aws-setup.sh first."
-[[ "$FIRM_TABLE" == "$FIRM_TABLE_NAME_EXPECTED" ]] ||
-  die "Refusing: firm table '$FIRM_TABLE' is not '$FIRM_TABLE_NAME_EXPECTED'."
+# The firm side is this machine's Docker Postgres (ADR 0030): the seeder
+# writes it through DATABASE_URL, and FIRM_TABLE is only the target's name,
+# which guards the load and derives the seeded ids.
+FIRM_TABLE="$FIRM_TABLE_NAME_EXPECTED"
+export DATABASE_URL="${DATABASE_URL:-postgresql://insolvia:insolvia@127.0.0.1:5432/insolvia}"
 
 CASE_TABLE="$(jq -r '.case_table_name.value // empty' <<<"$outputs")"
 [[ -n "$CASE_TABLE" ]] ||

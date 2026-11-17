@@ -6,8 +6,8 @@ from insolvia_core.adapters.aws.case_entity_store import DynamoDbCaseEntityStore
 from insolvia_core.adapters.aws.case_store import DynamoDbCaseStore
 from insolvia_core.adapters.aws.debtor_store import DynamoDbDebtorStore
 from insolvia_core.adapters.aws.document_store import DynamoDbDocumentStore
-from insolvia_core.adapters.aws.firm_store import DynamoDbFirmStore
 from insolvia_core.adapters.aws.jwks_provider import CognitoJwksProvider
+from insolvia_core.adapters.postgres.firm_store import PostgresFirmStore
 from mangum import Mangum
 
 from insolvia_mcp.api.dependencies import McpDependencies
@@ -40,8 +40,9 @@ if not config.case_table_name or not config.case_access_log_table_name:
         "for the Lambda entrypoint"
     )
 
-if not config.firm_table_name:
-    raise RuntimeError("FIRM_TABLE_NAME must be set for the Lambda entrypoint")
+# load_config() already refused to start without DATABASE_URL (ADR 0030):
+# the firm store lives there.
+assert config.database_url is not None
 
 app = create_asgi_app(
     McpDependencies(
@@ -55,7 +56,7 @@ app = create_asgi_app(
         document_store=DynamoDbDocumentStore(config.case_table_name),
         candidate_store=DynamoDbCandidateStore(config.case_table_name),
         access_log=DynamoDbAccessLog(config.case_access_log_table_name),
-        firm_store=DynamoDbFirmStore(config.firm_table_name),
+        firm_store=PostgresFirmStore(config.database_url),
         # Constructed at cold start so its key cache lives for the
         # container's lifetime; nothing is fetched until the first token.
         jwks_provider=CognitoJwksProvider(config.auth_issuer_url),

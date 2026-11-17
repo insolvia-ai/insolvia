@@ -42,7 +42,6 @@ class AppConfig:
     environment: str
     # Postgres (ADR 0030). load_config refuses to start a service without it.
     database_url: str | None = None
-    firm_table_name: str | None = None
     firm_user_pool_id: str | None = None
     admin_audit_table_name: str | None = None
     google_client_id: str | None = None
@@ -58,10 +57,10 @@ def load_config(environ: Mapping[str, str] | None = None) -> AppConfig:
     tenant API. The rest, all following its unset-means-in-memory shape for
     local work:
 
-    FIRM_TABLE_NAME — the SAME table the tenant API reads
-    (infra/modules/firm_store): this service is the second principal with
-    access to it, which is the exception ADR 0011 records. Unset composes the
-    in-memory store.
+    DATABASE_URL — the Postgres database (ADR 0030) holding the firm
+    stores, the SAME one the tenant API reads: this service is the second
+    principal with access to them, which is the exception ADR 0011 records.
+    A running service refuses to start without it.
 
     FIRM_USER_POOL_ID — the FIRM pool (insolvia-<env>-users), where
     provisioning mints the first administrator's account. Deliberately not
@@ -93,7 +92,6 @@ def load_config(environ: Mapping[str, str] | None = None) -> AppConfig:
     return AppConfig(
         environment=environment,
         database_url=database_url(env, required=environ is None),
-        firm_table_name=optional("FIRM_TABLE_NAME"),
         firm_user_pool_id=optional("FIRM_USER_POOL_ID"),
         admin_audit_table_name=optional("ADMIN_AUDIT_TABLE_NAME"),
         google_client_id=optional("GOOGLE_CLIENT_ID"),

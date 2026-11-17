@@ -12,7 +12,7 @@
 #
 # Sourced, never executed — callers own `set -euo pipefail`.
 
-# Several variables here (RESOURCE_PREFIX, WAITLIST_TABLE_NAME_EXPECTED, ...)
+# Several variables here (RESOURCE_PREFIX, CASE_TABLE_NAME_EXPECTED, ...)
 # are consumed by the sourcing scripts, not this file.
 # shellcheck disable=SC2034
 
@@ -84,9 +84,10 @@ load_aws_identity() {
   DEV_ENVIRONMENT="dev-$MACHINE_SHORT_ID"
   # What infra/envs/dev actually names things — asserted before any
   # destructive action ever touches a resource.
-  WAITLIST_TABLE_NAME_EXPECTED="insolvia-$DEV_ENVIRONMENT-waitlist"
   CASE_TABLE_NAME_EXPECTED="insolvia-$DEV_ENVIRONMENT-cases"
   CASE_ACCESS_LOG_TABLE_NAME_EXPECTED="insolvia-$DEV_ENVIRONMENT-case-access-log"
+  # Not a table any more (the firm stores are Postgres, ADR 0030): the name
+  # the seeder guards its target with and derives its ids from.
   FIRM_TABLE_NAME_EXPECTED="insolvia-$DEV_ENVIRONMENT-firms"
   # The pool every machine shares (insolvia-services' infra/envs/dev), not a
   # per-machine one — see "The shared development pool" below.

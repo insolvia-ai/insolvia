@@ -34,15 +34,6 @@ def test_database_url_is_read():
     assert config.database_url == "postgresql://127.0.0.1/insolvia"
 
 
-def test_waitlist_table_name_defaults_to_none():
-    assert load_config({}).waitlist_table_name is None
-
-
-def test_waitlist_table_name_is_read():
-    config = load_config({"WAITLIST_TABLE_NAME": "insolvia-staging-waitlist"})
-    assert config.waitlist_table_name == "insolvia-staging-waitlist"
-
-
 def test_case_table_name_defaults_to_none():
     assert load_config({}).case_table_name is None
 
@@ -50,15 +41,6 @@ def test_case_table_name_defaults_to_none():
 def test_case_table_name_is_read():
     config = load_config({"CASE_TABLE_NAME": "insolvia-staging-cases"})
     assert config.case_table_name == "insolvia-staging-cases"
-
-
-def test_firm_table_name_defaults_to_none():
-    assert load_config({}).firm_table_name is None
-
-
-def test_firm_table_name_is_read():
-    config = load_config({"FIRM_TABLE_NAME": "insolvia-staging-firms"})
-    assert config.firm_table_name == "insolvia-staging-firms"
 
 
 def test_case_access_log_table_name_defaults_to_none():

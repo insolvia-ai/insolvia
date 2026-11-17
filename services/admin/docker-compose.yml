@@ -23,10 +23,8 @@ services:
       # per machine — reached through the host, since the two stacks are
       # separate compose projects. services/api/scripts/dev-up.sh starts it.
       DATABASE_URL: postgresql://insolvia:insolvia@host.docker.internal:5432/insolvia
-      # The firm store + audit table move as a GROUP (the dev server's
-      # composition explains): both set → real AWS adapters, either unset →
-      # both in-memory.
-      FIRM_TABLE_NAME: ${FIRM_TABLE_NAME:-}
+      # The firm store is the Postgres above; the audit table is still this
+      # machine's DynamoDB table when set, in-memory otherwise (#623).
       ADMIN_AUDIT_TABLE_NAME: ${ADMIN_AUDIT_TABLE_NAME:-}
       # The FIRM pool provisioning mints first-administrator accounts in.
       # Set it to exercise the real invite email locally; unset means the
