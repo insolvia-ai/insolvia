@@ -102,7 +102,7 @@ from tests.unit.test_packet_assembly import reference_case_data  # noqa: E402
 from insolvia_api.adapters.aws.filing_approval_store import DynamoDbFilingApprovalStore  # noqa: E402
 from insolvia_core.adapters.aws.filing_store import DynamoDbFilingStore  # noqa: E402
 from insolvia_api.adapters.aws.filing_queue import SqsFilingQueue  # noqa: E402
-from insolvia_api.adapters.aws.packet_store import DynamoDbPacketStore  # noqa: E402
+from insolvia_api.adapters.postgres.packet_store import PostgresPacketStore  # noqa: E402
 from insolvia_api.core.filing_approval import (  # noqa: E402
     FILING_JOB_KEYS,
     ApprovalUnavailableError,
@@ -122,9 +122,9 @@ from insolvia_api.core.packet_assembly import (  # noqa: E402
 )
 from insolvia_core import courts  # noqa: E402
 from insolvia_core.adapters.aws.access_log import DynamoDbAccessLog  # noqa: E402
-from insolvia_core.adapters.aws.case_entity_store import DynamoDbCaseEntityStore  # noqa: E402
-from insolvia_core.adapters.aws.case_store import DynamoDbCaseStore  # noqa: E402
-from insolvia_core.adapters.aws.debtor_store import DynamoDbDebtorStore  # noqa: E402
+from insolvia_core.adapters.postgres.case_entity_store import PostgresCaseEntityStore  # noqa: E402
+from insolvia_core.adapters.postgres.case_store import PostgresCaseStore  # noqa: E402
+from insolvia_core.adapters.postgres.debtor_store import PostgresDebtorStore  # noqa: E402
 from insolvia_core.adapters.aws.document_blobs import S3DocumentBlobStore  # noqa: E402
 from insolvia_core.adapters.aws.filing_credentials import (  # noqa: E402
     DynamoDbFilingAuthorizationStore,
@@ -147,6 +147,7 @@ from insolvia_core.filing_credentials import (  # noqa: E402
 from insolvia_core.tax_ids import TaxIdInput, store_tax_id  # noqa: E402
 
 case_table = os.environ["CASE_TABLE_NAME"]
+database_url = os.environ["DATABASE_URL"]
 queue_url = os.environ["FILING_QUEUE_URL"]
 FIRM = "proof-firm-00000000"
 ATTORNEY = str(uuid.uuid4())
@@ -167,10 +168,10 @@ print(f"developer : {boto3.client('sts').get_caller_identity()['Arn']}")
 print(f"case table: {case_table}")
 print(f"queue     : {queue_url.rsplit('/', 1)[-1]}")
 
-case_store = DynamoDbCaseStore(case_table)
-debtor_store = DynamoDbDebtorStore(case_table)
-entity_store = DynamoDbCaseEntityStore(case_table)
-packet_store = DynamoDbPacketStore(case_table)
+case_store = PostgresCaseStore(database_url)
+debtor_store = PostgresDebtorStore(database_url)
+entity_store = PostgresCaseEntityStore(database_url)
+packet_store = PostgresPacketStore(database_url)
 access_log = DynamoDbAccessLog(os.environ["CASE_ACCESS_LOG_TABLE_NAME"])
 tax_id_store = DynamoDbTaxIdStore(case_table)
 tax_id_cipher = KmsTaxIdCipher(case_key_alias(case_table))

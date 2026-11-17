@@ -17,7 +17,10 @@ from dataclasses import replace
 
 import pytest
 from insolvia_core.adapters.memory.document_store import MemoryDocumentStore
+from insolvia_core.adapters.postgres.document_store import PostgresDocumentStore
 from insolvia_core.documents import Document
+
+from tests.unit.backends import BACKENDS, postgres_url_with_cases
 
 CASE_ID = "00000000-0000-4000-8000-0000000000ca"
 OTHER_CASE_ID = "00000000-0000-4000-8000-0000000000cb"
@@ -41,17 +44,25 @@ def document(
     )
 
 
-def test_creating_the_same_document_twice_is_refused():
+@pytest.fixture(params=BACKENDS)
+def store(request):
+    if request.param == "memory":
+        return MemoryDocumentStore()
+    return PostgresDocumentStore(
+        postgres_url_with_cases(request, CASE_ID, OTHER_CASE_ID)
+    )
+
+
+def test_creating_the_same_document_twice_is_refused(store):
     """The conditional write, with two DIFFERENT objects for one key.
 
     DynamoDB refuses this on the key alone. So must this."""
-    store = MemoryDocumentStore()
     store.create(document())
     with pytest.raises(RuntimeError):
         store.create(document(file_name="b.pdf"))
 
 
-def test_creating_the_same_instance_twice_is_refused():
+def test_creating_the_same_instance_twice_is_refused(store):
     """THE FAILURE THIS FILE EXISTS FOR.
 
     The check used to be `setdefault(key, document) is not document`, which
@@ -63,16 +74,15 @@ def test_creating_the_same_instance_twice_is_refused():
     the way its own comment promised it was not, and no route could show it:
     a route builds a fresh Document per request.
     """
-    store = MemoryDocumentStore()
     only = document()
     store.create(only)
     with pytest.raises(RuntimeError):
         store.create(only)
     # And the first write is still the one that stands.
-    assert store.get(CASE_ID, DOCUMENT_ID) is only
+    assert store.get(CASE_ID, DOCUMENT_ID) == only
 
 
-def test_update_refuses_a_row_that_is_not_there():
+def test_update_refuses_a_row_that_is_not_there(store):
     """attribute_exists(SK), as a dict.
 
     This is the window between the confirm route reading a document and
@@ -82,13 +92,11 @@ def test_update_refuses_a_row_that_is_not_there():
     open. None rather than an exception, so the route can answer the same 404
     a foreign document id gets.
     """
-    store = MemoryDocumentStore()
     assert store.update(document()) is None
-    assert store.documents == {}
+    assert store.list_for_case(CASE_ID) == ()
 
 
-def test_update_replaces_an_existing_row():
-    store = MemoryDocumentStore()
+def test_update_replaces_an_existing_row(store):
     store.create(document())
     confirmed = replace(document(), status="stored", byte_size=99, etag="deadbeef")
 
@@ -96,11 +104,10 @@ def test_update_replaces_an_existing_row():
     assert store.get(CASE_ID, DOCUMENT_ID) == confirmed
 
 
-def test_the_same_document_id_in_another_case_is_a_different_row():
+def test_the_same_document_id_in_another_case_is_a_different_row(store):
     """The key is (case, document), as it is in the table. If it were the
     document id alone, this create would collide — and a document id leaked
     from one firm's case would resolve inside another's."""
-    store = MemoryDocumentStore()
     store.create(document())
     store.create(document(case_id=OTHER_CASE_ID))
     assert store.get(CASE_ID, DOCUMENT_ID) is not None

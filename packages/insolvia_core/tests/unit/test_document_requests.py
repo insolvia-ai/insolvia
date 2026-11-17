@@ -10,16 +10,13 @@ from dataclasses import replace
 from typing import Any
 
 import pytest
-from botocore.exceptions import ClientError
-from insolvia_core.adapters.aws import document_request_store as aws_requests
-from insolvia_core.adapters.aws.document_request_store import (
-    DynamoDbDocumentRequestStore,
-)
-from insolvia_core.adapters.aws.dynamo import to_attributes
 from insolvia_core.adapters.memory.document_request_store import (
     MemoryDocumentRequestStore,
 )
 from insolvia_core.adapters.memory.firm_store import MemoryFirmStore
+from insolvia_core.adapters.postgres.document_request_store import (
+    PostgresDocumentRequestStore,
+)
 from insolvia_core.adapters.postgres.firm_store import PostgresFirmStore
 from insolvia_core.document_requests import (
     DEFAULT_CHECKLIST,
@@ -50,6 +47,8 @@ from insolvia_core.document_requests import (
 )
 from insolvia_core.documents import KINDS
 from insolvia_core.errors import FieldValidationError, ValidationError
+
+from tests.unit.backends import BACKENDS, postgres_url_with_cases
 
 FIRM_ID = "00000000-0000-4000-8000-00000000f18a"
 OTHER_FIRM_ID = "00000000-0000-4000-8000-00000000f18b"
@@ -293,11 +292,19 @@ def test_a_request_row_with_an_unknown_status_fails_loudly():
         request_from_item(item)
 
 
-# ── The memory request store ───────────────────────────────────────
+# ── The request store, memory and Postgres ─────────────────────────
 
 
-def test_the_memory_store_refuses_a_second_create_and_a_ghost_update():
-    store = MemoryDocumentRequestStore()
+@pytest.fixture(params=BACKENDS)
+def store(request):
+    if request.param == "memory":
+        return MemoryDocumentRequestStore()
+    return PostgresDocumentRequestStore(
+        postgres_url_with_cases(request, CASE_ID, OTHER_CASE_ID)
+    )
+
+
+def test_the_store_refuses_a_second_create_and_a_ghost_update(store):
     made = request()
     store.create(made)
     with pytest.raises(RuntimeError):
@@ -305,8 +312,7 @@ def test_the_memory_store_refuses_a_second_create_and_a_ghost_update():
     assert store.update(request("Other")) is None
 
 
-def test_the_memory_store_scopes_by_case_and_lists_in_creation_order():
-    store = MemoryDocumentRequestStore()
+def test_the_store_scopes_by_case_and_lists_in_creation_order(store):
     first, second = requests_from_checklist(
         DEFAULT_CHECKLIST[:2], (), case_id=CASE_ID, created_by=ALICE
     )
@@ -320,81 +326,10 @@ def test_the_memory_store_scopes_by_case_and_lists_in_creation_order():
     assert store.delete(CASE_ID, first.id) is False
 
 
-# ── The DynamoDB stores ────────────────────────────────────────────
-
-
-class FakeDynamoDb:
-    """Records calls and replays canned responses; conditions are not
-    simulated (test_firm_store.py's fake, trimmed to what these use)."""
-
-    def __init__(self, responses: dict[str, Any] | None = None) -> None:
-        self.calls: list[tuple[str, dict[str, Any]]] = []
-        self.responses = responses or {}
-        self.raises: Exception | None = None
-
-    def _record(self, name: str, kwargs: dict[str, Any]) -> Any:
-        self.calls.append((name, kwargs))
-        if self.raises is not None:
-            raise self.raises
-        return self.responses.get(name, {})
-
-    def put_item(self, **kwargs: Any) -> Any:
-        return self._record("put_item", kwargs)
-
-    def get_item(self, **kwargs: Any) -> Any:
-        return self._record("get_item", kwargs)
-
-    def query(self, **kwargs: Any) -> Any:
-        return self._record("query", kwargs)
-
-    def delete_item(self, **kwargs: Any) -> Any:
-        return self._record("delete_item", kwargs)
-
-
-def conditional_check_failed() -> ClientError:
-    return ClientError(
-        {"Error": {"Code": "ConditionalCheckFailedException", "Message": "no"}},
-        "PutItem",
-    )
-
-
-def request_store(monkeypatch, fake: FakeDynamoDb) -> DynamoDbDocumentRequestStore:
-    monkeypatch.setattr(aws_requests.boto3, "client", lambda _service: fake)
-    return DynamoDbDocumentRequestStore("insolvia-test-cases")
-
-
-def test_a_request_is_written_into_its_cases_partition(monkeypatch):
-    fake = FakeDynamoDb()
-    store = request_store(monkeypatch, fake)
+def test_a_requests_document_ids_round_trip(store):
     made = satisfy(request(), DOC_1)
-
     store.create(made)
-
-    name, kwargs = fake.calls[0]
-    assert name == "put_item"
-    assert kwargs["Item"]["PK"] == {"S": f"CASE#{CASE_ID}"}
-    assert kwargs["Item"]["documentIds"] == {"L": [{"S": DOC_1}]}
-    assert kwargs["ConditionExpression"] == "attribute_not_exists(SK)"
-
-
-def test_the_request_listing_reads_only_request_rows(monkeypatch):
-    made = request()
-    fake = FakeDynamoDb({"query": {"Items": [to_attributes(request_item(made))]}})
-    store = request_store(monkeypatch, fake)
-
-    assert store.list_for_case(CASE_ID) == (made,)
-    assert fake.calls[0][1]["ExpressionAttributeValues"][":prefix"] == {
-        "S": "DOCREQUEST#"
-    }
-
-
-def test_a_request_update_over_a_deleted_row_is_none(monkeypatch):
-    fake = FakeDynamoDb()
-    fake.raises = conditional_check_failed()
-    store = request_store(monkeypatch, fake)
-
-    assert store.update(request()) is None
-    assert fake.calls[0][1]["ConditionExpression"] == "attribute_exists(SK)"
+    assert store.get(CASE_ID, made.id) == made
 
 
 # ── The firm store's checklist ─────────────────────────────────────

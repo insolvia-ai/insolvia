@@ -18,19 +18,19 @@ from __future__ import annotations
 from typing import Any
 
 from insolvia_core.adapters.aws.access_log import DynamoDbAccessLog
-from insolvia_core.adapters.aws.candidate_store import DynamoDbCandidateStore
-from insolvia_core.adapters.aws.case_entity_store import DynamoDbCaseEntityStore
-from insolvia_core.adapters.aws.case_store import DynamoDbCaseStore
-from insolvia_core.adapters.aws.debtor_store import DynamoDbDebtorStore
 from insolvia_core.adapters.aws.document_blobs import S3DocumentBlobStore
-from insolvia_core.adapters.aws.document_store import DynamoDbDocumentStore
 from insolvia_core.adapters.aws.tax_id_cipher import KmsTaxIdCipher, case_key_alias
 from insolvia_core.adapters.aws.tax_id_store import DynamoDbTaxIdStore
+from insolvia_core.adapters.postgres.candidate_store import PostgresCandidateStore
+from insolvia_core.adapters.postgres.case_entity_store import PostgresCaseEntityStore
+from insolvia_core.adapters.postgres.case_store import PostgresCaseStore
+from insolvia_core.adapters.postgres.debtor_store import PostgresDebtorStore
+from insolvia_core.adapters.postgres.document_store import PostgresDocumentStore
 
 from insolvia_api.adapters.anthropic.extraction_model import AnthropicExtractionModel
 from insolvia_api.adapters.anthropic.review_model import AnthropicReviewModel
-from insolvia_api.adapters.aws.job_store import DynamoDbJobStore
-from insolvia_api.adapters.aws.packet_store import DynamoDbPacketStore
+from insolvia_api.adapters.postgres.job_store import PostgresJobStore
+from insolvia_api.adapters.postgres.packet_store import PostgresPacketStore
 from insolvia_api.core.config import load_config
 from insolvia_api.core.extraction import (
     DOCUMENT_EXTRACTION_KIND,
@@ -53,6 +53,10 @@ from insolvia_api.core.petition_review import (
 configure_logging()
 
 config = load_config()
+# Required by load_config (ADR 0030): unset, the service refused to start.
+database_url = config.database_url
+if database_url is None:
+    raise RuntimeError("DATABASE_URL must be set")
 # Hard-required, mirroring api_lambda.py's rule: the job record IS the
 # pipeline's truth, and a worker that cannot reach it has no degraded mode —
 # refusing to boot is discovered by the deploy, not by a stuck job.
@@ -69,16 +73,16 @@ if not config.case_access_log_table_name or not config.case_document_bucket:
         "for the worker Lambda entrypoint"
     )
 
-_store = DynamoDbJobStore(config.case_table_name)
+_store = PostgresJobStore(database_url)
 
 # The full registry: core/jobs.WORKERS holds the dependency-free workers, and
 # the store-reading ones are composed HERE, where the adapters exist —
 # core/jobs.KINDS is what keeps the accept endpoint and this mapping naming
 # the same kinds (tests/test_jobs.py pins that).
-_case_store = DynamoDbCaseStore(config.case_table_name)
-_debtor_store = DynamoDbDebtorStore(config.case_table_name)
-_entity_store = DynamoDbCaseEntityStore(config.case_table_name)
-_packet_store = DynamoDbPacketStore(config.case_table_name)
+_case_store = PostgresCaseStore(database_url)
+_debtor_store = PostgresDebtorStore(database_url)
+_entity_store = PostgresCaseEntityStore(database_url)
+_packet_store = PostgresPacketStore(database_url)
 _access_log = DynamoDbAccessLog(config.case_access_log_table_name)
 # B121's number (issue 13.12 / #382): the worker role holds Decrypt on the
 # case key for the tax-id encryption context and nothing more — it prints
@@ -129,9 +133,9 @@ _workers = {
     DOCUMENT_EXTRACTION_KIND: document_extraction_worker(
         DocumentExtractionDeps(
             case_store=_case_store,
-            document_store=DynamoDbDocumentStore(config.case_table_name),
+            document_store=PostgresDocumentStore(database_url),
             blobs=_blobs,
-            candidate_store=DynamoDbCandidateStore(config.case_table_name),
+            candidate_store=PostgresCandidateStore(database_url),
             access_log=_access_log,
             model=_extraction_model,
         )

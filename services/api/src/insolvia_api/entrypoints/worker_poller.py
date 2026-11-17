@@ -26,19 +26,19 @@ import logging
 
 import boto3
 from insolvia_core.adapters.aws.access_log import DynamoDbAccessLog
-from insolvia_core.adapters.aws.candidate_store import DynamoDbCandidateStore
-from insolvia_core.adapters.aws.case_entity_store import DynamoDbCaseEntityStore
-from insolvia_core.adapters.aws.case_store import DynamoDbCaseStore
-from insolvia_core.adapters.aws.debtor_store import DynamoDbDebtorStore
 from insolvia_core.adapters.aws.document_blobs import S3DocumentBlobStore
-from insolvia_core.adapters.aws.document_store import DynamoDbDocumentStore
 from insolvia_core.adapters.aws.tax_id_cipher import KmsTaxIdCipher, case_key_alias
 from insolvia_core.adapters.aws.tax_id_store import DynamoDbTaxIdStore
+from insolvia_core.adapters.postgres.candidate_store import PostgresCandidateStore
+from insolvia_core.adapters.postgres.case_entity_store import PostgresCaseEntityStore
+from insolvia_core.adapters.postgres.case_store import PostgresCaseStore
+from insolvia_core.adapters.postgres.debtor_store import PostgresDebtorStore
+from insolvia_core.adapters.postgres.document_store import PostgresDocumentStore
 
 from insolvia_api.adapters.anthropic.extraction_model import AnthropicExtractionModel
 from insolvia_api.adapters.anthropic.review_model import AnthropicReviewModel
-from insolvia_api.adapters.aws.job_store import DynamoDbJobStore
-from insolvia_api.adapters.aws.packet_store import DynamoDbPacketStore
+from insolvia_api.adapters.postgres.job_store import PostgresJobStore
+from insolvia_api.adapters.postgres.packet_store import PostgresPacketStore
 from insolvia_api.core.config import load_config
 from insolvia_api.core.extraction import (
     DOCUMENT_EXTRACTION_KIND,
@@ -64,6 +64,9 @@ logger = logging.getLogger(__name__)
 def main() -> None:
     configure_logging()
     config = load_config()
+    database_url = config.database_url
+    if database_url is None:
+        raise RuntimeError("DATABASE_URL must be set")
     if not config.case_table_name or not config.job_queue_url:
         raise RuntimeError(
             "CASE_TABLE_NAME and JOB_QUEUE_URL must be set for the worker poller "
@@ -78,17 +81,17 @@ def main() -> None:
             "services/api/.env)"
         )
 
-    store = DynamoDbJobStore(config.case_table_name)
+    store = PostgresJobStore(database_url)
     # The same composition the worker Lambda does — a laptop runs the exact
     # worker the cloud runs, against this machine's real dev resources. The
     # AI review's model rides ANTHROPIC_API_KEY from services/api/.env
     # (gitignored; add your own key by hand — dev-aws-setup does not write
     # it); without one, `petition_review` jobs fail honestly with
     # `not_configured` and everything else runs as before.
-    case_store = DynamoDbCaseStore(config.case_table_name)
-    debtor_store = DynamoDbDebtorStore(config.case_table_name)
-    entity_store = DynamoDbCaseEntityStore(config.case_table_name)
-    packet_store = DynamoDbPacketStore(config.case_table_name)
+    case_store = PostgresCaseStore(database_url)
+    debtor_store = PostgresDebtorStore(database_url)
+    entity_store = PostgresCaseEntityStore(database_url)
+    packet_store = PostgresPacketStore(database_url)
     access_log = DynamoDbAccessLog(config.case_access_log_table_name)
     # The same pair the worker Lambda composes, under this machine's own
     # case key (the developer's IAM user reaches it by root delegation).
@@ -134,9 +137,9 @@ def main() -> None:
         DOCUMENT_EXTRACTION_KIND: document_extraction_worker(
             DocumentExtractionDeps(
                 case_store=case_store,
-                document_store=DynamoDbDocumentStore(config.case_table_name),
+                document_store=PostgresDocumentStore(database_url),
                 blobs=blobs,
-                candidate_store=DynamoDbCandidateStore(config.case_table_name),
+                candidate_store=PostgresCandidateStore(database_url),
                 access_log=access_log,
                 model=extraction_model,
             )

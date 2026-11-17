@@ -15,7 +15,10 @@ from dataclasses import replace
 
 import pytest
 from insolvia_core.adapters.memory.task_store import MemoryTaskStore
+from insolvia_core.adapters.postgres.task_store import PostgresTaskStore
 from insolvia_core.tasks import Task
+
+from tests.unit.backends import BACKENDS, postgres_url_with_cases
 
 CASE_ID = "00000000-0000-4000-8000-0000000000ca"
 OTHER_CASE_ID = "00000000-0000-4000-8000-0000000000cb"
@@ -42,35 +45,38 @@ def task(
     )
 
 
-def test_creating_the_same_task_twice_is_refused():
-    store = MemoryTaskStore()
+@pytest.fixture(params=BACKENDS)
+def store(request):
+    if request.param == "memory":
+        return MemoryTaskStore()
+    return PostgresTaskStore(postgres_url_with_cases(request, CASE_ID, OTHER_CASE_ID))
+
+
+def test_creating_the_same_task_twice_is_refused(store):
     store.create(task())
     with pytest.raises(RuntimeError):
         store.create(task(subject="A different task"))
 
 
-def test_creating_the_same_instance_twice_is_refused():
+def test_creating_the_same_instance_twice_is_refused(store):
     """THE FAILURE test_document_store.py's own equivalent exists for: a
     `setdefault`-shaped check returns the same object for the same instance
     twice and would let this pass silently, where DynamoDB's
     `attribute_not_exists(SK)` — knowing nothing about Python identity — would
     raise."""
-    store = MemoryTaskStore()
     only = task()
     store.create(only)
     with pytest.raises(RuntimeError):
         store.create(only)
-    assert store.get(CASE_ID, TASK_ID) is only
+    assert store.get(CASE_ID, TASK_ID) == only
 
 
-def test_update_refuses_a_row_that_is_not_there():
-    store = MemoryTaskStore()
+def test_update_refuses_a_row_that_is_not_there(store):
     assert store.update(task()) is None
-    assert store.tasks == {}
+    assert store.list_for_case(CASE_ID) == ()
 
 
-def test_update_replaces_an_existing_row():
-    store = MemoryTaskStore()
+def test_update_replaces_an_existing_row(store):
     store.create(task())
     completed = replace(task(), done=True, completed_at="2026-01-02T00:00:00.000000Z")
 
@@ -78,17 +84,15 @@ def test_update_replaces_an_existing_row():
     assert store.get(CASE_ID, TASK_ID) == completed
 
 
-def test_delete_reports_whether_it_removed_anything():
-    store = MemoryTaskStore()
+def test_delete_reports_whether_it_removed_anything(store):
     store.create(task())
     assert store.delete(CASE_ID, TASK_ID) is True
     assert store.delete(CASE_ID, TASK_ID) is False
 
 
-def test_the_same_task_id_in_another_case_is_a_different_row():
+def test_the_same_task_id_in_another_case_is_a_different_row(store):
     """The key is (case, task), as it is in the table. A task id leaked from
     one firm's case must not resolve inside another's."""
-    store = MemoryTaskStore()
     store.create(task())
     store.create(task(case_id=OTHER_CASE_ID))
     assert store.get(CASE_ID, TASK_ID) is not None
@@ -96,8 +100,7 @@ def test_the_same_task_id_in_another_case_is_a_different_row():
     assert len(store.list_for_case(CASE_ID)) == 1
 
 
-def test_list_for_case_is_creation_order():
-    store = MemoryTaskStore()
+def test_list_for_case_is_creation_order(store):
     first = replace(
         task(task_id=f"{TASK_ID[:-1]}1"), created_at="2026-01-01T00:00:00.000000Z"
     )

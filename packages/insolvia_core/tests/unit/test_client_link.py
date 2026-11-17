@@ -13,17 +13,10 @@ Every identifier below is obviously fake. This repo is public.
 from __future__ import annotations
 
 from dataclasses import replace
-from typing import Any
 
 import pytest
 from insolvia_core.access import Accessor
-from insolvia_core.adapters.aws import case_store as aws_case_store
-from insolvia_core.adapters.aws.case_store import DynamoDbCaseStore
-from insolvia_core.adapters.aws.dynamo import to_attributes
-from insolvia_core.adapters.memory.case_store import MemoryCaseStore
-from insolvia_core.adapters.memory.debtor_store import MemoryDebtorStore
 from insolvia_core.cases import (
-    assignment_item,
     case_item,
     create_case,
     parse_case_creation,
@@ -48,6 +41,8 @@ from insolvia_core.firm_clients import (
 )
 from insolvia_core.firms import Firm, FirmUser, default_permissions
 from insolvia_core.provenance import SOURCES, parse_provenance, provenance_json
+
+from tests.unit.backends import BACKENDS, case_stores, firm_store
 
 FIRM_A = "00000000-0000-4000-8000-00000000f18a"
 FIRM_B = "00000000-0000-4000-8000-00000000f18b"
@@ -310,33 +305,41 @@ def test_an_unlinked_debtor_is_not_in_the_index():
     assert debtor_from_item(item).client_id is None
 
 
-# ── MemoryCaseStore ─────────────────────────────────────────────────
+# ── CaseStore, memory and Postgres ──────────────────────────────────
 
 
-def test_the_case_its_assignment_and_its_debtors_are_written_together():
-    debtors = MemoryDebtorStore()
-    store = MemoryCaseStore(debtor_store=debtors)
+@pytest.fixture(params=BACKENDS)
+def stores(request):
+    """The case stores and the firm store a linked client must be in."""
+    firms = firm_store(request, FIRM_A)
+    return (*case_stores(request, firm_store=firms), firms)
+
+
+def test_the_case_its_assignment_and_its_debtors_are_written_together(stores):
+    store, debtors, firms = stores
     case, assignment = a_case()
-    copy = debtor_from_client(a_client(), case=case, filing_role="debtor_1")
+    client = a_client()
+    firms.create_client(client)
+    copy = debtor_from_client(client, case=case, filing_role="debtor_1")
     store.create(case, assignment, [copy])
     assert debtors.get(case.id, filing_role="debtor_1") == copy
     assert store.get(case.id, accessor=accessor(ALICE)) == case
 
 
-def test_a_debtor_for_another_case_refuses_the_whole_write():
-    store = MemoryCaseStore()
+def test_a_debtor_for_another_case_refuses_the_whole_write(stores):
+    store, _, _ = stores
     case, assignment = a_case()
     other, _ = a_case()
     stray = debtor_from_client(a_client(), case=other, filing_role="debtor_1")
     with pytest.raises(RuntimeError):
         store.create(case, assignment, [stray])
-    assert case.id not in store.cases
+    assert store.read_for_worker(case.id) is None
 
 
-def test_a_clients_cases_are_the_ones_the_caller_may_see_newest_first():
-    debtors = MemoryDebtorStore()
-    store = MemoryCaseStore(debtor_store=debtors)
+def test_a_clients_cases_are_the_ones_the_caller_may_see_newest_first(stores):
+    store, _, firms = stores
     client = a_client()
+    firms.create_client(client)
     older, older_assignment = a_case(created_by=ALICE)
     newer, newer_assignment = a_case(created_by=DANA)
     store.create(
@@ -363,116 +366,9 @@ def test_a_clients_cases_are_the_ones_the_caller_may_see_newest_first():
     assert store.list_for_client(client.id, accessor=accessor(BOB, FIRM_B)) == ()
 
 
-# ── DynamoDbCaseStore, over a recording transport ───────────────────
-
-
-class FakeDynamoDb:
-    """Records calls and replays canned responses; conditions are not
-    simulated — the integration tier runs the real table."""
-
-    def __init__(self) -> None:
-        self.calls: list[tuple[str, dict[str, Any]]] = []
-        self.responses: dict[str, list[dict[str, Any]]] = {}
-
-    def _record(self, name: str, kwargs: dict[str, Any]) -> Any:
-        self.calls.append((name, kwargs))
-        queue = self.responses.get(name) or [{}]
-        return queue.pop(0) if len(queue) > 1 else queue[0]
-
-    def transact_write_items(self, **kwargs: Any) -> Any:
-        return self._record("transact_write_items", kwargs)
-
-    def query(self, **kwargs: Any) -> Any:
-        return self._record("query", kwargs)
-
-    def batch_get_item(self, **kwargs: Any) -> Any:
-        return self._record("batch_get_item", kwargs)
-
-
-def dynamo_store(monkeypatch, fake: FakeDynamoDb) -> DynamoDbCaseStore:
-    monkeypatch.setattr(aws_case_store.boto3, "client", lambda _service: fake)
-    return DynamoDbCaseStore("insolvia-test-cases")
-
-
-def test_one_transaction_writes_the_case_its_assignment_and_its_debtors(monkeypatch):
-    fake = FakeDynamoDb()
-    store = dynamo_store(monkeypatch, fake)
-    case, assignment = a_case()
-    client_1, client_2 = a_client(), a_client(name={"given": "Sam"})
-    copies = [
-        debtor_from_client(client_1, case=case, filing_role="debtor_1"),
-        debtor_from_client(client_2, case=case, filing_role="debtor_2"),
-    ]
-
-    store.create(case, assignment, copies)
-
-    [(name, kwargs)] = fake.calls
-    assert name == "transact_write_items"
-    puts = [item["Put"] for item in kwargs["TransactItems"]]
-    assert [put["Item"]["SK"]["S"] for put in puts] == [
-        "META",
-        f"ASSIGNEE#{ALICE}",
-        "DEBTOR#debtor_1",
-        "DEBTOR#debtor_2",
-    ]
-    assert puts[2]["Item"]["GSI3PK"] == {"S": f"CLIENT#{client_1.id}"}
-    assert puts[3]["Item"]["GSI3PK"] == {"S": f"CLIENT#{client_2.id}"}
-    # A role exists at most once however it was written.
-    assert all(
-        put["ConditionExpression"] == "attribute_not_exists(SK)" for put in puts[1:]
-    )
-
-
-def test_the_client_listing_reads_the_index_then_decides_per_case(monkeypatch):
-    fake = FakeDynamoDb()
-    store = dynamo_store(monkeypatch, fake)
-    client = a_client()
-    mine, mine_assignment = a_case(created_by=DANA)
-    theirs, _ = a_case(created_by=ALICE)
-    fake.responses["query"] = [
-        {
-            "Items": [
-                to_attributes(
-                    debtor_item(debtor_from_client(client, case=case, filing_role=role))
-                )
-                for case, role in ((mine, "debtor_1"), (theirs, "debtor_2"))
-            ]
-        }
-    ]
-    fake.responses["batch_get_item"] = [
-        {
-            "Responses": {
-                "insolvia-test-cases": [
-                    to_attributes(case_item(mine)),
-                    to_attributes(assignment_item(mine_assignment)),
-                    to_attributes(case_item(theirs)),
-                ]
-            }
-        }
-    ]
-
-    listed = store.list_for_client(client.id, accessor=accessor(DANA))
-
-    assert [(entry.case.id, entry.filing_role) for entry in listed] == [
-        (mine.id, "debtor_1")
-    ]
-    query = next(kwargs for name, kwargs in fake.calls if name == "query")
-    assert query["IndexName"] == "by-client"
-    assert query["ExpressionAttributeValues"] == {
-        ":client": {"S": f"CLIENT#{client.id}"}
-    }
-    assert query["ScanIndexForward"] is False
-    batch = next(kwargs for name, kwargs in fake.calls if name == "batch_get_item")
-    keys = batch["RequestItems"]["insolvia-test-cases"]["Keys"]
-    # Each case's META and the caller's own assignment row — nobody else's.
-    assert {key["SK"]["S"] for key in keys} == {"META", f"ASSIGNEE#{DANA}"}
-
-
-def test_a_client_with_no_cases_costs_one_query(monkeypatch):
-    fake = FakeDynamoDb()
-    store = dynamo_store(monkeypatch, fake)
+def test_a_client_with_no_cases_lists_nothing(stores):
+    store, _, _ = stores
     assert store.list_for_client("c-none", accessor=accessor(ALICE)) == ()
-    assert [name for name, _ in fake.calls] == ["query"]
 
 
 def test_the_address_county_is_part_of_the_copy():

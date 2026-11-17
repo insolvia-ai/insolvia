@@ -17,7 +17,7 @@ from botocore.exceptions import ClientError
 from fake_cmecf import FakeCmEcf
 from insolvia_api.adapters.aws.filing_approval_store import DynamoDbFilingApprovalStore
 from insolvia_api.adapters.aws.filing_queue import SqsFilingQueue
-from insolvia_api.adapters.aws.packet_store import DynamoDbPacketStore
+from insolvia_api.adapters.postgres.packet_store import PostgresPacketStore
 from insolvia_api.core.filing_approval import approve_filing, basis_for_case
 from insolvia_api.core.filing_outcome import parse_resolution, resolve_filing
 from insolvia_api.core.jobs import new_job
@@ -29,11 +29,7 @@ from insolvia_api.core.packet_assembly import (
 )
 from insolvia_core import courts
 from insolvia_core.adapters.aws.access_log import DynamoDbAccessLog
-from insolvia_core.adapters.aws.case_entity_store import DynamoDbCaseEntityStore
-from insolvia_core.adapters.aws.case_store import DynamoDbCaseStore
-from insolvia_core.adapters.aws.debtor_store import DynamoDbDebtorStore
 from insolvia_core.adapters.aws.document_blobs import S3DocumentBlobStore
-from insolvia_core.adapters.aws.document_store import DynamoDbDocumentStore
 from insolvia_core.adapters.aws.filing_credentials import (
     DynamoDbFilingAuthorizationStore,
     DynamoDbFilingCredentialStore,
@@ -44,6 +40,10 @@ from insolvia_core.adapters.aws.filing_credentials import (
 from insolvia_core.adapters.aws.filing_store import DynamoDbFilingStore
 from insolvia_core.adapters.aws.tax_id_cipher import KmsTaxIdCipher, case_key_alias
 from insolvia_core.adapters.aws.tax_id_store import DynamoDbTaxIdStore
+from insolvia_core.adapters.postgres.case_entity_store import PostgresCaseEntityStore
+from insolvia_core.adapters.postgres.case_store import PostgresCaseStore
+from insolvia_core.adapters.postgres.debtor_store import PostgresDebtorStore
+from insolvia_core.adapters.postgres.document_store import PostgresDocumentStore
 from insolvia_core.cases import FILING_WORKER_ACTOR, assign_case
 from insolvia_core.errors import ConflictError
 from insolvia_core.filing_authorization import (
@@ -65,6 +65,7 @@ from insolvia_filing.entrypoints.compose import compose
 from tests.unit.test_packet_assembly import reference_case_data
 
 TABLE = os.environ["CASE_TABLE_NAME"]
+DATABASE_URL = os.environ["DATABASE_URL"]
 QUEUE = os.environ["FILING_QUEUE_URL"]
 ROLE = os.environ["FILING_WORKER_ROLE_ARN"]
 FIRM = "proof-firm-00000000"
@@ -85,10 +86,10 @@ print(f"developer : {dev.client('sts').get_caller_identity()['Arn']}")
 print(f"case table: {TABLE}")
 print(f"queue     : {QUEUE.rsplit('/', 1)[-1]}")
 
-case_store = DynamoDbCaseStore(TABLE)
-debtor_store = DynamoDbDebtorStore(TABLE)
-entity_store = DynamoDbCaseEntityStore(TABLE)
-packet_store = DynamoDbPacketStore(TABLE)
+case_store = PostgresCaseStore(DATABASE_URL)
+debtor_store = PostgresDebtorStore(DATABASE_URL)
+entity_store = PostgresCaseEntityStore(DATABASE_URL)
+packet_store = PostgresPacketStore(DATABASE_URL)
 access_log = DynamoDbAccessLog(os.environ["CASE_ACCESS_LOG_TABLE_NAME"])
 tax_id_store = DynamoDbTaxIdStore(TABLE)
 tax_id_cipher = KmsTaxIdCipher(case_key_alias(TABLE))
@@ -102,7 +103,7 @@ api_filings = DynamoDbFilingStore(TABLE)
 queue = SqsFilingQueue(QUEUE)
 dev_sqs = dev.client("sqs")
 blobs = S3DocumentBlobStore(os.environ["CASE_DOCUMENT_BUCKET"])
-documents = DynamoDbDocumentStore(TABLE)
+documents = PostgresDocumentStore(DATABASE_URL)
 assembly = PacketAssemblyDeps(
     case_store=case_store,
     debtor_store=debtor_store,

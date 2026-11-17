@@ -180,16 +180,16 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Final, Protocol
 
-from insolvia_core.adapters.aws.case_entity_store import DynamoDbCaseEntityStore
-from insolvia_core.adapters.aws.case_store import DynamoDbCaseStore
-from insolvia_core.adapters.aws.debtor_store import DynamoDbDebtorStore
 from insolvia_core.adapters.aws.document_blobs import S3DocumentBlobStore
-from insolvia_core.adapters.aws.document_store import DynamoDbDocumentStore
 from insolvia_core.adapters.aws.tax_id_cipher import KmsTaxIdCipher, case_key_alias
 from insolvia_core.adapters.aws.tax_id_store import DynamoDbTaxIdStore
+from insolvia_core.adapters.postgres.case_entity_store import PostgresCaseEntityStore
+from insolvia_core.adapters.postgres.case_store import PostgresCaseStore
 from insolvia_core.adapters.postgres.client_binding_store import (
     PostgresClientBindingStore,
 )
+from insolvia_core.adapters.postgres.debtor_store import PostgresDebtorStore
+from insolvia_core.adapters.postgres.document_store import PostgresDocumentStore
 from insolvia_core.adapters.postgres.firm_store import PostgresFirmStore
 from insolvia_core.case_collections import COLLECTIONS
 from insolvia_core.case_entities import create_entity, entity_json, parse_entity
@@ -446,10 +446,20 @@ class Dependencies:
         _database()
     )
     accounts: Callable[[str], Accounts] = CognitoAccounts
-    case_store: Callable[[str], CaseStore] = DynamoDbCaseStore
-    debtor_store: Callable[[str], DebtorStore] = DynamoDbDebtorStore
-    entity_store: Callable[[str], CaseEntityStore] = DynamoDbCaseEntityStore
-    document_store: Callable[[str], DocumentStore] = DynamoDbDocumentStore
+    # The case side too (#622); the case table's name still guards the load
+    # and keys the derived ids and the tax ids (#623, #624).
+    case_store: Callable[[str], CaseStore] = lambda _table: PostgresCaseStore(
+        _database()
+    )
+    debtor_store: Callable[[str], DebtorStore] = lambda _table: PostgresDebtorStore(
+        _database()
+    )
+    entity_store: Callable[[str], CaseEntityStore] = (
+        lambda _table: PostgresCaseEntityStore(_database())
+    )
+    document_store: Callable[[str], DocumentStore] = (
+        lambda _table: PostgresDocumentStore(_database())
+    )
     document_blobs: Callable[[str], DocumentBlobStore] = S3DocumentBlobStore
     # (fixture bucket, target document bucket or None)
     fixture_objects: Callable[[str, str | None], FixtureObjects] = S3FixtureObjects

@@ -74,8 +74,8 @@ def lock_linkable_client(
     """Whether a debtor may be linked to this client, holding the row so a
     merge cannot claim it before the caller's transaction commits.
 
-    The Postgres form of the DynamoDB `client_linkable_check` condition: run
-    it inside the transaction that writes the link (the case stores, #622).
+    Run it inside the transaction that writes the link: the Postgres case
+    store's `create` and debtor store's `link` do.
     `FOR SHARE` lets two links proceed together and makes a merge's claim
     (an UPDATE of this row) wait for them, or them for it — whichever is
     second sees the other's outcome. The rule is the domain's own:

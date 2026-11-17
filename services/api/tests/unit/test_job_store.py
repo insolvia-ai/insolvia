@@ -1,7 +1,5 @@
-"""The in-memory JobStore — the same contract the DynamoDB adapter holds,
-exercised at the port. The AWS adapter is not tested against a fake DynamoDB
-by decision (no moto); its conditions mirror the ones asserted here and the
-key construction is shared through job_item."""
+"""The JobStore contract, held by the memory twin and the Postgres adapter
+alike (ADR 0030)."""
 
 from __future__ import annotations
 
@@ -9,7 +7,9 @@ from dataclasses import replace
 
 import pytest
 from insolvia_api.adapters.memory.job_store import MemoryJobStore
+from insolvia_api.adapters.postgres.job_store import PostgresJobStore
 from insolvia_api.core.jobs import Job, new_job, start_attempt
+from insolvia_core.adapters.postgres.connection import connect
 
 CASE = "case-0001"
 OTHER_CASE = "case-0002"
@@ -20,9 +20,21 @@ def job(case_id: str = CASE) -> Job:
     return new_job("echo", case_id=case_id, created_by=ALICE)
 
 
-@pytest.fixture
-def store() -> MemoryJobStore:
-    return MemoryJobStore()
+@pytest.fixture(params=("memory", "postgres"))
+def store(request):
+    if request.param == "memory":
+        return MemoryJobStore()
+    request.getfixturevalue("postgres")
+    url = request.getfixturevalue("postgres_url")
+    with connect(url) as conn:
+        for case_id in (CASE, OTHER_CASE):
+            conn.execute(
+                "INSERT INTO cases (id, firm_id, created_by, chapter, district,"
+                " status, created_at, updated_at)"
+                " VALUES (%s, 'firm-1', 'seed', 7, 'Seed', 'intake', now(), now())",
+                (case_id,),
+            )
+    return PostgresJobStore(url)
 
 
 def test_created_jobs_are_read_back(store) -> None:

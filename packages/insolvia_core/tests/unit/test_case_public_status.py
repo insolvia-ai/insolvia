@@ -3,8 +3,8 @@
 
 What is pinned here is the SHAPE of the read path, because the rule it
 enforces is structural: a portal route never holds a `Case`. The store method
-takes the `ClientAccessor` (no case id to pass wrongly), the DynamoDB adapter
-asks the table for exactly the public attributes, and the projection answers
+takes the `ClientAccessor` (no case id to pass wrongly), the Postgres adapter
+selects exactly the public columns, and the projection answers
 nothing for a row of another firm.
 
 Every identifier below is obviously fake. This repo is public.
@@ -13,18 +13,12 @@ Every identifier below is obviously fake. This repo is public.
 from __future__ import annotations
 
 from dataclasses import fields
-from typing import Any
 
 import pytest
 from insolvia_core.access import ClientAccessor
-from insolvia_core.adapters.aws import case_store as aws_case_store
-from insolvia_core.adapters.aws.case_store import DynamoDbCaseStore
-from insolvia_core.adapters.aws.dynamo import to_attributes
-from insolvia_core.adapters.memory.case_store import MemoryCaseStore
 from insolvia_core.cases import Case, CaseAssignment, case_item
 from insolvia_core.clients import (
     ACTIVE,
-    PUBLIC_STATUS_ATTRIBUTES,
     CasePublicStatus,
     ClientBinding,
     public_status_from_case_item,
@@ -32,6 +26,9 @@ from insolvia_core.clients import (
 )
 from insolvia_core.errors import ValidationError
 from insolvia_core.firms import Firm
+from insolvia_core.ports import CaseStore
+
+from tests.unit.backends import BACKENDS, case_stores
 
 FIRM = "00000000-0000-4000-8000-00000000f18a"
 OTHER_FIRM = "00000000-0000-4000-8000-00000000f18b"
@@ -114,11 +111,15 @@ def test_a_row_this_domain_did_not_write_raises(item):
         public_status_from_case_item(item, firm_id=FIRM)
 
 
-# ── Memory store ────────────────────────────────────────────────────
+# ── The store, memory and Postgres ──────────────────────────────────
 
 
-def seeded_memory(case: Case) -> MemoryCaseStore:
-    store = MemoryCaseStore()
+@pytest.fixture(params=BACKENDS)
+def store(request) -> CaseStore:
+    return case_stores(request)[0]
+
+
+def seeded(store: CaseStore, case: Case) -> CaseStore:
     store.create(
         case,
         CaseAssignment(
@@ -132,67 +133,21 @@ def seeded_memory(case: Case) -> MemoryCaseStore:
     return store
 
 
-def test_the_memory_store_reads_the_bound_case_without_an_assignment():
+def test_the_store_reads_the_bound_case_without_an_assignment(store):
     # The client is not an assignee and holds no Accessor: the binding is
     # the whole authority, and the read needs nothing else.
-    store = seeded_memory(a_case(status="filed"))
+    seeded(store, a_case(status="filed"))
 
     assert store.public_status(a_client()) == CasePublicStatus(
         chapter=13, stage="filed"
     )
 
 
-def test_the_memory_store_refuses_a_binding_whose_firm_does_not_own_the_case():
-    store = seeded_memory(a_case())
+def test_the_store_refuses_a_binding_whose_firm_does_not_own_the_case(store):
+    seeded(store, a_case())
 
     assert store.public_status(a_client(firm_id=OTHER_FIRM)) is None
 
 
-def test_the_memory_store_answers_nothing_for_a_missing_case():
-    assert MemoryCaseStore().public_status(a_client()) is None
-
-
-# ── DynamoDB ────────────────────────────────────────────────────────
-
-
-class FakeDynamoDb:
-    def __init__(self, item: dict[str, Any] | None) -> None:
-        self.item = item
-        self.calls: list[dict[str, Any]] = []
-
-    def get_item(self, **kwargs: Any) -> Any:
-        self.calls.append(kwargs)
-        return {} if self.item is None else {"Item": self.item}
-
-
-def dynamo(monkeypatch, fake: FakeDynamoDb) -> DynamoDbCaseStore:
-    monkeypatch.setattr(aws_case_store.boto3, "client", lambda _service: fake)
-    return DynamoDbCaseStore("insolvia-test-cases")
-
-
-def test_dynamo_asks_the_table_for_the_public_attributes_only(monkeypatch):
-    public = {
-        k: v for k, v in case_item(a_case()).items() if k in PUBLIC_STATUS_ATTRIBUTES
-    }
-    fake = FakeDynamoDb(to_attributes(public))
-
-    status = dynamo(monkeypatch, fake).public_status(a_client())
-
-    assert status == CasePublicStatus(chapter=13, stage="intake")
-    (call,) = fake.calls
-    assert call["Key"] == {"PK": {"S": f"CASE#{CASE}"}, "SK": {"S": "META"}}
-    names = call["ExpressionAttributeNames"]
-    assert sorted(names.values()) == sorted(PUBLIC_STATUS_ATTRIBUTES)
-    assert call["ProjectionExpression"] == ", ".join(names)
-
-
-def test_dynamo_refuses_a_row_of_another_firm(monkeypatch):
-    fake = FakeDynamoDb(
-        to_attributes({"firmId": OTHER_FIRM, "chapter": 7, "status": "intake"})
-    )
-
-    assert dynamo(monkeypatch, fake).public_status(a_client()) is None
-
-
-def test_dynamo_answers_nothing_for_a_missing_case(monkeypatch):
-    assert dynamo(monkeypatch, FakeDynamoDb(None)).public_status(a_client()) is None
+def test_the_store_answers_nothing_for_a_missing_case(store):
+    assert store.public_status(a_client()) is None

@@ -16,13 +16,9 @@ nowhere else:
 from __future__ import annotations
 
 from insolvia_api.adapters.aws.filing_approval_store import DynamoDbFilingApprovalStore
-from insolvia_api.adapters.aws.packet_store import DynamoDbPacketStore
+from insolvia_api.adapters.postgres.packet_store import PostgresPacketStore
 from insolvia_core.adapters.aws.access_log import DynamoDbAccessLog
-from insolvia_core.adapters.aws.case_entity_store import DynamoDbCaseEntityStore
-from insolvia_core.adapters.aws.case_store import DynamoDbCaseStore
-from insolvia_core.adapters.aws.debtor_store import DynamoDbDebtorStore
 from insolvia_core.adapters.aws.document_blobs import S3DocumentBlobStore
-from insolvia_core.adapters.aws.document_store import DynamoDbDocumentStore
 from insolvia_core.adapters.aws.filing_credentials import (
     DynamoDbFilingAuthorizationStore,
     DynamoDbFilingCredentialStore,
@@ -33,6 +29,10 @@ from insolvia_core.adapters.aws.filing_credentials import (
 from insolvia_core.adapters.aws.filing_store import DynamoDbFilingStore
 from insolvia_core.adapters.aws.tax_id_cipher import KmsTaxIdCipher, case_key_alias
 from insolvia_core.adapters.aws.tax_id_store import DynamoDbTaxIdStore
+from insolvia_core.adapters.postgres.case_entity_store import PostgresCaseEntityStore
+from insolvia_core.adapters.postgres.case_store import PostgresCaseStore
+from insolvia_core.adapters.postgres.debtor_store import PostgresDebtorStore
+from insolvia_core.adapters.postgres.document_store import PostgresDocumentStore
 
 from ..adapters.aws.kill_switch import SsmKillSwitch
 from ..adapters.http.fenced_client import FencedHttpClient
@@ -46,9 +46,12 @@ from ..core.worker import FilingDeps
 
 
 def compose(config: FilingConfig) -> FilingDeps:
+    database_url = config.database_url
     table = config.case_table_name
     access_log_table = config.case_access_log_table_name
     bucket = config.case_document_bucket
+    if database_url is None:
+        raise RuntimeError("DATABASE_URL must be set for the filing worker")
     if not table or not access_log_table or not bucket:
         raise RuntimeError(
             "CASE_TABLE_NAME, CASE_ACCESS_LOG_TABLE_NAME and CASE_DOCUMENT_BUCKET"
@@ -77,12 +80,12 @@ def compose(config: FilingConfig) -> FilingDeps:
         environment=config.environment,
         filings=DynamoDbFilingStore(table),
         approvals=DynamoDbFilingApprovalStore(table),
-        case_store=DynamoDbCaseStore(table),
-        debtor_store=DynamoDbDebtorStore(table),
-        entity_store=DynamoDbCaseEntityStore(table),
-        packet_store=DynamoDbPacketStore(table),
+        case_store=PostgresCaseStore(database_url),
+        debtor_store=PostgresDebtorStore(database_url),
+        entity_store=PostgresCaseEntityStore(database_url),
+        packet_store=PostgresPacketStore(database_url),
         blobs=S3DocumentBlobStore(bucket),
-        document_store=DynamoDbDocumentStore(table),
+        document_store=PostgresDocumentStore(database_url),
         credentials=DynamoDbFilingCredentialStore(vault),
         authorizations=DynamoDbFilingAuthorizationStore(vault),
         opener=KmsCredentialOpener(filing_credentials_key_alias(table)),

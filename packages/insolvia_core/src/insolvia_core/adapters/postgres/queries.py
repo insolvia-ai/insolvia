@@ -15,9 +15,11 @@ shape clients already hold does not change.
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from datetime import UTC, datetime
 from typing import Any
 
 from psycopg import Cursor, sql
+from psycopg.types.json import Jsonb
 
 from insolvia_core.errors import ValidationError
 
@@ -68,3 +70,24 @@ def next_key(
         return None
     last = rows[limit - 1]
     return {column: str(last[column]) for column in columns}
+
+
+def document(item: Mapping[str, object]) -> Jsonb:
+    """A domain item shape (`*_item`) as the `item jsonb` a child row stores:
+    the same document, minus the DynamoDB key attributes (PK, SK, GSI*), which
+    are the row's columns now. `*_from_item` reads it back unchanged."""
+    return Jsonb(
+        {
+            key: value
+            for key, value in item.items()
+            if key not in ("PK", "SK") and not key.startswith("GSI")
+        }
+    )
+
+
+def stamp(value: datetime) -> str:
+    """A `timestamptz` back as the domain's timestamp text: microsecond UTC
+    with a literal Z (`cases._timestamp`), so a value round-trips exactly."""
+    return (
+        value.astimezone(UTC).isoformat(timespec="microseconds").replace("+00:00", "Z")
+    )
