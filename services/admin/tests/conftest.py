@@ -24,6 +24,10 @@ from insolvia_core.adapters.memory.firm_store import MemoryFirmStore
 from insolvia_core.adapters.memory.jwks_provider import StaticJwksProvider
 from insolvia_core.adapters.memory.user_directory import MemoryUserDirectory
 
+# Store tests run against a real Postgres (ADR 0030): the `postgres` and
+# `postgres_url` fixtures. See insolvia_core/adapters/postgres/testing.py.
+pytest_plugins = ("insolvia_core.adapters.postgres.testing",)
+
 CLIENT_ID = "000000000000-fake.apps.googleusercontent.com"
 WORKSPACE = "example-workspace.test"
 STAFF_SUB = "100000000000000000001"

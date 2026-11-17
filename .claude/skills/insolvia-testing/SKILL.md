@@ -109,6 +109,11 @@ found online.
 - **Monkeypatch the transport, not the logic.** `test_mailer_client.py` patches
   `urlopen`; `test_jwks_provider.py` patches the fetch. There is deliberately
   **no `moto`, no `responses`, no `httpretty`** — do not add one.
+- **A Postgres store's test uses the real database, not a fake** (ADR 0030):
+  ask for the `postgres` fixture (`insolvia_core.adapters.postgres.testing`,
+  loaded by every Python conftest) — an empty, migrated database per test.
+  Locally it needs `docker compose -f services/api/docker-compose.yml up -d
+  --wait postgres`; CI runs it as a service container.
 - **Fake at the port.** `core/ports.py` defines Protocols; `adapters/memory/`
   implements them. A new external dependency gets a Protocol and a memory
   adapter, not an inline `Mock()`.

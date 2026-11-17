@@ -5,6 +5,10 @@ from insolvia_api.api.app_factory import create_app
 from insolvia_api.api.dependencies import ApiDependencies
 from insolvia_api.core.config import load_config
 
+# Store tests run against a real Postgres (ADR 0030): the `postgres` and
+# `postgres_url` fixtures. See insolvia_core/adapters/postgres/testing.py.
+pytest_plugins = ("insolvia_core.adapters.postgres.testing",)
+
 
 @pytest.fixture
 def store():

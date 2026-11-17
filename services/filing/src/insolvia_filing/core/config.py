@@ -22,6 +22,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from urllib.parse import urlsplit
 
+from insolvia_core.database import database_url
 from insolvia_core.errors import ValidationError
 
 SERVICE_NAME = "insolvia-filing"
@@ -46,6 +47,8 @@ class FilingConfig:
     defaults describe a bare local run against in-memory stores."""
 
     environment: str
+    # Postgres (ADR 0030). load_config refuses to start a service without it.
+    database_url: str | None = None
     case_table_name: str | None = None
     case_access_log_table_name: str | None = None
     case_document_bucket: str | None = None
@@ -116,6 +119,7 @@ def load_config(environ: Mapping[str, str] | None = None) -> FilingConfig:
 
     return FilingConfig(
         environment=environment,
+        database_url=database_url(source, required=environ is None),
         case_table_name=source.get("CASE_TABLE_NAME") or None,
         case_access_log_table_name=source.get("CASE_ACCESS_LOG_TABLE_NAME") or None,
         case_document_bucket=source.get("CASE_DOCUMENT_BUCKET") or None,

@@ -50,6 +50,9 @@ set -a
 source "$FILING_DIR/.env"
 set +a
 export INSOLVIA_ENV=local
+# Required (ADR 0030): the machine's one Postgres, from the API stack
+# (./services/api/scripts/dev-up.sh). A .env value wins.
+export DATABASE_URL="${DATABASE_URL:-postgresql://insolvia:insolvia@127.0.0.1:5432/insolvia}"
 export FAKE_CMECF_URL="http://127.0.0.1:${PORT}"
 export PYTHONPATH="$FILING_DIR/src:$FILING_DIR/../api/src:$FILING_DIR/fake"
 

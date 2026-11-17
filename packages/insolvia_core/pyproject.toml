@@ -15,6 +15,9 @@ dependencies = [
   # (issue 13.12 / #382), and a dependency reached only transitively is one
   # an upstream extra can drop without warning.
   "cryptography>=42",
+  # The Postgres adapters (ADR 0030). The binary extra bundles libpq, so
+  # neither a laptop nor the Lambda image needs a system package for it.
+  "psycopg[binary]>=3.2",
 ]
 
 [build-system]
@@ -35,7 +38,14 @@ where = ["src"]
 # package's own tests and raises FileNotFoundError in every service. The
 # filing authorization's text (`filing_authorization.py`, ADR 0024 guardrail
 # 2) ships the same way, for the same reason.
-insolvia_core = ["py.typed", "regulatory/**/*.json", "agreements/**/*.txt"]
+# The migrations (ADR 0030) ship the same way: the runner reads them from
+# the installed package, in the compose migrator and the migrator Lambda.
+insolvia_core = [
+  "py.typed",
+  "regulatory/**/*.json",
+  "agreements/**/*.txt",
+  "adapters/postgres/migrations/*.sql",
+]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

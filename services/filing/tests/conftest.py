@@ -71,6 +71,10 @@ from insolvia_filing.core.worker import (  # noqa: E402
     run_filing,
 )
 
+# Store tests run against a real Postgres (ADR 0030): the `postgres` and
+# `postgres_url` fixtures. See insolvia_core/adapters/postgres/testing.py.
+pytest_plugins = ("insolvia_core.adapters.postgres.testing",)
+
 
 def _import_api_tests() -> types.ModuleType:
     """services/api's `tests.unit.test_filing_approval`, imported under its

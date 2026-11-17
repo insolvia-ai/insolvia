@@ -1,0 +1,70 @@
+"""The two query shapes every Postgres store repeats (ADR 0030).
+
+A conditional write: each DynamoDB `ConditionExpression` becomes
+`UPDATE … WHERE <condition>`, and zero rows affected must raise the same
+domain error the `ConditionalCheckFailed` branch raises today. That error
+differs per store (a 409 `ConflictError`, a 404 `None`, …), so the store
+passes it in.
+
+A keyset cursor: `WHERE (sort columns) > (last row's values)` instead of an
+OFFSET or a DynamoDB start key. The values travel inside the existing opaque
+cursor (`insolvia_core.cases.encode_cursor`/`decode_cursor`), so the wire
+shape clients already hold does not change.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Mapping, Sequence
+from typing import Any
+
+from psycopg import Cursor, sql
+
+from insolvia_core.errors import ValidationError
+
+
+def require_rows(cursor: Cursor[Any], error: Exception) -> None:
+    """Raise `error` when the statement just run touched no row."""
+    if cursor.rowcount == 0:
+        raise error
+
+
+def keyset_after(
+    columns: Sequence[str],
+    after: Mapping[str, str] | None,
+    *,
+    descending: bool = False,
+) -> tuple[sql.Composable, list[str]]:
+    """The WHERE fragment and parameters that resume a listing after `after`.
+
+    `columns` is the listing's ORDER BY, ending in a unique column so no two
+    rows tie. `after` is a decoded cursor (None on the first page), and it is
+    caller-controlled, so its keys must be exactly `columns`.
+
+    shortcut: one direction for every column (a row comparison); a listing
+    that sorts columns in mixed directions needs the expanded OR form.
+    """
+    if after is None:
+        return sql.SQL("TRUE"), []
+    if set(after) != set(columns):
+        raise ValidationError("cursor is not valid")
+    fragment = sql.SQL("({}) {} ({})").format(
+        sql.SQL(", ").join(sql.Identifier(column) for column in columns),
+        sql.SQL("<" if descending else ">"),
+        sql.SQL(", ").join(sql.Placeholder() for _ in columns),
+    )
+    return fragment, [after[column] for column in columns]
+
+
+def next_key(
+    rows: Sequence[Mapping[str, Any]], limit: int, columns: Sequence[str]
+) -> dict[str, str] | None:
+    """The key the next page resumes after, or None on the last page.
+
+    The query fetches `limit + 1` rows: the extra row only proves another
+    page exists, and is not returned. Values are strings (what the cursor
+    carries); Postgres reads them back as the column's own type.
+    """
+    if len(rows) <= limit:
+        return None
+    last = rows[limit - 1]
+    return {column: str(last[column]) for column in columns}
