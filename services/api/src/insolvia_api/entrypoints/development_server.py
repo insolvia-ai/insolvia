@@ -1,15 +1,7 @@
 from __future__ import annotations
 
 from insolvia_core.adapters.aws.access_log import DynamoDbAccessLog
-from insolvia_core.adapters.aws.candidate_store import DynamoDbCandidateStore
-from insolvia_core.adapters.aws.case_entity_store import DynamoDbCaseEntityStore
-from insolvia_core.adapters.aws.case_store import DynamoDbCaseStore
-from insolvia_core.adapters.aws.debtor_store import DynamoDbDebtorStore
 from insolvia_core.adapters.aws.document_blobs import S3DocumentBlobStore
-from insolvia_core.adapters.aws.document_request_store import (
-    DynamoDbDocumentRequestStore,
-)
-from insolvia_core.adapters.aws.document_store import DynamoDbDocumentStore
 from insolvia_core.adapters.aws.filing_credentials import (
     DynamoDbFilingAuthorizationStore,
     DynamoDbFilingCredentialStore,
@@ -19,7 +11,6 @@ from insolvia_core.adapters.aws.filing_credentials import (
 )
 from insolvia_core.adapters.aws.filing_store import DynamoDbFilingStore
 from insolvia_core.adapters.aws.jwks_provider import CognitoJwksProvider
-from insolvia_core.adapters.aws.task_store import DynamoDbTaskStore
 from insolvia_core.adapters.aws.tax_id_cipher import KmsTaxIdCipher, case_key_alias
 from insolvia_core.adapters.aws.tax_id_store import DynamoDbTaxIdStore
 from insolvia_core.adapters.aws.user_directory import CognitoUserDirectory
@@ -43,10 +34,19 @@ from insolvia_core.adapters.memory.task_store import MemoryTaskStore
 from insolvia_core.adapters.memory.tax_id_cipher import LocalTaxIdCipher
 from insolvia_core.adapters.memory.tax_id_store import MemoryTaxIdStore
 from insolvia_core.adapters.memory.user_directory import MemoryUserDirectory
+from insolvia_core.adapters.postgres.candidate_store import PostgresCandidateStore
+from insolvia_core.adapters.postgres.case_entity_store import PostgresCaseEntityStore
+from insolvia_core.adapters.postgres.case_store import PostgresCaseStore
 from insolvia_core.adapters.postgres.client_binding_store import (
     PostgresClientBindingStore,
 )
+from insolvia_core.adapters.postgres.debtor_store import PostgresDebtorStore
+from insolvia_core.adapters.postgres.document_request_store import (
+    PostgresDocumentRequestStore,
+)
+from insolvia_core.adapters.postgres.document_store import PostgresDocumentStore
 from insolvia_core.adapters.postgres.firm_store import PostgresFirmStore
+from insolvia_core.adapters.postgres.task_store import PostgresTaskStore
 from insolvia_core.ports import (
     AccessLog,
     CandidateStore,
@@ -67,18 +67,12 @@ from insolvia_core.ports import (
     UserDirectory,
 )
 
-from insolvia_api.adapters.aws.event_store import (
-    DynamoDbCalendarTokenStore,
-    DynamoDbEventStore,
-)
 from insolvia_api.adapters.aws.filing_approval_store import (
     DynamoDbFilingApprovalStore,
 )
 from insolvia_api.adapters.aws.filing_queue import SqsFilingQueue
 from insolvia_api.adapters.aws.job_queue import SqsJobQueue
-from insolvia_api.adapters.aws.job_store import DynamoDbJobStore
 from insolvia_api.adapters.aws.mailer_client import SigV4MailerClient
-from insolvia_api.adapters.aws.packet_store import DynamoDbPacketStore
 from insolvia_api.adapters.memory.event_store import (
     MemoryCalendarTokenStore,
     MemoryEventStore,
@@ -91,6 +85,12 @@ from insolvia_api.adapters.memory.job_queue import MemoryJobQueue
 from insolvia_api.adapters.memory.job_store import MemoryJobStore
 from insolvia_api.adapters.memory.mailer_client import InMemoryMailerClient
 from insolvia_api.adapters.memory.packet_store import MemoryPacketStore
+from insolvia_api.adapters.postgres.event_store import (
+    PostgresCalendarTokenStore,
+    PostgresEventStore,
+)
+from insolvia_api.adapters.postgres.job_store import PostgresJobStore
+from insolvia_api.adapters.postgres.packet_store import PostgresPacketStore
 from insolvia_api.adapters.postgres.waitlist_store import PostgresWaitlistStore
 from insolvia_api.api.app_factory import create_app
 from insolvia_api.api.dependencies import ApiDependencies
@@ -116,8 +116,7 @@ configure_logging()
 # The Postgres stores (ADR 0030): this machine's Docker Postgres, migrated by
 # dev-up.sh. load_config() refused to start without DATABASE_URL, so there is
 # no in-memory fallback to drift to. The firm group, the portal bindings and
-# the waitlist live there; the case group still follows CASE_TABLE_NAME below
-# until it moves too (#622).
+# the waitlist live there, and the case stores below (#622).
 assert config.database_url is not None
 waitlist_store = PostgresWaitlistStore(config.database_url)
 firm_store = PostgresFirmStore(config.database_url)
@@ -166,9 +165,9 @@ if (
     and config.case_access_log_table_name
     and config.case_document_bucket
 ):
-    case_store = DynamoDbCaseStore(config.case_table_name)
+    case_store = PostgresCaseStore(config.database_url)
     access_log = DynamoDbAccessLog(config.case_access_log_table_name)
-    document_store = DynamoDbDocumentStore(config.case_table_name)
+    document_store = PostgresDocumentStore(config.database_url)
     document_blobs = S3DocumentBlobStore(config.case_document_bucket)
 else:
     case_store = MemoryCaseStore()
@@ -187,24 +186,19 @@ filing_credential_store: FilingCredentialStore
 filing_credential_sealer: FilingCredentialSealer
 filing_authorization_store: FilingAuthorizationStore
 if config.case_table_name and config.case_access_log_table_name:
-    case_store = DynamoDbCaseStore(config.case_table_name)
+    case_store = PostgresCaseStore(config.database_url)
     access_log = DynamoDbAccessLog(config.case_access_log_table_name)
-    # No firm table: the client rows moved to Postgres (#621), so a
-    # DynamoDB link refuses to run until the case stores follow (#622).
-    debtor_store = DynamoDbDebtorStore(config.case_table_name)
-    # The same table again: the generic collections (issue #249) are child
-    # items of their case's partition, so the dev table already holds them.
-    case_entity_store = DynamoDbCaseEntityStore(config.case_table_name)
+    debtor_store = PostgresDebtorStore(config.database_url)
+    case_entity_store = PostgresCaseEntityStore(config.database_url)
     # And the sealed tax ids (issue 13.12 / #382), under THIS MACHINE's real
     # case key — the developer's own IAM user reaches it through the key
     # policy's root delegation (infra/envs/dev), so a laptop seals and opens
     # exactly as staging does. The alias is derived from the table name.
     tax_id_store = DynamoDbTaxIdStore(config.case_table_name)
     tax_id_cipher = KmsTaxIdCipher(case_key_alias(config.case_table_name))
-    # Likewise: case tasks (issue #356 / 14.4) are child items too.
-    task_store = DynamoDbTaskStore(config.case_table_name)
+    task_store = PostgresTaskStore(config.database_url)
     # And a case's document requests (ADR 0023 PR 5 / #364).
-    document_request_store = DynamoDbDocumentRequestStore(config.case_table_name)
+    document_request_store = PostgresDocumentRequestStore(config.database_url)
     # The filing-credential vault (ADR 0024), on THIS MACHINE's real
     # vault table and key (infra/envs/dev). The developer's principal
     # seals through the key's root delegation and is refused Decrypt by
@@ -248,7 +242,7 @@ else:
 # is no worker in this process.
 job_store: JobStore
 if config.case_table_name and config.case_access_log_table_name:
-    job_store = DynamoDbJobStore(config.case_table_name)
+    job_store = PostgresJobStore(config.database_url)
 else:
     job_store = MemoryJobStore()
 job_queue: JobQueue
@@ -280,7 +274,7 @@ else:
 # branch the case store above IS the memory one (the group moves together).
 packet_store: PacketStore
 if config.case_table_name and config.case_access_log_table_name:
-    packet_store = DynamoDbPacketStore(config.case_table_name)
+    packet_store = PostgresPacketStore(config.database_url)
 else:
     if not isinstance(case_store, MemoryCaseStore):  # pragma: no cover - guard
         raise RuntimeError("memory packet store needs the memory case store")
@@ -303,7 +297,7 @@ else:
 # rest of the memory stores.
 candidate_store: CandidateStore
 if config.case_table_name and config.case_access_log_table_name:
-    candidate_store = DynamoDbCandidateStore(config.case_table_name)
+    candidate_store = PostgresCandidateStore(config.database_url)
 else:
     candidate_store = MemoryCandidateStore()
 
@@ -313,8 +307,8 @@ else:
 event_store: EventStore
 calendar_token_store: CalendarTokenStore
 if config.case_table_name and config.case_access_log_table_name:
-    event_store = DynamoDbEventStore(config.case_table_name)
-    calendar_token_store = DynamoDbCalendarTokenStore(config.case_table_name)
+    event_store = PostgresEventStore(config.database_url)
+    calendar_token_store = PostgresCalendarTokenStore(config.database_url)
 else:
     event_store = MemoryEventStore()
     calendar_token_store = MemoryCalendarTokenStore()

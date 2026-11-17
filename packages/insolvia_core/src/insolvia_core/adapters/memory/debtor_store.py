@@ -41,7 +41,7 @@ class MemoryDebtorStore:
         self.firm_store = firm_store
 
     def client_linkable(self, firm_id: str, client_id: str) -> bool:
-        """`firm_store.client_linkable_check`'s condition, read from the
+        """`lock_linkable_client`'s condition, read from the
         composed firm store: the row exists and `refusal_for_new_case` has
         nothing to say. Evaluated in the same step as the write it guards —
         nothing runs between them here — which is what the transaction buys

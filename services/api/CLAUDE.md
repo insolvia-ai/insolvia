@@ -40,8 +40,10 @@ signed in — [ADR 0021](../../docs/adr/0021-test-tiers-and-seed-fixtures.md)).
   (GLBA). A failed auth logs a category (`AuthFailureReason`), never the token
   or a claim.
 - **CORS is an exact-origin allowlist** (`core/config.py`), no wildcard.
-- **Local dev runs against this machine's real AWS dev table** — there is no
-  local DynamoDB emulator; `infra/envs/dev` is the dev database.
+- **The firm and case stores are Postgres** (ADR 0030): locally the Docker Postgres in
+  `docker-compose.yml`, `DATABASE_URL` required. What has not moved yet
+  (filings, approvals, tax ids) still reads this machine's AWS dev table —
+  there is no local DynamoDB emulator.
 - **Minutes-long work is a pipeline job, never an endpoint**
   ([ADR 0018](../../docs/adr/0018-sqs-queue-and-worker-lambda-over-step-functions.md)):
   the API accepts a job (`api/routes/jobs.py`) and a separate worker Lambda

@@ -226,7 +226,7 @@ class FirmClient:
 
         A READ, for the message. The writes that link a client carry the
         same rule as a condition on this row
-        (`adapters.aws.firm_store.client_linkable_check`), which is what
+        (`adapters.postgres.firm_store.lock_linkable_client`), which is what
         actually decides when a merge races the link."""
         if self.merged_into is not None:
             return "That client was merged into another client — use that one."

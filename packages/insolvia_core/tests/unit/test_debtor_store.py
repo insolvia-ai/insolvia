@@ -1,18 +1,9 @@
 """The debtor stores, and the attribute converter both of them rest on.
 
-DynamoDbDebtorStore is deliberately NOT tested here. This suite has no boto3
-stub and no moto by decision (ADR 0008: monkeypatch a transport, fake at a
-port), and there is no transport to patch under a boto3 client — so a test of
-its query wiring would be a test of a mock's shape.
-
-What IS reachable is the part that would actually be wrong, and it is tested
-end to end: `debtor_item → to_attributes → from_attributes → debtor_from_item`
-is every line of conversion the AWS adapter performs, minus the network. A
-debtor that survives that is one the real store can round-trip.
-
-Two things the AWS adapter owns alone stay unverified, and they are named here
-so nobody assumes otherwise: that `begins_with(SK, "DEBTOR#")` keeps the case's
-own SK=META row out of a list, and that a query comes back in sort-key order.
+The DebtorStore contract runs against the memory twin and the Postgres
+adapter alike (ADR 0030); the converter tests below hold `debtor_item →
+to_attributes → from_attributes → debtor_from_item`, which the seed loader
+and the remaining DynamoDB rows still rest on.
 
 Every identifier below is obviously fake. This repo is public.
 """
@@ -22,6 +13,7 @@ from __future__ import annotations
 import pytest
 from insolvia_core.adapters.aws.dynamo import from_attributes, to_attributes
 from insolvia_core.adapters.memory.debtor_store import MemoryDebtorStore
+from insolvia_core.adapters.postgres.debtor_store import PostgresDebtorStore
 from insolvia_core.cases import Case, case_from_item, case_item
 from insolvia_core.debtors import (
     FILING_ROLES,
@@ -35,6 +27,8 @@ from insolvia_core.debtors import (
     debtor_item,
 )
 from insolvia_core.provenance import ProvenanceEntry
+
+from tests.unit.backends import BACKENDS, postgres_url_with_cases
 
 CASE = "case-0001"
 WHEN = "2026-01-01T00:00:00.000000Z"
@@ -247,8 +241,6 @@ def test_the_stored_item_keys_place_the_debtor_in_its_cases_partition():
     item = debtor_item(a_debtor())
     assert item["PK"] == f"CASE#{CASE}"
     assert item["SK"] == "DEBTOR#debtor_1"
-    # The prefix DynamoDbDebtorStore queries on, and the reason a list of
-    # debtors does not also return the case's own SK=META row.
     assert str(item["SK"]).startswith("DEBTOR#")
 
 
@@ -262,41 +254,45 @@ def test_a_float_in_provenance_is_not_rounded_to_an_int():
     assert entry.locator == {"page": 2, "bbox": [0.1, 0.25, 0.3, 0.4]}
 
 
-# ── MemoryDebtorStore ───────────────────────────────────────────
+# ── DebtorStore, memory and Postgres ────────────────────────────
 
 
-def test_put_then_get_returns_the_debtor():
-    store = MemoryDebtorStore()
+@pytest.fixture(params=BACKENDS)
+def store(request):
+    if request.param == "memory":
+        return MemoryDebtorStore()
+    return PostgresDebtorStore(
+        postgres_url_with_cases(request, "case-0001", "case-0002")
+    )
+
+
+def test_put_then_get_returns_the_debtor(store):
     debtor = a_debtor()
     store.put(debtor)
     assert store.get(CASE, filing_role="debtor_1") == debtor
 
 
-def test_get_of_a_role_that_was_never_written_is_none():
-    store = MemoryDebtorStore()
+def test_get_of_a_role_that_was_never_written_is_none(store):
     store.put(a_debtor())
     assert store.get(CASE, filing_role="debtor_2") is None
 
 
-def test_get_is_scoped_to_the_case():
+def test_get_is_scoped_to_the_case(store):
     """Same role, different case. The record is reached through its case or
     not at all — see the DebtorStore port on why ownership is not a parameter
     here, which makes this scoping the only thing separating two cases."""
-    store = MemoryDebtorStore()
     store.put(a_debtor(case_id="case-0001"))
     assert store.get("case-0002", filing_role="debtor_1") is None
 
 
-def test_put_replaces_the_whole_record():
-    store = MemoryDebtorStore()
+def test_put_replaces_the_whole_record(store):
     store.put(a_debtor(surname="Nakamura"))
     store.put(a_debtor(surname="Okafor"))
     assert store.get(CASE, filing_role="debtor_1").name.surname == "Okafor"
     assert len(store.list_for_case(CASE)) == 1
 
 
-def test_list_for_case_returns_only_that_cases_debtors():
-    store = MemoryDebtorStore()
+def test_list_for_case_returns_only_that_cases_debtors(store):
     store.put(a_debtor(case_id="case-0001", filing_role="debtor_1"))
     store.put(a_debtor(case_id="case-0001", filing_role="debtor_2"))
     store.put(a_debtor(case_id="case-0002", filing_role="debtor_1"))
@@ -306,24 +302,22 @@ def test_list_for_case_returns_only_that_cases_debtors():
     ]
 
 
-def test_list_for_case_of_a_case_with_no_debtors_is_empty():
-    assert MemoryDebtorStore().list_for_case(CASE) == ()
+def test_list_for_case_of_a_case_with_no_debtors_is_empty(store):
+    assert store.list_for_case(CASE) == ()
 
 
-def test_list_for_case_is_in_filing_role_order():
-    store = MemoryDebtorStore()
+def test_list_for_case_is_in_filing_role_order(store):
     for role in reversed(FILING_ROLES):
         store.put(a_debtor(filing_role=role))
     assert [d.filing_role for d in store.list_for_case(CASE)] == list(FILING_ROLES)
 
 
-def test_ordering_is_by_position_on_the_form_not_alphabetical():
+def test_ordering_is_by_position_on_the_form_not_alphabetical(store):
     """The test above cannot tell the two apart, because FILING_ROLES happens
     to be in alphabetical order today — a store that sorted by name would pass
     it. This one uses a role the list does not know: it sorts first
     alphabetically and last by position, and it must not raise on the way.
     """
-    store = MemoryDebtorStore()
     store.put(a_debtor(filing_role="aa_role_from_a_later_revision"))
     store.put(a_debtor(filing_role="non_filing_spouse"))
     assert [d.filing_role for d in store.list_for_case(CASE)] == [

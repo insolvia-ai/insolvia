@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import pytest
 from insolvia_core.adapters.memory.case_entity_store import MemoryCaseEntityStore
+from insolvia_core.adapters.postgres.case_entity_store import PostgresCaseEntityStore
 from insolvia_core.case_entities import (
     CaseEntity,
     create_entity,
@@ -15,6 +16,8 @@ from insolvia_core.case_entities import (
 )
 from insolvia_core.creditors import CREDITOR
 from insolvia_core.expenses import EXPENSE
+
+from tests.unit.backends import BACKENDS, postgres_url_with_cases
 
 CASE = "case-0001"
 OTHER_CASE = "case-0002"
@@ -26,9 +29,11 @@ def creditor(case_id: str = CASE, name: str = "Example Bank") -> CaseEntity:
     return create_entity(CREDITOR, draft, case_id=case_id)
 
 
-@pytest.fixture
-def store() -> MemoryCaseEntityStore:
-    return MemoryCaseEntityStore()
+@pytest.fixture(params=BACKENDS)
+def store(request):
+    if request.param == "memory":
+        return MemoryCaseEntityStore()
+    return PostgresCaseEntityStore(postgres_url_with_cases(request, CASE, OTHER_CASE))
 
 
 def test_created_entities_are_read_back(store) -> None:

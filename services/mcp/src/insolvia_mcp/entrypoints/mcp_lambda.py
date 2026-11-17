@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 from insolvia_core.adapters.aws.access_log import DynamoDbAccessLog
-from insolvia_core.adapters.aws.candidate_store import DynamoDbCandidateStore
-from insolvia_core.adapters.aws.case_entity_store import DynamoDbCaseEntityStore
-from insolvia_core.adapters.aws.case_store import DynamoDbCaseStore
-from insolvia_core.adapters.aws.debtor_store import DynamoDbDebtorStore
-from insolvia_core.adapters.aws.document_store import DynamoDbDocumentStore
 from insolvia_core.adapters.aws.jwks_provider import CognitoJwksProvider
+from insolvia_core.adapters.postgres.candidate_store import PostgresCandidateStore
+from insolvia_core.adapters.postgres.case_entity_store import PostgresCaseEntityStore
+from insolvia_core.adapters.postgres.case_store import PostgresCaseStore
+from insolvia_core.adapters.postgres.debtor_store import PostgresDebtorStore
+from insolvia_core.adapters.postgres.document_store import PostgresDocumentStore
 from insolvia_core.adapters.postgres.firm_store import PostgresFirmStore
 from mangum import Mangum
 
@@ -50,11 +50,11 @@ app = create_asgi_app(
         # The SAME tables the API composes — this is a second surface over
         # the same stores (ADR 0016), with its own execution role scoped to
         # what this service exports.
-        case_store=DynamoDbCaseStore(config.case_table_name),
-        case_entity_store=DynamoDbCaseEntityStore(config.case_table_name),
-        debtor_store=DynamoDbDebtorStore(config.case_table_name),
-        document_store=DynamoDbDocumentStore(config.case_table_name),
-        candidate_store=DynamoDbCandidateStore(config.case_table_name),
+        case_store=PostgresCaseStore(config.database_url),
+        case_entity_store=PostgresCaseEntityStore(config.database_url),
+        debtor_store=PostgresDebtorStore(config.database_url),
+        document_store=PostgresDocumentStore(config.database_url),
+        candidate_store=PostgresCandidateStore(config.database_url),
         access_log=DynamoDbAccessLog(config.case_access_log_table_name),
         firm_store=PostgresFirmStore(config.database_url),
         # Constructed at cold start so its key cache lives for the

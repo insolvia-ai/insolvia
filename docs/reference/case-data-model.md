@@ -202,8 +202,8 @@ intake ◄──► ready_to_file ──► filed ──► discharged ──►
   put back. A filing resolved as *not filed* frees the case for a new
   approval; nothing else does (`insolvia_core.filings`, services/api
   `core/filing_outcome.py`).
-- **Every move is recorded**: a `STATUS#<changedAt>` row in the case's
-  partition (who, when, from and to status and stage), written in the same
+- **Every move is recorded**: a `case_status_changes` row (who, when, from
+  and to status and stage), written in the same
   transaction as the case — and the case write is conditioned on the status
   it was read at, so a stale whole-record save cannot put an old status back
   (`GET /v1/cases/<id>/status-history`).
@@ -280,11 +280,11 @@ from nothing; a non-filing spouse, who need not be the firm's client, still
 can. One client holds at most one role per case. The copy is never synced:
 `differs_from_client` (the field paths where the case and the client now
 disagree) is computed on every read for a caller who may see the client
-directory, and nothing resolves it silently. The debtor item carries
-`GSI3PK CLIENT#<client_id>` / `GSI3SK <case createdAt>#<case id>`, which is
-the `by-client` index a client's case list reads. "One client, one role" is
-the link write's own condition (a transaction that checks the case's other
-roles), not a read before it.
+directory, and nothing resolves it silently. The debtor row's `client_id`
+column, indexed, is what a client's case list reads, newest case first. "One
+client, one role" is the link write's own condition (a transaction that
+checks the case's other roles under a lock on the case row) and a partial
+unique index on `(case_id, client_id)`, not a read before it.
 
 Divergence is resolved only by one of two explicit acts, each a whole-record
 write: `POST …/debtors/<role>/copy-from-client` re-copies the client's
@@ -966,12 +966,13 @@ Handing these constraints, not a decision, to the encrypted-case-store work:
 - `extraction_candidate` is high-churn and short-lived relative to case data,
   and is never read by the forms engine.
 
-The last point is the one worth weighing hardest: the model is relational in
-shape, while the only precedent in this codebase is a single-partition
-DynamoDB table. The access patterns above are compatible with a single-table
-design keyed on the case — but that compatibility depends on there being no
-ad-hoc cross-case reporting, and that assumption should be made explicitly
-rather than inherited.
+The model is relational in shape, and since ADR 0030 it is stored that way:
+Postgres, one table per entity keyed `(case_id, id)`, every row carrying its
+`firm_id` with a composite foreign key back to its case
+(`insolvia_core/adapters/postgres/migrations/0002_case_stores.sql`). The case
+root and its status history are columns; every other record keeps this
+document's item shape as `jsonb`, validated in code — provenance and
+confirm-before-entry stay domain invariants, not SQL ones.
 
 ## Tenancy
 

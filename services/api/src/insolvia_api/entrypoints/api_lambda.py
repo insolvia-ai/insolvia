@@ -2,15 +2,7 @@ from __future__ import annotations
 
 from asgiref.wsgi import WsgiToAsgi
 from insolvia_core.adapters.aws.access_log import DynamoDbAccessLog
-from insolvia_core.adapters.aws.candidate_store import DynamoDbCandidateStore
-from insolvia_core.adapters.aws.case_entity_store import DynamoDbCaseEntityStore
-from insolvia_core.adapters.aws.case_store import DynamoDbCaseStore
-from insolvia_core.adapters.aws.debtor_store import DynamoDbDebtorStore
 from insolvia_core.adapters.aws.document_blobs import S3DocumentBlobStore
-from insolvia_core.adapters.aws.document_request_store import (
-    DynamoDbDocumentRequestStore,
-)
-from insolvia_core.adapters.aws.document_store import DynamoDbDocumentStore
 from insolvia_core.adapters.aws.filing_credentials import (
     DynamoDbFilingAuthorizationStore,
     DynamoDbFilingCredentialStore,
@@ -20,29 +12,37 @@ from insolvia_core.adapters.aws.filing_credentials import (
 )
 from insolvia_core.adapters.aws.filing_store import DynamoDbFilingStore
 from insolvia_core.adapters.aws.jwks_provider import CognitoJwksProvider
-from insolvia_core.adapters.aws.task_store import DynamoDbTaskStore
 from insolvia_core.adapters.aws.tax_id_cipher import KmsTaxIdCipher, case_key_alias
 from insolvia_core.adapters.aws.tax_id_store import DynamoDbTaxIdStore
 from insolvia_core.adapters.aws.user_directory import CognitoUserDirectory
+from insolvia_core.adapters.postgres.candidate_store import PostgresCandidateStore
+from insolvia_core.adapters.postgres.case_entity_store import PostgresCaseEntityStore
+from insolvia_core.adapters.postgres.case_store import PostgresCaseStore
 from insolvia_core.adapters.postgres.client_binding_store import (
     PostgresClientBindingStore,
 )
+from insolvia_core.adapters.postgres.debtor_store import PostgresDebtorStore
+from insolvia_core.adapters.postgres.document_request_store import (
+    PostgresDocumentRequestStore,
+)
+from insolvia_core.adapters.postgres.document_store import PostgresDocumentStore
 from insolvia_core.adapters.postgres.firm_store import PostgresFirmStore
+from insolvia_core.adapters.postgres.task_store import PostgresTaskStore
 from mangum import Mangum
 
-from insolvia_api.adapters.aws.event_store import (
-    DynamoDbCalendarTokenStore,
-    DynamoDbEventStore,
-)
 from insolvia_api.adapters.aws.filing_approval_store import (
     DynamoDbFilingApprovalStore,
 )
 from insolvia_api.adapters.aws.filing_queue import SqsFilingQueue
 from insolvia_api.adapters.aws.job_queue import SqsJobQueue
-from insolvia_api.adapters.aws.job_store import DynamoDbJobStore
 from insolvia_api.adapters.aws.mailer_client import SigV4MailerClient
-from insolvia_api.adapters.aws.packet_store import DynamoDbPacketStore
 from insolvia_api.adapters.memory.mailer_client import InMemoryMailerClient
+from insolvia_api.adapters.postgres.event_store import (
+    PostgresCalendarTokenStore,
+    PostgresEventStore,
+)
+from insolvia_api.adapters.postgres.job_store import PostgresJobStore
+from insolvia_api.adapters.postgres.packet_store import PostgresPacketStore
 from insolvia_api.adapters.postgres.waitlist_store import PostgresWaitlistStore
 from insolvia_api.api.app_factory import create_app
 from insolvia_api.api.dependencies import ApiDependencies
@@ -147,49 +147,38 @@ app = create_app(
         # until the first token arrives — an unauthenticated request path
         # never touches the network.
         jwks_provider=CognitoJwksProvider(config.auth_issuer_url),
-        # No firm table any more: the client rows a case open and a debtor
-        # link condition on moved to Postgres (#621). Until the case stores
-        # follow (#622) a DynamoDB case open states no client condition and
-        # a DynamoDB link refuses to run. Not deployed while AWS is paused.
-        case_store=DynamoDbCaseStore(config.case_table_name),
+        # A case open and a debtor link hold the client's row in their own
+        # transaction (`lock_linkable_client`): the merge race.
+        case_store=PostgresCaseStore(config.database_url),
         access_log=DynamoDbAccessLog(config.case_access_log_table_name),
         # Read on every authenticated request (ADR 0030: Postgres).
         firm_store=PostgresFirmStore(config.database_url),
         user_directory=CognitoUserDirectory(config.auth_user_pool_id),
-        # The document ROW lives in the case table — same table, same
-        # partition, no second table — while the bytes live in the bucket.
-        document_store=DynamoDbDocumentStore(config.case_table_name),
+        # The document ROW is Postgres; the bytes live in the bucket.
+        document_store=PostgresDocumentStore(config.database_url),
         document_blobs=S3DocumentBlobStore(config.case_document_bucket),
-        # Same table as the case store, deliberately: a debtor is stored in
-        # its case's partition.
-        debtor_store=DynamoDbDebtorStore(config.case_table_name),
+        debtor_store=PostgresDebtorStore(config.database_url),
         # The sealed tax ids (issue 13.12 / #382): items in the case table,
         # data keys under the case KEY — whose alias is derived from the
         # table's name (case_key_alias says why that is a derivation and not
         # a coincidence), so this needs no environment variable either.
         tax_id_store=DynamoDbTaxIdStore(config.case_table_name),
         tax_id_cipher=KmsTaxIdCipher(case_key_alias(config.case_table_name)),
-        # Likewise: the generic collections (issue #249) are child items of
-        # their case's partition — no new table, no new environment variable.
-        case_entity_store=DynamoDbCaseEntityStore(config.case_table_name),
-        # The pipeline pair (ADR 0018): jobs are child items of the case
-        # partition too, and the queue is Optional — see its note above.
-        job_store=DynamoDbJobStore(config.case_table_name),
+        case_entity_store=PostgresCaseEntityStore(config.database_url),
+        # The pipeline pair (ADR 0018): the queue is Optional — see above.
+        job_store=PostgresJobStore(config.database_url),
         job_queue=job_queue,
-        # Assembled packets (issue #96): records in the case table, written
-        # by the worker Lambda — the API composes this store to read them.
-        packet_store=DynamoDbPacketStore(config.case_table_name),
-        # The review queue (8.9): candidate rows in the case table, written
+        # Assembled packets (issue #96): written by the worker Lambda — the
+        # API composes this store to read them.
+        packet_store=PostgresPacketStore(config.database_url),
+        # The review queue (8.9): candidate rows, written
         # by the extraction worker and the MCP service — the API composes
         # this store to list and resolve them.
-        candidate_store=DynamoDbCandidateStore(config.case_table_name),
-        # Events and the feed token (issue 14.6 / #358): the case table once
-        # more — the calendar query rides its existing by-firm index.
-        event_store=DynamoDbEventStore(config.case_table_name),
-        calendar_token_store=DynamoDbCalendarTokenStore(config.case_table_name),
-        # Case tasks (issue #356 / 14.4): rows in the case table, no second
-        # table to provision.
-        task_store=DynamoDbTaskStore(config.case_table_name),
+        candidate_store=PostgresCandidateStore(config.database_url),
+        # Events and the feed token (issue 14.6 / #358).
+        event_store=PostgresEventStore(config.database_url),
+        calendar_token_store=PostgresCalendarTokenStore(config.database_url),
+        task_store=PostgresTaskStore(config.database_url),
         # The filing-credential vault (ADR 0024, guardrail 3): its OWN
         # table and key, both named from the case table's name
         # (infra/modules/filing_credentials keeps them one local), so no
@@ -213,7 +202,7 @@ app = create_app(
         filing_store=DynamoDbFilingStore(config.case_table_name),
         # A case's document requests (ADR 0023 PR 5 / #364): the case table
         # again.
-        document_request_store=DynamoDbDocumentRequestStore(config.case_table_name),
+        document_request_store=PostgresDocumentRequestStore(config.database_url),
         # The client portal's bindings (ADR 0023), in Postgres beside the
         # firm they belong to.
         client_binding_store=PostgresClientBindingStore(config.database_url),

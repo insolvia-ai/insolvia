@@ -1,11 +1,6 @@
 from __future__ import annotations
 
 from insolvia_core.adapters.aws.access_log import DynamoDbAccessLog
-from insolvia_core.adapters.aws.candidate_store import DynamoDbCandidateStore
-from insolvia_core.adapters.aws.case_entity_store import DynamoDbCaseEntityStore
-from insolvia_core.adapters.aws.case_store import DynamoDbCaseStore
-from insolvia_core.adapters.aws.debtor_store import DynamoDbDebtorStore
-from insolvia_core.adapters.aws.document_store import DynamoDbDocumentStore
 from insolvia_core.adapters.aws.jwks_provider import CognitoJwksProvider
 from insolvia_core.adapters.memory.access_log import MemoryAccessLog
 from insolvia_core.adapters.memory.candidate_store import MemoryCandidateStore
@@ -13,6 +8,11 @@ from insolvia_core.adapters.memory.case_entity_store import MemoryCaseEntityStor
 from insolvia_core.adapters.memory.case_store import MemoryCaseStore
 from insolvia_core.adapters.memory.debtor_store import MemoryDebtorStore
 from insolvia_core.adapters.memory.document_store import MemoryDocumentStore
+from insolvia_core.adapters.postgres.candidate_store import PostgresCandidateStore
+from insolvia_core.adapters.postgres.case_entity_store import PostgresCaseEntityStore
+from insolvia_core.adapters.postgres.case_store import PostgresCaseStore
+from insolvia_core.adapters.postgres.debtor_store import PostgresDebtorStore
+from insolvia_core.adapters.postgres.document_store import PostgresDocumentStore
 from insolvia_core.adapters.postgres.firm_store import PostgresFirmStore
 from insolvia_core.ports import (
     AccessLog,
@@ -53,11 +53,11 @@ access_log: AccessLog
 assert config.database_url is not None
 firm_store = PostgresFirmStore(config.database_url)
 if config.case_table_name and config.case_access_log_table_name:
-    case_store = DynamoDbCaseStore(config.case_table_name)
-    case_entity_store = DynamoDbCaseEntityStore(config.case_table_name)
-    debtor_store = DynamoDbDebtorStore(config.case_table_name)
-    document_store = DynamoDbDocumentStore(config.case_table_name)
-    candidate_store = DynamoDbCandidateStore(config.case_table_name)
+    case_store = PostgresCaseStore(config.database_url)
+    case_entity_store = PostgresCaseEntityStore(config.database_url)
+    debtor_store = PostgresDebtorStore(config.database_url)
+    document_store = PostgresDocumentStore(config.database_url)
+    candidate_store = PostgresCandidateStore(config.database_url)
     access_log = DynamoDbAccessLog(config.case_access_log_table_name)
 else:
     debtor_store = MemoryDebtorStore()

@@ -4,11 +4,14 @@ from dataclasses import replace
 
 import pytest
 from insolvia_core.adapters.memory.candidate_store import MemoryCandidateStore
+from insolvia_core.adapters.postgres.candidate_store import PostgresCandidateStore
 from insolvia_core.candidates import (
     CandidateOrigin,
     create_candidate,
     parse_proposals,
 )
+
+from tests.unit.backends import BACKENDS, postgres_url_with_cases
 
 ORIGIN = CandidateOrigin(channel="mcp", client_id="client-1", subject="subject-1")
 
@@ -20,9 +23,11 @@ def _candidate(case_id: str = "case-1"):
     return create_candidate(draft, case_id=case_id, origin=ORIGIN)
 
 
-@pytest.fixture
-def store() -> MemoryCandidateStore:
-    return MemoryCandidateStore()
+@pytest.fixture(params=BACKENDS)
+def store(request):
+    if request.param == "memory":
+        return MemoryCandidateStore()
+    return PostgresCandidateStore(postgres_url_with_cases(request, "case-1", "case-2"))
 
 
 def test_created_candidates_are_read_back(store) -> None:

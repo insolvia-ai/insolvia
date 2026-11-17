@@ -9,15 +9,9 @@ services/api's test_case_lifecycle_routes.py; this file pins the domain rule.
 from __future__ import annotations
 
 from dataclasses import replace
-from typing import Any
 
 import pytest
-from botocore.exceptions import ClientError
 from insolvia_core.access import Accessor, may_see_case
-from insolvia_core.adapters.aws import case_store as aws_case_store
-from insolvia_core.adapters.aws.case_store import DynamoDbCaseStore
-from insolvia_core.adapters.aws.dynamo import to_attributes
-from insolvia_core.adapters.memory.case_store import MemoryCaseStore
 from insolvia_core.case_copy import copy_case
 from insolvia_core.case_entities import CaseEntity
 from insolvia_core.cases import (
@@ -45,6 +39,8 @@ from insolvia_core.debtors import Debtor
 from insolvia_core.errors import ConflictError, FieldValidationError, ValidationError
 from insolvia_core.firms import Firm, FirmUser
 from insolvia_core.provenance import ProvenanceEntry, parse_provenance, provenance_json
+
+from tests.unit.backends import BACKENDS, case_stores
 
 FIRM = "00000000-0000-4000-8000-00000000f18a"
 ALICE = "00000000-0000-4000-8000-00000000a11c"
@@ -265,6 +261,11 @@ def test_the_deletion_stamp_never_reaches_the_wire():
 # ── Archive and delete ─────────────────────────────────────────────
 
 
+@pytest.fixture(params=BACKENDS)
+def store(request):
+    return case_stores(request)[0]
+
+
 def test_archiving_twice_keeps_the_first_stamp_and_restoring_clears_it():
     first = set_archived(a_case(), archived=True, by=ALICE)
     assert set_archived(first, archived=True, by="someone-else") == first
@@ -284,8 +285,7 @@ def test_a_deleted_case_is_invisible_to_everyone():
     assert public_status_from_case_item(case_item(case), firm_id=FIRM) is None
 
 
-def test_the_working_list_and_the_archive_are_two_views_a_deleted_case_neither():
-    store = MemoryCaseStore()
+def test_the_working_list_and_the_archive_are_two_views_a_deleted_case_neither(store):
     cases = []
     for _ in range(5):
         case, assignment = create_case(
@@ -304,8 +304,7 @@ def test_the_working_list_and_the_archive_are_two_views_a_deleted_case_neither()
     assert store.get(cases[2].id, accessor=admin()) is None
 
 
-def test_a_cursor_from_the_archive_is_refused_by_the_working_list():
-    store = MemoryCaseStore()
+def test_a_cursor_from_the_archive_is_refused_by_the_working_list(store):
     for _ in range(3):
         case, assignment = create_case(
             parse_case_creation(OPENING), firm_id=FIRM, created_by=ALICE
@@ -318,8 +317,7 @@ def test_a_cursor_from_the_archive_is_refused_by_the_working_list():
         store.list_for_accessor(admin(), limit=1, cursor=page.next_cursor)
 
 
-def test_a_write_read_before_a_status_move_is_refused():
-    store = MemoryCaseStore()
+def test_a_write_read_before_a_status_move_is_refused(store):
     case, assignment = create_case(
         parse_case_creation(OPENING), firm_id=FIRM, created_by=ALICE
     )
@@ -329,8 +327,7 @@ def test_a_write_read_before_a_status_move_is_refused():
         store.update(moved(case, {"judge": "J"}), expected_status="intake")
 
 
-def test_the_memory_store_keeps_the_history_with_the_write():
-    store = MemoryCaseStore()
+def test_the_store_keeps_the_history_with_the_write(store):
     case, assignment = create_case(
         parse_case_creation(OPENING), firm_id=FIRM, created_by=ALICE
     )
@@ -413,97 +410,19 @@ def test_the_copy_marker_round_trips_the_provenance_wire():
         parse_provenance({"name": {"source": "staff_typed", "copied_from_case_id": 7}})
 
 
-# ── DynamoDbCaseStore, over a recording transport ───────────────────
-
-
-class FakeDynamoDb:
-    """Records calls and replays canned responses in order; conditions are
-    not simulated — the integration tier runs the real table."""
-
-    def __init__(self) -> None:
-        self.calls: list[tuple[str, dict[str, Any]]] = []
-        self.responses: dict[str, list[Any]] = {}
-
-    def _record(self, name: str, kwargs: dict[str, Any]) -> Any:
-        self.calls.append((name, kwargs))
-        queue = self.responses.get(name) or [{}]
-        response = queue.pop(0) if len(queue) > 1 else queue[0]
-        if isinstance(response, Exception):
-            raise response
-        return response
-
-    def __getattr__(self, name: str) -> Any:
-        return lambda **kwargs: self._record(name, kwargs)
-
-
-def dynamo_store(monkeypatch, fake: FakeDynamoDb) -> DynamoDbCaseStore:
-    monkeypatch.setattr(aws_case_store.boto3, "client", lambda _service: fake)
-    return DynamoDbCaseStore("insolvia-test-cases")
-
-
-def test_the_dynamo_listing_reads_on_until_the_page_is_full(monkeypatch):
-    fake = FakeDynamoDb()
-    store = dynamo_store(monkeypatch, fake)
-    archived = set_archived(a_case(), archived=True, by=ALICE)
-    live_1, live_2 = a_case(), a_case()
-    fake.responses["query"] = [
-        {
-            "Items": [
-                to_attributes(case_item(archived)),
-                to_attributes(case_item(live_1)),
-            ],
-            "LastEvaluatedKey": {"PK": {"S": "k1"}},
-        },
-        {
-            "Items": [to_attributes(case_item(live_2))],
-            "LastEvaluatedKey": {"PK": {"S": "k2"}},
-        },
-    ]
+def test_a_page_is_full_however_many_archived_cases_sit_between(store):
+    cases = []
+    for _ in range(4):
+        case, assignment = create_case(
+            parse_case_creation(OPENING), firm_id=FIRM, created_by=ALICE
+        )
+        store.create(case, assignment)
+        cases.append(case)
+    # The two newest are archived: the first page still holds two live cases.
+    for case in cases[2:]:
+        store.update(set_archived(case, archived=True, by=ALICE))
 
     page = store.list_for_accessor(admin(), limit=2, cursor=None)
 
-    assert [case.id for case in page.cases] == [live_1.id, live_2.id]
-    limits = [kwargs["Limit"] for name, kwargs in fake.calls if name == "query"]
-    assert limits == [2, 1]
-    # The next page starts where the last read stopped, tagged with its view.
-    with pytest.raises(ValidationError):
-        store.list_for_accessor(
-            admin(), limit=2, cursor=page.next_cursor, archived=True
-        )
-
-
-def test_a_dynamo_status_move_writes_the_record_and_its_history_together(
-    monkeypatch,
-):
-    fake = FakeDynamoDb()
-    store = dynamo_store(monkeypatch, fake)
-    before = a_case()
-    after = moved(before, {"status": "ready_to_file"})
-
-    store.update(
-        after,
-        expected_status="intake",
-        status_change=status_change(before, after, changed_by=ALICE),
-    )
-
-    [(name, kwargs)] = fake.calls
-    assert name == "transact_write_items"
-    case_put, history_put = (item["Put"] for item in kwargs["TransactItems"])
-    assert "#status = :expected" in case_put["ConditionExpression"]
-    assert case_put["ExpressionAttributeValues"][":expected"] == {"S": "intake"}
-    assert history_put["Item"]["SK"] == {"S": f"STATUS#{after.updated_at}"}
-
-
-def test_a_dynamo_write_that_lost_to_a_status_move_is_a_conflict(monkeypatch):
-    fake = FakeDynamoDb()
-    store = dynamo_store(monkeypatch, fake)
-    case = a_case()
-    fake.responses["put_item"] = [
-        ClientError({"Error": {"Code": "ConditionalCheckFailedException"}}, "PutItem")
-    ]
-    fake.responses["get_item"] = [
-        {"Item": to_attributes(case_item(replace(case, status="ready_to_file")))}
-    ]
-
-    with pytest.raises(ConflictError):
-        store.update(moved(case, {"judge": "J"}), expected_status="intake")
+    assert [c.id for c in page.cases] == [cases[1].id, cases[0].id]
+    assert page.next_cursor is None
