@@ -39,8 +39,11 @@ installing).
 
 `dev-up.sh` delegates to the per-area `dev-up.sh`/`dev-down.sh` pairs below
 rather than duplicating them — which is also why it has no `--only`: to run one
-part, run that part's own script. It refuses to start until `dev-aws-setup.sh`
-has run, because there is no DynamoDB emulator and no fake Cognito.
+part, run that part's own script. **It needs no AWS session** (#624, ADR 0030
+row 5): the API's compose stack is Postgres, a local S3 server and the API,
+which runs jobs in process and seals under a development-only key. The one AWS
+service is the shared dev Cognito pool; `dev-aws-seed.sh` writes its ids and
+your account once, with an AWS login, and every later run is AWS-free.
 
 ## Run a package locally
 
@@ -50,7 +53,7 @@ Each package has a thin `scripts/dev-setup.sh` (bootstrap) + `dev-up.sh` (run):
 |---|---|
 | App (Expo/RN web SPA) | `apps/insolvia_app/scripts/dev-setup.sh` → `dev-up.sh` (`expo start --web`, pinned to **:3000** — Cognito registers that exact origin) |
 | Marketing site | `apps/insolvia_marketing/scripts/dev-setup.sh` → `dev-up.sh` (RR7 SSR dev server) |
-| API | `services/api/scripts/dev-setup.sh` → `dev-up.sh` (compose) → `dev-test.sh` (ruff+mypy+pytest, the UNIT tier, matches CI) → `dev-test-integration.sh` (the INTEGRATION tier: the running API over HTTP, signed in as `seeds/dev.json`'s person — needs `dev-up.sh` and `dev-aws-seed.sh`) |
+| API | `services/api/scripts/dev-setup.sh` → `dev-up.sh` (compose: Postgres + local S3 + API, no AWS) → `dev-test.sh` (ruff+mypy+pytest, the UNIT tier, matches CI) → `dev-test-integration.sh` (the INTEGRATION tier: the running API over HTTP, signed in as `seeds/dev.json`'s person — needs `dev-up.sh` and `dev-aws-seed.sh`) |
 | Mailer | **In insolvia-services now** — `../insolvia-services/services/mailer/scripts/dev-setup.sh` → `dev-up.sh` (compose + Mailpit) → `dev-test.sh`, run in that checkout |
 
 `packages/insolvia_api_client` deliberately has no scripts — the root workspace
@@ -74,15 +77,21 @@ live in `insolvia-ai/design-system` and install from GitHub Packages. If an
 install here 401s on `@insolvia-ai/*`, that is registry auth, not a missing
 setup script: run `./scripts/github-packages-auth.sh`.
 
-## Per-machine dev AWS resources (the API's real dev DB — there is no emulator)
+## Sign-in and seed data (local stack)
 
-These touch real AWS, so read **insolvia-aws-auth** first if credentials aren't
-already working.
+| Want to… | Run |
+|---|---|
+| Get a usable signed-in local environment. **Cognito half — needs an AWS login, once per user** (read **insolvia-aws-auth**): writes the shared pool's ids from SSM into `services/api/.env` and `apps/insolvia_app/.env`, creates the dev account if missing (there is **no sign-up screen** — `allow_admin_create_user_only`) and caches its `sub` in `~/.config/insolvia/dev-subjects.json`. **Data half — no AWS**: seeds the firm and fixture cases `seeds/dev.json` names into the local Postgres and the sample documents into the local S3 server (needs `dev-up.sh` running). Also the fix for **"signed in, but every route 403s"** (`no_active_firm_user`): the account belongs to no firm. Password from `~/.config/insolvia/dev.env`, `DEV_USER_PASSWORD`, or a no-echo prompt | `scripts/dev-aws-seed.sh` (`--check`, `--refresh`) |
+| Wipe the local stack's data (Postgres + documents) | `docker compose -f services/api/docker-compose.yml down -v`, then re-run the row above |
+
+## Per-machine dev AWS resources (optional, paused with AWS)
+
+Not needed for local work any more (#624). These touch real AWS, so read
+**insolvia-aws-auth** first if credentials aren't already working.
 
 | Want to… | Run |
 |---|---|
 | Provision this machine's isolated dev resources (`infra/envs/dev`: tables, queues, buckets) and wire `services/api/.env`. Sign-in is the ONE shared dev pool (`insolvia-dev-users`, insolvia-services', ADR 0026, read through SSM): setup stops naming the missing parameter if that pool was never applied (`scripts/apply-dev-auth.sh` in insolvia-services, once). On a machine set up before the move, the plan destroys the old per-machine pool — expected; run `dev-aws-seed.sh` after | `scripts/dev-aws-setup.sh` (`--check` verifies) |
-| Get a usable signed-in dev environment: creates the dev sign-in account if missing — there is **no sign-up screen** on any pool (`allow_admin_create_user_only`) — and seeds its firm **and the fixture case** `seeds/dev.json` names (sample documents copied server-side from the shared fixture bucket). Also the fix for **"signed in, but every route 403s"** (`accessor unresolved / no_active_firm_user` in the API log): the account exists in Cognito but belongs to no firm, and the first firm cannot come from the API because `POST /v1/firm/users` is itself behind `FIRM_ADMINISTRATION`. Password from `~/.config/insolvia/dev.env`, `DEV_USER_PASSWORD`, or a no-echo prompt that offers to write that file | `scripts/dev-aws-seed.sh` (`--check`) |
 | Wipe this machine's dev **data** (table delete+recreate incl. firms); resources survive, and so do Cognito accounts — the pool is shared by every machine. Leaves your account **without a firm** — re-run the row above | `scripts/dev-aws-reset.sh` (`--dry-run`) |
 | Publish a committed seed-fixture version (`seeds/fixtures/<v>/`) into the account's shared fixture bucket, idempotently — once, after its PR merges; or **capture** a new version out of this machine's dev stack (refuses any other source) | `scripts/dev-fixture.sh publish v1 [--check]` · `scripts/dev-fixture.sh capture v2 <case-id> <handle>` |
 | `terraform destroy` this machine's dev resources + unwind `.env` | `scripts/dev-aws-destroy.sh` |

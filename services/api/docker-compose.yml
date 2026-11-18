@@ -1,25 +1,18 @@
 # Local dev for services/api — `./services/api/scripts/dev-up.sh`, then
 # `curl http://127.0.0.1:8080/health`.
 #
-# There is no local DynamoDB emulator: the container talks to this machine's
-# REAL per-developer AWS case store (infra/envs/dev), provisioned by
-# ./scripts/dev-aws-setup.sh. That script writes services/api/.env
-# (gitignored), which compose auto-reads for the ${VAR:-default}
-# substitutions below — CASE_TABLE_NAME names the per-machine table. The
-# firm stores, portal bindings and waitlist are in the Postgres below.
+# No AWS but Cognito (#624, ADR 0030 row 5). Everything the API stores is in
+# this stack: Postgres for every table, and an S3-compatible server for the
+# case documents. Jobs (packets, extraction) run on the API's own in-process
+# queue, and tax ids and filing credentials seal under the development-only
+# key, which the API refuses to compose outside INSOLVIA_ENV=local. The one
+# AWS service left is the shared dev Cognito pool: services/api/.env's
+# AUTH_* values (scripts/dev-aws-seed.sh writes them, once, from SSM) point
+# token verification at it, and verifying a token needs no AWS credentials.
 #
-# AWS credentials are not environment values: scripts/dev-up.sh keeps a
-# refreshed process-format credentials file, and a config whose
-# credential_process reads it, in ~/.cache/insolvia/aws-container/api — the
-# directory mounted read-only below. botocore re-runs the process before each
-# set expires, so the container outlives any one set. Without dev-up.sh the
-# directory is empty and the container simply has no AWS credentials.
-#
-# Postgres 17 (ADR 0030) runs here, in Docker, for every service on this
-# machine: `migrate` applies insolvia_core's numbered migrations to it before
-# the API starts, so `up` always means a migrated database. Its data lives in
-# the `postgres-data` volume and survives `down`; `down -v` empties it. The
-# credentials are local-only throwaways, published on 127.0.0.1 alone.
+# Every credential here is a local-only throwaway, published on 127.0.0.1
+# alone. Postgres keeps its data in the `postgres-data` volume and the
+# documents in `s3-data`; both survive `down`, and `down -v` empties them.
 services:
   postgres:
     image: postgres:17
@@ -49,9 +42,61 @@ services:
       postgres:
         condition: service_healthy
 
+  # The case-documents bucket's stand-in. RustFS, not MinIO: MinIO no longer
+  # publishes community images. Presigned URLs are signed for the browser's
+  # address (localhost:9000), and the server checks them, so the signed size
+  # and content type are enforced here as S3 enforces them.
+  s3:
+    image: rustfs/rustfs:1.0.6
+    environment:
+      RUSTFS_ACCESS_KEY: insolvia
+      RUSTFS_SECRET_KEY: insolvia-local
+    ports:
+      - "127.0.0.1:9000:9000"
+    volumes:
+      - s3-data:/data
+
+  # Creates the bucket and the CORS rule the browser's direct upload needs
+  # (a deployed bucket's CORS is infra/modules/case_documents'). Idempotent.
+  s3-bucket:
+    build:
+      context: ../..
+      dockerfile: services/api/Dockerfile
+      target: development
+    command:
+      - python
+      - -c
+      - |
+        import time, boto3
+        s3 = boto3.client("s3", endpoint_url="http://s3:9000")
+        bucket = "insolvia-local-case-documents"
+        for attempt in range(30):
+            try:
+                if bucket not in [b["Name"] for b in s3.list_buckets()["Buckets"]]:
+                    s3.create_bucket(Bucket=bucket)
+                break
+            except Exception:
+                time.sleep(1)
+        else:
+            raise SystemExit("the local S3 server never answered")
+        s3.put_bucket_cors(Bucket=bucket, CORSConfiguration={"CORSRules": [{
+            "AllowedOrigins": ["http://localhost:3000"],
+            "AllowedMethods": ["GET", "PUT"],
+            "AllowedHeaders": ["*"],
+            "ExposeHeaders": ["ETag"],
+        }]})
+    environment:
+      AWS_ACCESS_KEY_ID: insolvia
+      AWS_SECRET_ACCESS_KEY: insolvia-local
+      AWS_DEFAULT_REGION: us-east-1
+    depends_on:
+      - s3
+
   api:
     depends_on:
       migrate:
+        condition: service_completed_successfully
+      s3-bucket:
         condition: service_completed_successfully
     build:
       # The repo root, not this directory: the image installs the shared
@@ -60,30 +105,25 @@ services:
       dockerfile: services/api/Dockerfile
       target: development
     environment:
-      INSOLVIA_ENV: ${INSOLVIA_ENV:-local}
+      INSOLVIA_ENV: local
       # Required: unset, the service refuses to start (ADR 0030).
       DATABASE_URL: postgresql://insolvia:insolvia@postgres:5432/insolvia
-      # Case store (issue 8.2). Encrypted under this machine's own
-      # customer-managed key, so a KMS permission mistake surfaces here
-      # rather than on staging.
-      CASE_TABLE_NAME: ${CASE_TABLE_NAME:-}
-      # Append-only access log (issue 8.3): who read which case. The API can
-      # write it and, by IAM, can never read it back.
-      CASE_ACCESS_LOG_TABLE_NAME: ${CASE_ACCESS_LOG_TABLE_NAME:-}
-      # Case documents (issue 8.6). This machine's real bucket, under the same
-      # customer-managed key as the table — there is no S3 emulator, and the
-      # presigned URLs the API mints are signed against this bucket, so a
-      # KMS or bucket-policy mistake surfaces here rather than on staging.
-      CASE_DOCUMENT_BUCKET: ${CASE_DOCUMENT_BUCKET:-}
-      # Auth (issue #79). Unset is safe and fails CLOSED: every protected
-      # route answers 401 rather than skipping verification. Point them at
-      # this machine's own Cognito pool (infra/envs/dev outputs
-      # auth_issuer_url / auth_web_client_id) to exercise a real sign-in.
+      # Case documents (issue 8.6) on the local S3 server: this container
+      # reaches it as s3:9000, the browser as localhost:9000.
+      CASE_DOCUMENT_BUCKET: insolvia-local-case-documents
+      CASE_DOCUMENT_ENDPOINT_URL: http://s3:9000
+      CASE_DOCUMENT_PUBLIC_ENDPOINT_URL: http://localhost:9000
+      # The local S3 server's throwaways. Nothing else in this container calls
+      # AWS: there are no other credentials to collide with.
+      AWS_ACCESS_KEY_ID: insolvia
+      AWS_SECRET_ACCESS_KEY: insolvia-local
+      AWS_DEFAULT_REGION: us-east-1
+      # Auth (issue #79): the shared dev pool. Unset is safe and fails CLOSED:
+      # every protected route answers 401 rather than skipping verification.
       AUTH_ISSUER_URL: ${AUTH_ISSUER_URL:-}
       AUTH_CLIENT_ID: ${AUTH_CLIENT_ID:-}
       # The client portal's app client (ADR 0023): every /v1/portal/ route
-      # verifies it and only it. dev-aws-setup.sh writes it; unset, portal
-      # routes answer 401 and staff routes are untouched.
+      # verifies it and only it. Unset, portal routes answer 401.
       AUTH_PORTAL_CLIENT_ID: ${AUTH_PORTAL_CLIENT_ID:-}
       # Unset records mail in memory. Set it to the local mailer
       # (http://host.docker.internal:8026) to see the portal invitation's
@@ -91,24 +131,14 @@ services:
       # insolvia-services repo's: ./scripts/dev-up.sh starts it from a sibling
       # checkout, or run its services/mailer/scripts/dev-up.sh there.
       MAILER_API_URL: ${MAILER_API_URL:-}
-      # The pool POST /v1/firm/users CALLS (AUTH_ISSUER_URL is what tokens are
-      # verified against); unset means the in-memory directory.
-      AUTH_USER_POOL_ID: ${AUTH_USER_POOL_ID:-}
-      # Job pipeline (ADR 0018): this machine's real queue. Accepted jobs land
-      # there and run when the worker poller is running
-      # (`python -m insolvia_api.entrypoints.worker_poller`, same .env);
-      # unset composes the in-memory queue, which records and runs nothing.
-      JOB_QUEUE_URL: ${JOB_QUEUE_URL:-}
-      # The filing queue (ADR 0024 PR 6): an approval's one filing job lands
-      # on this machine's real queue (no consumer until PR 7). Unset composes
-      # the in-memory queue, which records the job and sends nothing.
-      FILING_QUEUE_URL: ${FILING_QUEUE_URL:-}
-      AWS_CONFIG_FILE: /run/insolvia-aws/config
-      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-us-east-1}
-    volumes:
-      - ${HOME}/.cache/insolvia/aws-container/api:/run/insolvia-aws:ro
+      # The AI jobs' model; unset, they fail honestly with `not_configured`.
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      # No AUTH_USER_POOL_ID: inviting a colleague or a portal client uses
+      # the in-memory directory, which mints a subject and creates no pool
+      # user — creating one would need AWS credentials.
     ports:
       - "127.0.0.1:8080:8080"
 
 volumes:
   postgres-data:
+  s3-data:

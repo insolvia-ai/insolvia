@@ -1,4 +1,4 @@
-"""The local pipeline worker: long-polls this machine's dev queue and runs
+"""The per-machine dev queue's consumer: long-polls this machine's dev queue and runs
 jobs on the developer's laptop (ADR 0018's local story).
 
 There is no Lambda locally — infra/envs/dev deliberately provisions none —
@@ -10,6 +10,11 @@ core/jobs.handle_sqs_event the Lambda entrypoint uses, delete on a clean
 return, and leave it for redelivery when the handler raises (which is exactly
 what an erroring Lambda does — the visibility timeout is the retry delay, and
 maxReceiveCount still walks a poison message to the dev DLQ).
+
+Only for a machine that applied the optional per-machine dev stack
+(infra/envs/dev). The ordinary local stack needs none of this: with no
+JOB_QUEUE_URL the development server runs jobs on its own in-process queue
+(adapters/memory/in_process_job_queue.py, #624).
 
 Run it beside the dev server, with services/api/.env loaded:
 
@@ -35,28 +40,12 @@ from insolvia_core.adapters.postgres.case_store import PostgresCaseStore
 from insolvia_core.adapters.postgres.debtor_store import PostgresDebtorStore
 from insolvia_core.adapters.postgres.document_store import PostgresDocumentStore
 
-from insolvia_api.adapters.anthropic.extraction_model import AnthropicExtractionModel
-from insolvia_api.adapters.anthropic.review_model import AnthropicReviewModel
 from insolvia_api.adapters.postgres.job_store import PostgresJobStore
 from insolvia_api.adapters.postgres.packet_store import PostgresPacketStore
 from insolvia_api.core.config import load_config
-from insolvia_api.core.extraction import (
-    DOCUMENT_EXTRACTION_KIND,
-    DocumentExtractionDeps,
-    document_extraction_worker,
-)
-from insolvia_api.core.jobs import WORKERS, handle_sqs_event
+from insolvia_api.core.jobs import handle_sqs_event
 from insolvia_api.core.logging import configure_logging
-from insolvia_api.core.packet_assembly import (
-    PACKET_ASSEMBLY_KIND,
-    PacketAssemblyDeps,
-    packet_assembly_worker,
-)
-from insolvia_api.core.petition_review import (
-    PETITION_REVIEW_KIND,
-    PetitionReviewDeps,
-    petition_review_worker,
-)
+from insolvia_api.entrypoints.workers import compose_workers
 
 logger = logging.getLogger(__name__)
 
@@ -84,67 +73,22 @@ def main() -> None:
     store = PostgresJobStore(database_url)
     # The same composition the worker Lambda does — a laptop runs the exact
     # worker the cloud runs, against this machine's real dev resources. The
-    # AI review's model rides ANTHROPIC_API_KEY from services/api/.env
-    # (gitignored; add your own key by hand — dev-aws-setup does not write
-    # it); without one, `petition_review` jobs fail honestly with
-    # `not_configured` and everything else runs as before.
-    case_store = PostgresCaseStore(database_url)
-    debtor_store = PostgresDebtorStore(database_url)
-    entity_store = PostgresCaseEntityStore(database_url)
-    packet_store = PostgresPacketStore(database_url)
-    access_log = DynamoDbAccessLog(config.case_access_log_table_name)
-    # The same pair the worker Lambda composes, under this machine's own
-    # case key (the developer's IAM user reaches it by root delegation).
-    tax_id_store = DynamoDbTaxIdStore(config.case_table_name)
-    tax_id_cipher = KmsTaxIdCipher(case_key_alias(config.case_table_name))
-    review_model = (
-        AnthropicReviewModel(config.anthropic_api_key)
-        if config.anthropic_api_key
-        else None
+    # AI models ride ANTHROPIC_API_KEY from services/api/.env (gitignored;
+    # add your own key by hand).
+    workers = compose_workers(
+        case_store=PostgresCaseStore(database_url),
+        debtor_store=PostgresDebtorStore(database_url),
+        entity_store=PostgresCaseEntityStore(database_url),
+        packet_store=PostgresPacketStore(database_url),
+        document_store=PostgresDocumentStore(database_url),
+        candidate_store=PostgresCandidateStore(database_url),
+        blobs=S3DocumentBlobStore(config.case_document_bucket),
+        access_log=DynamoDbAccessLog(config.case_access_log_table_name),
+        # Under this machine's own case key (root delegation).
+        tax_id_store=DynamoDbTaxIdStore(config.case_table_name),
+        tax_id_cipher=KmsTaxIdCipher(case_key_alias(config.case_table_name)),
+        anthropic_api_key=config.anthropic_api_key,
     )
-    extraction_model = (
-        AnthropicExtractionModel(config.anthropic_api_key)
-        if config.anthropic_api_key
-        else None
-    )
-    blobs = S3DocumentBlobStore(config.case_document_bucket)
-    workers = {
-        **WORKERS,
-        PACKET_ASSEMBLY_KIND: packet_assembly_worker(
-            PacketAssemblyDeps(
-                case_store=case_store,
-                debtor_store=debtor_store,
-                entity_store=entity_store,
-                packet_store=packet_store,
-                blobs=blobs,
-                access_log=access_log,
-                tax_id_store=tax_id_store,
-                tax_id_cipher=tax_id_cipher,
-            )
-        ),
-        PETITION_REVIEW_KIND: petition_review_worker(
-            PetitionReviewDeps(
-                case_store=case_store,
-                debtor_store=debtor_store,
-                entity_store=entity_store,
-                packet_store=packet_store,
-                access_log=access_log,
-                tax_id_store=tax_id_store,
-                tax_id_cipher=tax_id_cipher,
-                model=review_model,
-            )
-        ),
-        DOCUMENT_EXTRACTION_KIND: document_extraction_worker(
-            DocumentExtractionDeps(
-                case_store=case_store,
-                document_store=PostgresDocumentStore(database_url),
-                blobs=blobs,
-                candidate_store=PostgresCandidateStore(database_url),
-                access_log=access_log,
-                model=extraction_model,
-            )
-        ),
-    }
     sqs = boto3.client("sqs")
     logger.info("worker poller listening", extra={"queue": config.job_queue_url})
 

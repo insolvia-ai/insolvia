@@ -1471,3 +1471,51 @@ def test_capture_writes_the_client_and_references_it(tmp_path: Path) -> None:
     assert client == {"handle": "captured-debtor-1", "name": {"given": "Sample"}}
     debtor = captured["cases"][0]["debtors"]["debtor_1"]
     assert debtor["client_id"] == {"$ref": "clients/captured-debtor-1"}
+
+
+# ── local load (#624): no AWS session ───────────────────────────
+
+
+def test_file_accounts_resolve_subjects_and_never_create(tmp_path: Path) -> None:
+    from insolvia_admin.entrypoints.seed import FileAccounts
+
+    subjects = tmp_path / "subjects.json"
+    subjects.write_text(json.dumps({"alice@insolvia.test": "sub-a"}))
+    accounts = FileAccounts(subjects)
+    assert accounts.subject_of("alice@insolvia.test") == "sub-a"
+    with pytest.raises(RefusedError):
+        accounts.subject_of("bob@insolvia.test")
+    with pytest.raises(RefusedError):
+        accounts.ensure("alice@insolvia.test", "a password")
+    with pytest.raises(RefusedError):
+        FileAccounts(tmp_path / "absent.json")
+
+
+def test_local_fixture_objects_copy_the_committed_bytes(tmp_path: Path) -> None:
+    from insolvia_admin.entrypoints.seed import LocalFixtureObjects
+    from insolvia_core.adapters.memory.document_blobs import MemoryDocumentBlobStore
+
+    (tmp_path / "v9" / "objects").mkdir(parents=True)
+    (tmp_path / "v9" / "objects" / "a.pdf").write_bytes(b"%PDF-1.4")
+    blobs = MemoryDocumentBlobStore()
+    LocalFixtureObjects(tmp_path, blobs).copy(
+        "v9/objects/a.pdf", target_key="cases/c/d", content_type="application/pdf"
+    )
+    assert blobs.get_bytes("cases/c/d") == b"%PDF-1.4"
+
+
+def test_a_pool_load_without_a_pool_is_refused(tmp_path: Path) -> None:
+    fixture = tmp_path / "dev.json"
+    fixture.write_text(json.dumps({"firms": []}))
+    assert (
+        main(
+            [
+                "load",
+                "--fixture",
+                str(fixture),
+                "--firm-table",
+                "insolvia-dev-0123456789ab-firms",
+            ]
+        )
+        != 0
+    )

@@ -298,3 +298,25 @@ def test_get_bytes_does_not_swallow_a_real_failure(blobs, monkeypatch):
     monkeypatch.setattr(blobs.client, "get_object", throttle)
     with pytest.raises(ClientError):
         blobs.get_bytes(KEY)
+
+
+def test_a_local_endpoint_signs_for_the_browser_and_operates_on_the_container(
+    monkeypatch,
+):
+    """The local S3 stand-in (#624): the container reaches the server as
+    `minio:9000`, the browser as `localhost:9000`, and the host is signed."""
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "AKIAEXAMPLEEXAMPLE00")
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "examplesecretkey0000000000000000")
+    monkeypatch.setenv("AWS_DEFAULT_REGION", "us-east-1")
+    local = S3DocumentBlobStore(
+        BUCKET,
+        endpoint_url="http://minio:9000",
+        public_endpoint_url="http://localhost:9000",
+    )
+    url = urlparse(
+        local.upload_url(
+            KEY, content_type="application/pdf", byte_size=4096, expires_in=900
+        )
+    )
+    assert (url.netloc, url.path) == ("localhost:9000", f"/{BUCKET}/{KEY}")
+    assert local.client.meta.endpoint_url == "http://minio:9000"

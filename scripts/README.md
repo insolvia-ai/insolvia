@@ -18,8 +18,8 @@ Two layers — a shared base plus thin per-package scripts:
 | `scripts/dev-aws-setup.sh` | Per-machine AWS layer | Provisions this machine's isolated dev resources (`infra/envs/dev`: case store, queues, …) — sign-in is the one shared dev pool, insolvia-services' (style included), read through SSM (ADR 0026) — and wires `services/api/.env` **and `apps/insolvia_app/.env`** at them; `--check` verifies |
 | `scripts/dev-test-unit.sh` | Unit tier (whole repo) | Runs every **unit** suite — pytest per Python unit (preceded by the same `ruff check .` / `ruff format --check .` its `*-pr.yml` job runs, with the venv's ruff checked against the CI pin — the only local ruff gate there is), Jest/Vitest per JS one, the forms checker, the plain-bash test of `.github/scripts/release-diff-base.sh` (the rule that picks which staging legs a release deploys) — or only the suites a set of files can break (`--list` shows the mapping). **What the pre-push hook runs** (`.pre-commit-config.yaml`); with no arguments it is the "did I break anything anywhere" question before a PR. Unit means unit: nothing it runs needs AWS, a server, a secret or the network. An affected area whose venv is missing FAILS naming its setup script rather than skipping — a hook that skips passes on exactly the machine that was never set up |
 | `scripts/dev-fixture.sh` | Seed fixtures (shared bucket) | `publish v1` copies a committed fixture version ([`seeds/fixtures/v1/`](../seeds/fixtures/v1/)) into the account's shared fixture bucket, idempotently by digest; `capture v2 <case-id> <handle>` writes a NEW version out of **this machine's** dev stack (and refuses any other source — that is what keeps every fixture synthetic). Curating a fixture is a human act, so neither runs in CI: the seed role reads the bucket and never writes it |
-| `scripts/dev-aws-seed.sh` | Per-machine AWS layer | Makes this machine signable-in **and** seeded, in one run. First ensures the dev account exists in the shared development Cognito pool (one for every machine, ADR 0026 — use the same password everywhere) — there is **no sign-up screen** on any pool (`allow_admin_create_user_only`), so this is the only way to get one; the password comes from `~/.config/insolvia/dev.env`, `DEV_USER_PASSWORD`, or a no-echo prompt that offers to write that file. Then loads [`seeds/dev.json`](../seeds/dev.json) into this machine's dev stores — a firm (into the local Postgres, through `DATABASE_URL`) with your dev account as its **admin**, and the fixture case it names (rows into the case table; the sample documents copied server-side from the shared fixture bucket into this machine's own document bucket). Without the firm a signed-in developer resolves to no firm and every route behind `current_accessor()` answers **403** (`no_active_firm_user`), because the first firm cannot come from the API (`POST /v1/firm/users` is itself behind `FIRM_ADMINISTRATION`). **Edit the fixture to change what is seeded; this script only says where.** The same loader puts `seeds/staging.json` into staging from `.github/actions/seed-staging` (shared by the API's integration job and the app's e2e job), so the two environments differ in fixture and tables, never in the code path that built the rows — which is why the account step lives in this wrapper, not the loader. `--check` verifies both halves |
-| `scripts/dev-aws-reset.sh` | Per-machine AWS layer | Wipes this machine's dev **data** — case and access-log tables (delete + recreate) plus the pool's users; the firm stores and waitlist are the local Postgres, wiped with `docker compose -f services/api/docker-compose.yml down -v` — resources survive; `--dry-run`, `--skip-cognito`. Leaves you needing `dev-aws-seed.sh` again, which recreates the account and the firm in one run |
+| `scripts/dev-aws-seed.sh` | Local stack + shared dev pool | Makes this machine signable-in **and** seeded, in two halves. **The Cognito half needs an AWS login, once per user** (#624): it reads the shared pool's public ids from SSM (`/insolvia/dev/auth/*`) into `services/api/.env` and `apps/insolvia_app/.env`, creates the fixture's people in `insolvia-dev-users` if missing — there is **no sign-up screen** on any pool (`allow_admin_create_user_only`), so this is the only way to get an account; the password comes from `~/.config/insolvia/dev.env`, `DEV_USER_PASSWORD`, or a no-echo prompt that offers to write that file — and records each person's Cognito `sub` in `~/.config/insolvia/dev-subjects.json`. **The data half needs no AWS**: the seeder's `--local` load puts [`seeds/dev.json`](../seeds/dev.json) into the local Postgres (a firm with your account as its **admin**, and the fixture cases) and the sample documents from the committed `seeds/fixtures/<version>/` into the local S3 server — so it needs `dev-up.sh` running. Later runs skip the Cognito half unless the fixture names someone new or you pass `--refresh`. Without the firm a signed-in developer resolves to no firm and every route behind `current_accessor()` answers **403** (`no_active_firm_user`). `--check` verifies both halves. Debtors' tax ids are not seeded locally until #623 |
+| `scripts/dev-aws-reset.sh` | Per-machine AWS layer (paused) | Wipes the optional per-machine dev stack's **data** (`infra/envs/dev`) plus the pool's users; `--dry-run`, `--skip-cognito`. The local stack's data is wiped with `docker compose -f services/api/docker-compose.yml down -v` (Postgres and the S3 server's volumes); re-run `dev-aws-seed.sh` after either |
 | `scripts/dev-aws-destroy.sh` | Per-machine AWS layer | `terraform destroy` of this machine's dev resources + unwinds both `.env` files; the machine id is retained |
 | `scripts/dev-aws-destroy-orphan.sh` | Per-machine AWS layer | `terraform destroy` of a **previous** machine-id's leftovers — `<short-id>` from the orphaned resource names; finds that id's own state key in the bucket, destroys everything the state tracks, then deletes the state object |
 | `scripts/dev-aws-common.sh` | Per-machine AWS layer (sourced) | Machine-UUID identity, per-machine state key, the `aws configure export-credentials` helper shared by the four scripts above, and the refreshed container credentials the API's and admin service's `dev-up.sh` hand their compose stacks (see **Credentials** below) |
@@ -46,7 +46,7 @@ Two layers — a shared base plus thin per-package scripts:
 | `services/filing/scripts/dev-filing-proof.sh` | Prove the filing worker (ADR 0024 PR 7) on this machine's dev AWS | With fake values only, the worker running as `insolvia-dev-<id>-filing-role`: the API unit tier's reference case approved and filed end to end against the in-process fake through the real queue, tables, bucket and vault — exactly one submission; the same job redelivered (no-op) and a crash right after the final submit (`outcome_unknown`) never submit again; every fault mode ends `handed_back` or `outcome_unknown` with a reason; and the role refused a source document, a write outside its prefix, a delete and a scan. Destroys the fake login; leaves one case partition per scenario under the fake firm. Needs `services/filing/scripts/dev-setup.sh` done |
 | `services/api/scripts/dev-test-integration.sh` | API integration tier, against local dev | Runs `services/api/tests/integration` — the RUNNING API over HTTP, signed in by SRP as the person [`seeds/dev.json`](../seeds/dev.json) names — against `http://localhost:8080` and this machine's pool. Needs `scripts/dev-up.sh` running and `scripts/dev-aws-seed.sh` done; the password comes from `E2E_TEST_USER_PASSWORD` or `~/.config/insolvia/dev.env`; no AWS credentials are used. `api-staging.yml` runs the same tier against staging after every deploy. A bare `pytest` in that service is the unit tier only |
 | `e2e/scripts/dev-test.sh` | E2E, against local dev | Runs both Playwright projects (`flows`, signed in; `smoke`, no credentials) against `http://localhost:3000` / `:8080` and **this machine's** dev Cognito pool, instead of deployed staging. Needs `scripts/dev-up.sh` running and `scripts/dev-aws-seed.sh` done; the password comes from `E2E_TEST_USER_PASSWORD` if exported, else `~/.config/insolvia/dev.env` — no committed default, the repo is public. The address comes from [`seeds/dev.json`](../seeds/dev.json). `--headed` to watch it, `--project smoke` for the unauthenticated half. The staging run in `app-staging.yml` stays authoritative; `app-prod.yml` runs `smoke` alone against production |
-| `services/api/scripts/dev-setup.sh` | API service | Shared base → Python 3.12 venv at `services/api/.venv` + pinned deps → chains into `scripts/dev-aws-setup.sh` (forwards `--profile`/`--region`/`--yes`/`--check`); `dev-up.sh` runs the compose stack against this machine's real AWS table, `dev-test.sh` runs ruff + mypy + pytest exactly as CI does |
+| `services/api/scripts/dev-setup.sh` | API service | Shared base → Python 3.12 venv at `services/api/.venv` + pinned deps → chains into `scripts/dev-aws-setup.sh` (forwards `--profile`/`--region`/`--yes`/`--check`; that half applies the optional per-machine stack and is paused with AWS); `dev-up.sh` runs the compose stack — Postgres, a local S3 server and the API — with **no AWS session** (#624); `dev-test.sh` runs ruff + mypy + pytest exactly as CI does |
 
 `packages/insolvia_api_client` has no scripts, deliberately: it is an npm
 workspace member with no setup beyond the root `npm ci` the app's script
@@ -306,27 +306,41 @@ Two things worth knowing:
   — every pool sets `allow_admin_create_user_only`, because a public sign-up
   form on a bankruptcy-filing platform is an invitation to junk accounts. And
   an account only gets you past sign-in: the account lives in Cognito, firm
-  membership lives in DynamoDB, and without the firm `/v1/me` reports no firm
+  membership lives in Postgres, and without the firm `/v1/me` reports no firm
   and everything else answers 403 — which reads as a broken build rather than
   a missing step. `./scripts/dev-aws-seed.sh` does both in order. The first
   run prompts for a password (no echo) and offers to save it to
   `~/.config/insolvia/dev.env` (chmod 600, outside the repo tree — this repo
   is public and an in-tree `.env` has been committed here once already); with
   the file in place, later runs and `e2e/scripts/dev-test.sh` need no prompt
-  and no export. `dev-aws-reset.sh` deletes the pool's users, and wiping the
-  local Postgres drops the firm — so re-run the seed script after either.
-- **It needs `dev-aws-setup.sh` to have run.** There is no DynamoDB emulator
-  and no fake Cognito: the API talks to this machine's real per-developer
-  tables and the app signs in against its real pool. Preflight says so by name
-  rather than letting a container fail obscurely.
+  and no export. Only that script's Cognito half needs an AWS login, and
+  only the first time; wiping the local stack (`down -v`) drops the firm, so
+  re-run it after that — it then needs no AWS.
+- **It needs no AWS session** (#624, ADR 0030 row 5). The API's compose stack
+  is Postgres, a local S3 server ([RustFS](https://github.com/rustfs/rustfs),
+  on `localhost:9000` — MinIO no longer publishes community images) and the
+  API, which runs accepted jobs (packets, extraction) on an in-process queue
+  and seals tax ids and filing credentials under a development-only key it
+  refuses to compose outside `INSOLVIA_ENV=local`. The one AWS service is the
+  shared dev Cognito pool the app signs in against — there is no fake
+  Cognito. Until #623 the access log, tax ids, filings and approvals are the
+  API's memory twins locally and forget on restart. Inviting a colleague or a
+  portal client creates no pool user locally (the in-memory directory).
 - **The first run of the day is slow.** Both compose stacks build images and
   Vite does its cold dependency scan, concurrently. The readiness wait is sized
   for that; a service still missing at the end says so and keeps trying.
 
 ## Per-machine AWS development resources
 
-The `dev-aws-*` scripts provision **local development's database** — there is
-no local emulator (`services/api`'s compose stack talks straight to real AWS).
+> **Paused with AWS, and optional (#624, ADR 0030).** Local development no
+> longer needs any of this: `dev-up.sh` runs on Docker alone, and only
+> `dev-aws-seed.sh`'s Cognito half reaches AWS. The per-machine stack below
+> is for checking real IAM, KMS, S3 and SQS when AWS is back; the API's
+> compose stack no longer reaches it — run `development_server` outside
+> compose with `services/api/.env` naming it (`CASE_TABLE_NAME`,
+> `JOB_QUEUE_URL`, …) and `worker_poller.py` beside it.
+
+The `dev-aws-*` scripts provision a machine's **own** AWS resources.
 Each developer machine gets its **own** isolated
 resources (the tables, queues and buckets of `infra/envs/dev/`), named with a
 persistent per-machine id so two developers can never collide. **Sign-in is
@@ -342,7 +356,6 @@ commands are:
 ```bash
 ./scripts/dev-aws-setup.sh                      # provision + wire services/api/.env
 ./scripts/dev-aws-setup.sh --check              # verify state, resources, env file
-./services/api/scripts/dev-up.sh                # compose against YOUR real table
 ./scripts/dev-aws-reset.sh                      # wipe the data, keep the resources
 ./scripts/dev-aws-destroy.sh                    # tear it all down (machine id kept)
 ./scripts/dev-aws-destroy-orphan.sh <short-id>  # tear down a PREVIOUS machine-id's leftovers
@@ -357,12 +370,10 @@ own state object in the bucket, destroys everything the state tracks, and
 removes the state object. It refuses the current machine's id, and without
 `--yes` the embedded `terraform destroy` shows its plan and asks first.
 
-The in-memory stores still exist in code — they are what unit tests and the
-bare `development_server` use when `CASE_TABLE_NAME` is unset — but they are
-a test seam, not the dev path: `dev-up.sh` refuses to start until setup has
-written `services/api/.env`. The firm stores and the waitlist have no
-in-memory fallback in a running service: they are the local Postgres
-(ADR 0030), and `DATABASE_URL` is required.
+The stores with no Postgres adapter yet (#623) fall back to their memory
+twins in `development_server` when `CASE_TABLE_NAME` is unset — the local
+stack's normal case. Everything else is Postgres, and `DATABASE_URL` is
+required.
 
 How it works:
 

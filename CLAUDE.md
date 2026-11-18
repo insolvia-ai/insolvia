@@ -1,4 +1,4 @@
-> **AWS is paused (2026-11-05).** There is no staging or production. Deploy workflows are disabled; do not re-enable them or apply Terraform. The Python backend needs the per-developer AWS stack to run locally, which is paused too. See [docs/runbooks/aws-paused.md](docs/runbooks/aws-paused.md).
+> **AWS is paused (2026-11-05).** There is no staging or production. Deploy workflows are disabled; do not re-enable them or apply Terraform. The whole system runs locally with no AWS session (`scripts/dev-up.sh`: Docker Postgres, a local S3 server); only the shared dev Cognito pool remains, and `scripts/dev-aws-seed.sh` needs an AWS login once to reach it. See [docs/runbooks/aws-paused.md](docs/runbooks/aws-paused.md).
 
 # Insolvia — agent guide
 
