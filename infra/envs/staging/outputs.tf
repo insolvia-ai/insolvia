@@ -241,3 +241,8 @@ output "filing_kill_switch_parameter" {
   description = "The filing kill switch: \"true\" lets the worker submit. Created off; flipped by hand only."
   value       = module.filing_worker.kill_switch_parameter
 }
+
+output "migrator_function_name" {
+  description = "The migrator Lambda the API deploy invokes before shifting its alias (ADR 0030)."
+  value       = module.database.migrator_function_name
+}

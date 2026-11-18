@@ -48,3 +48,11 @@ workflows:
 3. Apply `insolvia-services` staging, then `insolvia` staging. Repeat for prod.
 4. Publish the seed fixtures with `scripts/dev-fixture.sh`. The bytes are
    committed in `seeds/fixtures/`.
+
+The staging and prod roots now also create a VPC (`modules/network`) and an
+Aurora cluster with its migrator Lambda (`modules/database`, ADR 0030). They
+were written while paused and have never been applied. Before their first
+apply, the deploy role needs the EC2, RDS and Secrets Manager actions listed
+in #625's PR, which is a PR to insolvia-services and a human `ci-trust` apply.
+The services also need IAM-token connect, and the migrator handler
+(`insolvia_core.adapters.postgres.migrations.handler`) has to exist.

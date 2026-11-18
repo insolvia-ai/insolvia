@@ -65,6 +65,8 @@ module "web_hosting" {
 module "api_service" {
   source = "../../modules/api_service"
 
+  vpc_config = module.network.lambda_vpc_config
+
   project             = "insolvia"
   environment         = local.environment
   insolvia_env        = "staging"
@@ -104,6 +106,8 @@ module "admin_web_hosting" {
 module "admin_service" {
   source = "../../modules/admin_service"
 
+  vpc_config = module.network.lambda_vpc_config
+
   project             = "insolvia"
   environment         = local.environment
   insolvia_env        = "staging"
@@ -129,6 +133,8 @@ module "admin_service" {
 # grants attach from modules/case_store (mcp_role_name), so this module owns only the service stack itself.
 module "mcp_service" {
   source = "../../modules/mcp_service"
+
+  vpc_config = module.network.lambda_vpc_config
 
   project             = "insolvia"
   environment         = local.environment
@@ -305,6 +311,8 @@ module "marketing_site" {
 module "job_pipeline" {
   source = "../../modules/job_pipeline"
 
+  vpc_config = module.network.lambda_vpc_config
+
   project            = "insolvia"
   environment        = local.environment
   insolvia_env       = "staging"
@@ -435,6 +443,9 @@ module "case_documents" {
 # of modules/filing_worker/main.tf.
 module "filing_worker" {
   source = "../../modules/filing_worker"
+
+  vpc_config   = module.network.lambda_vpc_config
+  database_url = module.database.database_urls["filing"]
 
   project                    = "insolvia"
   environment                = local.environment
@@ -577,4 +588,61 @@ module "audit_trail" {
 # lookup by name is honest here.
 data "aws_s3_bucket" "dev_fixtures" {
   bucket = "insolvia-shared-dev-fixtures-${var.aws_region}"
+}
+
+# ── The network and the database (ADR 0030) ─────────────────────
+# Written and validated, NOT applied while AWS is paused
+# (docs/runbooks/aws-paused.md). The backend Lambdas above run in this VPC's
+# private subnets (their vpc_config); the database admits Postgres from their
+# security group alone.
+module "network" {
+  source = "../../modules/network"
+
+  project     = "insolvia"
+  environment = local.environment
+  tags        = local.common_tags
+}
+
+module "database" {
+  source = "../../modules/database"
+
+  project                  = "insolvia"
+  environment              = local.environment
+  insolvia_env             = "staging"
+  vpc_id                   = module.network.vpc_id
+  subnet_ids               = module.network.private_subnet_ids
+  client_security_group_id = module.network.lambda_security_group_id
+  migrator_image_uri       = "${data.aws_ecr_repository.service["api"].repository_url}:${local.environment}"
+
+  # One Postgres role per service, each mapped to its Lambda's role.
+  iam_users = {
+    api    = module.api_service.lambda_role_name
+    worker = module.job_pipeline.worker_role_name
+    admin  = module.admin_service.lambda_role_name
+    mcp    = module.mcp_service.lambda_role_name
+    filing = module.filing_credentials.worker_role_name
+  }
+
+  # Staging is disposable, like the rest of it.
+  deletion_protection         = false
+  key_deletion_window_in_days = 7
+  tags                        = local.common_tags
+}
+
+# Each service's DATABASE_URL, into its own SSM namespace so its deploy
+# workflow's get-parameters-by-path derives it with no workflow change. No
+# password rides here: the services authenticate with IAM. The jobs worker
+# reads the API's namespace and swaps the role (api-staging.yml); the filing
+# worker takes its URL straight from Terraform (module.filing_worker).
+resource "aws_ssm_parameter" "database_url" {
+  for_each = {
+    api       = "api"
+    admin-api = "admin"
+    mcp       = "mcp"
+  }
+
+  name  = "/insolvia/${local.environment}/${each.key}/database-url"
+  type  = "String"
+  value = module.database.database_urls[each.value]
+  tags  = local.common_tags
 }

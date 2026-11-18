@@ -87,6 +87,7 @@ jobs:
             echo "alias=$(terraform -chdir=infra/envs/staging output -raw api_lambda_alias_name)"
             echo "jobs_repo=$(terraform -chdir=infra/envs/staging output -raw jobs_ecr_repository_url)"
             echo "worker_function=$(terraform -chdir=infra/envs/staging output -raw jobs_worker_function_name)"
+            echo "migrator_function=$(terraform -chdir=infra/envs/staging output -raw migrator_function_name)"
             # The integration job's inputs: what the seed step loads into, and
             # the pool + client the suite signs in against (public values).
             echo "firm_table=$(terraform -chdir=infra/envs/staging output -raw firm_table_name)"
@@ -193,6 +194,29 @@ jobs:
             --environment "$environment"
           aws lambda wait function-updated --function-name "$FUNCTION"
 
+      # ADR 0030: migrations run BEFORE the new code serves — forward-only,
+      # so the version still serving keeps working on the migrated schema.
+      # The migrator is the API image with another handler
+      # (infra/modules/database), pointed at exactly the image shipping now.
+      - name: Apply database migrations
+        env:
+          MIGRATOR: ${{ steps.tf.outputs.migrator_function }}
+          IMAGE_URI: ${{ steps.tf.outputs.repo }}:sha-${{ github.sha }}
+        run: |
+          aws lambda update-function-code \
+            --function-name "$MIGRATOR" \
+            --image-uri "$IMAGE_URI"
+          aws lambda wait function-updated --function-name "$MIGRATOR"
+          aws lambda invoke \
+            --function-name "$MIGRATOR" \
+            --cli-read-timeout 310 \
+            migrate.json > migrate-meta.json
+          cat migrate-meta.json migrate.json
+          if jq -e '.FunctionError' migrate-meta.json > /dev/null; then
+            echo "::error::The staging migrator failed; the alias was not shifted."
+            exit 1
+          fi
+
       # Code and configuration are both settled, so this snapshot is coherent.
       # Staging publishes and shifts in one go — it is the proving ground, and
       # a failed smoke test below turns the run red. Production deliberately
@@ -261,6 +285,8 @@ jobs:
           if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
             environment="$(echo "$environment" | jq -c --arg v "$ANTHROPIC_API_KEY" '.Variables.ANTHROPIC_API_KEY = $v')"
           fi
+          # The worker connects as its own Postgres role (ADR 0030), not the API's.
+          environment="$(echo "$environment" | jq -c 'if .Variables.DATABASE_URL then .Variables.DATABASE_URL |= sub("^postgresql://api@"; "postgresql://worker@") else . end')"
           aws lambda update-function-configuration \
             --function-name "$WORKER" \
             --environment "$environment"

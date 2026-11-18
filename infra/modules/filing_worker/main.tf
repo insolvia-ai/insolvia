@@ -235,24 +235,40 @@ resource "aws_lambda_function" "worker" {
   memory_size = var.memory_mb
 
   environment {
-    variables = {
+    variables = merge({
       INSOLVIA_ENV                 = var.insolvia_env
       CASE_TABLE_NAME              = var.case_table_name
       CASE_ACCESS_LOG_TABLE_NAME   = var.case_access_log_table_name
       CASE_DOCUMENT_BUCKET         = var.case_document_bucket_name
       FILING_KILL_SWITCH_PARAMETER = local.kill_switch_name
-    }
+    }, var.database_url == null ? {} : { DATABASE_URL = var.database_url })
   }
 
   # The deploy workflow owns the image (filing-<env>.yml); Terraform owns the
   # environment, which holds names only — no secret ever rides here.
   lifecycle { ignore_changes = [image_uri] }
 
+  dynamic "vpc_config" {
+    for_each = var.vpc_config == null ? [] : [var.vpc_config]
+    content {
+      subnet_ids         = vpc_config.value.subnet_ids
+      security_group_ids = vpc_config.value.security_group_ids
+    }
+  }
+
   tags = var.tags
   depends_on = [
     aws_iam_role_policy_attachment.worker_logs,
     aws_iam_role_policy.worker,
+    aws_iam_role_policy_attachment.vpc_access,
   ]
+}
+
+# The ENI actions a Lambda in a VPC needs (ADR 0030).
+resource "aws_iam_role_policy_attachment" "vpc_access" {
+  count      = var.vpc_config == null ? 0 : local.worker_count
+  role       = var.worker_role_name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
 }
 
 resource "aws_cloudwatch_log_group" "worker" {
