@@ -99,8 +99,23 @@ resource "aws_lambda_function" "mcp" {
   # The block above is only the seed for the very first apply.
   lifecycle { ignore_changes = [image_uri, environment] }
 
+  dynamic "vpc_config" {
+    for_each = var.vpc_config == null ? [] : [var.vpc_config]
+    content {
+      subnet_ids         = vpc_config.value.subnet_ids
+      security_group_ids = vpc_config.value.security_group_ids
+    }
+  }
+
   tags       = var.tags
-  depends_on = [aws_iam_role_policy_attachment.mcp_basic]
+  depends_on = [aws_iam_role_policy_attachment.mcp_basic, aws_iam_role_policy_attachment.vpc_access]
+}
+
+# The ENI actions a Lambda in a VPC needs (ADR 0030).
+resource "aws_iam_role_policy_attachment" "vpc_access" {
+  count      = var.vpc_config == null ? 0 : 1
+  role       = aws_iam_role.mcp.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
 }
 
 resource "aws_cloudwatch_log_group" "lambda" {

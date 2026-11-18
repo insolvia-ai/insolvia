@@ -120,3 +120,20 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+# ADR 0030: the backend Lambdas run in the private subnets (modules/network),
+# where the database is. null = no VPC (dev, which has no database in AWS).
+variable "vpc_config" {
+  description = "subnet_ids and security_group_ids for the Lambda (modules/network's lambda_vpc_config), or null for none."
+  type = object({
+    subnet_ids         = list(string)
+    security_group_ids = list(string)
+  })
+  default = null
+}
+
+variable "database_url" {
+  description = "DATABASE_URL as the `filing` Postgres role (modules/database's database_urls), or null where there is no database in AWS (dev)."
+  type        = string
+  default     = null
+}
