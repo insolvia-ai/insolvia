@@ -57,9 +57,6 @@
 # target, never in the code path that builds the rows. The loader lives in
 # services/admin/src/insolvia_admin/entrypoints/seed.py.
 #
-# shortcut: debtors' tax ids are not seeded locally until #623 moves them
-# to Postgres — the local API keeps them in memory.
-#
 # ## Scope
 #
 # DEV ONLY, and not parameterised on purpose: the pool must be named

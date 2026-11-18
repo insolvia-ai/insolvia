@@ -1,6 +1,6 @@
 # Pins the vault's policy documents WHOLE (ADR 0024 PR 4: "unit tests pin
-# the policy documents"). Offline: the AWS provider is mocked, and the two
-# data sources the documents read are overridden, so `terraform test` needs
+# the policy documents"). Offline: the AWS provider is mocked, and the data
+# source the documents read is overridden, so `terraform test` needs
 # no credentials and creates nothing. Run from the module directory:
 #
 #   terraform -chdir=infra/modules/filing_credentials init -backend=false
@@ -17,17 +17,11 @@ mock_provider "aws" {
     target = data.aws_caller_identity.current
     values = { account_id = "111122223333" }
   }
-  override_data {
-    target = data.aws_region.current
-    values = { region = "us-east-1" }
-  }
 }
 
 variables {
-  environment          = "staging"
-  table_kms_key_arn    = "arn:aws:kms:us-east-1:111122223333:key/case-key"
-  access_log_table_arn = "arn:aws:dynamodb:us-east-1:111122223333:table/insolvia-staging-case-access-log"
-  api_role_name        = "insolvia-staging-api-role"
+  environment   = "staging"
+  api_role_name = "insolvia-staging-api-role"
 }
 
 run "deployed_key_policy_is_pinned" {
@@ -130,12 +124,7 @@ run "deployed_key_policy_is_pinned" {
   }
 
   assert {
-    condition     = aws_dynamodb_table.credentials.name == "insolvia-staging-filing-credentials"
-    error_message = "The table name is derived by insolvia_core.adapters.aws.filing_credentials from the case table's."
-  }
-
-  assert {
-    condition     = jsondecode(aws_iam_role_policy.api[0].policy).Statement[1].Action == ["kms:GenerateDataKey"]
+    condition     = jsondecode(aws_iam_role_policy.api[0].policy).Statement[0].Action == ["kms:GenerateDataKey"]
     error_message = "The API's vault-key grant is GenerateDataKey alone — seal, never open."
   }
 }

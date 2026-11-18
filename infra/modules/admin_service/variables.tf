@@ -60,15 +60,6 @@ variable "google_client_id" {
   type        = string
 }
 
-# True everywhere this module runs in a deployed environment: the audit table
-# IS the durable provisioning record (#178). Dev instances may disarm it so
-# dev-aws-destroy.sh can remove the table.
-variable "audit_deletion_protection" {
-  description = "Whether the admin audit table refuses deletion."
-  type        = bool
-  default     = true
-}
-
 variable "tags" {
   description = "Common tags applied to all resources."
   type        = map(string)

@@ -1,29 +1,17 @@
 from __future__ import annotations
 
-from insolvia_core.adapters.aws.access_log import DynamoDbAccessLog
 from insolvia_core.adapters.aws.document_blobs import S3DocumentBlobStore
 from insolvia_core.adapters.aws.filing_credentials import (
-    DynamoDbFilingAuthorizationStore,
-    DynamoDbFilingCredentialStore,
     KmsCredentialSealer,
     filing_credentials_key_alias,
-    filing_credentials_table_name,
 )
-from insolvia_core.adapters.aws.filing_store import DynamoDbFilingStore
 from insolvia_core.adapters.aws.jwks_provider import CognitoJwksProvider
 from insolvia_core.adapters.aws.tax_id_cipher import KmsTaxIdCipher, case_key_alias
-from insolvia_core.adapters.aws.tax_id_store import DynamoDbTaxIdStore
 from insolvia_core.adapters.aws.user_directory import CognitoUserDirectory
 from insolvia_core.adapters.development_keys import development_key_adapters
-from insolvia_core.adapters.memory.access_log import MemoryAccessLog
 from insolvia_core.adapters.memory.document_blobs import MemoryDocumentBlobStore
-from insolvia_core.adapters.memory.filing_credentials import (
-    MemoryFilingAuthorizationStore,
-    MemoryFilingCredentialStore,
-)
-from insolvia_core.adapters.memory.filing_store import MemoryFilingStore
-from insolvia_core.adapters.memory.tax_id_store import MemoryTaxIdStore
 from insolvia_core.adapters.memory.user_directory import MemoryUserDirectory
+from insolvia_core.adapters.postgres.access_log import PostgresAccessLog
 from insolvia_core.adapters.postgres.candidate_store import PostgresCandidateStore
 from insolvia_core.adapters.postgres.case_entity_store import PostgresCaseEntityStore
 from insolvia_core.adapters.postgres.case_store import PostgresCaseStore
@@ -35,8 +23,14 @@ from insolvia_core.adapters.postgres.document_request_store import (
     PostgresDocumentRequestStore,
 )
 from insolvia_core.adapters.postgres.document_store import PostgresDocumentStore
+from insolvia_core.adapters.postgres.filing_credentials import (
+    PostgresFilingAuthorizationStore,
+    PostgresFilingCredentialStore,
+)
+from insolvia_core.adapters.postgres.filing_store import PostgresFilingStore
 from insolvia_core.adapters.postgres.firm_store import PostgresFirmStore
 from insolvia_core.adapters.postgres.task_store import PostgresTaskStore
+from insolvia_core.adapters.postgres.tax_id_store import PostgresTaxIdStore
 from insolvia_core.ports import (
     AccessLog,
     CandidateStore,
@@ -57,21 +51,18 @@ from insolvia_core.ports import (
     UserDirectory,
 )
 
-from insolvia_api.adapters.aws.filing_approval_store import (
-    DynamoDbFilingApprovalStore,
-)
 from insolvia_api.adapters.aws.filing_queue import SqsFilingQueue
 from insolvia_api.adapters.aws.job_queue import SqsJobQueue
 from insolvia_api.adapters.aws.mailer_client import SigV4MailerClient
-from insolvia_api.adapters.memory.filing_approval_store import (
-    MemoryFilingApprovalStore,
-)
 from insolvia_api.adapters.memory.filing_queue import MemoryFilingQueue
 from insolvia_api.adapters.memory.in_process_job_queue import InProcessJobQueue
 from insolvia_api.adapters.memory.mailer_client import InMemoryMailerClient
 from insolvia_api.adapters.postgres.event_store import (
     PostgresCalendarTokenStore,
     PostgresEventStore,
+)
+from insolvia_api.adapters.postgres.filing_approval_store import (
+    PostgresFilingApprovalStore,
 )
 from insolvia_api.adapters.postgres.job_store import PostgresJobStore
 from insolvia_api.adapters.postgres.packet_store import PostgresPacketStore
@@ -127,11 +118,6 @@ else:
 # The case stores are Postgres, always (#622). What still needs a stand-in
 # locally (#624, ADR 0030) is everything AWS used to provide:
 #
-# - the sealed and logged data still on DynamoDB until #623 (access log, tax
-#   ids, filings, approvals, the credential vault): this machine's
-#   per-machine dev table when CASE_TABLE_NAME names one, else the memory
-#   twins — which forget on restart. shortcut: memory until #623 moves them
-#   to Postgres, then they are Postgres here too.
 # - KMS: the real case key beside a real table, else the development-only
 #   key adapters, which refuse to compose outside INSOLVIA_ENV=local.
 # - S3: CASE_DOCUMENT_BUCKET on CASE_DOCUMENT_ENDPOINT_URL — the compose
@@ -155,44 +141,35 @@ calendar_token_store: CalendarTokenStore = PostgresCalendarTokenStore(
     config.database_url
 )
 
-access_log: AccessLog
-tax_id_store: TaxIdStore
+# The sealed and logged data is Postgres too (#623): the access log, tax ids,
+# filings, approvals and the credential vault.
+access_log: AccessLog = PostgresAccessLog(config.database_url)
+tax_id_store: TaxIdStore = PostgresTaxIdStore(config.database_url)
+filing_credential_store: FilingCredentialStore = PostgresFilingCredentialStore(
+    config.database_url
+)
+filing_authorization_store: FilingAuthorizationStore = PostgresFilingAuthorizationStore(
+    config.database_url
+)
+filing_approval_store: FilingApprovalStore = PostgresFilingApprovalStore(
+    config.database_url
+)
+filing_store: FilingStore = PostgresFilingStore(config.database_url)
+
 tax_id_cipher: TaxIdCipher
-filing_credential_store: FilingCredentialStore
 filing_credential_sealer: FilingCredentialSealer
-filing_authorization_store: FilingAuthorizationStore
-filing_approval_store: FilingApprovalStore
-filing_store: FilingStore
-if config.case_table_name and config.case_access_log_table_name:
-    access_log = DynamoDbAccessLog(config.case_access_log_table_name)
-    # This machine's real case key and vault (infra/envs/dev); the
+if config.case_table_name:
+    # This machine's real case key and vault key (infra/envs/dev); the
     # developer's principal reaches them through the key policy's root
-    # delegation, so a laptop seals and opens exactly as staging does.
-    tax_id_store = DynamoDbTaxIdStore(config.case_table_name)
+    # delegation, so a laptop seals exactly as staging does.
     tax_id_cipher = KmsTaxIdCipher(case_key_alias(config.case_table_name))
-    filing_credential_store = DynamoDbFilingCredentialStore(
-        filing_credentials_table_name(config.case_table_name)
-    )
     filing_credential_sealer = KmsCredentialSealer(
         filing_credentials_key_alias(config.case_table_name)
     )
-    filing_authorization_store = DynamoDbFilingAuthorizationStore(
-        filing_credentials_table_name(config.case_table_name)
-    )
-    filing_approval_store = DynamoDbFilingApprovalStore(config.case_table_name)
-    filing_store = DynamoDbFilingStore(config.case_table_name)
 else:
-    access_log = MemoryAccessLog()
-    tax_id_store = MemoryTaxIdStore()
     tax_id_cipher, filing_credential_sealer = development_key_adapters(
         config.environment
     )
-    filing_credential_store = MemoryFilingCredentialStore()
-    filing_authorization_store = MemoryFilingAuthorizationStore()
-    filing_approval_store = MemoryFilingApprovalStore()
-    # shortcut: a hand-back that files the case writes it into this store's
-    # own memory case store, not Postgres — #623 moves filings beside cases.
-    filing_store = MemoryFilingStore()
 
 document_blobs: DocumentBlobStore
 if config.case_document_bucket:

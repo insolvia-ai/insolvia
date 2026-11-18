@@ -11,7 +11,9 @@ valid and describe nobody. This repo is public.
 
 from __future__ import annotations
 
+import base64
 import os
+from typing import Any
 
 import pytest
 from cryptography.exceptions import InvalidTag
@@ -23,7 +25,9 @@ from insolvia_core.adapters.envelope import NONCE_BYTES, context_aad, new_data_k
 from insolvia_core.adapters.memory.access_log import MemoryAccessLog
 from insolvia_core.adapters.memory.tax_id_cipher import LocalTaxIdCipher
 from insolvia_core.adapters.memory.tax_id_store import MemoryTaxIdStore
+from insolvia_core.adapters.postgres.tax_id_store import PostgresTaxIdStore
 from insolvia_core.errors import FieldValidationError
+from insolvia_core.ports import TaxIdStore
 from insolvia_core.tax_ids import (
     TAX_ID_PURPOSE,
     TaxIdInput,
@@ -37,6 +41,8 @@ from insolvia_core.tax_ids import (
     tax_id_item,
     tax_id_json,
 )
+
+from tests.unit.backends import BACKENDS, postgres_url_with_cases, seed_cases
 
 FIRM = "firm-0001"
 OTHER_FIRM = "firm-0002"
@@ -154,9 +160,9 @@ class TestPrinting:
 
 
 class Env:
-    def __init__(self) -> None:
+    def __init__(self, store: TaxIdStore | None = None) -> None:
         self.cipher = LocalTaxIdCipher()
-        self.store = MemoryTaxIdStore()
+        self.store = store if store is not None else MemoryTaxIdStore()
         self.log = MemoryAccessLog()
 
     def store_(self, given: TaxIdInput | None, existing: TaxIdRef | None = None):
@@ -183,8 +189,17 @@ class Env:
         )
 
 
-def test_a_number_is_sealed_and_the_debtor_gets_a_reference() -> None:
-    env = Env()
+@pytest.fixture(params=BACKENDS)
+def env(request: pytest.FixtureRequest) -> Env:
+    """The memory twin, or the Postgres store over a database holding CASE."""
+    if request.param == "memory":
+        return Env()
+    url = postgres_url_with_cases(request)
+    seed_cases(url, CASE, firm_id=FIRM)
+    return Env(PostgresTaxIdStore(url))
+
+
+def test_a_number_is_sealed_and_the_debtor_gets_a_reference(env: Env) -> None:
     ref = env.store_(TaxIdInput(kind="ssn", value=SSN))
     assert ref is not None
     assert (ref.kind, ref.last_four) == ("ssn", "4321")
@@ -196,15 +211,13 @@ def test_a_number_is_sealed_and_the_debtor_gets_a_reference() -> None:
     assert sealed.firm_id == FIRM
 
 
-def test_the_logged_read_opens_the_number() -> None:
-    env = Env()
+def test_the_logged_read_opens_the_number(env: Env) -> None:
     ref = env.store_(TaxIdInput(kind="ssn", value=SSN))
     assert ref is not None
     assert env.read(ref) == SSN
 
 
-def test_the_read_records_who_which_debtor_and_why() -> None:
-    env = Env()
+def test_the_read_records_who_which_debtor_and_why(env: Env) -> None:
     ref = env.store_(TaxIdInput(kind="itin", value=ITIN))
     assert ref is not None
     env.read(ref, purpose="b121")
@@ -226,25 +239,22 @@ def test_an_ordinary_row_carries_neither_extra_member() -> None:
     assert "purpose" not in item
 
 
-def test_the_read_is_recorded_even_when_the_item_is_missing() -> None:
-    env = Env()
+def test_the_read_is_recorded_even_when_the_item_is_missing(env: Env) -> None:
     dangling = TaxIdRef(kind="ssn", last_four="4321", ref="never-written")
     assert env.read(dangling) is None
     assert [e.action for e in env.log.events] == ["taxid.read"]
 
 
-def test_another_firm_cannot_open_the_envelope() -> None:
+def test_another_firm_cannot_open_the_envelope(env: Env) -> None:
     # The encryption context binds the firm: the same store, the same ref,
     # a different firm — refused by the tag, never answered with the number.
-    env = Env()
     ref = env.store_(TaxIdInput(kind="ssn", value=SSN))
     assert ref is not None
     with pytest.raises(InvalidTag):
         env.read(ref, firm_id=OTHER_FIRM)
 
 
-def test_a_ciphertext_cannot_be_replayed_under_another_ref() -> None:
-    env = Env()
+def test_a_ciphertext_cannot_be_replayed_under_another_ref(env: Env) -> None:
     ref = env.store_(TaxIdInput(kind="ssn", value=SSN))
     assert ref is not None
     sealed = env.store.get(CASE, ref.ref)
@@ -255,8 +265,7 @@ def test_a_ciphertext_cannot_be_replayed_under_another_ref() -> None:
         )
 
 
-def test_keeping_the_stored_number_echoes_the_view() -> None:
-    env = Env()
+def test_keeping_the_stored_number_echoes_the_view(env: Env) -> None:
     stored = env.store_(TaxIdInput(kind="ssn", value=SSN))
     kept = env.store_(TaxIdInput(kind="ssn", last_four="4321"), existing=stored)
     assert kept == stored
@@ -269,23 +278,20 @@ def test_keeping_the_stored_number_echoes_the_view() -> None:
         TaxIdInput(kind="itin", last_four="4321"),
     ],
 )
-def test_an_echo_that_does_not_match_is_refused(echo: TaxIdInput) -> None:
-    env = Env()
+def test_an_echo_that_does_not_match_is_refused(echo: TaxIdInput, env: Env) -> None:
     stored = env.store_(TaxIdInput(kind="ssn", value=SSN))
     with pytest.raises(FieldValidationError) as caught:
         env.store_(echo, existing=stored)
     assert "tax_id" in caught.value.fields
 
 
-def test_keeping_with_nothing_stored_is_refused() -> None:
-    env = Env()
+def test_keeping_with_nothing_stored_is_refused(env: Env) -> None:
     with pytest.raises(FieldValidationError):
         env.store_(TaxIdInput(kind="ssn", last_four="4321"), existing=None)
 
 
-def test_a_corrected_number_keeps_the_ref_and_replaces_the_item() -> None:
+def test_a_corrected_number_keeps_the_ref_and_replaces_the_item(env: Env) -> None:
     # A correction reaches every matter pointing at the ref (ADR 0022).
-    env = Env()
     first = env.store_(TaxIdInput(kind="ssn", value="987654321"))
     second = env.store_(TaxIdInput(kind="ssn", value="987654322"), existing=first)
     assert first is not None
@@ -298,16 +304,14 @@ def test_a_corrected_number_keeps_the_ref_and_replaces_the_item() -> None:
     assert sealed.created_at <= sealed.updated_at
 
 
-def test_clearing_leaves_the_sealed_item_in_place() -> None:
-    env = Env()
+def test_clearing_leaves_the_sealed_item_in_place(env: Env) -> None:
     stored = env.store_(TaxIdInput(kind="ssn", value=SSN))
     assert stored is not None
     assert env.store_(None, existing=stored) is None
     assert env.store.get(CASE, stored.ref) is not None
 
 
-def test_the_item_round_trips_through_the_attribute_converter() -> None:
-    env = Env()
+def test_the_item_round_trips_through_the_attribute_converter(env: Env) -> None:
     ref = env.store_(TaxIdInput(kind="ssn", value=SSN))
     assert ref is not None
     sealed = env.store.get(CASE, ref.ref)
@@ -315,6 +319,31 @@ def test_the_item_round_trips_through_the_attribute_converter() -> None:
     item = {"PK": "CASE#case-0001", **tax_id_item(sealed)}
     assert item["SK"] == f"TAXID#{ref.ref}"
     assert tax_id_from_item(from_attributes(to_attributes(item))) == sealed
+
+
+def test_an_envelope_sealed_before_the_move_still_opens_from_postgres(
+    postgres: Any, postgres_url: str
+) -> None:
+    """ADR 0030: the envelope is kept byte for byte. An item as the DynamoDB
+    store held it — base64 strings through the attribute converter — goes
+    into Postgres as bytea, comes back as the same strings, and opens."""
+    seed_cases(postgres_url, CASE, firm_id=FIRM)
+    before = Env()
+    ref = before.store_(TaxIdInput(kind="ssn", value=SSN))
+    assert ref is not None
+    sealed = before.store.get(CASE, ref.ref)
+    assert sealed is not None
+    dynamo_era = tax_id_from_item(
+        from_attributes(to_attributes({"PK": f"CASE#{CASE}", **tax_id_item(sealed)}))
+    )
+
+    after = Env(PostgresTaxIdStore(postgres_url))
+    after.store.put(CASE, dynamo_era)
+    assert after.store.get(CASE, ref.ref) == sealed
+    stored = postgres.execute("SELECT ciphertext, wrapped_key FROM tax_ids").fetchone()
+    assert stored["ciphertext"] == base64.b64decode(sealed.envelope.ciphertext)
+    assert stored["wrapped_key"] == base64.b64decode(sealed.envelope.wrapped_key)
+    assert after.read(ref) == SSN
 
 
 def test_the_context_names_the_purpose_the_grant_conditions_on() -> None:

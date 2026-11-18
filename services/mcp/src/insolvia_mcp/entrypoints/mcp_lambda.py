@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from insolvia_core.adapters.aws.access_log import DynamoDbAccessLog
 from insolvia_core.adapters.aws.jwks_provider import CognitoJwksProvider
+from insolvia_core.adapters.postgres.access_log import PostgresAccessLog
 from insolvia_core.adapters.postgres.candidate_store import PostgresCandidateStore
 from insolvia_core.adapters.postgres.case_entity_store import PostgresCaseEntityStore
 from insolvia_core.adapters.postgres.case_store import PostgresCaseStore
@@ -32,13 +32,8 @@ if not config.auth_issuer_url or not config.auth_client_ids:
         "AUTH_ISSUER_URL and AUTH_CLIENT_IDS must be set for the Lambda entrypoint"
     )
 
-# The pair rule services/api states: serving case data while recording nobody
-# reading it is the one failure mode this pair exists to prevent.
-if not config.case_table_name or not config.case_access_log_table_name:
-    raise RuntimeError(
-        "CASE_TABLE_NAME and CASE_ACCESS_LOG_TABLE_NAME must be set "
-        "for the Lambda entrypoint"
-    )
+if not config.case_table_name:
+    raise RuntimeError("CASE_TABLE_NAME must be set for the Lambda entrypoint")
 
 # load_config() already refused to start without DATABASE_URL (ADR 0030):
 # the firm store lives there.
@@ -55,7 +50,8 @@ app = create_asgi_app(
         debtor_store=PostgresDebtorStore(config.database_url),
         document_store=PostgresDocumentStore(config.database_url),
         candidate_store=PostgresCandidateStore(config.database_url),
-        access_log=DynamoDbAccessLog(config.case_access_log_table_name),
+        # Append-only: this role may INSERT and nothing else (migration 0003).
+        access_log=PostgresAccessLog(config.database_url),
         firm_store=PostgresFirmStore(config.database_url),
         # Constructed at cold start so its key cache lives for the
         # container's lifetime; nothing is fetched until the first token.

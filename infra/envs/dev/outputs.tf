@@ -18,19 +18,9 @@ output "case_table_name" {
   value       = module.case_store.table_name
 }
 
-output "case_access_log_table_name" {
-  description = "This machine's case access-log table (CASE_ACCESS_LOG_TABLE_NAME for the local API)."
-  value       = module.case_store.access_log_table_name
-}
-
 output "case_kms_key_alias" {
   description = "Alias of this machine's case-data key. Printed for orientation; nothing consumes it — DynamoDB resolves the key from the table."
   value       = module.case_store.kms_key_alias
-}
-
-output "filing_credentials_table_name" {
-  description = "This machine's filing-credential vault table. Nothing needs it configured — the API derives it from CASE_TABLE_NAME — printed for the dev proof."
-  value       = module.filing_credentials.table_name
 }
 
 output "filing_credentials_key_alias" {
@@ -81,11 +71,6 @@ output "job_queue_url" {
 output "filing_queue_url" {
   description = "This machine's filing queue (FILING_QUEUE_URL for the local API — ADR 0024 PR 6). No consumer until PR 7."
   value       = module.filing_queue.queue_url
-}
-
-output "admin_audit_table_name" {
-  description = "This machine's append-only admin audit table (#213)."
-  value       = aws_dynamodb_table.admin_audit.name
 }
 
 output "google_admin_client_id" {

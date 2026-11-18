@@ -59,11 +59,11 @@ attorney, every one ending at the filing-set checklist.
 
 ## The case is filed in the same write (ADR 0024 PR 8)
 
-`submitted → filed` is one DynamoDB transaction: the record's own move
-(conditional on `submitted` and this attempt), the case's `status`,
-`filedAt`, `caseNumber` and `caseNumberKey` (an UpdateItem of those
-attributes only, conditional on the status the worker read), and the case's
-`STATUS#` history row naming the filing (`changedBy: "filing-worker"`,
+`submitted → filed` is one Postgres transaction (ADR 0030): the record's own
+move (conditional on `submitted` and this attempt), the case's `status`,
+`filed_at`, `case_number` and `case_number_key` (an UPDATE of those columns
+only, conditional on the status the worker read), and the case's
+status-history row naming the filing (`changedBy: "filing-worker"`,
 `filingId`). The petition date is the date the court printed on its
 confirmation, never converted to UTC (`insolvia_core.case_numbers.petition_date`);
 the number is stored as the court printed it and its match key
@@ -154,15 +154,18 @@ version (`tests/unit/test_packaging.py`).
 ## The role
 
 `insolvia-<env>-filing-role` (created by `infra/modules/filing_credentials`).
-Its grants, all told: the vault (GetItem, Decrypt under the vault purpose,
-the access-log append — `filing_credentials`), the queue (consume —
-`filing_queue`), and `infra/modules/filing_worker`'s: GetItem/Query and
-PutItem/UpdateItem on the case table, the case key through DynamoDB and S3
-only, Decrypt of a sealed tax id under the tax-id encryption context alone
+Its AWS grants, all told: the vault key (Decrypt under the vault purpose —
+`filing_credentials`), the queue (consume — `filing_queue`), and
+`infra/modules/filing_worker`'s: GetItem/Query and PutItem/UpdateItem on the
+case table (unused since ADR 0030; #626 removes them), the case key through
+DynamoDB and S3 only, Decrypt of a sealed tax id under the tax-id encryption context alone
 (`TaxIdOpen` — the Case Upload file, below), GetObject on
 `cases/*/packets/*`, PutObject on `cases/*/filings/*`, and GetParameter on the
 kill switch. Locally the poller assumes the same role, so
-a laptop run is held to exactly these.
+a laptop run is held to exactly these. Its database role, `filing`, is the
+only one that may read a credential's envelope (migration 0003, proven by
+`insolvia_core`'s `test_postgres_grants.py`); a deployed role logs in as it
+once hosting lands (#625).
 
 ## Three environments
 

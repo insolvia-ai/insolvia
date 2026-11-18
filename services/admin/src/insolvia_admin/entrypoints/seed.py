@@ -182,9 +182,7 @@ from typing import Any, Final, Protocol
 
 from insolvia_core.adapters.aws.document_blobs import S3DocumentBlobStore
 from insolvia_core.adapters.aws.tax_id_cipher import KmsTaxIdCipher, case_key_alias
-from insolvia_core.adapters.aws.tax_id_store import DynamoDbTaxIdStore
 from insolvia_core.adapters.development_keys import development_key_adapters
-from insolvia_core.adapters.memory.tax_id_store import MemoryTaxIdStore
 from insolvia_core.adapters.postgres.case_entity_store import PostgresCaseEntityStore
 from insolvia_core.adapters.postgres.case_store import PostgresCaseStore
 from insolvia_core.adapters.postgres.client_binding_store import (
@@ -193,6 +191,7 @@ from insolvia_core.adapters.postgres.client_binding_store import (
 from insolvia_core.adapters.postgres.debtor_store import PostgresDebtorStore
 from insolvia_core.adapters.postgres.document_store import PostgresDocumentStore
 from insolvia_core.adapters.postgres.firm_store import PostgresFirmStore
+from insolvia_core.adapters.postgres.tax_id_store import PostgresTaxIdStore
 from insolvia_core.case_collections import COLLECTIONS
 from insolvia_core.case_entities import create_entity, entity_json, parse_entity
 from insolvia_core.cases import assign_case, create_case, parse_case_creation
@@ -523,7 +522,9 @@ class Dependencies:
     # sealed exactly as the API seals one — same store, same cipher, same
     # encryption context — under the target's case key, whose alias is
     # derived from the case table's name. Both factories take that name.
-    tax_id_store: Callable[[str], TaxIdStore] = DynamoDbTaxIdStore
+    tax_id_store: Callable[[str], TaxIdStore] = lambda _table: PostgresTaxIdStore(
+        _database()
+    )
     tax_id_cipher: Callable[[str], TaxIdCipher] = lambda table: KmsTaxIdCipher(
         case_key_alias(table)
     )
@@ -550,10 +551,8 @@ def _local_dependencies(fixture: Path, subjects: Path) -> Dependencies:
         fixture_objects=lambda _source, bucket: LocalFixtureObjects(
             fixture.resolve().parent / _FIXTURES_DIR, blobs(bucket or "")
         ),
-        # shortcut: tax ids are still DynamoDB until #623, and the local API
-        # keeps its own in memory — a seeded number goes nowhere. #623 makes
-        # both Postgres.
-        tax_id_store=lambda _table: MemoryTaxIdStore(),
+        # Tax ids are this machine's Postgres (#623), as the API's; only the
+        # key is the development stand-in.
         tax_id_cipher=lambda _table: development_key_adapters("local")[0],
     )
 

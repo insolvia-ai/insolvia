@@ -23,21 +23,20 @@ mock_provider "aws" {
 }
 
 variables {
-  environment                = "staging"
-  insolvia_env               = "staging"
-  ecr_repository_url         = "111122223333.dkr.ecr.us-east-1.amazonaws.com/insolvia-shared-filing"
-  image_tag                  = "staging"
-  worker_role_name           = "insolvia-staging-filing-role"
-  worker_role_arn            = "arn:aws:iam::111122223333:role/insolvia-staging-filing-role"
-  queue_arn                  = "arn:aws:sqs:us-east-1:111122223333:insolvia-staging-filing"
-  dlq_name                   = "insolvia-staging-filing-dlq"
-  case_table_arn             = "arn:aws:dynamodb:us-east-1:111122223333:table/insolvia-staging-cases"
-  case_table_name            = "insolvia-staging-cases"
-  case_access_log_table_name = "insolvia-staging-case-access-log"
-  case_kms_key_arn           = "arn:aws:kms:us-east-1:111122223333:key/case-key"
-  case_document_bucket_arn   = "arn:aws:s3:::insolvia-staging-case-documents-us-east-1"
-  case_document_bucket_name  = "insolvia-staging-case-documents-us-east-1"
-  alarms_topic_arn           = "arn:aws:sns:us-east-1:111122223333:insolvia-staging-api-alarms"
+  environment               = "staging"
+  insolvia_env              = "staging"
+  ecr_repository_url        = "111122223333.dkr.ecr.us-east-1.amazonaws.com/insolvia-shared-filing"
+  image_tag                 = "staging"
+  worker_role_name          = "insolvia-staging-filing-role"
+  worker_role_arn           = "arn:aws:iam::111122223333:role/insolvia-staging-filing-role"
+  queue_arn                 = "arn:aws:sqs:us-east-1:111122223333:insolvia-staging-filing"
+  dlq_name                  = "insolvia-staging-filing-dlq"
+  case_table_arn            = "arn:aws:dynamodb:us-east-1:111122223333:table/insolvia-staging-cases"
+  case_table_name           = "insolvia-staging-cases"
+  case_kms_key_arn          = "arn:aws:kms:us-east-1:111122223333:key/case-key"
+  case_document_bucket_arn  = "arn:aws:s3:::insolvia-staging-case-documents-us-east-1"
+  case_document_bucket_name = "insolvia-staging-case-documents-us-east-1"
+  alarms_topic_arn          = "arn:aws:sns:us-east-1:111122223333:insolvia-staging-api-alarms"
 }
 
 run "the_worker_grant_is_pinned" {

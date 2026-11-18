@@ -121,7 +121,6 @@ module "admin_service" {
 
   # Staging's audit rows are test provisioning of test firms; the table must
   # be destroyable with the environment.
-  audit_deletion_protection = false
 
   tags = local.common_tags
 }
@@ -367,11 +366,7 @@ module "filing_credentials" {
 
   project                     = "insolvia"
   environment                 = local.environment
-  table_kms_key_arn           = module.case_store.kms_key_arn
-  access_log_table_arn        = module.case_store.access_log_table_arn
   api_role_name               = module.api_service.lambda_role_name
-  point_in_time_recovery      = false
-  deletion_protection         = false
   key_deletion_window_in_days = 7
   tags                        = local.common_tags
 }
@@ -447,23 +442,22 @@ module "filing_worker" {
   vpc_config   = module.network.lambda_vpc_config
   database_url = module.database.database_urls["filing"]
 
-  project                    = "insolvia"
-  environment                = local.environment
-  insolvia_env               = "staging"
-  ecr_repository_url         = data.aws_ecr_repository.service["filing"].repository_url
-  image_tag                  = local.environment
-  worker_role_name           = module.filing_credentials.worker_role_name
-  worker_role_arn            = module.filing_credentials.worker_role_arn
-  queue_arn                  = module.filing_queue.queue_arn
-  dlq_name                   = module.filing_queue.dlq_name
-  case_table_arn             = module.case_store.table_arn
-  case_table_name            = module.case_store.table_name
-  case_access_log_table_name = module.case_store.access_log_table_name
-  case_kms_key_arn           = module.case_store.kms_key_arn
-  case_document_bucket_arn   = module.case_documents.bucket_arn
-  case_document_bucket_name  = module.case_documents.bucket_name
-  alarms_topic_arn           = module.api_service.alarms_topic_arn
-  tags                       = local.common_tags
+  project                   = "insolvia"
+  environment               = local.environment
+  insolvia_env              = "staging"
+  ecr_repository_url        = data.aws_ecr_repository.service["filing"].repository_url
+  image_tag                 = local.environment
+  worker_role_name          = module.filing_credentials.worker_role_name
+  worker_role_arn           = module.filing_credentials.worker_role_arn
+  queue_arn                 = module.filing_queue.queue_arn
+  dlq_name                  = module.filing_queue.dlq_name
+  case_table_arn            = module.case_store.table_arn
+  case_table_name           = module.case_store.table_name
+  case_kms_key_arn          = module.case_store.kms_key_arn
+  case_document_bucket_arn  = module.case_documents.bucket_arn
+  case_document_bucket_name = module.case_documents.bucket_name
+  alarms_topic_arn          = module.api_service.alarms_topic_arn
+  tags                      = local.common_tags
 }
 
 # Publish the case table name into the API's SSM config namespace, env-level
@@ -484,15 +478,6 @@ resource "aws_ssm_parameter" "case_table_name" {
   tags  = local.common_tags
 }
 
-# The access log's table name, same namespace and same reasoning as
-# case-table-name above — the API derives it as CASE_ACCESS_LOG_TABLE_NAME.
-resource "aws_ssm_parameter" "case_access_log_table_name" {
-  name  = "/insolvia/${local.environment}/api/case-access-log-table-name"
-  type  = "String"
-  value = module.case_store.access_log_table_name
-  tags  = local.common_tags
-}
-
 # ── MCP configuration namespace (#261/#262) ─────────────────────
 # The /insolvia/<env>/mcp siblings of the api namespace above, env-level for
 # the same cycle-avoidance reason: module.case_store
@@ -509,13 +494,6 @@ resource "aws_ssm_parameter" "mcp_case_table_name" {
   name  = "/insolvia/${local.environment}/mcp/case-table-name"
   type  = "String"
   value = module.case_store.table_name
-  tags  = local.common_tags
-}
-
-resource "aws_ssm_parameter" "mcp_case_access_log_table_name" {
-  name  = "/insolvia/${local.environment}/mcp/case-access-log-table-name"
-  type  = "String"
-  value = module.case_store.access_log_table_name
   tags  = local.common_tags
 }
 
@@ -565,11 +543,10 @@ module "audit_trail" {
   project     = "insolvia"
   environment = local.environment
 
-  # The case table, and its indexes via starts_with; the filing-credential
-  # vault's table (ADR 0024, guardrail 3).
+  # The case table, and its indexes via starts_with. The vault's rows are
+  # in Postgres since ADR 0030; its KEY is covered below.
   data_resource_arns = [
     module.case_store.table_arn,
-    module.filing_credentials.table_arn,
   ]
 
   # The vault KEY's seals and opens are management events (the module's

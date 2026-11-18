@@ -126,12 +126,8 @@ module "filing_credentials" {
 
   project                     = "insolvia"
   environment                 = local.environment
-  table_kms_key_arn           = module.case_store.kms_key_arn
-  access_log_table_arn        = module.case_store.access_log_table_arn
   api_role_name               = null
   worker_assumable_by         = [var.aws_principal_arn]
-  point_in_time_recovery      = false
-  deletion_protection         = false
   key_deletion_window_in_days = 7
   tags                        = local.common_tags
 }
@@ -189,47 +185,20 @@ module "case_documents" {
 module "filing_worker" {
   source = "../../modules/filing_worker"
 
-  project                    = "insolvia"
-  environment                = local.environment
-  ecr_repository_url         = null
-  worker_role_name           = module.filing_credentials.worker_role_name
-  worker_role_arn            = module.filing_credentials.worker_role_arn
-  queue_arn                  = module.filing_queue.queue_arn
-  dlq_name                   = module.filing_queue.dlq_name
-  case_table_arn             = module.case_store.table_arn
-  case_table_name            = module.case_store.table_name
-  case_access_log_table_name = module.case_store.access_log_table_name
-  case_kms_key_arn           = module.case_store.kms_key_arn
-  case_document_bucket_arn   = module.case_documents.bucket_arn
-  case_document_bucket_name  = module.case_documents.bucket_name
-  alarms_topic_arn           = null
-  tags                       = local.common_tags
-}
-
-
-# ── Admin audit table (#213) ────────────────────────────────────
-# Hand-rolled because dev has no Lambda, so modules/admin_service (which owns the deployed table alongside
-# an image Lambda and an HTTP API) does not fit here. Schema matches
-# services/admin's core/audit.py item shape. PITR off, protection off —
-# throwaway rows a developer wipes; the DEPLOYED table is the durable record.
-resource "aws_dynamodb_table" "admin_audit" {
-  name         = "insolvia-${local.environment}-admin-api-audit"
-  billing_mode = "PAY_PER_REQUEST"
-  hash_key     = "PK"
-  range_key    = "SK"
-
-  attribute {
-    name = "PK"
-    type = "S"
-  }
-
-  attribute {
-    name = "SK"
-    type = "S"
-  }
-
-  server_side_encryption { enabled = true }
-  tags = local.common_tags
+  project                   = "insolvia"
+  environment               = local.environment
+  ecr_repository_url        = null
+  worker_role_name          = module.filing_credentials.worker_role_name
+  worker_role_arn           = module.filing_credentials.worker_role_arn
+  queue_arn                 = module.filing_queue.queue_arn
+  dlq_name                  = module.filing_queue.dlq_name
+  case_table_arn            = module.case_store.table_arn
+  case_table_name           = module.case_store.table_name
+  case_kms_key_arn          = module.case_store.kms_key_arn
+  case_document_bucket_arn  = module.case_documents.bucket_arn
+  case_document_bucket_name = module.case_documents.bucket_name
+  alarms_topic_arn          = null
+  tags                      = local.common_tags
 }
 
 # ── Auth ────────────────────────────────────────────────────────
@@ -312,15 +281,6 @@ resource "aws_ssm_parameter" "case_table_name" {
   tags  = local.common_tags
 }
 
-# The access log's table name, same namespace and same reasoning as
-# case-table-name above — the API derives it as CASE_ACCESS_LOG_TABLE_NAME.
-resource "aws_ssm_parameter" "case_access_log_table_name" {
-  name  = "/insolvia/${local.environment}/api/case-access-log-table-name"
-  type  = "String"
-  value = module.case_store.access_log_table_name
-  tags  = local.common_tags
-}
-
 # The job queue's URL, same namespace-parity reasoning as everything above.
 # The value a developer actually consumes is the job_queue_url output, which
 # dev-aws-setup.sh writes into services/api/.env as JOB_QUEUE_URL.
@@ -355,7 +315,7 @@ module "audit_trail" {
 
   project                     = "insolvia"
   environment                 = local.environment
-  data_resource_arns          = [module.case_store.table_arn, module.filing_credentials.table_arn]
+  data_resource_arns          = [module.case_store.table_arn]
   include_management_events   = true
   retention_days              = 90
   key_deletion_window_in_days = 7

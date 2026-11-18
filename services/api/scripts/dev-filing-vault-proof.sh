@@ -16,7 +16,7 @@
 #   3. THE WORKER'S ROLE OPENS — the script assumes insolvia-dev-<id>-
 #      filing-role (its trust names the developer IN DEV ONLY; the module
 #      refuses that outside dev-*) and runs insolvia_core's open path under
-#      the role's own credentials: GetItem, Decrypt, the access-log append.
+#      the role's own credentials: Decrypt, then the access-log append.
 #   4. THE WRONG CONTEXT FAILS — the worker opening the same envelope under
 #      another attorney's context is refused by KMS.
 #   5. REVOKE DESTROYS, AND THE NEXT OPEN FAILS — the item is deleted; the
@@ -33,10 +33,11 @@
 #      enrolled and opened by the worker; the attorney withdraws; the
 #      credential item is gone, the current authorization item is gone (the
 #      history record says `withdrawn`), and the worker's next open raises.
-#   7. THE WORKER READS THE AUTHORIZATION UNDER ITS OWN GRANT — implicit in
-#      3 and 6: `open_credential` GetItems the `AUTHORIZATION` item with the
-#      role's credentials, which hold GetItem on the vault table and
-#      nothing more.
+#
+# The rows are Postgres (ADR 0030): locally the script reads them as the
+# compose superuser, so this proves the KMS layer. The database layer — the
+# api role never reads an envelope, the filing role alone does — is
+# insolvia_core's grants test (tests/unit/test_postgres_grants.py).
 #
 # The signature's fresh `auth_time` is a stand-in here (the script signs
 # in to nothing); the API's fresh-sign-in check against the real pool is
@@ -68,16 +69,18 @@ env_file="$API_DIR/.env"
 profile_from_env="$(sed -n 's/^AWS_PROFILE=//p' "$env_file" | tail -n 1)"
 [[ -n "$profile_from_env" ]] && AWS_PROFILE_VALUE="$profile_from_env"
 CASE_TABLE_NAME="$(sed -n 's/^CASE_TABLE_NAME=//p' "$env_file" | tail -n 1)"
-CASE_ACCESS_LOG_TABLE_NAME="$(sed -n 's/^CASE_ACCESS_LOG_TABLE_NAME=//p' "$env_file" | tail -n 1)"
+DATABASE_URL="$(sed -n 's/^DATABASE_URL=//p' "$env_file" | tail -n 1)"
 [[ "$CASE_TABLE_NAME" == insolvia-dev-*-cases ]] ||
   die "CASE_TABLE_NAME in services/api/.env is not a dev case table — this proof runs against dev only."
+[[ -n "$DATABASE_URL" ]] ||
+  die "DATABASE_URL is not in services/api/.env — the vault rows live in Postgres (ADR 0030)."
 [[ -x "$API_DIR/.venv/bin/python" ]] || die "services/api/.venv is missing — run ./services/api/scripts/dev-setup.sh."
 
 for command in aws jq; do require_command "$command"; done
 export_temporary_aws_credentials
 export AWS_DEFAULT_REGION="$AWS_REGION_VALUE"
 unset AWS_PROFILE
-export CASE_TABLE_NAME CASE_ACCESS_LOG_TABLE_NAME
+export CASE_TABLE_NAME DATABASE_URL
 
 exec "$API_DIR/.venv/bin/python" - <<'PY'
 import base64
@@ -87,15 +90,17 @@ import time
 import uuid
 
 import boto3
+import psycopg
 from botocore.exceptions import ClientError
-from insolvia_core.adapters.aws.access_log import DynamoDbAccessLog
 from insolvia_core.adapters.aws.filing_credentials import (
-    DynamoDbFilingAuthorizationStore,
-    DynamoDbFilingCredentialStore,
     KmsCredentialOpener,
     KmsCredentialSealer,
     filing_credentials_key_alias,
-    filing_credentials_table_name,
+)
+from insolvia_core.adapters.postgres.access_log import PostgresAccessLog
+from insolvia_core.adapters.postgres.filing_credentials import (
+    PostgresFilingAuthorizationStore,
+    PostgresFilingCredentialStore,
 )
 from insolvia_core.filing_authorization import (
     TEXT_VERSION,
@@ -114,9 +119,9 @@ from insolvia_core.filing_credentials import (
 )
 
 case_table = os.environ["CASE_TABLE_NAME"]
-table = filing_credentials_table_name(case_table)
+database_url = os.environ["DATABASE_URL"]
 alias = filing_credentials_key_alias(case_table)
-role_name = table.removesuffix("-filing-credentials") + "-filing-role"
+role_name = case_table.removesuffix("-cases") + "-filing-role"
 account = boto3.client("sts").get_caller_identity()
 role_arn = f"arn:aws:iam::{account['Account']}:role/{role_name}"
 
@@ -132,12 +137,12 @@ def step(text: str) -> None:
 
 
 print(f"developer : {account['Arn']}")
-print(f"vault     : {table} / {alias}")
+print(f"vault     : Postgres filing_credentials / {alias}")
 print(f"worker    : {role_arn}")
 
-api_store = DynamoDbFilingCredentialStore(table)
-api_authorizations = DynamoDbFilingAuthorizationStore(table)
-api_log = DynamoDbAccessLog(os.environ["CASE_ACCESS_LOG_TABLE_NAME"])
+api_store = PostgresFilingCredentialStore(database_url)
+api_authorizations = PostgresFilingAuthorizationStore(database_url)
+api_log = PostgresAccessLog(database_url)
 api_sealer = KmsCredentialSealer(alias)
 
 
@@ -183,17 +188,15 @@ print(f"signed authorization {signed.authorization_id}: version {signed.text_ver
 step("1. enrol seals (developer = the API's principal in dev)")
 credential = api_enrol("FAKE-ECF-USER", seed)
 print(f"enrolled under authorization {credential.authorization_ref}")
-stored = boto3.client("dynamodb").get_item(
-    TableName=table,
-    Key={
-        "PK": {"S": f"ATTORNEY#{FIRM}#{ATTORNEY}"},
-        "SK": {"S": f"CREDENTIAL#{credential.credential_id}"},
-    },
-    ConsistentRead=True,
-)["Item"]
+with psycopg.connect(database_url) as conn:
+    stored = conn.execute(
+        "SELECT * FROM filing_credentials WHERE credential_id = %s",
+        (credential.credential_id,),
+    ).fetchone()
+assert stored is not None
 assert password not in repr(stored) and seed not in repr(stored)
-print(f"sealed credential {credential.credential_id}; item attributes: {sorted(stored)}")
-print("the stored item contains neither the password nor the seed")
+print(f"sealed credential {credential.credential_id}; row has {len(stored)} columns")
+print("the stored row contains neither the password nor the seed")
 
 # ── 2. the API's principal is refused Decrypt ───────────────────
 step("2. the API's principal asks KMS to open it")
@@ -218,13 +221,13 @@ worker = boto3.session.Session(
     aws_session_token=assumed["SessionToken"],
 )
 print(f"assumed   : {worker.client('sts').get_caller_identity()['Arn']}")
-worker_store = DynamoDbFilingCredentialStore(table, client=worker.client("dynamodb"))
-worker_log = DynamoDbAccessLog(os.environ["CASE_ACCESS_LOG_TABLE_NAME"])
-worker_log.client = worker.client("dynamodb")
+# The rows: the filing worker's composition (opens=True). Locally they are
+# read as the compose superuser; the database grants that confine the
+# envelope to the filing role are proven by insolvia_core's grants test.
+worker_store = PostgresFilingCredentialStore(database_url, opens=True)
+worker_log = PostgresAccessLog(database_url)
 worker_opener = KmsCredentialOpener(alias, client=worker.client("kms"))
-worker_authorizations = DynamoDbFilingAuthorizationStore(
-    table, client=worker.client("dynamodb")
-)
+worker_authorizations = PostgresFilingAuthorizationStore(database_url)
 
 
 def worker_open(credential_id=None):
@@ -288,15 +291,12 @@ destroyed = withdraw_authorization(
 print(f"withdrawn: {destroyed} credential(s) destroyed")
 print(f"credential item present afterwards? {api_store.get(FIRM, ATTORNEY, second.credential_id) is not None}")
 print(f"current authorization present afterwards? {api_authorizations.get_current(FIRM, ATTORNEY) is not None}")
-history = boto3.client("dynamodb").get_item(
-    TableName=table,
-    Key={
-        "PK": {"S": f"ATTORNEY#{FIRM}#{ATTORNEY}"},
-        "SK": {"S": f"AUTHORIZATION#{signed.authorization_id}"},
-    },
-    ConsistentRead=True,
-)["Item"]
-print(f"history record kept: status {history['status']['S']}, withdrawn at {history['withdrawnAt']['S']}")
+with psycopg.connect(database_url) as conn:
+    (history,) = conn.execute(
+        "SELECT item FROM filing_authorizations WHERE authorization_id = %s",
+        (signed.authorization_id,),
+    ).fetchone()
+print(f"history record kept: status {history['status']}, withdrawn at {history['withdrawnAt']}")
 try:
     worker_open(second.credential_id)
 except CredentialUnavailableError:

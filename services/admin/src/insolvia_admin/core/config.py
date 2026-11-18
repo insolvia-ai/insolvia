@@ -43,7 +43,6 @@ class AppConfig:
     # Postgres (ADR 0030). load_config refuses to start a service without it.
     database_url: str | None = None
     firm_user_pool_id: str | None = None
-    admin_audit_table_name: str | None = None
     google_client_id: str | None = None
     workspace_domain: str = WORKSPACE_DOMAIN
     cors_allowed_origins: tuple[str, ...] = ()
@@ -58,8 +57,10 @@ def load_config(environ: Mapping[str, str] | None = None) -> AppConfig:
     local work:
 
     DATABASE_URL — the Postgres database (ADR 0030) holding the firm
-    stores, the SAME one the tenant API reads: this service is the second
-    principal with access to them, which is the exception ADR 0011 records.
+    stores and the append-only provisioning record (`admin_audit_log`, which
+    the admin role may only INSERT into), the SAME one the tenant API reads:
+    this service is the second principal with access to them, which is the
+    exception ADR 0011 records.
     A running service refuses to start without it.
 
     FIRM_USER_POOL_ID — the FIRM pool (insolvia-<env>-users), where
@@ -67,9 +68,6 @@ def load_config(environ: Mapping[str, str] | None = None) -> AppConfig:
     named AUTH_USER_POOL_ID as the API's is: this service never verifies
     tokens from that pool — staff tokens come from Google — and a name that
     read like "the auth pool" would invite exactly that confusion.
-
-    ADMIN_AUDIT_TABLE_NAME — the append-only provisioning record
-    (infra/modules/admin_service). The IAM grant is PutItem and nothing else.
 
     GOOGLE_CLIENT_ID — the environment's OAuth client id (a public value;
     it appears in every sign-in redirect the portal makes). Unset fails
@@ -93,7 +91,6 @@ def load_config(environ: Mapping[str, str] | None = None) -> AppConfig:
         environment=environment,
         database_url=database_url(env, required=environ is None),
         firm_user_pool_id=optional("FIRM_USER_POOL_ID"),
-        admin_audit_table_name=optional("ADMIN_AUDIT_TABLE_NAME"),
         google_client_id=optional("GOOGLE_CLIENT_ID"),
         cors_allowed_origins=_CORS_ALLOWED_ORIGINS[environment],
         cors_allow_localhost=environment != "production",

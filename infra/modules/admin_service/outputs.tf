@@ -35,11 +35,6 @@ output "http_api_id" {
   value       = aws_apigatewayv2_api.admin.id
 }
 
-output "audit_table_name" {
-  description = "Append-only admin audit table (#178's provisioning record)."
-  value       = aws_dynamodb_table.audit.name
-}
-
 output "ssm_parameter_prefix" {
   description = "SSM namespace holding this environment's admin config (/insolvia/<env>/admin)."
   value       = local.ssm_prefix

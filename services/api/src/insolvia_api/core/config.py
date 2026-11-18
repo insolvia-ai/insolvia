@@ -76,7 +76,6 @@ class AppConfig:
     # Postgres (ADR 0030). load_config refuses to start a service without it.
     database_url: str | None = None
     case_table_name: str | None = None
-    case_access_log_table_name: str | None = None
     auth_user_pool_id: str | None = None
     case_document_bucket: str | None = None
     # A local S3-compatible server (#624): where this process reaches it, and
@@ -111,11 +110,9 @@ def load_config(environ: Mapping[str, str] | None = None) -> AppConfig:
     Nothing reads it yet — the case routes and their store land with 8.3; the
     value is wired now so local, staging and prod are configured identically
     before the code that needs it arrives.
-    CASE_ACCESS_LOG_TABLE_NAME names the append-only table recording which
-    signed-in user read or changed which case. The API's role holds PutItem on
-    it and nothing else, so this service can write an entry and can never read,
-    amend or delete one — see modules/case_store. Same unset-means-in-memory
-    shape as CASE_TABLE_NAME.
+    The append-only access log (who read or changed which case) is the
+    `case_access_log` table in DATABASE_URL, which this service's role may
+    INSERT into and nothing else (migration 0003).
     AUTH_USER_POOL_ID names the Cognito pool this environment authenticates
     against. It is NOT redundant with AUTH_ISSUER_URL, which ends in the same
     id: parsing an id out of a URL to make an AWS API call would make the
@@ -205,7 +202,6 @@ def load_config(environ: Mapping[str, str] | None = None) -> AppConfig:
         environment=environment,
         database_url=database_url(source, required=environ is None),
         case_table_name=source.get("CASE_TABLE_NAME") or None,
-        case_access_log_table_name=source.get("CASE_ACCESS_LOG_TABLE_NAME") or None,
         auth_user_pool_id=source.get("AUTH_USER_POOL_ID") or None,
         case_document_bucket=source.get("CASE_DOCUMENT_BUCKET") or None,
         case_document_endpoint_url=source.get("CASE_DOCUMENT_ENDPOINT_URL") or None,

@@ -50,7 +50,6 @@ class FilingConfig:
     # Postgres (ADR 0030). load_config refuses to start a service without it.
     database_url: str | None = None
     case_table_name: str | None = None
-    case_access_log_table_name: str | None = None
     case_document_bucket: str | None = None
     filing_queue_url: str | None = None
     # The SSM parameter holding the kill switch ("true" = submissions on).
@@ -121,7 +120,6 @@ def load_config(environ: Mapping[str, str] | None = None) -> FilingConfig:
         environment=environment,
         database_url=database_url(source, required=environ is None),
         case_table_name=source.get("CASE_TABLE_NAME") or None,
-        case_access_log_table_name=source.get("CASE_ACCESS_LOG_TABLE_NAME") or None,
         case_document_bucket=source.get("CASE_DOCUMENT_BUCKET") or None,
         filing_queue_url=source.get("FILING_QUEUE_URL") or None,
         kill_switch_parameter=kill_switch,

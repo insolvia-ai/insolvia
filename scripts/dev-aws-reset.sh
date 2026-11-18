@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # Reset this machine's AWS-backed Insolvia development data: delete and
-# recreate the waitlist, case, access-log and firm tables (cheaper and simpler
+# recreate the case table (cheaper and simpler
 # than item-level scans for throwaway data). The resources themselves survive;
 # only data is wiped. Every resource is asserted against this machine's
 # expected names before anything is touched.
@@ -49,12 +49,9 @@ output_machine_id="$(jq -r '.machine_id.value' <<<"$outputs")"
 # Paranoid ownership checks: every name must carry THIS machine's short id
 # and match what infra/envs/dev provisions, or the reset refuses to run.
 case_table="$(jq -r '.case_table_name.value' <<<"$outputs")"
-access_log_table="$(jq -r '.case_access_log_table_name.value' <<<"$outputs")"
 pool_id="$(jq -r '.auth_user_pool_id.value' <<<"$outputs")"
 [[ "$case_table" == "$CASE_TABLE_NAME_EXPECTED" ]] ||
   die "Refusing reset: unexpected case table '$case_table' (expected '$CASE_TABLE_NAME_EXPECTED')."
-[[ "$access_log_table" == "$CASE_ACCESS_LOG_TABLE_NAME_EXPECTED" ]] ||
-  die "Refusing reset: unexpected access-log table '$access_log_table' (expected '$CASE_ACCESS_LOG_TABLE_NAME_EXPECTED')."
 pool_name="$(aws_dev cognito-idp describe-user-pool --user-pool-id "$pool_id" --query 'UserPool.Name' --output text)"
 [[ "$pool_name" == "$USER_POOL_NAME_EXPECTED" ]] ||
   die "Refusing reset: Cognito pool is named '$pool_name', not '$USER_POOL_NAME_EXPECTED'."
@@ -63,7 +60,6 @@ printf '\nThis will clear development data owned by:\n'
 printf '  AWS account: %s\n' "$AWS_ACCOUNT_ID"
 printf '  Machine ID:  %s\n' "$MACHINE_ID"
 printf '  Case table:  %s (delete + recreate)\n' "$case_table"
-printf '  Access log:  %s (delete + recreate)\n' "$access_log_table"
 printf '  Cognito:     %s — the shared pool; its users are NOT deleted\n\n' "$pool_id"
 
 if [[ "$DRY_RUN" -eq 1 ]]; then
@@ -96,14 +92,8 @@ log "Deleting $case_table..."
 aws_dev dynamodb delete-table --table-name "$case_table" >/dev/null
 aws_dev dynamodb wait table-not-exists --table-name "$case_table"
 
-# The access log goes with the cases it describes. Keeping it would leave
-# entries pointing at case ids that no longer exist, which is worse than
-# nothing — and on a laptop it is synthetic either way.
-log "Deleting $access_log_table..."
-aws_dev dynamodb delete-table --table-name "$access_log_table" >/dev/null
-aws_dev dynamodb wait table-not-exists --table-name "$access_log_table"
-
-# The firms, the portal bindings and the waitlist are not here: they live in
+# The firms, the portal bindings, the waitlist, and since #623 the filing
+# records, the vault, the access log and the admin audit log are not here: they live in
 # this machine's Docker Postgres (ADR 0030). Wipe that with
 #   docker compose -f services/api/docker-compose.yml down -v
 # and re-run `dev-aws-seed.sh` to give the shared pool's accounts their firm

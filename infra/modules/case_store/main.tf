@@ -299,108 +299,6 @@ resource "aws_dynamodb_table" "cases" {
   tags = var.tags
 }
 
-# ── The access log ──────────────────────────────────────────────
-# The log that answers "which signed-in user read this case", which the
-# CloudTrail trail in modules/audit_trail structurally cannot: ADR 0001 makes
-# the API role the only principal AWS ever sees, so the end user's identity
-# exists only inside the request. This table is where the API writes it down.
-#
-# The two are complementary and neither replaces the other. CloudTrail proves
-# nothing but the API touched the store; this proves who asked the API to.
-#
-#   PK = CASE#<case_id>
-#   SK = <recorded_at>#<event_id>   chronological within a case
-#
-# Keyed by case because that is the question actually asked — of a client, in
-# a dispute, or in a breach notice: who saw THIS file. "What did this account
-# touch" wants a by-principal index instead; it is deliberately not here yet,
-# and a GSI can be added online later without a migration.
-#
-# READS ARE LOGGED, not just writes. A write log answers "who changed this",
-# which the provenance fields in the case record already answer better. The
-# question this table exists for is who *saw* it.
-resource "aws_dynamodb_table" "access_log" {
-  name         = "${var.project}-${var.environment}-case-access-log"
-  billing_mode = "PAY_PER_REQUEST"
-  hash_key     = "PK"
-  range_key    = "SK"
-
-  attribute {
-    name = "PK"
-    type = "S"
-  }
-  attribute {
-    name = "SK"
-    type = "S"
-  }
-
-  # NO TTL, and it cannot be added here. This table had `ttl { attribute_name
-  # = "expires_at", enabled = true }` and it broke every staging deploy, for a
-  # reason that is structural rather than a missing permission:
-  #
-  #   DynamoDB's UpdateTimeToLive is authorised against the CALLER, and on a
-  #   CMK-encrypted table it needs kms:Decrypt on that key. This table is
-  #   encrypted under the case key on purpose (see below), and ci-trust's
-  #   DenyCaseDataDecryption denies the deploy role kms:Decrypt on exactly
-  #   alias/insolvia-*-cases. An explicit deny wins, so the create half-
-  #   succeeded — table made, TTL rejected — leaving a tainted resource that
-  #   every later run destroyed and failed to recreate. Four merges in a row.
-  #
-  # There is no condition key that separates "enable TTL" from "read a row":
-  # both are kms:ViaService = dynamodb. Granting Decrypt back would hand CI the
-  # case data the deny exists to withhold, and re-keying the log to an alias
-  # outside the pattern would hand it the access log. Both are worse than
-  # having no TTL.
-  #
-  # It is also the posture DenyAuditLogErasure already argues for the trail
-  # bucket: a retention rule the deploy pipeline can set is a delete button the
-  # deploy pipeline can press, and TTL deletes silently. Retention here is a
-  # compliance decision that belongs to the regulatory register and to a human
-  # apply, not to a Terraform default. Until it is made, rows are kept.
-  #
-  # PITR is fine on the same key and stays: enabling it needs no data-plane
-  # verb, which is why the case table has always applied cleanly.
-  #
-  # SPELLED OUT rather than deleted, and that is not style. `ttl` is
-  # optional+computed in the provider, so simply removing the block produces
-  # "No changes" against a table that already has TTL on — the config stops
-  # describing reality and never converges. Verified against a dev env that had
-  # it enabled: block deleted → no diff; block present and disabled → one
-  # in-place change. On a table being created this is the default, so the
-  # provider issues no UpdateTimeToLive and the deploy role needs nothing.
-  #
-  # The name must stay `expires_at`, and not because anything reads it. An
-  # attribute name is required even to disable (an empty one is a
-  # ValidationException) and DynamoDB will only accept the name TTL is
-  # CURRENTLY active on — anything else fails with "TimeToLive is active on a
-  # different AttributeName". Any dev env that applied the old config has it on
-  # `expires_at`, so this is what lets those converge instead of erroring
-  # forever. Both were found by running it; neither is in the provider docs.
-  #
-  # It is inert either way. Turning `enabled` on is not a one-line change: it
-  # needs an attribute something actually writes — nothing does, and the old
-  # writer used `expiresAt`, which is how this went unnoticed — AND it will
-  # fail in CI on the KMS deny above.
-  ttl {
-    attribute_name = "expires_at"
-    enabled        = false
-  }
-
-  point_in_time_recovery { enabled = var.point_in_time_recovery }
-
-  # Same key as the case table. That is deliberate: it means the deploy role,
-  # already denied every data-plane verb on alias/insolvia-*-cases, cannot read
-  # the access log either.
-  server_side_encryption {
-    enabled     = true
-    kms_key_arn = aws_kms_key.case.arn
-  }
-
-  deletion_protection_enabled = var.deletion_protection
-
-  tags = var.tags
-}
-
 # ── The one application principal ───────────────────────────────
 # Attached from inside this module onto the role looked up above — the mailer
 # module's pattern, and the reason there is no dependency cycle.
@@ -441,25 +339,6 @@ resource "aws_iam_role_policy" "api_case_access" {
         # choosing HTTPS is a default rather than a guarantee. Issue 8.2 puts
         # TLS in transit in scope, so this makes it one. Behaviour-neutral
         # today — nothing in services/api would notice.
-        Condition = {
-          Bool = { "aws:SecureTransport" = "true" }
-        }
-      },
-      {
-        # APPEND-ONLY, and the omissions are the design. No GetItem, no Query,
-        # no UpdateItem, no DeleteItem: the API writes access records and can
-        # never read, amend or remove one. An audit log the audited service can
-        # rewrite is not evidence, and the waitlist table's PutItem-only grant
-        # is the same reasoning.
-        #
-        # The consequence is that no endpoint can serve an access history
-        # today. That is a real limitation and the right default — serving it
-        # means granting Query, which should be its own decision with its own
-        # diff, not a capability that arrived by accident.
-        Sid      = "CaseAccessLogAppend"
-        Effect   = "Allow"
-        Action   = ["dynamodb:PutItem"]
-        Resource = aws_dynamodb_table.access_log.arn
         Condition = {
           Bool = { "aws:SecureTransport" = "true" }
         }
@@ -535,9 +414,8 @@ resource "aws_iam_role_policy" "api_case_access" {
 # cannot delete rows, and cannot make the transactional case+assignment
 # write that creating a case requires.
 #
-# The access-log append rides along, same append-only shape as the API's:
-# every case read through this surface is recorded, and the service can
-# never read, amend or delete an entry. No Scan, same as every principal.
+# No Scan, same as every principal. The access log it appends to is a
+# Postgres table since ADR 0030 (INSERT-only, migration 0003).
 resource "aws_iam_role_policy" "mcp_case_access" {
   count = var.mcp_role_name == null ? 0 : 1
 
@@ -566,15 +444,6 @@ resource "aws_iam_role_policy" "mcp_case_access" {
         }
       },
       {
-        Sid      = "CaseAccessLogAppend"
-        Effect   = "Allow"
-        Action   = ["dynamodb:PutItem"]
-        Resource = aws_dynamodb_table.access_log.arn
-        Condition = {
-          Bool = { "aws:SecureTransport" = "true" }
-        }
-      },
-      {
         Sid      = "CaseKeyUse"
         Effect   = "Allow"
         Action   = local.api_key_actions
@@ -595,14 +464,9 @@ resource "aws_iam_role_policy" "mcp_case_access" {
 # advances the job rows the API accepted, and (with 9.6/9.7) reads the case
 # it is assembling — under a role of its own so its blast radius is its own.
 #
-# Same statements as the API's grant. The access-log append arrived exactly
-# the way the original omission promised it would — in a diff that says so:
-# packet assembly (issue #96) is the first worker that reads case DATA (the
-# whole file, to project the forms), and a case-data read that the access
-# log cannot see is the failure the api-and-log pairing rule exists to
-# prevent. Recorded against the preparer whose accept caused the run
-# (core/packet_assembly.py). Write-only, PutItem alone, exactly as the API's
-# grant is; no Scan, same as the API, for the same reason.
+# Same statements as the API's grant; no Scan, same as the API, for the same
+# reason. Its access-log append (packet assembly reads whole case files, issue
+# #96) is a Postgres INSERT since ADR 0030 (migration 0003).
 resource "aws_iam_role_policy" "worker_case_access" {
   count = var.worker_role_name == null ? 0 : 1
 
@@ -627,18 +491,6 @@ resource "aws_iam_role_policy" "worker_case_access" {
           aws_dynamodb_table.cases.arn,
           "${aws_dynamodb_table.cases.arn}/index/*",
         ]
-        Condition = {
-          Bool = { "aws:SecureTransport" = "true" }
-        }
-      },
-      {
-        # Append-only, like the API's CaseAccessLogAppend and for its
-        # reasons: the packet worker reads whole case files (issue #96) and
-        # must record that it did; nothing grants it a read of the log.
-        Sid      = "CaseAccessLogAppend"
-        Effect   = "Allow"
-        Action   = ["dynamodb:PutItem"]
-        Resource = aws_dynamodb_table.access_log.arn
         Condition = {
           Bool = { "aws:SecureTransport" = "true" }
         }

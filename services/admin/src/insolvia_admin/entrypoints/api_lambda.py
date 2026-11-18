@@ -7,7 +7,7 @@ from insolvia_core.adapters.postgres.firm_store import PostgresFirmStore
 from insolvia_core.auth import GOOGLE_ISSUERS, google_jwks_url
 from mangum import Mangum
 
-from insolvia_admin.adapters.aws.audit_log import DynamoDbAuditLog
+from insolvia_admin.adapters.postgres.audit_log import PostgresAuditLog
 from insolvia_admin.api.app_factory import create_app
 from insolvia_admin.api.dependencies import AdminDependencies
 from insolvia_admin.core.config import load_config
@@ -26,7 +26,6 @@ config = load_config()
 # deploy; the alternatives are discovered by an operator mid-provision.
 for name, value in (
     ("FIRM_USER_POOL_ID", config.firm_user_pool_id),
-    ("ADMIN_AUDIT_TABLE_NAME", config.admin_audit_table_name),
     ("GOOGLE_CLIENT_ID", config.google_client_id),
 ):
     if not value:
@@ -35,7 +34,6 @@ for name, value in (
 # load_config() already refused to start without DATABASE_URL (ADR 0030).
 assert config.database_url is not None
 assert config.firm_user_pool_id is not None
-assert config.admin_audit_table_name is not None
 
 # THE TRUST BOUNDARY, in one constructor call: the JWKS provider is pointed
 # at GOOGLE's keys, so the only tokens that can ever verify here are ones
@@ -51,7 +49,7 @@ app = create_app(
         jwks_provider=jwks_provider,
         firm_store=PostgresFirmStore(config.database_url),
         user_directory=CognitoUserDirectory(config.firm_user_pool_id),
-        audit_log=DynamoDbAuditLog(config.admin_audit_table_name),
+        audit_log=PostgresAuditLog(config.database_url),
     )
 )
 

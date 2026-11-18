@@ -85,7 +85,6 @@ load_aws_identity() {
   # What infra/envs/dev actually names things — asserted before any
   # destructive action ever touches a resource.
   CASE_TABLE_NAME_EXPECTED="insolvia-$DEV_ENVIRONMENT-cases"
-  CASE_ACCESS_LOG_TABLE_NAME_EXPECTED="insolvia-$DEV_ENVIRONMENT-case-access-log"
   # Not a table any more (the firm stores are Postgres, ADR 0030): the name
   # the seeder guards its target with and derives its ids from.
   FIRM_TABLE_NAME_EXPECTED="insolvia-$DEV_ENVIRONMENT-firms"
