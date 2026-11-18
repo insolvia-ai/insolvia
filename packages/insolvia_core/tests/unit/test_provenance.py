@@ -290,7 +290,7 @@ TYPED_SOURCE = {"source": "staff_typed"}
 
 class TestLocator:
     """Accepted as any mapping at all until a review pointed out where those
-    values go: straight into DynamoDB, and back out in a response body."""
+    values go: straight into the store, and back out in a response body."""
 
     def test_a_well_formed_locator_is_accepted(self) -> None:
         entries = parse_provenance(
@@ -309,7 +309,7 @@ class TestLocator:
 
     def test_a_non_finite_number_is_refused(self) -> None:
         # stdlib JSON accepts `Infinity` and `NaN`, so these arrive as real
-        # floats. DynamoDB refuses {"N": "inf"}, and a response echoing
+        # floats. Postgres jsonb refuses them, and a response echoing
         # `Infinity` is not JSON any strict parser will read.
         for bad in (float("inf"), float("nan")):
             with pytest.raises(FieldValidationError):

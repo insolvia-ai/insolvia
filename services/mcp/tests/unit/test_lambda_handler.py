@@ -21,7 +21,7 @@ not. It imports an entrypoint, which composes from os.environ at import —
 the one place this package reads the environment outside load_config's
 mapping seam — so the fixture sets that environment and imports the module
 fresh, the mailer's test_development_api.py precedent. And it constructs the
-real DynamoDB adapters, which build a boto3 client at construction: the
+real AWS adapters, which build a boto3 client at construction: the
 fixture pins a region and obviously-fake credentials so client creation
 touches nothing, and neither request below ever reaches a store, the JWKS
 endpoint, or the network.

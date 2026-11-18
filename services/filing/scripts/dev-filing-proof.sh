@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # Prove the filing worker (ADR 0024 PR 7) on THIS MACHINE's real dev AWS —
-# the real case table, bucket and case key, the real vault and its key
+# its Postgres, the real bucket and case key, the real vault and its key
 # policy, the real filing queue — against the fake CM/ECF, with the worker
 # running AS ITS OWN ROLE (insolvia-dev-<id>-filing-role, which infra/envs/dev
 # alone trusts the developer to assume). Fake values only:
@@ -27,13 +27,13 @@
 #   3. A CRASH AFTER THE FINAL SUBMIT, then SQS redelivery: outcome_unknown,
 #      never retried — still one submission.
 #   4. EVERY FAULT MODE ends handed_back or outcome_unknown, with a reason.
-#   5. THE ROLE IS NARROW: it cannot read an uploaded source document, delete
-#      a row, seal a tax id, or decrypt the case key under any context but
+#   5. THE ROLE IS NARROW: it cannot read an uploaded source document, write
+#      outside its prefix, seal a tax id, or decrypt the case key under any context but
 #      the tax-id envelope's.
 #
-# WHAT IS LEFT BEHIND: one case partition per scenario under the fake firm,
+# WHAT IS LEFT BEHIND: one case per scenario under the fake firm,
 # its packet and receipt in the dev bucket — the PR 6 proof's cost, cleared by
-# scripts/dev-aws-reset.sh. Every fake login is destroyed at the end by
+# wiping the local Postgres. Every fake login is destroyed at the end by
 # withdrawing the authorization. Nothing real is used; nothing secret is
 # printed.
 set -euo pipefail

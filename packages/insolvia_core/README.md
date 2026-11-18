@@ -8,7 +8,7 @@ all of it. The firm domain was extracted from `services/api`
 and the admin service compose one firm domain instead of two drifting copies;
 the case domain followed when the MCP service became its second importer
 ([ADR 0016](../../docs/adr/0016-mcp-server-is-its-own-service.md),
-[#262](https://github.com/insolvia-ai/insolvia/issues/262)) — the DynamoDB
+[#262](https://github.com/insolvia-ai/insolvia/issues/262)) — the stored
 item shapes live here in exactly one place.
 
 Not published anywhere. Each consumer installs it by relative path from its
@@ -43,7 +43,7 @@ src/insolvia_core/
 │                      FilingAuthorizationStore
 └── adapters/
     ├── envelope.py  the AES-GCM half of the tax-id envelope both ciphers share
-    ├── aws/     DynamoDB stores · Cognito directory · JWKS fetcher · S3 blobs · the KMS tax-id cipher
+    ├── aws/     Cognito directory · JWKS fetcher · S3 blobs · the KMS tax-id cipher
     └── memory/  in-memory stand-ins for tests and local dev servers (a fixed-key tax-id cipher)
 ```
 

@@ -13,9 +13,9 @@ import { signIn } from '../../support/sign-in';
  *   - The app's jest suite asserts the request body against a fetch mock. It
  *     cannot tell whether the API accepts that body.
  *   - The API's pytest suite runs against an in-memory store. It cannot tell
- *     whether DynamoDB accepts the item.
- *   - The store's own probe runs against a dev table with no auth in front of
- *     it. It cannot tell whether a signed-in user reaches their own case.
+ *     whether Postgres accepts the item.
+ *   - The store's own tests run against a local database with no auth in
+ *     front of it. It cannot tell whether a signed-in user reaches their own case.
  *
  * Typing a name here and finding it after a reload closes all three at once,
  * and it closes the one that has actually bitten: the API rejects any body
@@ -99,7 +99,7 @@ test.describe('staging intake', () => {
 
     // ── 4. It is still there after a reload ───────────────────────────────
     //
-    // The whole point. This reads the record back out of DynamoDB through a
+    // The whole point. This reads the record back out of the database through a
     // fresh GET, so it proves the write landed rather than that the screen
     // remembered its own state.
     await page.reload();

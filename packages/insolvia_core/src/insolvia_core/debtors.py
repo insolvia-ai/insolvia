@@ -538,8 +538,8 @@ def role_order(filing_role: str) -> int:
     """Position in FILING_ROLES — the order the forms print debtors in, and
     the ONE definition of it, because both stores have to agree.
 
-    They would otherwise agree only by coincidence: DynamoDB returns a query
-    in sort-key order, which is alphabetical by role, and debtor_1 /
+    They would otherwise agree only by coincidence: a store returns rows
+    in key order, which is alphabetical by role, and debtor_1 /
     debtor_2 / non_filing_spouse happen to sort the same way. A fourth role
     named anything earlier in the alphabet would silently reorder the AWS
     store's results and not the memory store's — so the tests would keep

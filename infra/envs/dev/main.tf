@@ -13,9 +13,9 @@
 #
 # Scope is deliberately tiny — only what local development actually consumes
 # today (see docs/reference/terraform.md):
-#   • the case store via modules/case_store — the same module staging and prod
-#     instantiate, so local development exercises the real encrypted path
-#     rather than an approximation of it;
+#   • the case key via modules/case_store — the same module staging and prod
+#     instantiate, so local development seals tax ids under the real key
+#     rather than an approximation of it (case rows are local Postgres);
 #   • the filing-credential vault via modules/filing_credentials (ADR 0024)
 #     — its key, its table and the filing worker's role, so the key policy
 #     that keeps Decrypt to the worker is exercised here, not first met on
@@ -37,8 +37,8 @@
 locals {
   # dev-<machine_short_id> is this machine's environment name, and it slots
   # into the ENV segment of the repo-wide insolvia-<env>-<component>
-  # convention (the insolvia-aws-naming skill) — so this machine's case table
-  # is insolvia-dev-<short-id>-cases. The machine id being inside the env
+  # convention (the insolvia-aws-naming skill) — so this machine's case key
+  # is alias/insolvia-dev-<short-id>-cases. The machine id being inside the env
   # segment rather than trailing the whole name is what keeps two developers
   # from colliding on any name, including the globally-unique ones.
   environment = "dev-${var.machine_short_id}"
@@ -55,19 +55,14 @@ locals {
   }
 }
 
-# ── Case store (issue 8.2) ──────────────────────────────────────
-# The SAME module staging and prod use, not a hand-rolled copy — which is the
-# whole point. The table's keys, its owner index and its customer-managed key
-# behave here exactly as they do deployed, so the DynamoDB adapter, the GSI
-# query behind GET /v1/cases, and any KMS permission mistake all surface on a
-# laptop instead of on staging.
+# ── Case key (issue 8.2) ────────────────────────────────────────
+# The SAME module staging and prod use, not a hand-rolled copy: the case
+# customer-managed key behaves here exactly as it does deployed, so a KMS
+# permission mistake surfaces on a laptop instead of on staging. Case rows
+# are in Postgres since ADR 0030 (locally, the compose stack's).
 #
-# Three deliberate differences from the deployed instances, all for one
-# reason — this is throwaway data on a machine, not a case file:
-#   • PITR off — a developer wipes this with dev-aws-reset.sh.
-#   • Deletion protection off — dev-aws-destroy.sh has to be able to remove it.
-#   • The minimum 7-day key deletion window, so a destroy does not leave a
-#     30-day pending key (and a monthly charge) behind on every teardown.
+# One deliberate difference: the minimum 7-day key deletion window, so a
+# destroy does not leave a 30-day pending key behind on every teardown.
 #
 # api_role_name is null: there is no Lambda here. The developer's own IAM user
 # is the principal, and it reaches the key through the key policy's root
@@ -78,8 +73,6 @@ module "case_store" {
   project                     = "insolvia"
   environment                 = local.environment
   api_role_name               = null
-  point_in_time_recovery      = false
-  deletion_protection         = false
   key_deletion_window_in_days = 7
   tags                        = local.common_tags
 }
@@ -176,7 +169,7 @@ module "case_documents" {
 
 # ── The filing worker (ADR 0024 PR 7) ───────────────────────────
 # The same module staging and prod instantiate, with no Lambda
-# (ecr_repository_url = null): its grants on the case table, the documents
+# (ecr_repository_url = null): its grants on the case key, the documents
 # bucket and the kill switch attach to this machine's filing worker role all
 # the same, because services/filing's local poller ASSUMES that role
 # (FILING_WORKER_ROLE_ARN in services/filing/.env) — so a laptop run is held
@@ -192,8 +185,7 @@ module "filing_worker" {
   worker_role_arn           = module.filing_credentials.worker_role_arn
   queue_arn                 = module.filing_queue.queue_arn
   dlq_name                  = module.filing_queue.dlq_name
-  case_table_arn            = module.case_store.table_arn
-  case_table_name           = module.case_store.table_name
+  case_table_name           = module.case_store.name
   case_kms_key_arn          = module.case_store.kms_key_arn
   case_document_bucket_arn  = module.case_documents.bucket_arn
   case_document_bucket_name = module.case_documents.bucket_name
@@ -277,7 +269,7 @@ resource "aws_ssm_parameter" "auth_portal_client_id" {
 resource "aws_ssm_parameter" "case_table_name" {
   name  = "/insolvia/${local.environment}/api/case-table-name"
   type  = "String"
-  value = module.case_store.table_name
+  value = module.case_store.name
   tags  = local.common_tags
 }
 
@@ -315,7 +307,7 @@ module "audit_trail" {
 
   project                     = "insolvia"
   environment                 = local.environment
-  data_resource_arns          = [module.case_store.table_arn]
+  data_resource_arns          = ["${module.case_documents.bucket_arn}/"]
   include_management_events   = true
   retention_days              = 90
   key_deletion_window_in_days = 7

@@ -3,7 +3,7 @@
 Almost everything about this adapter is covered through the routes that use
 it, and that is where it belongs. What CANNOT be observed from a route is the
 one property this file exists for: the memory store must refuse exactly the
-writes DynamoDB's `attribute_not_exists(SK)` refuses. A route never calls
+writes the Postgres table's primary key refuses. A route never calls
 `create` twice with the same Document instance, so a looseness that only shows
 up under that call is invisible from above — and a suite running against the
 looser of two stores proves nothing about the one that holds the data.
@@ -56,7 +56,7 @@ def store(request):
 def test_creating_the_same_document_twice_is_refused(store):
     """The conditional write, with two DIFFERENT objects for one key.
 
-    DynamoDB refuses this on the key alone. So must this."""
+    Postgres refuses this on the key alone. So must this."""
     store.create(document())
     with pytest.raises(RuntimeError):
         store.create(document(file_name="b.pdf"))
@@ -68,8 +68,8 @@ def test_creating_the_same_instance_twice_is_refused(store):
     The check used to be `setdefault(key, document) is not document`, which
     reads like a conditional write and is not one. Handed the SAME instance
     twice, setdefault returns that very object, the identity comparison is
-    false, and the second create succeeds silently — while DynamoDB's
-    `attribute_not_exists(SK)`, which knows nothing about Python identity,
+    false, and the second create succeeds silently — while Postgres's
+    primary key, which knows nothing about Python identity,
     raises. The store was looser than the one holding the data in precisely
     the way its own comment promised it was not, and no route could show it:
     a route builds a fresh Document per request.

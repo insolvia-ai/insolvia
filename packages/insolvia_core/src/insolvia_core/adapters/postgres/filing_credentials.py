@@ -143,7 +143,7 @@ class PostgresFilingAuthorizationStore:
     worker reads) and `filing_authorizations` (one record per signature).
 
     One transaction per write, so the current row and the history never
-    disagree — stronger than the DynamoDB adapter's write ordering."""
+    disagree."""
 
     def __init__(self, database_url: str) -> None:
         self.database_url = database_url

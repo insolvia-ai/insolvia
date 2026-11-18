@@ -6,7 +6,7 @@ from insolvia_core.tasks import Task, list_order
 class MemoryTaskStore:
     """Ephemeral TaskStore for tests and the plain development server.
 
-    Keyed by (case_id, task_id) — the DynamoDB adapter's PK and SK — so "a
+    Keyed by (case_id, task_id) — the Postgres table's primary key — so "a
     task id only resolves inside its own case" is a property of this dict
     rather than something every caller has to remember, exactly as
     MemoryDocumentStore states for the same reason.

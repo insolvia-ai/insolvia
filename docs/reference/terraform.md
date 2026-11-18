@@ -22,9 +22,9 @@ infra/
 │   │                         #   reader below + its roles' AdminCreateUser grants
 │   ├── auth_contract/        # reads insolvia-services' SSM contract
 │   │                         #   /insolvia/<env>/auth/* (the pool's identifiers)
-│   ├── case_store/           # GLBA-scope case data: customer-managed KMS key +
-│   │                         #   single-table DynamoDB + the API role's grant
-│   ├── audit_trail/          # CloudTrail data events on the case store, into
+│   ├── case_store/           # the case KMS key (documents, sealed tax ids) +
+│   │                         #   the API and worker roles' tax-id grants
+│   ├── audit_trail/          # CloudTrail data events on the case documents, into
 │   │                         #   insolvia-<env>-audit under its own key
 │   ├── filing_credentials/   # the CM/ECF credential vault (ADR 0024): a dedicated
 │   │                         #   KMS key only the filing worker's role may decrypt,
@@ -159,7 +159,7 @@ The orchestration half of
 per environment, one SQS queue (`insolvia-<env>-jobs`) the API enqueues
 accepted jobs onto, a DLQ, and one image-packaged worker Lambda
 (`insolvia-<env>-jobs-worker`) consuming it at batch size 1. The job *record*
-lives in the case table — this module owns no store.
+lives in Postgres (the `jobs` table) — this module owns no store.
 
 - **The worker image** is `insolvia-shared-jobs` — services/api's Dockerfile,
   `worker` target: the API's source tree, a different handler, its own image
@@ -174,7 +174,7 @@ lives in the case table — this module owns no store.
   mailer's, in insolvia-services — so no
   module references another's resources): this module attaches
   `sqs:SendMessage` onto the API role it is passed, and `modules/case_store`
-  attaches the worker's case-table + key grant onto the worker role it is
+  attaches the worker's tax-id key grant onto the worker role it is
   passed (`worker_role_name`). The queue URL reaches the API as
   `/insolvia/<env>/api/job-queue-url` → `JOB_QUEUE_URL`; the worker reads the
   same namespace (it needs `CASE_TABLE_NAME`).
@@ -235,65 +235,38 @@ client ids into `/insolvia/<env>/api/`, the deploy workflow derives them into
 against the pool's JWKS. Auth fails **closed**: missing config gives a 401 on
 every protected route, never a bypass.
 
-## Case data store (`infra/modules/case_store/`)
+## Case key (`infra/modules/case_store/`)
 
-The first persistent store of GLBA-scope data in the account — SSNs, full
-financials — so the posture here is the one to copy, not to improvise on. The
-logical model it holds is
+Case ROWS are Postgres since ADR 0030 (`infra/modules/database`, its own
+key; locally the compose stack's Postgres). What stays here is the
+customer-managed KMS key for the rest of a case's GLBA-scope data — the
+case-documents bucket (`modules/case_documents` takes its ARN) and every sealed
+tax id — and the application roles' direct use of it. The module keeps its
+historical name so the key's state address does not move. The logical model is
 [`case-data-model.md`](case-data-model.md); this section is how it is
-protected. One instance per environment — `insolvia-staging-cases`,
-`insolvia-prod-cases`, and `insolvia-dev-<short-id>-cases` on each developer
-machine — each under its own key. Local is the same module, not an
-approximation of it: there is no DynamoDB emulator here, so a KMS or IAM
-mistake surfaces on a laptop instead of after a deploy.
+protected. One key per environment — `alias/insolvia-staging-cases`,
+`alias/insolvia-prod-cases`, and `alias/insolvia-dev-<short-id>-cases` on each
+developer machine, rotation enabled. Staging and prod never share a key: the
+key is what makes prod data unreadable to a staging mistake.
 
-**Encryption at rest.** A customer-managed KMS key per environment
-(`alias/insolvia-<env>-cases`), rotation enabled, with the DynamoDB table's
-`server_side_encryption` pointed at it. `enabled = true` alone would use the
-AWS-owned DynamoDB key, which is not a key we control — the distinction is the
-entire point. Staging and prod never share a key: the key is what makes prod
-data unreadable to a staging mistake. In transit, every path is TLS — the API
-reaches DynamoDB over the AWS SDK's HTTPS endpoint, and there is no other
-caller.
+**Who can use the key.**
 
-**Who can read a case.** Exactly one principal: the API Lambda's execution
-role, per [ADR 0001](../adr/0001-client-stays-dumb-trust-boundary.md). Two
-grants, deliberately disjoint:
+| Principal | Key |
+|---|---|
+| API Lambda role | `GenerateDataKey`/`Decrypt` **directly**, fenced to `kms:EncryptionContext:purpose = debtor-tax-id` — the tax-id envelope (13.12) |
+| Pipeline worker role | `Decrypt` alone under the tax-id context (it prints B121, it never enters an identifier) |
+| MCP service role | Nothing — "no tool returns a full tax identifier" is an IAM fact |
+| Filing worker role | `Decrypt` under the tax-id context (`modules/filing_worker`, below), and S3-fenced use for packets |
+| CI deploy role | Manage the key; **explicitly denied** `Decrypt`, `GenerateDataKey*` and `ReEncrypt*` except where SSM or CloudTrail is the calling service |
 
-| Principal | Table | Key |
-|---|---|---|
-| API Lambda role | Item-level reads and writes, **no `Scan`**, no control plane | `Decrypt`/`GenerateDataKey`, fenced to `kms:ViaService = dynamodb`; plus `GenerateDataKey`/`Decrypt` **directly**, fenced to `kms:EncryptionContext:purpose = debtor-tax-id` — the tax-id envelope (13.12), and the only direct use of the key |
-| Pipeline worker role | Item-level reads, no delete | The same DynamoDB-fenced pair; `Decrypt` alone under the tax-id context (it prints B121, it never enters an identifier) |
-| MCP service role | Item-level reads, candidate writes | The DynamoDB-fenced pair only — no tax-id context at all, so "no tool returns a full tax identifier" is an IAM fact |
-| Staging seed role (`ci-trust`) | Firm and case rows in staging | The DynamoDB- and S3-fenced pairs; `GenerateDataKey` alone under the tax-id context, to seal a fixture debtor's synthetic number — never `Decrypt` |
-| CI deploy role | Control plane only — create, update, tag, PITR | Manage the key; **explicitly denied** `Decrypt`, `GenerateDataKey*` and `ReEncrypt*` except where SSM or CloudTrail is the calling service |
-
-The tax-id statements are the one place a role touches the key without a
-`kms:ViaService` fence, and the encryption context is what replaces it: a
-call that does not carry `purpose = debtor-tax-id` is denied, and a call that
-does can only be the envelope `insolvia_core.tax_ids` designed
-(`infra/modules/case_store`, `TaxIdKeyUse`). The key's alias is derived by
-the ciphers from the case table's name — `alias/insolvia-<env>-cases` is the
-same `local.name` — so no environment carries a second configuration value
-for it, and `infra/envs/dev` needs nothing: the developer's own IAM user
-reaches the key through the key policy's root delegation, exactly as it
-reaches the table.
-
-The API role's key grant is easy to mistake for redundancy, because DynamoDB
-creates its own grant when the table is built. It is not: that grant covers
-DynamoDB's key management, while the table-key `Decrypt` behind a read is
-issued **on behalf of the calling principal**, against a per-caller cached key
-that re-checks IAM when it expires. Delete the grant and reads keep working
-until the cache turns over — the worst failure shape there is.
-
-Table reads and writes additionally require `aws:SecureTransport`. The
-DynamoDB endpoint accepts plain HTTP, and the SDK preferring HTTPS is a default
-rather than a guarantee; the condition makes TLS in transit a control instead
-of an assumption.
-
-The absence of `dynamodb:Scan` is load-bearing rather than tidy: every read in
-the model is keyed, and a Scan on this table is a full read of every debtor's
-financials. Adding one should require a diff that says so.
+Document access goes through S3 and is fenced there (`modules/case_documents`).
+The encryption context is what fences the tax-id statements: a call that does
+not carry `purpose = debtor-tax-id` is denied, and a call that does can only
+be the envelope `insolvia_core.tax_ids` designed. The ciphers derive the
+key's alias from `CASE_TABLE_NAME` — `insolvia-<env>-cases`, a historical name
+no table carries any more — so no environment carries a second configuration
+value for it, and `infra/envs/dev` needs no grant: the developer's own IAM user
+reaches the key through the key policy's root delegation.
 
 **On the key policy, and "no human read paths in prod".** The key policy grants
 the account root `kms:*` — AWS's default, and it means "IAM identity policies
@@ -301,42 +274,27 @@ decide", not "everyone can decrypt". The stricter alternative, naming only the
 API role and omitting root, is what would make "no human read path" a property
 of the key itself; it is rejected because a key policy naming no principal able
 to change it is unrecoverable. The property is delivered instead by no human
-principal holding DynamoDB data-plane or KMS decrypt permissions, and by the
-deploy role's explicit deny in insolvia-services' `infra/envs/ci-trust`. That is a weaker
-guarantee honestly stated, rather than a stronger one that risks locking the
-account out of its own data.
+principal holding KMS decrypt permissions, and by the deploy role's explicit
+deny in insolvia-services' `infra/envs/ci-trust`.
 
-**Backups.** Point-in-time recovery on both environments. Note what PITR does
-*not* cover: a restore is encrypted under the same key, so scheduling the key's
-deletion destroys the backups too. Prod therefore carries the maximum 30-day
-key deletion window and DynamoDB deletion protection; staging carries neither,
-holding only synthetic data.
+**Deletion.** Scheduling the key's deletion makes every case document and
+sealed tax id permanently unreadable, so prod carries the maximum 30-day key
+deletion window; staging and dev take the 7-day minimum. The key has no
+`prevent_destroy` — it takes a literal, not a variable, so it would bind
+staging's disposability too.
 
-The key itself has no `prevent_destroy`, which looks like an omission and is
-not. It would bind staging too — `prevent_destroy` takes a literal, not a
-variable — and staging's disposability is the point. Prod's key is defended
-twice over instead: the table depends on the key, so a `terraform destroy`
-reaches the table first and aborts on its deletion protection, and even a
-scheduled key deletion is cancellable for 30 days.
+**The access log** is the Postgres table `case_access_log` (migration 0003,
+ADR 0030): it answers the question the CloudTrail trail structurally cannot —
+*which signed-in user* read this case — and every service role holds `INSERT`
+on it and nothing else. `packages/insolvia_core/tests/unit/test_postgres_grants.py`
+pins that.
 
-**The access log is not here any more.** Since #623 it is the Postgres table
-`case_access_log` (migration 0003, ADR 0030): it answers the question the
-CloudTrail trail structurally cannot — *which signed-in user* read this case —
-and every service role holds `INSERT` on it and nothing else, so the audited
-service cannot read, amend or remove its own trail. The grants test in
-`packages/insolvia_core/tests/unit/test_postgres_grants.py` pins that.
-
-**Audit logging** lives next door, in `infra/modules/audit_trail/` — see below.
-
-**Wiring.** The module takes `api_role_name` — a name, not an ARN — looks the
-role up with a data source, and attaches the table grant from its own side.
-That is the mailer's pattern too (insolvia-services' `modules/mailer`, which
-finds `insolvia-<env>-api-role` by name), and it is what avoids a cycle, since
-`api_service` must not know this module exists. For the same reason the table
-name reaches the API through an **env-level** `aws_ssm_parameter` rather than
-through `api_service`'s own parameter map, landing as `CASE_TABLE_NAME` via the
-deploy workflow's existing `get-parameters-by-path` step. The key ARN is not
-published: DynamoDB decrypts under its own grant, so the API never names it.
+**Wiring.** The module takes `api_role_name` and `worker_role_name` — names,
+not ARNs — and attaches the grants from its own side, which is what avoids a
+cycle (`api_service` must not know this module exists). For the same reason
+`CASE_TABLE_NAME` reaches the services through an **env-level**
+`aws_ssm_parameter`, derived by the deploy workflow's `get-parameters-by-path`
+step. The key ARN is not published: the services derive the alias.
 
 ## Case-data audit trail (`infra/modules/audit_trail/`)
 
@@ -368,9 +326,9 @@ deletion that calls no Delete API. The role still holds `s3:*` otherwise, so a
 lifecycle rule or a bucket deletion remains open to it. Real immutability is S3
 Object Lock, which is deliberately not here yet.
 
-**Scope and cost.** Data events bill per event, so the selector names the case
-table specifically rather than "all
-DynamoDB tables". Management events are off by default — they would double the
+**Scope and cost.** Data events bill per event, so the selector names the
+case-documents bucket's objects specifically rather than "every object in the
+account". Management events are off by default — they would double the
 volume to say what the Terraform diff already says — **except** that KMS
 `Decrypt`/`GenerateDataKey` ARE management events, and a selector can only
 exclude KMS, never select it alone. So every root holding the vault sets
@@ -455,9 +413,8 @@ reasoning; the facts:
 
 - **Every grant the worker role holds on case data is here, pinned whole by
   `terraform test`** (`insolvia-<env>-filing-worker-access` on
-  `insolvia-<env>-filing-role`): `GetItem`/`Query` and `PutItem`/`UpdateItem`
-  on the case table (no index, no delete, no batch, no transaction); the case
-  key through DynamoDB and S3 only; `s3:GetObject` on `cases/*/packets/*` and
+  `insolvia-<env>-filing-role`): the case key through S3 only, and `Decrypt`
+  under the tax-id context; `s3:GetObject` on `cases/*/packets/*` and
   `s3:PutObject` on `cases/*/filings/*`; `ssm:GetParameter` on the kill
   switch. The vault's grants stay `filing_credentials`', the queue's
   `filing_queue`'s.
@@ -491,11 +448,10 @@ declares no `key`), so two developers can never collide on names or state.
 
 What it owns is deliberately only what local dev consumes today:
 
-- **Case store** via the same `modules/case_store` as staging/prod —
-  `insolvia-dev-<short-id>-cases` under this
-  machine's own customer-managed key, so the tenancy indexes and the encrypted read path behave here exactly as
-  they do deployed. PITR and deletion protection are **off** and the key
-  deletion window is the minimum 7 days, so a teardown does not leave a
+- **Case key** via the same `modules/case_store` as staging/prod —
+  `alias/insolvia-dev-<short-id>-cases`, this machine's own customer-managed
+  key, so tax-id sealing behaves here exactly as it does deployed (case rows
+  are the local Postgres). The key deletion window is the minimum 7 days, so a teardown does not leave a
   month-long pending key behind. `api_role_name` is null — there is no Lambda,
   so no grant is created and the developer's own credentials are the
   principal.

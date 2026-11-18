@@ -57,18 +57,13 @@ variable "dlq_name" {
   type        = string
 }
 
-variable "case_table_arn" {
-  description = "The case table — module.case_store.table_arn. Read (GetItem, Query) and written (PutItem, UpdateItem) for the approval, the filing record and the receipt's document item."
-  type        = string
-}
-
 variable "case_table_name" {
-  description = "The case table's name, for CASE_TABLE_NAME. The vault's key alias is derived from it (insolvia_core.adapters.aws.filing_credentials)."
+  description = "CASE_TABLE_NAME — the case key's name (module.case_store.name; no table carries it since ADR 0030). The vault's key alias is derived from it (insolvia_core.adapters.aws.filing_credentials)."
   type        = string
 }
 
 variable "case_kms_key_arn" {
-  description = "The case key — module.case_store.kms_key_arn — usable through DynamoDB and S3 only."
+  description = "The case key — module.case_store.kms_key_arn — usable through S3 and, for a sealed tax id, under its encryption context only."
   type        = string
 }
 

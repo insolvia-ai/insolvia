@@ -13,7 +13,7 @@ local-path install. Human docs: [`README.md`](README.md).
 - **The item shapes are the point.** `firms.firm_item` / `firm_user_item` —
   and the case-domain item shapes (`cases.case_item`, the per-entity parse
   functions, `provenance.py`'s invariants) that moved here under ADR 0016's
-  admission — exist in one place so the DynamoDB and in-memory stores cannot
+  admission — exist in one place so the Postgres and in-memory stores cannot
   drift, and so two services cannot disagree about what a stored record looks
   like. Never copy a shape into a service; import it.
 - **The court registry lives here, not beside the API's other series.**
@@ -52,7 +52,7 @@ local-path install. Human docs: [`README.md`](README.md).
   need the Docker Postgres up: `docker compose -f services/api/docker-compose.yml up -d --wait postgres`.
   The firm stores (`firm_store.py`, `client_binding_store.py`; migration
   `0001`) are here since #621: each row's `item` jsonb is the domain's
-  `*_item` shape minus the DynamoDB keys. A store test runs the memory twin
+  `*_item` shape minus its `PK`/`SK` key attributes. A store test runs the memory twin
   and the Postgres adapter through one parametrized fixture.
 - **Grants are part of every migration (since 0003, #623).** Each service
   has its own role (`api`, `worker`, `admin`, `mcp`, `filing`; `migrator`

@@ -1,27 +1,12 @@
-output "table_name" {
-  description = "Case table name. Published into the API's SSM namespace by the env root, not by this module — see the env-level aws_ssm_parameter."
-  value       = aws_dynamodb_table.cases.name
-}
-
-output "table_arn" {
-  description = "Case table ARN."
-  value       = aws_dynamodb_table.cases.arn
-}
-
-output "firm_index_name" {
-  description = "Sparse GSI backing 'list my firm's cases' — the path for an admin or a user with access_all_cases."
-  value       = "by-firm"
-}
-
-output "assignee_index_name" {
-  description = "Sparse GSI backing 'list the cases I am assigned to' — the path for a user restricted to their own matters."
-  value       = "by-assignee"
+output "name" {
+  description = "insolvia-<env>-cases: the case key's alias name, which the services read as CASE_TABLE_NAME (a historical name) to derive their key aliases. Published into the API's SSM namespace by the env root."
+  value       = local.name
 }
 
 # Issue 8.6 takes this rather than creating a second key: one key protects one
-# case, documents and rows alike.
+# case's documents and sealed identifiers alike.
 output "kms_key_arn" {
-  description = "Customer-managed key encrypting case data at rest."
+  description = "Customer-managed key for case documents and sealed tax ids."
   value       = aws_kms_key.case.arn
 }
 

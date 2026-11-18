@@ -1,7 +1,7 @@
 """The debtor's client acts through the real table (ADR 0022, PR 5).
 
 What only this tier can answer: that the link's one-client-one-role check —
-now a DynamoDB transaction with a ConditionCheck on the case's other roles,
+now one database transaction conditioned on the case's other roles,
 not a read before a write — is accepted by the real table and refuses what
 it should; and that a re-copy, the kept-provenance rule and an update of the
 client all round-trip through the deployed store.

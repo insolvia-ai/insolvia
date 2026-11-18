@@ -21,17 +21,16 @@ ADR's phrase, and a partition this rule cannot identify as a case is
 something else.
 
 The DELETE is fenced a second time, at the item, by the adapter: every
-debtor item is deleted on `attribute_not_exists(clientId)`, so a client
+debtor is deleted only while it names no client, so a client
 linked between the plan and the write stops that partition rather than
 being deleted with it. The case root goes last, so a stopped partition is
 still a case the next run re-decides.
 
 ## What goes with a partition
 
-Every item in it — the root, assignments, debtors, sealed tax ids,
-collection items, documents' rows, jobs, the portal binding's mirror and
-role claims — and ONE thing outside it: the portal binding's authoritative
-row in the firm table (ADR 0023), deleted only while it still names the
+Every row keyed by the case — the root, assignments, debtors, sealed tax
+ids, collection items, documents' rows, jobs, filings and role claims — and
+the portal binding (ADR 0023), deleted only while it still names the
 purged case. Left behind, it would bind a portal client to a case that no
 longer exists, and the seed loader — which leaves an existing binding
 alone — would never rebind them to the fixture's replacement case.
@@ -40,7 +39,7 @@ NOT deleted: the case's rows in the access log (append-only by design; the
 API cannot even read them), and its documents' bytes in the case-documents
 bucket. Both outlive the rows by intent or by grant; see the entrypoint.
 
-Pure: no boto3.
+Pure: no database.
 """
 
 from __future__ import annotations
@@ -150,14 +149,14 @@ def deletion_order(items: Iterable[Mapping[str, object]]) -> list[Mapping[str, o
 
 class CaseTableRows(Protocol):
     """The case table (and the firm table's binding rows) as the purge sees
-    them. Implemented in adapters/aws (DynamoDB) and adapters/memory (tests)."""
+    them. Implemented in adapters/postgres and adapters/memory (tests)."""
 
     def summaries(self) -> Iterable[Mapping[str, object]]:
         """Every case-table item's `PK`, `SK` and, where set, `clientId`."""
         ...
 
     def partition(self, case_id: str) -> list[Mapping[str, object]]:
-        """Every item in one case partition, read consistently."""
+        """Every item in one case partition, as it is now."""
         ...
 
     def delete(self, item: Mapping[str, object]) -> bool:

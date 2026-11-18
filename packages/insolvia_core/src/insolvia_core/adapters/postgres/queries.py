@@ -1,13 +1,12 @@
 """The two query shapes every Postgres store repeats (ADR 0030).
 
-A conditional write: each DynamoDB `ConditionExpression` becomes
-`UPDATE … WHERE <condition>`, and zero rows affected must raise the same
-domain error the `ConditionalCheckFailed` branch raises today. That error
+A conditional write is `UPDATE … WHERE <condition>`, and zero rows affected
+must raise the store's domain error. That error
 differs per store (a 409 `ConflictError`, a 404 `None`, …), so the store
 passes it in.
 
 A keyset cursor: `WHERE (sort columns) > (last row's values)` instead of an
-OFFSET or a DynamoDB start key. The values travel inside the existing opaque
+OFFSET. The values travel inside the existing opaque
 cursor (`insolvia_core.cases.encode_cursor`/`decode_cursor`), so the wire
 shape clients already hold does not change.
 """
@@ -74,7 +73,7 @@ def next_key(
 
 def document(item: Mapping[str, object]) -> Jsonb:
     """A domain item shape (`*_item`) as the `item jsonb` a child row stores:
-    the same document, minus the DynamoDB key attributes (PK, SK, GSI*), which
+    the same document, minus the item's key attributes (PK, SK, GSI*), which
     are the row's columns now. `*_from_item` reads it back unchanged."""
     return Jsonb(
         {

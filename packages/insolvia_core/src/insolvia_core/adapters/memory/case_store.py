@@ -30,7 +30,7 @@ from insolvia_core.errors import ClientUnavailableError, ConflictError
 class MemoryCaseStore:
     """Ephemeral CaseStore for tests and the plain development server.
 
-    It applies `may_see_case` and orders results exactly as the DynamoDB
+    It applies `may_see_case` and orders results exactly as the Postgres
     adapter does, because a test suite running against a store with weaker
     rules than production would pass on code that leaks other firms' cases.
 
@@ -48,10 +48,9 @@ class MemoryCaseStore:
         self.assignments: dict[tuple[str, str], CaseAssignment] = {}
         # The lifecycle history (#355), per case, in write order.
         self.history: dict[str, list[StatusChange]] = {}
-        # THE SAME TABLE, in DynamoDB: a case, its assignments and its debtors
-        # share a partition, which is what lets `create` write all three in
-        # one transaction and `list_for_client` read the `by-client` index the
-        # debtor items feed. Here that is one shared MemoryDebtorStore — pass
+        # ONE DATABASE: a case, its assignments and its debtors are written in
+        # one transaction by `create`, and `list_for_client` reads the
+        # debtors' client links. Here that is one shared MemoryDebtorStore — pass
         # the one the debtor routes are composed with, or the debtors this
         # store writes are invisible to them. A composition with no debtor
         # routes gets a private one.
@@ -68,8 +67,8 @@ class MemoryCaseStore:
         if case.id in self.cases:
             raise RuntimeError(f"case {case.id} already exists")
         # Refused BEFORE anything is written, which is what makes this a
-        # transaction: the DynamoDB adapter's attribute_not_exists(SK) on each
-        # debtor fails the whole TransactWriteItems, never part of it.
+        # transaction: the Postgres adapter's unique key on each debtor
+        # rolls back the whole transaction, never part of it.
         for debtor in debtors:
             if debtor.case_id != case.id:
                 raise RuntimeError("a debtor written with a case must belong to it")
@@ -77,15 +76,15 @@ class MemoryCaseStore:
                 raise RuntimeError(f"debtor {debtor.filing_role} already exists")
         # The ConditionCheck on each linked client's row, against the firm
         # store the shared debtor store is composed with (none composed: no
-        # check, the DynamoDB adapter's `firm_table_name=None`).
+        # check).
         for debtor in debtors:
             if debtor.client_id is not None and not self.debtor_store.client_linkable(
                 case.firm_id, debtor.client_id
             ):
                 raise ClientUnavailableError(debtor.client_id)
         # All together — the transaction, as dicts. Nothing here can fail
-        # between the lines, which is the property the DynamoDB adapter buys
-        # with TransactWriteItems.
+        # between the lines, which is the property the Postgres adapter buys
+        # with one transaction.
         self.cases[case.id] = case
         self.assignments[(assignment.case_id, assignment.subject)] = assignment
         for debtor in debtors:
@@ -127,7 +126,7 @@ class MemoryCaseStore:
         return self.cases.get(case_id)
 
     def public_status(self, client: ClientAccessor) -> CasePublicStatus | None:
-        # Through the stored item shape, as the DynamoDB adapter reads it, so
+        # Through the stored item shape, as the Postgres adapter reads it, so
         # the firm check and the parse are the one function both share.
         case = self.cases.get(client.case_id)
         if case is None:
@@ -198,7 +197,7 @@ class MemoryCaseStore:
             return None
         if expected_status is not None and existing.status != expected_status:
             raise ConflictError(STATUS_MOVED)
-        # Both, together — the DynamoDB adapter's transaction, as dicts.
+        # Both, together — the Postgres adapter's transaction, as dicts.
         self.cases[case.id] = case
         if status_change is not None:
             self.history.setdefault(case.id, []).append(status_change)
@@ -210,8 +209,8 @@ class MemoryCaseStore:
         )
 
     def assign(self, assignment: CaseAssignment) -> None:
-        # Unconditional: the port says idempotent, and the DynamoDB adapter's
-        # PutItem is too.
+        # Unconditional: the port says idempotent, and the Postgres adapter's
+        # upsert is too.
         self.assignments[(assignment.case_id, assignment.subject)] = assignment
 
     def unassign(self, case_id: str, subject: str) -> bool:

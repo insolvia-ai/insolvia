@@ -68,7 +68,7 @@ class EntityKind(Generic[BodyT]):
     name: str
     # The URL segment and the JSON listing key, e.g. "creditors".
     collection: str
-    # The DynamoDB sort-key namespace, e.g. "CREDITOR". Must be unique across
+    # The item's sort-key namespace (`SK`), e.g. "CREDITOR". Must be unique across
     # every SK in the case partition — META, ASSIGNEE, DEBTOR, DOCUMENT, and
     # each other — or one collection's listing would parse another's items.
     sk_prefix: str

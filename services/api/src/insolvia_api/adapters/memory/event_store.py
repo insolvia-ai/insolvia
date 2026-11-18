@@ -13,7 +13,7 @@ from insolvia_api.core.events import (
 class MemoryEventStore:
     """Ephemeral EventStore for tests and the plain development server.
 
-    Keyed by (partition, id) — the DynamoDB adapter's PK and SK split apart
+    Keyed by (partition, id) — the Postgres table's primary key
     — so a case event and a firm event of one firm live under different
     keys exactly as they do in the table, and `list_for_firm` is the same
     firm-wide sweep the index gives the real adapter.

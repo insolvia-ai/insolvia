@@ -1,1 +1,1 @@
-"""Real AWS backends: DynamoDB, via the shared insolvia_core adapters."""
+"""Real AWS backends, via the shared insolvia_core adapters."""

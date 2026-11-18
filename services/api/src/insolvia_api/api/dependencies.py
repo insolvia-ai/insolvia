@@ -72,7 +72,7 @@ class ApiDependencies:
     # Two ports rather than one, because they are two pieces of infrastructure
     # with two IAM grants and two failure modes: the row lives in the case
     # table, the bytes live in the bucket. Folding them together would put a
-    # DynamoDB client and an S3 client in one adapter and force the in-memory
+    # database and an S3 client in one adapter and force the in-memory
     # store to fake presigning as well as storage. Optional for the same reason
     # as the pair above — api/routes/documents.py raises rather than degrading,
     # and the Lambda entrypoint refuses to boot without the bucket.
@@ -89,7 +89,7 @@ class ApiDependencies:
     # (adapters/aws/tax_id_cipher.case_key_alias), so neither needs a
     # configuration value of its own. Two ports rather than one because
     # they are two pieces of infrastructure with two IAM grants: a row in
-    # DynamoDB, and GenerateDataKey/Decrypt on KMS.
+    # Postgres, and GenerateDataKey/Decrypt on KMS.
     tax_id_store: TaxIdStore | None = None
     tax_id_cipher: TaxIdCipher | None = None
     # The generic case collections (issue #249) — same table, same partition,

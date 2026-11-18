@@ -3,22 +3,27 @@ firm client, and nothing else.
 
 The rows are planted with `insolvia_core`'s own item functions — the exact
 shapes the API and the seeder write — so "what the purge recognises" and
-"what the store holds" cannot drift. The DynamoDB adapter is pinned over a
-recording transport at the end.
+"what the store holds" cannot drift. The Postgres adapter runs against a real
+database at the end.
 
 Every identifier is obviously fake. This repo is public.
 """
 
 from __future__ import annotations
 
-from typing import Any
-
 import pytest
-from botocore.exceptions import ClientError
-from insolvia_admin.adapters.aws import case_purge as aws_case_purge
 from insolvia_admin.adapters.memory.case_purge import MemoryCaseTableRows
+from insolvia_admin.adapters.postgres.case_purge import (
+    CASE_TABLES,
+    PostgresCaseTableRows,
+)
 from insolvia_admin.core.pre_client_purge import BindingRow, plan, purge
 from insolvia_admin.entrypoints.purge_pre_client import main
+from insolvia_core.adapters.postgres.case_store import PostgresCaseStore
+from insolvia_core.adapters.postgres.client_binding_store import (
+    PostgresClientBindingStore,
+)
+from insolvia_core.adapters.postgres.firm_store import PostgresFirmStore
 from insolvia_core.cases import (
     assign_case,
     assignment_item,
@@ -39,6 +44,7 @@ from insolvia_core.firm_clients import (
     debtor_from_client,
     parse_firm_client,
 )
+from insolvia_core.firms import Firm
 
 FIRM = "00000000-0000-4000-8000-00000000f18a"
 ALICE = "00000000-0000-4000-8000-00000000a11c"
@@ -315,71 +321,125 @@ def test_check_fails_while_anything_pre_client_remains_and_apply_clears_it():
     assert main([*argv, "--check"], rows=lambda _c, _f: rows) == 0
 
 
-# ── The DynamoDB adapter, over a recording transport ────────────────
+# ── The Postgres adapter, against a real database ───────────────────
 
 
-class FakeDynamoDb:
-    def __init__(self) -> None:
-        self.calls: list[tuple[str, dict[str, Any]]] = []
-        self.fail_conditions = False
-
-    def scan(self, **kwargs: Any) -> Any:
-        self.calls.append(("scan", kwargs))
-        return {"Items": [{"PK": {"S": "CASE#k"}, "SK": {"S": "META"}}]}
-
-    def query(self, **kwargs: Any) -> Any:
-        self.calls.append(("query", kwargs))
-        return {"Items": []}
-
-    def delete_item(self, **kwargs: Any) -> Any:
-        self.calls.append(("delete_item", kwargs))
-        if self.fail_conditions and "ConditionExpression" in kwargs:
-            raise ClientError(
-                {"Error": {"Code": "ConditionalCheckFailedException", "Message": ""}},
-                "DeleteItem",
-            )
-        return {}
-
-
-def adapter(monkeypatch, fake):
-    monkeypatch.setattr(aws_case_purge.boto3, "client", lambda _service: fake)
-    return aws_case_purge.DynamoDbCaseTableRows(DEV_CASES, DEV_FIRMS)
-
-
-def test_the_scan_reads_keys_and_the_client_link_only(monkeypatch):
-    fake = FakeDynamoDb()
-    rows = list(adapter(monkeypatch, fake).summaries())
-    assert rows == [{"PK": "CASE#k", "SK": "META"}]
-    [(_, kwargs)] = fake.calls
-    assert kwargs["ProjectionExpression"] == "PK, SK, clientId"
-    assert kwargs["ConsistentRead"] is True
-
-
-def test_a_debtor_is_deleted_only_while_it_names_no_client(monkeypatch):
-    fake = FakeDynamoDb()
-    store = adapter(monkeypatch, fake)
-    store.delete({"PK": "CASE#k", "SK": "DEBTOR#debtor_1"})
-    store.delete({"PK": "CASE#k", "SK": "META"})
-    debtor, root = (kwargs for _, kwargs in fake.calls)
-    assert debtor["ConditionExpression"] == "attribute_not_exists(clientId)"
-    assert "ConditionExpression" not in root
-
-    fake.fail_conditions = True
-    assert store.delete({"PK": "CASE#k", "SK": "DEBTOR#debtor_1"}) is False
-
-
-def test_a_binding_row_is_deleted_only_while_it_names_the_purged_case(monkeypatch):
-    fake = FakeDynamoDb()
-    store = adapter(monkeypatch, fake)
-    assert store.delete_binding(BindingRow(firm_id="f", subject="s", case_id="k"))
-    [(_, kwargs)] = fake.calls
-    assert kwargs["TableName"] == DEV_FIRMS
-    assert kwargs["Key"] == {"PK": {"S": "FIRM#f"}, "SK": {"S": "CLIENT#s"}}
-    assert kwargs["ConditionExpression"] == "caseId = :case"
-    fake.fail_conditions = True
-    assert (
-        store.delete_binding(BindingRow(firm_id="f", subject="s", case_id="k")) is False
+def _pg_case(url, *, client: bool):
+    """A case written by the real stores: root, assignment, Debtor 1 (from a
+    firm client or typed without one), and a portal binding to it."""
+    case = a_case()
+    debtors = []
+    if client:
+        firm_client = create_firm_client(
+            parse_firm_client({"name": {"given": "Jordan"}}),
+            firm_id=FIRM,
+            created_by=ALICE,
+        )
+        PostgresFirmStore(url).create_client(firm_client)
+        debtors.append(
+            debtor_from_client(firm_client, case=case, filing_role="debtor_1")
+        )
+    else:
+        debtors.append(
+            create_debtor(parse_debtor({}), case_id=case.id, filing_role="debtor_1")
+        )
+    PostgresCaseStore(url).create(
+        case, assign_case(case, subject=ALICE, assigned_by=ALICE), debtors
     )
+    return case
+
+
+def _pg_bind(url, case, subject=PORTAL):
+    binding = create_binding(
+        parse_invitation(
+            {
+                "email": f"{subject}@example.test",
+                "displayName": "Portal Person",
+                "roles": ["debtor_1"],
+            }
+        ),
+        firm_id=FIRM,
+        case_id=case.id,
+        subject=subject,
+        invited_by=ALICE,
+    )
+    PostgresClientBindingStore(url).bind(binding, narrowed=())
+
+
+@pytest.fixture
+def pg_firm(postgres, postgres_url):
+    PostgresFirmStore(postgres_url).create_firm(
+        Firm(
+            id=FIRM,
+            name="Example & Partners",
+            status="active",
+            created_at="2026-01-01T00:00:00.000Z",
+            updated_at="2026-01-01T00:00:00.000Z",
+        )
+    )
+    return postgres_url
+
+
+def test_postgres_purges_a_pre_client_case_whole_and_keeps_a_client_case(
+    postgres, pg_firm
+):
+    url = pg_firm
+    old = _pg_case(url, client=False)
+    _pg_bind(url, old)
+    kept = _pg_case(url, client=True)
+
+    report = purge(PostgresCaseTableRows(url), apply=True)
+
+    assert (report.deleted, report.kept_with_client) == ((old.id,), 1)
+    assert report.bindings_deleted == 1
+    for table in (*CASE_TABLES, "cases", "client_bindings"):
+        column = "id" if table == "cases" else "case_id"
+        left = postgres.execute(
+            f"SELECT count(*) AS n FROM {table} WHERE {column} = %s",
+            (old.id,),
+        ).fetchone()
+        assert left["n"] == 0, table
+    assert PostgresCaseTableRows(url).partition(kept.id)
+    assert purge(PostgresCaseTableRows(url), apply=True).planned == ()
+
+
+def test_postgres_refuses_a_debtor_or_root_once_a_client_is_linked(postgres, pg_firm):
+    url = pg_firm
+    case = _pg_case(url, client=False)
+    rows = PostgresCaseTableRows(url)
+    postgres.execute(
+        "UPDATE debtors SET client_id = 'c-late' WHERE case_id = %s", (case.id,)
+    )
+    assert rows.delete({"PK": f"CASE#{case.id}", "SK": "DEBTOR#debtor_1"}) is False
+    assert rows.delete({"PK": f"CASE#{case.id}", "SK": "META"}) is False
+    assert rows.partition(case.id)
+
+
+def test_postgres_keeps_a_binding_moved_to_another_case(postgres, pg_firm):
+    url = pg_firm
+    case = _pg_case(url, client=False)
+    _pg_bind(url, case)
+    rows = PostgresCaseTableRows(url)
+    moved = BindingRow(firm_id=FIRM, subject=PORTAL, case_id="another-case")
+    assert rows.delete_binding(moved) is False
+    assert rows.delete_binding(
+        BindingRow(firm_id=FIRM, subject=PORTAL, case_id=case.id)
+    )
+
+
+def test_the_purge_knows_every_table_keyed_by_a_case(postgres):
+    """A migration that adds a case child table must add it to CASE_TABLES,
+    or deleting the root would fail at its foreign key."""
+    tables = {
+        row["table_name"]
+        for row in postgres.execute(
+            "SELECT table_name FROM information_schema.columns"
+            " WHERE table_schema = 'public' AND column_name = 'case_id'"
+        )
+    }
+    # Kept on purpose: append-only, outlives the case (module docstring).
+    # client_bindings is `delete_binding`'s.
+    assert tables - {"client_bindings"} == set(CASE_TABLES)
 
 
 def test_the_plan_ignores_a_debtor_whose_client_link_is_empty():

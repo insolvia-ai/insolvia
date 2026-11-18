@@ -156,9 +156,7 @@ version (`tests/unit/test_packaging.py`).
 `insolvia-<env>-filing-role` (created by `infra/modules/filing_credentials`).
 Its AWS grants, all told: the vault key (Decrypt under the vault purpose —
 `filing_credentials`), the queue (consume — `filing_queue`), and
-`infra/modules/filing_worker`'s: GetItem/Query and PutItem/UpdateItem on the
-case table (unused since ADR 0030; #626 removes them), the case key through
-DynamoDB and S3 only, Decrypt of a sealed tax id under the tax-id encryption context alone
+`infra/modules/filing_worker`'s: the case key through S3 only, Decrypt of a sealed tax id under the tax-id encryption context alone
 (`TaxIdOpen` — the Case Upload file, below), GetObject on
 `cases/*/packets/*`, PutObject on `cases/*/filings/*`, and GetParameter on the
 kill switch. Locally the poller assumes the same role, so

@@ -39,22 +39,19 @@ Responses:
   for per-field failures, or `{"error": "ValidationError", "message": "…"}`
   when the body isn't a JSON object.
 
-The stored DynamoDB item preserves the marketing implementation's schema
+The stored item preserves the marketing implementation's schema
 exactly (`PK="WAITLIST"`, `SK="<submittedAt>#<id>"`, optional fields omitted
 rather than empty) — see `core/waitlist.py::record_item`.
 
 ## Local development
 
-Local dev runs against **this machine's real AWS dev table** — there is no
-local DynamoDB emulator. The per-machine layer
-(`infra/envs/dev`: an isolated case store per developer machine; sign-in
-uses the one shared dev pool from insolvia-services) is the dev case
-database. The firm stores, portal bindings and waitlist are the compose
-stack's Postgres (ADR 0030), migrated on start:
+Every store is the compose stack's Postgres (ADR 0030), migrated on start,
+and case documents go to its local S3 server; sign-in uses the one shared
+dev pool from insolvia-services:
 
 ```sh
 ./scripts/dev-setup.sh                      # venv + per-machine AWS resources
-./scripts/dev-up.sh                         # compose stack on :8080, real table
+./scripts/dev-up.sh                         # compose stack on :8080
 curl http://127.0.0.1:8080/health
 ```
 

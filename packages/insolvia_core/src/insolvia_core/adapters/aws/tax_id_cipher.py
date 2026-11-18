@@ -14,12 +14,12 @@ from insolvia_core.tax_ids import Envelope
 
 
 def case_key_alias(case_table_name: str) -> str:
-    """The case key's alias, from the case table's name.
+    """The case key's alias, from CASE_TABLE_NAME.
 
-    Both are `${project}-${environment}-cases` — ONE `local.name` in
-    infra/modules/case_store/main.tf, which is what makes this a derivation
-    rather than a coincidence: the table is `insolvia-<env>-cases` and its
-    key is `alias/insolvia-<env>-cases`, in every environment including a
+    `insolvia-<env>-cases` is a historical name — no table has carried it
+    since ADR 0030 — kept because it is `local.name` in
+    infra/modules/case_store/main.tf, which names the key: its alias is
+    `alias/insolvia-<env>-cases`, in every environment including a
     developer's `insolvia-dev-<short-id>-cases`. So the ciphers need no
     configuration of their own — no SSM parameter, no `.env` line, nothing
     for scripts/dev-aws-setup.sh to write — and the deploy role's

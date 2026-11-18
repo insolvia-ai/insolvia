@@ -1,5 +1,5 @@
 """The admin audit log over Postgres (ADR 0030): one appended row per event,
-its `item` the domain's `event_item` minus the DynamoDB keys. That the admin
+its `item` the domain's `event_item` minus its key attributes. That the admin
 role may only INSERT into it is insolvia_core's grants test. Every
 identifier is obviously fake."""
 

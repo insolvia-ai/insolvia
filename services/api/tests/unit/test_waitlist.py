@@ -109,7 +109,7 @@ def test_unknown_keys_are_ignored():
 # --- record + item shape ---------------------------------------------------
 
 
-def test_record_item_preserves_the_marketing_dynamodb_schema():
+def test_record_item_preserves_the_marketing_schema():
     submission = parse_waitlist_submission(VALID_BODY)
     record = create_waitlist_record(submission)
 

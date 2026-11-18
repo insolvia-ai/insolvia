@@ -326,7 +326,7 @@ jobs:
   # THIS IS WHAT MAKES THE API LEG ASSERT BEHAVIOUR. /health proves the
   # function booted; this proves a real token from the real pool verifies
   # against the deployed configuration, that the Lambda's own execution role
-  # may make every call the routes make (DynamoDB, KMS, S3 — the one thing
+  # may make every call the routes make (Postgres, KMS, S3 — the one thing
   # no test on a laptop can exercise, because a developer's credentials are
   # wider than the role's), that the bucket policy admits the presigned PUT
   # the API mints, and that ADR 0009's refusals hold from outside.

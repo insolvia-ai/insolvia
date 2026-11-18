@@ -29,7 +29,7 @@ def test_the_scratch_case_is_listed_for_its_firm(
 def test_an_update_is_read_back_from_the_store_not_the_response(
     admin: Api, scratch_case: dict[str, Any]
 ):
-    """PATCH then GET, and the GET is the assertion: it proves the item DynamoDB
+    """PATCH then GET, and the GET is the assertion: it proves the row Postgres
     holds is the one the API said it wrote."""
     case_id = scratch_case["id"]
     admin.patch(f"/v1/cases/{case_id}", {"chapter": 13})

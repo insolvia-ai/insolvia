@@ -129,7 +129,7 @@ module "admin_service" {
 # second protocol surface over the same case and firm stores, deployed the
 # way the API is: same cert-lookup reuse, same image-before-apply bootstrap
 # on the first apply (scripts/bootstrap-ecr-images.sh prod mcp). Its data
-# grants attach from modules/case_store (mcp_role_name), so this module owns only the service stack itself.
+# data access is its Postgres role (modules/database), so this module owns only the service stack itself.
 module "mcp_service" {
   source = "../../modules/mcp_service"
 
@@ -324,15 +324,14 @@ resource "aws_ssm_parameter" "job_queue_url" {
   tags  = local.common_tags
 }
 
-# Case data store (issue 8.2): the first GLBA-scope persistent store — a
-# customer-managed key and the case table behind it. Declared after
+# Case key (issue 8.2): the customer-managed key for case documents and
+# sealed tax ids (case rows are in Postgres since ADR 0030). Declared after
 # module.api_service because it takes that module's execution role name and
-# attaches the table grant onto it from its own side (modules/case_store).
+# attaches the tax-id key grant onto it from its own side (modules/case_store).
 #
-# Prod inverts staging's two settings: deletion protection on, and the maximum
-# key deletion window. Scheduling this key's deletion makes every case
-# permanently unreadable — PITR does not help, because the restore is
-# encrypted under the same key — so 30 days of second thoughts is the point.
+# Prod takes the maximum key deletion window. Scheduling this key's deletion
+# makes every case document and sealed tax id permanently unreadable, so 30
+# days of second thoughts is the point.
 module "case_store" {
   source = "../../modules/case_store"
 
@@ -340,8 +339,6 @@ module "case_store" {
   environment                 = local.environment
   api_role_name               = module.api_service.lambda_role_name
   worker_role_name            = module.job_pipeline.worker_role_name
-  mcp_role_name               = module.mcp_service.lambda_role_name
-  deletion_protection         = true
   key_deletion_window_in_days = 30
   tags                        = local.common_tags
 }
@@ -441,8 +438,7 @@ module "filing_worker" {
   worker_role_arn           = module.filing_credentials.worker_role_arn
   queue_arn                 = module.filing_queue.queue_arn
   dlq_name                  = module.filing_queue.dlq_name
-  case_table_arn            = module.case_store.table_arn
-  case_table_name           = module.case_store.table_name
+  case_table_name           = module.case_store.name
   case_kms_key_arn          = module.case_store.kms_key_arn
   case_document_bucket_arn  = module.case_documents.bucket_arn
   case_document_bucket_name = module.case_documents.bucket_name
@@ -450,34 +446,33 @@ module "filing_worker" {
   tags                      = local.common_tags
 }
 
-# Publish the case table name into the API's SSM config namespace, env-level
+# Publish CASE_TABLE_NAME (the case key's name — a historical name, no table
+# carries it since ADR 0030) into the API's SSM config namespace, env-level
 # for the same reason the auth parameters above are:
 # module.case_store already depends on module.api_service, so having
-# api_service read the table name back would be a dependency cycle.
+# api_service read the name back would be a dependency cycle.
 #
 # Same /insolvia/<env>/api/<kebab-key> convention, so the deploy workflow's
 # get-parameters-by-path step derives it into CASE_TABLE_NAME with no workflow
-# change. The key ARN is deliberately NOT published: the SDK resolves the key
-# from the table, so nothing in services/api ever names it. That is NOT the
-# same as the API role needing no key permissions — it does, and
-# modules/case_store explains why.
+# change. The key ARN is deliberately NOT published: the services derive the
+# key's alias from this name (insolvia_core's `case_key_alias`).
 resource "aws_ssm_parameter" "case_table_name" {
   name  = "/insolvia/${local.environment}/api/case-table-name"
   type  = "String"
-  value = module.case_store.table_name
+  value = module.case_store.name
   tags  = local.common_tags
 }
 
 # ── MCP configuration namespace (#261/#262) ─────────────────────
 # The /insolvia/<env>/mcp siblings of the api namespace above — env-level for
-# the same cycle-avoidance reason (module.case_store
-# depends on module.mcp_service to attach its grants), re-published under /mcp
+# the same reason (module.mcp_service never reads another module's outputs
+# back), re-published under /mcp
 # because each service's namespace is its complete configuration contract.
 # See infra/envs/staging/main.tf for the longer form of both arguments.
 resource "aws_ssm_parameter" "mcp_case_table_name" {
   name  = "/insolvia/${local.environment}/mcp/case-table-name"
   type  = "String"
-  value = module.case_store.table_name
+  value = module.case_store.name
   tags  = local.common_tags
 }
 
@@ -509,9 +504,9 @@ resource "aws_ssm_parameter" "case_document_bucket" {
   tags  = local.common_tags
 }
 
-# Case-data audit trail (issue 8.2): CloudTrail data events on the case table,
+# Case-data audit trail (issue 8.2): CloudTrail data events on the case documents,
 # into an insolvia-<env>-audit bucket under its own key. Declared after
-# module.case_store because it records that module's table.
+# module.case_documents because it records that module's bucket.
 #
 # The key is separate from the case key by necessity as well as design:
 # ci-trust denies the deploy role kms:GenerateDataKey on alias/insolvia-*-cases,
@@ -527,10 +522,10 @@ module "audit_trail" {
   project     = "insolvia"
   environment = local.environment
 
-  # The case table, and its indexes via starts_with. The vault's rows are
-  # in Postgres since ADR 0030; its KEY is covered below.
+  # The case documents' objects. Case rows (and the vault's) are in
+  # Postgres since ADR 0030; the vault's KEY is covered below.
   data_resource_arns = [
-    module.case_store.table_arn,
+    "${module.case_documents.bucket_arn}/",
   ]
 
   # The vault KEY's seals and opens are management events (the module's

@@ -1,7 +1,6 @@
-"""The in-memory CaseEntityStore — the same contract the DynamoDB adapter
-holds, exercised at the port. The AWS adapter is not tested against a fake
-DynamoDB by decision (no moto); its conditions mirror the ones asserted here
-and the key construction is shared with entity_item."""
+"""The in-memory CaseEntityStore — the same contract the Postgres adapter
+holds, exercised at the port; the key construction is shared with
+entity_item."""
 
 from __future__ import annotations
 

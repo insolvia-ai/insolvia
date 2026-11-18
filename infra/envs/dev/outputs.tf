@@ -14,12 +14,12 @@ output "environment" {
 }
 
 output "case_table_name" {
-  description = "This machine's case DynamoDB table (CASE_TABLE_NAME for the local API)."
-  value       = module.case_store.table_name
+  description = "CASE_TABLE_NAME for the local services: the case key's name (no table carries it since ADR 0030)."
+  value       = module.case_store.name
 }
 
 output "case_kms_key_alias" {
-  description = "Alias of this machine's case-data key. Printed for orientation; nothing consumes it — DynamoDB resolves the key from the table."
+  description = "Alias of this machine's case-data key. Printed for orientation; the services derive it from case_table_name."
   value       = module.case_store.kms_key_alias
 }
 

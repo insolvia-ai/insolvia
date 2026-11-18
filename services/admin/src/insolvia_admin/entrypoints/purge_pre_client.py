@@ -19,6 +19,10 @@ next plan does not name it; a case opened for a client has a client-linked
 Debtor 1 from its first write, so no plan ever names it. `--check` after an
 `--apply` is the proof: exit 0 means nothing pre-client is left.
 
+WHAT IT READS. The database DATABASE_URL names (ADR 0030). The two table
+names no longer name tables: they are the environment fence, the same
+labels the seeder takes, and must agree with each other.
+
 WHERE IT MAY RUN. Dev, staging AND prod — the one fence here that admits
 prod, which is why it is its own entrypoint rather than a `seed`
 subcommand: the seeder's dev/staging-only fence is load-bearing and stays
@@ -37,12 +41,15 @@ not worth one).
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import sys
 from collections.abc import Callable
 from typing import Final
 
-from insolvia_admin.adapters.aws.case_purge import DynamoDbCaseTableRows
+from insolvia_core.database import database_url
+
+from insolvia_admin.adapters.postgres.case_purge import PostgresCaseTableRows
 from insolvia_admin.core.pre_client_purge import CaseTableRows, purge
 
 # insolvia-<env>-<kind>, environment SECOND (the insolvia-aws-naming skill);
@@ -87,7 +94,7 @@ def _build_parser() -> argparse.ArgumentParser:
 def main(
     argv: list[str] | None = None,
     *,
-    rows: Callable[[str, str], CaseTableRows] = DynamoDbCaseTableRows,
+    rows: Callable[[str, str], CaseTableRows] | None = None,
 ) -> int:
     args = _build_parser().parse_args(argv)
     try:
@@ -102,6 +109,12 @@ def main(
         print(f"refusing: {refusal}", file=sys.stderr)
         return _REFUSED
 
+    if rows is None:
+        # The rows are DATABASE_URL's (ADR 0030); the table names stay the
+        # environment fence, exactly as the seeder's.
+        url = database_url(os.environ, required=True)
+        assert url is not None
+        rows = lambda _case, _firm: PostgresCaseTableRows(url)  # noqa: E731
     report = purge(rows(args.case_table, args.firm_table), apply=args.apply)
     # Case ids and counts only: never a name — a case id is what the access
     # log and every request log already carry.

@@ -1,6 +1,6 @@
 """Waitlist submission validation and record shape.
 
-The validation rules and the DynamoDB item shape mirror the marketing site's
+The validation rules and the stored item shape mirror the marketing site's
 original SSR implementation (apps/insolvia_marketing waitlist, issue #47) —
 that implementation moved behind this API per docs/adr/0001, and the table
 schema and its Query pattern (one fixed partition, time-ordered sort key)

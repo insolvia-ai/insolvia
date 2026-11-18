@@ -7,7 +7,7 @@ infra/modules/case_documents creates, and how access to them is brokered is
 api/routes/documents.py's docstring.
 
 Everything here is pure: no Flask, no boto3. The item shape lives here rather
-than in an adapter so the DynamoDB and in-memory stores cannot drift apart,
+than in an adapter so the Postgres and in-memory stores cannot drift apart,
 exactly as core/cases.py does for the case root.
 
 WHY THERE IS NO PROVENANCE ON THIS RECORD, since every other case-scoped entity
@@ -522,7 +522,7 @@ def list_order(document: Document) -> tuple[str, str]:
 
     They cannot get it for free the way the case list does. A case's documents
     are queried by partition and come back in sort-key order, and the sort key
-    is DOCUMENT#<uuid4>: random. So the order a DynamoDB query returns carries
+    is DOCUMENT#<uuid4>: random. So the order a keyed query returns carries
     no meaning at all, and both implementations sort explicitly against this
     function instead. The data model says the same thing from the other side —
     ordering comes from the timestamp, never from the id.
@@ -561,10 +561,9 @@ def document_item(document: Document) -> dict[str, str | int]:
     }
     if document.request_id is not None:
         item["requestId"] = document.request_id
-    # Omitted rather than written empty. DynamoDB has no empty-string type
-    # worth using here, and "the attribute is absent" is the honest encoding of
-    # "nothing has looked at this object yet" — which is exactly what a pending
-    # row means.
+    # Omitted rather than written empty: "the attribute is absent" is the
+    # honest encoding of "nothing has looked at this object yet" — which is
+    # exactly what a pending row means.
     if document.etag is not None:
         item["etag"] = document.etag
     return item

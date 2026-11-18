@@ -9,7 +9,7 @@ from insolvia_api.core.filing_approval import FilingApproval
 
 class MemoryFilingApprovalStore:
     """Ephemeral FilingApprovalStore for tests and the plain development
-    server, with the DynamoDB adapter's conditions — a test that could
+    server, with the Postgres adapter's conditions — a test that could
     consume twice, or create past a moved pointer, would be testing a weaker
     store than production runs."""
 

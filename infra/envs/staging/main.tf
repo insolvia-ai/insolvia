@@ -129,7 +129,7 @@ module "admin_service" {
 # second protocol surface over the same case and firm stores, deployed the
 # way the API is: same cert-lookup reuse, same image-before-apply bootstrap
 # on the first apply (scripts/bootstrap-ecr-images.sh staging mcp). Its data
-# grants attach from modules/case_store (mcp_role_name), so this module owns only the service stack itself.
+# data access is its Postgres role (modules/database), so this module owns only the service stack itself.
 module "mcp_service" {
   source = "../../modules/mcp_service"
 
@@ -300,7 +300,7 @@ module "marketing_site" {
 # accepted jobs onto, the worker Lambda that runs them, the DLQ and its
 # alarms. Declared after module.api_service because it takes that module's
 # role name (the enqueue grant attaches from the pipeline's side) and its
-# alarms topic; the worker's CASE-TABLE grant attaches from module.case_store
+# alarms topic; the worker's tax-id key grant attaches from module.case_store
 # below (worker_role_name), completing the seam without either module
 # referencing the other's resources.
 #
@@ -335,14 +335,14 @@ resource "aws_ssm_parameter" "job_queue_url" {
   tags  = local.common_tags
 }
 
-# Case data store (issue 8.2): the first GLBA-scope persistent store — a
-# customer-managed key and the case table behind it. Declared after
+# Case key (issue 8.2): the customer-managed key for case documents and
+# sealed tax ids (case rows are in Postgres since ADR 0030). Declared after
 # module.api_service because it takes that module's execution role name and
-# attaches the table grant onto it from its own side (modules/case_store).
+# attaches the tax-id key grant onto it from its own side (modules/case_store).
 #
-# Staging is disposable on purpose: synthetic cases only, no deletion
-# protection, and the minimum key deletion window so a teardown does not leave
-# a 30-day-pending key behind. Prod inverts both.
+# Staging is disposable on purpose: synthetic cases only, and the minimum key
+# deletion window so a teardown does not leave a 30-day-pending key behind.
+# Prod takes the maximum.
 module "case_store" {
   source = "../../modules/case_store"
 
@@ -350,8 +350,6 @@ module "case_store" {
   environment                 = local.environment
   api_role_name               = module.api_service.lambda_role_name
   worker_role_name            = module.job_pipeline.worker_role_name
-  mcp_role_name               = module.mcp_service.lambda_role_name
-  deletion_protection         = false
   key_deletion_window_in_days = 7
   tags                        = local.common_tags
 }
@@ -451,8 +449,7 @@ module "filing_worker" {
   worker_role_arn           = module.filing_credentials.worker_role_arn
   queue_arn                 = module.filing_queue.queue_arn
   dlq_name                  = module.filing_queue.dlq_name
-  case_table_arn            = module.case_store.table_arn
-  case_table_name           = module.case_store.table_name
+  case_table_name           = module.case_store.name
   case_kms_key_arn          = module.case_store.kms_key_arn
   case_document_bucket_arn  = module.case_documents.bucket_arn
   case_document_bucket_name = module.case_documents.bucket_name
@@ -460,29 +457,27 @@ module "filing_worker" {
   tags                      = local.common_tags
 }
 
-# Publish the case table name into the API's SSM config namespace, env-level
+# Publish CASE_TABLE_NAME (the case key's name — a historical name, no table
+# carries it since ADR 0030) into the API's SSM config namespace, env-level
 # for the same reason the auth parameters above are:
 # module.case_store already depends on module.api_service, so having
-# api_service read the table name back would be a dependency cycle.
+# api_service read the name back would be a dependency cycle.
 #
 # Same /insolvia/<env>/api/<kebab-key> convention, so the deploy workflow's
 # get-parameters-by-path step derives it into CASE_TABLE_NAME with no workflow
-# change. The key ARN is deliberately NOT published: the SDK resolves the key
-# from the table, so nothing in services/api ever names it. That is NOT the
-# same as the API role needing no key permissions — it does, and
-# modules/case_store explains why.
+# change. The key ARN is deliberately NOT published: the services derive the
+# key's alias from this name (insolvia_core's `case_key_alias`).
 resource "aws_ssm_parameter" "case_table_name" {
   name  = "/insolvia/${local.environment}/api/case-table-name"
   type  = "String"
-  value = module.case_store.table_name
+  value = module.case_store.name
   tags  = local.common_tags
 }
 
 # ── MCP configuration namespace (#261/#262) ─────────────────────
 # The /insolvia/<env>/mcp siblings of the api namespace above, env-level for
-# the same cycle-avoidance reason: module.case_store
-# already depends on module.mcp_service (it attaches its data grants), so the
-# service module reading their outputs back would be a cycle. The MCP deploy
+# the same reason: module.mcp_service never reads another module's
+# outputs back, which keeps the roots acyclic. The MCP deploy
 # workflow's get-parameters-by-path step derives each into the service's
 # environment (last segment, upper-cased, hyphens to underscores).
 #
@@ -493,7 +488,7 @@ resource "aws_ssm_parameter" "case_table_name" {
 resource "aws_ssm_parameter" "mcp_case_table_name" {
   name  = "/insolvia/${local.environment}/mcp/case-table-name"
   type  = "String"
-  value = module.case_store.table_name
+  value = module.case_store.name
   tags  = local.common_tags
 }
 
@@ -525,9 +520,9 @@ resource "aws_ssm_parameter" "case_document_bucket" {
   tags  = local.common_tags
 }
 
-# Case-data audit trail (issue 8.2): CloudTrail data events on the case table,
+# Case-data audit trail (issue 8.2): CloudTrail data events on the case documents,
 # into an insolvia-<env>-audit bucket under its own key. Declared after
-# module.case_store because it records that module's table.
+# module.case_documents because it records that module's bucket.
 #
 # The key is separate from the case key by necessity as well as design:
 # ci-trust denies the deploy role kms:GenerateDataKey on alias/insolvia-*-cases,
@@ -543,10 +538,10 @@ module "audit_trail" {
   project     = "insolvia"
   environment = local.environment
 
-  # The case table, and its indexes via starts_with. The vault's rows are
-  # in Postgres since ADR 0030; its KEY is covered below.
+  # The case documents' objects. Case rows (and the vault's) are in
+  # Postgres since ADR 0030; the vault's KEY is covered below.
   data_resource_arns = [
-    module.case_store.table_arn,
+    "${module.case_documents.bucket_arn}/",
   ]
 
   # The vault KEY's seals and opens are management events (the module's

@@ -6,7 +6,7 @@ from insolvia_core.documents import Document, list_order
 class MemoryDocumentStore:
     """Ephemeral DocumentStore for tests and the plain development server.
 
-    Keyed by (case_id, document_id) — the DynamoDB adapter's PK and SK — so
+    Keyed by (case_id, document_id) — the Postgres table's primary key — so
     "a document id only resolves inside its own case" is a property of this
     dict rather than something every caller has to remember, exactly as it is a
     property of the table's key schema on the other side. A store keyed by
@@ -27,7 +27,7 @@ class MemoryDocumentStore:
         # `setdefault(...) is not document` looked like the same check and was
         # not. Creating twice with the SAME Document instance made setdefault
         # return that very object, the identity test passed, and the second
-        # create succeeded silently — while DynamoDB's condition, which knows
+        # create succeeded silently — while the database's unique key, which knows
         # nothing about Python identity, would have raised. The looseness was
         # exactly the one the comment promised was absent, and it was invisible
         # because it needed the same instance twice to show up.

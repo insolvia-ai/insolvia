@@ -26,7 +26,7 @@ from insolvia_core.questionnaire import (
 class MemoryFirmStore:
     """Ephemeral FirmStore for tests and the plain development server.
 
-    It enforces the same conditions the DynamoDB adapter does — no overwrite on
+    It enforces the same conditions the Postgres adapter does — no overwrite on
     create, firm-scoped reads, a raise on a subject in two firms — because a
     suite running against a store with weaker rules than production would pass
     on code that crosses tenants.
@@ -36,7 +36,7 @@ class MemoryFirmStore:
         self.firms: dict[str, Firm] = {}
         # Keyed exactly as the table is: the firm partition, then the person.
         # A flat dict keyed by subject alone would make the firm-scoped reads
-        # below impossible to get wrong, which is the problem — the DynamoDB
+        # below impossible to get wrong, which is the problem — the Postgres
         # adapter CAN get them wrong, so this one has to be able to as well.
         self.users: dict[tuple[str, str], FirmUser] = {}
         # Same keying discipline as `users` above, for the same reason.
@@ -45,7 +45,7 @@ class MemoryFirmStore:
         self.clients: dict[tuple[str, str], FirmClient] = {}
         # The questionnaire config, held as the STORED ITEM rather than the
         # dataclass, so a suite running here round-trips the item shape the
-        # DynamoDB adapter writes. Keyed by firm: one item per partition.
+        # Postgres adapter writes. Keyed by firm: one item per partition.
         self.questionnaires: dict[str, dict[str, object]] = {}
         # The document checklist, held the same way for the same reason.
         self.document_checklists: dict[str, dict[str, object]] = {}
@@ -64,7 +64,7 @@ class MemoryFirmStore:
         return self.firms.get(firm_id)
 
     def list_firms(self) -> tuple[Firm, ...]:
-        # Same ordering contract as the DynamoDB adapter: name then id, so a
+        # Same ordering contract as the Postgres adapter: name then id, so a
         # suite passing against this store proves the ordering the portal
         # renders.
         return tuple(sorted(self.firms.values(), key=lambda firm: (firm.name, firm.id)))
@@ -96,7 +96,7 @@ class MemoryFirmStore:
         return matches[0]
 
     def list_users(self, firm_id: str) -> tuple[FirmUser, ...]:
-        # BY SURNAME, and this key must stay identical to the DynamoDB
+        # BY SURNAME, and this key must stay identical to the Postgres
         # adapter's — the two stores exist to be interchangeable, and an
         # ordering that differed between them would make a test that passes
         # here prove nothing about production.
@@ -130,7 +130,7 @@ class MemoryFirmStore:
         return self.library_creditors.get((firm_id, creditor_id))
 
     def list_library_creditors(self, firm_id: str) -> tuple[LibraryCreditor, ...]:
-        # BY NAME, matching the DynamoDB adapter — the two stores exist to be
+        # BY NAME, matching the Postgres adapter — the two stores exist to be
         # interchangeable.
         return tuple(
             sorted(
@@ -167,7 +167,7 @@ class MemoryFirmStore:
         return self.clients.get((firm_id, client_id))
 
     def list_clients(self, firm_id: str) -> tuple[FirmClient, ...]:
-        # The shared ordering, so this store and DynamoDB cannot disagree.
+        # The shared ordering, so this store and Postgres cannot disagree.
         return sorted_firm_clients(
             client for client in self.clients.values() if client.firm_id == firm_id
         )
@@ -178,7 +178,7 @@ class MemoryFirmStore:
         if stored is None or stored.merged_into is not None:
             return None
         # The record's own fields only: the merge attributes stay as stored,
-        # as the DynamoDB adapter's UpdateItem leaves them.
+        # as the Postgres adapter's UPDATE leaves them.
         written = replace(
             client,
             merged_into=stored.merged_into,
@@ -220,7 +220,7 @@ class MemoryFirmStore:
 
     # ── Merging two clients ─────────────────────────────────────────
     #
-    # The DynamoDB adapter's conditions, checked and applied in one step —
+    # The Postgres adapter's conditions, checked and applied in one step —
     # nothing runs between the lines here, which is what its transactions buy.
 
     def claim_client_merge(

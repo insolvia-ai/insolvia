@@ -1,6 +1,6 @@
 """Merging two firm clients (ADR 0022's PR 7): the re-point, the archive with
 `merged_into`, the refusals, the claim that keeps two merges into and out of
-one client from stranding a case, and the DynamoDB debtor store's half of it.
+one client from stranding a case, and the debtor store's half of it.
 
 The route — who may, the status codes, the access log — is services/api's
 test_firm_clients_routes.py; the firm store's transactions are pinned in

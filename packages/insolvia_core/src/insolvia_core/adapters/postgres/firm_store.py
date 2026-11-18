@@ -1,8 +1,8 @@
 """FirmStore over Postgres (ADR 0030, #621): migration 0001's firm tables.
 
-Each row's `item` is the domain's stored shape (`firm_item`, …) minus the
-DynamoDB key attributes, read back through the same `*_from_item` the memory
-twin's shapes come from. Each DynamoDB condition is an `UPDATE … WHERE`, and
+Each row's `item` is the domain's stored shape (`firm_item`, …) minus its
+`PK`/`SK` key attributes, read back through the same `*_from_item` the memory
+twin's shapes come from. Each conditional write is an `UPDATE … WHERE`, and
 each multi-item transaction is one database transaction.
 """
 
@@ -59,7 +59,7 @@ _KEYS = ("PK", "SK", "GSI1PK", "GSI1SK")
 
 
 def stored(item: Mapping[str, Any]) -> Jsonb:
-    """A domain item as the `item` column holds it: without the DynamoDB keys,
+    """A domain item as the `item` column holds it: without its key attributes,
     which the table's own columns replace."""
     return Jsonb({key: value for key, value in item.items() if key not in _KEYS})
 

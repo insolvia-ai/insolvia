@@ -34,7 +34,7 @@ description: >-
 Lowercase letters, digits and hyphens only. No underscores, no uppercase, no
 spaces — several AWS services reject them and others handle them inconsistently.
 Keep names short; per-service character limits are real (IAM roles 64, Lambda
-64, S3 63, DynamoDB 255).
+64, S3 63).
 
 **If AWS can generate the name and nothing in our workflow needs to predict it,
 let AWS generate it.** A name you never look up is a name that can't drift.
@@ -196,16 +196,16 @@ log groups, alarms, SSM parameters.
 | Resource | What is lost |
 | --- | --- |
 | Cognito user pool | every account and password. Users cannot be migrated with passwords intact — they must reset |
-| DynamoDB table | every row |
 | S3 bucket | every object. Names are also not immediately reusable after deletion |
 | SQS queue | in-flight messages |
 | SES domain identity | verification, until DNS re-propagates — outbound mail fails in the window |
 
-Prod sets `deletion_protection = true` on the Cognito pool and on the case,
-firm tables, and `force_destroy = false` on the document and
-audit buckets. **A rename apply against prod fails mid-plan on those** — the
-protections have to be turned off in their own apply first, and the buckets
-emptied. `scripts/rename-teardown.sh` does both, in that order.
+Prod sets `deletion_protection = true` on the Aurora cluster, and
+`force_destroy = false` on the document and audit buckets. **A rename apply
+against prod fails mid-plan on those** — the protections have to be turned
+off in their own apply first, and the buckets emptied (the one-time
+`scripts/rename-teardown.sh` did both for the 2026 rename; it is in git
+history).
 
 CloudFront distributions have no name attribute at all: renaming the *Terraform
 address* is free, and a `moved` block makes it a state move rather than a

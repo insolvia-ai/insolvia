@@ -399,9 +399,8 @@ def test_a_firm_carries_no_gsi_keys():
 
 
 def test_a_firm_user_always_carries_the_index_keys():
-    """THE SHARP EDGE OF A SPARSE INDEX. DynamoDB indexes an item only when it
-    has every key attribute, so omitting GSI1PK raises nothing — it produces a
-    user who simply cannot sign in, with no error anywhere."""
+    """Omitting the lookup keys raises nothing — it produces a user whom a
+    key-based lookup cannot find, with no error anywhere."""
     item = firm_user_item(user())
     assert item["GSI1PK"] == f"USER#{ALICE}"
     assert item["GSI1SK"] == f"FIRM#{FIRM_ID}"

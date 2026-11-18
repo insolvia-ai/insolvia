@@ -14,7 +14,7 @@ below is ours.
 
 Everything in this module is pure: no Flask, no boto3, no clock beyond
 datetime.now. The item shapes live here rather than in an adapter so the
-DynamoDB and in-memory stores cannot drift apart, exactly as core/cases.py does
+Postgres and in-memory stores cannot drift apart, exactly as core/cases.py does
 for the case root.
 
 WHY A FIRM USER HAS NO ID OF ITS OWN, since every other entity in this service
@@ -1159,7 +1159,7 @@ def apply_user_changes(user: FirmUser, changes: FirmUserChanges) -> FirmUser:
 # the firm defaults (issue #360) added an integer (`defaultChapter`) and two
 # nested maps (`letterhead`, `signatureBlock`), so the adapter now uses the
 # shared recursive converter every other store uses
-# (`adapters.aws.dynamo`), and the alias is the honest `object`.
+# (a jsonb document now), and the alias is the honest `object`.
 FirmItemValue = object
 
 
@@ -1356,10 +1356,9 @@ def firm_user_item(user: FirmUser) -> dict[str, FirmItemValue]:
     GSI1PK  USER#<subject>      the by-subject index: given a token's `sub`,
     GSI1SK  FIRM#<firm_id>      which firm, and what may they do
 
-    THE GSI KEYS ARE THE SHARP EDGE OF THE SPARSE INDEX. DynamoDB indexes an
-    item only when it carries every key attribute, so omitting GSI1PK here does
-    not raise anything — it produces a user who simply cannot sign in, with no
-    error in any log. That is why they are written here, unconditionally,
+    THE GSI KEYS ARE THE SIGN-IN LOOKUP'S KEYS. Omitting GSI1PK here does not
+    raise anything — it produces a user whom a key-based lookup cannot find,
+    with no error in any log. That is why they are written here, unconditionally,
     rather than by an adapter that might have a branch.
 
     `displayName` IS STILL WRITTEN, and it is derived rather than stored — a
@@ -1452,7 +1451,7 @@ def firm_user_from_item(item: Mapping[str, FirmItemValue]) -> FirmUser:
             first_name=first_name,
             last_name=last_name,
             role=str(item["role"]),
-            # bool() rather than a cast: these are stored as DynamoDB BOOL and
+            # bool() rather than a cast: these are stored as JSON booleans and
             # come back as Python bools, and a row that somehow holds anything
             # else must not make `is_admin` truthy by accident.
             is_admin=item["isAdmin"] is True,

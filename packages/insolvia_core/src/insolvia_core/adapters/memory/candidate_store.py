@@ -6,7 +6,7 @@ from insolvia_core.candidates import Candidate, list_order
 class MemoryCandidateStore:
     """Ephemeral CandidateStore for tests and the plain development server.
 
-    Keyed by (case_id, id) — the DynamoDB adapter's PK and SK split apart —
+    Keyed by (case_id, id) — the Postgres table's primary key —
     so the case scope is a property of this dict rather than something every
     caller has to remember.
     """

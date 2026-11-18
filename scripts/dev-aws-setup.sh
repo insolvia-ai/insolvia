@@ -61,8 +61,6 @@ if [[ "$CHECK_ONLY" -eq 1 ]]; then
   job_queue_url="$(jq -r '.outputs.job_queue_url.value // empty' <<<"$state_json")"
   filing_queue_url="$(jq -r '.outputs.filing_queue_url.value // empty' <<<"$state_json")"
   [[ -n "$case_table" && -n "$document_bucket" && -n "$pool_id" && -n "$job_queue_url" && -n "$filing_queue_url" ]] || die "Terraform state is missing required development outputs."
-  aws_dev dynamodb describe-table --table-name "$case_table" >/dev/null ||
-    die "Development case table '$case_table' is unavailable."
   aws_dev s3api head-bucket --bucket "$document_bucket" >/dev/null ||
     die "Development case document bucket '$document_bucket' is unavailable."
   aws_dev cognito-idp describe-user-pool --user-pool-id "$pool_id" >/dev/null ||
@@ -119,17 +117,16 @@ filing_queue_url="$(jq -r '.filing_queue_url.value' <<<"$outputs")"
 mcp_auth_client_ids="$(jq -r '.mcp_auth_client_ids.value' <<<"$outputs")"
 filing_worker_role_arn="$(jq -r '.filing_worker_role_arn.value' <<<"$outputs")"
 
-# ── Wire services/api at the real table ─────────────────────────
+# ── Wire services/api at this machine's AWS resources ───────────
 # Mechanism (chosen after reading services/api/docker-compose.yml): docker
 # compose auto-reads services/api/.env for VARIABLE SUBSTITUTION — not
 # container env — and the compose file's `environment:` block is written as
 # ${VAR:-default} substitutions for exactly the keys below. So:
-#   • CASE_TABLE_NAME points it at this machine's case store (issue 8.2),
-#     and dev-up.sh refuses to start without it. (The firm stores and the
-#     waitlist are the local Postgres, ADR 0030 — nothing to wire here.)
-#     encrypted under this machine's own customer-managed key. Local work on
-#     anything storing case data needs it, and having it here means a KMS or
-#     IAM mistake fails on a laptop rather than after a deploy.
+#   • CASE_TABLE_NAME names this machine's case key (issue 8.2; a historical
+#     name — no table carries it since ADR 0030, the stores are the local
+#     Postgres). The tax-id and vault ciphers derive their key aliases from
+#     it, so a KMS or IAM mistake fails on a laptop rather than after a
+#     deploy.
 #   • AWS_PROFILE is not read by compose at all — it is the profile name
 #     services/api/scripts/dev-up.sh uses to export short-lived credentials
 #     into the container at `compose up` time. Credentials are never written

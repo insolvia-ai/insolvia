@@ -7,7 +7,7 @@ arrive with the intake work; nothing here forecloses them.
 
 Everything in this module is pure: no Flask, no boto3, no clock beyond
 datetime.now. The item shape lives here rather than in an adapter so the
-DynamoDB and in-memory stores cannot drift apart, exactly as core/waitlist.py
+Postgres and in-memory stores cannot drift apart, exactly as core/waitlist.py
 does for the waitlist table.
 """
 
@@ -994,7 +994,7 @@ def case_from_item(item: Mapping[str, object]) -> Case:
     "treat the old owner as the firm" — would put a Cognito subject where a
     firm id goes and quietly build a one-person tenant whose id is somebody's
     identity. Loud is right: those rows are dev probe data, and
-    scripts/dev-aws-reset.sh is the answer.
+    wiping the local Postgres is the answer.
     """
     try:
         raw_revisions = item.get("formRevisions")
@@ -1219,7 +1219,7 @@ def parse_list_limit(raw: str | None) -> int:
 #
 # The failure this prevents is quiet. Flip a user's `access_all_cases` between
 # two pages and, without the tag, page two resumes a by-assignee scan position
-# inside a by-firm query: DynamoDB accepts the key, returns whatever sorts
+# inside a by-firm query: the store accepts the key, returns whatever sorts
 # after it, and the user silently never sees the cases in between. With the
 # tag it is a 400 and the client starts the listing again — which is the
 # correct answer, because their listing genuinely changed.
@@ -1262,8 +1262,8 @@ def decode_cursor(cursor: str, *, index: str) -> dict[str, str]:
     """Inverse of encode_cursor, rejecting anything this service did not mint
     and anything minted against a different index.
 
-    The value is attacker-controlled and goes on to become a DynamoDB
-    ExclusiveStartKey, so it is validated to a flat string map here rather
+    The value is attacker-controlled and goes on to become a query's
+    keyset start, so it is validated to a flat string map here rather
     than passed through — an unchecked dict would let a caller shape the
     query's start key.
     """

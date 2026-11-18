@@ -39,6 +39,7 @@ from insolvia_core.adapters.aws.tax_id_cipher import KmsTaxIdCipher, case_key_al
 from insolvia_core.adapters.postgres.access_log import PostgresAccessLog
 from insolvia_core.adapters.postgres.case_entity_store import PostgresCaseEntityStore
 from insolvia_core.adapters.postgres.case_store import PostgresCaseStore
+from insolvia_core.adapters.postgres.connection import connect
 from insolvia_core.adapters.postgres.debtor_store import PostgresDebtorStore
 from insolvia_core.adapters.postgres.document_store import PostgresDocumentStore
 from insolvia_core.adapters.postgres.filing_credentials import (
@@ -282,21 +283,17 @@ def filing_of(case_id: str, approval):
     return stored
 
 
-dev_ddb = dev.client("dynamodb")
-
-
 def case_facts(case_id: str):
-    """The case as stored, its match key (read off the raw item — it is
+    """The case as stored, its match key (read off the raw row — it is
     never on the wire), and its lifecycle history."""
     case = case_store.read_for_worker(case_id)
     assert case is not None
-    item = dev_ddb.get_item(
-        TableName=TABLE,
-        Key={"PK": {"S": f"CASE#{case_id}"}, "SK": {"S": "META"}},
-        ConsistentRead=True,
-    )["Item"]
-    key = item.get("caseNumberKey", {}).get("S")
-    return case, key, case_store.status_history(case_id)
+    with connect(DATABASE_URL) as conn:
+        row = conn.execute(
+            "SELECT case_number_key FROM cases WHERE id = %s", (case_id,)
+        ).fetchone()
+    assert row is not None
+    return case, row["case_number_key"], case_store.status_history(case_id)
 
 
 def show_case(case_id: str) -> None:
@@ -575,7 +572,6 @@ if outcome.outcome != "filed" or court.submissions != 1:
 # ── 6. the role is narrow ───────────────────────────────────────
 step("6. what the worker's role may NOT do")
 role_s3 = role.client("s3")
-role_ddb = role.client("dynamodb")
 
 
 def refused(what: str, call) -> None:
@@ -601,16 +597,6 @@ refused(
         Key=f"cases/{case_id}/{uuid.uuid4()}",
         Body=b"x",
     ),
-)
-refused(
-    "delete a row of the case table",
-    lambda: role_ddb.delete_item(
-        TableName=TABLE, Key={"PK": {"S": f"CASE#{case_id}"}, "SK": {"S": "META"}}
-    ),
-)
-refused(
-    "scan the case table",
-    lambda: role_ddb.scan(TableName=TABLE, Limit=1),
 )
 # TaxIdOpen (PR 9) is Decrypt under the tax-id context ALONE: the role can
 # neither seal a tax id nor open a data key minted under any other context.

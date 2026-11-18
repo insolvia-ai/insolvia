@@ -132,7 +132,7 @@ from .fields import (
 from .firms import partition_key
 from .provenance import ProvenanceEntry, populated_paths, provenance_json
 
-# The DynamoDB sort-key namespace in the firm partition, alongside "META",
+# The item's sort-key namespace among the firm's items, alongside "META",
 # "USER#", "LIBCREDITOR#" and the portal binding's "CLIENT#". NOT "CLIENT" —
 # see the module docstring.
 SK_PREFIX: Final = "FIRMCLIENT"
@@ -427,7 +427,7 @@ def sorted_firm_clients(clients: Iterable[FirmClient]) -> tuple[FirmClient, ...]
     """THE directory order — surname, given, middle, then id — case-folded so
     `de la Cruz` does not sort after every capitalised name. Both store
     adapters call this rather than each writing a key: an ordering the memory
-    store and DynamoDB disagreed on would make a passing test prove nothing."""
+    store and Postgres disagreed on would make a passing test prove nothing."""
 
     def key(client: FirmClient) -> tuple[str, str, str, str]:
         return (
@@ -492,7 +492,7 @@ def firm_client_item(client: FirmClient) -> dict[str, object]:
 
 
 # The stored attributes of the merge — `FirmClient.merged_into` and the
-# in-flight claim. Named once, because the DynamoDB adapter's whole-record
+# in-flight claim. Named once, because the Postgres adapter's whole-record
 # update must leave exactly these alone.
 MERGED_INTO: Final = "mergedInto"
 MERGING_INTO: Final = "mergingInto"

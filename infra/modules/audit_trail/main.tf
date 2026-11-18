@@ -13,8 +13,11 @@
 # existence stand in for that one.
 #
 # Data events are billed per event, unlike management events. The selector
-# below is scoped to named resources rather than "all DynamoDB tables" so the
-# bill tracks case access rather than everything in the account.
+# below is scoped to named resources rather than "every object in the account"
+# so the bill tracks case access rather than everything else. Case ROWS are in
+# Postgres since ADR 0030, where the application's own access log
+# (`case_access_log`) is the record; what stays in AWS is the case-documents
+# bucket, whose object reads and writes this trail records.
 
 data "aws_caller_identity" "current" {}
 data "aws_region" "current" {}
@@ -277,7 +280,7 @@ resource "aws_cloudtrail" "audit" {
     }
     field_selector {
       field  = "resources.type"
-      equals = ["AWS::DynamoDB::Table"]
+      equals = ["AWS::S3::Object"]
     }
     field_selector {
       field       = "resources.ARN"
