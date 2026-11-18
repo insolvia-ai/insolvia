@@ -1,8 +1,8 @@
-"""In-memory FilingStore — the same conditions as the DynamoDB adapter, held
+"""In-memory FilingStore — the same conditions as the Postgres adapter, held
 under a lock so concurrent test threads race the way two consumers would.
 
 The case half of a filing write (`FiledCase`) lands in the MemoryCaseStore
-this store is composed with — the same table in DynamoDB, so the same
+this store is composed with — the same database in Postgres, so the same
 transaction: every condition is checked first, then every write is made,
 with nothing between them that can fail."""
 
@@ -95,7 +95,7 @@ class MemoryFilingStore:
                     )
                 ):
                     return False
-                # The DynamoDB adapter's UpdateItem: the lifecycle attributes
+                # The Postgres adapter's UPDATE: the lifecycle attributes
                 # only, over whatever else the stored case now says.
                 filed = filed_case.case
                 cases.cases[current.id] = replace(

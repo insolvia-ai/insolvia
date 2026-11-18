@@ -4,7 +4,7 @@ and its route, `POST /v1/cases/<id>/filings/<filing_id>/resolution`.
 The filing records here are written the way the filing worker leaves them —
 claimed under the approval, then `handed_back` or `outcome_unknown` — into
 the same in-memory table the case lives in, so a `filed` resolution files the
-case in the one write the DynamoDB adapter makes. Every identifier is fake;
+case in the one transaction the Postgres adapter makes. Every identifier is fake;
 every date is far-future.
 """
 

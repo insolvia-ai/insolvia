@@ -8,9 +8,8 @@
 #     a single point of egress: if the instance dies, Lambdas lose the
 #     internet (not the database) until it is replaced. Accepted pre-launch;
 #     revisit at launch with the rest of ADR 0030's capacity calls.
-#   • Gateway endpoints for S3 and DynamoDB: free, and they keep document and
-#     table traffic off the NAT instance. The DynamoDB one goes with the last
-#     table (#626).
+#   • A gateway endpoint for S3: free, and it keeps document traffic off the
+#     NAT instance.
 
 locals {
   name = "${var.project}-${var.environment}-network"
@@ -138,7 +137,7 @@ resource "aws_route_table_association" "private" {
 }
 
 resource "aws_vpc_endpoint" "gateway" {
-  for_each          = toset(["s3", "dynamodb"])
+  for_each          = toset(["s3"])
   vpc_id            = aws_vpc.main.id
   service_name      = "com.amazonaws.${data.aws_region.current.region}.${each.key}"
   vpc_endpoint_type = "Gateway"

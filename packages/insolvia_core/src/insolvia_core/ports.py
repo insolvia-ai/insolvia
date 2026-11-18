@@ -147,9 +147,8 @@ class FirmStore(Protocol):
         plan's scale — tens of firms — a scan is one page. Revisit at ~1,000
         firms; the fix then is an index AND a cursor, not a silent cap here.
 
-        The tenant API must never call this, and its IAM enforces that: the
-        API role's grant deliberately lacks dynamodb:Scan — only the admin
-        service's role can execute it.
+        The tenant API must never call this: only the admin service's routes
+        do.
         """
         ...
 
@@ -181,15 +180,10 @@ class FirmStore(Protocol):
         The by-subject index, and the ONLY method that is not firm-scoped —
         necessarily, since its whole job is to discover the firm.
 
-        EVENTUALLY CONSISTENT, unavoidably: DynamoDB global secondary indexes
-        do not support ConsistentRead. A user added a moment ago may not
-        resolve yet, which is why the administration route reads its own write
-        back by primary key (`get_user`) rather than through this.
-
         An implementation MUST raise rather than choose if a subject resolves
         to more than one firm. One person, one firm is an application
-        invariant — nothing in the key schema enforces it, because DynamoDB
-        conditions cannot span partitions — and picking a row would make
+        invariant — nothing in the key schema enforces it, because the key is
+        per firm — and picking a row would make
         someone's tenancy depend on index ordering. A loud 500 for one user
         beats a silent, unstable answer.
         """
@@ -416,8 +410,8 @@ class FirmStore(Protocol):
 
 
 class CaseStore(Protocol):
-    """Persists case records (issue 8.3). Implemented by adapters/aws
-    (DynamoDB) and adapters/memory (tests and the plain development server).
+    """Persists case records (issue 8.3). Implemented by
+    adapters/postgres and adapters/memory (tests and the plain development server).
 
     Every read takes an `Accessor` explicitly and every implementation MUST
     apply `core/access.may_see_case` rather than trusting the route to have
@@ -820,9 +814,8 @@ class DebtorStore(Protocol):
         cases, including those the person merging is not linked to — a case
         left behind would name an archived client. What it returns must never
         reach a caller, not even as a count (`CaseStore.list_for_client`
-        says why). On DynamoDB the index is eventually consistent, so an
-        entry can lag a write in either direction; `repoint_client` re-checks
-        each one against the item itself."""
+        says why). `repoint_client` re-checks each one against the row
+        itself, since a link can move between this read and that write."""
         ...
 
     def repoint_client(

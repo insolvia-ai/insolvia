@@ -25,7 +25,7 @@ from insolvia_api.core.waitlist import WaitlistRecord
 
 
 class WaitlistStore(Protocol):
-    """Persists waitlist submissions. Implemented by adapters/aws (DynamoDB)
+    """Persists waitlist submissions. Implemented by adapters/postgres
     and adapters/memory (tests and the plain development server)."""
 
     def add(self, record: WaitlistRecord) -> None: ...

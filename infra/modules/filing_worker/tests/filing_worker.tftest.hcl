@@ -31,7 +31,6 @@ variables {
   worker_role_arn           = "arn:aws:iam::111122223333:role/insolvia-staging-filing-role"
   queue_arn                 = "arn:aws:sqs:us-east-1:111122223333:insolvia-staging-filing"
   dlq_name                  = "insolvia-staging-filing-dlq"
-  case_table_arn            = "arn:aws:dynamodb:us-east-1:111122223333:table/insolvia-staging-cases"
   case_table_name           = "insolvia-staging-cases"
   case_kms_key_arn          = "arn:aws:kms:us-east-1:111122223333:key/case-key"
   case_document_bucket_arn  = "arn:aws:s3:::insolvia-staging-case-documents-us-east-1"
@@ -46,33 +45,6 @@ run "the_worker_grant_is_pinned" {
     condition = output.worker_policy == jsonencode({
       Version = "2012-10-17"
       Statement = [
-        {
-          Sid      = "FilingCaseRead"
-          Effect   = "Allow"
-          Action   = ["dynamodb:GetItem", "dynamodb:Query"]
-          Resource = "arn:aws:dynamodb:us-east-1:111122223333:table/insolvia-staging-cases"
-          Condition = {
-            Bool = { "aws:SecureTransport" = "true" }
-          }
-        },
-        {
-          Sid      = "FilingRecordWrite"
-          Effect   = "Allow"
-          Action   = ["dynamodb:PutItem", "dynamodb:UpdateItem"]
-          Resource = "arn:aws:dynamodb:us-east-1:111122223333:table/insolvia-staging-cases"
-          Condition = {
-            Bool = { "aws:SecureTransport" = "true" }
-          }
-        },
-        {
-          Sid      = "CaseKeyThroughDynamoDb"
-          Effect   = "Allow"
-          Action   = ["kms:Decrypt", "kms:GenerateDataKey", "kms:DescribeKey"]
-          Resource = "arn:aws:kms:us-east-1:111122223333:key/case-key"
-          Condition = {
-            StringEquals = { "kms:ViaService" = "dynamodb.us-east-1.amazonaws.com" }
-          }
-        },
         {
           # ADR 0024 PR 9: the Case Upload file's tax-id read — Decrypt only,
           # fenced to the tax-id envelope's encryption context.

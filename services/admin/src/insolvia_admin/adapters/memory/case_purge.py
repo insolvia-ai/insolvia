@@ -1,6 +1,6 @@
 """`CaseTableRows` over two dicts of items — the tables as their raw rows, so
 tests can plant exactly the shapes `insolvia_core`'s item functions write and
-watch exactly which ones go. Mirrors the DynamoDB adapter's two conditions."""
+watch exactly which ones go. Mirrors the Postgres adapter's two conditions."""
 
 from __future__ import annotations
 

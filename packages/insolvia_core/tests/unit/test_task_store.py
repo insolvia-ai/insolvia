@@ -3,7 +3,7 @@
 Almost everything about this adapter is covered through the routes that use
 it, and that is where it belongs. What CANNOT be observed from a route is the
 one property this file exists for: the memory store must refuse exactly the
-writes DynamoDB's `attribute_not_exists(SK)`/`attribute_exists(SK)` refuse —
+writes the Postgres adapter's key and existence checks refuse —
 see test_document_store.py, which this mirrors.
 
 Every identifier below is obviously fake. This repo is public.
@@ -61,8 +61,8 @@ def test_creating_the_same_task_twice_is_refused(store):
 def test_creating_the_same_instance_twice_is_refused(store):
     """THE FAILURE test_document_store.py's own equivalent exists for: a
     `setdefault`-shaped check returns the same object for the same instance
-    twice and would let this pass silently, where DynamoDB's
-    `attribute_not_exists(SK)` — knowing nothing about Python identity — would
+    twice and would let this pass silently, where the Postgres
+    primary key — knowing nothing about Python identity — would
     raise."""
     only = task()
     store.create(only)

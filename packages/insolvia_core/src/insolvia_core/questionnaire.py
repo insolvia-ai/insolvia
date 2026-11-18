@@ -54,7 +54,7 @@ from insolvia_core.errors import FieldValidationError, ValidationError
 from .fields import boolean, narrative, timestamp
 from .firms import partition_key
 
-# The DynamoDB sort key, alongside firms.py's "META" and "USER#" and
+# The item's sort key, alongside firms.py's "META" and "USER#" and
 # library_creditors' "LIBCREDITOR#" in the same partition. One per firm.
 SORT_KEY: Final = "QUESTIONNAIRE"
 

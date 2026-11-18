@@ -11,15 +11,12 @@ valid and describe nobody. This repo is public.
 
 from __future__ import annotations
 
-import base64
 import os
-from typing import Any
 
 import pytest
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from insolvia_core.access_log import ACTIONS, access_item, record_access
-from insolvia_core.adapters.aws.dynamo import from_attributes, to_attributes
 from insolvia_core.adapters.aws.tax_id_cipher import KmsTaxIdCipher, case_key_alias
 from insolvia_core.adapters.envelope import NONCE_BYTES, context_aad, new_data_key
 from insolvia_core.adapters.memory.access_log import MemoryAccessLog
@@ -37,7 +34,6 @@ from insolvia_core.tax_ids import (
     parse_tax_id,
     read_tax_id,
     store_tax_id,
-    tax_id_from_item,
     tax_id_item,
     tax_id_json,
 )
@@ -309,41 +305,6 @@ def test_clearing_leaves_the_sealed_item_in_place(env: Env) -> None:
     assert stored is not None
     assert env.store_(None, existing=stored) is None
     assert env.store.get(CASE, stored.ref) is not None
-
-
-def test_the_item_round_trips_through_the_attribute_converter(env: Env) -> None:
-    ref = env.store_(TaxIdInput(kind="ssn", value=SSN))
-    assert ref is not None
-    sealed = env.store.get(CASE, ref.ref)
-    assert sealed is not None
-    item = {"PK": "CASE#case-0001", **tax_id_item(sealed)}
-    assert item["SK"] == f"TAXID#{ref.ref}"
-    assert tax_id_from_item(from_attributes(to_attributes(item))) == sealed
-
-
-def test_an_envelope_sealed_before_the_move_still_opens_from_postgres(
-    postgres: Any, postgres_url: str
-) -> None:
-    """ADR 0030: the envelope is kept byte for byte. An item as the DynamoDB
-    store held it — base64 strings through the attribute converter — goes
-    into Postgres as bytea, comes back as the same strings, and opens."""
-    seed_cases(postgres_url, CASE, firm_id=FIRM)
-    before = Env()
-    ref = before.store_(TaxIdInput(kind="ssn", value=SSN))
-    assert ref is not None
-    sealed = before.store.get(CASE, ref.ref)
-    assert sealed is not None
-    dynamo_era = tax_id_from_item(
-        from_attributes(to_attributes({"PK": f"CASE#{CASE}", **tax_id_item(sealed)}))
-    )
-
-    after = Env(PostgresTaxIdStore(postgres_url))
-    after.store.put(CASE, dynamo_era)
-    assert after.store.get(CASE, ref.ref) == sealed
-    stored = postgres.execute("SELECT ciphertext, wrapped_key FROM tax_ids").fetchone()
-    assert stored["ciphertext"] == base64.b64decode(sealed.envelope.ciphertext)
-    assert stored["wrapped_key"] == base64.b64decode(sealed.envelope.wrapped_key)
-    assert after.read(ref) == SSN
 
 
 def test_the_context_names_the_purpose_the_grant_conditions_on() -> None:

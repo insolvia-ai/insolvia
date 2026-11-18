@@ -7,7 +7,7 @@ from insolvia_core.errors import ConflictError
 class MemoryClientBindingStore:
     """Ephemeral ClientBindingStore for tests and the plain development server.
 
-    Enforces the two conditions the DynamoDB transaction does — one live
+    Enforces the two conditions the Postgres transaction does — one live
     binding per subject per firm, one holder per role per case — and checks
     ALL of them before applying ANY write, because a fake that half-applied a
     refused transaction would let a suite pass on code the real store rejects.

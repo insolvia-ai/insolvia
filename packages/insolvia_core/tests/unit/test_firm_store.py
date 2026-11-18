@@ -127,7 +127,7 @@ def test_a_user_is_read_within_their_firm(store):
 
 def test_finding_a_subject_in_two_firms_raises_rather_than_guessing(store):
     """One person, one firm is an application invariant — nothing in the key
-    schema enforces it, because a DynamoDB condition cannot span partitions.
+    schema enforces it, because the key is per firm.
     Picking one would make somebody's tenancy depend on index ordering, and it
     would be stable enough in testing to look correct."""
     store.add_user(user())
@@ -179,7 +179,7 @@ def test_updating_someone_who_is_not_there_is_none(store):
 
 def test_updating_across_firms_does_not_move_someone(store):
     """A PATCH carrying another firm's id must not create a row there. The
-    DynamoDB adapter's `firmId = :firm` condition says the same thing from the
+    Postgres adapter's `firm_id` condition says the same thing from the
     other side; without this the memory store would happily insert."""
     store.add_user(user())
     moved = replace(user(), firm_id=OTHER_FIRM_ID)

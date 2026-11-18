@@ -32,10 +32,10 @@
 # withdrawing the authorization.
 #
 # WHAT IS LEFT BEHIND, said so nobody mistakes it for a leak: one case
-# partition per run under the fake firm `proof-firm-00000000` — nothing a
+# per run under the fake firm `proof-firm-00000000` — nothing a
 # real firm can reach — and its two packets in the dev bucket. Like
 # test_case_lifecycle's copy, it is the cost of proving against the real
-# tables, and `scripts/dev-aws-reset.sh` clears it with everything else.
+# stores, and wiping the local Postgres clears it with everything else.
 #
 # The approver's fresh `auth_time` is a stand-in (this script signs in to
 # nothing); the API's fresh-sign-in check against the real pool is the

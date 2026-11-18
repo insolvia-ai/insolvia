@@ -6,10 +6,10 @@ from insolvia_api.core.jobs import Job, list_order
 class MemoryJobStore:
     """Ephemeral JobStore for tests and the plain development server.
 
-    Keyed by (case_id, job_id) — the DynamoDB adapter's PK and SK split apart
+    Keyed by (case_id, job_id) — the Postgres table's primary key
     — so the case scope is a property of this dict rather than something
     every caller has to remember. The conditional `update` mirrors the
-    DynamoDB adapter's compare-and-swap exactly, because the at-least-once
+    Postgres adapter's compare-and-swap exactly, because the at-least-once
     races tests/test_jobs.py exercises are decided by it.
     """
 

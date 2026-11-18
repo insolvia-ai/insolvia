@@ -8,11 +8,10 @@
 # topic.
 #
 # NO DATA STORES OF ITS OWN, deliberately. This service is a second surface
-# over the SAME case and access-log tables the API composes (and the firm
-# store, which is Postgres since ADR 0030); its execution role's grants
-# attach from modules/case_store (mcp_role_name), matching what ADR 0011 did for the
-# admin service — two execution roles with data-store access instead of one,
-# each scoped to what its service exports.
+# over the SAME Postgres stores the API composes (ADR 0030), reached as its
+# own database role, `mcp` (migration 0003's grants; modules/database), matching
+# what ADR 0011 did for the admin service — each execution role scoped to what
+# its service exports.
 #
 # ITS OWN LAMBDA AND ITS OWN THROTTLES, and that is the ADR's blast-radius
 # argument: agent traffic is bursty, retry-happy, and shaped by harness
@@ -66,11 +65,10 @@ resource "aws_iam_role_policy_attachment" "mcp_basic" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-# NO inline data policy here, deliberately: every data grant this role holds
-# attaches from the module that owns the store (modules/case_store's
-# mcp_case_access), so what this
-# service may reach is readable next to what the other principals may — one
-# file per store, every principal's grant side by side.
+# NO inline data policy here, deliberately: this role holds no AWS data
+# grant. Its data access is its Postgres role (migration 0003), and it holds
+# no case-key use at all — "no tool returns a full tax identifier" is an IAM
+# fact (modules/case_store).
 
 # ── Lambda function ─────────────────────────────────────────────
 

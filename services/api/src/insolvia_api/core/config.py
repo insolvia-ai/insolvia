@@ -103,13 +103,11 @@ def load_config(environ: Mapping[str, str] | None = None) -> AppConfig:
     app's EXPO_PUBLIC_INSOLVIA_ENV. DATABASE_URL is the Postgres database
     (ADR 0030) holding the firm stores, the portal bindings and the waitlist;
     a running service refuses to start without it.
-    CASE_TABLE_NAME names the DynamoDB table holding case data (issue 8.2),
-    encrypted under a customer-managed key. Unset means the in-memory store,
-    which only unit tests and the bare development server use; in local dev
-    it is this machine's real per-developer table rather than an emulator.
-    Nothing reads it yet — the case routes and their store land with 8.3; the
-    value is wired now so local, staging and prod are configured identically
-    before the code that needs it arrives.
+    CASE_TABLE_NAME is `insolvia-<env>-cases`, a historical name: since
+    ADR 0030 no table carries it. It names the case key, whose alias the
+    tax-id and credential ciphers derive from it (`case_key_alias`). Unset
+    means the development key stand-in, which unit tests and the bare
+    development server use.
     The append-only access log (who read or changed which case) is the
     `case_access_log` table in DATABASE_URL, which this service's role may
     INSERT into and nothing else (migration 0003).

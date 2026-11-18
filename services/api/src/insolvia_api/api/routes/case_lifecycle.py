@@ -240,8 +240,8 @@ def copy_case_route(case_id: str) -> ResponseReturnValue:
     `clients >= view_only` for the reason `POST /v1/cases` needs it: the
     copy reads client records into a case the caller can then read.
 
-    ORDER IS THE TRANSACTION'S SUBSTITUTE. A case can hold more records than
-    one DynamoDB transaction can write, so the copy cannot be one write. The
+    ORDER IS THE TRANSACTION'S SUBSTITUTE. The copy is several store
+    calls, so it cannot be one write. The
     collection records and the sealed tax ids are written FIRST, under the
     new case's id, while no case record exists to reach them; the case, its
     copier's assignment and its debtors land LAST, together, in

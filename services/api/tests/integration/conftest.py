@@ -22,7 +22,7 @@ cannot drift onto two different people.
 ## What it proves that nothing else can
 
 The unit tier runs the Flask app in-process over memory adapters. It cannot
-tell whether DynamoDB accepts the item shapes, whether the bucket policy
+tell whether Postgres accepts the item shapes, whether the bucket policy
 accepts the presigned PUT the API mints, whether the Lambda's own execution
 role may make the calls the code makes, or whether a real access token from
 the real pool verifies against the deployed configuration. Every request

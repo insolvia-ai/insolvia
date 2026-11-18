@@ -1,7 +1,9 @@
 # ADR 0030 — PostgreSQL replaces DynamoDB; the backend stays Python
 
-- **Status:** Accepted 2026-11-16, decided by the maintainer in chat. Not
-  built: the build breakdown below is the work. The hosting and ordering
+- **Status:** Accepted 2026-11-16, decided by the maintainer in chat. Built
+  2026-11-17 (#620–#626): every store is on Postgres and no DynamoDB is left
+  in code, infra or current docs. The hosting Terraform (row 6) is written
+  and validated but not applied while AWS is paused. The hosting and ordering
   calls were recommended to the maintainer and accepted as recommended.
 - **Date:** 2026-11-16
 - **Numbering:** 0028 and 0029 belonged to the dropped .NET rewrite and are

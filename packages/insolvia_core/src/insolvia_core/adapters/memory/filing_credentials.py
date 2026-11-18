@@ -76,8 +76,8 @@ class MemoryFilingCredentialStore:
 
 class MemoryFilingAuthorizationStore:
     """FilingAuthorizationStore in memory: the current item per attorney,
-    and the history keyed by signature id — the two item kinds the
-    DynamoDB adapter writes."""
+    and the history keyed by signature id — the two tables the
+    Postgres adapter writes."""
 
     def __init__(self) -> None:
         self.current: dict[tuple[str, str], FilingAuthorization] = {}

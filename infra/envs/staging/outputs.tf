@@ -205,11 +205,11 @@ output "mcp_client_ids" {
 # Read by .github/actions/seed-staging from the workflow: the values are
 # Terraform's already, and an SSM
 # read from the workflow would need one more grant on the seed role. The
-# case table and document bucket are ALSO published to SSM (main.tf) for the
+# case key's name and document bucket are ALSO published to SSM (main.tf) for the
 # API; these outputs are the workflow's copy.
 output "case_table_name" {
-  description = "Cases, debtors, collection items and document records (CASE_TABLE_NAME for the API)."
-  value       = module.case_store.table_name
+  description = "CASE_TABLE_NAME for the API and the seeder: the case key's name (no table carries it since ADR 0030)."
+  value       = module.case_store.name
 }
 
 output "case_document_bucket" {

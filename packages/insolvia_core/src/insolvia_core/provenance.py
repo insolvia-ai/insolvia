@@ -177,7 +177,7 @@ def _check_locator(value: object, path: str, errors: dict[str, str]) -> bool:
     renders pages at whatever width the viewport gives it.
 
     It was previously accepted as any mapping at all, which was not merely
-    loose. The values ride straight into DynamoDB, and stdlib JSON accepts
+    loose. The values ride straight into the store, and stdlib JSON accepts
     `Infinity` and `NaN` as numbers — so `{"page": Infinity}` stored fine in
     the memory store, blew up the real one with a ClientError, and came back
     out in a 201 response body as a token no strict JSON parser accepts. A

@@ -6,7 +6,7 @@ from insolvia_core.tax_ids import SealedTaxId
 class MemoryTaxIdStore:
     """Ephemeral TaxIdStore for tests and the plain development server.
 
-    Keyed by (case_id, ref) — the DynamoDB adapter's PK and SK — so the
+    Keyed by (case_id, ref) — the Postgres table's primary key — so the
     "location plus identity" shape the port describes is a property of this
     dict too, and a test that reads under the wrong case gets the same None
     the real store answers.

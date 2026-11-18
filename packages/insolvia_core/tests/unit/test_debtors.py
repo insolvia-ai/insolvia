@@ -398,7 +398,7 @@ class TestAliasIdsStayAddressable:
 
 class TestRoleOrdering:
     """One definition of "the order the forms print them", because both stores
-    have to agree and DynamoDB's own sort-key order agrees only by coincidence."""
+    have to agree and a store's key order agrees only by coincidence."""
 
     def test_roles_order_as_the_forms_print_them(self) -> None:
         roles = ["non_filing_spouse", "debtor_2", "debtor_1"]

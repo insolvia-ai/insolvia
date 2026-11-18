@@ -558,8 +558,8 @@ class Env:
 
         self.firms = MemoryFirmStore()
         # One debtor store behind both: the case store writes a case's
-        # client debtors in its own transaction (ADR 0022), as the shared
-        # DynamoDB table does.
+        # client debtors in its own transaction (ADR 0022), as the Postgres
+        # store does.
         self.debtors = MemoryDebtorStore()
         self.cases = MemoryCaseStore(debtor_store=self.debtors)
         self.entities = MemoryCaseEntityStore()

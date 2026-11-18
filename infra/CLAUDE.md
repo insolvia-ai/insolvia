@@ -22,11 +22,9 @@ bootstrap is its
   DynamoDB lock table), AWS provider `~> 6.37` — **6.37 is a deliberate floor,
   not a stale `~> 6.0`**. Two things set it, and the floor is the later:
   `aws_cognito_managed_login_branding` first shipped in 6.12.0 (it lives in
-  insolvia-services now, which keeps the same pin), and
-  `modules/case_store`'s `global_secondary_index.key_schema` first shipped in
-  6.29.0 — but *working* `key_schema` is 6.37.0, because 6.32.1 fixed a
-  perpetual diff on an index that has a range key (ours does) and 6.37.0 fixed
-  a removal that deletes **every** index on the table. Bump the floor whenever
+  insolvia-services now, which keeps the same pin), and the DynamoDB
+  `key_schema` fixes of 6.32.1/6.37.0 (the case table, removed with ADR 0030;
+  the floor stays so both repos keep one pin). Bump the floor whenever
   a root starts depending on a newer resource or a data-loss fix. All three
   roots here carry the same pin, and so do insolvia-services' roots — keep
   them moving together. **Region `us-east-1` everywhere** (CloudFront ACM

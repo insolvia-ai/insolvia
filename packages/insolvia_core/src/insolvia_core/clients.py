@@ -410,9 +410,9 @@ class CasePublicStatus:
     stage: str
 
 
-# The case META item's attributes the projection may read. The DynamoDB
-# adapter passes exactly these as its ProjectionExpression, so the rest of the
-# row never leaves the table on a portal request.
+# The case META item's attributes the projection may read. Only these
+# reach the projection, so the rest of the row never reaches a portal
+# response.
 # `deletedAt` is read only to refuse: a deleted case (#355) has no status to
 # show anyone, its client included.
 PUBLIC_STATUS_ATTRIBUTES: Final = ("firmId", "chapter", "status", "deletedAt")

@@ -648,7 +648,7 @@ def test_a_cursor_from_the_other_listing_is_refused(client, firms):
 
     Alice pages through by-firm, an admin revokes her access_all_cases, and her
     next request would resume a by-firm scan position inside a by-assignee
-    query. Without the index tag DynamoDB accepts the key and returns whatever
+    query. Without the index tag the store accepts the key and returns whatever
     sorts after it — she silently never sees the cases in between. With it she
     gets a 400 and the client starts the listing again, which is correct,
     because her listing genuinely changed.
@@ -1002,7 +1002,7 @@ def test_a_cursor_is_refused_by_the_other_index():
 @pytest.mark.parametrize("cursor", ["!!!", "", "eyJhIjogMX0="])
 def test_decode_cursor_rejects_junk(cursor):
     # The last one is valid base64 of {"a": 1} — a non-string value, which
-    # would otherwise reach DynamoDB as part of an ExclusiveStartKey.
+    # would otherwise reach the query as part of its keyset start.
     with pytest.raises(ValidationError):
         decode_cursor(cursor, index=INDEX_BY_FIRM)
 

@@ -65,7 +65,7 @@ from .firms import partition_key
 MAX_NAME: Final = 200
 MAX_NOTES: Final = 2000
 
-# The DynamoDB sort-key namespace, alongside firms.py's "META" and "USER#" in
+# The item's sort-key namespace, alongside firms.py's "META" and "USER#" in
 # the same partition — must stay unique across every SK that partition uses.
 SK_PREFIX: Final = "LIBCREDITOR"
 

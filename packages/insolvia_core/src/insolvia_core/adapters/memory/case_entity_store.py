@@ -8,8 +8,8 @@ from insolvia_core.case_entities import CaseEntity, EntityKind, list_order
 class MemoryCaseEntityStore:
     """Ephemeral CaseEntityStore for tests and the plain development server.
 
-    Keyed by (case_id, sk_prefix, id) — the DynamoDB adapter's PK and SK split
-    apart — so the case scope and the kind scope are properties of this dict
+    Keyed by (case_id, sk_prefix, id) — the Postgres table's primary
+    key — so the case scope and the kind scope are properties of this dict
     rather than something every caller has to remember, exactly as they are
     properties of the table's key schema on the other side.
     """

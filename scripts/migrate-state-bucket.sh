@@ -50,7 +50,8 @@
 #                                       — the new repositories are empty, and an
 #                                         Image-package Lambda cannot be created
 #                                         from an empty repository
-#   8. scripts/rename-teardown.sh <env> — clears deletion protection and empties
+#   8. scripts/rename-teardown.sh <env> (deleted with #626; in git history)
+#                                       — cleared deletion protection and emptied
 #                                         the buckets the rename apply destroys
 #   9. merge; CI applies staging, then prod behind the promote gate
 #

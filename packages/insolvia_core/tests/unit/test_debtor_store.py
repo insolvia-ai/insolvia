@@ -1,9 +1,7 @@
-"""The debtor stores, and the attribute converter both of them rest on.
+"""The debtor stores.
 
 The DebtorStore contract runs against the memory twin and the Postgres
-adapter alike (ADR 0030); the converter tests below hold `debtor_item →
-to_attributes → from_attributes → debtor_from_item`, which the seed loader
-and the remaining DynamoDB rows still rest on.
+adapter alike (ADR 0030).
 
 Every identifier below is obviously fake. This repo is public.
 """
@@ -11,10 +9,8 @@ Every identifier below is obviously fake. This repo is public.
 from __future__ import annotations
 
 import pytest
-from insolvia_core.adapters.aws.dynamo import from_attributes, to_attributes
 from insolvia_core.adapters.memory.debtor_store import MemoryDebtorStore
 from insolvia_core.adapters.postgres.debtor_store import PostgresDebtorStore
-from insolvia_core.cases import Case, case_from_item, case_item
 from insolvia_core.debtors import (
     FILING_ROLES,
     Address,
@@ -23,7 +19,6 @@ from insolvia_core.debtors import (
     OtherName,
     PersonName,
     Venue,
-    debtor_from_item,
     debtor_item,
 )
 from insolvia_core.provenance import ProvenanceEntry
@@ -98,132 +93,16 @@ def a_filled_in_debtor():
     )
 
 
-# ── The converter ───────────────────────────────────────────────
+# ── The stored debtor item, through each store ──────────────────
 
 
-@pytest.mark.parametrize(
-    "value",
-    [
-        "text",
-        "",
-        0,
-        7,
-        -3,
-        0.5,
-        1.0,
-        True,
-        False,
-        None,
-        {},
-        [],
-        {"a": 1, "b": ["x", None], "c": {"d": {"e": False}}},
-        [{"id": "alias-1", "surname": "Okafor"}, {"id": "alias-2"}],
-        [[1, [2, [3]]]],
-    ],
-)
-def test_every_supported_value_round_trips(value):
-    assert from_attributes(to_attributes({"v": value}))["v"] == value
-
-
-def test_a_boolean_is_not_stored_as_a_number():
-    """The trap this converter exists to avoid. `bool` is a subclass of `int`,
-    so an `isinstance(value, int)` branch placed first writes True as the
-    number 1 — which reads back as 1, and `1 == True`, so every equality
-    assertion in the test above would still pass. Hence the stored shape and
-    the type, rather than equality.
-    """
-    assert to_attributes({"flag": True, "off": False}) == {
-        "flag": {"BOOL": True},
-        "off": {"BOOL": False},
-    }
-    assert from_attributes({"flag": {"BOOL": True}})["flag"] is True
-    assert from_attributes({"flag": {"BOOL": False}})["flag"] is False
-
-
-@pytest.mark.parametrize(
-    ("value", "expected"),
-    [(7, int), (0, int), (-3, int), (0.87, float), (1.0, float), (True, bool)],
-)
-def test_a_number_keeps_the_python_type_it_went_in_as(value, expected):
-    # DynamoDB has one number type. case_from_item wants an int chapter and a
-    # provenance confidence is a float, so the split has to survive the trip.
-    assert type(from_attributes(to_attributes({"v": value}))["v"]) is expected
-
-
-@pytest.mark.parametrize(
-    ("value", "expected"),
-    [
-        (7, {"N": "7"}),
-        (0, {"N": "0"}),
-        ("7", {"S": "7"}),
-        ("META", {"S": "META"}),
-    ],
-)
-def test_the_encoding_the_case_store_already_wrote_is_unchanged(value, expected):
-    """Rows written before this converter existed are still in the dev table
-    and in staging. S and N have to mean exactly what they meant then."""
-    assert to_attributes({"v": value}) == {"v": expected}
-
-
-def test_a_case_item_still_round_trips():
-    """The property case_store's own two helpers had, asserted after they were
-    replaced — this is the whole risk of that migration."""
-    case = Case(
-        id="c-0001",
-        firm_id="00000000-0000-4000-8000-00000000f18a",
-        created_by="00000000-0000-4000-8000-00000000a11c",
-        chapter=7,
-        district="NDCA",
-        status="intake",
-        created_at=WHEN,
-        updated_at=WHEN,
-    )
-    assert case_from_item(from_attributes(to_attributes(case_item(case)))) == case
-
-
-def test_empty_containers_survive():
-    """Not an edge case: a debtor who has answered nothing yet stores a body of
-    `{}`, and that is the normal state for most of an intake."""
-    stored = to_attributes({"body": {}, "aliases": []})
-    assert stored == {"body": {"M": {}}, "aliases": {"L": []}}
-    assert from_attributes(stored) == {"body": {}, "aliases": []}
-
-
-def test_a_tuple_comes_back_as_a_list():
-    # DynamoDB has one sequence type, so this asymmetry is real. Nothing in
-    # core depends on it — the parse functions rebuild their own tuples.
-    assert from_attributes(to_attributes({"ids": ("a", "b")}))["ids"] == ["a", "b"]
-
-
-def test_a_null_is_a_null_and_not_a_missing_key():
-    assert to_attributes({"v": None}) == {"v": {"NULL": True}}
-    assert from_attributes({"v": {"NULL": True}}) == {"v": None}
-
-
-@pytest.mark.parametrize("value", [b"bytes", bytearray(b"bytes"), {1, 2}, object()])
-def test_a_value_that_cannot_be_stored_is_refused_rather_than_mangled(value):
-    # bytes is a Sequence, so a converter that let it fall through would write
-    # it as a list of integers and never say anything.
-    with pytest.raises(TypeError):
-        to_attributes({"v": value})
-
-
-@pytest.mark.parametrize("attribute", [{"SS": ["a"]}, {"B": "abc"}, {}])
-def test_an_attribute_type_this_service_never_writes_is_refused(attribute):
-    with pytest.raises(ValueError, match="unsupported DynamoDB attribute"):
-        from_attributes({"v": attribute})
-
-
-# ── The stored debtor item, through the converter ───────────────
-
-
-def test_a_filled_in_debtor_survives_the_trip_to_dynamodb_and_back():
+def test_a_filled_in_debtor_survives_the_store(store):
     original = a_filled_in_debtor()
-    stored = from_attributes(to_attributes(debtor_item(original)))
-    assert debtor_from_item(stored) == original
+    store.put(original)
+    assert store.get(CASE, filing_role="debtor_1") == original
 
 
-def test_an_empty_debtor_survives_the_trip_to_dynamodb_and_back():
+def test_an_empty_debtor_survives_the_store(store):
     """A record created before anyone has typed anything, which is what the
     first autosave of every case writes."""
     original = Debtor(
@@ -233,8 +112,8 @@ def test_an_empty_debtor_survives_the_trip_to_dynamodb_and_back():
         created_at=WHEN,
         updated_at=WHEN,
     )
-    stored = from_attributes(to_attributes(debtor_item(original)))
-    assert debtor_from_item(stored) == original
+    store.put(original)
+    assert store.get(CASE, filing_role="debtor_2") == original
 
 
 def test_the_stored_item_keys_place_the_debtor_in_its_cases_partition():
@@ -244,11 +123,12 @@ def test_the_stored_item_keys_place_the_debtor_in_its_cases_partition():
     assert str(item["SK"]).startswith("DEBTOR#")
 
 
-def test_a_float_in_provenance_is_not_rounded_to_an_int():
+def test_a_float_in_provenance_is_not_rounded_to_an_int(store):
     """`confidence` is the only float the case data model stores today, and an
     int-only number decoder would turn 0.87 into a crash and 1.0 into 1."""
-    original = a_filled_in_debtor()
-    restored = debtor_from_item(from_attributes(to_attributes(debtor_item(original))))
+    store.put(a_filled_in_debtor())
+    restored = store.get(CASE, filing_role="debtor_1")
+    assert restored is not None
     entry = restored.provenance["residence_address.line1"]
     assert entry.confidence == 0.87
     assert entry.locator == {"page": 2, "bbox": [0.1, 0.25, 0.3, 0.4]}

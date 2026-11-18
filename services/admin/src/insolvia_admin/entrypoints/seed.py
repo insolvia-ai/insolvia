@@ -29,7 +29,7 @@ built the rows, which is what would otherwise drift.
 
 ## Why the rows still go through core/
 
-The item shapes live in `core/` precisely so the DynamoDB and in-memory stores
+The item shapes live in `core/` precisely so the Postgres and in-memory stores
 cannot drift apart. A loader that turned fixture JSON straight into
 `{"PK": "FIRM#…"}` would be a THIRD writer of that shape and the one nobody
 re-reads when a field is added. So the fixture is parsed by the same

@@ -11,11 +11,10 @@ variable "environment" {
 
 variable "data_resource_arns" {
   description = <<-EOT
-    Resource ARN prefixes whose DATA events this trail records — today the
-    case table, and the case document bucket when 8.6 lands. Matched with
-    starts_with, so a table ARN also covers its indexes.
+    S3 object ARN prefixes whose DATA events this trail records — the case
+    document bucket (`<bucket arn>/`). Matched with starts_with.
 
-    Deliberately a list of named resources rather than "every table in the
+    Deliberately a list of named resources rather than "every bucket in the
     account": data events bill per event, and this trail exists to record
     case-data access rather than to be a general audit surface.
   EOT

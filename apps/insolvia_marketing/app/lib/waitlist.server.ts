@@ -5,8 +5,8 @@
  * endpoint (services/api) instead of touching AWS itself — the marketing
  * Lambda is a client like any other, and per ADR 0001
  * (docs/adr/0001-client-stays-dumb-trust-boundary.md) no client holds AWS
- * credentials or calls an AWS service directly. Storage, the item schema, and
- * the DynamoDB grant all live with the API now.
+ * credentials or calls an AWS service directly. Storage and the item schema
+ * live with the API now.
  *
  * Validation here is a UX nicety: instant per-field errors without a network
  * round-trip. The API re-validates with the same rules (its limits were

@@ -11,7 +11,7 @@ class MemoryPacketStore:
 
     Takes the MemoryCaseStore it shares a "table" with, because `create` is a
     transaction over both: the packet record and the case's pins land
-    together or not at all, with the same conditions the DynamoDB adapter
+    together or not at all, with the same conditions the Postgres adapter
     expresses — a test that could pin a filed case, or pin without storing
     the packet, would be testing a weaker store than production runs.
     """
@@ -39,7 +39,7 @@ class MemoryPacketStore:
         ):
             return False
         # Both, together — nothing can fail between these lines, which is the
-        # property the DynamoDB adapter buys with TransactWriteItems.
+        # property the Postgres adapter buys with one transaction.
         self.packets[key] = packet
         self.case_store.cases[pinned_case.id] = pinned_case
         return True

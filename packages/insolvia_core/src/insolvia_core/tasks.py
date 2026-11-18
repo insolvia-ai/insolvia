@@ -27,7 +27,7 @@ document precedent is the cleaner fit, and it is why this module's shape
 mirrors core/documents.py rather than core/codebtors.py.
 
 Everything here is pure: no Flask, no boto3. The item shape lives here rather
-than in an adapter so the DynamoDB and in-memory stores cannot drift apart,
+than in an adapter so the Postgres and in-memory stores cannot drift apart,
 exactly as core/documents.py does for the record it is modelled on.
 """
 

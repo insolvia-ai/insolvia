@@ -12,10 +12,10 @@ class MemoryDocumentRequestStore:
     """Ephemeral DocumentRequestStore for tests and the plain development
     server.
 
-    Keyed by (case_id, request_id) — the DynamoDB adapter's PK and SK — and
+    Keyed by (case_id, request_id) — the Postgres table's primary key — and
     holding the STORED ITEM rather than the dataclass, as MemoryFirmStore
     does for the questionnaire: a suite running here round-trips the shape
-    DynamoDB writes, list-valued `documentIds` included.
+    Postgres stores, list-valued `documentIds` included.
     """
 
     def __init__(self) -> None:

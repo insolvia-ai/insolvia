@@ -24,15 +24,15 @@ def _order(debtor: Debtor) -> tuple[int, str]:
 class MemoryDebtorStore:
     """Ephemeral DebtorStore for tests and the plain development server.
 
-    Keyed by (case_id, filing_role) — the DynamoDB adapter's PK and SK — so
+    Keyed by (case_id, filing_role) — the Postgres table's primary key — so
     "one record per role per case" is a property of this dict rather than
     something every caller has to remember, exactly as it is a property of the
     table's key schema on the other side.
 
-    `firm_store` is the DynamoDB adapter's `firm_table_name`: the store whose
+    `firm_store` is the store whose
     client rows `link` (and `MemoryCaseStore.create`, which shares this
     store) condition on. Without one, `link` refuses to run, as the
-    DynamoDB adapter's does — pass the firm store the routes are composed
+    Postgres adapter's lock would — pass the firm store the routes are composed
     with.
     """
 
@@ -66,7 +66,7 @@ class MemoryDebtorStore:
         self.debtors[(debtor.case_id, debtor.filing_role)] = debtor
 
     def link(self, debtor: Debtor, *, create: bool, firm_id: str) -> LinkOutcome:
-        # The same three conditions the DynamoDB transaction states, checked
+        # The same three conditions the Postgres transaction states, checked
         # and applied in one step — nothing else runs between them here —
         # and answered in the order its cancellation reasons are read.
         if debtor.client_id is None:
@@ -110,7 +110,7 @@ class MemoryDebtorStore:
         from_client_id: str,
         to_client_id: str,
     ) -> RepointOutcome:
-        # Both of the DynamoDB transaction's conditions, checked and applied
+        # Both of the Postgres transaction's conditions, checked and applied
         # in one step. Only the link moves — `link_client` keeps every
         # copied field and the provenance exactly as they are.
         stored = self.debtors.get((case_id, filing_role))

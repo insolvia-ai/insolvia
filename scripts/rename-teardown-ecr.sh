@@ -32,6 +32,7 @@
 #   3. ./scripts/bootstrap-ecr-images.sh staging
 #      ./scripts/bootstrap-ecr-images.sh prod  <- the new repositories are empty
 #   4. ./scripts/rename-teardown.sh <env>      <- tables, pools, buckets
+#      (deleted once run; it is in git history before #626)
 #   5. merge; CI applies the environments
 #
 # ## THIS OPENS THE OUTAGE WINDOW

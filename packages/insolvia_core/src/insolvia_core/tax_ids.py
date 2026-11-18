@@ -58,7 +58,7 @@ NOT the case id: under ADR 0022 the case is where the item happens to live,
 not what it belongs to. `purpose` is what the IAM grant conditions on
 (`kms:EncryptionContext:purpose`), so the API role can generate and open
 these data keys directly and nothing else — every other KMS use it holds is
-fenced to DynamoDB or S3 as the calling service.
+fenced to S3 as the calling service.
 
 ## The two reads
 

@@ -2,9 +2,8 @@
 
 `client_bindings` is the authoritative row (one per subject per firm, its
 case a column) and `client_role_claims` says who answers for a role on a
-case. A bind or a revoke is one transaction over both; the DynamoDB
-case-partition mirror has no counterpart, because a case's bindings are one
-indexed query here.
+case. A bind or a revoke is one transaction over both; a case's bindings are one
+indexed query on `case_id`.
 """
 
 from __future__ import annotations
