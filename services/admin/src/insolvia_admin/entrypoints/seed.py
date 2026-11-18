@@ -183,6 +183,8 @@ from typing import Any, Final, Protocol
 from insolvia_core.adapters.aws.document_blobs import S3DocumentBlobStore
 from insolvia_core.adapters.aws.tax_id_cipher import KmsTaxIdCipher, case_key_alias
 from insolvia_core.adapters.aws.tax_id_store import DynamoDbTaxIdStore
+from insolvia_core.adapters.development_keys import development_key_adapters
+from insolvia_core.adapters.memory.tax_id_store import MemoryTaxIdStore
 from insolvia_core.adapters.postgres.case_entity_store import PostgresCaseEntityStore
 from insolvia_core.adapters.postgres.case_store import PostgresCaseStore
 from insolvia_core.adapters.postgres.client_binding_store import (
@@ -237,7 +239,9 @@ _SEEDABLE_TABLE: Final = r"^insolvia-(dev-[0-9a-f]{{12}}|staging)-{kind}\Z"
 # The case-documents bucket, per infra/modules/case_documents: the same env
 # segment, then the component and the region suffix S3 names carry.
 _SEEDABLE_BUCKET: Final = (
-    r"^insolvia-(dev-[0-9a-f]{12}|staging)-case-documents-[a-z0-9-]+\Z"
+    r"^(insolvia-(dev-[0-9a-f]{12}|staging)-case-documents-[a-z0-9-]+"
+    # services/api's compose stack's local S3 server (#624).
+    r"|insolvia-local-case-documents)\Z"
 )
 # Only a dev stack may be captured FROM: what a developer typed is synthetic
 # by construction, and nothing else is.
@@ -367,6 +371,35 @@ class CognitoAccounts:
         )
 
 
+class FileAccounts:
+    """`Accounts` from a file of resolved subjects — local seeding (#624),
+    which needs no AWS session. `scripts/dev-aws-seed.sh` writes the file
+    the one time it does reach the pool: `{"<email>": "<sub>"}`, the same
+    lookup CognitoAccounts makes, made once. A pool replaced since then
+    shows as a 403 after sign-in; re-run the wrapper with --refresh."""
+
+    def __init__(self, path: Path) -> None:
+        self.path = path
+        try:
+            self.subjects = json.loads(path.read_text())
+        except FileNotFoundError:
+            raise RefusedError(
+                f"no subjects file at {path} — scripts/dev-aws-seed.sh writes it"
+            ) from None
+
+    def subject_of(self, email: str) -> str:
+        subject = self.subjects.get(email)
+        if not isinstance(subject, str) or not subject:
+            raise RefusedError(f"{self.path} has no subject for {email}")
+        return subject
+
+    def ensure(self, email: str, password: str) -> str:
+        raise RefusedError(
+            f"{email} carries a password, so the loader would create the "
+            "account — that needs the pool, not a local load"
+        )
+
+
 class FixtureObjects(Protocol):
     """The bytes half of a fixture: the shared bucket's objects, copied into
     a target's own case-documents bucket without passing through here."""
@@ -433,6 +466,29 @@ class S3FixtureObjects:
         return hashlib.sha256(body.read()).hexdigest()
 
 
+class LocalFixtureObjects:
+    """`FixtureObjects` for a local load (#624): the bytes come from the
+    committed fixture folder rather than the shared bucket, and land in the
+    target through the same blob store the API reads them with."""
+
+    def __init__(self, fixtures: Path, target: DocumentBlobStore) -> None:
+        self.fixtures = fixtures
+        self.target = target
+
+    def copy(self, source_key: str, *, target_key: str, content_type: str) -> None:
+        self.target.put_bytes(
+            target_key,
+            content=(self.fixtures / source_key).read_bytes(),
+            content_type=content_type,
+        )
+
+    def put(self, key: str, *, content: bytes, content_type: str) -> None:
+        raise RefusedError("a local load publishes nothing")
+
+    def digest(self, key: str) -> str | None:
+        raise RefusedError("a local load publishes nothing")
+
+
 @dataclass(frozen=True)
 class Dependencies:
     """The seams tests replace. Factories, because neither a table name nor a
@@ -474,6 +530,31 @@ class Dependencies:
     # (firm target, case table): the bindings live beside the firm, in Postgres.
     client_binding_store: Callable[[str, str], ClientBindingStore] = (
         lambda _firm, _cases: PostgresClientBindingStore(_database())
+    )
+
+
+def _local_dependencies(fixture: Path, subjects: Path) -> Dependencies:
+    """A load with no AWS session (#624): this machine's Postgres, the local
+    S3 server at CASE_DOCUMENT_ENDPOINT_URL, and subjects from a file."""
+    endpoint = os.environ.get("CASE_DOCUMENT_ENDPOINT_URL")
+    if not endpoint:
+        raise RefusedError("--local needs CASE_DOCUMENT_ENDPOINT_URL")
+
+    def blobs(bucket: str) -> DocumentBlobStore:
+        return S3DocumentBlobStore(bucket, endpoint_url=endpoint)
+
+    return replace(
+        Dependencies(),
+        accounts=lambda _pool: FileAccounts(subjects),
+        document_blobs=blobs,
+        fixture_objects=lambda _source, bucket: LocalFixtureObjects(
+            fixture.resolve().parent / _FIXTURES_DIR, blobs(bucket or "")
+        ),
+        # shortcut: tax ids are still DynamoDB until #623, and the local API
+        # keeps its own in memory — a seeded number goes nowhere. #623 makes
+        # both Postgres.
+        tax_id_store=lambda _table: MemoryTaxIdStore(),
+        tax_id_cipher=lambda _table: development_key_adapters("local")[0],
     )
 
 
@@ -1569,7 +1650,7 @@ def _build_parser() -> argparse.ArgumentParser:
     load.add_argument("--fixture", required=True, type=Path)
     load.add_argument("--firm-table", required=True)
     load.add_argument(
-        "--user-pool-id", required=True, help="the pool the fixture's people live in"
+        "--user-pool-id", help="the pool the fixture's people live in (not --local)"
     )
     load.add_argument("--case-table", help="required when the fixture names cases")
     load.add_argument(
@@ -1577,6 +1658,15 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     load.add_argument(
         "--fixture-bucket", help="required when a fixture case carries documents"
+    )
+    load.add_argument(
+        "--local",
+        type=Path,
+        metavar="SUBJECTS_FILE",
+        help=(
+            "load with no AWS session (#624): subjects from this file, bytes "
+            "from the committed fixture into CASE_DOCUMENT_ENDPOINT_URL"
+        ),
     )
     load.add_argument(
         "--check", action="store_true", help="report what is missing; write nothing"
@@ -1659,7 +1749,9 @@ def _load(args: argparse.Namespace, deps: Dependencies) -> int:
             or []
             if spec.get("handle") == entry.get("case")
         )
-        if needs_bytes and not (args.document_bucket and args.fixture_bucket):
+        if needs_bytes and not (
+            args.document_bucket and (args.fixture_bucket or args.local)
+        ):
             raise RefusedError(
                 "a fixture case carries documents; --document-bucket and "
                 "--fixture-bucket are both required"
@@ -1689,6 +1781,10 @@ def main(argv: list[str] | None = None, *, deps: Dependencies | None = None) -> 
     dependencies = deps or Dependencies()
     try:
         if args.command == "load":
+            if args.local is not None and deps is None:
+                dependencies = _local_dependencies(args.fixture, args.local)
+            elif args.local is None and not args.user_pool_id:
+                raise RefusedError("--user-pool-id is required without --local")
             return _load(args, dependencies)
         if args.command == "publish":
             _require_fixture_bucket(args.fixture_bucket)

@@ -1,105 +1,70 @@
 #!/usr/bin/env bash
 #
-# Make this machine's dev environment signable-in AND seeded: ensure the dev
-# account exists in the SHARED development Cognito pool (insolvia-dev-users —
-# one pool for every machine, insolvia-services', ADR 0026), then load
-# seeds/dev.json into this machine's own dev data stores.
+# Make this machine signable-in AND seeded: ensure the dev account exists in
+# the SHARED development Cognito pool (insolvia-dev-users — one pool for every
+# machine, insolvia-services', ADR 0026), then load seeds/dev.json into this
+# machine's local stack — the Postgres and the S3 server services/api's
+# compose stack runs (#624, ADR 0030 row 5).
 #
 #   ./scripts/dev-aws-seed.sh
 #   ./scripts/dev-aws-seed.sh --check     # report what is missing, write nothing
+#   ./scripts/dev-aws-seed.sh --refresh   # redo the Cognito half even if cached
+#
+# ## Two halves, and only the first needs AWS
+#
+# THE COGNITO HALF NEEDS AN AWS LOGIN, ONCE PER USER. It reads the pool's
+# public ids from SSM (/insolvia/dev/auth/*), writes them into
+# services/api/.env and apps/insolvia_app/.env, creates the fixture's people
+# in the pool if they are missing, and records each person's Cognito `sub` in
+# ~/.config/insolvia/dev-subjects.json. Log in first (the insolvia-aws-auth
+# skill has the mechanics); after that run, nothing here touches AWS again
+# unless the fixture names someone new or you pass --refresh.
+#
+# THE DATA HALF NEEDS NO AWS SESSION. It runs the seeder with --local: the
+# firm and cases into the local Postgres, the sample documents from the
+# committed fixture (seeds/fixtures/<version>/) into the local S3 server, the
+# people resolved from the subjects file. It needs ./scripts/dev-up.sh (or
+# ./services/api/scripts/dev-up.sh) running.
 #
 # ## Why this exists
 #
 # There is no sign-up screen, and there is not supposed to be one. Every
 # Insolvia pool sets `allow_admin_create_user_only = true`
-# (insolvia-services' infra/modules/auth/main.tf) — a public sign-up form on a bankruptcy-filing
-# platform is an invitation to junk accounts, not a growth channel. So the
-# hosted UI offers sign-in and nothing else, and `admin-create-user` is the
-# only way an account comes into existence.
-#
-# An account gets you PAST sign-in and no further: the account lives in
-# Cognito, firm membership lives in DynamoDB, and without a firm every route
-# behind current_accessor() answers 403 ("accessor unresolved /
-# no_active_firm_user" in the API log). That is the tenancy model working as
-# designed (ADR 0009), and the first firm cannot be made through the API —
-# POST /v1/firm/users is itself behind FIRM_ADMINISTRATION, so it needs an
-# admin to make an admin. Those used to be two scripts run in an order you had
-# to know; the refusal when you didn't cost real time, so now this one script
-# does both, in the only order that works.
+# (insolvia-services' infra/modules/auth/main.tf), so `admin-create-user` is
+# the only way an account comes into existence. An account gets you PAST
+# sign-in and no further: firm membership lives in Postgres, and without a
+# firm every route behind current_accessor() answers 403
+# (`no_active_firm_user`) — the tenancy model working as designed (ADR
+# 0009). The first firm cannot be made through the API (POST /v1/firm/users is
+# itself behind FIRM_ADMINISTRATION), so this one script does both, in the
+# only order that works.
 #
 # ## The password, and ~/.config/insolvia/dev.env
 #
 # The account step needs a password exactly once per pool lifetime. The pool is
 # SHARED: an account another machine already created exists here too, with the
-# password that machine set — use the same DEV_USER_PASSWORD on every machine
-# you work from. It comes from, in order:
-#
-#   1. DEV_USER_PASSWORD already in the environment,
-#   2. DEV_USER_PASSWORD in ~/.config/insolvia/dev.env (created on request by
-#      this script, chmod 600 — next to machine-id, which already lives there),
-#   3. a no-echo prompt, which then offers to write that file for next time.
-#
-# The file sits OUTSIDE the repo tree on purpose: this repo is public, an
-# in-tree gitignored .env has been committed to a public branch here once
-# already, and a file git never walks cannot repeat that. It is still a
-# plaintext credential on disk — accepted deliberately, because it guards one
-# thing: sign-in to the shared development pool, which holds throwaway test
-# accounts and nothing else. Nothing here may reach staging or prod (see Scope), whose
-# secrets live in GitHub environments, never in files.
-#
-# When the account already exists and is CONFIRMED, no password is needed and
-# none is read — re-seeding after a fixture edit stays credential-free.
+# password that machine set — use the same DEV_USER_PASSWORD on every machine.
+# It comes from, in order: DEV_USER_PASSWORD in the environment, then
+# ~/.config/insolvia/dev.env, then a no-echo prompt that offers to write that
+# file (chmod 600, outside the repo — this repo is public). When the account
+# already exists and is CONFIRMED, no password is read.
 #
 # ## What is actually in the seed
 #
-# seeds/dev.json, which is the answer to "what is on a developer's machine" and
-# is reviewable as a diff. This script does not describe the data; it only says
-# WHERE to put it. The same loader puts seeds/staging.json into staging from
-# the seed step CI runs (.github/actions/seed-staging), so the two environments
-# differ in their fixture and their tables, never in the code path that built
-# the rows. The account step lives HERE in the wrapper, not in the loader, for
-# the same reason: staging's accounts come from its fixture (password via
-# ${E2E_TEST_USER_PASSWORD}), so a prompt in the loader would be a dev-only
-# fork of a CI-shared path.
+# seeds/dev.json — this script only says WHERE it goes. The same loader puts
+# seeds/staging.json into staging from .github/actions/seed-staging (against
+# real AWS, with no --local), so the environments differ in fixture and
+# target, never in the code path that builds the rows. The loader lives in
+# services/admin/src/insolvia_admin/entrypoints/seed.py.
 #
-# The fixture also names CASES (seeds/fixtures/<version>/), whose sample
-# documents live in the shared fixture bucket — one bucket for the account,
-# insolvia-services' infra/modules/dev_fixtures, applied by that repo's CI as
-# part of its infra/envs/shared. The loader copies them server-side into this
-# machine's own case-documents bucket; the developer's credentials are what
-# read the shared bucket. If the copy is
-# refused, the bucket has not been applied yet or the fixture version has not
-# been published (scripts/dev-fixture.sh publish).
-#
-# ## Why this is shell and the loading is Python
-#
-# The split follows one question: does the step need to know the shape of our
-# data? Not here. This file resolves an ENVIRONMENT — the machine id, the table
-# and pool names in this machine's Terraform state, and, the load-bearing part,
-# AWS credentials an SDK can actually read. The `aws login` session format is
-# unreadable by boto3 and by Terraform's provider, which is what
-# `export_temporary_aws_credentials` in dev-aws-common.sh exists to fix, and a
-# child process cannot fix its own parent's environment. Run the loader without
-# this wrapper and it fails with NoCredentialsError.
-#
-# Building rows does need the shape, so that is Python next to the code owning
-# it: services/admin/src/insolvia_admin/entrypoints/seed.py.
+# shortcut: debtors' tax ids are not seeded locally until #623 moves them
+# to Postgres — the local API keeps them in memory.
 #
 # ## Scope
 #
-# DEV ONLY, and not parameterised on purpose. A script that creates accounts
-# and could be pointed at the prod pool by changing one argument is a script
-# that eventually is. The names come from THIS machine's Terraform state and
-# must carry this machine's short id; the loader re-checks each name's shape
-# itself, so neither guard is load-bearing alone. Staging is seeded by the
-# .github/actions/seed-staging step its deploy workflows share, and prod is
-# refused outright.
-#
-# ## AWS credentials
-#
-# Needs a working session — the developer's own IAM user, the same one
-# scripts/dev-aws-setup.sh used. If it is not working, read the
-# `insolvia-aws-auth` skill; the mechanics live there and are not restated.
+# DEV ONLY, and not parameterised on purpose: the pool must be named
+# insolvia-dev-users, and the seeded names carry this machine's short id,
+# which the loader re-checks. Staging is seeded by CI, and prod is refused.
 #
 set -euo pipefail
 
@@ -108,18 +73,21 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/dev-aws-common.sh"
 
 DEV_ENV_FILE="$HOME/.config/insolvia/dev.env"
+SUBJECTS_FILE="$CONFIG_DIR/dev-subjects.json"
 
 CHECK_ONLY=0
+REFRESH=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
   --check) CHECK_ONLY=1 ;;
+  --refresh) REFRESH=1 ;;
   -h | --help)
-    printf 'Usage: %s [--check]\n\n' "$0"
+    printf 'Usage: %s [--check] [--refresh]\n\n' "$0"
     printf '  DEV_USER_PASSWORD  optional — read from %s,\n' "$DEV_ENV_FILE"
     printf '                     or prompted for without echo, when an account must be created\n\n'
     printf 'Ensures the dev sign-in account(s) named by seeds/dev.json exist in the\n'
-    printf 'shared dev pool, then loads that fixture into this machine'"'"'s dev tables.\n'
-    printf 'Edit the fixture to change WHAT is seeded; this script only says where.\n'
+    printf 'shared dev pool (needs an AWS login, once), then loads that fixture into\n'
+    printf 'the local Postgres and S3 server (no AWS).\n'
     exit 0
     ;;
   *) die "Unknown option: $1" ;;
@@ -127,55 +95,24 @@ while [[ $# -gt 0 ]]; do
   shift
 done
 
-for command in aws jq terraform; do require_command "$command"; done
+require_command jq
 
 FIXTURE="$REPO_ROOT/seeds/dev.json"
 [[ -f "$FIXTURE" ]] || die "No fixture at $FIXTURE."
 
-# The loader runs through the API's own code, so it needs the API's venv — the
-# one services/api/scripts/dev-setup.sh creates. Checked here rather than left
-# to a ModuleNotFoundError, which names `boto3` and not the missing step.
+# The loader runs through the API's own code, so it needs the API's venv.
 VENV_PYTHON="$API_DIR/.venv/bin/python"
 [[ -x "$VENV_PYTHON" ]] ||
   die "No API venv at $VENV_PYTHON. Run ./services/api/scripts/dev-setup.sh first."
 
-load_machine_id false
-load_aws_identity
-terraform_init
-outputs="$(terraform_output_json)"
-
-# Belt and braces on "dev only", exactly as dev-aws-reset.sh does before it
-# deletes anything: every name must carry THIS machine's short id.
-# The firm side is this machine's Docker Postgres (ADR 0030): the seeder
-# writes it through DATABASE_URL, and FIRM_TABLE is only the target's name,
-# which guards the load and derives the seeded ids.
-FIRM_TABLE="$FIRM_TABLE_NAME_EXPECTED"
-export DATABASE_URL="${DATABASE_URL:-postgresql://insolvia:insolvia@127.0.0.1:5432/insolvia}"
-
-CASE_TABLE="$(jq -r '.case_table_name.value // empty' <<<"$outputs")"
-[[ -n "$CASE_TABLE" ]] ||
-  die "No case_table_name in this machine's Terraform state. Run ./scripts/dev-aws-setup.sh first."
-[[ "$CASE_TABLE" == "$CASE_TABLE_NAME_EXPECTED" ]] ||
-  die "Refusing: case table '$CASE_TABLE' is not '$CASE_TABLE_NAME_EXPECTED'."
-DOCUMENT_BUCKET="$(jq -r '.case_document_bucket.value // empty' <<<"$outputs")"
-[[ -n "$DOCUMENT_BUCKET" ]] ||
-  die "No case_document_bucket in this machine's Terraform state. Run ./scripts/dev-aws-setup.sh first."
-[[ "$DOCUMENT_BUCKET" == "$RESOURCE_PREFIX-case-documents-"* ]] ||
-  die "Refusing: document bucket '$DOCUMENT_BUCKET' does not carry this machine's prefix."
-# The shared fixture bucket is account-level and named deterministically
-# (insolvia-services' infra/modules/dev_fixtures); INSOLVIA_DEV_FIXTURES_BUCKET
-# overrides it for an account that names it differently.
-FIXTURE_BUCKET="${INSOLVIA_DEV_FIXTURES_BUCKET:-insolvia-shared-dev-fixtures-$AWS_REGION_VALUE}"
-
-POOL_ID="$(jq -r '.auth_user_pool_id.value // empty' <<<"$outputs")"
-[[ -n "$POOL_ID" ]] ||
-  die "No auth_user_pool_id in this machine's Terraform state. Run ./scripts/dev-aws-setup.sh first."
-[[ "$POOL_ID" =~ ^[a-z0-9-]+_[A-Za-z0-9]+$ ]] ||
-  die "'$POOL_ID' does not look like a Cognito user pool id — refusing to continue."
-pool_name="$(aws_dev cognito-idp describe-user-pool --user-pool-id "$POOL_ID" \
-  --query 'UserPool.Name' --output text)"
-[[ "$pool_name" == "$USER_POOL_NAME_EXPECTED" ]] ||
-  die "Refusing: pool '$POOL_ID' is named '$pool_name', not '$USER_POOL_NAME_EXPECTED'."
+# The seeded names carry this machine's short id: the loader guards its
+# target with them and derives the seeded ids from them. Not AWS resources.
+load_machine_id true
+FIRM_TABLE="insolvia-dev-$MACHINE_SHORT_ID-firms"
+CASE_TABLE="insolvia-dev-$MACHINE_SHORT_ID-cases"
+DOCUMENT_BUCKET="insolvia-local-case-documents"
+API_ENV="$API_DIR/.env"
+APP_ENV="$APP_DIR/.env"
 
 # ── The accounts ────────────────────────────────────────────────
 # FROM THE FIXTURE, not from an env var or a default that has to be kept in
@@ -310,60 +247,105 @@ ensure_account() {
   ok "Sign-in ready: $email in $pool_name"
 }
 
-# ── The data ────────────────────────────────────────────────────
-# PYTHONPATH rather than an install: the venv has the runtime dependencies but
-# the service itself is not packaged into it (pyproject declares no dependencies
-# and nothing runs `pip install -e .`), so `src` has to be on the path the same
-# way pytest's `pythonpath` setting puts it there.
-#
-# The seeder lives in the ADMIN service (#212 — provisioning tooling has one
-# home), while the venv is still the API's: its pinned boto3 + insolvia_core
-# cover everything the seeder imports, and a second venv for one entrypoint
-# would be setup for setup's sake.
+# ── The Cognito half (AWS login, once) ──────────────────────────
+
+has_subject() {
+  [[ -f "$SUBJECTS_FILE" ]] && jq -e --arg e "$1" '.[$e] | strings' "$SUBJECTS_FILE" >/dev/null
+}
+
+cognito_half_done() {
+  local email
+  grep -q '^AUTH_ISSUER_URL=.' "$API_ENV" 2>/dev/null || return 1
+  grep -q '^EXPO_PUBLIC_COGNITO_CLIENT_ID=.' "$APP_ENV" 2>/dev/null || return 1
+  for email in "${ACCOUNT_EMAILS[@]}"; do has_subject "$email" || return 1; done
+}
+
+contract() {
+  jq -r --arg name "$SHARED_CONTRACT_PATH/$1" '.[] | select(.Name == $name) | .Value' <<<"$PARAMETERS"
+}
+
+cognito_half() {
+  require_command aws
+  log "The Cognito half needs an AWS login (once per user) — profile '$AWS_PROFILE_VALUE'."
+  aws_dev sts get-caller-identity >/dev/null 2>&1 ||
+    die "No AWS session for profile '$AWS_PROFILE_VALUE'. Log in (see the insolvia-aws-auth skill), then re-run.
+       Only this half needs it; once done, seeding and running the stack need no AWS."
+  PARAMETERS="$(aws_dev ssm get-parameters-by-path --path "$SHARED_CONTRACT_PATH" \
+    --query Parameters --output json)" || die "Could not read $SHARED_CONTRACT_PATH/* from SSM."
+  POOL_ID="$(contract user-pool-id)"
+  [[ "$POOL_ID" =~ ^[a-z0-9-]+_[A-Za-z0-9]+$ ]] ||
+    die "No usable $SHARED_CONTRACT_PATH/user-pool-id. The shared dev pool is insolvia-services' infra/envs/dev."
+  pool_name="$(aws_dev cognito-idp describe-user-pool --user-pool-id "$POOL_ID" \
+    --query 'UserPool.Name' --output text)"
+  [[ "$pool_name" == "$SHARED_POOL_NAME" ]] ||
+    die "Refusing: pool '$POOL_ID' is named '$pool_name', not '$SHARED_POOL_NAME'."
+
+  # Public identifiers (they ride in every sign-in redirect), into the two
+  # gitignored env files that need them.
+  upsert_env "$API_ENV" AUTH_ISSUER_URL "$(contract issuer-url)"
+  upsert_env "$API_ENV" AUTH_CLIENT_ID "$(contract client-id)"
+  upsert_env "$API_ENV" AUTH_PORTAL_CLIENT_ID "$(contract portal-client-id)"
+  upsert_env "$APP_ENV" EXPO_PUBLIC_INSOLVIA_ENV "local"
+  upsert_env "$APP_ENV" EXPO_PUBLIC_COGNITO_DOMAIN "$(contract domain)"
+  upsert_env "$APP_ENV" EXPO_PUBLIC_COGNITO_CLIENT_ID "$(contract client-id)"
+  upsert_env "$APP_ENV" EXPO_PUBLIC_COGNITO_PORTAL_CLIENT_ID "$(contract portal-client-id)"
+  ok "Wrote the pool's ids into services/api/.env and apps/insolvia_app/.env"
+
+  local email subjects='{}' sub
+  for email in "${ACCOUNT_EMAILS[@]}"; do
+    ensure_account "$email"
+    sub="$(user_json "$email" | jq -r '.UserAttributes[] | select(.Name == "sub") | .Value')"
+    [[ -n "$sub" ]] || die "Pool user '$email' has no sub."
+    subjects="$(jq --arg e "$email" --arg s "$sub" '. + {($e): $s}' <<<"$subjects")"
+  done
+  offer_to_save_password
+  (
+    umask 077
+    mkdir -p "$CONFIG_DIR"
+    printf '%s\n' "$subjects" >"$SUBJECTS_FILE"
+  )
+  ok "Recorded ${#ACCOUNT_EMAILS[@]} subject(s) in $SUBJECTS_FILE"
+}
+
+# ── The data half (no AWS) ──────────────────────────────────────
+# PYTHONPATH rather than an install: the service itself is not packaged into
+# the venv. The seeder lives in the ADMIN service (#212); the venv is the
+# API's, whose pinned boto3 + insolvia_core cover everything it imports.
+# The local S3 server's throwaway keys, and no profile: nothing in this half
+# may reach AWS.
 seed() {
-  PYTHONPATH="$REPO_ROOT/services/admin/src" "$VENV_PYTHON" -m insolvia_admin.entrypoints.seed load \
+  env -u AWS_PROFILE \
+    DATABASE_URL="${DATABASE_URL:-postgresql://insolvia:insolvia@127.0.0.1:5432/insolvia}" \
+    CASE_DOCUMENT_ENDPOINT_URL="http://127.0.0.1:9000" \
+    AWS_ACCESS_KEY_ID=insolvia AWS_SECRET_ACCESS_KEY=insolvia-local AWS_DEFAULT_REGION=us-east-1 \
+    PYTHONPATH="$REPO_ROOT/services/admin/src" \
+    "$VENV_PYTHON" -m insolvia_admin.entrypoints.seed load \
+    --local "$SUBJECTS_FILE" \
     --fixture "$FIXTURE" \
     --firm-table "$FIRM_TABLE" \
-    --user-pool-id "$POOL_ID" \
     --case-table "$CASE_TABLE" \
     --document-bucket "$DOCUMENT_BUCKET" \
-    --fixture-bucket "$FIXTURE_BUCKET" \
     "$@"
 }
 
-# ADR 0022's release step, on this machine: delete the case partitions whose
-# debtors name no firm client — the rows seeded from fixtures v1..v3, or opened
-# before cases were opened for clients. Idempotent (a second run finds none),
-# and it can never delete a case that has a client; the entrypoint's docstring
-# owns the rule. Run before the load, so the v4 cases replace the v3 ones
-# rather than sitting beside them.
-purge_pre_client() {
-  PYTHONPATH="$REPO_ROOT/services/admin/src" "$VENV_PYTHON" -m insolvia_admin.entrypoints.purge_pre_client \
-    --case-table "$CASE_TABLE" \
-    --firm-table "$FIRM_TABLE" \
-    "$@"
-}
+port_open() { (exec 3<>"/dev/tcp/127.0.0.1/$1") >/dev/null 2>&1; }
 
 if [[ "$CHECK_ONLY" -eq 1 ]]; then
-  for email in "${ACCOUNT_EMAILS[@]}"; do
-    user_is_confirmed "$email" ||
-      die "No CONFIRMED user '$email' in $pool_name. Re-run without --check to create it."
-  done
-  purge_pre_client --check ||
-    die "This machine still holds pre-client cases (ADR 0022). Re-run without --check."
+  cognito_half_done ||
+    die "The Cognito half has not run on this machine (or the fixture names someone new). Re-run without --check."
   seed --check || die "seeds/dev.json is not fully loaded. Re-run without --check."
   ok "Sign-in ready and this machine matches seeds/dev.json."
   exit 0
 fi
 
-for email in "${ACCOUNT_EMAILS[@]}"; do
-  ensure_account "$email"
-done
-offer_to_save_password
+if [[ "$REFRESH" -eq 1 ]] || ! cognito_half_done; then
+  cognito_half
+else
+  ok "Cognito half already done (subjects in $SUBJECTS_FILE) — no AWS needed."
+fi
 
-log "Deleting pre-client cases from $CASE_TABLE (ADR 0022) — finding none is the usual answer"
-purge_pre_client --apply
-
-log "Loading $(basename "$FIXTURE") into $FIRM_TABLE and $CASE_TABLE (documents from s3://$FIXTURE_BUCKET)"
+{ port_open 5432 && port_open 9000; } ||
+  die "The local stack is not up (Postgres :5432, S3 :9000). Start ./scripts/dev-up.sh, then re-run."
+log "Loading $(basename "$FIXTURE") into the local Postgres and S3 server"
 seed
-ok "Done. Start ./scripts/dev-up.sh if it is not running, then sign in at http://localhost:3000 as ${ACCOUNT_EMAILS[0]}."
+ok "Done. Sign in at http://localhost:3000 as ${ACCOUNT_EMAILS[0]}."

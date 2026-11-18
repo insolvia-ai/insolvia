@@ -43,8 +43,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 COPY packages/insolvia_core /build/packages/insolvia_core
 COPY services/api/requirements.txt /build/services/api/requirements.txt
-# Same cd-then-install rule as the lambda stage above.
-RUN cd /build/services/api && pip install --no-cache-dir -r requirements.txt
+COPY services/api/requirements-worker.txt /build/services/api/requirements-worker.txt
+# Same cd-then-install rule as the lambda stage above. The WORKER's set: the
+# development server runs accepted jobs in process (#624), so locally one
+# image is both halves of the split ADR 0015 keeps apart when deployed.
+RUN cd /build/services/api && pip install --no-cache-dir -r requirements-worker.txt
 COPY services/api/src/ src/
 
 EXPOSE 8080

@@ -14,24 +14,14 @@ from insolvia_core.adapters.aws.jwks_provider import CognitoJwksProvider
 from insolvia_core.adapters.aws.tax_id_cipher import KmsTaxIdCipher, case_key_alias
 from insolvia_core.adapters.aws.tax_id_store import DynamoDbTaxIdStore
 from insolvia_core.adapters.aws.user_directory import CognitoUserDirectory
+from insolvia_core.adapters.development_keys import development_key_adapters
 from insolvia_core.adapters.memory.access_log import MemoryAccessLog
-from insolvia_core.adapters.memory.candidate_store import MemoryCandidateStore
-from insolvia_core.adapters.memory.case_entity_store import MemoryCaseEntityStore
-from insolvia_core.adapters.memory.case_store import MemoryCaseStore
-from insolvia_core.adapters.memory.debtor_store import MemoryDebtorStore
 from insolvia_core.adapters.memory.document_blobs import MemoryDocumentBlobStore
-from insolvia_core.adapters.memory.document_request_store import (
-    MemoryDocumentRequestStore,
-)
-from insolvia_core.adapters.memory.document_store import MemoryDocumentStore
 from insolvia_core.adapters.memory.filing_credentials import (
-    LocalCredentialSealer,
     MemoryFilingAuthorizationStore,
     MemoryFilingCredentialStore,
 )
 from insolvia_core.adapters.memory.filing_store import MemoryFilingStore
-from insolvia_core.adapters.memory.task_store import MemoryTaskStore
-from insolvia_core.adapters.memory.tax_id_cipher import LocalTaxIdCipher
 from insolvia_core.adapters.memory.tax_id_store import MemoryTaxIdStore
 from insolvia_core.adapters.memory.user_directory import MemoryUserDirectory
 from insolvia_core.adapters.postgres.candidate_store import PostgresCandidateStore
@@ -73,18 +63,12 @@ from insolvia_api.adapters.aws.filing_approval_store import (
 from insolvia_api.adapters.aws.filing_queue import SqsFilingQueue
 from insolvia_api.adapters.aws.job_queue import SqsJobQueue
 from insolvia_api.adapters.aws.mailer_client import SigV4MailerClient
-from insolvia_api.adapters.memory.event_store import (
-    MemoryCalendarTokenStore,
-    MemoryEventStore,
-)
 from insolvia_api.adapters.memory.filing_approval_store import (
     MemoryFilingApprovalStore,
 )
 from insolvia_api.adapters.memory.filing_queue import MemoryFilingQueue
-from insolvia_api.adapters.memory.job_queue import MemoryJobQueue
-from insolvia_api.adapters.memory.job_store import MemoryJobStore
+from insolvia_api.adapters.memory.in_process_job_queue import InProcessJobQueue
 from insolvia_api.adapters.memory.mailer_client import InMemoryMailerClient
-from insolvia_api.adapters.memory.packet_store import MemoryPacketStore
 from insolvia_api.adapters.postgres.event_store import (
     PostgresCalendarTokenStore,
     PostgresEventStore,
@@ -106,6 +90,7 @@ from insolvia_api.core.ports import (
     Mailer,
     PacketStore,
 )
+from insolvia_api.entrypoints.workers import compose_workers
 
 config = load_config()
 if config.environment != "local":
@@ -115,8 +100,8 @@ configure_logging()
 
 # The Postgres stores (ADR 0030): this machine's Docker Postgres, migrated by
 # dev-up.sh. load_config() refused to start without DATABASE_URL, so there is
-# no in-memory fallback to drift to. The firm group, the portal bindings and
-# the waitlist live there, and the case stores below (#622).
+# no in-memory fallback to drift to. The firm group, the portal bindings,
+# the waitlist and the case stores (#622) live there.
 assert config.database_url is not None
 waitlist_store = PostgresWaitlistStore(config.database_url)
 firm_store = PostgresFirmStore(config.database_url)
@@ -139,70 +124,52 @@ if config.mailer_api_url:
 else:
     mailer = InMemoryMailerClient()
 
-# Auth against this machine's own Cognito pool when AUTH_ISSUER_URL and
-# AUTH_CLIENT_ID are set (infra/envs/dev publishes both; export them into
-# services/api/.env to use them). Unset, the provider is simply absent and
-# every protected route answers 401 — the bare dev server keeps working for
-# the public routes, and auth fails CLOSED rather than waving requests
-# through. This is the ONE entrypoint that tolerates missing auth config;
-# api_lambda.py refuses to boot without it.
-# Same shape as the waitlist store above: with this machine's real stores named
-# (scripts/dev-aws-setup.sh writes all of them into services/api/.env) the AWS
-# adapters run against them, and the bare dev server falls back to in-memory.
-# The GROUP moves together — an in-memory store with a real access log, or a
-# real document row pointing at a bucket that only exists in this process,
-# would be a confusing half-state to debug. That is also why the document
-# bucket is in this condition rather than in one of its own: dev-aws-setup.sh
-# provisions the table and the bucket in the same apply, so "some but not all"
-# means a stale .env, and falling back wholesale is the state a developer can
-# actually reason about.
-case_store: CaseStore
+# The case stores are Postgres, always (#622). What still needs a stand-in
+# locally (#624, ADR 0030) is everything AWS used to provide:
+#
+# - the sealed and logged data still on DynamoDB until #623 (access log, tax
+#   ids, filings, approvals, the credential vault): this machine's
+#   per-machine dev table when CASE_TABLE_NAME names one, else the memory
+#   twins — which forget on restart. shortcut: memory until #623 moves them
+#   to Postgres, then they are Postgres here too.
+# - KMS: the real case key beside a real table, else the development-only
+#   key adapters, which refuse to compose outside INSOLVIA_ENV=local.
+# - S3: CASE_DOCUMENT_BUCKET on CASE_DOCUMENT_ENDPOINT_URL — the compose
+#   stack's MinIO, presigning for the browser's address — or a real bucket
+#   with no endpoint; unset, the memory store mints URLs nothing can fetch.
+# - SQS: JOB_QUEUE_URL names a real queue (worker_poller.py consumes it);
+#   unset, the in-process queue runs jobs in this process.
+case_store: CaseStore = PostgresCaseStore(config.database_url)
+debtor_store: DebtorStore = PostgresDebtorStore(config.database_url)
+case_entity_store: CaseEntityStore = PostgresCaseEntityStore(config.database_url)
+document_store: DocumentStore = PostgresDocumentStore(config.database_url)
+task_store: TaskStore = PostgresTaskStore(config.database_url)
+document_request_store: DocumentRequestStore = PostgresDocumentRequestStore(
+    config.database_url
+)
+job_store: JobStore = PostgresJobStore(config.database_url)
+packet_store: PacketStore = PostgresPacketStore(config.database_url)
+candidate_store: CandidateStore = PostgresCandidateStore(config.database_url)
+event_store: EventStore = PostgresEventStore(config.database_url)
+calendar_token_store: CalendarTokenStore = PostgresCalendarTokenStore(
+    config.database_url
+)
+
 access_log: AccessLog
-document_store: DocumentStore
-document_blobs: DocumentBlobStore
-if (
-    config.case_table_name
-    and config.case_access_log_table_name
-    and config.case_document_bucket
-):
-    case_store = PostgresCaseStore(config.database_url)
-    access_log = DynamoDbAccessLog(config.case_access_log_table_name)
-    document_store = PostgresDocumentStore(config.database_url)
-    document_blobs = S3DocumentBlobStore(config.case_document_bucket)
-else:
-    case_store = MemoryCaseStore()
-    access_log = MemoryAccessLog()
-    document_store = MemoryDocumentStore()
-    # Mints URLs nothing can fetch, which is the honest local shape: there is
-    # no S3 emulator here. Run scripts/dev-aws-setup.sh to get a real bucket.
-    document_blobs = MemoryDocumentBlobStore()
-debtor_store: DebtorStore
-case_entity_store: CaseEntityStore
 tax_id_store: TaxIdStore
 tax_id_cipher: TaxIdCipher
-task_store: TaskStore
-document_request_store: DocumentRequestStore
 filing_credential_store: FilingCredentialStore
 filing_credential_sealer: FilingCredentialSealer
 filing_authorization_store: FilingAuthorizationStore
+filing_approval_store: FilingApprovalStore
+filing_store: FilingStore
 if config.case_table_name and config.case_access_log_table_name:
-    case_store = PostgresCaseStore(config.database_url)
     access_log = DynamoDbAccessLog(config.case_access_log_table_name)
-    debtor_store = PostgresDebtorStore(config.database_url)
-    case_entity_store = PostgresCaseEntityStore(config.database_url)
-    # And the sealed tax ids (issue 13.12 / #382), under THIS MACHINE's real
-    # case key — the developer's own IAM user reaches it through the key
-    # policy's root delegation (infra/envs/dev), so a laptop seals and opens
-    # exactly as staging does. The alias is derived from the table name.
+    # This machine's real case key and vault (infra/envs/dev); the
+    # developer's principal reaches them through the key policy's root
+    # delegation, so a laptop seals and opens exactly as staging does.
     tax_id_store = DynamoDbTaxIdStore(config.case_table_name)
     tax_id_cipher = KmsTaxIdCipher(case_key_alias(config.case_table_name))
-    task_store = PostgresTaskStore(config.database_url)
-    # And a case's document requests (ADR 0023 PR 5 / #364).
-    document_request_store = PostgresDocumentRequestStore(config.database_url)
-    # The filing-credential vault (ADR 0024), on THIS MACHINE's real
-    # vault table and key (infra/envs/dev). The developer's principal
-    # seals through the key's root delegation and is refused Decrypt by
-    # its key policy, exactly as the deployed API's role is.
     filing_credential_store = DynamoDbFilingCredentialStore(
         filing_credentials_table_name(config.case_table_name)
     )
@@ -212,107 +179,69 @@ if config.case_table_name and config.case_access_log_table_name:
     filing_authorization_store = DynamoDbFilingAuthorizationStore(
         filing_credentials_table_name(config.case_table_name)
     )
+    filing_approval_store = DynamoDbFilingApprovalStore(config.case_table_name)
+    filing_store = DynamoDbFilingStore(config.case_table_name)
 else:
-    # Composed with the firm store, whose client rows a link (and a case
-    # open, through the shared store) conditions on.
-    debtor_store = MemoryDebtorStore(firm_store=firm_store)
-    # ONE debtor store for both: opening a case writes its debtors through
-    # the case store (ADR 0022), and the debtor routes must see them — the
-    # shared-table property the DynamoDB pair has by construction.
-    case_store = MemoryCaseStore(debtor_store=debtor_store)
     access_log = MemoryAccessLog()
-    case_entity_store = MemoryCaseEntityStore()
     tax_id_store = MemoryTaxIdStore()
-    # The deterministic local key — never composed beside a real table.
-    tax_id_cipher = LocalTaxIdCipher()
-    task_store = MemoryTaskStore()
-    document_request_store = MemoryDocumentRequestStore()
+    tax_id_cipher, filing_credential_sealer = development_key_adapters(
+        config.environment
+    )
     filing_credential_store = MemoryFilingCredentialStore()
-    filing_credential_sealer = LocalCredentialSealer()
     filing_authorization_store = MemoryFilingAuthorizationStore()
+    filing_approval_store = MemoryFilingApprovalStore()
+    # shortcut: a hand-back that files the case writes it into this store's
+    # own memory case store, not Postgres — #623 moves filings beside cases.
+    filing_store = MemoryFilingStore()
 
-# The pipeline pair (ADR 0018). The store rides the case-table condition
-# above — a job is a child item of the case partition, so whichever table the
-# case store got, the job store shares. The QUEUE follows the user-directory
-# shape: with JOB_QUEUE_URL set (dev-aws-setup.sh writes this machine's real
-# dev queue into services/api/.env) an accepted job lands on real SQS, and
-# `python -m insolvia_api.entrypoints.worker_poller` in another terminal runs
-# it — the full accept → deliver → run → status loop on a laptop. Unset, the
-# memory queue records the enqueue and nothing runs, which is honest: there
-# is no worker in this process.
-job_store: JobStore
-if config.case_table_name and config.case_access_log_table_name:
-    job_store = PostgresJobStore(config.database_url)
+document_blobs: DocumentBlobStore
+if config.case_document_bucket:
+    document_blobs = S3DocumentBlobStore(
+        config.case_document_bucket,
+        endpoint_url=config.case_document_endpoint_url,
+        public_endpoint_url=config.case_document_public_endpoint_url,
+    )
 else:
-    job_store = MemoryJobStore()
+    document_blobs = MemoryDocumentBlobStore()
+
 job_queue: JobQueue
 if config.job_queue_url:
     job_queue = SqsJobQueue(config.job_queue_url)
 else:
-    job_queue = MemoryJobQueue()
+    job_queue = InProcessJobQueue(
+        store=job_store,
+        # The SAME instances the routes use, so a memory twin's writes are
+        # visible to the job that reads them.
+        workers=compose_workers(
+            case_store=case_store,
+            debtor_store=debtor_store,
+            entity_store=case_entity_store,
+            packet_store=packet_store,
+            document_store=document_store,
+            candidate_store=candidate_store,
+            blobs=document_blobs,
+            access_log=access_log,
+            tax_id_store=tax_id_store,
+            tax_id_cipher=tax_id_cipher,
+            anthropic_api_key=config.anthropic_api_key,
+        ),
+    )
 
-# The per-filing approval (ADR 0024 PR 6): the records ride the case-table
-# group like the job store; the queue follows the job queue's shape — with
-# FILING_QUEUE_URL set (dev-aws-setup.sh writes this machine's real filing
-# queue) an approval's job lands on real SQS and waits there, since nothing
-# consumes it until services/filing (PR 7); unset, the memory queue records
-# it and sends nothing.
-filing_approval_store: FilingApprovalStore
-if config.case_table_name and config.case_access_log_table_name:
-    filing_approval_store = DynamoDbFilingApprovalStore(config.case_table_name)
-else:
-    filing_approval_store = MemoryFilingApprovalStore()
+# The filing queue's consumer is services/filing, its own service with its
+# own fake court; unset, the memory queue records an approval's job and
+# sends nothing (no local filing poller yet).
 filing_queue: FilingQueue
 if config.filing_queue_url:
     filing_queue = SqsFilingQueue(config.filing_queue_url)
 else:
     filing_queue = MemoryFilingQueue()
 
-# Assembled packets (issue #96): the record rides the case table like the job
-# store; the API side only reads it. The memory fallback shares the memory
-# case store because its `create` is a transaction over both — and in that
-# branch the case store above IS the memory one (the group moves together).
-packet_store: PacketStore
-if config.case_table_name and config.case_access_log_table_name:
-    packet_store = PostgresPacketStore(config.database_url)
-else:
-    if not isinstance(case_store, MemoryCaseStore):  # pragma: no cover - guard
-        raise RuntimeError("memory packet store needs the memory case store")
-    packet_store = MemoryPacketStore(case_store)
-
-# The filing records (ADR 0024 PR 8): written by services/filing, read here,
-# and a hand-back's resolution written onto them — in one transaction with
-# the case when it files it, which is why the memory fallback shares the
-# memory case store, exactly as the packet store does.
-filing_store: FilingStore
-if config.case_table_name and config.case_access_log_table_name:
-    filing_store = DynamoDbFilingStore(config.case_table_name)
-else:
-    if not isinstance(case_store, MemoryCaseStore):  # pragma: no cover - guard
-        raise RuntimeError("memory filing store needs the memory case store")
-    filing_store = MemoryFilingStore(case_store)
-
-# The review queue (8.9): candidate rows ride the case table like the job
-# store — this machine's real dev table, or the in-memory group with the
-# rest of the memory stores.
-candidate_store: CandidateStore
-if config.case_table_name and config.case_access_log_table_name:
-    candidate_store = PostgresCandidateStore(config.database_url)
-else:
-    candidate_store = MemoryCandidateStore()
-
-# Events, deadlines and the feed token (issue 14.6 / #358): the case table
-# again, so a developer's calendar rides this machine's real dev table and
-# the bare server keeps everything in memory.
-event_store: EventStore
-calendar_token_store: CalendarTokenStore
-if config.case_table_name and config.case_access_log_table_name:
-    event_store = PostgresEventStore(config.database_url)
-    calendar_token_store = PostgresCalendarTokenStore(config.database_url)
-else:
-    event_store = MemoryEventStore()
-    calendar_token_store = MemoryCalendarTokenStore()
-
+# Auth against the shared dev Cognito pool when AUTH_ISSUER_URL and
+# AUTH_CLIENT_ID are set (scripts/dev-aws-seed.sh writes both into
+# services/api/.env). Unset, the provider is simply absent and every
+# protected route answers 401 — auth fails CLOSED rather than waving
+# requests through. This is the ONE entrypoint that tolerates missing auth
+# config; api_lambda.py refuses to boot without it.
 jwks_provider: JwksProvider | None = None
 if config.auth_issuer_url and config.auth_client_id:
     jwks_provider = CognitoJwksProvider(config.auth_issuer_url)

@@ -11,20 +11,19 @@
 #   ./apps/insolvia_app/scripts/dev-up.sh
 #
 # This script starts and stops NOTHING itself. Every area owns a dev-up.sh
-# that knows how to run its own thing (the API's keeps its container's
-# short-lived AWS credentials refreshed while `compose up` runs; the app's
+# that knows how to run its own thing (the API's runs its compose stack —
+# Postgres, a local S3 server and the API; the app's
 # pins port 3000 because Cognito registers that exact origin) and a dev-down.sh that knows how to stop it
 # (compose containers outlive the process that started them; a stray npx
 # grandchild keeps holding 3000). Both halves of that knowledge belong next to
 # the thing they describe. This file is an orchestrator: preflight, launch,
 # prefix each stream, and on Ctrl-C run every dev-down.sh.
 #
-# WHAT LOCAL ACTUALLY MEANS HERE. There is no DynamoDB emulator and no fake
-# Cognito: the API talks to this machine's REAL per-developer tables and the
-# app signs in against this machine's REAL Cognito pool, both provisioned by
-# scripts/dev-aws-setup.sh into infra/envs/dev. That is the point — a KMS or
-# IAM mistake surfaces on a laptop rather than after a deploy — but it does
-# mean this script cannot do anything useful until that one has run.
+# WHAT LOCAL ACTUALLY MEANS HERE (#624, ADR 0030 row 5). No AWS session: the
+# API's data is a Docker Postgres and a local S3 server, its jobs run in
+# process, and its keys are a development-only stand-in. The one AWS service
+# is the shared dev Cognito pool the app signs in against — there is no fake
+# Cognito — and scripts/dev-aws-seed.sh writes its ids, once, with an AWS login.
 #
 set -euo pipefail
 
@@ -189,33 +188,11 @@ preflight() {
     failures=$((failures + 1))
   fi
 
-  # The API is the one service with nothing local to fall back to:
-  # infra/envs/dev IS the dev database.
-  if [[ ! -f "$api_env" ]]; then
-    warn "services/api/.env is missing — run ./scripts/dev-aws-setup.sh to provision this machine's dev tables and write it."
-    failures=$((failures + 1))
-  else
-    local missing="" key
-    for key in CASE_TABLE_NAME CASE_ACCESS_LOG_TABLE_NAME CASE_DOCUMENT_BUCKET; do
-      grep -q "^$key=" "$api_env" || missing="$missing $key"
-    done
-    if [[ -n "$missing" ]]; then
-      warn "services/api/.env is missing:$missing — re-run ./scripts/dev-aws-setup.sh (it adds keys as new stores land)."
-      failures=$((failures + 1))
-    fi
-    # Not fatal: the API fails closed, so the public routes still work and
-    # only sign-in breaks. Worth saying out loud, because "every protected
-    # route 401s" reads as a bug rather than a setup gap.
-    grep -q '^AUTH_ISSUER_URL=' "$api_env" ||
-      warn "services/api/.env has no AUTH_ISSUER_URL — protected routes will answer 401 and the app cannot sign in."
-  fi
-
-  # Warn-only, matching the admin service's own posture: without its .env it
-  # runs on in-memory adapters, which is fine for poking at the portal but
-  # means a provisioned firm evaporates on restart and never reaches the real
-  # dev tables the app reads.
-  [[ -f "$REPO_ROOT/services/admin/.env" ]] ||
-    warn "services/admin/.env is missing — the admin service will run in-memory only. Run ./scripts/dev-aws-setup.sh to point it at this machine's dev tables."
+  # Not fatal: the API fails closed, so the public routes still work and
+  # only sign-in breaks. Worth saying out loud, because "every protected
+  # route 401s" reads as a bug rather than a setup gap.
+  grep -q '^AUTH_ISSUER_URL=.' "$api_env" 2>/dev/null ||
+    warn "services/api/.env has no AUTH_ISSUER_URL — protected routes will answer 401 and the app cannot sign in. Run ./scripts/dev-aws-seed.sh once (it needs an AWS login, once)."
 
   if [[ ! -d "$REPO_ROOT/node_modules" ]]; then
     warn "root node_modules missing — run ./apps/insolvia_app/scripts/dev-setup.sh (the app resolves through the root workspace)."
@@ -366,7 +343,7 @@ banner() {
   # seeds the firm, which covers the failure that is easier to miss: an
   # account gets you PAST sign-in, and every route then answers 403 until the
   # firm exists. That failure looks like a broken build, not a missing step.
-  printf '\n%s  Sign in at http://localhost:3000 — this machine'"'"'s own Cognito pool.%s\n' "$c_dim" "$c_reset"
+  printf '\n%s  Sign in at http://localhost:3000 — the shared dev Cognito pool.%s\n' "$c_dim" "$c_reset"
   printf '%s  No account yet (there is no sign-up screen by design), or signed in%s\n' "$c_dim" "$c_reset"
   printf '%s  but everything 403s? One script creates the account and its firm:%s\n' "$c_dim" "$c_reset"
   printf '%s      ./scripts/dev-aws-seed.sh%s\n' "$c_dim" "$c_reset"

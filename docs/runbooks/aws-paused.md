@@ -12,7 +12,7 @@ right now.**
 | Route53 zone `insolvia.ai` and the domain registration | Domain routing. The zone holds the Google Workspace mail records (MX, SPF, DKIM, verification) |
 | Wildcard ACM certificate | Free, and `dev-auth.insolvia.ai` needs it |
 | SES identity `insolvia.ai` and its DNS | Free, and keeps the sending domain verified |
-| Cognito pool `insolvia-dev-users`, `dev-auth.insolvia.ai`, and `/insolvia/dev/auth/*` in SSM | Local sign-in. There is no local stand-in yet |
+| Cognito pool `insolvia-dev-users`, `dev-auth.insolvia.ai`, and `/insolvia/dev/auth/*` in SSM | Local sign-in. There is no local stand-in for Cognito |
 | IAM user and admin group | Account access |
 | `insolvia-shared-terraform-state-us-east-1` | Terraform state for what remains |
 
@@ -24,12 +24,17 @@ Support Center, also remains; it has cost nothing.
 
 ## Local development
 
-The backend is Python again (main restored to its state before ADR 0028). That
-backend has **no local stand-in for DynamoDB**: `scripts/dev-up.sh` talks to a
-per-developer stack that `scripts/dev-aws-setup.sh` applies into
-`infra/envs/dev`. While AWS is paused that stack does not exist, so the API
-cannot run locally until someone decides to apply `infra/envs/dev` (it costs
-money) or adds a local DynamoDB. Unit tests that use moto still run offline.
+The whole system runs on a laptop with **no AWS session** (#624, ADR 0030
+row 5): `scripts/dev-up.sh` starts Docker Postgres, a local S3 server and the
+API, which runs jobs in process and seals under a development-only key. The
+one AWS service is the shared dev Cognito pool. `scripts/dev-aws-seed.sh`
+reaches it once per user — that run needs an AWS login — to write the pool's
+ids into the local `.env` files and create your account; after that, seeding
+and running need no AWS. [`scripts/README.md`](../../scripts/README.md) has
+the detail.
+
+The per-developer stack (`infra/envs/dev`, `scripts/dev-aws-setup.sh`) is
+optional and stays unapplied while AWS is paused.
 
 ## Do not run while paused
 

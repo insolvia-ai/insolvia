@@ -73,9 +73,32 @@ class S3DocumentBlobStore:
     behind, and listing the bucket would make one look like a document.
     """
 
-    def __init__(self, bucket_name: str) -> None:
+    def __init__(
+        self,
+        bucket_name: str,
+        *,
+        endpoint_url: str | None = None,
+        public_endpoint_url: str | None = None,
+    ) -> None:
+        """`endpoint_url` is a local S3-compatible server (#624, ADR 0030) —
+        unset everywhere deployed. Path-style there, because a bucket
+        subdomain of a compose hostname does not resolve. Presigned URLs are
+        signed for `public_endpoint_url`: the host is part of the signature,
+        and the browser reaches the server at a different address than this
+        container does. Signing makes no request, so that client never needs
+        to reach it."""
         self.bucket_name = bucket_name
-        self.client = boto3.client("s3", config=_SIGNING)
+        config = (
+            _SIGNING
+            if endpoint_url is None
+            else Config(signature_version="s3v4", s3={"addressing_style": "path"})
+        )
+        self.client = boto3.client("s3", config=config, endpoint_url=endpoint_url)
+        self.signer = (
+            self.client
+            if public_endpoint_url is None
+            else boto3.client("s3", config=config, endpoint_url=public_endpoint_url)
+        )
 
     def upload_url(
         self, storage_ref: str, *, content_type: str, byte_size: int, expires_in: int
@@ -119,7 +142,7 @@ class S3DocumentBlobStore:
         this instance and from the record, never from a caller.
         """
         return str(
-            self.client.generate_presigned_url(
+            self.signer.generate_presigned_url(
                 "put_object",
                 Params={
                     "Bucket": self.bucket_name,
@@ -146,7 +169,7 @@ class S3DocumentBlobStore:
         already has the name from the record and can label its own download.
         """
         return str(
-            self.client.generate_presigned_url(
+            self.signer.generate_presigned_url(
                 "get_object",
                 Params={"Bucket": self.bucket_name, "Key": storage_ref},
                 ExpiresIn=expires_in,

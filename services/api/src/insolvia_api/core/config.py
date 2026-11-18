@@ -79,6 +79,10 @@ class AppConfig:
     case_access_log_table_name: str | None = None
     auth_user_pool_id: str | None = None
     case_document_bucket: str | None = None
+    # A local S3-compatible server (#624): where this process reaches it, and
+    # where a browser does. Unset everywhere deployed.
+    case_document_endpoint_url: str | None = None
+    case_document_public_endpoint_url: str | None = None
     job_queue_url: str | None = None
     filing_queue_url: str | None = None
     anthropic_api_key: str | None = None
@@ -128,6 +132,10 @@ def load_config(environ: Mapping[str, str] | None = None) -> AppConfig:
     case key, S3 resolves it from the bucket's default encryption, and nothing
     in this service ever names it — which is what keeps this service's only
     KMS reach fenced to `kms:ViaService = s3` (modules/case_documents).
+    CASE_DOCUMENT_ENDPOINT_URL / CASE_DOCUMENT_PUBLIC_ENDPOINT_URL point the
+    bucket at a local S3-compatible server instead (#624: services/api's
+    compose stack runs one) — the first is where this process reaches it, the
+    second the address presigned URLs are signed for, the browser's.
     JOB_QUEUE_URL is the SQS queue the accept endpoint hands pipeline jobs to
     (ADR 0018; published to SSM as /insolvia/<env>/api/job-queue-url and
     re-derived into this env var by the deploy workflow). In local dev it is
@@ -200,6 +208,10 @@ def load_config(environ: Mapping[str, str] | None = None) -> AppConfig:
         case_access_log_table_name=source.get("CASE_ACCESS_LOG_TABLE_NAME") or None,
         auth_user_pool_id=source.get("AUTH_USER_POOL_ID") or None,
         case_document_bucket=source.get("CASE_DOCUMENT_BUCKET") or None,
+        case_document_endpoint_url=source.get("CASE_DOCUMENT_ENDPOINT_URL") or None,
+        case_document_public_endpoint_url=(
+            source.get("CASE_DOCUMENT_PUBLIC_ENDPOINT_URL") or None
+        ),
         job_queue_url=source.get("JOB_QUEUE_URL") or None,
         filing_queue_url=source.get("FILING_QUEUE_URL") or None,
         anthropic_api_key=source.get("ANTHROPIC_API_KEY") or None,
