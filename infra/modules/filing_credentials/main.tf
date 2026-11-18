@@ -1,7 +1,9 @@
 # ── The credential vault (ADR 0024, guardrail 3) ────────────────
 # An attorney's CM/ECF login — the PACER password and the TOTP seed — sealed
-# under a DEDICATED key in a DEDICATED table, openable by the filing worker's
-# role and by nothing else. ADR 0024 makes three properties binding, and this
+# under a DEDICATED key, openable by the filing worker's role and by nothing
+# else. The sealed rows live in Postgres (`filing_credentials`, migration
+# 0003, ADR 0030), where only the `filing` database role may SELECT the
+# envelope — the second layer; this key is the first. ADR 0024 makes three properties binding, and this
 # module is where each one is enforced rather than promised:
 #
 #   1. ONLY THE FILING WORKER CAN DECRYPT, AND THE KEY POLICY SAYS SO — not
@@ -16,23 +18,10 @@
 #      enrolment is sealed with, and it cannot unwrap one afterwards.
 #   3. EVERY USE IS RECORDED. CloudTrail records each GenerateDataKey and
 #      Decrypt on this key (with the encryption context — firm, attorney,
-#      credential — in the event) and the data events on this table, via
-#      modules/audit_trail; the worker's role can append the application
-#      `credential.open` row to the case access log, which names the
+#      credential — in the event), via modules/audit_trail; the worker
+#      appends the application `credential.open` row to the case access log
+#      (a Postgres INSERT-only table), which names the
 #      attorney, the filing and the purpose (insolvia_core.filing_credentials).
-#
-# WHY THE TABLE IS ENCRYPTED UNDER THE CASE KEY AND NOT THE VAULT KEY. DynamoDB
-# decrypts a CMK-encrypted table's keys AS THE CALLER (kms:ViaService =
-# dynamodb), so a table under the vault key would need the API's role to hold
-# kms:Decrypt on the vault key — through DynamoDB, but Decrypt all the same,
-# and the deny in (1) would have to carve an exception for it. A key whose
-# policy reads "Decrypt: the worker, plus anyone via DynamoDB" is a weaker
-# sentence than "Decrypt: the worker". So the two jobs take two keys: the
-# table's at-rest wrapper is the case key, exactly as the case table's
-# is (ci-trust's DenyCaseDataDecryption already fences it from the
-# pipeline), and the SECRET inside each item is sealed under the vault key.
-# The non-secret attributes — the login name, the courts, the status — are
-# what the case key protects; the password and seed are what this key does.
 #
 # THE ESCAPE HATCH, NAMED. A principal holding kms:PutKeyPolicy can rewrite
 # this policy, and one holding iam:UpdateAssumeRolePolicy can widen who
@@ -47,12 +36,11 @@
 # that rewrote the key policy could not open a credential ITSELF.
 
 data "aws_caller_identity" "current" {}
-data "aws_region" "current" {}
 
 locals {
-  # insolvia-<env>-filing-credentials — the TABLE's name AND the KEY's alias
-  # (`alias/${local.name}`). One local on purpose, the case store's pattern:
-  # insolvia_core.adapters.aws.filing_credentials derives both from the case
+  # insolvia-<env>-filing-credentials — the KEY's alias
+  # (`alias/${local.name}`) and the role-policy names. The case store's pattern:
+  # insolvia_core.adapters.aws.filing_credentials derives the alias from the case
   # table name the API is already configured with, so no environment carries
   # a new configuration value. ci-trust's DenyFilingCredentialDecryption
   # matches `alias/insolvia-*-filing-credentials`; renaming here without
@@ -200,24 +188,15 @@ locals {
   })
 
   # What the filing worker may do, and it is exactly what PR 7's Lambda needs
-  # FROM THE VAULT: read a credential's item (its status is re-checked
-  # immediately before the final submit — ADR 0024), open its envelope, and
-  # append the access row. No Put/Update/Delete on the vault: the worker
-  # never enrols or revokes. Its queue grant is modules/filing_queue's; its
+  # FROM THE KEY: open an envelope. Reading the row (its status is re-checked
+  # immediately before the final submit — ADR 0024) and appending the access
+  # row are Postgres grants to the `filing` role (migration 0003), which can
+  # never enrol or revoke. Its queue grant is modules/filing_queue's; its
   # case-table, bucket, kill-switch and log grants are modules/filing_worker's
   # (ADR 0024 PR 7), pinned whole by that module's test.
   worker_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
-      {
-        Sid      = "CredentialRead"
-        Effect   = "Allow"
-        Action   = ["dynamodb:GetItem"]
-        Resource = "arn:aws:dynamodb:${data.aws_region.current.region}:${local.account_id}:table/${local.name}"
-        Condition = {
-          Bool = { "aws:SecureTransport" = "true" }
-        }
-      },
       {
         Sid      = "CredentialOpen"
         Effect   = "Allow"
@@ -227,29 +206,6 @@ locals {
           StringEquals = { "kms:EncryptionContext:purpose" = local.credential_purpose }
         }
       },
-      {
-        # Append-only, the API's CaseAccessLogAppend posture: the worker
-        # records that it opened a credential and can never read the log.
-        Sid      = "CredentialAccessLogAppend"
-        Effect   = "Allow"
-        Action   = ["dynamodb:PutItem"]
-        Resource = var.access_log_table_arn
-        Condition = {
-          Bool = { "aws:SecureTransport" = "true" }
-        }
-      },
-      {
-        # The table's (and the access log's) at-rest key, through DynamoDB
-        # only — modules/case_store's api_key_actions note says why this is
-        # not dead weight.
-        Sid      = "TableKeyThroughDynamoDb"
-        Effect   = "Allow"
-        Action   = ["kms:Decrypt", "kms:GenerateDataKey", "kms:DescribeKey"]
-        Resource = var.table_kms_key_arn
-        Condition = {
-          StringEquals = { "kms:ViaService" = "dynamodb.${data.aws_region.current.region}.amazonaws.com" }
-        }
-      },
     ]
   })
 
@@ -257,38 +213,12 @@ locals {
     Version = "2012-10-17"
     Statement = [
       {
-        # Enrol (PutItem), status (Query, GetItem), revoke (DeleteItem — the
-        # item is DESTROYED, ADR 0024: revocation is not a flag the worker
-        # might fail to read). No Scan: every read names the attorney.
-        Sid    = "CredentialRows"
-        Effect = "Allow"
-        Action = [
-          "dynamodb:PutItem",
-          "dynamodb:GetItem",
-          "dynamodb:Query",
-          "dynamodb:DeleteItem",
-        ]
-        Resource = aws_dynamodb_table.credentials.arn
-        Condition = {
-          Bool = { "aws:SecureTransport" = "true" }
-        }
-      },
-      {
         Sid      = "CredentialSeal"
         Effect   = "Allow"
         Action   = ["kms:GenerateDataKey"]
         Resource = aws_kms_key.vault.arn
         Condition = {
           StringEquals = { "kms:EncryptionContext:purpose" = local.credential_purpose }
-        }
-      },
-      {
-        Sid      = "TableKeyThroughDynamoDb"
-        Effect   = "Allow"
-        Action   = ["kms:Decrypt", "kms:GenerateDataKey", "kms:DescribeKey"]
-        Resource = var.table_kms_key_arn
-        Condition = {
-          StringEquals = { "kms:ViaService" = "dynamodb.${data.aws_region.current.region}.amazonaws.com" }
         }
       },
     ]
@@ -335,40 +265,6 @@ resource "aws_kms_key" "vault" {
 resource "aws_kms_alias" "vault" {
   name          = "alias/${local.name}"
   target_key_id = aws_kms_key.vault.key_id
-}
-
-# ── The table ───────────────────────────────────────────────────
-#   PK  ATTORNEY#<firm_id>#<subject>   the attorney the credential belongs to
-#   SK  CREDENTIAL#<credential_id>
-#
-# Keyed by the attorney because every read is "this attorney's credentials":
-# status lists them, revoke and open name one. No index — nothing asks the
-# table a question that does not start from the attorney.
-resource "aws_dynamodb_table" "credentials" {
-  name         = local.name
-  billing_mode = "PAY_PER_REQUEST"
-  hash_key     = "PK"
-  range_key    = "SK"
-
-  attribute {
-    name = "PK"
-    type = "S"
-  }
-  attribute {
-    name = "SK"
-    type = "S"
-  }
-
-  point_in_time_recovery { enabled = var.point_in_time_recovery }
-
-  server_side_encryption {
-    enabled     = true
-    kms_key_arn = var.table_kms_key_arn
-  }
-
-  deletion_protection_enabled = var.deletion_protection
-
-  tags = var.tags
 }
 
 # ── The API's seal-only grant ───────────────────────────────────

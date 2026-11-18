@@ -5,9 +5,10 @@
 # image_uri/environment, REGIONAL custom domain with no CloudFront, the SSM
 # namespace contract, alarm choices). This header records only what DIFFERS:
 #
-#   - It owns the APPEND-ONLY ADMIN AUDIT TABLE instead of the waitlist, and
-#     the role's grant on it is PutItem alone — an audit log its own subject
-#     can rewrite is not evidence (the same posture as the case access log).
+#   - No table of its own. The append-only admin audit log is Postgres
+#     (`admin_audit_log`, migration 0003, ADR 0030), where the `admin` role
+#     holds INSERT alone — an audit log its own subject can rewrite is not
+#     evidence (the same posture as the case access log).
 #   - Its cross-service grants arrive FROM OTHER MODULES' seams, not here:
 #     modules/auth's admin_invite_role_name
 #     (AdminCreateUser on the firm pool — create and RESEND are one action).
@@ -41,34 +42,6 @@ locals {
   ssm_prefix = "/${var.project}/${var.environment}/admin-api"
 }
 
-# ── Admin audit table (#178's audit trail) ──────────────────────
-# Who provisioned/suspended/re-invited what: PK FIRM#<id>, SK
-# <recordedAt>#<eventId>, shapes owned by services/admin's core/audit.py.
-# PITR on in every environment that has this module — the table IS the
-# durable record #178 asked for, so "throwaway" never applies to it.
-
-resource "aws_dynamodb_table" "audit" {
-  name         = "${local.name}-audit"
-  billing_mode = "PAY_PER_REQUEST"
-  hash_key     = "PK"
-  range_key    = "SK"
-
-  attribute {
-    name = "PK"
-    type = "S"
-  }
-
-  attribute {
-    name = "SK"
-    type = "S"
-  }
-
-  point_in_time_recovery { enabled = true }
-  server_side_encryption { enabled = true }
-  deletion_protection_enabled = var.audit_deletion_protection
-  tags                        = var.tags
-}
-
 # ── Lambda execution role ───────────────────────────────────────
 
 data "aws_iam_policy_document" "lambda_trust" {
@@ -93,26 +66,6 @@ resource "aws_iam_role_policy_attachment" "admin_basic" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-# PutItem ONLY — see the header. The firm-table and Cognito grants are
-# attached by the other modules' seams, against the role this module outputs.
-resource "aws_iam_role_policy" "admin_audit" {
-  name = "${local.name}-audit"
-  role = aws_iam_role.admin.id
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect   = "Allow"
-        Action   = ["dynamodb:PutItem"]
-        Resource = aws_dynamodb_table.audit.arn
-        Condition = {
-          Bool = { "aws:SecureTransport" = "true" }
-        }
-      },
-    ]
-  })
-}
-
 # ── Lambda function ─────────────────────────────────────────────
 # The environment block is only the first-apply seed; the deploy workflow owns
 # both image_uri and environment thereafter (ignore_changes below — the
@@ -129,10 +82,9 @@ resource "aws_lambda_function" "admin" {
 
   environment {
     variables = {
-      INSOLVIA_ENV           = var.insolvia_env
-      FIRM_USER_POOL_ID      = var.firm_user_pool_id
-      ADMIN_AUDIT_TABLE_NAME = aws_dynamodb_table.audit.name
-      GOOGLE_CLIENT_ID       = var.google_client_id
+      INSOLVIA_ENV      = var.insolvia_env
+      FIRM_USER_POOL_ID = var.firm_user_pool_id
+      GOOGLE_CLIENT_ID  = var.google_client_id
     }
   }
 
@@ -149,7 +101,6 @@ resource "aws_lambda_function" "admin" {
   tags = var.tags
   depends_on = [
     aws_iam_role_policy_attachment.admin_basic,
-    aws_iam_role_policy.admin_audit,
     aws_iam_role_policy_attachment.vpc_access,
   ]
 }
@@ -293,10 +244,9 @@ resource "aws_route53_record" "admin" {
 
 resource "aws_ssm_parameter" "config" {
   for_each = {
-    "insolvia-env"           = var.insolvia_env
-    "firm-user-pool-id"      = var.firm_user_pool_id
-    "admin-audit-table-name" = aws_dynamodb_table.audit.name
-    "google-client-id"       = var.google_client_id
+    "insolvia-env"      = var.insolvia_env
+    "firm-user-pool-id" = var.firm_user_pool_id
+    "google-client-id"  = var.google_client_id
   }
 
   name  = "${local.ssm_prefix}/${each.key}"

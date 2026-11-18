@@ -37,7 +37,6 @@ class AppConfig:
     # Postgres (ADR 0030). load_config refuses to start a service without it.
     database_url: str | None = None
     case_table_name: str | None = None
-    case_access_log_table_name: str | None = None
     auth_issuer_url: str | None = None
     auth_client_ids: tuple[str, ...] = ()
     resource_url: str = _RESOURCE_URLS["local"]
@@ -46,12 +45,11 @@ class AppConfig:
 def load_config(environ: Mapping[str, str] | None = None) -> AppConfig:
     """Build the configuration from the environment.
 
-    INSOLVIA_ENV (local|staging|production) defaults to "local". The two
-    table names, and DATABASE_URL (ADR 0030: the firm store), are the SAME
-    stores the API composes — this service is a
+    INSOLVIA_ENV (local|staging|production) defaults to "local".
+    DATABASE_URL (ADR 0030: the firm and case stores and the access log) and
+    CASE_TABLE_NAME are the SAME the API composes — this service is a
     second surface over the same stores (ADR 0016), so the values are the
-    same SSM parameters re-derived by the deploy workflow:
-    CASE_TABLE_NAME, CASE_ACCESS_LOG_TABLE_NAME. Unset means
+    same SSM parameters re-derived by the deploy workflow. Unset means
     the in-memory stores, which only unit tests and the bare development
     server use; local dev names this machine's real per-developer tables
     (scripts/dev-aws-setup.sh), exactly as services/api does — no emulator.
@@ -83,7 +81,6 @@ def load_config(environ: Mapping[str, str] | None = None) -> AppConfig:
         environment=environment,
         database_url=database_url(source, required=environ is None),
         case_table_name=source.get("CASE_TABLE_NAME") or None,
-        case_access_log_table_name=source.get("CASE_ACCESS_LOG_TABLE_NAME") or None,
         auth_issuer_url=source.get("AUTH_ISSUER_URL") or None,
         auth_client_ids=_client_ids(source.get("AUTH_CLIENT_IDS")),
         resource_url=source.get("MCP_RESOURCE_URL") or _RESOURCE_URLS[environment],

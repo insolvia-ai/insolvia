@@ -8,9 +8,9 @@
 # name it, so it is created there, ahead of the service) and arrives here by
 # name and ARN. What it holds, all told:
 #
-#   from modules/filing_credentials   the vault: GetItem on the credential
-#                                     table, Decrypt under the vault purpose,
-#                                     the access-log append (PR 4)
+#   from modules/filing_credentials   the vault: Decrypt under the vault
+#                                     purpose (its rows and the access-log
+#                                     append are Postgres grants, ADR 0030)
 #   from modules/filing_queue         consume on the filing queue (PR 6)
 #   from THIS module                  the case table, the documents bucket,
 #                                     the tax-id open (Case Upload, PR 9),
@@ -101,7 +101,7 @@ locals {
         # is partition keys only) or to one item's attributes when the same
         # statement must Put whole items, so "those five only, those
         # attributes only" is a property of the code — services/filing writes
-        # nothing but through insolvia_core.adapters.aws.filing_store and the
+        # nothing but through the filing store (Postgres since #623) and the
         # API's approval and document stores, and the case update's attribute
         # list is pinned by packages/insolvia_core tests/unit/test_filings.py.
         # What the omissions buy: no DeleteItem, no BatchWriteItem — the
@@ -238,7 +238,6 @@ resource "aws_lambda_function" "worker" {
     variables = merge({
       INSOLVIA_ENV                 = var.insolvia_env
       CASE_TABLE_NAME              = var.case_table_name
-      CASE_ACCESS_LOG_TABLE_NAME   = var.case_access_log_table_name
       CASE_DOCUMENT_BUCKET         = var.case_document_bucket_name
       FILING_KILL_SWITCH_PARAMETER = local.kill_switch_name
     }, var.database_url == null ? {} : { DATABASE_URL = var.database_url })

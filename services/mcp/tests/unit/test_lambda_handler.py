@@ -50,9 +50,6 @@ def handler(monkeypatch):
     monkeypatch.setenv("AUTH_ISSUER_URL", ISSUER)
     monkeypatch.setenv("AUTH_CLIENT_IDS", CLIENT_ID)
     monkeypatch.setenv("CASE_TABLE_NAME", "insolvia-staging-case-table-test")
-    monkeypatch.setenv(
-        "CASE_ACCESS_LOG_TABLE_NAME", "insolvia-staging-case-access-log-test"
-    )
     monkeypatch.setenv("DATABASE_URL", "postgresql://127.0.0.1/unused")
     # boto3 resolves a region and a credential provider when a client is
     # built. Fake values satisfy both without consulting a profile, an

@@ -25,7 +25,7 @@ ALLOWED_API = {
     "insolvia_api.core.filing_set",
     "insolvia_api.core.packets",
     "insolvia_api.core.ports",
-    "insolvia_api.adapters.aws.filing_approval_store",
+    "insolvia_api.adapters.postgres.filing_approval_store",
     "insolvia_api.adapters.postgres.packet_store",
 }
 

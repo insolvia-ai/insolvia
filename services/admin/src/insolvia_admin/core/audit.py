@@ -98,7 +98,8 @@ def event_item(event: AdminEvent) -> dict[str, str]:
 
 class AuditLog(Protocol):
     """The port. Write-only by design, on both sides of the boundary: no read
-    method here, PutItem alone in IAM. Implemented by adapters/aws/audit_log
-    (DynamoDB) and adapters/memory/audit_log (tests and the dev server)."""
+    method here, INSERT alone in the database grants (migration 0003).
+    Implemented by adapters/postgres/audit_log and adapters/memory/audit_log
+    (tests)."""
 
     def record(self, event: AdminEvent) -> None: ...

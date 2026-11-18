@@ -54,3 +54,11 @@ local-path install. Human docs: [`README.md`](README.md).
   `0001`) are here since #621: each row's `item` jsonb is the domain's
   `*_item` shape minus the DynamoDB keys. A store test runs the memory twin
   and the Postgres adapter through one parametrized fixture.
+- **Grants are part of every migration (since 0003, #623).** Each service
+  has its own role (`api`, `worker`, `admin`, `mcp`, `filing`; `migrator`
+  owns). Sealed values (tax ids, the credential vault) are `bytea`, byte for
+  byte, via `sealed.py`. The narrow tables: the access log and admin audit
+  log are INSERT-only; the vault is INSERT/DELETE plus non-secret columns for
+  `api`, and full SELECT for `filing` alone. **A new table's migration must
+  GRANT it** — `tests/unit/test_postgres_grants.py` connects as each role and
+  fails on any table no role can reach.

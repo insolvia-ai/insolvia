@@ -319,39 +319,12 @@ twice over instead: the table depends on the key, so a `terraform destroy`
 reaches the table first and aborts on its deletion protection, and even a
 scheduled key deletion is cancellable for 30 days.
 
-**The access log.** A second table, `insolvia-<env>-case-access-log`, keyed
-`PK = CASE#<id>` / `SK = <recorded_at>#<event_id>`, under the same key. It
-answers the question the CloudTrail trail structurally cannot: *which
-signed-in user* read this case. ADR 0001 means AWS only ever sees the API
-role, so the end user's identity exists solely inside the request — this is
-where the API writes it down. **Reads are logged, not just writes**; the
-provenance fields on the case record already answer "who changed this", and
-who *saw* it is the question with no other source.
-
-**Nothing in it expires, and TTL cannot be turned on from the pipeline.**
-DynamoDB authorises `UpdateTimeToLive` against the caller, and on a
-CMK-encrypted table that needs `kms:Decrypt` on the key — which `ci-trust`
-explicitly denies the deploy role on `alias/insolvia-*-cases`. There is no
-condition key separating "enable TTL" from "read a row"; both are
-`kms:ViaService = dynamodb`. So the choice is retention or a deploy role that
-can read case data, and the deny wins. That also matches the posture
-`DenyAuditLogErasure` takes for the trail bucket: a retention rule the pipeline
-can set is a delete button the pipeline can press, and TTL deletes silently.
-Retention here is a compliance decision for the regulatory register and a human
-apply, not a Terraform default.
-
-The API's grant on it is **`PutItem` and nothing else** — no `GetItem`, no
-`Query`, no update, no delete. The audited service cannot read, amend or
-remove its own audit trail. The consequence is real and intended: no endpoint
-can serve an access history today, and adding one means granting `Query` in a
-diff that says so rather than inheriting the capability by accident.
-Retention is by TTL, and the number is a compliance decision the
-[regulatory register](../business/regulatory-source-register.html) owns rather
-than an engineering one.
-
-A by-principal index — "what did this account touch" — is deliberately not
-here yet. It is the breach-response question rather than the client question,
-and a GSI can be added online later without a migration.
+**The access log is not here any more.** Since #623 it is the Postgres table
+`case_access_log` (migration 0003, ADR 0030): it answers the question the
+CloudTrail trail structurally cannot — *which signed-in user* read this case —
+and every service role holds `INSERT` on it and nothing else, so the audited
+service cannot read, amend or remove its own trail. The grants test in
+`packages/insolvia_core/tests/unit/test_postgres_grants.py` pins that.
 
 **Audit logging** lives next door, in `infra/modules/audit_trail/` — see below.
 
@@ -396,7 +369,7 @@ lifecycle rule or a bucket deletion remains open to it. Real immutability is S3
 Object Lock, which is deliberately not here yet.
 
 **Scope and cost.** Data events bill per event, so the selector names the case
-table (and the filing-credential vault's table) specifically rather than "all
+table specifically rather than "all
 DynamoDB tables". Management events are off by default — they would double the
 volume to say what the Terraform diff already says — **except** that KMS
 `Decrypt`/`GenerateDataKey` ARE management events, and a selector can only
@@ -408,8 +381,9 @@ days. Retention is 90 days on staging and a year on prod.
 ## Filing-credential vault (`infra/modules/filing_credentials/`)
 
 ADR 0024's guardrail 3: an attorney's PACER password and TOTP seed, sealed
-under a **dedicated key** in a **dedicated table**
-(`insolvia-<env>-filing-credentials`, alias of the same name). The module's
+under a **dedicated key** (alias `insolvia-<env>-filing-credentials`). The
+sealed rows are Postgres (`filing_credentials`, migration 0003), where only
+the `filing` role may read the envelope columns. The module's
 header owns the reasoning; the facts a reader needs here:
 
 - **The key policy, not IAM, keeps Decrypt to the filing worker's role**
@@ -421,12 +395,8 @@ header owns the reasoning; the facts a reader needs here:
   and can never open. `terraform test` in the module pins the whole document.
 - **The worker's role is created here**, ahead of `services/filing` (ADR 0024
   PR 7), because KMS refuses a key policy naming a principal that does not
-  exist. It holds GetItem on the vault, Decrypt on its key, and PutItem on the
-  case access log; PR 7 adds its queue and case grants.
-- **The table is encrypted at rest under the case key**, not the vault key:
-  DynamoDB decrypts a CMK table AS THE CALLER, so a vault-key table would need
-  a Decrypt carve-out for the API in the very policy whose point is that only
-  the worker decrypts.
+  exist. It holds Decrypt on the vault key; PR 7 adds its queue and case
+  grants. Reading the row and appending the access log are Postgres grants.
 - **ci-trust's `DenyFilingCredentialDecryption`** (alias-matched, like
   `DenyCaseDataDecryption`) keeps the pipeline unable to open a credential even
   if it rewrote the key policy. It is hardening; the deploy needs no new grant.
@@ -522,7 +492,7 @@ declares no `key`), so two developers can never collide on names or state.
 What it owns is deliberately only what local dev consumes today:
 
 - **Case store** via the same `modules/case_store` as staging/prod —
-  `insolvia-dev-<short-id>-cases` and its access-log table under this
+  `insolvia-dev-<short-id>-cases` under this
   machine's own customer-managed key, so the tenancy indexes and the encrypted read path behave here exactly as
   they do deployed. PITR and deletion protection are **off** and the key
   deletion window is the minimum 7 days, so a teardown does not leave a

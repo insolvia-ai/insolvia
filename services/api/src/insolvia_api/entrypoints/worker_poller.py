@@ -30,15 +30,15 @@ from __future__ import annotations
 import logging
 
 import boto3
-from insolvia_core.adapters.aws.access_log import DynamoDbAccessLog
 from insolvia_core.adapters.aws.document_blobs import S3DocumentBlobStore
 from insolvia_core.adapters.aws.tax_id_cipher import KmsTaxIdCipher, case_key_alias
-from insolvia_core.adapters.aws.tax_id_store import DynamoDbTaxIdStore
+from insolvia_core.adapters.postgres.access_log import PostgresAccessLog
 from insolvia_core.adapters.postgres.candidate_store import PostgresCandidateStore
 from insolvia_core.adapters.postgres.case_entity_store import PostgresCaseEntityStore
 from insolvia_core.adapters.postgres.case_store import PostgresCaseStore
 from insolvia_core.adapters.postgres.debtor_store import PostgresDebtorStore
 from insolvia_core.adapters.postgres.document_store import PostgresDocumentStore
+from insolvia_core.adapters.postgres.tax_id_store import PostgresTaxIdStore
 
 from insolvia_api.adapters.postgres.job_store import PostgresJobStore
 from insolvia_api.adapters.postgres.packet_store import PostgresPacketStore
@@ -63,11 +63,10 @@ def main() -> None:
         )
     # The packet worker's extra reach (issue #96) — same dev-aws provisioning,
     # same .env, and the worker Lambda entrypoint states the same pair.
-    if not config.case_access_log_table_name or not config.case_document_bucket:
+    if not config.case_document_bucket:
         raise RuntimeError(
-            "CASE_ACCESS_LOG_TABLE_NAME and CASE_DOCUMENT_BUCKET must be set "
-            "for the worker poller (scripts/dev-aws-setup.sh writes both into "
-            "services/api/.env)"
+            "CASE_DOCUMENT_BUCKET must be set for the worker poller "
+            "(scripts/dev-aws-setup.sh writes it into services/api/.env)"
         )
 
     store = PostgresJobStore(database_url)
@@ -83,9 +82,9 @@ def main() -> None:
         document_store=PostgresDocumentStore(database_url),
         candidate_store=PostgresCandidateStore(database_url),
         blobs=S3DocumentBlobStore(config.case_document_bucket),
-        access_log=DynamoDbAccessLog(config.case_access_log_table_name),
+        access_log=PostgresAccessLog(database_url),
         # Under this machine's own case key (root delegation).
-        tax_id_store=DynamoDbTaxIdStore(config.case_table_name),
+        tax_id_store=PostgresTaxIdStore(database_url),
         tax_id_cipher=KmsTaxIdCipher(case_key_alias(config.case_table_name)),
         anthropic_api_key=config.anthropic_api_key,
     )

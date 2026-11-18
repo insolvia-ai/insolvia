@@ -17,15 +17,15 @@ from __future__ import annotations
 
 from typing import Any
 
-from insolvia_core.adapters.aws.access_log import DynamoDbAccessLog
 from insolvia_core.adapters.aws.document_blobs import S3DocumentBlobStore
 from insolvia_core.adapters.aws.tax_id_cipher import KmsTaxIdCipher, case_key_alias
-from insolvia_core.adapters.aws.tax_id_store import DynamoDbTaxIdStore
+from insolvia_core.adapters.postgres.access_log import PostgresAccessLog
 from insolvia_core.adapters.postgres.candidate_store import PostgresCandidateStore
 from insolvia_core.adapters.postgres.case_entity_store import PostgresCaseEntityStore
 from insolvia_core.adapters.postgres.case_store import PostgresCaseStore
 from insolvia_core.adapters.postgres.debtor_store import PostgresDebtorStore
 from insolvia_core.adapters.postgres.document_store import PostgresDocumentStore
+from insolvia_core.adapters.postgres.tax_id_store import PostgresTaxIdStore
 
 from insolvia_api.adapters.anthropic.extraction_model import AnthropicExtractionModel
 from insolvia_api.adapters.anthropic.review_model import AnthropicReviewModel
@@ -62,15 +62,13 @@ if database_url is None:
 # refusing to boot is discovered by the deploy, not by a stuck job.
 if not config.case_table_name:
     raise RuntimeError("CASE_TABLE_NAME must be set for the worker Lambda entrypoint")
-# Hard-required with the packet worker on board (issue #96): assembly reads
-# the whole case file (which must be access-logged — the api_lambda pair rule)
-# and stores its bytes in the document bucket. The deploy workflow injects the
-# same /insolvia/<env>/api namespace as the API, so both are always present in
-# a deployed environment; refusing to boot is discovered by the deploy.
-if not config.case_access_log_table_name or not config.case_document_bucket:
+# Hard-required with the packet worker on board (issue #96): assembly stores
+# its bytes in the document bucket. The deploy workflow injects the same
+# /insolvia/<env>/api namespace as the API, so it is always present in a
+# deployed environment; refusing to boot is discovered by the deploy.
+if not config.case_document_bucket:
     raise RuntimeError(
-        "CASE_ACCESS_LOG_TABLE_NAME and CASE_DOCUMENT_BUCKET must be set "
-        "for the worker Lambda entrypoint"
+        "CASE_DOCUMENT_BUCKET must be set for the worker Lambda entrypoint"
     )
 
 _store = PostgresJobStore(database_url)
@@ -83,11 +81,11 @@ _case_store = PostgresCaseStore(database_url)
 _debtor_store = PostgresDebtorStore(database_url)
 _entity_store = PostgresCaseEntityStore(database_url)
 _packet_store = PostgresPacketStore(database_url)
-_access_log = DynamoDbAccessLog(config.case_access_log_table_name)
+_access_log = PostgresAccessLog(database_url)
 # B121's number (issue 13.12 / #382): the worker role holds Decrypt on the
 # case key for the tax-id encryption context and nothing more — it prints
 # identifiers, it never enters one (infra/modules/case_store, TaxIdKeyUse).
-_tax_id_store = DynamoDbTaxIdStore(config.case_table_name)
+_tax_id_store = PostgresTaxIdStore(database_url)
 _tax_id_cipher = KmsTaxIdCipher(case_key_alias(config.case_table_name))
 # The AI review's model seam (issue #97, ADR 0019). Deliberately NOT
 # hard-required like the stores above: an environment without the key still

@@ -63,12 +63,7 @@ variable "case_table_arn" {
 }
 
 variable "case_table_name" {
-  description = "The case table's name, for CASE_TABLE_NAME. The vault's table and key alias are derived from it (insolvia_core.adapters.aws.filing_credentials)."
-  type        = string
-}
-
-variable "case_access_log_table_name" {
-  description = "The case access log's name, for CASE_ACCESS_LOG_TABLE_NAME. The append grant is modules/filing_credentials'."
+  description = "The case table's name, for CASE_TABLE_NAME. The vault's key alias is derived from it (insolvia_core.adapters.aws.filing_credentials)."
   type        = string
 }
 

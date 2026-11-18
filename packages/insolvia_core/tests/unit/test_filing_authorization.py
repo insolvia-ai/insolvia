@@ -16,15 +16,14 @@ from importlib import resources
 from typing import Any
 
 import pytest
-from botocore.exceptions import ClientError
 from insolvia_core.access_log import ACTIONS, access_item
-from insolvia_core.adapters.aws.dynamo import from_attributes
-from insolvia_core.adapters.aws.filing_credentials import (
-    DynamoDbFilingAuthorizationStore,
-)
 from insolvia_core.adapters.memory.access_log import MemoryAccessLog
 from insolvia_core.adapters.memory.filing_credentials import (
     MemoryFilingAuthorizationStore,
+)
+from insolvia_core.adapters.postgres.connection import connect
+from insolvia_core.adapters.postgres.filing_credentials import (
+    PostgresFilingAuthorizationStore,
 )
 from insolvia_core.auth import ReauthenticationRequiredError
 from insolvia_core.errors import ConflictError, ValidationError
@@ -41,6 +40,9 @@ from insolvia_core.filing_authorization import (
     text_digest,
     text_json,
 )
+from insolvia_core.ports import FilingAuthorizationStore
+
+from tests.unit.backends import BACKENDS
 
 FIRM = "firm-0001"
 ATTORNEY = "00000000-0000-4000-8000-00000000a771"
@@ -242,56 +244,29 @@ def test_the_item_round_trips() -> None:
     assert authorization_from_item(authorization_item(signed, sort_key="x")) == signed
 
 
-# ── The DynamoDB adapter, with the transport faked at the client ─
+# ── The stores: memory and Postgres ─────────────────────────────
 
 
-class FakeDynamo:
-    """put/get/delete with the two condition forms the store uses."""
-
-    def __init__(self) -> None:
-        self.items: dict[tuple[str, str], dict[str, Any]] = {}
-        self.calls: list[tuple[str, str]] = []
-
-    @staticmethod
-    def _refuse(operation: str) -> ClientError:
-        return ClientError(
-            {"Error": {"Code": "ConditionalCheckFailedException"}}, operation
-        )
-
-    def _check(self, key: tuple[str, str], kwargs: dict[str, Any], op: str) -> None:
-        condition = kwargs.get("ConditionExpression")
-        held = self.items.get(key)
-        if condition == "attribute_not_exists(SK)" and held is not None:
-            raise self._refuse(op)
-        if condition == "authorizationId = :held":
-            wanted = kwargs["ExpressionAttributeValues"][":held"]["S"]
-            if held is None or held["authorizationId"]["S"] != wanted:
-                raise self._refuse(op)
-
-    def put_item(self, **kwargs: Any) -> None:
-        item = kwargs["Item"]
-        key = (item["PK"]["S"], item["SK"]["S"])
-        self._check(key, kwargs, "PutItem")
-        self.calls.append(("put", key[1]))
-        self.items[key] = item
-
-    def get_item(self, **kwargs: Any) -> dict[str, Any]:
-        assert kwargs["ConsistentRead"] is True
-        key = (kwargs["Key"]["PK"]["S"], kwargs["Key"]["SK"]["S"])
-        return {"Item": self.items[key]} if key in self.items else {}
-
-    def delete_item(self, **kwargs: Any) -> dict[str, Any]:
-        key = (kwargs["Key"]["PK"]["S"], kwargs["Key"]["SK"]["S"])
-        self._check(key, kwargs, "DeleteItem")
-        self.calls.append(("delete", key[1]))
-        self.items.pop(key, None)
-        return {}
+@pytest.fixture(params=BACKENDS)
+def store(request: pytest.FixtureRequest) -> FilingAuthorizationStore:
+    if request.param == "memory":
+        return MemoryFilingAuthorizationStore()
+    request.getfixturevalue("postgres")
+    return PostgresFilingAuthorizationStore(request.getfixturevalue("postgres_url"))
 
 
-def test_the_dynamodb_store_writes_current_first_and_withdraws_current_first() -> None:
-    dynamo = FakeDynamo()
-    store = DynamoDbFilingAuthorizationStore("t", client=dynamo)
-    log = MemoryAccessLog()
+def _history(store: FilingAuthorizationStore, authorization_id: str) -> Any:
+    if isinstance(store, MemoryFilingAuthorizationStore):
+        return store.history[authorization_id]
+    with connect(store.database_url) as conn:
+        row = conn.execute(
+            "SELECT item FROM filing_authorizations WHERE authorization_id = %s",
+            (authorization_id,),
+        ).fetchone()
+    return authorization_from_item(row["item"])  # type: ignore[index]
+
+
+def test_the_store_signs_and_withdraws_once(store: FilingAuthorizationStore) -> None:
     signed = sign_authorization(
         body(),
         firm_id=FIRM,
@@ -299,25 +274,20 @@ def test_the_dynamodb_store_writes_current_first_and_withdraws_current_first() -
         authenticated_at=SIGNED_IN_AT,
         now=SIGNED_IN_AT,
         store=store,
-        access_log=log,
+        access_log=MemoryAccessLog(),
     )
-    pk = f"ATTORNEY#{FIRM}#{ATTORNEY}"
-    history = f"AUTHORIZATION#{signed.authorization_id}"
-    assert dynamo.calls == [("put", "AUTHORIZATION"), ("put", history)]
     assert store.get_current(FIRM, ATTORNEY) == signed
+    assert _history(store, signed.authorization_id) == signed
 
     assert store.withdraw(signed, withdrawn_at="2100-01-01T00:05:00.000000Z")
-    assert dynamo.calls[2:] == [("delete", "AUTHORIZATION"), ("put", history)]
     assert store.get_current(FIRM, ATTORNEY) is None
-    kept = authorization_from_item(from_attributes(dynamo.items[(pk, history)]))
+    kept = _history(store, signed.authorization_id)
     assert kept.status == "withdrawn"
     # A second withdrawal of the same signature finds nothing to delete.
     assert not store.withdraw(signed, withdrawn_at="2100-01-01T00:06:00.000000Z")
 
 
-def test_the_dynamodb_store_refuses_a_lost_race() -> None:
-    dynamo = FakeDynamo()
-    store = DynamoDbFilingAuthorizationStore("t", client=dynamo)
+def test_the_store_refuses_a_lost_race(store: FilingAuthorizationStore) -> None:
     first = FilingAuthorization(
         authorization_id="a1",
         firm_id=FIRM,
@@ -334,5 +304,9 @@ def test_the_dynamodb_store_refuses_a_lost_race() -> None:
         store.put_current(second, replacing=None)
     # Replacing the one actually held succeeds, and supersedes its history.
     store.put_current(second, replacing=first)
-    superseded = dynamo.items[(f"ATTORNEY#{FIRM}#{ATTORNEY}", "AUTHORIZATION#a1")]
-    assert superseded["status"] == {"S": "superseded"}
+    assert store.get_current(FIRM, ATTORNEY) == second
+    assert _history(store, "a1").status == "superseded"
+    # Replacing one no longer held loses too.
+    third = FilingAuthorization(**{**first.__dict__, "authorization_id": "a3"})
+    with pytest.raises(ConflictError):
+        store.put_current(third, replacing=first)

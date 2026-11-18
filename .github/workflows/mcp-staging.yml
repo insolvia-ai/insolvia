@@ -102,7 +102,6 @@ jobs:
           # /insolvia/staging/mcp/<kebab-key> -> KEBAB_KEY:
           #   insolvia-env               -> INSOLVIA_ENV
           #   case-table-name            -> CASE_TABLE_NAME
-          #   case-access-log-table-name -> CASE_ACCESS_LOG_TABLE_NAME
           #   firm-table-name            -> FIRM_TABLE_NAME
           #   auth-issuer-url            -> AUTH_ISSUER_URL
           #   auth-client-ids            -> AUTH_CLIENT_IDS

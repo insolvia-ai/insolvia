@@ -63,22 +63,21 @@ read_env() { sed -n "s/^$1=//p" "$env_file" | tail -n 1; }
 profile_from_env="$(read_env AWS_PROFILE)"
 [[ -n "$profile_from_env" ]] && AWS_PROFILE_VALUE="$profile_from_env"
 CASE_TABLE_NAME="$(read_env CASE_TABLE_NAME)"
-CASE_ACCESS_LOG_TABLE_NAME="$(read_env CASE_ACCESS_LOG_TABLE_NAME)"
 CASE_DOCUMENT_BUCKET="$(read_env CASE_DOCUMENT_BUCKET)"
 FILING_QUEUE_URL="$(read_env FILING_QUEUE_URL)"
 [[ "$CASE_TABLE_NAME" == insolvia-dev-*-cases ]] ||
   die "CASE_TABLE_NAME in services/api/.env is not a dev case table — this proof runs against dev only."
 [[ "$FILING_QUEUE_URL" == */insolvia-dev-*-filing ]] ||
   die "FILING_QUEUE_URL in services/api/.env is not a dev filing queue — run ./scripts/dev-aws-setup.sh."
-[[ -n "$CASE_ACCESS_LOG_TABLE_NAME" && -n "$CASE_DOCUMENT_BUCKET" ]] ||
-  die "CASE_ACCESS_LOG_TABLE_NAME / CASE_DOCUMENT_BUCKET are not in services/api/.env."
+[[ -n "$CASE_DOCUMENT_BUCKET" ]] ||
+  die "CASE_DOCUMENT_BUCKET is not in services/api/.env."
 [[ -x "$API_DIR/.venv/bin/python" ]] || die "services/api/.venv is missing — run ./services/api/scripts/dev-setup.sh."
 
 for command in aws jq; do require_command "$command"; done
 export_temporary_aws_credentials
 export AWS_DEFAULT_REGION="$AWS_REGION_VALUE"
 unset AWS_PROFILE
-export CASE_TABLE_NAME CASE_ACCESS_LOG_TABLE_NAME CASE_DOCUMENT_BUCKET FILING_QUEUE_URL
+export CASE_TABLE_NAME CASE_DOCUMENT_BUCKET FILING_QUEUE_URL
 
 cd "$API_DIR"
 exec "$API_DIR/.venv/bin/python" - <<'PY'
@@ -99,8 +98,8 @@ import boto3
 sys.path[:0] = [os.path.join(os.getcwd(), "src"), os.getcwd()]
 from tests.unit.test_packet_assembly import reference_case_data  # noqa: E402
 
-from insolvia_api.adapters.aws.filing_approval_store import DynamoDbFilingApprovalStore  # noqa: E402
-from insolvia_core.adapters.aws.filing_store import DynamoDbFilingStore  # noqa: E402
+from insolvia_api.adapters.postgres.filing_approval_store import PostgresFilingApprovalStore  # noqa: E402
+from insolvia_core.adapters.postgres.filing_store import PostgresFilingStore  # noqa: E402
 from insolvia_api.adapters.aws.filing_queue import SqsFilingQueue  # noqa: E402
 from insolvia_api.adapters.postgres.packet_store import PostgresPacketStore  # noqa: E402
 from insolvia_api.core.filing_approval import (  # noqa: E402
@@ -121,20 +120,21 @@ from insolvia_api.core.packet_assembly import (  # noqa: E402
     run_packet_assembly,
 )
 from insolvia_core import courts  # noqa: E402
-from insolvia_core.adapters.aws.access_log import DynamoDbAccessLog  # noqa: E402
+from insolvia_core.adapters.postgres.access_log import PostgresAccessLog  # noqa: E402
+from insolvia_core.adapters.postgres.filing_credentials import (  # noqa: E402
+    PostgresFilingAuthorizationStore,
+    PostgresFilingCredentialStore,
+)
+from insolvia_core.adapters.postgres.tax_id_store import PostgresTaxIdStore  # noqa: E402
 from insolvia_core.adapters.postgres.case_entity_store import PostgresCaseEntityStore  # noqa: E402
 from insolvia_core.adapters.postgres.case_store import PostgresCaseStore  # noqa: E402
 from insolvia_core.adapters.postgres.debtor_store import PostgresDebtorStore  # noqa: E402
 from insolvia_core.adapters.aws.document_blobs import S3DocumentBlobStore  # noqa: E402
 from insolvia_core.adapters.aws.filing_credentials import (  # noqa: E402
-    DynamoDbFilingAuthorizationStore,
-    DynamoDbFilingCredentialStore,
     KmsCredentialSealer,
     filing_credentials_key_alias,
-    filing_credentials_table_name,
 )
 from insolvia_core.adapters.aws.tax_id_cipher import KmsTaxIdCipher, case_key_alias  # noqa: E402
-from insolvia_core.adapters.aws.tax_id_store import DynamoDbTaxIdStore  # noqa: E402
 from insolvia_core.auth import ReauthenticationRequiredError  # noqa: E402
 from insolvia_core.cases import assign_case  # noqa: E402
 from insolvia_core.errors import ConflictError  # noqa: E402
@@ -172,14 +172,13 @@ case_store = PostgresCaseStore(database_url)
 debtor_store = PostgresDebtorStore(database_url)
 entity_store = PostgresCaseEntityStore(database_url)
 packet_store = PostgresPacketStore(database_url)
-access_log = DynamoDbAccessLog(os.environ["CASE_ACCESS_LOG_TABLE_NAME"])
-tax_id_store = DynamoDbTaxIdStore(case_table)
+access_log = PostgresAccessLog(database_url)
+tax_id_store = PostgresTaxIdStore(database_url)
 tax_id_cipher = KmsTaxIdCipher(case_key_alias(case_table))
-vault_table = filing_credentials_table_name(case_table)
-credentials = DynamoDbFilingCredentialStore(vault_table)
-authorizations = DynamoDbFilingAuthorizationStore(vault_table)
-approvals = DynamoDbFilingApprovalStore(case_table)
-filings = DynamoDbFilingStore(case_table)
+credentials = PostgresFilingCredentialStore(database_url)
+authorizations = PostgresFilingAuthorizationStore(database_url)
+approvals = PostgresFilingApprovalStore(database_url)
+filings = PostgresFilingStore(database_url)
 queue = SqsFilingQueue(queue_url)
 sqs = boto3.client("sqs")
 deps = PacketAssemblyDeps(
@@ -419,7 +418,7 @@ except ApprovalUnavailableError as refused:
 else:
     fail("an approval was consumed twice")
 # And the table's own condition, not only the status read before it: the raw
-# conditional write for a second use is refused by DynamoDB.
+# conditional write for a second use is refused by Postgres.
 if approvals.consume(
     CASE_ID,
     third.approval_id,
@@ -427,8 +426,8 @@ if approvals.consume(
     now=int(time.time()),
     consumed_at="proof-second-use",
 ):
-    fail("DynamoDB accepted a second consume")
-print("REFUSED: the conditional UpdateItem for a second use (ConditionalCheckFailed)")
+    fail("Postgres accepted a second consume")
+print("REFUSED: the conditional UPDATE for a second use (no row matched)")
 expect_nothing_enqueued("either consume")
 
 # ── 5. no second filing ─────────────────────────────────────────

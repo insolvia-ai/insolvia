@@ -1,20 +1,15 @@
 from __future__ import annotations
 
 from asgiref.wsgi import WsgiToAsgi
-from insolvia_core.adapters.aws.access_log import DynamoDbAccessLog
 from insolvia_core.adapters.aws.document_blobs import S3DocumentBlobStore
 from insolvia_core.adapters.aws.filing_credentials import (
-    DynamoDbFilingAuthorizationStore,
-    DynamoDbFilingCredentialStore,
     KmsCredentialSealer,
     filing_credentials_key_alias,
-    filing_credentials_table_name,
 )
-from insolvia_core.adapters.aws.filing_store import DynamoDbFilingStore
 from insolvia_core.adapters.aws.jwks_provider import CognitoJwksProvider
 from insolvia_core.adapters.aws.tax_id_cipher import KmsTaxIdCipher, case_key_alias
-from insolvia_core.adapters.aws.tax_id_store import DynamoDbTaxIdStore
 from insolvia_core.adapters.aws.user_directory import CognitoUserDirectory
+from insolvia_core.adapters.postgres.access_log import PostgresAccessLog
 from insolvia_core.adapters.postgres.candidate_store import PostgresCandidateStore
 from insolvia_core.adapters.postgres.case_entity_store import PostgresCaseEntityStore
 from insolvia_core.adapters.postgres.case_store import PostgresCaseStore
@@ -26,13 +21,16 @@ from insolvia_core.adapters.postgres.document_request_store import (
     PostgresDocumentRequestStore,
 )
 from insolvia_core.adapters.postgres.document_store import PostgresDocumentStore
+from insolvia_core.adapters.postgres.filing_credentials import (
+    PostgresFilingAuthorizationStore,
+    PostgresFilingCredentialStore,
+)
+from insolvia_core.adapters.postgres.filing_store import PostgresFilingStore
 from insolvia_core.adapters.postgres.firm_store import PostgresFirmStore
 from insolvia_core.adapters.postgres.task_store import PostgresTaskStore
+from insolvia_core.adapters.postgres.tax_id_store import PostgresTaxIdStore
 from mangum import Mangum
 
-from insolvia_api.adapters.aws.filing_approval_store import (
-    DynamoDbFilingApprovalStore,
-)
 from insolvia_api.adapters.aws.filing_queue import SqsFilingQueue
 from insolvia_api.adapters.aws.job_queue import SqsJobQueue
 from insolvia_api.adapters.aws.mailer_client import SigV4MailerClient
@@ -40,6 +38,9 @@ from insolvia_api.adapters.memory.mailer_client import InMemoryMailerClient
 from insolvia_api.adapters.postgres.event_store import (
     PostgresCalendarTokenStore,
     PostgresEventStore,
+)
+from insolvia_api.adapters.postgres.filing_approval_store import (
+    PostgresFilingApprovalStore,
 )
 from insolvia_api.adapters.postgres.job_store import PostgresJobStore
 from insolvia_api.adapters.postgres.packet_store import PostgresPacketStore
@@ -69,15 +70,12 @@ if not config.auth_issuer_url or not config.auth_client_id:
         "AUTH_ISSUER_URL and AUTH_CLIENT_ID must be set for the Lambda entrypoint"
     )
 
-# Hard-required together, and together on purpose (issue 8.3). Booting with a
-# case store but no access log would serve case data while recording nobody
-# reading it, which is the one failure mode this pair exists to prevent — and
-# it would be invisible, because every route would still answer 200.
-if not config.case_table_name or not config.case_access_log_table_name:
-    raise RuntimeError(
-        "CASE_TABLE_NAME and CASE_ACCESS_LOG_TABLE_NAME must be set "
-        "for the Lambda entrypoint"
-    )
+# Hard-required: the case and vault KMS key aliases are derived from it
+# (case_key_alias, filing_credentials_key_alias). The access log is a
+# Postgres table beside the cases (ADR 0030), so it cannot be missing while
+# they are there.
+if not config.case_table_name:
+    raise RuntimeError("CASE_TABLE_NAME must be set for the Lambda entrypoint")
 
 # NOT hard-required, unlike AUTH_CLIENT_ID: without it every /v1/portal/ route
 # fails CLOSED with a 401 (insolvia_core.auth.portal_settings_or_raise) and
@@ -150,7 +148,7 @@ app = create_app(
         # A case open and a debtor link hold the client's row in their own
         # transaction (`lock_linkable_client`): the merge race.
         case_store=PostgresCaseStore(config.database_url),
-        access_log=DynamoDbAccessLog(config.case_access_log_table_name),
+        access_log=PostgresAccessLog(config.database_url),
         # Read on every authenticated request (ADR 0030: Postgres).
         firm_store=PostgresFirmStore(config.database_url),
         user_directory=CognitoUserDirectory(config.auth_user_pool_id),
@@ -158,11 +156,11 @@ app = create_app(
         document_store=PostgresDocumentStore(config.database_url),
         document_blobs=S3DocumentBlobStore(config.case_document_bucket),
         debtor_store=PostgresDebtorStore(config.database_url),
-        # The sealed tax ids (issue 13.12 / #382): items in the case table,
-        # data keys under the case KEY — whose alias is derived from the
+        # The sealed tax ids (issue 13.12 / #382): rows in Postgres, data
+        # keys under the case KEY — whose alias is derived from the case
         # table's name (case_key_alias says why that is a derivation and not
         # a coincidence), so this needs no environment variable either.
-        tax_id_store=DynamoDbTaxIdStore(config.case_table_name),
+        tax_id_store=PostgresTaxIdStore(config.database_url),
         tax_id_cipher=KmsTaxIdCipher(case_key_alias(config.case_table_name)),
         case_entity_store=PostgresCaseEntityStore(config.database_url),
         # The pipeline pair (ADR 0018): the queue is Optional — see above.
@@ -179,27 +177,25 @@ app = create_app(
         event_store=PostgresEventStore(config.database_url),
         calendar_token_store=PostgresCalendarTokenStore(config.database_url),
         task_store=PostgresTaskStore(config.database_url),
-        # The filing-credential vault (ADR 0024, guardrail 3): its OWN
-        # table and key, both named from the case table's name
-        # (infra/modules/filing_credentials keeps them one local), so no
-        # environment variable. Seal-only — no opener is composed here.
-        filing_credential_store=DynamoDbFilingCredentialStore(
-            filing_credentials_table_name(config.case_table_name)
-        ),
+        # The filing-credential vault (ADR 0024, guardrail 3): its own
+        # table, which this role may fill and empty but never read the
+        # envelope of (migration 0003), and its own key, named from the case
+        # table's name. Seal-only — no opener is composed here.
+        filing_credential_store=PostgresFilingCredentialStore(config.database_url),
         filing_credential_sealer=KmsCredentialSealer(
             filing_credentials_key_alias(config.case_table_name)
         ),
-        # The signed authorization (guardrail 2), in the same vault table.
-        filing_authorization_store=DynamoDbFilingAuthorizationStore(
-            filing_credentials_table_name(config.case_table_name)
+        # The signed authorization (guardrail 2).
+        filing_authorization_store=PostgresFilingAuthorizationStore(
+            config.database_url
         ),
-        # The per-filing approval (guardrail 1): child items of the case
-        # partition, and the filing worker's own queue — Optional, above.
-        filing_approval_store=DynamoDbFilingApprovalStore(config.case_table_name),
+        # The per-filing approval (guardrail 1): case children, and the
+        # filing worker's own queue — Optional, above.
+        filing_approval_store=PostgresFilingApprovalStore(config.database_url),
         filing_queue=filing_queue,
         # The filing records (ADR 0024 PR 8): read for the approval screen,
-        # and a hand-back's resolution written onto them — the case table.
-        filing_store=DynamoDbFilingStore(config.case_table_name),
+        # and a hand-back's resolution written onto them.
+        filing_store=PostgresFilingStore(config.database_url),
         # A case's document requests (ADR 0023 PR 5 / #364): the case table
         # again.
         document_request_store=PostgresDocumentRequestStore(config.database_url),

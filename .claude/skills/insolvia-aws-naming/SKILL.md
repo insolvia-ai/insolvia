@@ -202,7 +202,7 @@ log groups, alarms, SSM parameters.
 | SES domain identity | verification, until DNS re-propagates — outbound mail fails in the window |
 
 Prod sets `deletion_protection = true` on the Cognito pool and on the case,
-firm and admin-audit tables, and `force_destroy = false` on the document and
+firm tables, and `force_destroy = false` on the document and
 audit buckets. **A rename apply against prod fails mid-plan on those** — the
 protections have to be turned off in their own apply first, and the buckets
 emptied. `scripts/rename-teardown.sh` does both, in that order.

@@ -7,11 +7,9 @@ from insolvia_core.adapters.postgres.firm_store import PostgresFirmStore
 from insolvia_core.auth import GOOGLE_ISSUERS, google_jwks_url
 from insolvia_core.ports import JwksProvider, UserDirectory
 
-from insolvia_admin.adapters.aws.audit_log import DynamoDbAuditLog
-from insolvia_admin.adapters.memory.audit_log import MemoryAuditLog
+from insolvia_admin.adapters.postgres.audit_log import PostgresAuditLog
 from insolvia_admin.api.app_factory import create_app
 from insolvia_admin.api.dependencies import AdminDependencies
-from insolvia_admin.core.audit import AuditLog
 from insolvia_admin.core.config import load_config
 from insolvia_admin.core.logging import configure_logging
 
@@ -22,19 +20,12 @@ if config.environment != "local":
 configure_logging()
 
 # Adapter composition, mirroring the tenant API's dev server. The firm store
-# is this machine's Docker Postgres (ADR 0030; load_config() refused to start
-# without DATABASE_URL) — the same database the local API reads. The audit
-# table is still DynamoDB until it moves (#623): this machine's real table
-# when ADMIN_AUDIT_TABLE_NAME is set, in-memory otherwise. Local data is
-# throwaway, so an in-memory audit row beside a local firm is acceptable here
-# and nowhere else; api_lambda.py requires both.
+# and the audit log are this machine's Docker Postgres (ADR 0030;
+# load_config() refused to start without DATABASE_URL) — the same database
+# the local API reads, exactly as api_lambda.py composes them.
 assert config.database_url is not None
 firm_store = PostgresFirmStore(config.database_url)
-audit_log: AuditLog
-if config.admin_audit_table_name:
-    audit_log = DynamoDbAuditLog(config.admin_audit_table_name)
-else:
-    audit_log = MemoryAuditLog()
+audit_log = PostgresAuditLog(config.database_url)
 
 # Its own condition, like the API dev server's: provisioning is the one
 # operation that reaches Cognito, and with a real pool named the invite email

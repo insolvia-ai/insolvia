@@ -5,16 +5,22 @@ stores make — including the one transaction that files the case."""
 from __future__ import annotations
 
 from dataclasses import replace
-from typing import Any
 
 import pytest
-from botocore.exceptions import ClientError
-from insolvia_core.adapters.aws.filing_store import DynamoDbFilingStore
 from insolvia_core.adapters.memory.case_store import MemoryCaseStore
 from insolvia_core.adapters.memory.filing_store import MemoryFilingStore
+from insolvia_core.adapters.postgres.case_store import (
+    PostgresCaseStore,
+    case_from_row,
+    case_values,
+    write_case,
+)
+from insolvia_core.adapters.postgres.connection import connect
+from insolvia_core.adapters.postgres.filing_store import PostgresFilingStore
 from insolvia_core.cases import (
     FILING_WORKER_ACTOR,
     Case,
+    StatusChange,
     file_case,
     status_change_from_item,
     status_change_item,
@@ -39,6 +45,10 @@ from insolvia_core.filings import (
     is_resolvable,
     may_transition,
 )
+from insolvia_core.ports import FilingStore
+from psycopg import sql
+
+from tests.unit.backends import BACKENDS, postgres_url_with_cases
 
 CASE_ID = "00000000-0000-4000-8000-0000000000c1"
 FILING_ID = "00000000-0000-4000-8000-0000000000f1"
@@ -266,17 +276,67 @@ def test_a_filing_needs_its_number_and_a_petition_date(number, date, field):
     assert field in refused.value.fields
 
 
-# ── The memory store: the same conditions as DynamoDB ───────────
+# ── The stores: memory and Postgres, the same conditions ────────
 
 
-def test_a_filing_is_claimed_once():
-    store = MemoryFilingStore()
+class World:
+    """One case and the filing store that files it, on one backend."""
+
+    def __init__(self, request: pytest.FixtureRequest) -> None:
+        self.backend = request.param
+        if self.backend == "memory":
+            self.cases = MemoryCaseStore()
+            self.store: FilingStore = MemoryFilingStore(self.cases)
+        else:
+            self.url = postgres_url_with_cases(request)
+            self.store = PostgresFilingStore(self.url)
+        self.put_case(make_case(), new=True)
+
+    def put_case(self, case: Case, *, new: bool = False) -> None:
+        """Store `case` whole — as something other than the filing did."""
+        if self.backend == "memory":
+            self.cases.cases[case.id] = case
+            return
+        with connect(self.url) as conn:
+            if new:
+                values = case_values(case)
+                conn.execute(
+                    sql.SQL("INSERT INTO cases ({}) VALUES ({})").format(
+                        sql.SQL(", ").join(map(sql.Identifier, values)),
+                        sql.SQL(", ").join([sql.Placeholder()] * len(values)),
+                    ),
+                    list(values.values()),
+                )
+            else:
+                write_case(conn, case, sql.SQL("TRUE"), [])
+
+    def case(self) -> Case:
+        if self.backend == "memory":
+            return self.cases.cases[CASE_ID]
+        with connect(self.url) as conn:
+            row = conn.execute("SELECT * FROM cases WHERE id = %s", (CASE_ID,))
+            return case_from_row(row.fetchone())  # type: ignore[arg-type]
+
+    def history(self) -> tuple[StatusChange, ...]:
+        if self.backend == "memory":
+            return self.cases.status_history(CASE_ID)
+        return PostgresCaseStore(self.url).status_history(CASE_ID)
+
+
+@pytest.fixture(params=BACKENDS)
+def world(request: pytest.FixtureRequest) -> World:
+    return World(request)
+
+
+def test_a_filing_is_claimed_once(world):
+    store = world.store
     assert store.claim(make_filing())
     assert not store.claim(make_filing(attempt_id="attempt-2"))
+    assert store.get(CASE_ID, FILING_ID) == make_filing()
 
 
-def test_a_transition_needs_the_state_and_the_attempt_it_read():
-    store = MemoryFilingStore()
+def test_a_transition_needs_the_state_and_the_attempt_it_read(world):
+    store = world.store
     store.claim(make_filing())
 
     assert not store.transition(
@@ -291,42 +351,36 @@ def test_a_transition_needs_the_state_and_the_attempt_it_read():
     )
 
 
-def _stores(case: Case | None = None) -> tuple[MemoryCaseStore, MemoryFilingStore]:
-    cases = MemoryCaseStore()
-    stored = case or make_case()
-    cases.cases[stored.id] = stored
-    return cases, MemoryFilingStore(cases)
-
-
-def test_filing_the_record_files_the_case_in_the_same_write():
-    cases, store = _stores()
+def test_filing_the_record_files_the_case_in_the_same_write(world):
+    store = world.store
     store.claim(make_filing(state="submitted"))
 
     assert store.transition(
         make_filing(state="filed"), expected_state="submitted", filed_case=filed()
     )
-    case = cases.cases[CASE_ID]
+    case = world.case()
     assert (case.status, case.case_number, case.filed_at) == (
         "filed",
         "6:26-bk-10000",
         "2099-01-15",
     )
-    assert [row.filing_id for row in cases.status_history(CASE_ID)] == [FILING_ID]
+    assert [row.filing_id for row in world.history()] == [FILING_ID]
     assert store.get(CASE_ID, FILING_ID).state == "filed"  # type: ignore[union-attr]
 
 
-def test_the_case_write_sets_the_lifecycle_and_keeps_every_other_edit():
+def test_the_case_write_sets_the_lifecycle_and_keeps_every_other_edit(world):
     # Something else changed the case between the worker's read and its
     # write — the § 341 date. The filing's write must not put it back.
-    cases, store = _stores()
+    store = world.store
     store.claim(make_filing(state="submitted"))
     write = filed()
-    cases.cases[CASE_ID] = replace(cases.cases[CASE_ID], meeting_341_at="2099-03-01")
+    world.put_case(replace(world.case(), meeting_341_at="2099-03-01"))
 
     assert store.transition(
         make_filing(state="filed"), expected_state="submitted", filed_case=write
     )
-    assert cases.cases[CASE_ID].meeting_341_at == "2099-03-01"
+    assert world.case().meeting_341_at == "2099-03-01"
+    assert world.case().status == "filed"
 
 
 @pytest.mark.parametrize(
@@ -334,39 +388,60 @@ def test_the_case_write_sets_the_lifecycle_and_keeps_every_other_edit():
     [
         {"status": "intake"},
         {"firm_id": "another-firm"},
-        {"deleted_at": "2099-01-15T00:00:00Z", "deleted_by": "x"},
+        {"deleted_at": "2099-01-15T00:00:00.000000Z", "deleted_by": "x"},
     ],
 )
-def test_a_case_that_moved_underneath_writes_nothing_at_all(moved):
-    cases, store = _stores()
+def test_a_case_that_moved_underneath_writes_nothing_at_all(world, moved):
+    if world.backend == "postgres" and "firm_id" in moved:
+        pytest.skip("the schema refuses it: a case's children pin its firm (FK)")
+    store = world.store
     store.claim(make_filing(state="submitted"))
     write = filed()
-    cases.cases[CASE_ID] = replace(cases.cases[CASE_ID], **moved)  # type: ignore[arg-type]
+    world.put_case(replace(world.case(), **moved))
 
     assert not store.transition(
         make_filing(state="filed"), expected_state="submitted", filed_case=write
     )
     assert store.get(CASE_ID, FILING_ID).state == "submitted"  # type: ignore[union-attr]
-    assert cases.status_history(CASE_ID) == ()
+    assert world.history() == ()
 
 
-def test_a_filing_record_that_moved_writes_nothing_to_the_case():
-    cases, store = _stores()
+def test_a_status_row_already_at_that_instant_writes_nothing_at_all(world):
+    store = world.store
+    store.claim(make_filing(state="submitted"))
+    write = filed()
+    store.claim(replace(make_filing(state="submitted"), filing_id="other-filing"))
+    assert store.transition(
+        replace(make_filing(state="filed"), filing_id="other-filing"),
+        expected_state="submitted",
+        filed_case=write,
+    )
+    world.put_case(replace(world.case(), status="ready_to_file"))
+
+    assert not store.transition(
+        make_filing(state="filed"), expected_state="submitted", filed_case=write
+    )
+    assert store.get(CASE_ID, FILING_ID).state == "submitted"  # type: ignore[union-attr]
+    assert world.case().status == "ready_to_file"
+
+
+def test_a_filing_record_that_moved_writes_nothing_to_the_case(world):
+    store = world.store
     store.claim(make_filing(state="outcome_unknown"))
 
     assert not store.transition(
         make_filing(state="filed"), expected_state="submitted", filed_case=filed()
     )
-    assert cases.cases[CASE_ID].status == "ready_to_file"
+    assert world.case().status == "ready_to_file"
 
 
-def test_a_hand_back_is_resolved_once():
-    cases, store = _stores()
+def test_a_hand_back_is_resolved_once(world):
+    store = world.store
     store.claim(make_filing(state="handed_back"))
     resolved = make_filing(state="handed_back", resolution=RESOLVED)
 
     assert store.resolve(resolved, expected_state="handed_back", filed_case=filed())
-    assert cases.cases[CASE_ID].status == "filed"
+    assert world.case().status == "filed"
     again = make_filing(
         state="handed_back", resolution=replace(RESOLVED, outcome="not_filed")
     )
@@ -374,126 +449,10 @@ def test_a_hand_back_is_resolved_once():
     assert store.get(CASE_ID, FILING_ID).resolution == RESOLVED  # type: ignore[union-attr]
 
 
-def test_a_resolution_needs_the_state_it_read():
-    _, store = _stores()
+def test_a_resolution_needs_the_state_it_read(world):
+    store = world.store
     store.claim(make_filing(state="outcome_unknown"))
     assert not store.resolve(
         make_filing(state="handed_back", resolution=RESOLVED),
         expected_state="handed_back",
     )
-
-
-# ── The DynamoDB adapter: the calls it makes ────────────────────
-
-
-class FakeDynamoDb:
-    def __init__(self, fail: str | None = None) -> None:
-        self.calls: list[tuple[str, dict[str, Any]]] = []
-        self.fail = fail
-
-    def _call(self, name: str, kwargs: dict[str, Any]) -> dict[str, Any]:
-        self.calls.append((name, kwargs))
-        if self.fail is not None:
-            raise ClientError({"Error": {"Code": self.fail}}, name)
-        return {}
-
-    def put_item(self, **kwargs: Any) -> dict[str, Any]:
-        return self._call("put_item", kwargs)
-
-    def get_item(self, **kwargs: Any) -> dict[str, Any]:
-        return self._call("get_item", kwargs)
-
-    def transact_write_items(self, **kwargs: Any) -> dict[str, Any]:
-        return self._call("transact_write_items", kwargs)
-
-
-def test_a_claim_is_conditional_on_no_record():
-    fake = FakeDynamoDb()
-    DynamoDbFilingStore("t", client=fake).claim(make_filing())
-    assert fake.calls[0][1]["ConditionExpression"] == "attribute_not_exists(PK)"
-
-
-def test_a_transition_is_conditional_on_the_state_and_the_attempt():
-    fake = FakeDynamoDb()
-    DynamoDbFilingStore("t", client=fake).transition(
-        make_filing(state="signed_in"), expected_state="claimed"
-    )
-    name, call = fake.calls[0]
-    assert name == "put_item"
-    assert call["ConditionExpression"] == "#state = :expected AND attemptId = :attempt"
-    assert call["ExpressionAttributeValues"] == {
-        ":expected": {"S": "claimed"},
-        ":attempt": {"S": "attempt-1"},
-    }
-
-
-def test_a_resolution_is_also_conditional_on_there_being_none():
-    fake = FakeDynamoDb()
-    DynamoDbFilingStore("t", client=fake).resolve(
-        make_filing(state="handed_back", resolution=RESOLVED),
-        expected_state="handed_back",
-    )
-    assert fake.calls[0][1]["ConditionExpression"].endswith(
-        "AND attribute_not_exists(resolution)"
-    )
-
-
-def test_filing_the_case_is_one_transaction_of_three_conditional_items():
-    fake = FakeDynamoDb()
-    write = filed()
-    DynamoDbFilingStore("t", client=fake).transition(
-        make_filing(state="filed"), expected_state="submitted", filed_case=write
-    )
-    name, call = fake.calls[0]
-    assert name == "transact_write_items"
-    record, case, history = call["TransactItems"]
-    assert record["Put"]["Item"]["SK"] == {"S": f"FILING#{FILING_ID}"}
-    update = case["Update"]
-    assert update["Key"] == {"PK": {"S": f"CASE#{CASE_ID}"}, "SK": {"S": "META"}}
-    assert update["ConditionExpression"] == (
-        "attribute_exists(PK) AND firmId = :firm AND #status = :read"
-        " AND attribute_not_exists(deletedAt)"
-    )
-    assert update["ExpressionAttributeValues"][":read"] == {"S": "ready_to_file"}
-    # Exactly the lifecycle attributes — the rest of the case is untouched.
-    set_names = {
-        update["ExpressionAttributeNames"][token.split(" = ")[0]]
-        for token in update["UpdateExpression"].removeprefix("SET ").split(", ")
-    }
-    assert set_names == {
-        "status",
-        "filedAt",
-        "caseNumber",
-        "caseNumberKey",
-        "updatedAt",
-    }
-    assert update["ExpressionAttributeValues"][":key"] == {"S": "flmb:6:26-bk-10000"}
-    assert history["Put"]["Item"]["filingId"] == {"S": FILING_ID}
-    assert history["Put"]["ConditionExpression"] == "attribute_not_exists(SK)"
-
-
-@pytest.mark.parametrize(
-    "code", ["ConditionalCheckFailedException", "TransactionCanceledException"]
-)
-def test_a_lost_condition_is_false_not_an_error(code):
-    store = DynamoDbFilingStore("t", client=FakeDynamoDb(fail=code))
-    assert store.claim(make_filing()) is False
-    assert store.transition(make_filing(), expected_state="claimed") is False
-    assert (
-        store.transition(
-            make_filing(state="filed"), expected_state="submitted", filed_case=filed()
-        )
-        is False
-    )
-
-
-def test_another_failure_is_raised():
-    store = DynamoDbFilingStore("t", client=FakeDynamoDb(fail="ThrottlingException"))
-    with pytest.raises(ClientError):
-        store.claim(make_filing())
-
-
-def test_reads_are_strongly_consistent():
-    fake = FakeDynamoDb()
-    assert DynamoDbFilingStore("t", client=fake).get(CASE_ID, FILING_ID) is None
-    assert fake.calls[0][1]["ConsistentRead"] is True

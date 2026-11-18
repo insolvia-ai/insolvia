@@ -41,9 +41,9 @@ signed in — [ADR 0021](../../docs/adr/0021-test-tiers-and-seed-fixtures.md)).
   or a claim.
 - **CORS is an exact-origin allowlist** (`core/config.py`), no wildcard.
 - **The firm and case stores are Postgres** (ADR 0030): locally the Docker Postgres in
-  `docker-compose.yml`, `DATABASE_URL` required. What has not moved yet
-  (filings, approvals, tax ids) still reads this machine's AWS dev table —
-  there is no local DynamoDB emulator.
+  `docker-compose.yml`, `DATABASE_URL` required. So are the filings,
+  approvals, tax ids, the credential vault and the access log (#623). The
+  KMS keys still come from this machine's AWS dev stack.
 - **Minutes-long work is a pipeline job, never an endpoint**
   ([ADR 0018](../../docs/adr/0018-sqs-queue-and-worker-lambda-over-step-functions.md)):
   the API accepts a job (`api/routes/jobs.py`) and a separate worker Lambda

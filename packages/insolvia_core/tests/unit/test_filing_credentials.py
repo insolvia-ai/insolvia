@@ -20,13 +20,10 @@ import pytest
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from insolvia_core.access_log import ACTIONS, access_item, record_access
-from insolvia_core.adapters.aws.dynamo import from_attributes
 from insolvia_core.adapters.aws.filing_credentials import (
-    DynamoDbFilingCredentialStore,
     KmsCredentialOpener,
     KmsCredentialSealer,
     filing_credentials_key_alias,
-    filing_credentials_table_name,
 )
 from insolvia_core.adapters.envelope import NONCE_BYTES, context_aad, new_data_key
 from insolvia_core.adapters.memory.access_log import MemoryAccessLog
@@ -37,6 +34,11 @@ from insolvia_core.adapters.memory.filing_credentials import (
     MemoryFilingCredentialStore,
 )
 from insolvia_core.adapters.memory.tax_id_cipher import LOCAL_MASTER_KEY
+from insolvia_core.adapters.postgres.filing_credentials import (
+    WITHHELD,
+    PostgresFilingAuthorizationStore,
+    PostgresFilingCredentialStore,
+)
 from insolvia_core.errors import ConflictError, FieldValidationError, NotFoundError
 from insolvia_core.filing_authorization import (
     TEXT_VERSION,
@@ -62,6 +64,7 @@ from insolvia_core.filing_credentials import (
     revoke_credential,
     withdraw_authorization,
 )
+from insolvia_core.ports import FilingAuthorizationStore, FilingCredentialStore
 
 from tests import paths
 
@@ -86,11 +89,26 @@ class Vault:
     """The memory composition: what the API holds (sealer, store, log) and,
     separately, what only the worker will (opener)."""
 
-    def __init__(self, *, signed: tuple[str, ...] = (ATTORNEY, OTHER_ATTORNEY)) -> None:
+    def __init__(
+        self,
+        *,
+        signed: tuple[str, ...] = (ATTORNEY, OTHER_ATTORNEY),
+        url: str | None = None,
+    ) -> None:
         self.sealer = LocalCredentialSealer()
         self.opener = LocalCredentialOpener()
-        self.store = MemoryFilingCredentialStore()
-        self.authorizations = MemoryFilingAuthorizationStore()
+        self.store: FilingCredentialStore
+        self.worker_store: FilingCredentialStore
+        self.authorizations: FilingAuthorizationStore
+        if url is None:
+            self.store = self.worker_store = MemoryFilingCredentialStore()
+            self.authorizations = MemoryFilingAuthorizationStore()
+        else:
+            # Composed as the services compose them: the API's store never
+            # selects the envelope; the filing worker's does.
+            self.store = PostgresFilingCredentialStore(url)
+            self.worker_store = PostgresFilingCredentialStore(url, opens=True)
+            self.authorizations = PostgresFilingAuthorizationStore(url)
         self.log = MemoryAccessLog()
         # Guardrail 2 is a precondition of every enrolment, so the vault
         # these tests share starts with both attorneys' authorizations
@@ -143,7 +161,7 @@ class Vault:
             filing_id=FILING,
             purpose="sign_in",
             opener=self.opener,
-            store=self.store,
+            store=self.worker_store,
             authorizations=self.authorizations,
             access_log=self.log,
         )
@@ -607,64 +625,77 @@ def test_the_kms_opener_opens_under_the_sealing_context_only() -> None:
         opener.open(envelope, context={**context, "attorney_id": OTHER_ATTORNEY})
 
 
-def test_the_names_are_derived_from_the_case_table() -> None:
-    assert filing_credentials_table_name("insolvia-staging-cases") == (
-        "insolvia-staging-filing-credentials"
-    )
+def test_the_key_alias_is_derived_from_the_case_table() -> None:
     assert filing_credentials_key_alias("insolvia-dev-0123456789ab-cases") == (
         "alias/insolvia-dev-0123456789ab-filing-credentials"
     )
     with pytest.raises(ValueError, match="not an insolvia-<env>-cases"):
-        filing_credentials_table_name("insolvia-staging-firms")
+        filing_credentials_key_alias("insolvia-staging-firms")
 
 
-class FakeDynamo:
-    """put/get/query/delete over attribute-value items — enough to prove the
-    store's keys and its conditional create."""
-
-    def __init__(self) -> None:
-        self.items: dict[tuple[str, str], dict[str, Any]] = {}
-
-    def put_item(self, **kwargs: Any) -> None:
-        item = kwargs["Item"]
-        key = (item["PK"]["S"], item["SK"]["S"])
-        if "ConditionExpression" in kwargs and key in self.items:
-            from botocore.exceptions import ClientError
-
-            raise ClientError(
-                {"Error": {"Code": "ConditionalCheckFailedException"}}, "PutItem"
-            )
-        self.items[key] = item
-
-    def get_item(self, **kwargs: Any) -> dict[str, Any]:
-        assert kwargs["ConsistentRead"] is True
-        key = (kwargs["Key"]["PK"]["S"], kwargs["Key"]["SK"]["S"])
-        return {"Item": self.items[key]} if key in self.items else {}
-
-    def query(self, **kwargs: Any) -> dict[str, Any]:
-        pk = kwargs["ExpressionAttributeValues"][":pk"]["S"]
-        return {"Items": [v for (p, _), v in self.items.items() if p == pk]}
-
-    def delete_item(self, **kwargs: Any) -> dict[str, Any]:
-        key = (kwargs["Key"]["PK"]["S"], kwargs["Key"]["SK"]["S"])
-        old = self.items.pop(key, None)
-        return {"Attributes": old} if old else {}
+# ── The Postgres vault (ADR 0030) ───────────────────────────────
 
 
-def test_the_dynamodb_store_keys_by_attorney_and_destroys_on_delete() -> None:
-    dynamo = FakeDynamo()
-    store = DynamoDbFilingCredentialStore("t", client=dynamo)
-    credential = Vault().enrol(seed=fresh_seed())
-    store.create(credential)
-    ((pk, sk),) = dynamo.items
-    assert pk == f"ATTORNEY#{FIRM}#{ATTORNEY}"
-    assert sk == f"CREDENTIAL#{credential.credential_id}"
-    assert from_attributes(dynamo.items[(pk, sk)])["courts"] == []
-    assert store.get(FIRM, ATTORNEY, credential.credential_id) == credential
-    assert store.list_for_attorney(FIRM, ATTORNEY) == (credential,)
-    assert store.list_for_attorney(FIRM, OTHER_ATTORNEY) == ()
+@pytest.fixture
+def pg_vault(postgres: Any, postgres_url: str) -> Vault:
+    return Vault(url=postgres_url)
+
+
+def test_the_postgres_vault_seals_opens_and_keys_by_attorney(pg_vault: Vault) -> None:
+    seed = fresh_seed()
+    credential = pg_vault.enrol(seed=seed)
+    assert pg_vault.open(credential.credential_id) == CredentialSecret(
+        password=PASSWORD, totp_seed=seed
+    )
+    assert pg_vault.worker_store.get(FIRM, ATTORNEY, credential.credential_id) == (
+        credential
+    )
+    assert pg_vault.store.list_for_attorney(FIRM, OTHER_ATTORNEY) == ()
+    assert pg_vault.store.get(FIRM, OTHER_ATTORNEY, credential.credential_id) is None
     with pytest.raises(RuntimeError):
-        store.create(credential)
-    assert store.delete(FIRM, ATTORNEY, credential.credential_id)
-    assert not store.delete(FIRM, ATTORNEY, credential.credential_id)
-    assert store.get(FIRM, ATTORNEY, credential.credential_id) is None
+        pg_vault.store.create(credential)
+    with pytest.raises(ConflictError):
+        pg_vault.enrol(seed=fresh_seed(), login=LOGIN.lower())
+
+
+def test_the_api_store_never_reads_the_envelope(pg_vault: Vault) -> None:
+    credential = pg_vault.enrol(seed=fresh_seed())
+    (listed,) = pg_vault.store.list_for_attorney(FIRM, ATTORNEY)
+    assert listed.envelope == WITHHELD
+    assert listed == replace(credential, envelope=WITHHELD)
+    assert credential_json(listed) == credential_json(credential)
+
+
+def test_the_envelope_is_stored_byte_for_byte(pg_vault: Vault, postgres: Any) -> None:
+    credential = pg_vault.enrol(seed=fresh_seed())
+    row = postgres.execute(
+        "SELECT scheme, ciphertext, nonce, wrapped_key FROM filing_credentials"
+    ).fetchone()
+    envelope = credential.envelope
+    assert row["scheme"] == envelope.scheme
+    assert row["ciphertext"] == base64.b64decode(envelope.ciphertext)
+    assert row["nonce"] == base64.b64decode(envelope.nonce)
+    assert row["wrapped_key"] == base64.b64decode(envelope.wrapped_key)
+    assert PASSWORD.encode() not in row["ciphertext"]
+
+
+def test_postgres_revoke_and_withdrawal_destroy_and_nothing_opens(
+    pg_vault: Vault,
+) -> None:
+    first = pg_vault.enrol(seed=fresh_seed())
+    assert not pg_vault.store.delete(FIRM, OTHER_ATTORNEY, first.credential_id)
+    assert pg_vault.store.delete(FIRM, ATTORNEY, first.credential_id)
+    assert not pg_vault.store.delete(FIRM, ATTORNEY, first.credential_id)
+    with pytest.raises(CredentialUnavailableError):
+        pg_vault.open(first.credential_id)
+
+    second = pg_vault.enrol(seed=fresh_seed())
+    current = pg_vault.authorizations.get_current(FIRM, ATTORNEY)
+    assert current is not None
+    assert pg_vault.withdraw() == 1
+    assert pg_vault.store.list_for_attorney(FIRM, ATTORNEY) == ()
+    assert pg_vault.authorizations.get_current(FIRM, ATTORNEY) is None
+    # The straggler: an enrolment that lands after the withdrawal.
+    pg_vault.store.create(second)
+    with pytest.raises(CredentialUnavailableError):
+        pg_vault.open(second.credential_id)
